@@ -313,14 +313,14 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         };
 
         if let Some(sent_timestamp) = sync_state.broadcast_info.sent_messages.remove(&message_id) {
-            let rtt = timestamp
-                .duration_since(sent_timestamp)
-                .expect("failed to calculate mempool broadcast RTT");
-
-            let network_id = peer.network_id();
-            counters::SHARED_MEMPOOL_BROADCAST_RTT
-                .with_label_values(&[network_id.as_str()])
-                .observe(rtt.as_secs_f64());
+            // The wall clock may step backwards (e.g., NTP adjustments), so skip
+            // the RTT observation rather than panicking in that case.
+            if let Ok(rtt) = timestamp.duration_since(sent_timestamp) {
+                let network_id = peer.network_id();
+                counters::SHARED_MEMPOOL_BROADCAST_RTT
+                    .with_label_values(&[network_id.as_str()])
+                    .observe(rtt.as_secs_f64());
+            }
 
             counters::shared_mempool_pending_broadcasts(&peer).dec();
         } else {
@@ -679,5 +679,57 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
     pub fn sync_states_exists(&self, peer: &PeerNetworkId) -> bool {
         self.sync_states.read().get(peer).is_some()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_config::network_id::NetworkId;
+    use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
+    use aptos_types::PeerId;
+
+    #[test]
+    fn test_broadcast_ack_with_backwards_clock() {
+        let mempool_config = MempoolConfig::default();
+        let network_client: NetworkClient<MempoolSyncMsg> = NetworkClient::new(
+            vec![],
+            vec![],
+            HashMap::new(),
+            PeersAndMetadata::new(&[NetworkId::Public]),
+        );
+        let network_interface = MempoolNetworkInterface::new(
+            network_client,
+            NodeType::PublicFullnode,
+            mempool_config.clone(),
+        );
+
+        // Record a broadcast that was sent "in the future" relative to the ack
+        let peer = PeerNetworkId::new(NetworkId::Public, PeerId::random());
+        let message_id = MempoolMessageId(vec![(1, 1)]);
+        let sent_time = SystemTime::now();
+        let mut sync_state = PeerSyncState::new(
+            mempool_config.broadcast_buckets.len(),
+            mempool_config.num_sender_buckets,
+        );
+        sync_state
+            .broadcast_info
+            .sent_messages
+            .insert(message_id.clone(), sent_time);
+        network_interface
+            .sync_states
+            .write()
+            .insert(peer, sync_state);
+
+        // Process an ack whose timestamp is before the send time (e.g., the
+        // wall clock stepped backwards). This must not panic.
+        let ack_time = sent_time - Duration::from_secs(10);
+        network_interface.process_broadcast_ack(peer, message_id.clone(), false, false, ack_time);
+
+        // The broadcast should no longer be pending
+        assert!(!network_interface.sync_states.read()[&peer]
+            .broadcast_info
+            .sent_messages
+            .contains_key(&message_id));
     }
 }
