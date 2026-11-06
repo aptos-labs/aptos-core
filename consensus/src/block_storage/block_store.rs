@@ -276,6 +276,10 @@ impl BlockStore {
             Arc::new(RwLock::new(tree))
         };
 
+        if let Some(builder) = &pipeline_builder {
+            builder.bind_commit_tree(&inner);
+        }
+
         let block_store = Self {
             inner,
             execution_client,
@@ -529,7 +533,11 @@ impl BlockStore {
         self.storage
             .save_tree(vec![pipelined_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
-        self.inner.write().insert_block(pipelined_block)
+        let block = self.inner.write().insert_block(pipelined_block)?;
+        if let Some(builder) = &self.pipeline_builder {
+            builder.deliver_commit_inputs(&block);
+        }
+        Ok(block)
     }
 
     /// Validates quorum certificates and inserts it into block tree assuming dependencies exist.

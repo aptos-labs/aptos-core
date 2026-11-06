@@ -101,7 +101,7 @@ pub struct BlockTree {
 }
 
 impl BlockTree {
-    pub(super) fn new(
+    pub(crate) fn new(
         commit_root_id: HashValue,
         window_root: PipelinedBlock,
         root_quorum_cert: QuorumCert,
@@ -184,7 +184,7 @@ impl BlockTree {
         self.id_to_block.contains_key(block_id)
     }
 
-    pub(super) fn get_block(&self, block_id: &HashValue) -> Option<Arc<PipelinedBlock>> {
+    pub(crate) fn get_block(&self, block_id: &HashValue) -> Option<Arc<PipelinedBlock>> {
         self.get_linkable_block(block_id)
             .map(|lb| lb.executed_block().clone())
     }
@@ -200,7 +200,7 @@ impl BlockTree {
             .expect("Root must exist")
     }
 
-    pub(super) fn commit_root(&self) -> Arc<PipelinedBlock> {
+    pub(crate) fn commit_root(&self) -> Arc<PipelinedBlock> {
         self.get_block(&self.commit_root_id)
             .expect("Commit root must exist")
     }
@@ -304,7 +304,7 @@ impl BlockTree {
         Ok(OrderedBlockWindow::new(window))
     }
 
-    pub(super) fn insert_block(
+    pub(crate) fn insert_block(
         &mut self,
         block: PipelinedBlock,
     ) -> anyhow::Result<Arc<PipelinedBlock>> {
@@ -552,7 +552,7 @@ impl BlockTree {
         self.path_from_root_to_block(block_id, self.ordered_root_id, self.ordered_root().round())
     }
 
-    pub(super) fn path_from_commit_root(
+    pub(crate) fn path_from_commit_root(
         &self,
         block_id: HashValue,
     ) -> Option<Vec<Arc<PipelinedBlock>>> {

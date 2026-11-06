@@ -3,7 +3,7 @@
 
 use crate::{
     monitor, persistent_liveness_storage::PersistentLivenessStorage,
-    pipeline::signing_phase::CommitSignerProvider,
+    pipeline::commit_signer::CommitSignerProvider,
 };
 use aptos_consensus_types::{
     block_data::BlockData,

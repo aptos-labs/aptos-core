@@ -6,8 +6,8 @@ use crate::{
     network::{IncomingCommitRequest, IncomingRandGenRequest, IncomingSecretShareRequest},
     payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
     pipeline::{
-        buffer_manager::OrderedBlocks, execution_client::TExecutionClient,
-        pipeline_builder::PipelineBuilder, signing_phase::CommitSignerProvider,
+        buffer_manager::OrderedBlocks, commit_signer::CommitSignerProvider,
+        execution_client::TExecutionClient, pipeline_builder::PipelineBuilder,
     },
     rand::{rand_gen::types::RandConfig, secret_sharing::verifier::SecretShareVerifier},
     test_utils::mock_storage::MockStorage,

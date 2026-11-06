@@ -32,10 +32,6 @@ impl TaskGuard {
         counter.fetch_add(1, Ordering::SeqCst);
         Self { counter }
     }
-
-    fn spawn(&self) -> Self {
-        Self::new(self.counter.clone())
-    }
 }
 
 impl Drop for TaskGuard {
@@ -46,20 +42,13 @@ impl Drop for TaskGuard {
 
 pub struct CountedRequest<Request> {
     req: Request,
-    guard: TaskGuard,
+    _guard: TaskGuard,
 }
 
 impl<Request> CountedRequest<Request> {
     pub fn new(req: Request, counter: Arc<AtomicU64>) -> Self {
         let guard = TaskGuard::new(counter);
-        Self { req, guard }
-    }
-
-    pub fn spawn<OtherRequest>(&self, other_req: OtherRequest) -> CountedRequest<OtherRequest> {
-        CountedRequest {
-            req: other_req,
-            guard: self.guard.spawn(),
-        }
+        Self { req, _guard: guard }
     }
 }
 
@@ -88,7 +77,7 @@ impl<T: StatelessPipeline> PipelinePhase<T> {
     pub async fn start(mut self) {
         // main loop
         while let Some(counted_req) = self.rx.next().await {
-            let CountedRequest { req, guard: _guard } = counted_req;
+            let CountedRequest { req, _guard } = counted_req;
             if self.reset_flag.load(Ordering::SeqCst) {
                 continue;
             }

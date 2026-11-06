@@ -21,7 +21,7 @@ use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
     decryption::{BlockTxnDecryptionKey, DecryptionPayload},
-    ledger_info::LedgerInfoWithSignatures,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     randomness::Randomness,
     secret_sharing::{SecretShare, SecretSharedKey},
     transaction::{
@@ -132,6 +132,24 @@ pub type PrepareResult = (
 pub type RandResult = (Option<Option<Randomness>>, bool);
 pub type ExecuteResult = Duration;
 pub type LedgerUpdateResult = (StateComputeResult, Duration, Option<u64>);
+
+/// Canonical execution result used for both local votes and certificate matching.
+pub fn execution_ledger_info(
+    block: &Block,
+    result: &StateComputeResult,
+    epoch_end_timestamp: Option<u64>,
+    consensus_data_hash: HashValue,
+) -> LedgerInfo {
+    let mut info = block.gen_block_info(
+        result.root_hash(),
+        result.last_version_or_0(),
+        result.epoch_state().clone(),
+    );
+    if let Some(timestamp) = epoch_end_timestamp {
+        info.change_timestamp(timestamp);
+    }
+    LedgerInfo::new(info, consensus_data_hash)
+}
 pub type PostLedgerUpdateResult = ();
 pub type CommitVoteResult = CommitVote;
 pub type PreCommitResult = StateComputeResult;
@@ -140,8 +158,26 @@ pub type CommitLedgerResult = Option<LedgerInfoWithSignatures>;
 pub type PostCommitResult = ();
 pub type SecretShareResult = Option<SecretShare>;
 
+/// Verified network inputs to a block's certificate future.
+#[derive(Clone)]
+pub enum CommitInput {
+    Vote(CommitVote),
+    Decision(LedgerInfoWithSignatures),
+}
+
+/// Consensus commit stages. DAG and observers retain their existing adapters.
+#[derive(Clone)]
+pub struct CommitPipelineFutures {
+    pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
+    pub broadcast_fut: TaskFuture<()>,
+    pub certificate_fut: TaskFuture<LedgerInfoWithSignatures>,
+    pub certify_ancestors_fut: TaskFuture<()>,
+    pub epoch_change_fut: TaskFuture<()>,
+}
+
 #[derive(Clone)]
 pub struct PipelineFutures {
+    pub commit_pipeline: Option<CommitPipelineFutures>,
     pub decryption_fut: TaskFuture<DecryptionResult>,
     pub prepare_fut: TaskFuture<PrepareResult>,
     pub has_rand_txns_fut: TaskFuture<bool>,
@@ -173,6 +209,7 @@ impl PipelineFutures {
 }
 
 pub struct PipelineInputTx {
+    pub commit_messages_tx: Option<tokio::sync::mpsc::Sender<CommitInput>>,
     pub qc_tx: Option<oneshot::Sender<Arc<QuorumCert>>>,
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
