@@ -25,16 +25,18 @@ const CPU_VENDOR_LABEL: &str = "vendor";
 
 /// A Collector for exposing CPU metrics
 pub(crate) struct CpuMetricsCollector {
-    system: Arc<Mutex<System>>,
+    system: Option<Arc<Mutex<System>>>,
     cpu: Desc,
     cpu_info: Desc,
 }
 
 impl CpuMetricsCollector {
     fn new() -> Self {
-        let system = Arc::new(Mutex::new(System::new_with_specifics(
-            RefreshKind::nothing().with_cpu(CpuRefreshKind::nothing().with_cpu_usage()),
-        )));
+        let system = System::new_with_specifics(
+            RefreshKind::nothing().with_cpu(CpuRefreshKind::nothing().with_usage()),
+        )
+        .ok()
+        .map(|system| Arc::new(Mutex::new(system)));
 
         let cpu = Opts::new(SYSTEM_CPU_USAGE, "CPU usage.")
             .namespace(NAMESPACE)
@@ -70,7 +72,10 @@ impl Collector for CpuMetricsCollector {
     fn collect(&self) -> Vec<MetricFamily> {
         let _measure = MeasureLatency::new("cpu".into());
 
-        let mut system = self.system.lock();
+        let Some(system) = &self.system else {
+            return Vec::new();
+        };
+        let mut system = system.lock();
 
         system.refresh_cpu_usage();
 
@@ -88,7 +93,7 @@ impl Collector for CpuMetricsCollector {
             .flat_map(|(idx, cpu)| {
                 ConstMetric::new_gauge(
                     self.cpu.clone(),
-                    cpu.cpu_usage() as f64,
+                    cpu.usage() as f64,
                     Some(&[format!("cpu{}_idx{}", cpu.name(), idx + 1)]),
                 )
                 .unwrap()
