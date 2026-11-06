@@ -15,7 +15,7 @@ use aptos_cached_packages::aptos_stdlib::{
 };
 use aptos_crypto::HashValue;
 use aptos_gas_algebra::Gas;
-use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_50;
+use aptos_gas_schedule::gas_feature_versions::TESTNET_RESET_OCT_2026;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     account_address::AccountAddress,
@@ -732,30 +732,32 @@ fn test_high_limit_txn_storage_fee_pays_gas_price() {
     h.new_epoch();
 
     // A transfer to a fresh address pays the storage fee for a new account.
-    let txn =
-        h.create_transaction_payload(&acc, aptos_account_transfer(AccountAddress::random(), 1));
-    let output = h.run_raw(txn);
-    assert_success!(output.status().clone());
-    let fee_statement = output.try_extract_fee_statement().unwrap().unwrap();
-    assert!(fee_statement.storage_fee_used() > 0);
+    let payload = || aptos_account_transfer(AccountAddress::random(), 0);
+    let raw = run_with_excess_multiplier(&mut h, &acc, payload(), EXCESS_PRICE_MULTIPLIER);
+    assert!(raw.storage_fee_used() > 0);
 
-    // The same transfer with a limits request fits in a similar budget.
-    let payload = with_limits(
-        aptos_account_transfer(AccountAddress::random(), 1),
-        stake_pool_owner(200, 200),
+    // The same transfer with a limits request pays the same. The larger
+    // payload can only add IO gas below one gas unit.
+    let billed = run_with_excess_multiplier(
+        &mut h,
+        &acc,
+        with_limits(payload(), stake_pool_owner(200, 200)),
+        EXCESS_PRICE_MULTIPLIER,
     );
-    let txn = h
-        .create_transaction_without_sign(&acc, payload)
-        .max_gas_amount(2 * fee_statement.gas_used())
-        .sign();
-    assert_success!(h.run(txn));
+    assert_eq!(billed.storage_fee_used(), raw.storage_fee_used());
+    assert!(
+        billed.gas_used().abs_diff(raw.gas_used()) <= 1,
+        "billed {}, raw {}",
+        billed.gas_used(),
+        raw.gas_used()
+    );
 }
 
 #[test]
-fn test_high_limit_txn_before_v1_51_pays_gas_price() {
+fn test_high_limit_txn_before_v1_50_pays_gas_price() {
     let mut h = new_test_harness();
     let (acc, _, raw) = setup_excess_execution(&mut h);
-    h.modify_gas_schedule_raw(|gas_schedule| gas_schedule.feature_version = RELEASE_V1_50);
+    h.modify_gas_schedule_raw(|gas_schedule| gas_schedule.feature_version = TESTNET_RESET_OCT_2026);
 
     let fee_statement =
         run_with_excess_multiplier(&mut h, &acc, spin_with_limits(), EXCESS_PRICE_MULTIPLIER);

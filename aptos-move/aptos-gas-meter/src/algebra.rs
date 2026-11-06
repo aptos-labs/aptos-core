@@ -26,27 +26,6 @@ struct GasTier {
 }
 
 impl GasTier {
-    /// Returns the tier that charges 1x up to `base`, and the higher-priced
-    /// tiers after it: `multiplier` times from `base` up to `max`.
-    fn with_excess(base: InternalGas, max: InternalGas, multiplier: u64) -> (Self, Vec<Self>) {
-        if multiplier <= 1 || max <= base {
-            let tier = Self {
-                limit: max,
-                multiplier: 1,
-            };
-            return (tier, vec![]);
-        }
-        let excess = u64::from(max) - u64::from(base);
-        let limit = base + InternalGas::new(excess.saturating_mul(multiplier));
-        (
-            Self {
-                limit: base,
-                multiplier: 1,
-            },
-            vec![Self { limit, multiplier }],
-        )
-    }
-
     /// Returns the billed amount for `amount` of gas used in this tier.
     #[inline(always)]
     fn price(&self, amount: InternalGas) -> InternalGas {
@@ -54,41 +33,110 @@ impl GasTier {
     }
 }
 
-/// Moves to the next tier while `used` is above the current tier's limit.
-/// Gas used above the limit was charged at the current tier's price, so the
-/// difference to the next tier's price is charged on top.
-fn exceed_tier_limit(
-    balance: &mut InternalGas,
-    used: &mut InternalGas,
-    tier: &mut GasTier,
-    next_tiers: &mut Vec<GasTier>,
-    limit_reached: StatusCode,
-) -> PartialVMResult<()> {
-    while *used > tier.limit {
-        let next = next_tiers
-            .pop()
-            .ok_or_else(|| PartialVMError::new(limit_reached))?;
+/// Execution or IO gas used in billed units, and the tier that prices it.
+struct TieredGasUsage {
+    used: InternalGas,
+    tier: GasTier,
+    // Higher-priced tier entered above the current tier's limit. Only the 1x
+    // base tier has one.
+    next_tier: Option<GasTier>,
+}
 
-        // Exact: usage enters a tier at its lower bound and grows in multiples
-        // of the tier's multiplier.
-        let excess = (u64::from(*used) - u64::from(tier.limit)) / tier.multiplier;
-        let extra = InternalGas::new(
-            excess.saturating_mul(next.multiplier.saturating_sub(tier.multiplier)),
-        );
-        match balance.checked_sub(extra) {
+impl TieredGasUsage {
+    /// Charges 1x up to `max`.
+    fn single(max: InternalGas) -> Self {
+        Self {
+            used: 0.into(),
+            tier: GasTier {
+                limit: max,
+                multiplier: 1,
+            },
+            next_tier: None,
+        }
+    }
+
+    /// Charges 1x up to `base`, and `multiplier` times from `base` up to `max`.
+    fn base_and_excess(base: InternalGas, max: InternalGas, multiplier: u64) -> Self {
+        debug_assert!(multiplier > 1);
+        let excess = u64::from(max).saturating_sub(u64::from(base));
+        let limit = base + InternalGas::new(excess.saturating_mul(multiplier));
+        Self {
+            used: 0.into(),
+            tier: GasTier {
+                limit: base,
+                multiplier: 1,
+            },
+            next_tier: Some(GasTier { limit, multiplier }),
+        }
+    }
+
+    #[inline(always)]
+    fn charge(
+        &mut self,
+        balance: &mut InternalGas,
+        feature_version: u64,
+        amount: InternalGas,
+        limit_reached: StatusCode,
+    ) -> PartialVMResult<()> {
+        let billed = self.tier.price(amount);
+        if self.used + billed <= self.tier.limit {
+            return self.deduct(balance, feature_version, billed);
+        }
+        self.charge_over_limit(balance, feature_version, amount, limit_reached)
+    }
+
+    /// Charges `amount` that does not fit under the current tier's limit.
+    #[cold]
+    #[inline(never)]
+    fn charge_over_limit(
+        &mut self,
+        balance: &mut InternalGas,
+        feature_version: u64,
+        amount: InternalGas,
+        limit_reached: StatusCode,
+    ) -> PartialVMResult<()> {
+        let billed = match self.next_tier.take() {
+            Some(next) => {
+                // The current tier is the 1x base tier, so the gas that still
+                // fits under its limit is billed as is.
+                let within = u64::from(self.tier.limit).saturating_sub(u64::from(self.used));
+                let rest = u64::from(amount).saturating_sub(within);
+                self.tier = next;
+                InternalGas::new(within) + next.price(InternalGas::new(rest))
+            },
+            None => self.tier.price(amount),
+        };
+        self.deduct(balance, feature_version, billed)?;
+
+        if feature_version >= 7 && self.used > self.tier.limit {
+            return Err(PartialVMError::new(limit_reached));
+        }
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn deduct(
+        &mut self,
+        balance: &mut InternalGas,
+        feature_version: u64,
+        billed: InternalGas,
+    ) -> PartialVMResult<()> {
+        match balance.checked_sub(billed) {
             Some(new_balance) => {
                 *balance = new_balance;
-                *used += extra;
+                self.used += billed;
+                Ok(())
             },
             None => {
-                *used += *balance;
+                let old_balance = *balance;
                 *balance = 0.into();
-                return Err(PartialVMError::new(StatusCode::OUT_OF_GAS));
+                if feature_version >= 12 {
+                    self.used += old_balance;
+                }
+                Err(PartialVMError::new(StatusCode::OUT_OF_GAS))
             },
         }
-        *tier = next;
     }
-    Ok(())
 }
 
 /// Base gas algebra implementation that tracks the gas usage using its internal counters.
@@ -105,15 +153,8 @@ where
     initial_balance: InternalGas,
     balance: InternalGas,
 
-    execution_tier: GasTier,
-    // Higher-priced execution tiers, in reverse order.
-    next_execution_tiers: Vec<GasTier>,
-    execution_gas_used: InternalGas,
-
-    io_tier: GasTier,
-    // Higher-priced IO tiers, in reverse order.
-    next_io_tiers: Vec<GasTier>,
-    io_gas_used: InternalGas,
+    execution: TieredGasUsage,
+    io: TieredGasUsage,
 
     max_storage_fee: Fee,
     // The gas consumed by the storage operations.
@@ -191,19 +232,33 @@ where
             Some(TxnLimitsRequest::Staking(_))
                 if gas_feature_version >= gas_feature_versions::RELEASE_V1_50 =>
             {
-                u64::from(vm_gas_params.txn.high_limit_txn_excess_price_multiplier)
+                let excess_multiplier =
+                    u64::from(vm_gas_params.txn.high_limit_txn_excess_price_multiplier);
+                debug_assert!(excess_multiplier > 0);
+                Some(excess_multiplier).filter(|multiplier| *multiplier > 1)
             },
             None
             | Some(TxnLimitsRequest::Staking(_))
-            | Some(TxnLimitsRequest::ApprovedGovernanceScript) => 1,
+            | Some(TxnLimitsRequest::ApprovedGovernanceScript) => None,
         };
-        let (execution_tier, next_execution_tiers) = GasTier::with_excess(
-            vm_gas_params.txn.max_execution_gas,
-            max_execution_gas,
-            excess_multiplier,
-        );
-        let (io_tier, next_io_tiers) =
-            GasTier::with_excess(vm_gas_params.txn.max_io_gas, max_io_gas, excess_multiplier);
+        let (execution, io) = match excess_multiplier {
+            Some(multiplier) => (
+                TieredGasUsage::base_and_excess(
+                    vm_gas_params.txn.max_execution_gas,
+                    max_execution_gas,
+                    multiplier,
+                ),
+                TieredGasUsage::base_and_excess(
+                    vm_gas_params.txn.max_io_gas,
+                    max_io_gas,
+                    multiplier,
+                ),
+            ),
+            None => (
+                TieredGasUsage::single(max_execution_gas),
+                TieredGasUsage::single(max_io_gas),
+            ),
+        };
 
         Self {
             feature_version: gas_feature_version,
@@ -211,12 +266,8 @@ where
             storage_gas_params,
             initial_balance: balance,
             balance,
-            execution_tier,
-            next_execution_tiers,
-            execution_gas_used: 0.into(),
-            io_tier,
-            next_io_tiers,
-            io_gas_used: 0.into(),
+            execution,
+            io,
             max_storage_fee,
             storage_fee_in_internal_units: 0.into(),
             storage_fee_used: 0.into(),
@@ -271,7 +322,7 @@ where
             })?;
 
         let total_calculated =
-            self.execution_gas_used + self.io_gas_used + self.storage_fee_in_internal_units;
+            self.execution.used + self.io.used + self.storage_fee_in_internal_units;
         if total != total_calculated {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
@@ -279,8 +330,8 @@ where
                         "The per-category costs do not add up. {} (total) != {} = {} (exec) + {} (io) + {} (storage)",
                         total,
                         total_calculated,
-                        self.execution_gas_used,
-                        self.io_gas_used,
+                        self.execution.used,
+                        self.io.used,
                         self.storage_fee_in_internal_units,
                     ),
                 ),
@@ -306,34 +357,12 @@ where
         }
 
         let amount = abstract_amount.evaluate(self.feature_version, &self.vm_gas_params);
-        let amount = self.execution_tier.price(amount);
-
-        match self.balance.checked_sub(amount) {
-            Some(new_balance) => {
-                self.balance = new_balance;
-                self.execution_gas_used += amount;
-            },
-            None => {
-                let old_balance = self.balance;
-                self.balance = 0.into();
-                if self.feature_version >= 12 {
-                    self.execution_gas_used += old_balance;
-                }
-                return Err(PartialVMError::new(StatusCode::OUT_OF_GAS));
-            },
-        };
-
-        if self.feature_version >= 7 && self.execution_gas_used > self.execution_tier.limit {
-            exceed_tier_limit(
-                &mut self.balance,
-                &mut self.execution_gas_used,
-                &mut self.execution_tier,
-                &mut self.next_execution_tiers,
-                StatusCode::EXECUTION_LIMIT_REACHED,
-            )
-        } else {
-            Ok(())
-        }
+        self.execution.charge(
+            &mut self.balance,
+            self.feature_version,
+            amount,
+            StatusCode::EXECUTION_LIMIT_REACHED,
+        )
     }
 
     fn charge_io(
@@ -341,34 +370,12 @@ where
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit>,
     ) -> PartialVMResult<()> {
         let amount = abstract_amount.evaluate(self.feature_version, &self.vm_gas_params);
-        let amount = self.io_tier.price(amount);
-
-        match self.balance.checked_sub(amount) {
-            Some(new_balance) => {
-                self.balance = new_balance;
-                self.io_gas_used += amount;
-            },
-            None => {
-                let old_balance = self.balance;
-                self.balance = 0.into();
-                if self.feature_version >= 12 {
-                    self.io_gas_used += old_balance;
-                }
-                return Err(PartialVMError::new(StatusCode::OUT_OF_GAS));
-            },
-        };
-
-        if self.feature_version >= 7 && self.io_gas_used > self.io_tier.limit {
-            exceed_tier_limit(
-                &mut self.balance,
-                &mut self.io_gas_used,
-                &mut self.io_tier,
-                &mut self.next_io_tiers,
-                StatusCode::IO_LIMIT_REACHED,
-            )
-        } else {
-            Ok(())
-        }
+        self.io.charge(
+            &mut self.balance,
+            self.feature_version,
+            amount,
+            StatusCode::IO_LIMIT_REACHED,
+        )
     }
 
     fn charge_storage_fee(
@@ -448,11 +455,11 @@ where
     }
 
     fn execution_gas_used(&self) -> InternalGas {
-        self.execution_gas_used
+        self.execution.used
     }
 
     fn io_gas_used(&self) -> InternalGas {
-        self.io_gas_used
+        self.io.used
     }
 
     fn storage_fee_used_in_gas_units(&self) -> InternalGas {
@@ -576,7 +583,7 @@ mod tests {
     }
 
     #[test]
-    fn no_excess_pricing_without_staking_request_or_before_v1_51() {
+    fn no_excess_pricing_without_staking_request_or_before_v1_50() {
         let mut algebra = new_algebra(LATEST_GAS_FEATURE_VERSION, None);
         let err = algebra
             .charge_execution(InternalGas::new(100_001))
@@ -585,8 +592,57 @@ mod tests {
         assert_used(&algebra, 100_001, 0);
 
         let request = staking_request(400);
-        let mut algebra = new_algebra(gas_feature_versions::RELEASE_V1_50, Some(&request));
+        let mut algebra = new_algebra(gas_feature_versions::TESTNET_RESET_OCT_2026, Some(&request));
         assert!(algebra.charge_execution(InternalGas::new(120_000)).is_ok());
         assert_used(&algebra, 120_000, 0);
+    }
+
+    #[test]
+    fn limit_reached_persists() {
+        let mut algebra = new_algebra(LATEST_GAS_FEATURE_VERSION, None);
+        let err = algebra
+            .charge_execution(InternalGas::new(100_001))
+            .unwrap_err();
+        assert_eq!(err.major_status(), StatusCode::EXECUTION_LIMIT_REACHED);
+        for amount in [0, 1] {
+            let err = algebra
+                .charge_execution(InternalGas::new(amount))
+                .unwrap_err();
+            assert_eq!(err.major_status(), StatusCode::EXECUTION_LIMIT_REACHED);
+        }
+        assert_used(&algebra, 100_002, 0);
+
+        let request = staking_request(110);
+        let mut algebra = new_algebra(LATEST_GAS_FEATURE_VERSION, Some(&request));
+        let err = algebra
+            .charge_execution(InternalGas::new(120_000))
+            .unwrap_err();
+        assert_eq!(err.major_status(), StatusCode::EXECUTION_LIMIT_REACHED);
+        for amount in [0, 1] {
+            let err = algebra
+                .charge_execution(InternalGas::new(amount))
+                .unwrap_err();
+            assert_eq!(err.major_status(), StatusCode::EXECUTION_LIMIT_REACHED);
+        }
+        assert_used(&algebra, 300_010, 0);
+    }
+
+    #[test]
+    fn no_limit_before_v7() {
+        let mut algebra = new_algebra(6, None);
+        assert!(algebra.charge_execution(InternalGas::new(100_001)).is_ok());
+        assert_used(&algebra, 100_001, 0);
+    }
+
+    #[test]
+    fn out_of_gas_before_v12_keeps_used() {
+        let mut algebra = new_algebra(11, None);
+        assert!(algebra.charge_execution(InternalGas::new(60_000)).is_ok());
+        let err = algebra
+            .charge_execution(InternalGas::new(1_000_000))
+            .unwrap_err();
+        assert_eq!(err.major_status(), StatusCode::OUT_OF_GAS);
+        assert_eq!(algebra.execution_gas_used(), 60_000.into());
+        assert_eq!(algebra.balance_internal(), 0.into());
     }
 }
