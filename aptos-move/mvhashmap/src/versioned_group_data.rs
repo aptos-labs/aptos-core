@@ -76,7 +76,7 @@ pub struct VersionedGroupData<K, T, V> {
     // TODO: Once AggregatorV1 is deprecated (no V: TransactionWrite trait bound),
     // switch to VersionedData<K, ResourceGroupSize>.
     // If an entry exists for a group key in Dashmap, the group is considered initialized.
-    group_sizes: DashMap<K, VersionedGroupSize>,
+    group_sizes: DashMap<K, VersionedGroupSize, ahash::RandomState>,
 
     // Stores a set of tags for this group, basically a superset of all tags encountered in
     // group related APIs. The accesses are synchronized with group size entry (for now),
@@ -87,7 +87,7 @@ pub struct VersionedGroupData<K, T, V> {
     // that the contents observed in the multi-versioned map after index is committed
     // must correspond to the outputs recorded by the committed transaction incarnations.
     // (and the correctness of the outputs is the responsibility of BlockSTM validation).
-    group_tags: DashMap<K, HashSet<T>>,
+    group_tags: DashMap<K, HashSet<T>, ahash::RandomState>,
 }
 
 // This struct allows us to reference a group key and tag without cloning
@@ -136,8 +136,8 @@ where
     pub(crate) fn empty() -> Self {
         Self {
             values: VersionedData::empty(),
-            group_sizes: DashMap::new(),
-            group_tags: DashMap::new(),
+            group_sizes: DashMap::with_hasher(ahash::RandomState::new()),
+            group_tags: DashMap::with_hasher(ahash::RandomState::new()),
         }
     }
 
