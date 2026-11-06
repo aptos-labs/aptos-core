@@ -366,31 +366,24 @@ pub(crate) struct ExecutionQueueManager {
     /// that `j` re-executes with the benefit of the initial speculative writes from all
     /// preceding transactions.
     executed_once_max_idx: CachePadded<AtomicU32>,
-    /// Stores the minimum transaction index that has not yet been popped from the
-    /// `execution_queue`. This serves as an upper bound for transactions that have not
-    /// been executed yet and provides an indication of scheduling progress.
+    /// The minimum transaction index that has never been scheduled. Every index at
+    /// or above it is waiting for its first incarnation, so those are handed out
+    /// by advancing this counter rather than through `execution_queue`.
     ///
-    /// ***IMPORTANT***: Both reads and writes of this field must be performed while
-    /// holding the `execution_queue` lock. The lock provides the happens-before
-    /// relationship required for correctness: `record_validation_requirements` reads
-    /// this value to determine which transactions need cold validation (those already
-    /// scheduled). Without the lock, a stale read could miss a transaction that was
-    /// already popped and is executing with an outdated module.
-    ///
-    /// We re-use the `execution_queue` lock (rather than introducing a dedicated one)
-    /// because `pop_next` already acquires it, so the write is naturally protected
-    /// without adding lock overhead on the hot scheduling path.
+    /// ***IMPORTANT***: Every access after construction is a read-modify-write.
+    /// `record_validation_requirements` reads this value to determine which
+    /// transactions need cold validation (those already scheduled). An RMW read
+    /// either observes a pop, or is ordered before it with release-acquire
+    /// semantics, so the popped transaction observes the published modules.
     min_never_scheduled_idx: CachePadded<AtomicU32>,
-    /// Holds the indices of transactions currently scheduled for execution.
-    /// Using a `BTreeSet` ensures that transactions are generally processed in an
-    /// order (ascending by index by default when popping via `pop_first()`), which is
-    /// beneficial for reducing execution conflicts.
-    /// TODO(BlockSTMv2): Alternative implementations for performance (e.g. packed ints,
-    /// intervals w. locks, CachePadded<ConcurrentQueue<TxnIndex>>).
+    num_txns: TxnIndex,
+    /// Holds the indices of already scheduled transactions that are scheduled for
+    /// re-execution. All are below `min_never_scheduled_idx`, so popping from here
+    /// first preserves ascending order, which is beneficial for reducing execution
+    /// conflicts.
     execution_queue: Mutex<BTreeSet<TxnIndex>>,
-    /// The length of `execution_queue`, written under its lock. Lets an idle
-    /// worker see that there is nothing to pop without taking the lock, which
-    /// the workers that do have work need.
+    /// The length of `execution_queue`, written under its lock. Lets a worker see
+    /// that there is nothing to re-execute without taking the lock.
     execution_queue_len: CachePadded<AtomicU32>,
 }
 
@@ -399,26 +392,31 @@ impl ExecutionQueueManager {
         Self {
             executed_once_max_idx: CachePadded::new(AtomicU32::new(0)),
             min_never_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
-            execution_queue: Mutex::new((0..num_txns).collect()),
-            execution_queue_len: CachePadded::new(AtomicU32::new(num_txns)),
+            num_txns,
+            execution_queue: Mutex::new(BTreeSet::new()),
+            execution_queue_len: CachePadded::new(AtomicU32::new(0)),
         }
     }
 
     fn pop_next(&self) -> Option<TxnIndex> {
-        // A stale zero only makes the caller ask again.
-        if self.execution_queue_len.load(Ordering::Relaxed) == 0 {
+        // A stale zero only delays a re-execution until the caller asks again.
+        if self.execution_queue_len.load(Ordering::Relaxed) > 0 {
+            let mut guard = self.execution_queue.lock();
+            let ret = guard.pop_first();
+            self.execution_queue_len
+                .store(guard.len() as u32, Ordering::Relaxed);
+            if ret.is_some() {
+                return ret;
+            }
+        }
+        if self.min_never_scheduled_idx.load(Ordering::Relaxed) >= self.num_txns {
             return None;
         }
-        let mut guard = self.execution_queue.lock();
-        let ret = guard.pop_first();
-        if let Some(idx) = ret {
-            self.min_never_scheduled_idx
-                .fetch_max(idx + 1, Ordering::Relaxed);
-        }
-        self.execution_queue_len
-            .store(guard.len() as u32, Ordering::Relaxed);
-        drop(guard);
-        ret
+        self.min_never_scheduled_idx
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |idx| {
+                (idx < self.num_txns).then_some(idx + 1)
+            })
+            .ok()
     }
 
     fn insert(&self, txn_idx: TxnIndex) {
@@ -428,12 +426,10 @@ impl ExecutionQueueManager {
             .store(guard.len() as u32, Ordering::Relaxed);
     }
 
-    /// Acquires the `execution_queue` lock before reading `min_never_scheduled_idx`.
-    /// The lock provides a happens-before relationship with all prior `pop_next` calls,
-    /// ensuring the returned value reflects all transactions that have been popped.
+    /// Reflects every prior `pop_next`, see the field's documentation.
     fn min_never_scheduled_idx(&self) -> TxnIndex {
-        let _guard = self.execution_queue.lock();
-        self.min_never_scheduled_idx.load(Ordering::Relaxed)
+        self.min_never_scheduled_idx
+            .fetch_add(0, Ordering::AcqRel)
     }
 
     // Note: the method must be performed while holding the idx-th status lock.
@@ -463,6 +459,7 @@ impl ExecutionQueueManager {
         Self {
             executed_once_max_idx: CachePadded::new(AtomicU32::new(executed_once_max_idx)),
             min_never_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
+            num_txns: 0,
             execution_queue: Mutex::new(BTreeSet::new()),
             execution_queue_len: CachePadded::new(AtomicU32::new(0)),
         }
@@ -470,7 +467,8 @@ impl ExecutionQueueManager {
 
     #[cfg(test)]
     pub(crate) fn assert_execution_queue(&self, expected_indices: &Vec<TxnIndex>) {
-        let queue = self.execution_queue.lock();
+        let mut queue = self.execution_queue.lock().clone();
+        queue.extend(self.min_never_scheduled_idx.load(Ordering::Relaxed)..self.num_txns);
         assert_eq!(queue.len(), expected_indices.len());
         for scheduled_idx in expected_indices {
             assert!(queue.contains(scheduled_idx));
