@@ -951,6 +951,7 @@ pub enum BehaviorKind {
     UnchangedOf,
     FoldsOf,
     WriteOf(usize),
+    TransitionOf,
 }
 
 /// A field of an enum variant.

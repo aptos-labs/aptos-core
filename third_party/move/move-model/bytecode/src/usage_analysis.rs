@@ -18,6 +18,7 @@ use move_model::{
     ast::{ConditionKind, Spec, TempIndex},
     model::{FunId, FunctionEnv, GlobalEnv, QualifiedId, QualifiedInstId, StructId},
     pragmas::VERIFY_PRAGMA,
+    spec_derivation,
     ty::Type,
 };
 use paste::paste;
@@ -475,6 +476,116 @@ impl MemoryUsageAnalysis<'_> {
             }
         }
     }
+}
+
+/// Whether the postcondition of `fun` at `inst` may only be related to its result over an
+/// actual transition of the function.
+///
+/// A behavioral predicate over `fun` is evaluated in the memory its contract observes
+/// (`behavioral_target_memory`). The `result_of` axiom relates that memory to the
+/// contract's postcondition. When a call to `fun` writes none of that memory, one memory
+/// state is both the pre- and the post-state of any call, and the postcondition holds at
+/// every state the function does not abort in; otherwise the postcondition holds only
+/// between the pre- and post-state of an actual call, and a postcondition such as
+/// `v == old(v) + 1` is false at any other pair, including a single state. The Boogie
+/// backend then guards the axiom with a transition witness which only an assumed
+/// `ensures_of` establishes, and spec inference anchors the carrier it substitutes for
+/// such a call by the `ensures_of` fact of the call.
+///
+/// A function writing none of that memory still has its `result_of` axiom quantified over
+/// a pair of states once its contract reads the pre-state (`old(..)` or a pre-state `let`):
+/// a clause relating the two states (`v == old(v)`, or a post-state read next to a
+/// pre-state `let`) is false off the diagonal and would force the abort condition there.
+/// Such a function is guarded too, unless every `ensures` clause reads the pre-state
+/// alone, which holds at any pair.
+///
+/// Unknown effects (`call_effects` returns `None`) are treated as writes.
+pub fn behavioral_transition_guarded(
+    env: &GlobalEnv,
+    fun_id: QualifiedId<FunId>,
+    inst: &[Type],
+    summary_of: &dyn Fn(QualifiedId<FunId>) -> Option<UsageState>,
+) -> bool {
+    let fun = env.get_function(fun_id);
+    let old_memory = spec_derivation::behavioral_old_memory_instantiated(&fun, inst);
+    let mut observed = spec_derivation::behavioral_target_memory(env, fun_id, inst);
+    observed.extend(old_memory.iter().cloned());
+    if observed.is_empty() {
+        return false;
+    }
+    let may_write = match call_effects(env, fun_id, inst, summary_of) {
+        None => true,
+        Some(effects) => observed.iter().any(|mem| effects.writes.contains(mem)),
+    };
+    may_write || (!old_memory.is_empty() && !spec_derivation::fun_ensures_are_pre_state_only(&fun))
+}
+
+/// Whether `behavioral_transition_guarded` may hold for `fun_id` at some instantiation of its
+/// type parameters, over-approximated. At the identity instantiation, the memory selected
+/// by a bare type parameter (the `T` in `object::spec_exists_at<T>`) is not resolved, and a
+/// resource read at a type parameter (`R<T>`) differs from one written at a concrete type
+/// (`R<u64>`); either may become guarded once instantiated. So a function with such memory
+/// counts as guarded, and observed and written memory are compared by struct only.
+pub fn behavioral_transition_guarded_at_some_instance(
+    env: &GlobalEnv,
+    fun_id: QualifiedId<FunId>,
+    summary_of: &dyn Fn(QualifiedId<FunId>) -> Option<UsageState>,
+) -> bool {
+    let fun = env.get_function(fun_id);
+    let inst: Vec<Type> = (0..fun.get_type_parameter_count())
+        .map(|idx| Type::TypeParameter(idx as u16))
+        .collect();
+    if behavioral_transition_guarded(env, fun_id, &inst, summary_of) {
+        return true;
+    }
+    let spec = fun.get_spec();
+    let generic_aborts = || {
+        !spec_derivation::spec_aborts_are_exact(env, fun_id)
+            && spec_derivation::derive_fun_aborts_conditions(env, fun_id, &inst).is_some_and(
+                |aborts| {
+                    aborts
+                        .iter()
+                        .any(|exp| !exp.directly_generic_used_memory(env).is_empty())
+                },
+            )
+    };
+    if !fun.get_spec_generic_used_memory().is_empty()
+        || !fun.get_spec_generic_old_memory().is_empty()
+        || spec.conditions.iter().any(|cond| {
+            matches!(cond.kind, ConditionKind::LetPre(..))
+                && !cond.exp.directly_generic_used_memory(env).is_empty()
+        })
+        || generic_aborts()
+    {
+        return true;
+    }
+    let mut observed = spec_derivation::behavioral_target_memory(env, fun_id, &inst);
+    observed.extend(spec_derivation::behavioral_old_memory_instantiated(
+        &fun, &inst,
+    ));
+    match call_effects(env, fun_id, &inst, summary_of) {
+        None => !observed.is_empty(),
+        Some(effects) => observed.iter().any(|mem| {
+            effects
+                .writes
+                .iter()
+                .any(|write| write.module_id == mem.module_id && write.id == mem.id)
+        }),
+    }
+}
+
+/// `behavioral_transition_guarded` over the usage summaries recorded in `targets`.
+pub fn behavioral_transition_guarded_in(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    fun_id: QualifiedId<FunId>,
+    inst: &[Type],
+) -> bool {
+    behavioral_transition_guarded(env, fun_id, inst, &|callee| {
+        targets
+            .get_data(&callee, &FunctionVariant::Baseline)
+            .and_then(|data| data.annotations.get::<UsageState>().cloned())
+    })
 }
 
 /// What a closure built in some function writes and accesses, as the prover sees a call to

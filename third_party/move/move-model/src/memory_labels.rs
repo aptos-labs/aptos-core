@@ -397,19 +397,25 @@ fn is_wellformed_tautology(exp: &ExpData) -> bool {
     }
 }
 
-/// Check if an expression contains any mutation operations (SpecPublish/SpecRemove/SpecUpdate),
-/// even under conditionals. This detects functions that may modify state.
+/// Check if an expression contains any operation which moves the memory state, even
+/// under conditionals: a mutation builtin (SpecPublish/SpecRemove/SpecUpdate), or a
+/// behavioral predicate or spec function evaluated at a state range, which spec
+/// inference emits for a call that may write memory. Either way the pre-state and the
+/// post-state of the function may differ, so a read of the entry state is `old()`.
 fn has_mutation_ops(exp: &ExpData) -> bool {
     let mut found = false;
     exp.visit_pre_order(&mut |e| {
         if !found {
             if let ExpData::Call(_, op, _) = e {
-                if matches!(
-                    op,
-                    Operation::SpecPublish(_) | Operation::SpecRemove(_) | Operation::SpecUpdate(_)
-                ) {
-                    found = true;
-                }
+                found = match op {
+                    Operation::SpecPublish(_)
+                    | Operation::SpecRemove(_)
+                    | Operation::SpecUpdate(_) => true,
+                    Operation::Behavior(_, range) | Operation::SpecFunction(_, _, range) => {
+                        range.pre.is_some() || range.post.is_some()
+                    },
+                    _ => false,
+                };
             }
         }
         !found
