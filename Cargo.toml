@@ -968,6 +968,9 @@ move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = 
 move-vm-types = { path = "third_party/move/move-vm/types" }
 shared-dsa = { path = "third_party/move/shared-dsa" }
 
+[workspace.metadata.dylint]
+libraries = [{ path = "devtools/lints" }]
+
 [profile.release]
 debug = true
 overflow-checks = true
