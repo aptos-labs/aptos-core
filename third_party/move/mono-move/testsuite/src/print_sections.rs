@@ -19,9 +19,9 @@ use anyhow::{anyhow, Result};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NoNatives,
-    types::{InternedType, EMPTY_TYPE_LIST},
-    CaptureLayoutsId, DescriptorId, FrameOffset, FrameworkSymbols, LayoutId, LayoutProvider,
-    NominalFields, VMResult, ValueLayout,
+    types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    DescriptorId, FrameOffset, FrameworkSymbols, LayoutId, LayoutProvider, NominalFields, VMResult,
+    ValueLayout,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -207,10 +207,6 @@ impl LayoutProvider for SnapshotLoaderContext<'_, '_, '_> {
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
         self.guard.layout_id(ty)
     }
-
-    fn capture_layouts(&self, id: CaptureLayoutsId) -> Option<&[LayoutId]> {
-        self.guard.capture_layouts(id)
-    }
 }
 
 impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
@@ -262,8 +258,12 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
             .publish_captured_data_descriptor(values_size, pointer_offsets)
     }
 
-    fn publish_capture_layouts(&self, ids: &[LayoutId]) -> CaptureLayoutsId {
-        self.guard.publish_capture_layouts(ids)
+    fn publish_captured_values_layout(
+        &self,
+        captured: InternedTypeList,
+        layout: ValueLayout,
+    ) -> LayoutId {
+        self.guard.publish_captured_values_layout(captured, layout)
     }
 
     fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {

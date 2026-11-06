@@ -120,7 +120,7 @@ use crate::{
     types::{
         display_type, display_type_list, view_name, InternedType, InternedTypeList, VariantTag,
     },
-    value_layout::CaptureLayoutsId,
+    value_layout::LayoutId,
     FunctionPtr,
 };
 use move_binary_format::file_format::ConstantPoolIndex;
@@ -256,10 +256,10 @@ pub struct PackClosureOp {
     /// Byte width of the captured values region: the natural-aligned layout of
     /// `captured`. `0` for a non-capturing closure.
     pub values_size: u32,
-    /// Layouts of the captured values, in capture order. Serializing the
-    /// closure walks them, so it never has to resolve the target.
-    /// [`CaptureLayoutsId::NONE`] for a non-capturing closure.
-    pub capture_layouts_id: CaptureLayoutsId,
+    /// Layout of the captured values: an anonymous struct with one field per
+    /// capture, in capture order. Serializing the closure walks it, so it never
+    /// has to resolve the target. [`None`] for a non-capturing closure.
+    pub captured_layout_id: Option<LayoutId>,
     /// Sources (in caller's frame) of the captured values, in the order that
     /// `mask.is_captured(i)` is true — i.e. ascending `i` through the
     /// function's parameter list.
@@ -2215,7 +2215,7 @@ pub const FUNC_REF_TAG_UNRESOLVED: u8 = 1;
 // ---------------------------------------------------------------------------
 //
 //   Data region: [tag: u8 @ 0] [pad(3)] [values_size: u32 @ 4]
-//                [blob_size: u32 @ 8] [capture_layouts_id: u32 @ 12]
+//                [blob_size: u32 @ 8] [layout_id: u32 @ 12]
 //                [captured values @ 16, packed in param order]
 //                [blob @ 16 + values_size]
 //
@@ -2242,9 +2242,9 @@ pub const CAPTURED_DATA_VALUES_SIZE_OFFSET: usize = 4;
 /// object holds no blob.
 pub const CAPTURED_DATA_BLOB_SIZE_OFFSET: usize = 8;
 
-/// Byte offset of the `CaptureLayoutsId` (`u32`) naming the layouts of the
-/// captured values. `CaptureLayoutsId::NONE` when there are no values.
-pub const CAPTURED_DATA_CAPTURE_LAYOUTS_ID_OFFSET: usize = 12;
+/// Byte offset of the `LayoutId` (`u32`) of the captured values. Set only under
+/// the `Materialized` tag.
+pub const CAPTURED_DATA_LAYOUT_ID_OFFSET: usize = 12;
 
 /// Byte offset where captured values begin (after the header).
 pub const CAPTURED_DATA_VALUES_OFFSET: usize = 16;

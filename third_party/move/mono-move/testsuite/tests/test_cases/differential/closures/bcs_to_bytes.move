@@ -1,4 +1,7 @@
 // RUN: publish
+module 0x1::create_signer {
+    public native fun create_signer(addr: address): signer;
+}
 module 0x99::closure_bcs {
     use std::bcs;
 
@@ -22,6 +25,12 @@ module 0x99::closure_bcs {
     #[persistent]
     fun pick<T: drop>(a: T, b: u64): u64 {
         let _ = a;
+        b
+    }
+
+    #[persistent]
+    fun owner(s: signer, b: u64): u64 {
+        let _ = s;
         b
     }
 
@@ -58,6 +67,12 @@ module 0x99::closure_bcs {
         let f: |u64|u64 has drop = |b| pick<Point>(p, b);
         bcs::to_bytes(&f)
     }
+
+    public fun ser_signer_capture(addr: address): vector<u8> {
+        let s = 0x1::create_signer::create_signer(addr);
+        let f: |u64|u64 has drop = |b| owner(s, b);
+        bcs::to_bytes(&f)
+    }
 }
 
 // RUN: execute 0x99::closure_bcs::ser_noncapturing
@@ -77,3 +92,8 @@ module 0x99::closure_bcs {
 
 // RUN: execute 0x99::closure_bcs::ser_generic_struct
 // CHECK: results: 0x07010000000000000000000000000000000000000000000000000000000000000000990b636c6f737572655f626373047069636b010700000000000000000000000000000000000000000000000000000000000000990b636c6f737572655f62637305506f696e740001000000000000000600020201010000000000000002
+
+// A captured signer serializes as its address, as V1's bcs natives write it.
+
+// RUN: execute 0x99::closure_bcs::ser_signer_capture --args 0xcafe
+// CHECK: results: 0x07010000000000000000000000000000000000000000000000000000000000000000990b636c6f737572655f626373056f776e657200010000000000000007000000000000000000000000000000000000000000000000000000000000cafe
