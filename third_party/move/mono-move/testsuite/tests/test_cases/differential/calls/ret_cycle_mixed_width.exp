@@ -126,5 +126,7 @@ fun runner() {
     19: Return @7
   safe_point_layouts:
     2: []
+    3: []
     5: []
+    6: []
 }

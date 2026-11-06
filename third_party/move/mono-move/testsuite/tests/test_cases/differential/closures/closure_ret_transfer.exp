@@ -97,6 +97,7 @@ fun consumed_before_next_call() {
     4: Return @3
   safe_point_layouts:
     0: []
+    1: []
 }
 
 fun g() {
@@ -142,6 +143,7 @@ fun live_ret_then_call() {
     8: Return @3
   safe_point_layouts:
     0: []
+    1: []
 }
 
 fun pass_through() {
@@ -155,6 +157,7 @@ fun pass_through() {
     4: Return @3
   safe_point_layouts:
     0: []
+    1: []
 }
 
 fun ret_slot_overwrite() {
@@ -173,4 +176,5 @@ fun ret_slot_overwrite() {
     9: Return @4
   safe_point_layouts:
     0: []
+    1: []
 }
