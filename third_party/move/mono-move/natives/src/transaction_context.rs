@@ -21,6 +21,7 @@ use mono_move_core::{
 use move_core_types::account_address::AccountAddress;
 use serde::Serialize;
 use sha3::{Digest, Sha3_256};
+use smallvec::SmallVec;
 
 /// Derives an AUID address: `sha3_256(txn_hash || auid_counter_le ||
 /// DeriveAuid)`.
@@ -28,11 +29,11 @@ fn auid_address(txn_hash: &[u8], auid_counter: u64) -> AccountAddress {
     AuthenticationKey::auid(txn_hash.to_vec(), auid_counter).account_address()
 }
 
-/// Derives a table handle: `sha3_256(txn_hash || table_count_be_u32)`. Unlike
-/// the AUID derivation, no scheme byte is appended.
-fn table_handle(txn_hash: &[u8], table_count: u32) -> TableHandle {
+/// Derives a table handle: `sha3_256(seed || table_count_be_u32)`. Unlike the
+/// AUID derivation, no scheme byte is appended.
+fn table_handle(seed: &[u8; 32], table_count: u32) -> TableHandle {
     let mut hasher = Sha3_256::new();
-    hasher.update(txn_hash);
+    hasher.update(seed);
     hasher.update(table_count.to_be_bytes());
     TableHandle::new(AccountAddress::new(hasher.finalize().into()))
 }
@@ -40,7 +41,11 @@ fn table_handle(txn_hash: &[u8], table_count: u32) -> TableHandle {
 /// Carries transaction context information, such as transaction hashes or chain
 /// ID.
 pub struct TransactionContextExtension {
-    txn_hash: [u8; 32],
+    /// The transaction hash, which also seeds AUIDs. 32 bytes in production;
+    /// test environments may use other lengths.
+    txn_hash: SmallVec<[u8; 32]>,
+    /// Seeds table handles. Production uses the transaction hash.
+    table_handle_seed: [u8; 32],
     /// Hash of the script executed by the transaction, or empty when the payload
     /// is not a script.
     script_hash: Vec<u8>,
@@ -67,7 +72,8 @@ impl TransactionContextExtension {
         user_transaction_context: Option<UserTransactionContext>,
     ) -> Self {
         Self {
-            txn_hash,
+            txn_hash: SmallVec::from_slice(&txn_hash),
+            table_handle_seed: txn_hash,
             script_hash,
             network_chain_id,
             auid_counter: 0,
@@ -78,6 +84,28 @@ impl TransactionContextExtension {
         }
     }
 
+    /// Creates a context matching V1's unit-test environment: the transaction
+    /// hash may have any length, and table handles use a separate seed.
+    pub fn for_unit_test(
+        txn_hash: &[u8],
+        table_handle_seed: [u8; 32],
+        script_hash: Vec<u8>,
+        network_chain_id: u8,
+        session_counter: u8,
+    ) -> Self {
+        Self {
+            txn_hash: SmallVec::from_slice(txn_hash),
+            table_handle_seed,
+            script_hash,
+            network_chain_id,
+            auid_counter: 0,
+            local_counter: 0,
+            session_counter,
+            table_counter: 0,
+            user_transaction_context: None,
+        }
+    }
+
     /// Chain ID of the network the transaction runs on.
     pub(crate) fn network_chain_id(&self) -> u8 {
         self.network_chain_id
@@ -85,7 +113,7 @@ impl TransactionContextExtension {
 
     /// Mints the next table handle, advancing the per-transaction counter.
     pub fn next_table_handle(&mut self) -> TableHandle {
-        let handle = table_handle(&self.txn_hash, self.table_counter);
+        let handle = table_handle(&self.table_handle_seed, self.table_counter);
         self.table_counter += 1;
         handle
     }
@@ -312,7 +340,10 @@ pub fn native_is_encrypted_txn<C: NativeContext>(ctx: &C) -> VMResult<NativeStat
 //
 // TODO(metering): charge gas.
 pub fn native_get_txn_hash<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
-    let txn_hash = ctx.get_extension::<TransactionContextExtension>()?.txn_hash;
+    let txn_hash = ctx
+        .get_extension::<TransactionContextExtension>()?
+        .txn_hash
+        .clone();
     let bytes = ctx.new_byte_vector(&txn_hash)?;
     // SAFETY: return 0 is `vector<u8>`.
     unsafe { ctx.set_return(0, bytes)? };
