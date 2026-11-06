@@ -14,6 +14,7 @@ mod metrics;
 pub mod native;
 pub mod pipeline;
 pub mod position_verifier;
+mod resource_usage;
 pub mod transaction_committer;
 pub mod transaction_executor;
 pub mod transaction_generator;

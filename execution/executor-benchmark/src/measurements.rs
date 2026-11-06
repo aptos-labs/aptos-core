@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::metrics::TIMER;
+use crate::{metrics::TIMER, resource_usage::ResourceUsage};
 use aptos_block_executor::counters::{
     self as block_executor_counters, GasType, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
 };
@@ -222,6 +222,7 @@ pub(crate) struct OverallMeasuring {
     pub(crate) start_time: Instant,
     start_execution: ExecutionTimeMeasurement,
     start_gas: GasMeasurement,
+    start_resources: ResourceUsage,
 }
 
 impl OverallMeasuring {
@@ -230,6 +231,7 @@ impl OverallMeasuring {
             start_time: Instant::now(),
             start_execution: ExecutionTimeMeasurement::now(),
             start_gas: GasMeasurement::now(),
+            start_resources: ResourceUsage::now(),
         }
     }
 
@@ -237,6 +239,7 @@ impl OverallMeasuring {
         let elapsed = self.start_time.elapsed().as_secs_f64();
         let delta_execution = self.start_execution.elapsed_delta();
         let delta_gas = self.start_gas.elapsed_delta();
+        let delta_resources = self.start_resources.elapsed_delta();
 
         OverallMeasurement {
             prefix,
@@ -245,6 +248,7 @@ impl OverallMeasuring {
             num_txns,
             delta_execution,
             delta_gas,
+            delta_resources,
         }
     }
 }
@@ -257,6 +261,7 @@ pub struct OverallMeasurement {
     num_txns: u64,
     delta_execution: ExecutionTimeMeasurement,
     delta_gas: GasMeasurement,
+    delta_resources: ResourceUsage,
 }
 
 impl OverallMeasurement {
@@ -443,6 +448,8 @@ impl OverallMeasurement {
             self.delta_execution.commit_total_time / self.elapsed,
             num_txns / self.delta_execution.commit_total_time
         );
+
+        self.delta_resources.print(&self.prefix, num_txns);
 
         // Native-position stages; absent when the storage is not attached.
         if self.delta_execution.position_fold_total > 0.0 {

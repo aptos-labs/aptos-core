@@ -379,6 +379,17 @@ pub static BLOCKSTM_VERSION_NUMBER: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Worker time by phase, in microseconds. `clock` is `wall` or `cpu`; the gap
+/// between the two is time the worker spent descheduled.
+pub static WORKER_PHASE_MICROS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_execution_worker_phase_micros",
+        "Block-STM worker time by phase, in microseconds, by wall and thread CPU clock",
+        &["phase", "clock"]
+    )
+    .unwrap()
+});
+
 pub static PAR_EXEC_POOL_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "par_exec_pool_size",
