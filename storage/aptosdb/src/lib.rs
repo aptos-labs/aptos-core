@@ -32,6 +32,7 @@ mod event_store;
 mod ledger_db;
 mod lru_node_cache;
 pub mod native_metrics;
+pub mod native_order_reader;
 pub mod native_state_committer;
 pub mod native_state_reader;
 pub mod native_state_store;
@@ -44,6 +45,7 @@ mod sharded_kv_db;
 #[cfg(test)]
 mod native_storage_tests;
 
+pub use native_order_reader::{InMemoryNativeOrderReader, NativeOrderReader};
 pub use native_state_reader::{InMemoryNativeStateReader, NativeStateReader};
 pub use native_state_store::{AccountKey, PositionBase, PositionKey, PositionOverlay};
 mod state_kv_db;

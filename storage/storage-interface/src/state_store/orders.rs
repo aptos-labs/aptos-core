@@ -12,7 +12,7 @@ use crate::state_store::{
         NativeOverlay, NativeParent, NativeWrites, ShardedKey, ShardedNativeLayers,
         NUM_NATIVE_INDEX_SHARDS,
     },
-    order_books::MarketBook,
+    order_books::{BookDelta, BookView, MarketBook},
 };
 use ahash::AHashMap;
 use aptos_experimental_layered_map::MapLayer;
@@ -30,7 +30,10 @@ use aptos_types::{
     transaction::Version,
 };
 use arr_macro::arr;
-use std::collections::BTreeMap;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::OnceLock,
+};
 
 pub const NUM_ORDER_SHARDS: usize = NUM_NATIVE_INDEX_SHARDS;
 
@@ -132,6 +135,13 @@ impl MarketOrders {
 
     pub fn book(&self) -> &MarketBook {
         &self.book
+    }
+
+    pub fn contains(&self, key: &OrderKey) -> bool {
+        match key {
+            OrderKey::Single { order_id, .. } => self.singles.contains_key(order_id),
+            OrderKey::Bulk { account, .. } => self.bulks.contains_key(account),
+        }
     }
 
     pub fn get(&self, key: &OrderKey) -> Option<NativeOrder> {
@@ -374,7 +384,8 @@ impl OrderBase {
                 by_market
                     .entry(key.market())
                     .or_default()
-                    .push((key, write));
+                    .writes
+                    .insert(key, write);
             }
             f(&OrderView {
                 base: base_view,
@@ -420,9 +431,45 @@ impl OrderBase {
     }
 }
 
+/// The overlay's writes to one market, and the book delta they make, derived
+/// by the first query that needs it and reused for the rest of the view.
+#[derive(Default)]
+struct MarketWrites {
+    writes: AHashMap<OrderKey, Option<NativeOrder>>,
+    delta: OnceLock<BookDelta>,
+}
+
+impl MarketWrites {
+    fn delta(&self, base: Option<&MarketOrders>) -> &BookDelta {
+        self.delta.get_or_init(|| {
+            let mut delta = BookDelta::default();
+            for (key, write) in &self.writes {
+                match key {
+                    OrderKey::Single { order_id, .. } => {
+                        if let Some(old) = base.and_then(|orders| orders.singles().get(order_id)) {
+                            delta.retracted.insert_single(old);
+                        }
+                    },
+                    OrderKey::Bulk { account, .. } => {
+                        if let Some(old) = base.and_then(|orders| orders.bulks().get(account)) {
+                            delta.retracted.insert_bulk(old);
+                        }
+                    },
+                }
+                match write {
+                    Some(NativeOrder::Single(order)) => delta.inserted.insert_single(order),
+                    Some(NativeOrder::Bulk(order)) => delta.inserted.insert_bulk(order),
+                    None => {},
+                }
+            }
+            delta
+        })
+    }
+}
+
 /// The overlay's writes grouped by market. Built once per view, affordable
 /// because the overlay holds only writes since the last fold.
-type OverlayByMarket = AHashMap<MarketKey, Vec<(OrderKey, Option<NativeOrder>)>>;
+type OverlayByMarket = AHashMap<MarketKey, MarketWrites>;
 
 /// An [`OrderOverlay`] merged over the base it sits on, valid for the scope
 /// of [`OrderBase::with_view`].
@@ -439,26 +486,113 @@ impl OrderView<'_> {
 
     /// Overlay first, then the base. `None` for a tombstone or a miss.
     pub fn get(&self, key: &OrderKey) -> Option<NativeOrder> {
-        match self.by_market.get(&key.market()).and_then(|writes| {
-            writes
-                .iter()
-                .find(|(k, _)| k == key)
-                .map(|(_, write)| write.clone())
-        }) {
-            Some(write) => write,
+        match self
+            .by_market
+            .get(&key.market())
+            .and_then(|market| market.writes.get(key))
+        {
+            Some(write) => write.clone(),
             None => self.base.get(key),
         }
     }
 
-    /// The market's orders, base merged with the overlay's writes.
-    pub fn market_orders(&self, market: &MarketKey) -> MarketOrders {
-        let mut orders = self.base.market_orders(market).cloned().unwrap_or_default();
-        if let Some(writes) = self.by_market.get(market) {
-            for (key, write) in writes {
-                orders.apply(key, write.clone());
+    /// The market's book with the overlay's writes applied, without copying
+    /// the base book: the written orders' old values are retracted and their
+    /// new values inserted, by the same index rule the fold applies.
+    pub fn book(&self, market: &MarketKey) -> BookView<'_> {
+        let base = self.base.market_orders(market);
+        let delta = match self.by_market.get(market) {
+            Some(writes) => writes.delta(base),
+            None => BookDelta::empty(),
+        };
+        BookView::new(base.map(MarketOrders::book), delta)
+    }
+
+    /// `(best bid, best ask)`; `None` for an empty side.
+    pub fn best_prices(&self, market: &MarketKey) -> (Option<u64>, Option<u64>) {
+        self.book(market).best_prices()
+    }
+
+    /// `(impact bid, impact ask)` for `notional_raw`, over at most
+    /// `max_levels` depth levels per side. See [`BookView::impact_prices`].
+    pub fn impact_prices(
+        &self,
+        market: &MarketKey,
+        notional_raw: u128,
+        max_levels: usize,
+    ) -> (Option<u64>, Option<u64>) {
+        self.book(market).impact_prices(notional_raw, max_levels)
+    }
+
+    /// The best `max_levels` depth levels on a side, `(price, size)`.
+    pub fn depth(&self, market: &MarketKey, is_bid: bool, max_levels: usize) -> Vec<(u64, u128)> {
+        self.book(market).depth(is_bid, max_levels)
+    }
+
+    /// Size resting at `limit_px` or better on a side.
+    pub fn depth_within(&self, market: &MarketKey, is_bid: bool, limit_px: u64) -> u128 {
+        self.book(market).depth_within(is_bid, limit_px)
+    }
+
+    /// The account's orders in the market: its single orders by id, then its
+    /// bulk order if it holds one.
+    pub fn account_orders(&self, market: &MarketKey, account: AccountAddress) -> Vec<OrderKey> {
+        let mut keys: Vec<OrderKey> = self
+            .book(market)
+            .account_single_orders(&account)
+            .into_iter()
+            .map(|order_id| OrderKey::Single {
+                exchange: market.exchange,
+                market: market.market,
+                order_id,
+            })
+            .collect();
+        let bulk = OrderKey::Bulk {
+            exchange: market.exchange,
+            market: market.market,
+            account,
+        };
+        if self.get(&bulk).is_some() {
+            keys.push(bulk);
+        }
+        keys
+    }
+
+    /// The exchange's markets holding at least one order, ascending.
+    pub fn markets_in_exchange(&self, exchange: AccountAddress) -> Vec<AccountAddress> {
+        let mut markets: BTreeSet<AccountAddress> = (0..NUM_ORDER_SHARDS)
+            .flat_map(|shard| {
+                self.base
+                    .shard(shard)
+                    .range(
+                        MarketKey {
+                            exchange,
+                            market: AccountAddress::ZERO,
+                        }..,
+                    )
+                    .take_while(move |(market, _)| market.exchange == exchange)
+                    .map(|(market, _)| market.market)
+            })
+            .collect();
+        // Only markets the overlay wrote can change emptiness.
+        for (market, MarketWrites { writes, .. }) in &self.by_market {
+            if market.exchange != exchange {
+                continue;
+            }
+            let base = self.base.market_orders(market);
+            let base_len = base.map_or(0, MarketOrders::len);
+            let overwritten = writes
+                .iter()
+                .filter(|(key, _)| base.is_some_and(|orders| orders.contains(key)))
+                .count();
+            let written = writes.iter().filter(|(_, write)| write.is_some()).count();
+            if base_len - overwritten + written > 0 {
+                markets.insert(market.market);
+            } else {
+                markets.remove(&market.market);
             }
         }
-        orders
+        markets.into_iter().collect()
     }
 }
 
@@ -662,7 +796,7 @@ mod tests {
     }
 
     #[test]
-    fn market_orders_merges_the_overlay_over_the_base() {
+    fn view_queries_merge_the_overlay_over_the_base() {
         let base = base_with(vec![
             (single_key(7, 1), single(1, 100)),
             (single_key(7, 2), single(2, 101)),
@@ -673,15 +807,79 @@ mod tests {
             (single_key(7, 3), Some(single(3, 102))),
             (bulk_key(7, 4), Some(bulk(4, 98))),
         ]);
-        let orders = base.with_view(&overlay, |view| view.market_orders(&market(7)));
-        assert_eq!(orders.singles.keys().copied().collect::<Vec<_>>(), vec![
-            1, 3
+        base.with_view(&overlay, |view| {
+            assert_eq!(view.best_prices(&market(7)), (Some(102), None));
+            assert_eq!(view.depth(&market(7), true, 10), vec![
+                (102, 10),
+                (100, 10),
+                (98, 1)
+            ]);
+            assert_eq!(view.account_orders(&market(7), addr(9)), vec![
+                single_key(7, 1),
+                single_key(7, 3)
+            ]);
+            assert_eq!(view.account_orders(&market(7), addr(4)), vec![bulk_key(
+                7, 4
+            )]);
+            assert_eq!(
+                view.best_prices(&market(8)),
+                (Some(500), None),
+                "other markets are untouched"
+            );
+        });
+    }
+
+    /// A written market's book delta is built by the first query that needs
+    /// it and reused after; point reads never build one.
+    #[test]
+    fn book_delta_is_built_once_per_written_market() {
+        let base = base_with(vec![
+            (single_key(7, 1), single(1, 100)),
+            (single_key(8, 1), single(1, 500)),
         ]);
-        assert_eq!(orders.bulks.keys().copied().collect::<Vec<_>>(), vec![
-            addr(4)
+        let overlay = base.new_overlay().extend(&base.layers(), 1, vec![(
+            single_key(7, 2),
+            Some(single(2, 101)),
+        )]);
+        base.with_view(&overlay, |view| {
+            let built = || {
+                view.by_market
+                    .get(&market(7))
+                    .expect("market 7 written")
+                    .delta
+                    .get()
+                    .map(|delta| delta as *const BookDelta)
+            };
+            assert_eq!(view.get(&single_key(7, 2)), Some(single(2, 101)));
+            assert_eq!(built(), None, "a point read builds no delta");
+
+            assert_eq!(view.best_prices(&market(7)), (Some(101), None));
+            let first = built().expect("built by the first book query");
+            assert_eq!(view.depth(&market(7), true, 10), vec![(101, 10), (100, 10)]);
+            assert_eq!(built(), Some(first), "reused by later queries");
+
+            assert_eq!(view.best_prices(&market(8)), (Some(500), None));
+            assert!(view.by_market.get(&market(8)).is_none());
+        });
+    }
+
+    #[test]
+    fn markets_in_exchange_follows_the_overlay() {
+        let base = base_with(vec![
+            (single_key(7, 1), single(1, 100)),
+            (single_key(8, 1), single(1, 500)),
+            (single_key(8, 2), single(2, 501)),
         ]);
-        let other = base.with_view(&overlay, |view| view.market_orders(&market(8)));
-        assert_eq!(other.len(), 1, "other markets are untouched");
+        let overlay = base.new_overlay().extend(&base.layers(), 1, vec![
+            (single_key(8, 1), None),
+            (single_key(8, 2), None),
+            (bulk_key(9, 4), Some(bulk(4, 98))),
+            (single_key(7, 1), Some(single(1, 99))),
+        ]);
+        base.with_view(&overlay, |view| {
+            assert_eq!(view.markets_in_exchange(addr(1)), vec![addr(7), addr(9)]);
+            assert!(view.markets_in_exchange(addr(2)).is_empty());
+        });
     }
 
     #[test]
@@ -793,7 +991,7 @@ mod tests {
 #[cfg(test)]
 mod book_tests {
     use super::*;
-    use crate::state_store::order_books::{BookEntry, BookOrder};
+    use crate::state_store::order_books::{BookDelta, BookEntry, BookOrder, BookView};
     use aptos_types::state_store::native_order::{
         BulkOrderV1, SingleOrderV1, TimeInForce, TriggerCondition,
     };
@@ -1148,5 +1346,135 @@ mod book_tests {
             }
             prop_assert_eq!(&orders, &rebuilt(&orders));
         }
+    }
+
+    fn write_of(op: &Op) -> (OrderKey, Option<NativeOrder>) {
+        match op {
+            Op::SetSingle(single) => (single_key(single.order_id), Some(single.order())),
+            Op::DeleteSingle(order_id) => (single_key(*order_id), None),
+            Op::SetBulk {
+                account,
+                bids,
+                asks,
+            } => (bulk_key(*account), Some(bulk(*account, bids, asks))),
+            Op::DeleteBulk(account) => (bulk_key(*account), None),
+        }
+    }
+
+    fn market() -> MarketKey {
+        MarketKey {
+            exchange: addr(1),
+            market: addr(7),
+        }
+    }
+
+    /// Everything the read API answers from a book.
+    #[derive(Debug, PartialEq)]
+    struct Answers {
+        bids: Vec<(u64, BookEntry)>,
+        asks: Vec<(u64, BookEntry)>,
+        bid_depth: Vec<(u64, u128)>,
+        ask_depth: Vec<(u64, u128)>,
+        best: (Option<u64>, Option<u64>),
+        impact: Vec<(Option<u64>, Option<u64>)>,
+        within: Vec<(u128, u128)>,
+        accounts: Vec<Vec<u128>>,
+    }
+
+    fn answers(view: &BookView<'_>) -> Answers {
+        Answers {
+            bids: view.bids().map(|(price, entry)| (price, *entry)).collect(),
+            asks: view.asks().map(|(price, entry)| (price, *entry)).collect(),
+            bid_depth: view.depth_levels(true).collect(),
+            ask_depth: view.depth_levels(false).collect(),
+            best: view.best_prices(),
+            impact: [(0, 10), (500, 10), (1_500, 2), (u128::MAX / 2, 10)]
+                .iter()
+                .map(|(notional, levels)| view.impact_prices(*notional, *levels))
+                .collect(),
+            within: [95, 100, 104]
+                .iter()
+                .map(|px| (view.depth_within(true, *px), view.depth_within(false, *px)))
+                .collect(),
+            accounts: (0..3)
+                .map(|account| view.account_single_orders(&addr(account)))
+                .collect(),
+        }
+    }
+
+    proptest! {
+        /// A block's view, the base with the overlay's writes applied on
+        /// read, answers exactly as the base does after folding the overlay.
+        #[test]
+        fn view_over_an_overlay_equals_the_folded_book(
+            seed in prop::collection::vec(op(), 0..40),
+            writes in prop::collection::vec(op(), 0..20),
+        ) {
+            let mut seeded = MarketOrders::default();
+            for op in &seed {
+                let (key, write) = write_of(op);
+                seeded.apply(&key, write);
+            }
+            let rows: Vec<_> = seeded
+                .singles()
+                .iter()
+                .map(|(order_id, order)| (single_key(*order_id), NativeOrder::Single(order.clone())))
+                .chain(seeded.bulks().iter().map(|(account, order)| {
+                    let key = OrderKey::Bulk {
+                        exchange: addr(1),
+                        market: addr(7),
+                        account: *account,
+                    };
+                    (key, NativeOrder::Bulk(order.clone()))
+                }))
+                .collect();
+            let base = OrderBase::new_at_version(Some(0), "test", rows.clone());
+            let folded = OrderBase::new_at_version(Some(0), "test", rows);
+            let writes: Vec<_> = writes.iter().map(write_of).collect();
+            let overlay = base.new_overlay().extend(&base.layers(), 1, writes.clone());
+            let folded_overlay = folded.new_overlay().extend(&folded.layers(), 1, writes);
+
+            let from_view = base.with_view(&overlay, |view| answers(&view.book(&market())));
+            prop_assert!(folded.fold(&folded_overlay));
+            let from_fold = folded.read(|view| {
+                let book = view.market_orders(&market()).map(MarketOrders::book);
+                answers(&BookView::new(book, BookDelta::empty()))
+            });
+            prop_assert_eq!(from_view, from_fold);
+        }
+    }
+
+    /// loracle's `test_impact_price_{combined_regular_and_bulk_orders,
+    /// bulk_orders_improve_spread}`: single orders and a bulk order's levels
+    /// aggregate into one depth, and the impact walk runs over it.
+    #[test]
+    fn impact_prices_over_singles_and_bulk_levels() {
+        let target = 25_000_000_000_000u128;
+        let mut orders = MarketOrders::default();
+        set_single(&mut orders, &Single::active(1, 9_900_000, 1_000_000, true));
+        set_single(&mut orders, &Single::active(2, 9_800_000, 2_000_000, true));
+        set_single(
+            &mut orders,
+            &Single::active(3, 10_100_000, 1_000_000, false),
+        );
+        set_single(
+            &mut orders,
+            &Single::active(4, 10_200_000, 2_000_000, false),
+        );
+        let regular = BookView::new(Some(orders.book()), BookDelta::empty())
+            .impact_prices(target, usize::MAX);
+        assert_eq!(regular, (Some(9_839_357), Some(10_159_363)));
+
+        orders.apply(
+            &bulk_key(5),
+            Some(bulk(
+                5,
+                &[(9_900_000, 1_500_000), (9_700_000, 3_000_000)],
+                &[(10_100_000, 1_500_000), (10_300_000, 3_000_000)],
+            )),
+        );
+        let combined = BookView::new(Some(orders.book()), BookDelta::empty())
+            .impact_prices(target, usize::MAX);
+        assert_eq!(combined, (Some(9_898_989), Some(10_100_000)));
     }
 }

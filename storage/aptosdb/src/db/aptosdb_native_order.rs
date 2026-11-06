@@ -4,6 +4,7 @@
 use crate::{
     db::AptosDB,
     ledger_db::LedgerDb,
+    native_order_reader::InMemoryNativeOrderReader,
     native_store::{
         bundle::{NativeStoreBundle, NativeStoreConfigs},
         NativeStoreSpec, OrderStore,
@@ -39,6 +40,16 @@ pub struct OrderBundle {
 impl AptosDB {
     pub fn order(&self) -> Option<&Arc<OrderBundle>> {
         self.order.as_ref()
+    }
+
+    /// Reader over the committed order tip. `None` when trading-native
+    /// storage is off.
+    pub fn native_order_reader(&self) -> Option<InMemoryNativeOrderReader> {
+        let bundle = self.order.as_ref()?;
+        Some(InMemoryNativeOrderReader::new(
+            Arc::clone(&bundle.order_base),
+            Arc::clone(&bundle.orders),
+        ))
     }
 
     /// Called from `open_internal` beside `init_native_position` when

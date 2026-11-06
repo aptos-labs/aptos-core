@@ -2403,4 +2403,77 @@ mod reopen {
         assert_eq!(read(&db, 2), Some(NativeOrder::Single(order(2, 101))));
         assert_eq!(read(&db, 3), Some(NativeOrder::Single(order(3, 102))));
     }
+
+    /// The reader answers from the committed tip, and the same after a reopen
+    /// cold-loads the base.
+    #[test]
+    fn order_reader_answers_from_the_committed_tip() {
+        use crate::native_order_reader::NativeOrderReader;
+        use aptos_storage_interface::state_store::orders::{MarketKey, OrderKey};
+        use aptos_types::state_store::native_order::{
+            NativeSingleOrder, SingleOrderV1, TimeInForce,
+        };
+
+        fn bytes(order_id: u128, price: u64, is_bid: bool) -> Vec<u8> {
+            NativeSingleOrder::V1(SingleOrderV1 {
+                account: super::account(2),
+                order_id,
+                client_order_id: None,
+                price,
+                orig_size: 10,
+                remaining_size: 10,
+                is_bid,
+                trigger_condition: None,
+                time_in_force: TimeInForce::Gtc,
+                creation_time_micros: 0,
+                unique_priority_idx: order_id,
+                metadata: vec![].into(),
+            })
+            .serialize()
+            .unwrap()
+        }
+        let market = MarketKey {
+            exchange: exchange(1),
+            market: super::market(7),
+        };
+        let check = |db: &AptosDB| {
+            let reader = db.native_order_reader().expect("order store attached");
+            assert_eq!(reader.best_prices(&market), (Some(100), Some(105)));
+            assert_eq!(reader.depth(&market, true, 10), vec![(100, 10), (99, 10)]);
+            assert_eq!(reader.depth_within(&market, false, 105), 10);
+            assert_eq!(
+                reader.impact_prices(&market, 1_000, 10),
+                (Some(100), Some(105))
+            );
+            assert_eq!(
+                reader.account_orders(&market, super::account(2)),
+                [1, 3, 4]
+                    .map(|order_id| OrderKey::Single {
+                        exchange: market.exchange,
+                        market: market.market,
+                        order_id,
+                    })
+                    .to_vec()
+            );
+            assert_eq!(reader.markets_in_exchange(exchange(1)), vec![
+                super::market(7)
+            ]);
+        };
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[], &[
+                (order_key(1), Some(&bytes(1, 100, true))),
+                (order_key(2), Some(&bytes(2, 101, true))),
+                (order_key(3), Some(&bytes(3, 105, false))),
+            ]);
+            commit_orders(&db, 1, &[], &[
+                (order_key(2), None),
+                (order_key(4), Some(&bytes(4, 99, true))),
+            ]);
+            check(&db);
+        }
+        check(&open(&dir, true));
+    }
 }
