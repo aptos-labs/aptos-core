@@ -1,0 +1,10 @@
+module 0xfc::genmovefromdrop
+
+struct R<A: store> has key
+  v: A
+
+fun f<A: store>(a: address) acquires R
+    move_loc a
+    move_from R<A>
+    pop
+    ret

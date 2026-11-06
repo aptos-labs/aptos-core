@@ -1,0 +1,5 @@
+module 0xdb::retlocal
+
+fun f(x: u64): &u64
+    borrow_loc x
+    ret

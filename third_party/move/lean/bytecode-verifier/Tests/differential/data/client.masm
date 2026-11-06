@@ -1,0 +1,9 @@
+module 0x88::client
+use 0x88::data as d
+
+public fun twice(x: u64): u64
+    copy_loc x
+    move_loc x
+    call d::make
+    call d::sum
+    ret

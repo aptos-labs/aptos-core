@@ -1,0 +1,13 @@
+module 0x89::packbad
+
+struct Pair has drop
+  a: u64
+  b: u64
+
+fun f(): u64
+    ld_u64 1
+    ld_true
+    pack Pair
+    pop
+    ld_u64 0
+    ret

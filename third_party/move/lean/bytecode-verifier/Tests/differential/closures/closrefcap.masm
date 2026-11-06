@@ -1,0 +1,11 @@
+module 0xe4::closrefcap
+
+fun read(x: &u64): u64
+    move_loc x
+    read_ref
+    ret
+
+fun f(x: &u64): | |u64 has drop
+    move_loc x
+    pack_closure read, 1
+    ret

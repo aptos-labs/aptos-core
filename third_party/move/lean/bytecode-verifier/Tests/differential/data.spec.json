@@ -1,0 +1,47 @@
+{
+  "inputs": [
+    "data/data.masm",
+    "data/client.masm"
+  ],
+  "calls": [
+    { "function": "0x88::data::pair_sum", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "3" },
+      { "kind": "integer", "width": 64, "signed": false, "value": "4" } ] },
+    { "function": "0x88::data::copy_pair", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "5" } ] },
+    { "function": "0x88::data::area", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "3" },
+      { "kind": "integer", "width": 64, "signed": false, "value": "4" } ] },
+    { "function": "0x88::data::wrong_variant", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "1" } ] },
+    { "function": "0x88::data::same_circle", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "1" },
+      { "kind": "integer", "width": 64, "signed": false, "value": "1" } ] },
+    { "function": "0x88::data::same_circle", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "1" },
+      { "kind": "integer", "width": 64, "signed": false, "value": "2" } ] },
+    { "function": "0x88::data::coin_roundtrip", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "9" } ] },
+    { "function": "0x88::data::vec3", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "1" },
+      { "kind": "integer", "width": 64, "signed": false, "value": "2" },
+      { "kind": "integer", "width": 64, "signed": false, "value": "3" } ] },
+    { "function": "0x88::data::vec_sum", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "2" },
+      { "kind": "integer", "width": 64, "signed": false, "value": "3" } ] },
+    { "function": "0x88::data::vec_bad_len", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "1" } ] },
+    { "function": "0x88::data::vec_eq", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "1" },
+      { "kind": "integer", "width": 64, "signed": false, "value": "1" } ] },
+    { "function": "0x88::data::vec_eq", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "1" },
+      { "kind": "integer", "width": 64, "signed": false, "value": "2" } ] },
+    { "function": "0x88::data::const_vec", "args": [] },
+    { "function": "0x88::data::nested", "args": [] },
+    { "function": "0x88::data::msg", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "42" } ] },
+    { "function": "0x88::client::twice", "args": [
+      { "kind": "integer", "width": 64, "signed": false, "value": "4" } ] }
+  ]
+}

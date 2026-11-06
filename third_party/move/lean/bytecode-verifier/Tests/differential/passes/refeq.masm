@@ -1,0 +1,10 @@
+module 0xc2::refeq
+
+fun h(x: &mut u64): bool
+    local y: &mut u64
+    copy_loc x
+    st_loc y
+    move_loc x
+    copy_loc y
+    eq
+    ret

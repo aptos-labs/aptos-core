@@ -1,0 +1,12 @@
+module 0xb3::acqmissing
+
+struct R has key
+  v: u64
+
+fun f(): u64 acquires R
+    call f
+    ret
+
+fun g(): u64
+    call f
+    ret

@@ -1,0 +1,125 @@
+module 0xd0::refsok
+
+struct S has copy + drop
+  a: u64
+  b: u8
+
+struct R has key
+  v: u64
+
+enum E has drop
+  V1
+    x: u64
+  V2
+    x: u64
+    y: bool
+
+fun loc_rw(): u64
+    local x: u64
+    ld_u64 1
+    st_loc x
+    ld_u64 2
+    mut_borrow_loc x
+    write_ref
+    borrow_loc x
+    read_ref
+    ret
+
+fun field_rw(s: S): u8
+    ld_u8 7
+    mut_borrow_loc s
+    mut_borrow_field S, b
+    write_ref
+    borrow_loc s
+    borrow_field S, b
+    read_ref
+    ret
+
+fun freeze(x: &mut u64): u64
+    move_loc x
+    freeze_ref
+    read_ref
+    ret
+
+fun variant_read(e: E): u64
+    borrow_loc e
+    borrow_variant_field E, V1::x, V2::x
+    read_ref
+    ret
+
+fun variant_write(e: &mut E)
+    ld_u64 3
+    move_loc e
+    mut_borrow_variant_field E, V1::x, V2::x
+    write_ref
+    ret
+
+fun is_v1(e: &E): bool
+    move_loc e
+    test_variant E, V1
+    ret
+
+fun vec_ops(v: vector<u64>): u64
+    mut_borrow_loc v
+    ld_u64 4
+    vec_push_back <u64>
+    mut_borrow_loc v
+    ld_u64 0
+    ld_u64 1
+    vec_swap <u64>
+    mut_borrow_loc v
+    vec_pop_back <u64>
+    pop
+    borrow_loc v
+    vec_len <u64>
+    pop
+    borrow_loc v
+    ld_u64 0
+    vec_borrow <u64>
+    read_ref
+    ret
+
+fun vec_set(v: &mut vector<u64>)
+    ld_u64 9
+    move_loc v
+    ld_u64 0
+    vec_mut_borrow <u64>
+    write_ref
+    ret
+
+fun publish(s: &signer)
+    move_loc s
+    ld_u64 1
+    pack R
+    move_to R
+    ret
+
+fun has(a: address): bool
+    move_loc a
+    exists R
+    ret
+
+fun get(a: address): u64 acquires R
+    move_loc a
+    borrow_global R
+    borrow_field R, v
+    read_ref
+    ret
+
+fun set(a: address) acquires R
+    ld_u64 5
+    move_loc a
+    mut_borrow_global R
+    mut_borrow_field R, v
+    write_ref
+    ret
+
+fun take(a: address): u64 acquires R
+    move_loc a
+    move_from R
+    unpack R
+    ret
+
+fun pass_through(x: &mut u64): &mut u64
+    move_loc x
+    ret

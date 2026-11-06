@@ -1,0 +1,9 @@
+module 0xd4::apikey
+
+struct S has key
+  a: u64
+
+#[pack] fun pack$S(a: u64): S
+    move_loc a
+    pack S
+    ret

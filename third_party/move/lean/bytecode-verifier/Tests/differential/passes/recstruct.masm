@@ -1,0 +1,11 @@
+module 0xa4::recstruct
+
+struct S has drop
+  f: T
+
+struct T has drop
+  g: S
+
+fun f(): u64
+    ld_u64 1
+    ret

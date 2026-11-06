@@ -1,0 +1,18 @@
+{
+  "inputs": [
+    "generics/genericsok.masm",
+    "generics/genpackbad.masm",
+    "generics/gencallbad.masm",
+    "generics/genretbad.masm",
+    "generics/genunpackbad.masm",
+    "generics/genfieldbad.masm",
+    "generics/genkeybad.masm",
+    "generics/gentestbad.masm",
+    "generics/genmovetobad.masm",
+    "generics/genvariantdiff.masm",
+    "generics/genvariantsame.masm",
+    "generics/genglobalref.masm",
+    "generics/genmovefromdrop.masm"
+  ],
+  "calls": []
+}

@@ -1,0 +1,11 @@
+module 0xd3::apipattern
+
+struct S has drop
+  a: u64
+  b: u64
+
+#[pack] fun pack$S(a: u64, b: u64): S
+    move_loc b
+    move_loc a
+    pack S
+    ret

@@ -1,0 +1,7 @@
+module 0x98::badadd
+
+fun f(): u64
+    ld_u64 1
+    ld_u8 2
+    add
+    ret

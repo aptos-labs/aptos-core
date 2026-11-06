@@ -1,0 +1,14 @@
+module 0xc1::refcall
+
+fun take(x: &mut u64)
+    move_loc x
+    pop
+    ret
+
+fun g(x: &mut u64)
+    local y: &mut u64
+    copy_loc x
+    st_loc y
+    move_loc x
+    call take
+    ret

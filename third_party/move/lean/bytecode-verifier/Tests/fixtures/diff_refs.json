@@ -1,0 +1,2426 @@
+{
+  "format": "move-bytecode-lean-diff/1",
+  "modules": [
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 3,
+          "type_parameters": []
+        },
+        {
+          "module": 0,
+          "name": 2,
+          "abilities": 8,
+          "type_parameters": []
+        },
+        {
+          "module": 0,
+          "name": 3,
+          "abilities": 2,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 4,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 5,
+          "parameters": 2,
+          "return_": 3,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 6,
+          "parameters": 4,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 7,
+          "parameters": 5,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 8,
+          "parameters": 6,
+          "return_": 0,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 9,
+          "parameters": 7,
+          "return_": 8,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 10,
+          "parameters": 9,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 11,
+          "parameters": 10,
+          "return_": 0,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 12,
+          "parameters": 11,
+          "return_": 0,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 13,
+          "parameters": 12,
+          "return_": 8,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 14,
+          "parameters": 12,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 15,
+          "parameters": 12,
+          "return_": 0,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 16,
+          "parameters": 12,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 17,
+          "parameters": 4,
+          "return_": 4,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [
+        {
+          "owner": 0,
+          "field": 1
+        },
+        {
+          "owner": 1,
+          "field": 0
+        }
+      ],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [],
+        [
+          "U64"
+        ],
+        [
+          {
+            "Struct": 0
+          }
+        ],
+        [
+          "U8"
+        ],
+        [
+          {
+            "MutableReference": "U64"
+          }
+        ],
+        [
+          {
+            "Struct": 2
+          }
+        ],
+        [
+          {
+            "MutableReference": {
+              "Struct": 2
+            }
+          }
+        ],
+        [
+          {
+            "Reference": {
+              "Struct": 2
+            }
+          }
+        ],
+        [
+          "Bool"
+        ],
+        [
+          {
+            "Vector": "U64"
+          }
+        ],
+        [
+          {
+            "MutableReference": {
+              "Vector": "U64"
+            }
+          }
+        ],
+        [
+          {
+            "Reference": "Signer"
+          }
+        ],
+        [
+          "Address"
+        ]
+      ],
+      "identifiers": [
+        "refsok",
+        "S",
+        "R",
+        "E",
+        "loc_rw",
+        "field_rw",
+        "freeze",
+        "variant_read",
+        "variant_write",
+        "is_v1",
+        "vec_ops",
+        "vec_set",
+        "publish",
+        "has",
+        "get",
+        "set",
+        "take",
+        "pass_through",
+        "a",
+        "b",
+        "v",
+        "V1",
+        "x",
+        "V2",
+        "y"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000d0"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 18,
+                "signature": "U64"
+              },
+              {
+                "name": 19,
+                "signature": "U8"
+              }
+            ]
+          }
+        },
+        {
+          "struct_handle": 1,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 20,
+                "signature": "U64"
+              }
+            ]
+          }
+        },
+        {
+          "struct_handle": 2,
+          "field_information": {
+            "DeclaredVariants": [
+              {
+                "name": 21,
+                "fields": [
+                  {
+                    "name": 22,
+                    "signature": "U64"
+                  }
+                ]
+              },
+              {
+                "name": 23,
+                "fields": [
+                  {
+                    "name": 22,
+                    "signature": "U64"
+                  },
+                  {
+                    "name": 24,
+                    "signature": "Bool"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 1,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              {
+                "StLoc": 0
+              },
+              {
+                "LdU64": "2"
+              },
+              {
+                "MutBorrowLoc": 0
+              },
+              "WriteRef",
+              {
+                "ImmBorrowLoc": 0
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 1,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU8": "7"
+              },
+              {
+                "MutBorrowLoc": 0
+              },
+              {
+                "MutBorrowField": 0
+              },
+              "WriteRef",
+              {
+                "ImmBorrowLoc": 0
+              },
+              {
+                "ImmBorrowField": 0
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 2,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              "FreezeRef",
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 3,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "ImmBorrowLoc": 0
+              },
+              {
+                "ImmBorrowVariantField": 0
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 4,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "3"
+              },
+              {
+                "MoveLoc": 0
+              },
+              {
+                "MutBorrowVariantField": 0
+              },
+              "WriteRef",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 5,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "TestVariant": 0
+              },
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 6,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "MutBorrowLoc": 0
+              },
+              {
+                "LdU64": "4"
+              },
+              {
+                "VecPushBack": 1
+              },
+              {
+                "MutBorrowLoc": 0
+              },
+              {
+                "LdU64": "0"
+              },
+              {
+                "LdU64": "1"
+              },
+              {
+                "VecSwap": 1
+              },
+              {
+                "MutBorrowLoc": 0
+              },
+              {
+                "VecPopBack": 1
+              },
+              "Pop",
+              {
+                "ImmBorrowLoc": 0
+              },
+              {
+                "VecLen": 1
+              },
+              "Pop",
+              {
+                "ImmBorrowLoc": 0
+              },
+              {
+                "LdU64": "0"
+              },
+              {
+                "VecImmBorrow": 1
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 7,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "9"
+              },
+              {
+                "MoveLoc": 0
+              },
+              {
+                "LdU64": "0"
+              },
+              {
+                "VecMutBorrow": 1
+              },
+              "WriteRef",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 8,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "LdU64": "1"
+              },
+              {
+                "Pack": 1
+              },
+              {
+                "MoveTo": 1
+              },
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 9,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "Exists": 1
+              },
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 10,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [
+            1
+          ],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "ImmBorrowGlobal": 1
+              },
+              {
+                "ImmBorrowField": 1
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 11,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [
+            1
+          ],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "5"
+              },
+              {
+                "MoveLoc": 0
+              },
+              {
+                "MutBorrowGlobal": 1
+              },
+              {
+                "MutBorrowField": 1
+              },
+              "WriteRef",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 12,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [
+            1
+          ],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "MoveFrom": 1
+              },
+              {
+                "Unpack": 1
+              },
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 13,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [
+        {
+          "struct_index": 2,
+          "variant": 0
+        }
+      ],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [
+        {
+          "struct_index": 2,
+          "variants": [
+            0,
+            1
+          ],
+          "field": 0
+        }
+      ],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 8,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          "Address"
+        ],
+        [
+          {
+            "Struct": 0
+          }
+        ],
+        []
+      ],
+      "identifiers": [
+        "readnocopy",
+        "R",
+        "f",
+        "v"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000d1"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [
+            0
+          ],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "ImmBorrowGlobal": 0
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Reference": "U64"
+          }
+        ],
+        []
+      ],
+      "identifiers": [
+        "writeimm",
+        "f"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000d2"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 1,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              {
+                "MoveLoc": 0
+              },
+              "WriteRef",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 4,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "MutableReference": {
+              "Struct": 0
+            }
+          },
+          {
+            "Struct": 0
+          }
+        ],
+        []
+      ],
+      "identifiers": [
+        "writenodrop",
+        "C",
+        "f",
+        "v"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000d3"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 1,
+            "code": [
+              {
+                "MoveLoc": 1
+              },
+              {
+                "MoveLoc": 0
+              },
+              "WriteRef",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Reference": "U64"
+          }
+        ],
+        []
+      ],
+      "identifiers": [
+        "borrowref",
+        "f"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000d4"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 1,
+            "code": [
+              {
+                "MutBorrowLoc": 0
+              },
+              "Pop",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 4,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Reference": "Signer"
+          }
+        ],
+        []
+      ],
+      "identifiers": [
+        "movetonokey",
+        "S",
+        "f",
+        "v"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000d5"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 1,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "LdU64": "1"
+              },
+              {
+                "Pack": 0
+              },
+              {
+                "MoveTo": 0
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 2,
+          "type_parameters": []
+        },
+        {
+          "module": 0,
+          "name": 2,
+          "abilities": 2,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 3,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [
+        {
+          "owner": 0,
+          "field": 0
+        }
+      ],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Reference": {
+              "Struct": 1
+            }
+          }
+        ],
+        [
+          "U64"
+        ],
+        []
+      ],
+      "identifiers": [
+        "fieldmismatch",
+        "A",
+        "B",
+        "f",
+        "v"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000d6"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 4,
+                "signature": "U64"
+              }
+            ]
+          }
+        },
+        {
+          "struct_handle": 1,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 4,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "ImmBorrowField": 0
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Reference": {
+              "Vector": "U64"
+            }
+          }
+        ],
+        [],
+        [
+          "U64"
+        ]
+      ],
+      "identifiers": [
+        "pushimm",
+        "f"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000d7"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 1,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "LdU64": "1"
+              },
+              {
+                "VecPushBack": 2
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 0,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Reference": "U64"
+          }
+        ],
+        []
+      ],
+      "identifiers": [
+        "freezeimm",
+        "f"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000d8"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 1,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              "FreezeRef",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [],
+        [
+          "U64"
+        ],
+        [
+          "U64",
+          {
+            "Reference": "U64"
+          }
+        ]
+      ],
+      "identifiers": [
+        "moveborrowed",
+        "f"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000da"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "LdU64": "0"
+              },
+              {
+                "StLoc": 0
+              },
+              {
+                "ImmBorrowLoc": 0
+              },
+              {
+                "StLoc": 1
+              },
+              {
+                "MoveLoc": 0
+              },
+              "Pop",
+              {
+                "MoveLoc": 1
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          "U64"
+        ],
+        [
+          {
+            "Reference": "U64"
+          }
+        ],
+        []
+      ],
+      "identifiers": [
+        "retlocal",
+        "f"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000db"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "ImmBorrowLoc": 0
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 8,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [
+        {
+          "owner": 0,
+          "field": 0
+        }
+      ],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          "Address"
+        ],
+        [
+          "U64"
+        ],
+        []
+      ],
+      "identifiers": [
+        "noacquire",
+        "R",
+        "f",
+        "v"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000dc"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "ImmBorrowGlobal": 0
+              },
+              {
+                "ImmBorrowField": 0
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 2,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Reference": {
+              "Struct": 0
+            }
+          }
+        ],
+        [
+          "U64"
+        ],
+        []
+      ],
+      "identifiers": [
+        "variantmismatch",
+        "E",
+        "f",
+        "V1",
+        "x",
+        "V2"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000dd"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "DeclaredVariants": [
+              {
+                "name": 3,
+                "fields": [
+                  {
+                    "name": 4,
+                    "signature": "U64"
+                  }
+                ]
+              },
+              {
+                "name": 5,
+                "fields": [
+                  {
+                    "name": 4,
+                    "signature": "Bool"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "ImmBorrowVariantField": 0
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [
+        {
+          "struct_index": 0,
+          "variants": [
+            0,
+            1
+          ],
+          "field": 0
+        }
+      ],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 2,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Struct": 0
+          }
+        ],
+        [
+          "Bool"
+        ],
+        []
+      ],
+      "identifiers": [
+        "testvalue",
+        "E",
+        "f",
+        "V1",
+        "x",
+        "V2"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000de"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "DeclaredVariants": [
+              {
+                "name": 3,
+                "fields": [
+                  {
+                    "name": 4,
+                    "signature": "U64"
+                  }
+                ]
+              },
+              {
+                "name": 5,
+                "fields": [
+                  {
+                    "name": 4,
+                    "signature": "U64"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "TestVariant": 0
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [
+        {
+          "struct_index": 0,
+          "variant": 0
+        }
+      ],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 8,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [],
+        [
+          "Bool"
+        ]
+      ],
+      "identifiers": [
+        "existsbad",
+        "R",
+        "f",
+        "v"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000df"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              {
+                "Exists": 0
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [],
+        [
+          "U64"
+        ],
+        [
+          "U64",
+          {
+            "Reference": "U64"
+          }
+        ]
+      ],
+      "identifiers": [
+        "writeborrowed",
+        "f"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000e4"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "LdU64": "0"
+              },
+              {
+                "StLoc": 0
+              },
+              {
+                "ImmBorrowLoc": 0
+              },
+              {
+                "StLoc": 1
+              },
+              {
+                "LdU64": "5"
+              },
+              {
+                "MutBorrowLoc": 0
+              },
+              "WriteRef",
+              {
+                "MoveLoc": 1
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 8,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [
+        {
+          "owner": 0,
+          "field": 0
+        }
+      ],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          "Address"
+        ],
+        [
+          "U64"
+        ],
+        [
+          {
+            "MutableReference": {
+              "Struct": 0
+            }
+          }
+        ]
+      ],
+      "identifiers": [
+        "globaltwice",
+        "R",
+        "f",
+        "v"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000e5"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [
+            0
+          ],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "CopyLoc": 0
+              },
+              {
+                "MutBorrowGlobal": 0
+              },
+              {
+                "StLoc": 1
+              },
+              {
+                "CopyLoc": 0
+              },
+              {
+                "ImmBorrowGlobal": 0
+              },
+              {
+                "ImmBorrowField": 0
+              },
+              "ReadRef",
+              {
+                "MoveLoc": 1
+              },
+              {
+                "MutBorrowField": 0
+              },
+              "ReadRef",
+              "Add",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 8,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 3,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [
+        {
+          "owner": 0,
+          "field": 0
+        }
+      ],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          "Address"
+        ],
+        [
+          "U64"
+        ],
+        [],
+        [
+          {
+            "Reference": {
+              "Struct": 0
+            }
+          }
+        ]
+      ],
+      "identifiers": [
+        "callacquires",
+        "R",
+        "get",
+        "f",
+        "v"
+      ],
+      "address_identifiers": [
+        "0x00000000000000000000000000000000000000000000000000000000000000e6"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 4,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [
+            0
+          ],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "ImmBorrowGlobal": 0
+              },
+              {
+                "ImmBorrowField": 0
+              },
+              "ReadRef",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 1,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [
+            0
+          ],
+          "code": {
+            "locals": 3,
+            "code": [
+              {
+                "CopyLoc": 0
+              },
+              {
+                "ImmBorrowGlobal": 0
+              },
+              {
+                "StLoc": 1
+              },
+              {
+                "MoveLoc": 0
+              },
+              {
+                "Call": 0
+              },
+              {
+                "MoveLoc": 1
+              },
+              {
+                "ImmBorrowField": 0
+              },
+              "ReadRef",
+              "Add",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    }
+  ],
+  "scripts": [],
+  "rust_verifier": [
+    {
+      "module": "0xd0::refsok",
+      "local": "ok",
+      "linking": "ok"
+    },
+    {
+      "module": "0xd1::readnocopy",
+      "local": "READREF_WITHOUT_COPY_ABILITY",
+      "linking": "ok"
+    },
+    {
+      "module": "0xd2::writeimm",
+      "local": "WRITEREF_NO_MUTABLE_REFERENCE_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0xd3::writenodrop",
+      "local": "WRITEREF_WITHOUT_DROP_ABILITY",
+      "linking": "ok"
+    },
+    {
+      "module": "0xd4::borrowref",
+      "local": "BORROWLOC_REFERENCE_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0xd5::movetonokey",
+      "local": "MOVETO_WITHOUT_KEY_ABILITY",
+      "linking": "ok"
+    },
+    {
+      "module": "0xd6::fieldmismatch",
+      "local": "BORROWFIELD_TYPE_MISMATCH_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0xd7::pushimm",
+      "local": "TYPE_MISMATCH",
+      "linking": "ok"
+    },
+    {
+      "module": "0xd8::freezeimm",
+      "local": "FREEZEREF_TYPE_MISMATCH_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0xda::moveborrowed",
+      "local": "MOVELOC_EXISTS_BORROW_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0xdb::retlocal",
+      "local": "UNSAFE_RET_LOCAL_OR_RESOURCE_STILL_BORROWED",
+      "linking": "ok"
+    },
+    {
+      "module": "0xdc::noacquire",
+      "local": "MISSING_ACQUIRES_ANNOTATION",
+      "linking": "ok"
+    },
+    {
+      "module": "0xdd::variantmismatch",
+      "local": "BORROWFIELD_TYPE_MISMATCH_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0xde::testvalue",
+      "local": "TEST_VARIANT_TYPE_MISMATCH_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0xdf::existsbad",
+      "local": "EXISTS_WITHOUT_KEY_ABILITY_OR_BAD_ARGUMENT",
+      "linking": "ok"
+    },
+    {
+      "module": "0xe4::writeborrowed",
+      "local": "WRITEREF_EXISTS_BORROW_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0xe5::globaltwice",
+      "local": "GLOBAL_REFERENCE_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0xe6::callacquires",
+      "local": "GLOBAL_REFERENCE_ERROR",
+      "linking": "ok"
+    }
+  ],
+  "calls": []
+}

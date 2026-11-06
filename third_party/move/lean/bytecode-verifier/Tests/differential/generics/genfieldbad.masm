@@ -1,0 +1,10 @@
+module 0xf5::genfieldbad
+
+struct S<A> has drop
+  a: A
+
+fun f(s: &S<u64>): u8
+    move_loc s
+    borrow_field S<u8>, a
+    read_ref
+    ret

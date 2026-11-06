@@ -1,0 +1,5 @@
+module 0x92::underflow
+
+fun f(): u64
+    add
+    ret

@@ -1,0 +1,6 @@
+module 0xab::friendok
+friend 0xab::buddy
+
+fun f(): u64
+    ld_u64 1
+    ret

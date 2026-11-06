@@ -47,6 +47,8 @@ verex-ir <- verex-move <- verex-e2e-tests
              verex-rust <- verex-e2e-tests
 
 move-model <- move <- transpiler        (deprecated, reference only)
+
+bytecode-verifier                       (independent of all of the above)
 ```
 
 `verex-e2e-tests` is deliberately test-only and may depend on every layer it
@@ -66,6 +68,7 @@ exercises. Avoid introducing reverse dependencies into production packages.
 | [`v0/move/`](v0/move/) | **Deprecated, reference only.** The original Verex Move surface language, source semantics, contracts, `verify`, compiler lowering, and `Move/Tests` regressions, being rebuilt over the unified VIR. |
 | [`v0/transpiler/`](v0/transpiler/) | **Deprecated, reference only.** `aptos move exchange --format ast` decoder, Move-to-Verex printer, intrinsic handling, reporting, CLI, and printer/elaboration baselines. Its exchange frontend and VIR adapter were ported to `verex-move`. |
 | [`verex-e2e-tests/`](verex-e2e-tests/) | Discoverable Move-to-VerexSL and Rust-to-VerexSL source/result baselines. Assertion-style legacy tests remain with their owning packages. |
+| [`bytecode-verifier/`](bytecode-verifier/) | Reference semantics of Move bytecode and soundness proofs for the bytecode verifier, per [`doc/designs/bytecode-verifier-soundness.md`](doc/designs/bytecode-verifier-soundness.md). `Spec/` is the trusted base and follows the plan's clean-room rules; `exporter/` is a workspace crate that exports compiled bytecode as JSON. See its `README.md`. |
 | [`scripts/`](scripts/) | The core smoke suite (`smoke.sh`, see "Between turns"), package verification with one process per module (`verify-modules.py`), the Rust pipeline benchmark (`bench-rust-pipeline.sh`), single-target isolation for cost and debugging (`isolate-target.py`), and the baseline error delta after a `UB=1` run (`exp-error-delta.sh`); see `doc/designs/performance.md`. The verification benchmark driver (`verex-bench.py`); see `doc/status/verification-benchmarks.md`. |
 | [`bench/`](bench/) | The problems of the verification benchmark (`problems.toml`), read from the tree at the benchmarked commit, and a Move package of problems written for it (`package/`). |
 | [`v0/`](v0/) | **Deprecated, reference only.** The original stack: `move`, `move-model`, `transpiler`, and their `scripts/` proof-cost tools. Nothing links them and they are not built in CI. |
@@ -111,6 +114,7 @@ Designs:
 - [`relocatable-namespaces.md`](doc/designs/relocatable-namespaces.md): namespaces linked by relocation; verification across modules.
 - [`rust-mir-design.md`](doc/designs/rust-mir-design.md): the Rustc Public frontend, Rust profile, source backend, milestones.
 - [`monovm-link-design.md`](doc/designs/monovm-link-design.md): MonoVM linked for differential execution.
+- [`bytecode-verifier-soundness.md`](doc/designs/bytecode-verifier-soundness.md): the plan of the bytecode verifier's soundness proof (`bytecode-verifier/`): trusted base, properties, phases, clean-room rules.
 - [`verex-rust/rust-exporter/README.md`](verex-rust/rust-exporter/README.md): exporter scope and commands.
 
 The deprecated packages under `v0/` keep their own design documents
@@ -170,7 +174,7 @@ pragmas are summarized in [`README.md`](README.md) ("Verifying sources").
 
 ## Build and test
 
-Build or test the package you changed from its own directory. These four
+Build or test the package you changed from its own directory. These five
 suites are the test matrix; the deprecated packages' suites are not part of
 test runs or CI:
 
@@ -179,6 +183,7 @@ test runs or CI:
 (cd verex-move       && lake build && lake test)
 (cd verex-rust       && lake build && lake test)
 (cd verex-e2e-tests && lake build && lake test)
+(cd bytecode-verifier && lake build && lake test)
 ```
 
 `verex-ir`'s suite includes a verification-cost benchmark

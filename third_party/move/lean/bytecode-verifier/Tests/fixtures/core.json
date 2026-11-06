@@ -1,0 +1,291 @@
+{
+  "format": "move-bytecode-lean/1",
+  "modules": [
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 0,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 1,
+          "return_": 2,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 3,
+          "parameters": 3,
+          "return_": 4,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 0,
+          "name": 4,
+          "parameters": 3,
+          "return_": 0,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          "U64"
+        ],
+        [
+          "I8",
+          "I8"
+        ],
+        [
+          "I8"
+        ],
+        [],
+        [
+          "I64"
+        ],
+        [
+          "U64",
+          "U64"
+        ]
+      ],
+      "identifiers": [
+        "math",
+        "sum",
+        "div_i8",
+        "neg_i64",
+        "secret"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000066"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Public",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 5,
+            "code": [
+              {
+                "LdU64": "0"
+              },
+              {
+                "StLoc": 1
+              },
+              {
+                "LdU64": "0"
+              },
+              {
+                "StLoc": 2
+              },
+              {
+                "CopyLoc": 1
+              },
+              {
+                "CopyLoc": 0
+              },
+              "Lt",
+              {
+                "BrFalse": 17
+              },
+              {
+                "CopyLoc": 1
+              },
+              {
+                "LdU64": "1"
+              },
+              "Add",
+              {
+                "StLoc": 1
+              },
+              {
+                "CopyLoc": 2
+              },
+              {
+                "CopyLoc": 1
+              },
+              "Add",
+              {
+                "StLoc": 2
+              },
+              {
+                "Branch": 4
+              },
+              {
+                "MoveLoc": 2
+              },
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 1,
+          "visibility": "Public",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 3,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "MoveLoc": 1
+              },
+              "Div",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 2,
+          "visibility": "Public",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 3,
+            "code": [
+              {
+                "LdI64": "-45"
+              },
+              "Negate",
+              "Ret"
+            ]
+          }
+        },
+        {
+          "function": 3,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 3,
+            "code": [
+              {
+                "LdU64": "7"
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        },
+        {
+          "address": 0,
+          "name": 2
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        },
+        {
+          "module": 1,
+          "name": 3,
+          "parameters": 1,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [],
+        [
+          "U64"
+        ]
+      ],
+      "identifiers": [
+        "client",
+        "run",
+        "math",
+        "sum"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000066"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Public",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "10"
+              },
+              {
+                "Call": 1
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    }
+  ],
+  "scripts": []
+}

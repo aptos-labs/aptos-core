@@ -1,0 +1,10 @@
+module 0xe5::closmaskbad
+
+fun one(x: u64): u64
+    move_loc x
+    ret
+
+fun f(): | |u64 has drop
+    ld_u64 1
+    pack_closure one, 2
+    ret

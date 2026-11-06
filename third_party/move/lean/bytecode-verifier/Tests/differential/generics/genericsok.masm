@@ -1,0 +1,110 @@
+module 0xf0::genericsok
+
+struct S<A> has copy + drop
+  a: A
+  n: u64
+
+struct R<A: store> has key
+  v: A
+
+enum E<A> has drop
+  V1
+    x: A
+  V2
+    x: A
+    y: bool
+
+fun id<A>(x: A): A
+    move_loc x
+    ret
+
+fun call_id(): u64
+    ld_u64 3
+    call id<u64>
+    ret
+
+fun call_id_param<B>(x: B): B
+    move_loc x
+    call id<B>
+    ret
+
+fun call_nested<B: copy + drop>(x: B): S<B>
+    move_loc x
+    ld_u64 1
+    pack S<B>
+    call id<S<B>>
+    ret
+
+fun pack_unpack(x: u64): (u64, u64)
+    move_loc x
+    ld_u64 1
+    pack S<u64>
+    unpack S<u64>
+    ret
+
+fun field_read<A: copy + drop>(s: &S<A>): A
+    move_loc s
+    borrow_field S<A>, a
+    read_ref
+    ret
+
+fun field_write(s: &mut S<u64>)
+    ld_u64 5
+    move_loc s
+    mut_borrow_field S<u64>, a
+    write_ref
+    ret
+
+fun test_v1<A: drop>(e: E<A>): bool
+    borrow_loc e
+    test_variant E<A>, V1
+    ret
+
+fun variant_read<A: copy + drop>(e: &E<A>): A
+    move_loc e
+    borrow_variant_field E<A>, V1::x, V2::x
+    read_ref
+    ret
+
+fun variant_write(e: &mut E<u64>)
+    ld_u64 3
+    move_loc e
+    mut_borrow_variant_field E<u64>, V1::x, V2::x
+    write_ref
+    ret
+
+fun variant_pack_unpack(x: u64): u64
+    move_loc x
+    pack_variant E<u64>, V1
+    unpack_variant E<u64>, V1
+    ret
+
+fun publish<A: store>(s: &signer, v: A, a: address): bool
+    move_loc s
+    move_loc v
+    pack R<A>
+    move_to R<A>
+    move_loc a
+    exists R<A>
+    ret
+
+fun read_global(a: address): u64 acquires R
+    move_loc a
+    borrow_global R<u64>
+    borrow_field R<u64>, v
+    read_ref
+    ret
+
+fun write_global(a: address) acquires R
+    ld_u64 1
+    move_loc a
+    mut_borrow_global R<u64>
+    mut_borrow_field R<u64>, v
+    write_ref
+    ret
+
+fun take<A: store>(a: address): A acquires R
+    move_loc a
+    move_from R<A>
+    unpack R<A>
+    ret

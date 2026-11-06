@@ -1,0 +1,11 @@
+module 0xd5::movetonokey
+
+struct S has store
+  v: u64
+
+fun f(s: &signer)
+    move_loc s
+    ld_u64 1
+    pack S
+    move_to S
+    ret

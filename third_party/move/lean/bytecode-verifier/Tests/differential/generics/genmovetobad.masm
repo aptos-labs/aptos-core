@@ -1,0 +1,11 @@
+module 0xf8::genmovetobad
+
+struct R<A: store> has key
+  v: A
+
+fun f(s: &signer)
+    move_loc s
+    ld_u8 1
+    pack R<u8>
+    move_to R<u64>
+    ret

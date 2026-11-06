@@ -1,0 +1,11 @@
+module 0x89::stloccoin
+
+struct Coin
+  value: u64
+
+fun f(c: Coin): Coin
+    ld_u64 1
+    pack Coin
+    st_loc c
+    move_loc c
+    ret

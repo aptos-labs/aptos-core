@@ -1,0 +1,12 @@
+module 0xd5::apivariant
+
+enum E has drop
+  V
+    x: u64
+  W
+    y: u64
+
+#[test_variant(1)] fun test_variant$E$V(e: &E): bool
+    move_loc e
+    test_variant E, V
+    ret

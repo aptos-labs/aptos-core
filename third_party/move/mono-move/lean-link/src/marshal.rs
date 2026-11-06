@@ -78,11 +78,15 @@ fn encode_integer(width: u16, signed: bool, text: &str) -> Result<Vec<u8>, Strin
         let value: i128 = text
             .parse()
             .map_err(|_| format!("invalid signed integer literal {text:?}"))?;
-        let limit = 1i128 << (width - 1);
-        if !(-limit..=limit - 1).contains(&value) {
-            return Err(format!(
-                "signed integer {value} does not fit in {width} bits"
-            ));
+        // Parsing as `i128` already bounds a 128-bit value; computing its
+        // limit would overflow (`-(1 << 127)`).
+        if width < 128 {
+            let limit = 1i128 << (width - 1);
+            if !(-limit..=limit - 1).contains(&value) {
+                return Err(format!(
+                    "signed integer {value} does not fit in {width} bits"
+                ));
+            }
         }
         Ok(value.to_le_bytes()[..byte_width].to_vec())
     } else {
@@ -158,8 +162,11 @@ fn decode_value(bytes: &[u8], cursor: &mut usize, ty: &Type) -> Result<Value, St
         Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::I128 => {
             let width = int_width(ty);
             let raw = read_le_u128(bytes, cursor, width as usize / 8)?;
+            // A 128-bit value is already two's complement in `raw`; for
+            // narrower widths, sign-extend (computing `1 << 128` would
+            // overflow).
             let limit = 1u128 << (width - 1);
-            let signed = if raw >= limit {
+            let signed = if width < 128 && raw >= limit {
                 (raw as i128).wrapping_sub(1i128 << width)
             } else {
                 raw as i128
@@ -281,5 +288,49 @@ fn integer_value(width: u16, signed: bool, value: String) -> Value {
         width,
         signed,
         value,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Signed 128-bit arguments encode at both ends of their range; the range
+    /// check must not overflow computing `-(1 << 127)`.
+    #[test]
+    fn encodes_i128_extremes() {
+        for (text, expected) in [
+            ("-170141183460469231731687303715884105728", i128::MIN),
+            ("170141183460469231731687303715884105727", i128::MAX),
+        ] {
+            let value = Value::Integer {
+                width: 128,
+                signed: true,
+                value: text.to_string(),
+            };
+            assert_eq!(encode_bcs(&value), Ok(expected.to_le_bytes().to_vec()));
+        }
+        let too_small = Value::Integer {
+            width: 8,
+            signed: true,
+            value: "-129".to_string(),
+        };
+        assert!(encode_bcs(&too_small).is_err());
+    }
+
+    /// Signed 128-bit results decode at both ends of their range; the sign
+    /// extension must not overflow computing `1 << 128`.
+    #[test]
+    fn decodes_i128_extremes() {
+        for value in [i128::MIN, -1, i128::MAX] {
+            assert_eq!(
+                decode_bcs(&value.to_le_bytes(), &Type::I128),
+                Ok(integer_value(128, true, value.to_string()))
+            );
+        }
+        assert_eq!(
+            decode_bcs(&[0x80], &Type::I8),
+            Ok(integer_value(8, true, "-128".to_string()))
+        );
     }
 }

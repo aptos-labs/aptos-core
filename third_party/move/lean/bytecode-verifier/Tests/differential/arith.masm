@@ -1,0 +1,151 @@
+module 0x77::arith
+
+public fun add_u8(a: u8, b: u8): u8
+    move_loc a
+    move_loc b
+    add
+    ret
+
+public fun sub_u64(a: u64, b: u64): u64
+    move_loc a
+    move_loc b
+    sub
+    ret
+
+public fun mul_u128(a: u128, b: u128): u128
+    move_loc a
+    move_loc b
+    mul
+    ret
+
+public fun div_u256(a: u256, b: u256): u256
+    move_loc a
+    move_loc b
+    div
+    ret
+
+public fun mod_u32(a: u32, b: u32): u32
+    move_loc a
+    move_loc b
+    mod
+    ret
+
+public fun add_i8(a: i8, b: i8): i8
+    move_loc a
+    move_loc b
+    add
+    ret
+
+public fun sub_i16(a: i16, b: i16): i16
+    move_loc a
+    move_loc b
+    sub
+    ret
+
+public fun mul_i32(a: i32, b: i32): i32
+    move_loc a
+    move_loc b
+    mul
+    ret
+
+public fun div_i64(a: i64, b: i64): i64
+    move_loc a
+    move_loc b
+    div
+    ret
+
+public fun mod_i128(a: i128, b: i128): i128
+    move_loc a
+    move_loc b
+    mod
+    ret
+
+public fun neg_i256(a: i256): i256
+    move_loc a
+    negate
+    ret
+
+public fun shl_u8(a: u8, n: u8): u8
+    move_loc a
+    move_loc n
+    shl
+    ret
+
+public fun shr_u64(a: u64, n: u8): u64
+    move_loc a
+    move_loc n
+    shr
+    ret
+
+public fun shl_u256(a: u256, n: u8): u256
+    move_loc a
+    move_loc n
+    shl
+    ret
+
+public fun bits_u16(a: u16, b: u16): (u16, u16, u16)
+    copy_loc a
+    copy_loc b
+    bit_and
+    copy_loc a
+    copy_loc b
+    bit_or
+    move_loc a
+    move_loc b
+    xor
+    ret
+
+public fun cast_u8_from_u64(x: u64): u8
+    move_loc x
+    cast_u8
+    ret
+
+public fun cast_i8_from_i64(x: i64): i8
+    move_loc x
+    cast_i8
+    ret
+
+public fun cast_u64_from_i32(x: i32): u64
+    move_loc x
+    cast_u64
+    ret
+
+public fun cast_i256_from_u256(x: u256): i256
+    move_loc x
+    cast_i256
+    ret
+
+public fun cmp_i8(a: i8, b: i8): (bool, bool, bool, bool)
+    copy_loc a
+    copy_loc b
+    lt
+    copy_loc a
+    copy_loc b
+    gt
+    copy_loc a
+    copy_loc b
+    le
+    move_loc a
+    move_loc b
+    ge
+    ret
+
+public fun eq_address(a: address, b: address): (bool, bool)
+    copy_loc a
+    copy_loc b
+    eq
+    move_loc a
+    move_loc b
+    neq
+    ret
+
+public fun logic(a: bool, b: bool): (bool, bool, bool)
+    copy_loc a
+    copy_loc b
+    and
+    copy_loc a
+    move_loc b
+    or
+    move_loc a
+    not
+    ret

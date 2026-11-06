@@ -1,0 +1,10 @@
+module 0xd1::readnocopy
+
+struct R has key
+  v: u64
+
+fun f(a: address): R acquires R
+    move_loc a
+    borrow_global R
+    read_ref
+    ret

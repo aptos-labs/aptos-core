@@ -1,0 +1,6 @@
+module 0xc3::refret
+
+fun r(x: &mut u64): (&mut u64, &mut u64)
+    copy_loc x
+    move_loc x
+    ret

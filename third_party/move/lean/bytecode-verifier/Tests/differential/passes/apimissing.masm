@@ -1,0 +1,8 @@
+module 0xd1::apimissing
+
+struct S has drop
+  a: u64
+
+fun borrow$S$00(): u64
+    ld_u64 1
+    ret

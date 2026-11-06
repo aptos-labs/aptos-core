@@ -1,0 +1,6 @@
+module 0x97::brtype
+
+fun f()
+    ld_u64 1
+    br_true l1
+l1: ret

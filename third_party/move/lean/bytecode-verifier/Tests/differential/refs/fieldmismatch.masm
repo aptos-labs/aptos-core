@@ -1,0 +1,13 @@
+module 0xd6::fieldmismatch
+
+struct A has drop
+  v: u64
+
+struct B has drop
+  v: u64
+
+fun f(b: &B): u64
+    move_loc b
+    borrow_field A, v
+    read_ref
+    ret

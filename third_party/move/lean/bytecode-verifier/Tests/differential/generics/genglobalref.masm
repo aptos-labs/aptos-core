@@ -1,0 +1,11 @@
+module 0xfb::genglobalref
+
+struct R<A: store> has key
+  v: A
+
+fun f(a: address): u8 acquires R
+    move_loc a
+    borrow_global R<u64>
+    borrow_field R<u8>, v
+    read_ref
+    ret

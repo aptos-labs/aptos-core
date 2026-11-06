@@ -1,0 +1,16 @@
+module 0x89::variantbad
+
+struct Pair has drop
+  a: u64
+  b: u64
+
+enum E has drop
+  V
+    x: u64
+
+fun f(): u64
+    ld_u64 1
+    ld_u64 2
+    pack Pair
+    unpack_variant E, V
+    ret

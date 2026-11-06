@@ -88,6 +88,29 @@ jobs:
           source "$HOME/.profile"
           lake test
 
+      - name: Test the bytecode-verifier specification
+        working-directory: third_party/move/lean/bytecode-verifier
+        run: |
+          source "$HOME/.profile"
+          lake test
+
+      - name: Check the bytecode-verifier fixtures
+        # The fixtures are exporter output; a change to the exporter, the
+        # assembler, or the deserializer must regenerate them.
+        working-directory: third_party/move/lean/bytecode-verifier
+        run: |
+          cargo test --locked -p move-bytecode-lean-export
+          scripts/regenerate-fixtures.sh
+          git diff --exit-code -- Tests/fixtures
+
+      - name: Check the bytecode-verifier model on the framework
+        # N4: the model accepts every module of head.mrb, as the Rust
+        # verifier does, and the theorems still cover the recorded minimum.
+        working-directory: third_party/move/lean/bytecode-verifier
+        run: |
+          source "$HOME/.profile"
+          scripts/check-framework.sh
+
       - name: Build the verification benchmark
         # Run nightly by verex-bench.yaml; built here so a change breaking
         # it shows on the pull request.

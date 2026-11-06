@@ -1,0 +1,9 @@
+module 0xf6::genkeybad
+
+struct T<A> has key
+  v: A
+
+fun f<A>(a: address): bool
+    move_loc a
+    exists T<A>
+    ret
