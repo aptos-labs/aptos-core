@@ -590,6 +590,25 @@ impl ConsensusObserver {
             }
         }
 
+        // A block inside an ordered block commits on its own if it requires
+        // cache invalidation. The execution pipeline caches the decision until
+        // it reaches that block, so forward it even if payloads are missing.
+        let proof_block_info = commit_decision.proof_block_info();
+        if self
+            .observer_block_data
+            .lock()
+            .contains_inner_ordered_block(
+                proof_block_info.epoch(),
+                proof_block_info.round(),
+                proof_block_info.id(),
+            )
+        {
+            if !self.state_sync_manager.is_syncing_to_commit() {
+                self.forward_commit_decision(commit_decision.clone());
+            }
+            return true;
+        }
+
         false // The commit decision was not processed
     }
 

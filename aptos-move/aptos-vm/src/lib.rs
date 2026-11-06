@@ -136,7 +136,8 @@ use aptos_types::{
     state_store::StateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
-        BlockExecutionResult, BlockOutput, SignedTransaction, TransactionOutput, VMValidatorResult,
+        BlockExecutionResult, BlockOutput, CacheInvalidationInfo, SignedTransaction,
+        TransactionOutput, VMValidatorResult,
     },
     vm_status::VMStatus,
 };
@@ -192,6 +193,11 @@ pub trait VMBlockExecutor: Send + Sync {
         )
         .map(BlockOutput::into_transaction_outputs_forced)
     }
+
+    /// Invalidates executor-held caches after a block commits, never at
+    /// pre-commit. Has no default, so a VM that caches code cannot silently
+    /// skip invalidation.
+    fn invalidate(&self, info: &CacheInvalidationInfo);
 
     /// Executes a block of transactions using a sharded block executor and returns the results.
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
