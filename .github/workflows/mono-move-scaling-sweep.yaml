@@ -42,6 +42,16 @@ on:
         required: false
         type: string
         default: "1"
+      SPLIT_STAGES:
+        description: "Run the pipeline stages one after another (true) or pipelined as a node does (false)"
+        required: false
+        type: boolean
+        default: true
+      MALLOC_CONF:
+        description: "jemalloc MALLOC_CONF for the benchmark process, e.g. dirty_decay_ms:-1,muzzy_decay_ms:-1"
+        required: false
+        type: string
+        default: ""
       MONO_METERED:
         description: "Charge gas on MonoMove (placeholder schedule), so it writes its fee like V1"
         required: false
@@ -155,6 +165,11 @@ jobs:
           NUM_INIT_ACCOUNTS: ${{ inputs.NUM_INIT_ACCOUNTS }}
           TXNS_PER_SENDER: ${{ inputs.TXNS_PER_SENDER }}
           MONO_METERED: ${{ inputs.MONO_METERED && '1' || '' }}
+          SPLIT_STAGES: ${{ inputs.SPLIT_STAGES && '1' || '0' }}
+          # jemalloc reads one or the other depending on the symbol prefix it
+          # was built with.
+          MALLOC_CONF: ${{ inputs.MALLOC_CONF }}
+          _RJEM_MALLOC_CONF: ${{ inputs.MALLOC_CONF }}
           PROFILE: ${{ inputs.PROFILE && 'perf' || '' }}
           PROFILE_CONFIGS: ${{ inputs.PROFILE_CONFIGS }}
           PERF_FREQ: ${{ inputs.PERF_FREQ }}
@@ -187,6 +202,7 @@ jobs:
             ${{ runner.temp }}/sweep-out/results.jsonl
             ${{ runner.temp }}/sweep-out/medians.json
             ${{ runner.temp }}/sweep-out/profiles/
+            ${{ runner.temp }}/sweep-out/timeline/
           if-no-files-found: warn
 
       - name: Fail on sweep error

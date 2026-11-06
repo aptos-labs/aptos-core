@@ -67,6 +67,9 @@ TXNS_PER_SENDER = int(os.environ.get("TXNS_PER_SENDER", default=1))
 # what shapes the write set. Unmetered, a transaction writes nothing for its
 # fee and its store is only read.
 MONO_METERED = bool(os.environ.get("MONO_METERED"))
+# Run the stages one after another (the default), so that the execution
+# stage's counters are its own, or pipelined as a node runs them.
+SPLIT_STAGES = os.environ.get("SPLIT_STAGES", "1") != "0"
 NUM_INIT_ACCOUNTS = int(os.environ.get("NUM_INIT_ACCOUNTS", default=2000000))
 CREATE_DB_THREADS = int(os.environ.get("CREATE_DB_THREADS", default=32))
 OUT_DIR = os.environ.get("OUT_DIR", default="scaling-sweep-out")
@@ -130,10 +133,11 @@ def common_flags(block_size, threads, db_dir, checkpoint_dir):
     """The benchmark invocation without any environment prefix, so that it can
     also be handed to `perf record`.
     """
+    split = "--split-stages " if SPLIT_STAGES else ""
     return (
         f"{taskset_prefix()}{BUILD_FOLDER}/aptos-executor-benchmark "
         f"--block-executor-type aptos-vm-with-block-stm "
-        f"--execution-threads {threads} --generate-then-execute --split-stages "
+        f"--execution-threads {threads} --generate-then-execute {split}"
         f"--num-generator-workers 1 "
         f"--block-size {block_size} --transactions-per-sender {TXNS_PER_SENDER} "
         f"run-executor "
@@ -166,14 +170,19 @@ def record(workload, db_dir, checkpoint_dir, blocks_path):
     )
 
 
-def replay_command(workload, threads, vm, recorded_db, checkpoint_dir, blocks_path):
+def replay_command(workload, threads, vm, recorded_db, checkpoint_dir, blocks_path, tag=None):
     """The environment prefix and the program of one replay, kept apart so a
-    profiler can wrap the program alone.
+    profiler can wrap the program alone. `tag` names the replay's block
+    timeline file.
     """
     override = "--enable-feature-after-init" if vm == "mono" else "--disable-feature-after-init"
     env = "RUST_BACKTRACE=1 "
     if MONO_METERED and vm == "mono":
         env += "MONO_MOVE_METERED=1 "
+    if tag:
+        timeline_dir = os.path.join(OUT_DIR, "timeline")
+        os.makedirs(timeline_dir, exist_ok=True)
+        env += f"BLOCK_TIMELINE_PATH={os.path.join(timeline_dir, tag + '.jsonl')} "
     program = (
         f"{common_flags(block_size_of(workload), threads, recorded_db, checkpoint_dir)} "
         f"--replay-blocks {blocks_path} {override} {MONO_MOVE_FLAG}"
@@ -424,6 +433,9 @@ METRIC_ROWS = [
     ("worker wall scheduler", "worker_wall_scheduler_us", "waiting for a task"),
     ("worker wall execute_vm", "worker_wall_execute_vm_us", "wall inside the VM's execute"),
     ("dependency wait", "dependency_wait_us", "parked on a dependency"),
+    ("vm init (all workers)", "vm_init_us", "per-worker VM construction per block"),
+    ("finalize", "finalize_us", "after the workers return: epilogue, flush"),
+    ("worker loop wall (all workers)", "worker_loop_us", "inside the worker loops"),
     ("process cpu user", "process_user_cpu_us", "whole process, execution stage"),
     ("process cpu system", "process_system_cpu_us", "whole process, execution stage"),
     ("minor faults /txn", "minor_faults_per_txn", ""),
@@ -588,8 +600,9 @@ def build_report(workloads, medians, profile_rows, failures, machine):
         "### MonoMove vs V1 MoveVM thread-scaling sweep",
         "",
         f"{NUM_BLOCKS} blocks per workload, {REPEATS} repeats, {NUM_INIT_ACCOUNTS} account DB, "
-        f"{TXNS_PER_SENDER} transaction(s) per sender per block, threads {THREADS}, split "
-        f"stages, MonoMove {'metered' if MONO_METERED else 'unmetered'}. Every metric is a "
+        f"{TXNS_PER_SENDER} transaction(s) per sender per block, threads {THREADS}, "
+        f"stages {'split' if SPLIT_STAGES else 'pipelined'}, MonoMove "
+        f"{'metered' if MONO_METERED else 'unmetered'}. Every metric is a "
         "median over repeats, in "
         "microseconds per transaction unless marked. Worker metrics are summed over all "
         "workers, so `worker wall total` ≈ threads × `worker scope wall`.",
@@ -707,7 +720,13 @@ def main():
                 started = time.monotonic()
                 try:
                     env, program = replay_command(
-                        workload, threads, vm, recorded_db, checkpoint, blocks_path
+                        workload,
+                        threads,
+                        vm,
+                        recorded_db,
+                        checkpoint,
+                        blocks_path,
+                        tag=f"{workload.name}-{vm}-{threads}t-r{repeat}",
                     )
                     output = execute_command(env + program)
                     row = parse_run(output, workload, threads, vm, repeat)

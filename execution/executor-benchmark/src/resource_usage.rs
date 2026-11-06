@@ -44,6 +44,12 @@ pub(crate) struct ResourceUsage {
     worker_scope_secs: f64,
     /// Seconds workers spent parked on a dependency.
     dependency_wait_secs: f64,
+    /// Per-worker VM construction, summed over workers and blocks.
+    vm_init_secs: f64,
+    /// Finalization after the workers return: block epilogue, flush.
+    finalize_secs: f64,
+    /// Worker loop wall, summed over workers.
+    worker_loop_secs: f64,
     /// Keys the block epilogues asked to make hot.
     hot_state_promotions: f64,
     /// Cold state reads that reached the DB, and the seconds they took.
@@ -94,6 +100,9 @@ impl ResourceUsage {
                 .get_sample_sum(),
             worker_scope_secs: block_executor_counters::RAYON_EXECUTION_SECONDS.get_sample_sum(),
             dependency_wait_secs: block_executor_counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum(),
+            vm_init_secs: block_executor_counters::VM_INIT_SECONDS.get_sample_sum(),
+            finalize_secs: block_executor_counters::PARALLEL_FINALIZE_SECONDS.get_sample_sum(),
+            worker_loop_secs: block_executor_counters::WORK_WITH_TASK_SECONDS.get_sample_sum(),
             hot_state_promotions: block_executor_counters::HOT_STATE_PROMOTIONS_PER_BLOCK
                 .get_sample_sum(),
             cold_state_reads: DB_API_LATENCY_SECONDS
@@ -146,6 +155,9 @@ impl ResourceUsage {
             parallel_execution_secs: end.parallel_execution_secs - self.parallel_execution_secs,
             worker_scope_secs: end.worker_scope_secs - self.worker_scope_secs,
             dependency_wait_secs: end.dependency_wait_secs - self.dependency_wait_secs,
+            vm_init_secs: end.vm_init_secs - self.vm_init_secs,
+            finalize_secs: end.finalize_secs - self.finalize_secs,
+            worker_loop_secs: end.worker_loop_secs - self.worker_loop_secs,
             hot_state_promotions: end.hot_state_promotions - self.hot_state_promotions,
             cold_state_reads: end.cold_state_reads - self.cold_state_reads,
             cold_state_read_secs: end.cold_state_read_secs - self.cold_state_read_secs,
@@ -210,11 +222,14 @@ impl ResourceUsage {
             prefix, self.monotonic_start_secs, self.monotonic_end_secs
         );
         info!(
-            "{} resources: block executor wall us/txn: parallel_execution={:.2} worker_scope={:.2} dependency_wait={:.2}",
+            "{} resources: block executor wall us/txn: parallel_execution={:.2} worker_scope={:.2} dependency_wait={:.2} vm_init={:.2} finalize={:.2} worker_loop={:.2}",
             prefix,
             per_txn_us(self.parallel_execution_secs),
             per_txn_us(self.worker_scope_secs),
             per_txn_us(self.dependency_wait_secs),
+            per_txn_us(self.vm_init_secs),
+            per_txn_us(self.finalize_secs),
+            per_txn_us(self.worker_loop_secs),
         );
         for clock in WORKER_CLOCKS {
             let phases = WorkerPhase::ALL
@@ -290,16 +305,16 @@ impl ResourceUsage {
 fn state_view_counters() -> BTreeMap<&'static str, u64> {
     let mut out = BTreeMap::new();
     for family in aptos_metrics_core::gather() {
-        if family.get_name() != "aptos_storage_interface_counter" {
+        if family.name() != "aptos_storage_interface_counter" {
             continue;
         }
         for metric in family.get_metric() {
-            let Some(label) = metric.get_label().iter().find(|l| l.get_name() == "name") else {
+            let Some(label) = metric.get_label().iter().find(|l| l.name() == "name") else {
                 continue;
             };
             if let Some(name) = STATE_VIEW_COUNTERS
                 .iter()
-                .find(|name| **name == label.get_value())
+                .find(|name| **name == label.value())
             {
                 out.insert(*name, metric.get_counter().get_value() as u64);
             }
@@ -316,15 +331,15 @@ fn workflow_timer_secs() -> BTreeMap<String, f64> {
     ];
     let mut out = BTreeMap::new();
     for family in aptos_metrics_core::gather() {
-        let Some((_, short)) = FAMILIES.iter().find(|(name, _)| *name == family.get_name()) else {
+        let Some((_, short)) = FAMILIES.iter().find(|(name, _)| *name == family.name()) else {
             continue;
         };
         for metric in family.get_metric() {
-            let Some(label) = metric.get_label().iter().find(|l| l.get_name() == "name") else {
+            let Some(label) = metric.get_label().iter().find(|l| l.name() == "name") else {
                 continue;
             };
             out.insert(
-                format!("{short}/{}", label.get_value()),
+                format!("{short}/{}", label.value()),
                 metric.get_histogram().get_sample_sum(),
             );
         }
