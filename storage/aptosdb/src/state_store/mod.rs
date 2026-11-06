@@ -788,12 +788,13 @@ impl LiveState {
             *SPARSE_MERKLE_PLACEHOLDER_HASH
         };
         let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
-        let effective_hot_state_config = EffectiveHotStateConfig::read_at(
+        let (effective_hot_state_config, exists_on_chain) = EffectiveHotStateConfig::read_at(
             hot_state_config,
             state_db.as_ref(),
             latest_snapshot_version,
         )?;
         info!(
+            exists_on_chain = exists_on_chain,
             effective_hot_state_config = ?effective_hot_state_config,
             "Loaded hot state config at latest snapshot version."
         );
