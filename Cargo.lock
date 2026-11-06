@@ -13218,7 +13218,6 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "bytes",
- "fxhash",
  "mono-move-aptos-transaction-executor",
  "mono-move-core",
  "mono-move-global-context",
@@ -13226,6 +13225,7 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
+ "shared-dsa",
  "thiserror 2.0.21",
 ]
 
@@ -13268,7 +13268,6 @@ dependencies = [
  "aptos-types",
  "bitflags 2.13.2",
  "bytes",
- "fxhash",
  "mono-move-alloc",
  "move-binary-format",
  "move-bytecode-verifier",
