@@ -57,7 +57,10 @@ struct VersionedValue<V> {
 
 /// Maps each key (access path) to an internal versioned value representation.
 pub struct VersionedData<K, V> {
-    values: DashMap<K, VersionedValue<V>>,
+    // Keyed by a random-state ahash rather than the default SipHash: the map
+    // is probed on every read and write of every worker, and the keys are
+    // short and already well distributed.
+    values: DashMap<K, VersionedValue<V>, ahash::RandomState>,
     total_base_value_size: AtomicU64,
 }
 
@@ -236,7 +239,7 @@ impl<V: SpeculativeValue> VersionedValue<V> {
 impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     pub(crate) fn empty() -> Self {
         Self {
-            values: DashMap::new(),
+            values: DashMap::with_hasher(ahash::RandomState::new()),
             total_base_value_size: AtomicU64::new(0),
         }
     }
