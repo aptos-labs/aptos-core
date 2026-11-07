@@ -341,7 +341,9 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
             let num_committed = self.num_committed(v.block);
             if !v.settle(num_committed, block) {
                 drop(v);
-                self.values.remove(key);
+                // Unless a writer got in between: its entry stays.
+                self.values
+                    .remove_if(key, |_, v| v.versioned_map.is_empty());
                 return None;
             }
         }

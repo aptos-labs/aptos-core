@@ -207,8 +207,10 @@ where
             let num_committed = self.values.num_committed(sizes.block);
             if !sizes.settle(num_committed, block) {
                 drop(sizes);
-                self.group_sizes.remove(group_key);
-                self.group_tags.remove(group_key);
+                // Unless a writer got in between: its entry stays. The tag
+                // superset is left as it is; it only ever over-approximates.
+                self.group_sizes
+                    .remove_if(group_key, |_, sizes| sizes.size_entries.is_empty());
                 return None;
             }
         }
