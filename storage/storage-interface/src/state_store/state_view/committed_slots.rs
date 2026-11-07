@@ -5,12 +5,14 @@ use crate::state_store::{
     state_update_refs::StateUpdateRefs, state_view::cached_state_view::ShardedStateCache,
 };
 use aptos_types::{
-    state_store::{state_key::StateKey, state_slot::StateSlot},
+    state_store::{state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use dashmap::DashMap;
 use parking_lot::Mutex;
-use rayon::prelude::*;
+
+/// Tasks one absorb fans out to.
+const ABSORB_TASKS: usize = 4;
 
 /// The slot of every key a run of consecutive blocks read or wrote, as the
 /// last of them left it. A block that reads such a key from the execution
@@ -80,27 +82,32 @@ impl CommittedSlots {
         if *next_version != Some(updates.per_version.first_version) {
             self.slots.clear();
         }
-        reads.shards.par_iter().for_each(|shard| {
-            for entry in shard.iter() {
-                self.slots
-                    .insert(entry.key().clone(), Self::cold(entry.value().clone()));
-            }
-        });
-        for batch in [
+        let batches = [
             updates.for_last_checkpoint_batched(),
             updates.for_latest_batched(),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            batch.shards.par_iter().for_each(|shard| {
-                for (key, update) in shard {
-                    if let Some(slot) = update.to_result_slot((*key).clone()) {
-                        self.slots.insert((*key).clone(), Self::cold(slot));
+        ];
+        // A few tasks over the shards: every thread a parallel iterator wakes
+        // for a job this small spins longer than the job takes.
+        let shard_ids = (0..NUM_STATE_SHARDS).collect::<Vec<_>>();
+        rayon::scope(|s| {
+            for shard_ids in shard_ids.chunks(NUM_STATE_SHARDS / ABSORB_TASKS) {
+                s.spawn(move |_| {
+                    for &shard_id in shard_ids {
+                        for entry in reads.shards[shard_id].iter() {
+                            self.slots
+                                .insert(entry.key().clone(), Self::cold(entry.value().clone()));
+                        }
+                        for batch in batches.into_iter().flatten() {
+                            for (key, update) in &batch.shards[shard_id] {
+                                if let Some(slot) = update.to_result_slot((*key).clone()) {
+                                    self.slots.insert((*key).clone(), Self::cold(slot));
+                                }
+                            }
+                        }
                     }
-                }
-            });
-        }
+                });
+            }
+        });
         if self.slots.len() > self.max_keys {
             self.slots.clear();
             *next_version = None;

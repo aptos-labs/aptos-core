@@ -608,7 +608,7 @@ impl LedgerState {
             persisted_snapshot.clone(),
             self.latest().clone(),
         );
-        state_view.prime_cache(updates, PrimingPolicy::All)?;
+        state_view.prime_cache(updates, PrimingPolicy::All, None)?;
 
         let (updated, hot_state_updates) = self.update_with_memorized_reads(
             hot_state,

@@ -545,10 +545,6 @@ impl Parser {
                 .transpose()?
         };
 
-        if *EXECUTION_POOL {
-            base_state_view
-                .prime_cache_from_committed(to_commit.state_update_refs(), &COMMITTED_SLOTS);
-        }
         base_state_view.prime_cache(
             to_commit.state_update_refs(),
             // With the execution pool, a key the previous block wrote is read from
@@ -564,6 +560,7 @@ impl Parser {
                 // the keys, not the values.
                 PrimingPolicy::MakeHotOnly
             },
+            EXECUTION_POOL.then(|| &*COMMITTED_SLOTS),
         )?;
 
         let (result_state, hot_state_updates) = parent_state.update_with_memorized_reads(
