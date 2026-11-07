@@ -628,3 +628,29 @@ merges by version. `pipelined_pending_writes` went from 3.1 to 2.4–2.9
 µs/txn, far less than the parallelism should give, so the cost is not the
 map inserts. A perf profile of the pipelined stage is queued (run
 42331262428) to find what the per-write cost is.
+
+### Whole-process CPU in pipelined mode (run 42331397445, 16 threads)
+
+Thread-group CPU from `/proc/self/task` over the run (perf over-attributes
+idle rayon threads through `__perf_event_task_sched_in`, so the folded
+stacks are not usable for this; the `/proc` numbers are). µs of CPU per
+transaction:
+
+| transfer, 16T | par_exec (Block-STM) | smt_update | non_exe | rayon-global | io | total |
+|---|---|---|---|---|---|---|
+| V1 | 489 (55%) | 132 | 122 | 61 | 47 | 897 |
+| MonoMove | 158 (29%) | 133 | 110 | 61 | 47 | 544 |
+
+| no-op, 16T | par_exec | smt_update | non_exe | rayon-global | io | total |
+|---|---|---|---|---|---|---|
+| V1 | 329 (61%) | 37 | 84 | 40 | 22 | 538 |
+| MonoMove | 91 (37%) | 25 | 64 | 36 | 15 | 247 |
+
+MonoMove removes two thirds of the execution CPU and 39% (transfer) to 54%
+(no-op) of the process's. What remains is the same on both VMs: the state
+tree update (`smt_update` + the hashing part of `non_exe`, keccak in the
+profiles), the ledger update on `rayon-global`, and RocksDB on `io`. In
+pipelined mode those stages set the end-to-end rate (commit at 63 µs/txn
+wall for transfers), which is why a 2.5x faster execution stage gives
++12% end to end. Past this point the throughput question is a storage
+question, not a VM one.

@@ -82,9 +82,15 @@ the abort loop in index order, right after the transaction's own
 before the stall is in place. A wrong prediction (the next incarnation
 writes the same value) costs a delay, not correctness.
 
-Expected: chains 2.0 → 1.4 aborts/txn without sender hints (the first wave
-and the second wave's first abort remain), order book 6.3 → about 2.
-Measured: see `scaling_log.md`.
+Measured (`scaling_log.md`): on the order book, 2.9–3.3 stalls/txn, a
+fifth fewer aborts and 10–17% less VM CPU, no throughput (chain-bound). On
+sender chains, nothing, for a reason worth knowing: an incarnation that
+runs with a stale sequence number is discarded by the prologue, so it has
+no entries and no readers; the cascade there is "the next transaction of
+the sender succeeds and invalidates the rest", which only a hint known
+before execution (D3) can prevent. Aborted incarnations that wrote nothing
+are the common case for any workload whose conflicts are checked early in
+the transaction (sequence numbers, nonces, balance checks).
 
 ## D2. Kill switch for MonoMove (done, measured)
 
