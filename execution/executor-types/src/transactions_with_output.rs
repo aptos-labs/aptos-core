@@ -5,7 +5,11 @@ use crate::metrics::TIMER;
 use anyhow::{ensure, Result};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::state_update_refs::StateUpdateRefs;
-use aptos_types::transaction::{PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version};
+use aptos_types::{
+    state_store::state_key::StateKey,
+    transaction::{BlockWrites, PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version},
+    write_set::WriteOp,
+};
 use itertools::{izip, Itertools};
 use std::{
     fmt::{Debug, Formatter},
@@ -17,6 +21,10 @@ pub struct TransactionsWithOutput {
     pub transactions: Vec<Transaction>,
     pub transaction_outputs: Vec<TransactionOutput>,
     pub persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+    /// Under member-level group writes, the groups' blobs after the block,
+    /// which the state takes at the block's last version in place of the
+    /// member writes in the outputs.
+    pub block_writes: Option<BlockWrites<StateKey, WriteOp>>,
 }
 
 impl TransactionsWithOutput {
@@ -31,7 +39,16 @@ impl TransactionsWithOutput {
             transactions,
             transaction_outputs,
             persisted_auxiliary_infos,
+            block_writes: None,
         }
+    }
+
+    pub fn with_block_writes(
+        mut self,
+        block_writes: Option<BlockWrites<StateKey, WriteOp>>,
+    ) -> Self {
+        self.block_writes = block_writes;
+        self
     }
 
     pub fn new_empty() -> Self {
@@ -107,13 +124,28 @@ impl TransactionsToKeep {
             transactions_with_output,
             is_reconfig,
             state_update_refs_builder: |transactions_with_output| {
-                let write_sets = transactions_with_output
+                let block_writes = transactions_with_output.block_writes.as_ref();
+                let last = transactions_with_output.len().saturating_sub(1);
+                let updates = transactions_with_output
                     .transaction_outputs
                     .iter()
-                    .map(TransactionOutput::write_set);
-                StateUpdateRefs::index_write_sets(
+                    .enumerate()
+                    .map(move |(i, output)| {
+                        // Member writes are not state keys; the group's blob
+                        // enters at the block's last version instead.
+                        let ops = output.write_set().base_op_iter().filter(move |(key, _)| {
+                            block_writes.is_none_or(|w| !w.member_keys.contains(key))
+                        });
+                        let group_writes = block_writes
+                            .filter(|_| i == last)
+                            .into_iter()
+                            .flat_map(|w| w.group_writes.iter())
+                            .map(|(key, op)| (key, op.as_base_op()));
+                        ops.chain(group_writes)
+                    });
+                StateUpdateRefs::index(
                     first_version,
-                    write_sets,
+                    updates,
                     transactions_with_output.len(),
                     all_checkpoint_indices,
                 )

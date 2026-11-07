@@ -6,7 +6,9 @@
 use crate::{
     errors::ResourceGroupSerializationError,
     executor_utilities::Materializer,
-    single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
+    single_transaction_executor::{
+        SharedViewArgs, SingleTransactionExecutor, ViewMode, MEMBER_GROUP_WRITES,
+    },
     task::{ExecutionStatus, TxnOutput},
     types::InputOutputKey,
 };
@@ -22,7 +24,7 @@ use aptos_types::{
         BlockExecutableTransaction as Transaction, Transaction as AptosTransaction,
         TransactionAuxiliaryData, TransactionOutput,
     },
-    write_set::{WriteOpKind, WriteSet},
+    write_set::{WriteOp, WriteOpKind, WriteSet},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
@@ -37,7 +39,7 @@ use mono_move_core::{
     types::InternedType,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_runtime::{SegmentedArena, SessionEffects, WriteClass};
+use mono_move_runtime::{serialize, SegmentedArena, SessionEffects, WriteClass};
 use move_core_types::language_storage::{ModuleId, StructTag};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::Lazy;
@@ -703,7 +705,13 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 // Groups are assembled from the versioned map on demand, so
                 // nothing is cached back here.
                 let (output, _groups) = outcome
-                    .materialize(&guard, &provider, features, auxiliary_data)
+                    .materialize_with(
+                        &guard,
+                        &provider,
+                        features,
+                        auxiliary_data,
+                        *MEMBER_GROUP_WRITES,
+                    )
                     .map_err(materialization_failed)?;
                 output
             },
@@ -736,5 +744,82 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
     fn materialize_storage_key(&self, key: InMemoryStorageKey) -> Result<StateKey, PanicError> {
         key.as_state_key()
             .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))
+    }
+
+    fn supports_member_group_writes(&self) -> bool {
+        true
+    }
+
+    fn member_storage_key(
+        &self,
+        group_key: &InMemoryStorageKey,
+        tag: &StructTag,
+    ) -> Result<StateKey, PanicError> {
+        StateKey::resource(&group_key.address(), tag)
+            .map_err(|e| code_invariant_error(format!("Failed to build a member key: {e:#}")))
+    }
+
+    fn finalize_group_writes<S: TStateView<Key = StateKey> + Sync>(
+        &self,
+        group_keys: Vec<InMemoryStorageKey>,
+        _shared: SharedViewArgs<'_, S>,
+        mode: ViewMode<'_, Self::Input>,
+        next_txn_idx: TxnIndex,
+    ) -> Result<Vec<(StateKey, WriteOp)>, PanicError> {
+        let ViewMode::Parallel { versioned_map, .. } = mode else {
+            return Err(code_invariant_error(
+                "Group writes are only assembled after parallel execution",
+            ));
+        };
+        let guard = self.execution_guard()?;
+        let group_data = versioned_map.group_data();
+        let members_blob =
+            |members: Vec<(StructTag, MonoValue)>| -> Result<Option<Bytes>, PanicError> {
+                if members.is_empty() {
+                    return Ok(None);
+                }
+                let members = members
+                    .into_iter()
+                    .map(|(tag, value)| {
+                        let bytes = match value {
+                            MonoValue::RawFromStorage(bytes) => bytes,
+                            MonoValue::Write { ptr, ty, .. } => {
+                                // SAFETY: the entry holding this pointer pins the frozen
+                                // heap it points into, and that heap is never mutated.
+                                let blob = unsafe { serialize(&guard, ptr.as_ptr(), ty) }.map_err(
+                                    |e| {
+                                        code_invariant_error(format!(
+                                            "Failed to serialize a group member: {e}"
+                                        ))
+                                    },
+                                )?;
+                                Bytes::from(blob)
+                            },
+                            MonoValue::Deletion | MonoValue::GroupMetadata => {
+                                return Err(code_invariant_error(
+                                    "A deleted member or group metadata was assembled",
+                                ))
+                            },
+                        };
+                        Ok((tag, bytes))
+                    })
+                    .collect::<Result<BTreeMap<_, _>, PanicError>>()?;
+                let blob = bcs::to_bytes(&members)
+                    .map_err(|e| code_invariant_error(format!("Failed to encode a group: {e}")))?;
+                Ok(Some(Bytes::from(blob)))
+            };
+        let mut writes = Vec::with_capacity(group_keys.len());
+        for group_key in group_keys {
+            let existed = !group_data.group_members_at(&group_key, 0)?.is_empty();
+            let blob = members_blob(group_data.group_members_at(&group_key, next_txn_idx)?)?;
+            let op = match (existed, blob) {
+                (false, Some(bytes)) => WriteOp::legacy_creation(bytes),
+                (true, Some(bytes)) => WriteOp::legacy_modification(bytes),
+                (true, None) => WriteOp::legacy_deletion(),
+                (false, None) => continue,
+            };
+            writes.push((self.materialize_storage_key(group_key)?, op));
+        }
+        Ok(writes)
     }
 }
