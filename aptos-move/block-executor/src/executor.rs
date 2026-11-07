@@ -20,7 +20,9 @@ use crate::{
         SENDER_HINTS,
     },
     scheduler_wrapper::SchedulerWrapper,
-    single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
+    single_transaction_executor::{
+        SharedViewArgs, SingleTransactionExecutor, ViewMode, MEMBER_GROUP_WRITES,
+    },
     task::{ExecutionStatus, TxnOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
@@ -32,6 +34,7 @@ use crate::{
 use aptos_aggregator::delayed_change::{ApplyBase, DelayedChange};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
+use aptos_infallible::Mutex;
 use aptos_logger::{error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, TxnIndex},
@@ -49,7 +52,8 @@ use aptos_types::{
     state_store::TStateView,
     transaction::{
         block_epilogue::TBlockEndInfoExt, AuxiliaryInfoTrait, BlockError,
-        BlockExecutableTransaction, BlockExecutionResult, BlockOutput, FeeDistribution,
+        BlockExecutableTransaction, BlockExecutionResult, BlockOutput, BlockWrites,
+        FeeDistribution,
     },
     vm::modules::AptosModuleExtension,
 };
@@ -88,6 +92,9 @@ where
     start_shared_counter: u32,
     delayed_field_id_counter: &'a AtomicU32,
     block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<E::Key, E::Tag>>,
+    /// Under member-level group writes: the groups committed transactions
+    /// wrote, and the member keys their write sets carry.
+    written_groups: &'a Mutex<(HashSet<E::Key>, HashSet<T::Key>)>,
     final_results: &'a ExplicitSyncWrapper<Vec<CommittedOutput<E>>>,
     maybe_block_epilogue_txn_idx: &'a ExplicitSyncWrapper<Option<TxnIndex>>,
 }
@@ -1101,6 +1108,21 @@ where
         let read_set = last_input_output
             .read_set(txn_idx)
             .ok_or_else(|| code_invariant_error("Read set must be recorded for materialization"))?;
+        if *MEMBER_GROUP_WRITES && executor.supports_member_group_writes() {
+            let mut written = shared_sync_params.written_groups.lock();
+            last_input_output.for_each_resource_group_key_and_tags(
+                txn_idx,
+                |group_key, tags| {
+                    for tag in tags {
+                        written
+                            .1
+                            .insert(executor.member_storage_key(group_key, tag)?);
+                    }
+                    written.0.insert(group_key.clone());
+                    Ok(())
+                },
+            )?;
+        }
         // Taking the output finalizes it and may not be concurrent with any other
         // accesses to it (write-set, events, etc), which are assumed to have terminated.
         let output = last_input_output.take_committed_output(txn_idx)?;
@@ -1464,7 +1486,7 @@ where
         scheduler: SchedulerWrapper,
         environment: &AptosEnvironment,
         shared_sync_params: &SharedSyncParams<'_, T, E, S>,
-    ) -> Result<Option<T>, PanicError> {
+    ) -> Result<(Option<T>, Option<BlockWrites<T::Key, T::Value>>), PanicError> {
         let _timer = PARALLEL_FINALIZE_SECONDS.start_timer();
         let mut maybe_block_epilogue_txn = None;
 
@@ -1601,7 +1623,42 @@ where
             final_results.acquire().dereference_mut().pop();
         }
 
-        Ok(maybe_block_epilogue_txn)
+        let block_writes = if *MEMBER_GROUP_WRITES
+            && maybe_executor
+                .as_ref()
+                .is_some_and(|executor| executor.supports_member_group_writes())
+        {
+            let (group_keys, member_keys) =
+                std::mem::take(&mut *shared_sync_params.written_groups.lock());
+            let executor = maybe_executor
+                .as_ref()
+                .ok_or_else(|| code_invariant_error("Group writes require an executor"))?;
+            let next_txn_idx = final_results.dereference().len() as TxnIndex;
+            let group_writes = executor.finalize_group_writes(
+                group_keys.into_iter().collect(),
+                SharedViewArgs {
+                    base_view,
+                    runtime_environment: environment.runtime_environment(),
+                    global_module_cache: shared_sync_params.global_module_cache,
+                },
+                ViewMode::Parallel {
+                    versioned_map: versioned_cache,
+                    scheduler,
+                    start_shared_counter,
+                    shared_counter,
+                    incarnation: 0,
+                },
+                next_txn_idx,
+            )?;
+            Some(BlockWrites {
+                group_writes,
+                member_keys,
+            })
+        } else {
+            None
+        };
+
+        Ok((maybe_block_epilogue_txn, block_writes))
     }
 
     pub(crate) fn execute_transactions_parallel_v2(
@@ -1674,6 +1731,7 @@ where
             SchedulerV2::new(num_txns, num_workers)
         };
 
+        let written_groups = Mutex::new((HashSet::new(), HashSet::new()));
         let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
             base_view,
             versioned_cache: &versioned_cache,
@@ -1684,6 +1742,7 @@ where
             block_limit_processor: &block_limit_processor,
             final_results: &final_results,
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
+            written_groups: &written_groups,
         };
 
         let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
@@ -1738,32 +1797,34 @@ where
         });
         drop(timer);
 
-        let (has_error, maybe_block_epilogue_txn) = if shared_maybe_error.load(Ordering::SeqCst) {
-            (true, None)
-        } else {
-            match self.finalize_parallel_execution(
-                maybe_executor.into_inner(),
-                signature_verified_block,
-                !scheduler.post_commit_processing_queue_is_empty(),
-                transaction_slice_metadata,
-                SchedulerWrapper::V2(&scheduler, 0),
-                module_cache_manager_guard.environment(),
-                &shared_sync_params,
-            ) {
-                Ok(maybe_block_epilogue_txn) => {
-                    // Update state counters & insert verified modules into cache (safe after error check).
-                    counters::update_state_counters(versioned_cache.stats(), true);
-                    (
-                        module_cache_manager_guard
-                            .module_cache_mut()
-                            .insert_verified(versioned_cache.take_modules_iter())
-                            .is_err(),
-                        maybe_block_epilogue_txn,
-                    )
-                },
-                Err(_) => (true, None),
-            }
-        };
+        let (has_error, maybe_block_epilogue_txn, block_writes) =
+            if shared_maybe_error.load(Ordering::SeqCst) {
+                (true, None, None)
+            } else {
+                match self.finalize_parallel_execution(
+                    maybe_executor.into_inner(),
+                    signature_verified_block,
+                    !scheduler.post_commit_processing_queue_is_empty(),
+                    transaction_slice_metadata,
+                    SchedulerWrapper::V2(&scheduler, 0),
+                    module_cache_manager_guard.environment(),
+                    &shared_sync_params,
+                ) {
+                    Ok((maybe_block_epilogue_txn, block_writes)) => {
+                        // Update state counters & insert verified modules into cache (safe after error check).
+                        counters::update_state_counters(versioned_cache.stats(), true);
+                        (
+                            module_cache_manager_guard
+                                .module_cache_mut()
+                                .insert_verified(versioned_cache.take_modules_iter())
+                                .is_err(),
+                            maybe_block_epilogue_txn,
+                            block_writes,
+                        )
+                    },
+                    Err(_) => (true, None, None),
+                }
+            };
 
         // Explicit async drops even when there is an error.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
@@ -1773,9 +1834,10 @@ where
         }
 
         // Return final result
-        Ok(BlockOutput::new(
+        Ok(BlockOutput::with_block_writes(
             final_results.into_inner(),
             maybe_block_epilogue_txn,
+            block_writes,
         ))
     }
 
@@ -1866,6 +1928,7 @@ where
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         let maybe_executor = ExplicitSyncWrapper::new(None);
 
+        let written_groups = Mutex::new((HashSet::new(), HashSet::new()));
         let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
             base_view,
             versioned_cache: &versioned_cache,
@@ -1876,6 +1939,7 @@ where
             block_limit_processor: &block_limit_processor,
             final_results: &final_results,
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
+            written_groups: &written_groups,
         };
 
         let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
@@ -1926,32 +1990,34 @@ where
         });
         drop(timer);
 
-        let (has_error, maybe_block_epilogue_txn) = if shared_maybe_error.load(Ordering::SeqCst) {
-            (true, None)
-        } else {
-            match self.finalize_parallel_execution(
-                maybe_executor.into_inner(),
-                signature_verified_block,
-                scheduler.pop_from_commit_queue().is_ok(),
-                transaction_slice_metadata,
-                SchedulerWrapper::V1(&scheduler, &skip_module_reads_validation),
-                module_cache_manager_guard.environment(),
-                &shared_sync_params,
-            ) {
-                Ok(maybe_block_epilogue_txn) => {
-                    // Update state counters & insert verified modules into cache (safe after error check).
-                    counters::update_state_counters(versioned_cache.stats(), true);
-                    (
-                        module_cache_manager_guard
-                            .module_cache_mut()
-                            .insert_verified(versioned_cache.take_modules_iter())
-                            .is_err(),
-                        maybe_block_epilogue_txn,
-                    )
-                },
-                Err(_) => (true, None),
-            }
-        };
+        let (has_error, maybe_block_epilogue_txn, block_writes) =
+            if shared_maybe_error.load(Ordering::SeqCst) {
+                (true, None, None)
+            } else {
+                match self.finalize_parallel_execution(
+                    maybe_executor.into_inner(),
+                    signature_verified_block,
+                    scheduler.pop_from_commit_queue().is_ok(),
+                    transaction_slice_metadata,
+                    SchedulerWrapper::V1(&scheduler, &skip_module_reads_validation),
+                    module_cache_manager_guard.environment(),
+                    &shared_sync_params,
+                ) {
+                    Ok((maybe_block_epilogue_txn, block_writes)) => {
+                        // Update state counters & insert verified modules into cache (safe after error check).
+                        counters::update_state_counters(versioned_cache.stats(), true);
+                        (
+                            module_cache_manager_guard
+                                .module_cache_mut()
+                                .insert_verified(versioned_cache.take_modules_iter())
+                                .is_err(),
+                            maybe_block_epilogue_txn,
+                            block_writes,
+                        )
+                    },
+                    Err(_) => (true, None, None),
+                }
+            };
 
         // Explicit async drops even when there is an error.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
@@ -1961,9 +2027,10 @@ where
         }
 
         // Return final result
-        Ok(BlockOutput::new(
+        Ok(BlockOutput::with_block_writes(
             final_results.into_inner(),
             maybe_block_epilogue_txn,
+            block_writes,
         ))
     }
 

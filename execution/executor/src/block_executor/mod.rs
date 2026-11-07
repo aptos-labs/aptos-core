@@ -361,20 +361,42 @@ where
     /// The writes the next block will see from `raw` before it is indexed.
     fn pending_writes(raw: &RawBlockExecution) -> Result<PendingWrites> {
         let first_version = raw.state_view.next_version();
+        let block_writes = raw.block_writes.as_ref();
+        let last_version = raw.next_version().saturating_sub(1);
         let writes = raw
             .transaction_outputs
             .par_iter()
             .enumerate()
-            .flat_map_iter(|(i, output)| {
+            .flat_map_iter(move |(i, output)| {
                 let version = first_version + i as Version;
-                output.write_set().write_op_iter().map(move |(key, op)| {
-                    (
-                        key.clone(),
-                        version,
-                        op.as_base_op().as_state_value_opt().flatten().cloned(),
-                    )
-                })
-            });
+                // Member writes are not state keys: the next block reads the
+                // group's blob, which enters at the block's last version.
+                output
+                    .write_set()
+                    .write_op_iter()
+                    .filter(move |(key, _)| {
+                        block_writes.is_none_or(|w| !w.member_keys.contains(key))
+                    })
+                    .map(move |(key, op)| {
+                        (
+                            key.clone(),
+                            version,
+                            op.as_base_op().as_state_value_opt().flatten().cloned(),
+                        )
+                    })
+            })
+            .chain(
+                block_writes
+                    .into_par_iter()
+                    .flat_map_iter(|w| w.group_writes.iter())
+                    .map(move |(key, op)| {
+                        (
+                            key.clone(),
+                            last_version,
+                            op.as_base_op().as_state_value_opt().flatten().cloned(),
+                        )
+                    }),
+            );
         THREAD_MANAGER.get_exe_cpu_pool().install(|| {
             PendingWrites::new(
                 writes,

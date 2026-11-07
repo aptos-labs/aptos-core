@@ -48,10 +48,10 @@ use aptos_types::{
     },
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        AuxiliaryInfoTrait, BlockOutput, PersistedAuxiliaryInfo, Transaction, TransactionOutput,
-        TransactionStatus, Version,
+        AuxiliaryInfoTrait, BlockOutput, BlockWrites, PersistedAuxiliaryInfo, Transaction,
+        TransactionOutput, TransactionStatus, Version,
     },
-    write_set::{TransactionWrite, WriteSet},
+    write_set::{TransactionWrite, WriteOp, WriteSet},
 };
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
@@ -67,6 +67,7 @@ pub struct RawBlockExecution {
     pub state_view: CachedStateView,
     pub onchain_config: BlockExecutorConfigFromOnchain,
     pub is_block: bool,
+    pub block_writes: Option<BlockWrites<StateKey, WriteOp>>,
 }
 
 impl RawBlockExecution {
@@ -195,7 +196,7 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
-        let (mut transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+        let (mut transaction_outputs, block_epilogue_txn, block_writes) = block_output.into_parts();
         let (transactions, mut auxiliary_infos) = txn_provider.into_inner();
         let mut transactions = transactions
             .into_iter()
@@ -233,6 +234,7 @@ impl DoGetExecutionOutput {
             is_block: transaction_slice_metadata
                 .append_state_checkpoint_to_block()
                 .is_some(),
+            block_writes,
         })
     }
 
@@ -251,12 +253,14 @@ impl DoGetExecutionOutput {
             state_view,
             onchain_config,
             is_block,
+            block_writes,
         } = raw;
         Parser::parse()
             .first_version(state_view.next_version())
             .transactions(transactions)
             .transaction_outputs(transaction_outputs)
             .auxiliary_infos(auxiliary_infos)
+            .maybe_block_writes(block_writes)
             .parent_state(parent_state)
             .maybe_parent_positions(parent_positions)
             .maybe_parent_orders(parent_orders)
@@ -464,6 +468,7 @@ impl Parser {
         mut transactions: Vec<Transaction>,
         mut transaction_outputs: Vec<TransactionOutput>,
         auxiliary_infos: Vec<AuxiliaryInfo>,
+        block_writes: Option<BlockWrites<StateKey, WriteOp>>,
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
         parent_orders: Option<OrderParent<'_>>,
@@ -514,7 +519,8 @@ impl Parser {
                 transactions,
                 transaction_outputs,
                 persisted_auxiliary_infos,
-            );
+            )
+            .with_block_writes(block_writes);
             TransactionsToKeep::index(first_version, to_commit, is_block)
         };
         let next_epoch_state = {

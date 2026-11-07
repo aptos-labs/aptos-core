@@ -102,6 +102,20 @@ impl TxnOutcome {
         features: &Features,
         auxiliary_data: TransactionAuxiliaryData,
     ) -> Result<(TransactionOutput, MaterializedGroups), MaterializationError> {
+        self.materialize_with(layouts, provider, features, auxiliary_data, false)
+    }
+
+    /// Like [`Self::materialize`]; with `member_level`, a resource-group
+    /// member's write is emitted under the member's own resource key and the
+    /// group is not assembled (nor returned).
+    pub fn materialize_with(
+        self,
+        layouts: &impl LayoutProvider,
+        provider: &dyn AptosDataProvider,
+        features: &Features,
+        auxiliary_data: TransactionAuxiliaryData,
+        member_level: bool,
+    ) -> Result<(TransactionOutput, MaterializedGroups), MaterializationError> {
         match self {
             TxnOutcome::Discarded { reason, .. } => Ok((
                 materialize::discarded_output(
@@ -141,6 +155,7 @@ impl TxnOutcome {
                     fee_statement.gas_used(),
                     txn_status,
                     auxiliary_data,
+                    member_level,
                 )
             },
         }
