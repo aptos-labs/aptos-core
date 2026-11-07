@@ -13,6 +13,7 @@ use crate::{
     types::InputOutputKey,
 };
 use aptos_aggregator::delayed_change::DelayedChange;
+use aptos_logger::info;
 use aptos_mvhashmap::{
     types::{Incarnation, TxnIndex},
     versioned_data::VersionedData,
@@ -407,6 +408,14 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         worker_id: u32,
         _async_runtime_checks_enabled: bool,
     ) -> Self {
+        if worker_id == 0 {
+            // A build with memory checks is a different program from the
+            // production one; make that visible wherever this runs.
+            info!(
+                "mono-move memory check tier: {:?}",
+                mono_move_mem::CHECK_TIER
+            );
+        }
         Self {
             ctx,
             environment: environment.clone(),

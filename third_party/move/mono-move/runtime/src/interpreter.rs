@@ -2619,7 +2619,8 @@ impl InterpreterContext<'_> {
                         let obj = Obj::new(frame.slot(heap_ptr).load_ptr());
                         // The value may contain pointers or uninitialized
                         // padding and need not be 8-aligned.
-                        obj.field(offset as usize).copy_word(frame.slot(dst));
+                        obj.field_range(offset as usize, 8)
+                            .copy_word(frame.slot(dst));
                     },
 
                     MicroOp::HeapMoveFrom {
@@ -2631,7 +2632,7 @@ impl InterpreterContext<'_> {
                         // SAFETY: `heap_ptr` holds a struct object pointer, which
                         // is never null (always allocated by `HeapNew`).
                         let obj = Obj::new(frame.slot(heap_ptr).load_ptr());
-                        obj.field(offset as usize)
+                        obj.field_range(offset as usize, size as usize)
                             .copy_to_nonoverlapping(frame.slot(dst), size as usize);
                     },
 
@@ -2645,7 +2646,9 @@ impl InterpreterContext<'_> {
                         let obj = Obj::new(frame.slot(heap_ptr).load_ptr());
                         // The value may contain pointers or uninitialized
                         // padding and need not be 8-aligned.
-                        frame.slot(src).copy_word(obj.field(offset as usize));
+                        frame
+                            .slot(src)
+                            .copy_word(obj.field_range(offset as usize, 8));
                     },
 
                     MicroOp::HeapMoveToImm8 {
@@ -2658,7 +2661,8 @@ impl InterpreterContext<'_> {
                         let obj = Obj::new(frame.slot(heap_ptr).load_ptr());
                         // The destination may be unaligned. `imm` contains
                         // initialized integer bytes, so a typed store is valid.
-                        obj.field(offset as usize).store_unaligned::<u64>(imm);
+                        obj.field_range(offset as usize, 8)
+                            .store_unaligned::<u64>(imm);
                     },
 
                     MicroOp::HeapMoveTo {
@@ -2670,9 +2674,10 @@ impl InterpreterContext<'_> {
                         // SAFETY: `heap_ptr` holds a struct object pointer, which
                         // is never null (always allocated by `HeapNew`).
                         let obj = Obj::new(frame.slot(heap_ptr).load_ptr());
-                        frame
-                            .slot(src)
-                            .copy_to_nonoverlapping(obj.field(offset as usize), size as usize);
+                        frame.slot(src).copy_to_nonoverlapping(
+                            obj.field_range(offset as usize, size as usize),
+                            size as usize,
+                        );
                     },
 
                     MicroOp::HeapBorrow {
@@ -2900,7 +2905,7 @@ impl InterpreterContext<'_> {
                         let obj = Obj::new(frame.ref_target(obj_ref).load_ptr());
                         // Non-overlapping: `dst` is a stack-region slot, the
                         // source is heap-object bytes.
-                        obj.field(offset as usize)
+                        obj.field_range(offset as usize, size as usize)
                             .copy_to_nonoverlapping(frame.slot(dst), size as usize);
                     },
 
@@ -2915,9 +2920,10 @@ impl InterpreterContext<'_> {
                         let obj = Obj::new(frame.ref_target(obj_ref).load_ptr());
                         // Non-overlapping: `src` is a stack-region slot, the
                         // destination is heap-object bytes.
-                        frame
-                            .slot(src)
-                            .copy_to_nonoverlapping(obj.field(offset as usize), size as usize);
+                        frame.slot(src).copy_to_nonoverlapping(
+                            obj.field_range(offset as usize, size as usize),
+                            size as usize,
+                        );
                     },
 
                     MicroOp::EnumReadVariantFieldByTag {
@@ -2929,7 +2935,7 @@ impl InterpreterContext<'_> {
                         let (obj, offset) = variant_field_loc(frame, enum_ref, offsets)?;
                         // Non-overlapping: `dst` is a stack-region slot, the
                         // field is heap-object bytes.
-                        obj.field(offset as usize)
+                        obj.field_range(offset as usize, size as usize)
                             .copy_to_nonoverlapping(frame.slot(dst), size as usize);
                     },
 
@@ -2942,9 +2948,10 @@ impl InterpreterContext<'_> {
                         let (obj, offset) = variant_field_loc(frame, enum_ref, offsets)?;
                         // Non-overlapping: `src` is a stack-region slot, the
                         // field is heap-object bytes.
-                        frame
-                            .slot(src)
-                            .copy_to_nonoverlapping(obj.field(offset as usize), size as usize);
+                        frame.slot(src).copy_to_nonoverlapping(
+                            obj.field_range(offset as usize, size as usize),
+                            size as usize,
+                        );
                     },
 
                     MicroOp::DeepCopyHeapPtrs { base, ref offsets } => {

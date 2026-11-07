@@ -1112,10 +1112,11 @@ fn gc_scan_to_space<P: DescriptorProvider + ?Sized>(
         // `gc_collect`).
         unsafe {
             let obj = Obj::new(scan_ptr.add(OBJECT_HEADER_SIZE));
+            // The forwarded check is the scan's own, below.
             let ObjHeader {
                 descriptor: descriptor_id,
                 size,
-            } = obj.header();
+            } = obj.header_or_forwarded();
             let obj_size = size as usize;
 
             if obj_size == 0 || obj_size != align_max(obj_size) {
@@ -1259,21 +1260,18 @@ fn gc_copy_object(old_ptr: MemAddr, free_ptr: &mut MemAddr) -> MemAddr {
     // does not overlap.
     unsafe {
         let old = Obj::new(old_ptr);
+        // A from-space object may already be forwarded; the header's size
+        // is checked by the accessor.
         let ObjHeader {
             descriptor: descriptor_id,
             size,
-        } = old.header();
+        } = old.header_or_forwarded();
 
         if descriptor_id == FORWARDED_MARKER {
             return forwarding(old);
         }
 
         let obj_size = size as usize;
-        debug_assert!(
-            obj_size >= OBJECT_HEADER_SIZE && obj_size == align_max(obj_size),
-            "gc_copy_object: invalid object size {}",
-            obj_size
-        );
 
         // Move the `[header | payload]` block from from-space to
         // to-space, then advance the raw bump cursor by `obj_size`. The

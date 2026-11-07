@@ -59,6 +59,33 @@ Rules:
   verifier check, which allocator guarantee, which null check above — not
   "caller must uphold".
 
+## Memory checks
+
+Runtime memory checks live at the choke point (`MemAddr`, `FatRef`, `Frame`,
+`Obj`) and are attached with `mono_move_mem::mem_check!(<tier>, cond, fault)`.
+A check only ever fails on a VM bug; it never changes what a valid program
+computes, and it is never metered.
+
+- **Tiers** are a build property of `mono-move-mem`, selected by
+  `MONO_MOVE_MEM_CHECKS=hardened|exhaustive` when invoking cargo (unset =
+  production, no check code compiled). Not a cargo feature on purpose:
+  features are additive across the dependency graph and would let a tool
+  crate silently harden the node. `mono_move_mem::CHECK_TIER` says what a
+  binary was built with; the block executor logs it at startup.
+- `hardened`: O(1) per access; the candidate for running on validators one
+  day. `exhaustive`: anything heavier; CI and fuzzing only. Below its tier a
+  `hardened` check is a `debug_assert!`; an `exhaustive` check is nothing.
+- **Failure**: `mono_move_mem::checks::fault` records a `MemFault` for
+  `take_last_fault()` and unwinds; harnesses map it to an invariant violation.
+- **Adding a check**: attach it where the invariant is established, not at
+  the call site; give it a `MemFaultKind`; add a negative test next to the
+  type (the `assert_fault` pattern in `mem/src/addr.rs`), which is a no-op
+  in the production tier; run the differential suite under both tiers
+  (`.github/workflows/mono-move-mem-checks.yaml` does) — it must show zero
+  faults on valid programs.
+- `testsuite/benches/perf/run.sh` refuses to run with a tier set unless
+  `MONO_MOVE_MEM_CHECKS_BENCH=1`, so the gate always measures production.
+
 ## TODO labels
 
 Every inline TODO is `// TODO(<group>): message`, where `<group>` is one or more

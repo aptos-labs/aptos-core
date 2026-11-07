@@ -46,6 +46,7 @@ mono-move-aptos-state-view-providers = { workspace = true }
 mono-move-aptos-transaction-executor = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-global-context = { workspace = true }
+mono-move-mem = { workspace = true }
 mono-move-runtime = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }

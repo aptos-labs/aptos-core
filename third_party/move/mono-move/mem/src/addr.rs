@@ -3,7 +3,12 @@
 
 //! [`MemAddr`]: a raw address into VM memory.
 
-use crate::{align::MAX_ALIGN, scalar::Scalar};
+use crate::{
+    align::MAX_ALIGN,
+    checks::{MemFault, MemFaultKind},
+    mem_check,
+    scalar::Scalar,
+};
 use std::{fmt, mem::MaybeUninit, ptr, ptr::NonNull};
 
 /// A raw address into VM memory. Every raw memory access in the VM goes
@@ -101,6 +106,54 @@ impl MemAddr {
 }
 
 // ---------------------------------------------------------------------------
+// Check hooks (compile to nothing in the production tier)
+// ---------------------------------------------------------------------------
+
+impl MemAddr {
+    /// Hardened: an access of `size` bytes at `self` is non-null, does not
+    /// wrap the address space, and is `align`-aligned.
+    #[inline(always)]
+    fn check_access(self, size: usize, align: usize) {
+        let a = self.as_usize();
+        mem_check!(
+            hardened,
+            a != 0,
+            MemFault::new(MemFaultKind::Null, a, size, align)
+        );
+        mem_check!(
+            hardened,
+            a.checked_add(size).is_some(),
+            MemFault::new(MemFaultKind::AddressWrap, a, size, align)
+        );
+        mem_check!(
+            hardened,
+            a & (align - 1) == 0,
+            MemFault::new(MemFaultKind::Misaligned, a, size, align)
+        );
+    }
+
+    /// Hardened: `[self, self + n)` and `[other, other + n)` are disjoint.
+    #[inline(always)]
+    fn check_disjoint(self, other: MemAddr, n: usize) {
+        mem_check!(
+            hardened,
+            self.as_usize().abs_diff(other.as_usize()) >= n,
+            MemFault::new(MemFaultKind::Overlap, self.as_usize(), n, other.as_usize())
+        );
+    }
+}
+
+/// The alignment [`MemAddr::load`] / [`MemAddr::store`] require for a `T`.
+#[inline(always)]
+const fn access_align<T: Scalar>() -> usize {
+    if T::ALIGN <= MAX_ALIGN {
+        T::ALIGN
+    } else {
+        1
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Address formation
 // ---------------------------------------------------------------------------
 
@@ -113,6 +166,11 @@ impl MemAddr {
     /// the end of, the same allocation.
     #[inline(always)]
     pub unsafe fn add(self, bytes: usize) -> MemAddr {
+        mem_check!(
+            hardened,
+            self.as_usize().checked_add(bytes).is_some(),
+            MemFault::new(MemFaultKind::AddressWrap, self.as_usize(), bytes, 0)
+        );
         // SAFETY: forwarded to the caller.
         MemAddr(unsafe { self.0.add(bytes) })
     }
@@ -125,6 +183,11 @@ impl MemAddr {
     /// the end of, the same allocation.
     #[inline(always)]
     pub unsafe fn sub(self, bytes: usize) -> MemAddr {
+        mem_check!(
+            hardened,
+            self.as_usize() >= bytes,
+            MemFault::new(MemFaultKind::AddressWrap, self.as_usize(), bytes, 0)
+        );
         // SAFETY: forwarded to the caller.
         MemAddr(unsafe { self.0.sub(bytes) })
     }
@@ -178,6 +241,7 @@ impl MemAddr {
     /// [`MemAddr::load_ptr`]).
     #[inline(always)]
     pub unsafe fn load<T: Scalar>(self) -> T {
+        self.check_access(std::mem::size_of::<T>(), access_align::<T>());
         let p = self.0.cast::<T>();
         // SAFETY: forwarded to the caller; the alignment branch is a
         // compile-time constant.
@@ -199,6 +263,7 @@ impl MemAddr {
     /// within [`MAX_ALIGN`].
     #[inline(always)]
     pub unsafe fn store<T: Scalar>(self, v: T) {
+        self.check_access(std::mem::size_of::<T>(), access_align::<T>());
         let p = self.0.cast::<T>();
         let v = T::to_le(v);
         // SAFETY: forwarded to the caller; the alignment branch is a
@@ -219,6 +284,7 @@ impl MemAddr {
     /// The bytes must be readable and initialized, and not a pointer slot.
     #[inline(always)]
     pub unsafe fn load_unaligned<T: Scalar>(self) -> T {
+        self.check_access(std::mem::size_of::<T>(), 1);
         // SAFETY: forwarded to the caller.
         T::from_le(unsafe { self.0.cast::<T>().read_unaligned() })
     }
@@ -230,6 +296,7 @@ impl MemAddr {
     /// The bytes must be writable.
     #[inline(always)]
     pub unsafe fn store_unaligned<T: Scalar>(self, v: T) {
+        self.check_access(std::mem::size_of::<T>(), 1);
         // SAFETY: forwarded to the caller.
         unsafe { self.0.cast::<T>().write_unaligned(T::to_le(v)) }
     }
@@ -242,6 +309,10 @@ impl MemAddr {
     /// The word must be readable, initialized, and pointer-aligned.
     #[inline(always)]
     pub unsafe fn load_ptr(self) -> MemAddr {
+        self.check_access(
+            std::mem::size_of::<*mut u8>(),
+            std::mem::align_of::<*mut u8>(),
+        );
         // SAFETY: forwarded to the caller.
         MemAddr(unsafe { self.0.cast::<*mut u8>().read() })
     }
@@ -253,6 +324,10 @@ impl MemAddr {
     /// The word must be writable and pointer-aligned.
     #[inline(always)]
     pub unsafe fn store_ptr(self, p: MemAddr) {
+        self.check_access(
+            std::mem::size_of::<*mut u8>(),
+            std::mem::align_of::<*mut u8>(),
+        );
         // SAFETY: forwarded to the caller.
         unsafe { self.0.cast::<*mut u8>().write(p.0) }
     }
@@ -268,7 +343,11 @@ impl MemAddr {
     pub unsafe fn load_bool(self) -> bool {
         // SAFETY: forwarded to the caller.
         let byte = unsafe { self.load::<u8>() };
-        debug_assert!(byte <= 1, "boolean slot holds non-boolean byte {byte}");
+        mem_check!(
+            hardened,
+            byte <= 1,
+            MemFault::new(MemFaultKind::InvalidBool, self.as_usize(), 1, byte as usize)
+        );
         byte != 0
     }
 
@@ -298,6 +377,8 @@ impl MemAddr {
     /// `self` must be readable and `dst` writable for 8 bytes.
     #[inline(always)]
     pub unsafe fn copy_word(self, dst: MemAddr) {
+        self.check_access(8, 1);
+        dst.check_access(8, 1);
         // SAFETY: forwarded to the caller. Loading all eight bytes before
         // writing them permits overlap.
         unsafe {
@@ -314,10 +395,9 @@ impl MemAddr {
     /// ranges must not overlap.
     #[inline(always)]
     pub unsafe fn copy_to_nonoverlapping(self, dst: MemAddr, n: usize) {
-        debug_assert!(
-            self.as_usize().abs_diff(dst.as_usize()) >= n,
-            "copy_to_nonoverlapping ranges overlap"
-        );
+        self.check_access(n, 1);
+        dst.check_access(n, 1);
+        self.check_disjoint(dst, n);
         // SAFETY: forwarded to the caller.
         unsafe { ptr::copy_nonoverlapping(self.0, dst.0, n) }
     }
@@ -343,6 +423,8 @@ impl MemAddr {
     /// `self` must be readable and `dst` writable for `n` bytes.
     #[inline(always)]
     pub unsafe fn copy_to(self, dst: MemAddr, n: usize) {
+        self.check_access(n, 1);
+        dst.check_access(n, 1);
         // SAFETY: forwarded to the caller.
         unsafe { ptr::copy(self.0, dst.0, n) }
     }
@@ -355,10 +437,9 @@ impl MemAddr {
     /// overlap.
     #[inline(always)]
     pub unsafe fn swap_nonoverlapping_with(self, other: MemAddr, n: usize) {
-        debug_assert!(
-            self.as_usize().abs_diff(other.as_usize()) >= n,
-            "swap_nonoverlapping_with ranges overlap"
-        );
+        self.check_access(n, 1);
+        other.check_access(n, 1);
+        self.check_disjoint(other, n);
         // SAFETY: forwarded to the caller.
         unsafe { ptr::swap_nonoverlapping(self.0, other.0, n) }
     }
@@ -381,6 +462,7 @@ impl MemAddr {
     /// `self` must be writable for `n` bytes.
     #[inline(always)]
     pub unsafe fn fill(self, byte: u8, n: usize) {
+        self.check_access(n, 1);
         // SAFETY: forwarded to the caller.
         unsafe { ptr::write_bytes(self.0, byte, n) }
     }
@@ -399,6 +481,7 @@ impl MemAddr {
     /// written through any other path for `'a`.
     #[inline(always)]
     pub unsafe fn as_bytes<'a>(self, n: usize) -> &'a [u8] {
+        self.check_access(n, 1);
         // SAFETY: forwarded to the caller.
         unsafe { std::slice::from_raw_parts(self.0, n) }
     }
@@ -411,6 +494,7 @@ impl MemAddr {
     /// other path for `'a`.
     #[inline(always)]
     pub unsafe fn as_bytes_mut<'a>(self, n: usize) -> &'a mut [u8] {
+        self.check_access(n, 1);
         // SAFETY: forwarded to the caller.
         unsafe { std::slice::from_raw_parts_mut(self.0, n) }
     }
@@ -423,6 +507,7 @@ impl MemAddr {
     /// for `'a`.
     #[inline(always)]
     pub unsafe fn as_uninit_bytes<'a>(self, n: usize) -> &'a [MaybeUninit<u8>] {
+        self.check_access(n, 1);
         // SAFETY: forwarded to the caller; `MaybeUninit<u8>` permits any byte.
         unsafe { std::slice::from_raw_parts(self.0.cast(), n) }
     }
@@ -435,6 +520,7 @@ impl MemAddr {
     /// through any other path for `'a`.
     #[inline(always)]
     pub unsafe fn as_uninit_bytes_mut<'a>(self, n: usize) -> &'a mut [MaybeUninit<u8>] {
+        self.check_access(n, 1);
         // SAFETY: forwarded to the caller; `MaybeUninit<u8>` permits any byte.
         unsafe { std::slice::from_raw_parts_mut(self.0.cast(), n) }
     }
@@ -547,5 +633,85 @@ mod tests {
         assert!(base.is_aligned_to(1));
         assert!(MemAddr::NULL.is_null());
         assert!(!base.is_null());
+    }
+
+    // ----- hardened-tier negative tests (no-ops in the production tier) -----
+
+    /// Runs `f` and returns the fault it raised, or `None` if checks are
+    /// not compiled in.
+    fn expect_fault(f: impl FnOnce()) -> Option<MemFaultKind> {
+        use crate::checks::{take_last_fault, HARDENED};
+        if !HARDENED {
+            return None;
+        }
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+        assert!(r.is_err(), "expected a memory fault");
+        Some(take_last_fault().expect("fault recorded").kind)
+    }
+
+    fn assert_fault(expected: MemFaultKind, f: impl FnOnce()) {
+        if let Some(kind) = expect_fault(f) {
+            assert_eq!(kind, expected);
+        }
+    }
+
+    #[test]
+    fn hardened_misaligned_load_faults() {
+        let mut buf = Buf::<16>::zeroed();
+        let base = buf.addr();
+        assert_fault(MemFaultKind::Misaligned, || unsafe {
+            base.add(1).load::<u64>();
+        });
+        // Unaligned access is explicitly allowed.
+        unsafe { base.add(1).load_unaligned::<u64>() };
+    }
+
+    #[test]
+    fn hardened_null_access_faults() {
+        assert_fault(MemFaultKind::Null, || unsafe {
+            MemAddr::NULL.load::<u8>();
+        });
+        assert_fault(MemFaultKind::Null, || unsafe {
+            MemAddr::NULL.copy_to(MemAddr::NULL, 0);
+        });
+    }
+
+    #[test]
+    fn hardened_wrap_faults() {
+        let mut buf = Buf::<16>::zeroed();
+        let base = buf.addr();
+        assert_fault(MemFaultKind::AddressWrap, || unsafe {
+            base.add(usize::MAX);
+        });
+        assert_fault(MemFaultKind::AddressWrap, || unsafe {
+            base.as_bytes(usize::MAX);
+        });
+        assert_fault(MemFaultKind::AddressWrap, || unsafe {
+            MemAddr::from_ptr(std::ptr::without_provenance_mut(8)).sub(16);
+        });
+    }
+
+    #[test]
+    fn hardened_overlap_faults() {
+        let mut buf = Buf::<32>::zeroed();
+        let base = buf.addr();
+        assert_fault(MemFaultKind::Overlap, || unsafe {
+            base.copy_to_nonoverlapping(base.add(4), 8);
+        });
+        assert_fault(MemFaultKind::Overlap, || unsafe {
+            base.swap_nonoverlapping_with(base.add(4), 8);
+        });
+        // The overlapping copy is fine.
+        unsafe { base.copy_to(base.add(4), 8) };
+    }
+
+    #[test]
+    fn hardened_invalid_bool_faults() {
+        let mut buf = Buf::<8>::zeroed();
+        let base = buf.addr();
+        unsafe { base.store::<u8>(2) };
+        assert_fault(MemFaultKind::InvalidBool, || unsafe {
+            base.load_bool();
+        });
     }
 }

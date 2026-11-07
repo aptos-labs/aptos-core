@@ -30,5 +30,4 @@ pub(crate) const VEC_PUSHBACK_INIT_CAPACITY: u64 = 4;
 /// TODO(cleanup): make this configurable in some VM config.
 pub(crate) const ABORT_MESSAGE_SIZE_LIMIT: usize = 1024;
 
-/// Marker written into the `descriptor_id` field of a forwarded object during GC.
-pub(crate) const FORWARDED_MARKER: u32 = u32::MAX;
+pub(crate) use mono_move_core::memory::FORWARDED_MARKER;
