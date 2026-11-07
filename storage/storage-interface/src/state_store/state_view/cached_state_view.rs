@@ -45,7 +45,9 @@ pub type StateCacheShard = DashMap<StateKey, StateSlot>;
 /// execute while its parent's output is still being indexed.
 #[derive(Debug)]
 pub struct PendingWrites {
-    slots: HashMap<StateKey, StateSlot>,
+    /// The last write to each key, with its version so that writes can be
+    /// merged in any order.
+    slots: HashMap<StateKey, (Version, StateSlot)>,
     next_version: Version,
     usage: StateStorageUsage,
 }
@@ -63,48 +65,44 @@ impl PendingWrites {
         old_slots: impl Fn(&StateKey) -> Option<StateSlot> + Sync,
     ) -> Result<Self> {
         fn keep_latest(
-            map: &mut HashMap<StateKey, (Version, Option<StateValue>)>,
+            map: &mut HashMap<StateKey, (Version, StateSlot)>,
             key: StateKey,
             version: Version,
-            value: Option<StateValue>,
+            slot: StateSlot,
         ) {
             match map.entry(key) {
                 hash_map::Entry::Occupied(mut e) if e.get().0 < version => {
-                    e.insert((version, value));
+                    e.insert((version, slot));
                 },
                 hash_map::Entry::Occupied(_) => {},
                 hash_map::Entry::Vacant(e) => {
-                    e.insert((version, value));
+                    e.insert((version, slot));
                 },
             }
         }
-        let latest = writes
+        // Per-worker maps merged in a tree; a serial collect into one map would
+        // cost as much as the whole build.
+        let slots = writes
             .fold(HashMap::new, |mut map, (key, version, value)| {
-                keep_latest(&mut map, key, version, value);
+                let slot = StateSlot::from_db_get(key.clone(), value.map(|v| (version, v)));
+                keep_latest(&mut map, key, version, slot);
                 map
             })
             .reduce(HashMap::new, |mut a, mut b| {
                 if a.len() < b.len() {
                     std::mem::swap(&mut a, &mut b);
                 }
-                for (key, (version, value)) in b {
-                    keep_latest(&mut a, key, version, value);
+                for (key, (version, slot)) in b {
+                    keep_latest(&mut a, key, version, slot);
                 }
                 a
             });
-        let slots = latest
-            .into_par_iter()
-            .map(|(key, (version, value))| {
-                let slot = StateSlot::from_db_get(key.clone(), value.map(|v| (version, v)));
-                (key, slot)
-            })
-            .collect::<HashMap<_, _>>();
         let usage = if base_usage.is_untracked() {
             base_usage
         } else {
             let (items, bytes) = slots
                 .par_iter()
-                .map(|(key, slot)| -> Result<(i64, i64)> {
+                .map(|(key, (_, slot))| -> Result<(i64, i64)> {
                     let key_size = key.size() as i64;
                     let mut items = 0i64;
                     let mut bytes = 0i64;
@@ -387,7 +385,7 @@ impl CachedStateView {
             .pending
             .iter()
             .rev()
-            .find_map(|writes| writes.slots.get(state_key).cloned());
+            .find_map(|writes| writes.slots.get(state_key).map(|(_, slot)| slot.clone()));
         let ret = if let Some(slot) = pending {
             COUNTER.inc_with(&["sv_hit_pending"]);
             slot
