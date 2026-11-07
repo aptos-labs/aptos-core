@@ -39,7 +39,7 @@ use move_core_types::{
 use move_vm_runtime::{Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::code::WithSize;
 use parking_lot::{Mutex, MutexGuard};
-use std::{hash::Hash, ops::Deref, sync::Arc};
+use std::{any::Any, hash::Hash, ops::Deref, sync::Arc};
 
 /// A global context for the MonoMove executor.
 fn new_global_context(num_workers: usize) -> Arc<GlobalContext> {
@@ -111,6 +111,10 @@ pub struct ModuleCacheManager<K, D, V, E> {
     /// responsibility of [ModuleCacheManager] to ensure it stays in sync with the environment and
     /// the state.
     module_cache: GlobalModuleCache<K, D, V, E>,
+    /// The multi-version map the last block left behind, collapsed to base
+    /// values, for the next block on the same fork. Typed by the executor that
+    /// uses it; dropped whenever the module cache is flushed.
+    execution_pool: Option<Box<dyn Any + Send + Sync>>,
 }
 
 impl<K, D, V, E> ModuleCacheManager<K, D, V, E>
@@ -127,6 +131,7 @@ where
             environment: None,
             environment_inputs: None,
             module_cache: GlobalModuleCache::empty(),
+            execution_pool: None,
         }
     }
 
@@ -177,6 +182,7 @@ where
             self.module_cache.flush_all_caches();
             self.environment = None;
             self.environment_inputs = None;
+            self.execution_pool = None;
         }
         // Record the new metadata for this slice of transactions.
         self.transaction_slice_metadata = transaction_slice_metadata;
@@ -209,6 +215,7 @@ where
 
             self.environment = Some(storage_environment);
             self.module_cache.flush_all_caches();
+            self.execution_pool = None;
         }
 
         let environment = self.environment.as_ref().expect("Environment must be set");
@@ -435,6 +442,29 @@ impl<'a> AptosModuleCacheManagerGuard<'a> {
         match self {
             Guard { guard, .. } => &mut guard.module_cache,
             None { module_cache, .. } => module_cache,
+        }
+    }
+
+    /// The execution pool the previous block left for this one, if it is of
+    /// type `P` and the blocks are consecutive. Taking it leaves none behind.
+    pub fn take_execution_pool<P: Any + Send + Sync>(&mut self) -> Option<P> {
+        use AptosModuleCacheManagerGuard::*;
+        match self {
+            Guard { guard, .. } => guard
+                .execution_pool
+                .take()
+                .and_then(|pool| pool.downcast::<P>().ok())
+                .map(|pool| *pool),
+            None { .. } => Option::None,
+        }
+    }
+
+    /// Leaves an execution pool for the next block. Without a manager (no
+    /// guard) the pool is dropped.
+    pub fn store_execution_pool<P: Any + Send + Sync>(&mut self, pool: P) {
+        use AptosModuleCacheManagerGuard::*;
+        if let Guard { guard, .. } = self {
+            guard.execution_pool = Some(Box::new(pool));
         }
     }
 

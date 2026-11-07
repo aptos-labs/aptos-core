@@ -388,6 +388,15 @@ pub static INTERRUPTED_INCARNATIONS: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Blocks that started from the multi-version map the previous block left.
+pub static EXECUTION_POOL_REUSED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_execution_pool_reused",
+        "Blocks executed on the previous block's multi-version map"
+    )
+    .unwrap()
+});
+
 /// Aborted readers held back until the next writer above them executed again.
 pub static PREDICTED_STALLS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

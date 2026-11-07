@@ -101,6 +101,15 @@ where
         &self.module_cache
     }
 
+    /// Keeps the map for the next block on the same fork: every key's latest
+    /// value becomes its base, with no versions, dependencies or delayed
+    /// fields left. The module and script caches are left as they are.
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) {
+        self.data.collapse_to_base(num_committed);
+        self.group_data.collapse_to_base(num_committed);
+        self.delayed_fields = VersionedDelayedFields::empty();
+    }
+
     /// Takes module from module cache and returns an iterator to the taken keys and modules.
     pub fn take_modules_iter(
         &mut self,

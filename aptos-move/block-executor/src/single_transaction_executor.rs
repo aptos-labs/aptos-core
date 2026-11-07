@@ -144,6 +144,12 @@ pub trait SingleTransactionExecutor {
         false
     }
 
+    /// Whether the multi-version map may be kept across blocks for this
+    /// executor (the values it stores must stay valid after the block).
+    fn uses_execution_pool() -> bool {
+        false
+    }
+
     /// Under member-level group writes, the storage key a group member's
     /// write is recorded under: the member's own resource key.
     fn member_storage_key(
@@ -182,6 +188,12 @@ pub trait SingleTransactionExecutor {
 /// each written group's blob once at its end.
 pub static MEMBER_GROUP_WRITES: Lazy<bool> =
     Lazy::new(|| std::env::var("APTOS_MEMBER_GROUP_WRITES").is_ok_and(|v| v == "1"));
+
+/// The multi-version map is kept from one block to the next on the same fork,
+/// collapsed to base values, so keys the previous block touched need no base
+/// value from the state view.
+pub static EXECUTION_POOL: Lazy<bool> =
+    Lazy::new(|| std::env::var("APTOS_EXECUTION_POOL").is_ok_and(|v| v == "1"));
 
 /// Builds the legacy `LatestView` from the view ingredients.
 fn build_latest_view<'a, T: Transaction, S: TStateView<Key = T::Key>>(

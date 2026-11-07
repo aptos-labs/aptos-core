@@ -311,6 +311,34 @@ where
         Ok(invalidated_dependencies.take())
     }
 
+    /// Keeps every group's latest members and size below `num_committed` as
+    /// its base for the next block on the same fork.
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) {
+        self.values.collapse_to_base(num_committed);
+        self.group_sizes.iter_mut().for_each(|mut sizes| {
+            let Some(size) = sizes
+                .size_entries
+                .range(..ShiftedTxnIndex::new(num_committed))
+                .next_back()
+                .map(|(_, entry)| entry.value.size)
+            else {
+                sizes.size_entries.clear();
+                return;
+            };
+            sizes.size_entries.clear();
+            sizes.size_entries.insert(
+                ShiftedTxnIndex::zero_idx(),
+                SizeEntry::new(SizeAndDependencies::from_size(size)),
+            );
+        });
+        // A group with no committed size is uninitialized again, so that the
+        // next read provisions it from the state view.
+        self.group_sizes
+            .retain(|_, sizes| !sizes.size_entries.is_empty());
+        self.group_tags
+            .retain(|key, _| self.group_sizes.contains_key(key));
+    }
+
     /// Transactions that registered a read of a member or the size the group's
     /// entry at txn_idx holds.
     pub fn readers_of<'a>(
