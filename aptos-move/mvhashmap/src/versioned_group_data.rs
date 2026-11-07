@@ -19,7 +19,7 @@ use aptos_types::{
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use claims::{assert_ok, assert_some};
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use equivalent::Equivalent;
 use rayon::prelude::*;
 use serde::Serialize;
@@ -89,6 +89,9 @@ pub struct VersionedGroupData<K, T, V> {
     // must correspond to the outputs recorded by the committed transaction incarnations.
     // (and the correctness of the outputs is the responsibility of BlockSTM validation).
     group_tags: DashMap<K, HashSet<T>, ahash::RandomState>,
+    /// Groups whose size was written, or read with a registered dependency,
+    /// since the map was last collapsed.
+    touched_groups: DashSet<K, ahash::RandomState>,
 }
 
 // This struct allows us to reference a group key and tag without cloning
@@ -139,11 +142,18 @@ where
             values: VersionedData::empty(),
             group_sizes: DashMap::with_hasher(ahash::RandomState::new()),
             group_tags: DashMap::with_hasher(ahash::RandomState::new()),
+            touched_groups: DashSet::with_hasher(ahash::RandomState::new()),
         }
     }
 
     pub(crate) fn num_keys(&self) -> usize {
         self.group_sizes.len()
+    }
+
+    fn touch(&self, group_key: &K) {
+        if !self.touched_groups.contains(group_key) {
+            self.touched_groups.insert(group_key.clone());
+        }
     }
 
     pub fn set_raw_base_values(
@@ -308,6 +318,8 @@ where
                 size, store_deps,
             )),
         );
+        drop(group_sizes);
+        self.touch(&group_key);
 
         Ok(invalidated_dependencies.take())
     }
@@ -323,35 +335,31 @@ where
         self.values.collapse_to_base(num_committed);
         // A group with no committed size is uninitialized again, so that the
         // next read provisions it from the state view.
-        self.group_sizes
-            .shards_mut()
-            .par_iter_mut()
-            .for_each(|shard| {
-                shard.get_mut().retain(|(_, sizes)| {
-                    let Some(size) = sizes
-                        .size_entries
-                        .range(..ShiftedTxnIndex::new(num_committed))
-                        .next_back()
-                        .map(|(_, entry)| entry.value.size)
-                    else {
-                        return false;
-                    };
-                    sizes.size_entries.clear();
-                    sizes.size_entries.insert(
-                        ShiftedTxnIndex::zero_idx(),
-                        SizeEntry::new(SizeAndDependencies::from_size(size)),
-                    );
-                    true
-                });
-            });
-        self.group_tags
-            .shards_mut()
-            .par_iter_mut()
-            .for_each(|shard| {
-                shard
-                    .get_mut()
-                    .retain(|(key, _)| self.group_sizes.contains_key(key));
-            });
+        let touched = std::mem::replace(
+            &mut self.touched_groups,
+            DashSet::with_hasher(ahash::RandomState::new()),
+        );
+        touched.into_iter().par_bridge().for_each(|group_key| {
+            let Some(mut sizes) = self.group_sizes.get_mut(&group_key) else {
+                return;
+            };
+            let Some(size) = sizes
+                .size_entries
+                .range(..ShiftedTxnIndex::new(num_committed))
+                .next_back()
+                .map(|(_, entry)| entry.value.size)
+            else {
+                drop(sizes);
+                self.group_sizes.remove(&group_key);
+                self.group_tags.remove(&group_key);
+                return;
+            };
+            sizes.size_entries.clear();
+            sizes.size_entries.insert(
+                ShiftedTxnIndex::zero_idx(),
+                SizeEntry::new(SizeAndDependencies::from_size(size)),
+            );
+        });
     }
 
     /// Transactions that registered a read of a member or the size the group's
@@ -549,6 +557,7 @@ where
     ) -> Result<ResourceGroupSize, MVGroupError> {
         match self.group_sizes.get(group_key) {
             Some(g) => {
+                self.touch(group_key);
                 Self::get_latest_entry(&g.size_entries, txn_idx, ReadPosition::BeforeCurrentTxn)
                     .map_or(Err(MVGroupError::Uninitialized), |(_, size)| {
                         // TODO(BlockSTMv2): convert to PanicErrors after MVHashMap refactoring.

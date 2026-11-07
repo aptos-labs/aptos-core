@@ -839,3 +839,44 @@ a fifth of the time but the other workers never wait for it, so it was not
 on the critical path. Kept, since it is what would bind first at higher
 thread counts (the remaining 2–3 µs/txn is the gas-limit accounting and
 the commit queue).
+
+### Execution pool, B2 (commits afead1348e, b12d56efcc, 9643dc9b6f; flag `APTOS_EXECUTION_POOL=1`)
+
+The multi-version map is kept from one block to the next on the same fork:
+after a block it is collapsed to one base entry per key (the last committed
+value, no versions, no readers) and parked in the module cache manager,
+which drops it on a non-consecutive block or a changed environment. A key
+the previous block touched then costs no state-view read and no base-value
+insertion. Root hashes are identical to the base run on every workload
+(the pool changes where values come from, never what they are). Three
+iterations were needed before the collapse itself was cheap:
+
+| transfer, 16T, split stages | inner µs/txn | worker CPU µs/txn | collapse µs/txn (wall) |
+|---|---|---|---|
+| base | 10.6 | 141 | – |
+| pool, serial collapse over the whole map | 72 | 143 | ~60 |
+| pool, parallel collapse, serial prune | 18.8 | 139 | ~8 |
+| pool, one parallel pass per shard | 13.1 | 136 | 2.9 |
+
+| no-op, 16T, split stages | inner µs/txn | worker CPU µs/txn | collapse µs/txn |
+|---|---|---|---|
+| base | 6.8 | 81 | – |
+| pool, one parallel pass per shard | 5.85 (−14%, 147k → 171k TPS) | 53 (−35%) | 0.8 |
+
+Where the key set is stable (no-op: 2000 senders cycling, the framework and
+config keys) the pool removes a third of MonoMove's worker CPU: the
+`set_raw_base_values` / `set_base_value` insertions, the state-view lookups
+behind them and their page faults. Where every block brings new keys
+(transfer and account generation: receivers never repeat) the map grows by
+thousands of keys a block and the collapse, which walked every key, cost
+more than the pool saved. The next iteration tracks the keys touched since
+the last collapse and walks only those, which makes the collapse
+proportional to the block rather than to the map.
+
+Two things the pool had to get right: a key served from the pool is never
+read through the state view, so the commit's usage and pruning accounting
+("must cache read") did not find its old slot; with the pool, the parse
+step primes the state cache for every updated key (off the critical path in
+pipelined mode). And the previous block's registered readers must be
+dropped from every entry the next block can write to, or they would be
+invalidated as if they were the new block's transactions.
