@@ -8,6 +8,7 @@ use crate::{
         state_delta::StateDelta,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::{
+            committed_slots::CommittedSlots,
             db_state_view::DbStateView,
             hot_state_view::{EmptyHotState, HotStateView},
         },
@@ -174,6 +175,10 @@ impl ShardedStateCache {
         self.shard(state_key.get_shard_id())
             .get(state_key)
             .map(|r| r.clone())
+    }
+
+    pub fn contains(&self, state_key: &StateKey) -> bool {
+        self.shard(state_key.get_shard_id()).contains_key(state_key)
     }
 
     pub fn next_version(&self) -> Version {
@@ -360,13 +365,46 @@ impl CachedStateView {
         keys: T,
     ) -> Result<()> {
         rayon::scope(|s| {
-            keys.into_iter().for_each(|key| {
-                s.spawn(move |_| {
-                    self.get_state_value(key).expect("Must succeed.");
-                })
-            });
+            keys.into_iter()
+                .filter(|key| !self.memorized.contains(key))
+                .for_each(|key| {
+                    s.spawn(move |_| {
+                        self.get_state_value(key).expect("Must succeed.");
+                    })
+                });
         });
         Ok(())
+    }
+
+    /// Memorizes, for the keys `updates` writes that this view was never
+    /// asked for, the slot the previous blocks left behind. Only the keys
+    /// `committed` does not know remain for `prime_cache`.
+    pub fn prime_cache_from_committed(
+        &self,
+        updates: &StateUpdateRefs,
+        committed: &CommittedSlots,
+    ) {
+        let _timer = TIMER.timer_with(&["prime_state_cache_from_committed"]);
+        let Some(committed) = committed.for_block(self.next_version()) else {
+            return;
+        };
+        for batch in [
+            updates.for_last_checkpoint_batched(),
+            updates.for_latest_batched(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            batch.shards.par_iter().for_each(|shard| {
+                for key in shard.keys() {
+                    if !self.memorized.contains(key) {
+                        if let Some(slot) = committed.get(key) {
+                            self.memorized.try_insert(key, &slot);
+                        }
+                    }
+                }
+            });
+        }
     }
 
     /// Consumes `Self` and returns the state and all the memorized state reads.
