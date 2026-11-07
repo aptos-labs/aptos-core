@@ -13,6 +13,7 @@ use crate::{
     types::InputOutputKey,
 };
 use aptos_aggregator::delayed_change::DelayedChange;
+use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::value::SpeculativeValue,
@@ -775,13 +776,15 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 "Group writes are only assembled after parallel execution",
             ));
         };
-        let guard = self.execution_guard()?;
         let group_data = versioned_map.group_data();
-        let members_blob =
-            |members: Vec<(StructTag, MonoValue)>| -> Result<Option<Bytes>, PanicError> {
-                if members.is_empty() {
-                    return Ok(None);
-                }
+        let assemble = |guard: &ExecutionGuard<'_>,
+                        group_key: InMemoryStorageKey|
+         -> Result<Option<(StateKey, WriteOp)>, PanicError> {
+            let existed = !group_data.group_members_at(&group_key, 0)?.is_empty();
+            let members = group_data.group_members_at(&group_key, next_txn_idx)?;
+            let blob = if members.is_empty() {
+                None
+            } else {
                 let members = members
                     .into_iter()
                     .map(|(tag, value)| {
@@ -790,13 +793,12 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                             MonoValue::Write { ptr, ty, .. } => {
                                 // SAFETY: the entry holding this pointer pins the frozen
                                 // heap it points into, and that heap is never mutated.
-                                let blob = unsafe { serialize(&guard, ptr.as_ptr(), ty) }.map_err(
-                                    |e| {
+                                let blob =
+                                    unsafe { serialize(guard, ptr.as_ptr(), ty) }.map_err(|e| {
                                         code_invariant_error(format!(
                                             "Failed to serialize a group member: {e}"
                                         ))
-                                    },
-                                )?;
+                                    })?;
                                 Bytes::from(blob)
                             },
                             MonoValue::Deletion | MonoValue::GroupMetadata => {
@@ -810,19 +812,50 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     .collect::<Result<BTreeMap<_, _>, PanicError>>()?;
                 let blob = bcs::to_bytes(&members)
                     .map_err(|e| code_invariant_error(format!("Failed to encode a group: {e}")))?;
-                Ok(Some(Bytes::from(blob)))
+                Some(Bytes::from(blob))
             };
-        let mut writes = Vec::with_capacity(group_keys.len());
-        for group_key in group_keys {
-            let existed = !group_data.group_members_at(&group_key, 0)?.is_empty();
-            let blob = members_blob(group_data.group_members_at(&group_key, next_txn_idx)?)?;
             let op = match (existed, blob) {
                 (false, Some(bytes)) => WriteOp::legacy_creation(bytes),
                 (true, Some(bytes)) => WriteOp::legacy_modification(bytes),
                 (true, None) => WriteOp::legacy_deletion(),
-                (false, None) => continue,
+                (false, None) => return Ok(None),
             };
-            writes.push((self.materialize_storage_key(group_key)?, op));
+            let state_key = group_key
+                .as_state_key()
+                .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))?;
+            Ok(Some((state_key, op)))
+        };
+        // The workers have returned their arenas, so each chunk takes one: a
+        // block writes thousands of groups and assembling them serially would
+        // cost more than the per-transaction assembly it replaces.
+        let ctx = &self.ctx;
+        let num_workers = ctx.num_execution_workers().max(1);
+        let chunk_len = group_keys.len().div_ceil(num_workers).max(1);
+        let chunks = group_keys.chunks(chunk_len).collect::<Vec<_>>();
+        let results = Mutex::new(Vec::with_capacity(chunks.len()));
+        rayon::scope(|scope| {
+            for (worker_id, chunk) in chunks.into_iter().enumerate() {
+                let results = &results;
+                let assemble = &assemble;
+                scope.spawn(move |_| {
+                    let chunk_writes = ctx
+                        .try_execution_context(worker_id)
+                        .ok_or_else(|| code_invariant_error("No free arena to assemble groups"))
+                        .and_then(|guard| {
+                            chunk
+                                .iter()
+                                .filter_map(|key| assemble(&guard, key.clone()).transpose())
+                                .collect::<Result<Vec<_>, PanicError>>()
+                        });
+                    results.lock().push((worker_id, chunk_writes));
+                });
+            }
+        });
+        let mut results = results.into_inner();
+        results.sort_by_key(|(worker_id, _)| *worker_id);
+        let mut writes = Vec::with_capacity(group_keys.len());
+        for (_, chunk_writes) in results {
+            writes.extend(chunk_writes?);
         }
         Ok(writes)
     }

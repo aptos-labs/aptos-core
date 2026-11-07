@@ -13,6 +13,7 @@ use crate::{
     errors::*,
     executor_utilities::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
+    hot_state_op_accumulator::BlockHotStateOpAccumulator,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     scheduler_v2::{
@@ -95,6 +96,10 @@ where
     /// Under member-level group writes: the groups committed transactions
     /// wrote, and the member keys their write sets carry.
     written_groups: &'a Mutex<(HashSet<E::Key>, HashSet<T::Key>)>,
+    /// Collects the keys committed transactions read and wrote, for hot-state
+    /// promotion. Fed from the parallel post-commit phase, not the serial
+    /// commit hook: the promotion set does not depend on the order.
+    hot_state_accumulator: Option<&'a BlockHotStateOpAccumulator<E::Key>>,
     final_results: &'a ExplicitSyncWrapper<Vec<CommittedOutput<E>>>,
     maybe_block_epilogue_txn_idx: &'a ExplicitSyncWrapper<Option<TxnIndex>>,
 }
@@ -1108,6 +1113,12 @@ where
         let read_set = last_input_output
             .read_set(txn_idx)
             .ok_or_else(|| code_invariant_error("Read set must be recorded for materialization"))?;
+        if let Some(accumulator) = shared_sync_params.hot_state_accumulator {
+            last_input_output.with_committed_output(txn_idx, |output| {
+                accumulator
+                    .add_transaction(output.storage_keys_written(), output.storage_keys_read());
+            })?;
+        }
         if *MEMBER_GROUP_WRITES && executor.supports_member_group_writes() {
             let mut written = shared_sync_params.written_groups.lock();
             last_input_output.for_each_resource_group_key_and_tags(
@@ -1552,6 +1563,7 @@ where
                 final_results.dereference().iter(),
                 epilogue_txn_idx,
                 block_limit_processor,
+                shared_sync_params.hot_state_accumulator,
                 environment,
             )? {
                 let block_epilogue_aux_info = if num_txns > 0 {
@@ -1741,6 +1753,9 @@ where
         };
 
         let written_groups = Mutex::new((HashSet::new(), HashSet::new()));
+        let hot_state_accumulator = block_limit_processor
+            .dereference()
+            .new_hot_state_accumulator(module_cache_manager_guard.environment().hot_state_config());
         let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
             base_view,
             versioned_cache: &versioned_cache,
@@ -1752,6 +1767,7 @@ where
             final_results: &final_results,
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
             written_groups: &written_groups,
+            hot_state_accumulator: hot_state_accumulator.as_ref(),
         };
 
         let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
@@ -1947,6 +1963,9 @@ where
         let maybe_executor = ExplicitSyncWrapper::new(None);
 
         let written_groups = Mutex::new((HashSet::new(), HashSet::new()));
+        let hot_state_accumulator = block_limit_processor
+            .dereference()
+            .new_hot_state_accumulator(module_cache_manager_guard.environment().hot_state_config());
         let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
             base_view,
             versioned_cache: &versioned_cache,
@@ -1958,6 +1977,7 @@ where
             final_results: &final_results,
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
             written_groups: &written_groups,
+            hot_state_accumulator: hot_state_accumulator.as_ref(),
         };
 
         let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
@@ -2251,6 +2271,8 @@ where
             environment.hot_state_config(),
             num_txns + 1,
         );
+        let hot_state_accumulator =
+            block_limit_processor.new_hot_state_accumulator(environment.hot_state_config());
 
         let mut block_epilogue_txn = None;
         // Counts user-txn `accumulate_fee_statement` calls. Incremented alongside each
@@ -2387,11 +2409,11 @@ where
                         }
                     };
 
-                    // Feed only committed transactions to the hot-state accumulator, in commit
-                    // order: bcs-fallback discards have continued above, and genuine discards
-                    // carry empty read/write sets.
-                    if block_limit_processor.is_hot_state_accumulation_enabled() {
-                        block_limit_processor.accumulate_hot_state_rw(
+                    // Feed only committed transactions to the hot-state accumulator: bcs-fallback
+                    // discards have continued above, and genuine discards carry empty read/write
+                    // sets.
+                    if let Some(accumulator) = &hot_state_accumulator {
+                        accumulator.add_transaction(
                             output.storage_keys_written(),
                             output.storage_keys_read(),
                         );
@@ -2468,6 +2490,7 @@ where
                         let block_end_info = block_limit_processor.get_block_end_info(
                             |k| executor.materialize_storage_key(k.clone()),
                             T::promoted_key_size,
+                            hot_state_accumulator.as_ref(),
                         )?;
                         block_epilogue_txn = Some(self.gen_block_epilogue(
                             block_id,
@@ -2626,6 +2649,7 @@ where
         outputs: impl Iterator<Item = &'a CommittedOutput<E>>,
         epilogue_txn_idx: TxnIndex,
         block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<E::Key, E::Tag>>,
+        hot_state_accumulator: Option<&BlockHotStateOpAccumulator<E::Key>>,
         environment: &AptosEnvironment,
     ) -> Result<Option<T>, PanicError> {
         // We only do this for block (when the block_id is returned). For other cases
@@ -2635,6 +2659,7 @@ where
             let block_end_info = block_limit_processor.acquire().get_block_end_info(
                 |k| executor.materialize_storage_key(k.clone()),
                 T::promoted_key_size,
+                hot_state_accumulator,
             )?;
             let epilogue_txn = self.gen_block_epilogue(
                 block_id,
