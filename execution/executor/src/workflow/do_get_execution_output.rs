@@ -59,6 +59,33 @@ use std::sync::Arc;
 
 pub struct DoGetExecutionOutput;
 
+/// A block's outputs as the VM produced them, before indexing.
+pub struct RawBlockExecution {
+    pub transactions: Vec<Transaction>,
+    pub transaction_outputs: Vec<TransactionOutput>,
+    pub auxiliary_infos: Vec<AuxiliaryInfo>,
+    pub state_view: CachedStateView,
+    pub onchain_config: BlockExecutorConfigFromOnchain,
+    pub is_block: bool,
+}
+
+impl RawBlockExecution {
+    /// The version right after this block.
+    pub fn next_version(&self) -> Version {
+        self.state_view.next_version() + self.transactions.len() as Version
+    }
+
+    /// Whether the block ends an epoch, after which nothing may be pipelined.
+    pub fn has_reconfiguration(&self) -> bool {
+        self.transaction_outputs.iter().any(|output| {
+            output
+                .events()
+                .iter()
+                .any(ContractEvent::is_new_epoch_event)
+        })
+    }
+}
+
 impl DoGetExecutionOutput {
     pub fn by_transaction_execution<V: VMBlockExecutor>(
         executor: &V,
@@ -101,7 +128,13 @@ impl DoGetExecutionOutput {
             )?,
         };
 
-        let ret = out.clone();
+        Self::update_counters_async(&out);
+        Ok(out)
+    }
+
+    /// Updates the per-transaction metrics off the critical path.
+    pub fn update_counters_async(out: &ExecutionOutput) {
+        let out = out.clone();
         THREAD_MANAGER.get_background_pool().spawn(move || {
             let _timer = OTHER_TIMERS.timer_with(&["async_update_counters__by_execution"]);
             for x in [&out.to_commit, &out.to_retry, &out.to_discard] {
@@ -112,8 +145,6 @@ impl DoGetExecutionOutput {
                 )
             }
         });
-
-        Ok(ret)
     }
 
     fn by_transaction_execution_unsharded<V: VMBlockExecutor>(
@@ -128,6 +159,34 @@ impl DoGetExecutionOutput {
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
+        let raw = Self::execute_raw::<V>(
+            executor,
+            transactions,
+            auxiliary_infos,
+            state_view,
+            onchain_config,
+            transaction_slice_metadata,
+        )?;
+        Self::parse_raw(
+            raw,
+            parent_state,
+            parent_positions,
+            parent_orders,
+            parent_collateral,
+        )
+    }
+
+    /// Runs the VM over the block and returns its outputs before they are
+    /// indexed into an [ExecutionOutput], so the indexing can overlap with the
+    /// next block's execution.
+    pub fn execute_raw<V: VMBlockExecutor>(
+        executor: &V,
+        transactions: Vec<SignatureVerifiedTransaction>,
+        auxiliary_infos: Vec<AuxiliaryInfo>,
+        state_view: CachedStateView,
+        onchain_config: BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata: TransactionSliceMetadata,
+    ) -> Result<RawBlockExecution> {
         let txn_provider = DefaultTxnProvider::new(transactions, auxiliary_infos.clone());
         let block_output = Self::execute_block::<V>(
             executor,
@@ -165,6 +224,34 @@ impl DoGetExecutionOutput {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
 
+        Ok(RawBlockExecution {
+            transactions,
+            transaction_outputs,
+            auxiliary_infos,
+            state_view,
+            onchain_config,
+            is_block: transaction_slice_metadata
+                .append_state_checkpoint_to_block()
+                .is_some(),
+        })
+    }
+
+    /// Indexes a block's raw outputs on top of its parent's state.
+    pub fn parse_raw(
+        raw: RawBlockExecution,
+        parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
+        parent_orders: Option<OrderParent<'_>>,
+        parent_collateral: Option<CollateralParent<'_>>,
+    ) -> Result<ExecutionOutput> {
+        let RawBlockExecution {
+            transactions,
+            transaction_outputs,
+            auxiliary_infos,
+            state_view,
+            onchain_config,
+            is_block,
+        } = raw;
         Parser::parse()
             .first_version(state_view.next_version())
             .transactions(transactions)
@@ -176,11 +263,7 @@ impl DoGetExecutionOutput {
             .maybe_parent_collateral(parent_collateral)
             .base_state_view(state_view)
             .prime_state_cache(false)
-            .is_block(
-                transaction_slice_metadata
-                    .append_state_checkpoint_to_block()
-                    .is_some(),
-            )
+            .is_block(is_block)
             .transaction_info_v1(onchain_config.transaction_info_v1())
             .hot_state_root_in_txn_info(onchain_config.hot_state_root_in_txn_info())
             .compute_trading_native_state_roots(onchain_config.compute_trading_native_state_roots())
