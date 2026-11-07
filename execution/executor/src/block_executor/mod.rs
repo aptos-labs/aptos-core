@@ -53,6 +53,7 @@ use aptos_vm::VMBlockExecutor;
 use block_tree::BlockTree;
 use fail::fail_point;
 use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use std::sync::Arc;
 
 pub mod block_tree;
@@ -362,9 +363,9 @@ where
         let first_version = raw.state_view.next_version();
         let writes = raw
             .transaction_outputs
-            .iter()
+            .par_iter()
             .enumerate()
-            .flat_map(|(i, output)| {
+            .flat_map_iter(|(i, output)| {
                 let version = first_version + i as Version;
                 output.write_set().write_op_iter().map(move |(key, op)| {
                     (
@@ -374,12 +375,14 @@ where
                     )
                 })
             });
-        PendingWrites::new(
-            writes,
-            raw.next_version(),
-            raw.state_view.get_usage()?,
-            |key| raw.state_view.memorized_reads().get_cloned(key),
-        )
+        THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+            PendingWrites::new(
+                writes,
+                raw.next_version(),
+                raw.state_view.get_usage()?,
+                |key| raw.state_view.memorized_reads().get_cloned(key),
+            )
+        })
     }
 }
 

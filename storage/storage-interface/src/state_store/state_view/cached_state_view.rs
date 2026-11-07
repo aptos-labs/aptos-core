@@ -32,7 +32,7 @@ use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rayon::prelude::*;
 use std::{
-    collections::HashMap,
+    collections::{hash_map, HashMap},
     fmt::{Debug, Formatter},
     sync::Arc,
 };
@@ -51,40 +51,80 @@ pub struct PendingWrites {
 }
 
 impl PendingWrites {
-    /// `writes` are one block's value writes in order, `(key, version, value)`
-    /// with `None` for a deletion. `old_slots` must answer for every written
-    /// key with the slot the block itself read, which is what the storage
-    /// usage delta is computed against.
+    /// `writes` are one block's value writes, `(key, version, value)` with
+    /// `None` for a deletion, in any order: the highest version of a key wins.
+    /// `old_slots` must answer for every written key with the slot the block
+    /// itself read, which is what the storage usage delta is computed against.
+    /// Runs on the current rayon pool.
     pub fn new(
-        writes: impl IntoIterator<Item = (StateKey, Version, Option<StateValue>)>,
+        writes: impl ParallelIterator<Item = (StateKey, Version, Option<StateValue>)>,
         next_version: Version,
         base_usage: StateStorageUsage,
-        old_slots: impl Fn(&StateKey) -> Option<StateSlot>,
+        old_slots: impl Fn(&StateKey) -> Option<StateSlot> + Sync,
     ) -> Result<Self> {
-        let mut slots = HashMap::new();
-        for (key, version, value) in writes {
-            let slot = StateSlot::from_db_get(key.clone(), value.map(|v| (version, v)));
-            slots.insert(key, slot);
+        fn keep_latest(
+            map: &mut HashMap<StateKey, (Version, Option<StateValue>)>,
+            key: StateKey,
+            version: Version,
+            value: Option<StateValue>,
+        ) {
+            match map.entry(key) {
+                hash_map::Entry::Occupied(mut e) if e.get().0 < version => {
+                    e.insert((version, value));
+                },
+                hash_map::Entry::Occupied(_) => {},
+                hash_map::Entry::Vacant(e) => {
+                    e.insert((version, value));
+                },
+            }
         }
+        let latest = writes
+            .fold(HashMap::new, |mut map, (key, version, value)| {
+                keep_latest(&mut map, key, version, value);
+                map
+            })
+            .reduce(HashMap::new, |mut a, mut b| {
+                if a.len() < b.len() {
+                    std::mem::swap(&mut a, &mut b);
+                }
+                for (key, (version, value)) in b {
+                    keep_latest(&mut a, key, version, value);
+                }
+                a
+            });
+        let slots = latest
+            .into_par_iter()
+            .map(|(key, (version, value))| {
+                let slot = StateSlot::from_db_get(key.clone(), value.map(|v| (version, v)));
+                (key, slot)
+            })
+            .collect::<HashMap<_, _>>();
         let usage = if base_usage.is_untracked() {
             base_usage
         } else {
-            let mut items = base_usage.items() as i64;
-            let mut bytes = base_usage.bytes() as i64;
-            for (key, slot) in &slots {
-                let key_size = key.size() as i64;
-                if slot.is_occupied() {
-                    items += 1;
-                    bytes += key_size + slot.size() as i64;
-                }
-                let old = old_slots(key)
-                    .ok_or_else(|| anyhow::anyhow!("written key {key:?} was never read"))?;
-                if old.is_occupied() {
-                    items -= 1;
-                    bytes -= key_size + old.size() as i64;
-                }
-            }
-            StateStorageUsage::new(items as usize, bytes as usize)
+            let (items, bytes) = slots
+                .par_iter()
+                .map(|(key, slot)| -> Result<(i64, i64)> {
+                    let key_size = key.size() as i64;
+                    let mut items = 0i64;
+                    let mut bytes = 0i64;
+                    if slot.is_occupied() {
+                        items += 1;
+                        bytes += key_size + slot.size() as i64;
+                    }
+                    let old = old_slots(key)
+                        .ok_or_else(|| anyhow::anyhow!("written key {key:?} was never read"))?;
+                    if old.is_occupied() {
+                        items -= 1;
+                        bytes -= key_size + old.size() as i64;
+                    }
+                    Ok((items, bytes))
+                })
+                .try_reduce(|| (0, 0), |a, b| Ok((a.0 + b.0, a.1 + b.1)))?;
+            StateStorageUsage::new(
+                (base_usage.items() as i64 + items) as usize,
+                (base_usage.bytes() as i64 + bytes) as usize,
+            )
         };
         Ok(Self {
             slots,
