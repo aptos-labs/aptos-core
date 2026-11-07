@@ -21,7 +21,7 @@ use crate::{
     },
     scheduler_wrapper::SchedulerWrapper,
     single_transaction_executor::{
-        SharedViewArgs, SingleTransactionExecutor, ViewMode, MEMBER_GROUP_WRITES,
+        SharedViewArgs, SingleTransactionExecutor, ViewMode, EXECUTION_POOL, MEMBER_GROUP_WRITES,
     },
     task::{ExecutionStatus, TxnOutput},
     txn_commit_hook::TransactionCommitHook,
@@ -1706,7 +1706,16 @@ where
 
         // +1 for potential BlockEpilogue txn.
         let last_input_output = TxnLastInputOutput::new(num_txns + 1);
-        let mut versioned_cache = MVHashMap::new();
+        let pooled = *EXECUTION_POOL && E::uses_execution_pool();
+        let mut versioned_cache = if pooled {
+            let pool =
+                module_cache_manager_guard
+                    .take_execution_pool::<MVHashMap<E::Key, E::Tag, E::Value, DelayedFieldID>>();
+            counters::EXECUTION_POOL_REUSED.inc_by(pool.is_some() as u64);
+            pool.unwrap_or_else(MVHashMap::new)
+        } else {
+            MVHashMap::new()
+        };
         if self.config.local.enable_pre_write {
             for txn_idx in 0..num_txns {
                 let values = E::pre_write_values(signature_verified_block.get_txn(txn_idx));
@@ -1826,8 +1835,17 @@ where
                 }
             };
 
-        // Explicit async drops even when there is an error.
-        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
+        if pooled && !has_error {
+            // Every committed transaction's writes are the base of the next block
+            // on this fork; the manager drops the pool if the fork changes.
+            let num_committed = final_results.dereference().len() as TxnIndex;
+            versioned_cache.collapse_to_base(num_committed);
+            module_cache_manager_guard.store_execution_pool(versioned_cache);
+            DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler));
+        } else {
+            // Explicit async drops even when there is an error.
+            DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
+        }
 
         if has_error {
             return Err(());

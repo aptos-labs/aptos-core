@@ -752,6 +752,10 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         true
     }
 
+    fn uses_execution_pool() -> bool {
+        true
+    }
+
     fn member_storage_key(
         &self,
         group_key: &InMemoryStorageKey,

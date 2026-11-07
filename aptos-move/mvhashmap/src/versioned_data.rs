@@ -504,6 +504,39 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         })
     }
 
+    /// Keeps, for every key, only its latest entry below `num_committed`, as
+    /// the base value for the next block on the same fork. Entries of
+    /// transactions past the committed prefix, dependencies and estimates are
+    /// dropped; a trailing deletion stays as a deleted base.
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) {
+        self.values.iter_mut().for_each(|mut v| {
+            let Some(idx) = v
+                .versioned_map
+                .range(..ShiftedTxnIndex::new(num_committed))
+                .next_back()
+                .map(|(idx, _)| idx.clone())
+            else {
+                v.versioned_map.clear();
+                return;
+            };
+            let entry = v
+                .versioned_map
+                .remove(&idx)
+                .expect("the entry was just found");
+            v.versioned_map.clear();
+            // Readers registered on the entry belong to this block; the next
+            // block's indices start over.
+            let EntryCell { value, .. } = CachePadded::into_inner(entry).value;
+            v.versioned_map.insert(
+                ShiftedTxnIndex::zero_idx(),
+                CachePadded::new(new_write_entry(0, value, BTreeMap::new())),
+            );
+        });
+        // A key with only uncommitted entries is unknown again: its base is
+        // read from the state view when next needed.
+        self.values.retain(|_, v| !v.versioned_map.is_empty());
+    }
+
     /// Transactions that registered a read of the entry written at txn_idx, if any.
     pub fn readers_of<Q>(&self, key: &Q, txn_idx: TxnIndex, out: &mut Vec<TxnIndex>)
     where
@@ -993,5 +1026,49 @@ mod tests {
         // Try to remove a non-existent entry at index 1
         assert_err!(versioned_data.remove_v2::<_, false>(&(), 1));
         assert_err!(versioned_data.remove_v2::<_, true>(&(), 1));
+    }
+}
+
+#[cfg(test)]
+mod collapse_tests {
+    use super::*;
+    use crate::types::test::{KeyType, TestValue};
+    use claims::assert_matches;
+
+    fn value(v: u32) -> TestValue {
+        TestValue::new(vec![v])
+    }
+
+    /// After a collapse, every key reads its last committed value as the base
+    /// with no versions above it, and a key written only past the committed
+    /// prefix is unknown again.
+    #[test]
+    fn collapse_keeps_committed_latest_as_base() {
+        let mut data = VersionedData::<KeyType<u32>, TestValue>::empty();
+        let committed = KeyType(1);
+        let only_above = KeyType(2);
+        let base_only = KeyType(3);
+        data.set_base_value(committed.clone(), value(0), |_, _| {});
+        data.set_base_value(base_only.clone(), value(7), |_, _| {});
+        assert_ok!(data.write(committed.clone(), 3, 0, value(3)));
+        assert_ok!(data.write(committed.clone(), 8, 0, value(8)));
+        assert_ok!(data.write(only_above.clone(), 9, 0, value(9)));
+        // Readers of this block register on the entries; they must not survive.
+        assert_ok!(data.fetch_data_and_record_dependency(&committed, 5, 1));
+
+        data.collapse_to_base(5);
+
+        let read = data.fetch_data_no_record(&committed, 0);
+        assert_matches!(read, Ok(MVDataOutput::Versioned(Err(_), v)) if v == value(3));
+        let read = data.fetch_data_no_record(&committed, 100);
+        assert_matches!(read, Ok(MVDataOutput::Versioned(Err(_), v)) if v == value(3));
+        assert_matches!(
+            data.fetch_data_no_record(&only_above, 100),
+            Err(MVDataError::Uninitialized)
+        );
+        let read = data.fetch_data_no_record(&base_only, 100);
+        assert_matches!(read, Ok(MVDataOutput::Versioned(Err(_), v)) if v == value(7));
+        // A write in the next block invalidates no reader of the old block.
+        assert!(assert_ok!(data.write_v2::<false>(committed, 2, 0, value(2))).is_empty());
     }
 }
