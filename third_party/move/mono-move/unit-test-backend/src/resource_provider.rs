@@ -10,6 +10,7 @@
 
 use bytes::Bytes;
 use mono_move_core::{
+    memory::Obj,
     nominal_tag,
     storage::resource_provider::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
@@ -20,7 +21,7 @@ use mono_move_core::{
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{deserialize_into, Heap, SharedArena, DEFAULT_HEAP_SIZE};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
-use std::{cell::RefCell, collections::HashMap, ptr::NonNull, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 /// Capacity shared by all materialized resources, matching the default interpreter heap size.
 const MATERIALIZATION_HEAP_SIZE: usize = DEFAULT_HEAP_SIZE;
@@ -38,7 +39,7 @@ struct Materialized {
     /// Holds decoded values and is never reset. Each storage read retains an
     /// `Arc` to keep the arena alive while its values are in use.
     arena: Arc<SharedArena>,
-    cache: HashMap<InMemoryStorageKey, NonNull<u8>>,
+    cache: HashMap<InMemoryStorageKey, Obj>,
 }
 
 impl<'guard, 'ctx, L> LazyResourceProvider<'guard, 'ctx, L>
@@ -127,7 +128,7 @@ fn materialize_one(
     guard: &ExecutionGuard,
     ty: InternedType,
     blob: &[u8],
-) -> Result<NonNull<u8>, ResourceProviderError> {
+) -> Result<Obj, ResourceProviderError> {
     let layout = guard.layout_by_ty(ty).ok_or_else(|| {
         ResourceProviderError::InvariantViolation("no layout for a stored value's type".to_string())
     })?;
@@ -146,7 +147,7 @@ fn materialize_one(
         })?;
     // SAFETY: `obj` is a fresh allocation of the type's size, and `blob` is
     // the BCS encoding of a value of type `ty`.
-    unsafe { deserialize_into(guard, heap, ty, blob, obj.as_ptr()) }.map_err(|err| {
+    unsafe { deserialize_into(guard, heap, ty, blob, obj.addr()) }.map_err(|err| {
         ResourceProviderError::InvariantViolation(format!("a stored value does not decode: {err}"))
     })?;
     Ok(obj)

@@ -7,12 +7,11 @@
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
     heap::{alloc_enum_no_gc, alloc_vec_no_gc, AllocationError, Heap},
-    memory::write_ptr,
-    types::VEC_DATA_OFFSET,
 };
 use mono_move_core::{
-    types::InternedType, FieldValueLayout, LayoutKind, LayoutProvider, ValueLayout,
-    ENUM_DATA_OFFSET,
+    memory::{MemAddr, Obj},
+    types::InternedType,
+    FieldValueLayout, LayoutKind, LayoutProvider, ValueLayout, ENUM_DATA_OFFSET,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -35,13 +34,13 @@ pub(crate) unsafe fn write_value<L: LayoutProvider + ?Sized, T: MoveValueView + 
     heap: &mut Heap,
     ty: InternedType,
     value: &T,
-    dst: *mut u8,
+    dst: MemAddr,
 ) -> Result<(), RuntimeError> {
     let layout = layouts.layout_by_ty(ty).ok_or({
         RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
     })?;
     debug_assert!(
-        dst.addr().is_multiple_of(layout.align as usize),
+        dst.is_aligned_to(layout.align as usize),
         "write destination must meet the type's alignment"
     );
     value.visit(ValueWriter {
@@ -57,7 +56,7 @@ struct ValueWriter<'a, L: ?Sized> {
     layouts: &'a L,
     heap: &'a mut Heap,
     layout: &'a ValueLayout,
-    dst: *mut u8,
+    dst: MemAddr,
 }
 
 /// Rejects vector lengths beyond what BCS can encode, matching the BCS path.
@@ -82,8 +81,9 @@ impl<'a, L: LayoutProvider + ?Sized> ValueWriter<'a, L> {
     }
 
     /// Writes an integer's little-endian bytes into a matching integer slot.
-    //
-    // TODO(correctness): assumes a little-endian host, as the BCS path does.
+    /// Integer slots hold little-endian bytes on every host (all integer
+    /// stores go through `MemAddr::store`), so the copy is exact by
+    /// construction.
     fn write_int(self, signed: bool, bytes: &[u8]) -> Result<(), RuntimeError> {
         let kind_matches = match self.layout.kind {
             LayoutKind::UnsignedInt => !signed,
@@ -106,7 +106,7 @@ impl<'a, L: LayoutProvider + ?Sized> ValueWriter<'a, L> {
         }
         // SAFETY: `dst` is writable for the layout's size, checked equal to
         // the byte count.
-        unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), self.dst, bytes.len()) };
+        unsafe { self.dst.copy_from_slice(bytes) };
         Ok(())
     }
 
@@ -156,7 +156,7 @@ impl<'a, L: LayoutProvider + ?Sized> MoveValueVisitor for ValueWriter<'a, L> {
             return Err(self.mismatch("a bool"));
         }
         // SAFETY: `dst` is writable for the 1-byte bool slot.
-        unsafe { std::ptr::write(self.dst, v as u8) };
+        unsafe { self.dst.store_bool(v) };
         Ok(())
     }
 
@@ -216,9 +216,7 @@ impl<'a, L: LayoutProvider + ?Sized> MoveValueVisitor for ValueWriter<'a, L> {
         }
         // SAFETY: `dst` is writable for the layout's size, checked to be an
         // address's length.
-        unsafe {
-            std::ptr::copy_nonoverlapping(v.as_ref().as_ptr(), self.dst, AccountAddress::LENGTH)
-        };
+        unsafe { self.dst.copy_from_slice(v.as_ref()) };
         Ok(())
     }
 
@@ -261,16 +259,17 @@ impl<'a, L: LayoutProvider + ?Sized> MoveValueVisitor for ValueWriter<'a, L> {
         if v.is_empty() {
             // The empty vector is the null pointer.
             // SAFETY: `dst` is writable for the vector's pointer slot.
-            unsafe { write_ptr(self.dst, 0usize, std::ptr::null()) };
+            unsafe { self.dst.store_ptr(MemAddr::NULL) };
             return Ok(());
         }
         check_sequence_len(v.len())?;
-        let vec_ptr = alloc_vec_no_gc(self.heap, *descriptor_id, 1, v.len() as u64)
+        let vec = alloc_vec_no_gc(self.heap, *descriptor_id, 1, v.len() as u64)
             .map_err(AllocationError::into_runtime_error)?;
-        // SAFETY: the data region was allocated for exactly `v.len()` bytes.
-        unsafe { std::ptr::copy_nonoverlapping(v.as_ptr(), vec_ptr.add(VEC_DATA_OFFSET), v.len()) };
+        // SAFETY: `alloc_vec_no_gc` returned a live vector object whose data
+        // region was allocated for exactly `v.len()` bytes.
+        unsafe { vec.vec_data().copy_from_slice(v) };
         // SAFETY: `dst` is writable for the vector's pointer slot.
-        unsafe { write_ptr(self.dst, 0usize, vec_ptr) };
+        unsafe { self.dst.store_ptr(vec.addr()) };
         Ok(())
     }
 
@@ -288,10 +287,11 @@ impl<'a, L: LayoutProvider + ?Sized> MoveValueVisitor for ValueWriter<'a, L> {
         check_sequence_len(len)?;
         let vec_ptr = if len == 0 {
             // The empty vector is the null pointer, written at `end()`.
-            std::ptr::null_mut()
+            MemAddr::NULL
         } else {
             alloc_vec_no_gc(self.heap, *descriptor_id, elem_layout.size, len as u64)
                 .map_err(AllocationError::into_runtime_error)?
+                .addr()
         };
         Ok(SeqWriter {
             layouts: self.layouts,
@@ -345,22 +345,24 @@ impl<'a, L: LayoutProvider + ?Sized> MoveValueVisitor for ValueWriter<'a, L> {
         })?;
         let fields = Self::fields_of(variant_layout, "variant body", num_fields)?;
 
-        let obj_ptr = alloc_enum_no_gc(
+        let obj = alloc_enum_no_gc(
             self.heap,
             *descriptor_id,
             tag as u64,
             *max_size_across_variants as usize,
         )
         .map_err(AllocationError::into_runtime_error)?;
-        // SAFETY: the variant body lives at this offset within the allocation.
-        let data_ptr = unsafe { obj_ptr.add(ENUM_DATA_OFFSET) };
+        // SAFETY: `alloc_enum_no_gc` returned a live enum object with the
+        // maximum variant size allocated, so the variant body at
+        // `ENUM_DATA_OFFSET` lies within it.
+        let data_ptr = unsafe { obj.field(ENUM_DATA_OFFSET) };
         Ok(FieldsWriter {
             layouts: self.layouts,
             heap: self.heap,
             fields,
             base: data_ptr,
             next: 0,
-            finish: Some((obj_ptr, self.dst)),
+            finish: Some((obj.addr(), self.dst)),
         })
     }
 }
@@ -371,9 +373,9 @@ struct SeqWriter<'a, L: ?Sized> {
     heap: &'a mut Heap,
     elem_layout: &'a ValueLayout,
     /// Null for the empty vector.
-    vec_ptr: *mut u8,
+    vec_ptr: MemAddr,
     /// The slot the vector pointer lands in.
-    dst: *mut u8,
+    dst: MemAddr,
     expected: usize,
     written: usize,
 }
@@ -391,12 +393,11 @@ impl<L: LayoutProvider + ?Sized> VectorElementVisitor for SeqWriter<'_, L> {
                 )),
             ));
         }
-        // SAFETY: the data region was allocated for `expected` elements and
-        // `written < expected`.
-        let elem_dst = unsafe {
-            self.vec_ptr
-                .add(VEC_DATA_OFFSET + self.written * self.elem_layout.size as usize)
-        };
+        // SAFETY: `written < expected`, so `expected > 0` and `vec_ptr` is the
+        // live vector object `visit_vector` allocated for `expected` elements;
+        // the `written`th element lies within its data region.
+        let elem_dst =
+            unsafe { Obj::new(self.vec_ptr).vec_elem(self.written as u64, self.elem_layout.size) };
         value.visit(ValueWriter {
             layouts: self.layouts,
             heap: self.heap,
@@ -417,7 +418,7 @@ impl<L: LayoutProvider + ?Sized> VectorElementVisitor for SeqWriter<'_, L> {
             ));
         }
         // SAFETY: `dst` is writable for the vector's pointer slot.
-        unsafe { write_ptr(self.dst, 0usize, self.vec_ptr) };
+        unsafe { self.dst.store_ptr(self.vec_ptr) };
         Ok(())
     }
 }
@@ -428,10 +429,10 @@ struct FieldsWriter<'a, L: ?Sized> {
     heap: &'a mut Heap,
     fields: &'a [FieldValueLayout],
     /// Base of the field region: the value's slot, or an enum's data region.
-    base: *mut u8,
+    base: MemAddr,
     next: usize,
     /// Set for an enum variant: the object and the slot to link it into.
-    finish: Option<(*mut u8, *mut u8)>,
+    finish: Option<(MemAddr, MemAddr)>,
 }
 
 impl<L: LayoutProvider + ?Sized> FieldVisitor for FieldsWriter<'_, L> {
@@ -448,8 +449,8 @@ impl<L: LayoutProvider + ?Sized> FieldVisitor for FieldsWriter<'_, L> {
         let layout = self.layouts.layout(field.id).ok_or({
             RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
         })?;
-        // SAFETY: a field offset lies within the field region, which was
-        // sized for the whole struct.
+        // SAFETY: the field offset is within the value's layout, and the field
+        // region was sized for the whole struct (or variant body).
         let dst = unsafe { self.base.add(field.offset as usize) };
         value.visit(ValueWriter {
             layouts: self.layouts,
@@ -473,7 +474,7 @@ impl<L: LayoutProvider + ?Sized> FieldVisitor for FieldsWriter<'_, L> {
         }
         if let Some((obj_ptr, slot)) = self.finish {
             // SAFETY: `slot` is writable for the enum's pointer slot.
-            unsafe { write_ptr(slot, 0usize, obj_ptr) };
+            unsafe { slot.store_ptr(obj_ptr) };
         }
         Ok(())
     }
@@ -602,7 +603,7 @@ mod tests {
                 &mut written_heap,
                 ty,
                 value,
-                written_slot.as_mut_ptr(),
+                written_slot.as_addr_mut(),
             )
             .expect("write_value succeeds");
             crate::value_conv::bcs::deserialize_into(
@@ -610,11 +611,11 @@ mod tests {
                 &mut decoded_heap,
                 ty,
                 &bytes,
-                decoded_slot.as_mut_ptr(),
+                decoded_slot.as_addr_mut(),
             )
             .expect("deserialize_into succeeds");
         }
-        let (written_slot, decoded_slot) = (written_slot.as_ptr(), decoded_slot.as_ptr());
+        let (written_slot, decoded_slot) = (written_slot.as_addr(), decoded_slot.as_addr());
         // SAFETY: both slots hold initialized values of `ty` on live heaps.
         let (written, decoded) = unsafe {
             (
@@ -803,18 +804,18 @@ mod tests {
         // SAFETY: the slot is aligned and wider than any test type's
         // in-memory size.
         unsafe {
-            write_value(&guard, &mut heap, u64_ty, &1u32, slot.as_mut_ptr())
+            write_value(&guard, &mut heap, u64_ty, &1u32, slot.as_addr_mut())
                 .expect_err("a u32 must not write as u64");
-            write_value(&guard, &mut heap, u64_ty, &vec![1u64], slot.as_mut_ptr())
+            write_value(&guard, &mut heap, u64_ty, &vec![1u64], slot.as_addr_mut())
                 .expect_err("a vector must not write as u64");
-            write_value(&guard, &mut heap, addr_ty, &1u64, slot.as_mut_ptr())
+            write_value(&guard, &mut heap, addr_ty, &1u64, slot.as_addr_mut())
                 .expect_err("a u64 must not write as an address");
             write_value(
                 &guard,
                 &mut heap,
                 u64_ty,
                 &AccountAddress::ONE,
-                slot.as_mut_ptr(),
+                slot.as_addr_mut(),
             )
             .expect_err("an address must not write as u64");
         }
@@ -831,11 +832,11 @@ mod tests {
         // SAFETY: the slot is aligned and wider than an address's in-memory
         // size.
         unsafe {
-            write_value(&guard, &mut heap, addr_ty, &signer, slot.as_mut_ptr())
+            write_value(&guard, &mut heap, addr_ty, &signer, slot.as_addr_mut())
                 .expect_err("a signer must not be placed as an argument");
             // The same address, as an address, still writes.
             let address = move_core_types::value::MoveValue::Address(AccountAddress::ONE);
-            write_value(&guard, &mut heap, addr_ty, &address, slot.as_mut_ptr())
+            write_value(&guard, &mut heap, addr_ty, &address, slot.as_addr_mut())
                 .expect("an address writes as an address");
         }
     }
@@ -863,7 +864,7 @@ mod tests {
         // SAFETY: the slot is aligned and wider than an enum's in-memory
         // size.
         unsafe {
-            write_value(&guard, &mut heap, ty, &Some(1u64), slot.as_mut_ptr())
+            write_value(&guard, &mut heap, ty, &Some(1u64), slot.as_addr_mut())
                 .expect_err("`Some` must not fill a two-field variant body");
         }
     }

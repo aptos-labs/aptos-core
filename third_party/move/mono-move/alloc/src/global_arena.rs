@@ -61,6 +61,11 @@ impl<T: ?Sized> GlobalArenaPtr<T> {
     pub fn as_raw_ptr(&self) -> *const T {
         self.0.as_ptr()
     }
+
+    /// The allocation's address as an integer, for identity comparisons.
+    pub fn addr(&self) -> usize {
+        self.0.addr().get()
+    }
 }
 
 // SAFETY: This pointer acts as a shared reference when send to other threads.

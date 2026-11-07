@@ -9,7 +9,7 @@ use aptos_types::event::EventKey;
 #[cfg(feature = "testing")]
 use mono_move_core::native::{Opaque, Ref};
 use mono_move_core::{
-    memory::{read_ptr, write_ptr, MemoryRegion},
+    memory::{MemAddr, MemoryRegion},
     native::{
         native_invariant_violation, NativeContext, NativeContextFamily, NativeExtension,
         NativeStatus, Vector,
@@ -81,17 +81,19 @@ impl EventStore {
 }
 
 impl NativeExtension for EventStore {
-    unsafe fn relocate_roots(&mut self, relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {
+    unsafe fn relocate_roots(&mut self, relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>) {
         for entry in &mut self.entries {
-            let base = entry.msg_data.as_ptr();
+            let base = entry.msg_data.base();
             for &off in &entry.ptr_offsets {
                 let off = off as usize;
                 // SAFETY: `arg_ptr_offsets` provides complete, pointer-aligned
-                // slots within the aligned `msg_data` allocation. Typed pointer
-                // accesses preserve provenance.
+                // slots within the aligned `msg_data` allocation, so `slot` is
+                // in bounds and pointer-aligned. `load_ptr` / `store_ptr`
+                // preserve provenance.
                 unsafe {
-                    if let Some(new) = relocate(read_ptr(base, off)) {
-                        write_ptr(base, off, new);
+                    let slot = base.add(off);
+                    if let Some(new) = relocate(slot.load_ptr()) {
+                        slot.store_ptr(new);
                     }
                 }
             }
@@ -234,19 +236,16 @@ pub fn native_emitted_events_by_handle<C: NativeContext>(ctx: &C) -> VMResult<Na
     // `creation_num` at 8 and `addr` at 16.
     // SAFETY: arg 0 is `&EventHandle<T>`.
     let handle = unsafe { ctx.arg::<Ref<Opaque>>(0)? };
-    let base = handle.ptr();
+    let base = handle.addr();
     // SAFETY: `base` references a live `EventHandle<T>`, so both fields lie
-    // within it. Nothing allocates before these reads.
+    // within it. Nothing allocates before these reads. The referent is not
+    // necessarily 8-aligned, so `creation_num` is loaded unaligned; the
+    // address is a byte array and has no alignment requirement.
     let (creation_num, addr) = unsafe {
-        let mut addr = [0u8; AccountAddress::LENGTH];
-        std::ptr::copy_nonoverlapping(
-            base.add(GUID_CREATION_NUM_OFFSET + std::mem::size_of::<u64>()),
-            addr.as_mut_ptr(),
-            AccountAddress::LENGTH,
-        );
         (
-            std::ptr::read_unaligned(base.add(GUID_CREATION_NUM_OFFSET) as *const u64),
-            AccountAddress::new(addr),
+            base.add(GUID_CREATION_NUM_OFFSET).load_unaligned::<u64>(),
+            base.add(GUID_CREATION_NUM_OFFSET + std::mem::size_of::<u64>())
+                .load::<AccountAddress>(),
         )
     };
     let key = EventKey::new(creation_num, addr);
@@ -298,22 +297,28 @@ mod tests {
     #[test]
     fn relocate_roots_keeps_payload_pointers_usable() {
         let (old_val, new_val) = (1u64, 2u64);
-        let old = std::ptr::from_ref(&old_val).cast_mut().cast::<u8>();
-        let new = std::ptr::from_ref(&new_val).cast_mut().cast::<u8>();
+        let old = MemAddr::from_ref(&old_val);
+        let new = MemAddr::from_ref(&new_val);
         // The second word holds a pointer; relocation uses `ptr_offsets`,
         // independent of `msg_ty`.
         let payload = MemoryRegion::new_zeroed(16);
-        unsafe { write_ptr(payload.as_ptr(), 8usize, old) };
+        // SAFETY: the region is 16 bytes and `MAX_ALIGN`-aligned, so offset 8
+        // is an in-bounds, pointer-aligned slot.
+        unsafe { payload.base().add(8).store_ptr(old) };
         let mut store = EventStore::new();
         store.emit(U64_TY, payload, vec![8], EventKind::V2);
 
+        // SAFETY: the only root is the slot written above, and both targets
+        // are live, aligned `u64` locals.
         unsafe {
             store.relocate_roots(&mut |ptr| {
-                assert_eq!(*ptr.cast::<u64>(), 1);
+                assert_eq!(ptr.load::<u64>(), 1);
                 Some(new)
             })
         };
-        let relocated = unsafe { read_ptr(store.entries()[0].msg_data.as_ptr(), 8usize) };
-        assert_eq!(unsafe { *relocated.cast::<u64>() }, 2);
+        // SAFETY: as above; the slot now holds `new`, which points at a live
+        // `u64` local.
+        let relocated = unsafe { store.entries()[0].msg_data.base().add(8).load_ptr() };
+        assert_eq!(unsafe { relocated.load::<u64>() }, 2);
     }
 }

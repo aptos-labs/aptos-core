@@ -921,7 +921,7 @@ pub enum MicroOp {
     //======================================================================
     // Reference (fat pointer) operations
     //======================================================================
-    // References are fat pointers: (base: *mut u8, offset: u64).
+    // References are fat pointers: (base: MemAddr, offset: u64).
     // Fat pointers keep the base visible to GC; thin pointers would be
     // cheaper but GC couldn't identify the owning object.
     //
@@ -1563,7 +1563,7 @@ impl fmt::Display for MicroOp {
                 let fmt_slots = |slots: &[FrameSlot]| {
                     slots
                         .iter()
-                        .map(|s| format!("({}, {})", s.offset, s.size))
+                        .map(|s| format!("({}, {})", s.offset.0, s.size))
                         .collect::<Vec<_>>()
                         .join(", ")
                 };

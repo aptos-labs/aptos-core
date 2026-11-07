@@ -5,6 +5,7 @@
 
 use crate::{polymorphic_natives, NativeEntry};
 use mono_move_core::{
+    memory::MemAddr,
     native::{NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref},
     VMResult,
 };
@@ -18,15 +19,20 @@ pub fn native_swap<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     unsafe {
         let left: Ref<Opaque> = ctx.arg(0)?;
         let right: Ref<Opaque> = ctx.arg(1)?;
-        // TODO(correctness): `swap_nonoverlapping` would be UB if the two referents
+        // TODO(correctness): `MemAddr::swap_nonoverlapping_with` would be UB if the two referents
         // ever alias. Move borrow rules forbid that, but it's unclear whether
         // Block-STM speculative execution can transiently produce aliasing
         // references — so swap via a temporary, which is sound either way until
         // we've confirmed disjointness holds under speculation.
         let mut tmp = vec![0u8; size];
-        std::ptr::copy_nonoverlapping(left.ptr(), tmp.as_mut_ptr(), size);
-        std::ptr::copy(right.ptr(), left.ptr(), size);
-        std::ptr::copy_nonoverlapping(tmp.as_ptr(), right.ptr(), size);
+        let (left, right) = (left.addr(), right.addr());
+        let tmp = MemAddr::from_mut(tmp.as_mut_slice());
+        // `tmp` is a Rust heap buffer, so it never overlaps VM memory (`copy_to_nonoverlapping`);
+        // `left` / `right` may, so that step is a `copy_to`. `tmp` outlives
+        // the three copies: the `Vec` is dropped at the end of this block.
+        left.copy_to_nonoverlapping(tmp, size);
+        right.copy_to(left, size);
+        tmp.copy_to_nonoverlapping(right, size);
     }
     Ok(NativeStatus::Success)
 }

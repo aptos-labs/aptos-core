@@ -8,7 +8,7 @@ use mono_move_alloc::MemoryRegion;
 #[test]
 fn contains_range_bounds() {
     let region = MemoryRegion::new_zeroed(64);
-    let base = region.as_ptr();
+    let base = region.base();
     // Wrapping arithmetic allows test pointers outside the allocation.
     let at = |offset: usize| base.wrapping_add(offset);
 

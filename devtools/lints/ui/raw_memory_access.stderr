@@ -1,0 +1,123 @@
+error: raw pointer type in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:10:11
+   |
+LL |     data: *mut u8,
+   |           ^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+   = note: `#[deny(raw_memory_access)]` on by default
+
+error: raw pointer type in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:11:13
+   |
+LL |     tagged: *const u32,
+   |             ^^^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: raw pointer type in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:17:13
+   |
+LL | fn takes(p: *const u8) -> *mut u64 {
+   |             ^^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: raw pointer type in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:17:27
+   |
+LL | fn takes(p: *const u8) -> *mut u64 {
+   |                           ^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: raw pointer type in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:22:12
+   |
+LL |     let p: *mut u8 = buf.as_mut_ptr();
+   |            ^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: raw pointer type in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:23:29
+   |
+LL |     let q = buf.as_ptr() as *const u32;
+   |                             ^^^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: raw pointer type in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:27:15
+   |
+LL |     let back: *mut u8 = n.as_ptr();
+   |               ^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: method `read` called on a raw pointer in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:33:17
+   |
+LL |         let x = buf.as_mut_ptr().add(1).read();
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: method `write` called on a raw pointer in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:34:9
+   |
+LL |         v.as_mut_ptr().add(2).write(0);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: method `cast` called on a raw pointer in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:35:18
+   |
+LL |         let y = *buf.as_ptr().cast::<u16>();
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: call to `std::ptr::copy_nonoverlapping` in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:41:9
+   |
+LL |         std::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), 4);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: call to `std::ptr::copy` in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:42:9
+   |
+LL |         core::ptr::copy(src.as_ptr(), dst.as_mut_ptr(), 4);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: call to `std::slice::from_raw_parts` in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:43:17
+   |
+LL |         let s = std::slice::from_raw_parts(src.as_ptr(), 2);
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: call to `std::ptr::write_bytes` in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:44:9
+   |
+LL |         std::ptr::write_bytes(dst.as_mut_ptr(), 0, 4);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: method `is_null` called on a raw pointer in a crate where raw memory access is banned
+  --> $DIR/raw_memory_access.rs:54:13
+   |
+LL |     let _ = b.is_null(); // ...but calling a method on it is.
+   |             ^^^^^^^^^^^
+   |
+   = help: Rust's native raw memory accessors are banned here; raw memory access must go through `mono_move_mem::MemAddr` instead
+
+error: aborting due to 15 previous errors
+

@@ -6,11 +6,11 @@
 //! back into the flat in-memory representation, allocating heap storage for
 //! vectors and failing rather than running GC when space runs out.
 //!
-//! TODO(correctness):
-//!   Current implementation works only for little-endian architectures,
-//!   we should revisit it to have big-endian working as well. In particular,
-//!   serialization fast-path via memcpy or integer comparison are broken for
-//!   big endian hosts.
+//! Host endianness: the memcpy fast paths copy a value's in-memory bytes to
+//! and from its BCS encoding verbatim. This holds on any host by construction
+//! because every integer store goes through `MemAddr::store`, which writes
+//! little-endian bytes, so the in-memory image of a pointer-free, padding-free
+//! value is exactly its BCS encoding.
 //!
 //! TODO(cleanup):
 //!   Unify the value walks (serialize, deserialize, equals, compare, and the
@@ -23,11 +23,10 @@
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
     heap::{alloc_enum_no_gc, alloc_vec_no_gc, AllocationError, AllocationResult, Heap},
-    memory::{read_enum_tag, read_ptr, read_vec_len, write_ptr},
-    types::VEC_DATA_OFFSET,
 };
 use mono_move_core::{
     interner::view_module_id,
+    memory::{vec_len_or_zero, MemAddr, Obj},
     types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
     LayoutKind, LayoutProvider, VMInternalError, VMResult, ValueLayout, ENUM_DATA_OFFSET,
 };
@@ -54,7 +53,7 @@ pub fn fixed_serialized_size<T: LayoutProvider + ?Sized>(
 /// remain valid (with all reachable heap objects live) throughout the call.
 pub unsafe fn serialized_size<T: LayoutProvider + ?Sized>(
     layouts: &T,
-    base: *const u8,
+    base: MemAddr,
     ty: InternedType,
 ) -> VMResult<usize> {
     // TODO(perf): Implement a more efficient serialized size implementation:
@@ -71,7 +70,7 @@ pub unsafe fn serialized_size<T: LayoutProvider + ?Sized>(
 /// remain valid (with all reachable heap objects live) throughout the call.
 pub unsafe fn serialize<T: LayoutProvider + ?Sized>(
     layouts: &T,
-    base: *const u8,
+    base: MemAddr,
     ty: InternedType,
 ) -> VMResult<Vec<u8>> {
     let layout = layouts.layout_by_ty(ty).ok_or({
@@ -96,19 +95,19 @@ pub unsafe fn serialize<T: LayoutProvider + ?Sized>(
 /// remain valid (with all reachable heap objects live) throughout the call.
 unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
     layouts: &T,
-    base: *const u8,
+    base: MemAddr,
     layout: &ValueLayout,
     out: &mut Vec<u8>,
 ) -> VMResult<()> {
     // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     if layout.has_no_pointers_no_padding() {
-        // SAFETY: for values with no padding and pointers, value's in-memory
-        // bytes are its BCS encoding.
-        // TODO(correctness): breaks on big-endian hosts. The in-memory
-        // representation is native-endian, so this raw copy only equals the
-        // little-endian BCS encoding on little-endian hosts.
-        unsafe { out.extend_from_slice(std::slice::from_raw_parts(base, layout.size as usize)) };
+        // For values with no padding and no pointers, the value's in-memory
+        // bytes are its BCS encoding (little-endian on every host, since all
+        // integer stores go through `MemAddr::store`).
+        // SAFETY: `base` holds `layout.size` initialized bytes with no pointer
+        // slots and no padding, by the flag.
+        unsafe { out.extend_from_slice(base.as_bytes(layout.size as usize)) };
         return Ok(());
     }
 
@@ -126,9 +125,9 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {
                 let field_layout = layouts.layout(field.id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
-                // SAFETY: the field lies within `base`'s region at `offset`
-                // which holds for well-typed values, as guaranteed by the
-                // safety precondition of this function.
+                // SAFETY: the field offset is within the value's layout, and
+                // the field holds an initialized value of `field.id`, as
+                // guaranteed by the safety precondition of this function.
                 unsafe {
                     serialize_impl(layouts, base.add(field.offset as usize), field_layout, out)?
                 };
@@ -137,10 +136,10 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
         },
         LayoutKind::Vector { elem_id, .. } => {
             // SAFETY: vector value holds an 8-byte heap pointer pointing to
-            // its data for any well-typed value. The length is stored in the
-            // data pointed to.
-            let vec_ptr = unsafe { read_ptr(base, 0usize) };
-            let len = unsafe { read_vec_len(vec_ptr) };
+            // its data for any well-typed value (null for the empty vector).
+            // The length is stored in the data pointed to.
+            let vec_ptr = unsafe { base.load_ptr() };
+            let len = unsafe { vec_len_or_zero(vec_ptr) };
             if len > bcs::MAX_SEQUENCE_LENGTH as u64 {
                 return Err(VMInternalError::new(RuntimeError::BCSSequenceTooLong {
                     len,
@@ -152,39 +151,35 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             }
 
             let elem_layout = layouts.layout(*elem_id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
-            let elem_size = elem_layout.size as usize;
+            let elem_size = elem_layout.size;
+            // SAFETY: the vector is a live heap object: the empty (null) case
+            // was excluded above.
+            let vec = unsafe { Obj::new(vec_ptr) };
             if elem_layout.has_no_pointers_no_padding() {
-                // TODO(correctness): breaks on big-endian hosts, for the same
-                // reason as the scalar fast path: native-endian in-memory bytes
-                // equal the little-endian BCS bytes only on little-endian hosts.
-                // SAFETY: vector data is a single allocation, pointer is not
-                // null and is within bounds.
-                let vec_data = unsafe {
-                    std::slice::from_raw_parts(
-                        vec_ptr.add(VEC_DATA_OFFSET),
-                        len as usize * elem_size,
-                    )
-                };
+                // Element bytes are their BCS bytes, as in the scalar fast
+                // path above.
+                // SAFETY: the data region holds `len` elements of `elem_size`
+                // bytes each, with no pointer slots and no padding by the flag.
+                let vec_data = unsafe { vec.vec_data().as_bytes(len as usize * elem_size as usize) };
                 out.extend_from_slice(vec_data);
             } else {
-                for i in 0..len as usize {
-                    // SAFETY: ith element lies within the vector data region,
-                    // so the pointer is non-null and new pointer points within
-                    // the data region.
-                    let elem_ptr = unsafe { vec_ptr.add(VEC_DATA_OFFSET + i * elem_size) };
-                    // SAFETY: element pointer is a valid value of the given
+                for i in 0..len {
+                    // SAFETY: `i < len`, so the ith element lies within the
+                    // vector's data region.
+                    let elem_ptr = unsafe { vec.vec_elem(i, elem_size) };
+                    // SAFETY: the element holds an initialized value of the
                     // element layout, as guaranteed by the valid `base` value
-                    // pointer passed into this function.
+                    // passed into this function.
                     unsafe { serialize_impl(layouts, elem_ptr, elem_layout, out)? };
                 }
             }
             Ok(())
         },
         LayoutKind::FrozenEnum { variants, .. } => {
-            // SAFETY: an enum value holds a non-null heap pointer and data
-            // follows the offset.
-            let obj_ptr = unsafe { read_ptr(base, 0usize) };
-            let tag = unsafe { read_enum_tag(obj_ptr) };
+            // SAFETY: an enum value holds a non-null heap pointer to an object
+            // storing the tag followed by the variant body.
+            let obj = unsafe { Obj::new(base.load_ptr()) };
+            let tag = unsafe { obj.enum_tag() };
             let variant_id = variants
                 .get(tag as usize)
                 .map(|v| v.id)
@@ -197,9 +192,9 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             write_uleb128_len(out, tag);
 
             let variant_layout = layouts.layout(variant_id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
-            // SAFETY: the variant body lives at the specified offset within
-            // the object.
-            unsafe { serialize_impl(layouts, obj_ptr.add(ENUM_DATA_OFFSET), variant_layout, out)? };
+            // SAFETY: the variant body lives at `ENUM_DATA_OFFSET` within the
+            // enum object.
+            unsafe { serialize_impl(layouts, obj.field(ENUM_DATA_OFFSET), variant_layout, out)? };
             Ok(())
         },
         // TODO(completeness): function values are not yet supported.
@@ -236,7 +231,7 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
     heap: &mut Heap,
     ty: InternedType,
     bytes: &[u8],
-    dst: *mut u8,
+    dst: MemAddr,
 ) -> AllocationResult<()> {
     // SAFETY: forwarded to the caller.
     unsafe { deserialize_with(layouts, heap, ty, bytes, dst, None) }
@@ -267,7 +262,7 @@ pub(crate) unsafe fn deserialize_untrusted<T: LayoutProvider + ?Sized>(
     heap: &mut Heap,
     ty: InternedType,
     bytes: &[u8],
-    dst: *mut u8,
+    dst: MemAddr,
     hooks: &mut dyn DeserializeHooks,
 ) -> AllocationResult<()> {
     // SAFETY: forwarded to the caller.
@@ -358,14 +353,14 @@ unsafe fn deserialize_with<T: LayoutProvider + ?Sized>(
     heap: &mut Heap,
     ty: InternedType,
     bytes: &[u8],
-    dst: *mut u8,
+    dst: MemAddr,
     hooks: Option<&mut (dyn DeserializeHooks + '_)>,
 ) -> AllocationResult<()> {
     let layout = layouts.layout_by_ty(ty).ok_or({
         RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
     })?;
     debug_assert!(
-        dst.addr().is_multiple_of(layout.align as usize),
+        dst.is_aligned_to(layout.align as usize),
         "deserialize destination must meet the type's alignment"
     );
 
@@ -394,7 +389,7 @@ pub unsafe fn deserialize_into<T: LayoutProvider + ?Sized>(
     heap: &mut Heap,
     ty: InternedType,
     bytes: &[u8],
-    dst: *mut u8,
+    dst: MemAddr,
 ) -> VMResult<()> {
     // SAFETY: forwarded to the caller.
     unsafe { deserialize(layouts, heap, ty, bytes, dst) }
@@ -418,18 +413,16 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     layout: &ValueLayout,
     bytes: &[u8],
     cursor: &mut usize,
-    dst: *mut u8,
+    dst: MemAddr,
     mut hooks: Option<&mut (dyn DeserializeHooks + '_)>,
 ) -> AllocationResult<()> {
     // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
     //
     // If every byte pattern is valid (no padding, no pointers, no `bool`), the
-    // value's BCS bytes are exactly its in-memory image. A `bool` is excluded
-    // because only `0`/`1` are canonical and a raw copy would skip that check.
-    // TODO(correctness): breaks on big-endian hosts. This writes the
-    // little-endian BCS bytes verbatim, but the in-memory representation is
-    // native-endian, so the two only match on little-endian hosts.
+    // value's BCS bytes are exactly its in-memory image (little-endian on
+    // every host; see the module docs). A `bool` is excluded because only
+    // `0`/`1` are canonical and a raw copy would skip that check.
     // Checked before the value is built, so nothing is allocated for a value
     // that is refused.
     if let (Some(hooks), Some(ty)) = (hooks.as_deref_mut(), layout.ty) {
@@ -439,9 +432,8 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     if blittable(layout, hooks.is_some()) {
         let n = layout.size as usize;
         let src = read_slice(bytes, cursor, n)?;
-        // SAFETY: caller ensures `n` bytes can be written to `dst` and it is
-        // not aliasing `src`.
-        unsafe { std::ptr::copy_nonoverlapping(src.as_ptr(), dst, n) };
+        // SAFETY: caller ensures `n` bytes can be written to `dst`.
+        unsafe { dst.copy_from_slice(src) };
         return Ok(());
     }
 
@@ -454,7 +446,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                 return Err(RuntimeError::BCSInvalidBool { byte }.into());
             }
             // SAFETY: caller ensures one byte can be written to `dst`.
-            unsafe { std::ptr::write(dst, byte) };
+            unsafe { dst.store::<u8>(byte) };
             Ok(())
         },
         LayoutKind::UnsignedInt | LayoutKind::SignedInt | LayoutKind::Address => Err(
@@ -470,9 +462,9 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                 let field_layout = layouts.layout(field.id).ok_or({
                     RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
                 })?;
-                // SAFETY: value is a valid struct, so all fields lie at `offset`
-                // and are within bounds. `dst` is correctly sized so there is
-                // enough space to write all fields.
+                // SAFETY: the field offset is within the value's layout, and
+                // `dst` is writable for the whole layout, so there is enough
+                // space to write every field.
                 unsafe {
                     deserialize_impl(
                         layouts,
@@ -499,61 +491,47 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                 // The empty vector is the null pointer.
                 // SAFETY: `dst` has size to write the null pointer as
                 // guaranteed by the caller.
-                unsafe { write_ptr(dst, 0usize, std::ptr::null()) };
+                unsafe { dst.store_ptr(MemAddr::NULL) };
                 return Ok(());
             }
 
             let elem_layout = layouts.layout(*elem_id).ok_or({
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
             })?;
-            let elem_size = elem_layout.size as usize;
+            let elem_size = elem_layout.size;
 
             // Lengths exceeding the maximum allocation size are invalid BCS input;
             // insufficient remaining heap is a VM resource error.
-            let vec_ptr =
-                alloc_vec_no_gc(heap, *descriptor_id, elem_layout.size, len).map_err(|err| {
-                    match err {
-                        AllocationError::RuntimeError(
-                            RuntimeError::AllocationTooLarge { .. }
-                            | RuntimeError::VecAllocSizeOverflow,
-                        ) => {
-                            AllocationError::RuntimeError(RuntimeError::BCSSequenceTooLong { len })
-                        },
-                        other @ (AllocationError::OutOfHeapMemory { .. }
-                        | AllocationError::RuntimeError(_)) => other,
-                    }
+            let vec =
+                alloc_vec_no_gc(heap, *descriptor_id, elem_size, len).map_err(|err| match err {
+                    AllocationError::RuntimeError(
+                        RuntimeError::AllocationTooLarge { .. }
+                        | RuntimeError::VecAllocSizeOverflow,
+                    ) => AllocationError::RuntimeError(RuntimeError::BCSSequenceTooLong { len }),
+                    other @ (AllocationError::OutOfHeapMemory { .. }
+                    | AllocationError::RuntimeError(_)) => other,
                 })?;
+            // `vec` is a live vector object sized for `len` elements.
             // The allocation checked this product against overflow.
-            let data_size = len as usize * elem_size;
+            let data_size = len as usize * elem_size as usize;
 
             if blittable(elem_layout, hooks.is_some()) {
                 // If every element byte pattern is valid, element bytes equal
                 // their BCS bytes. A `bool` element is excluded so each byte is
                 // validated by the per-element walk below.
-                // TODO(correctness): breaks on big-endian hosts, for the same
-                // reason as the scalar fast path above: native-endian in-memory
-                // bytes equal the little-endian BCS bytes only on little-endian
-                // hosts.
                 let src = read_slice(bytes, cursor, data_size)?;
 
                 // SAFETY: the vector data region has space to write
-                // `data_size` bytes and source has same size.
-                unsafe {
-                    std::ptr::copy_nonoverlapping(
-                        src.as_ptr(),
-                        vec_ptr.add(VEC_DATA_OFFSET),
-                        data_size,
-                    )
-                };
+                // `data_size` bytes and the source has the same size.
+                unsafe { vec.vec_data().copy_from_slice(src) };
             } else {
-                for i in 0..len as usize {
-                    // SAFETY: ith element lies within the vector data region,
-                    // so the pointer is non-null and new pointer points within
-                    // the data region.
-                    let elem_ptr = unsafe { vec_ptr.add(VEC_DATA_OFFSET + i * elem_size) };
-                    // SAFETY: element pointer is a valid value of the given
-                    // element layout, as guaranteed by the precondition of the
-                    // function.
+                for i in 0..len {
+                    // SAFETY: `i < len`, so the ith element lies within the
+                    // vector's data region.
+                    let elem_ptr = unsafe { vec.vec_elem(i, elem_size) };
+                    // SAFETY: the element slot is writable for the element
+                    // layout's size, as the data region was sized for `len`
+                    // elements.
                     unsafe {
                         deserialize_impl(
                             layouts,
@@ -570,7 +548,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
 
             // SAFETY: `dst` has size to write the vector pointer as
             // guaranteed by the caller.
-            unsafe { write_ptr(dst, 0usize, vec_ptr) };
+            unsafe { dst.store_ptr(vec.addr()) };
             Ok(())
         },
         LayoutKind::FrozenEnum {
@@ -593,29 +571,23 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
             })?;
 
-            let obj_ptr = alloc_enum_no_gc(
+            let obj = alloc_enum_no_gc(
                 heap,
                 *descriptor_id,
                 tag,
                 *max_size_across_variants as usize,
             )?;
+            // SAFETY: `alloc_enum_no_gc` returned a live enum object with the
+            // maximum variant size allocated, so the variant body at
+            // `ENUM_DATA_OFFSET` has enough space to deserialize into.
+            let body = unsafe { obj.field(ENUM_DATA_OFFSET) };
 
-            // SAFETY: variant body lives at the specified offset. The maximum
-            // size was allocated so there is enough space to deserialize into.
-            unsafe {
-                deserialize_impl(
-                    layouts,
-                    heap,
-                    variant_layout,
-                    bytes,
-                    cursor,
-                    obj_ptr.add(ENUM_DATA_OFFSET),
-                    hooks,
-                )?
-            };
+            // SAFETY: `body` is writable for the variant layout's size (see
+            // above).
+            unsafe { deserialize_impl(layouts, heap, variant_layout, bytes, cursor, body, hooks)? };
             // SAFETY: `dst` has space to write the 8-byte enum pointer as
             // guaranteed by the caller.
-            unsafe { write_ptr(dst, 0usize, obj_ptr) };
+            unsafe { dst.store_ptr(obj.addr()) };
             Ok(())
         },
         // TODO(completeness): function values are not yet supported.
@@ -719,17 +691,21 @@ impl AlignedBuf {
         }
     }
 
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.words.as_mut_ptr().cast()
+    /// The buffer's address, for the walkers that read through a [`MemAddr`].
+    pub(crate) fn as_addr(&self) -> MemAddr {
+        MemAddr::from_ref(self.words.as_slice())
     }
 
-    pub(crate) fn as_ptr(&self) -> *const u8 {
-        self.words.as_ptr().cast()
+    /// The buffer's address, for the writers that fill it through a
+    /// [`MemAddr`].
+    pub(crate) fn as_addr_mut(&mut self) -> MemAddr {
+        MemAddr::from_mut(self.words.as_mut_slice())
     }
 
     fn as_slice(&self) -> &[u8] {
-        // SAFETY: `zeroed` allocated and initialized at least `len` bytes.
-        unsafe { std::slice::from_raw_parts(self.as_ptr(), self.len) }
+        // SAFETY: `zeroed` allocated and initialized at least `len` bytes,
+        // and the buffer holds no pointer slots that are loaded back.
+        unsafe { self.as_addr().as_bytes(self.len) }
     }
 }
 
@@ -759,10 +735,6 @@ mod tests {
     use serde::Serialize;
     use std::mem::{offset_of, size_of};
 
-    fn ptr<T>(x: &T) -> *const u8 {
-        x as *const T as *const u8
-    }
-
     fn vector_layout(ty: InternedType, elem_id: LayoutId) -> ValueLayout {
         ValueLayout::vector(ty, elem_id, DescriptorId(2))
     }
@@ -785,7 +757,7 @@ mod tests {
                 layout,
                 &bytes,
                 &mut cursor,
-                slot.as_mut_ptr(),
+                MemAddr::from_mut(&mut slot),
                 None,
             )
         };
@@ -815,7 +787,7 @@ mod tests {
                 layout,
                 &bytes,
                 &mut cursor,
-                &mut slot as *mut u64 as *mut u8,
+                MemAddr::from_mut(&mut slot),
                 None,
             )
         };
@@ -831,10 +803,12 @@ mod tests {
     fn serialize_signer_emits_address_bytes() {
         let table = ValueLayoutTable::new();
         let layout = table.layout(SIGNER_LAYOUT_ID).unwrap();
-        let addr = [7u8; 32];
+        let addr_bytes = [7u8; 32];
         let mut out = vec![];
-        unsafe { serialize_impl(&table, addr.as_ptr(), layout, &mut out).unwrap() };
-        assert_eq!(out, addr);
+        unsafe {
+            serialize_impl(&table, MemAddr::from_ref(&addr_bytes), layout, &mut out).unwrap()
+        };
+        assert_eq!(out, addr_bytes);
     }
 
     #[test]
@@ -852,7 +826,7 @@ mod tests {
                 &layout,
                 &bytes,
                 &mut cursor,
-                &mut slot as *mut u64 as *mut u8,
+                MemAddr::from_mut(&mut slot),
                 None,
             )
             .unwrap()
@@ -878,7 +852,7 @@ mod tests {
                 layout,
                 &bytes,
                 &mut cursor,
-                &mut slot as *mut u64 as *mut u8,
+                MemAddr::from_mut(&mut slot),
                 None,
             )
         };
@@ -976,7 +950,7 @@ mod tests {
                 &mut heap,
                 U64_TY,
                 &bytes,
-                &mut slot as *mut u64 as *mut u8,
+                MemAddr::from_mut(&mut slot),
             )
         };
         assert!(matches!(
@@ -1056,7 +1030,7 @@ mod tests {
                 layout,
                 bytes,
                 &mut cursor,
-                &mut slot as *mut u64 as *mut u8,
+                MemAddr::from_mut(&mut slot),
                 hooks,
             )
         }
@@ -1197,7 +1171,7 @@ mod tests {
                 layout,
                 &[0x02u8],
                 &mut cursor,
-                &mut slot as *mut u64 as *mut u8,
+                MemAddr::from_mut(&mut slot),
                 None,
             )
         };
@@ -1232,7 +1206,7 @@ mod tests {
                     layout,
                     &[byte],
                     &mut cursor,
-                    &mut slot,
+                    MemAddr::from_mut(&mut slot),
                     None,
                 )
                 .unwrap()
@@ -1256,7 +1230,7 @@ mod tests {
                 layout,
                 &[2u8],
                 &mut cursor,
-                &mut slot,
+                MemAddr::from_mut(&mut slot),
                 None,
             )
         };
@@ -1285,7 +1259,7 @@ mod tests {
                 layout,
                 &bytes,
                 &mut cursor,
-                &mut slot as *mut u64 as *mut u8,
+                MemAddr::from_mut(&mut slot),
                 None,
             )
         };
@@ -1324,7 +1298,7 @@ mod tests {
                 layout,
                 &bytes,
                 &mut cursor,
-                slot.as_mut_ptr(),
+                MemAddr::from_mut(&mut slot),
                 None,
             )
         };
@@ -1409,7 +1383,7 @@ mod tests {
             // Serialize matches bcs; a padded struct wrongly put on the raw-copy
             // fast path would memcpy its padding and diverge here.
             let mut out = vec![];
-            unsafe { serialize_impl(table, ptr(x), layout, &mut out).unwrap() };
+            unsafe { serialize_impl(table, MemAddr::from_ref(x), layout, &mut out).unwrap() };
             assert_eq!(out, x_bcs);
 
             // Round-trip through the packed bytes, not `dst` directly: the
@@ -1424,14 +1398,14 @@ mod tests {
                     layout,
                     &x_bcs,
                     &mut cursor,
-                    dst.as_mut_ptr(),
+                    dst.as_addr_mut(),
                     None,
                 )
                 .unwrap()
             };
             assert_eq!(cursor, x_bcs.len());
             let mut reser = vec![];
-            unsafe { serialize_impl(table, dst.as_ptr(), layout, &mut reser).unwrap() };
+            unsafe { serialize_impl(table, dst.as_addr(), layout, &mut reser).unwrap() };
             assert_eq!(reser, x_bcs);
         }
 
@@ -1440,8 +1414,15 @@ mod tests {
         for x in values {
             for y in values {
                 unsafe {
-                    assert_eq!(compare_impl(table, ptr(x), ptr(y), id).unwrap(), x.cmp(y));
-                    assert_eq!(equals_impl(table, ptr(x), ptr(y), id).unwrap(), x == y);
+                    assert_eq!(
+                        compare_impl(table, MemAddr::from_ref(x), MemAddr::from_ref(y), id)
+                            .unwrap(),
+                        x.cmp(y)
+                    );
+                    assert_eq!(
+                        equals_impl(table, MemAddr::from_ref(x), MemAddr::from_ref(y), id).unwrap(),
+                        x == y
+                    );
                 }
             }
         }
@@ -1634,7 +1615,7 @@ mod tests {
                     layout,
                     &bytes,
                     &mut cursor,
-                    dst.as_mut_ptr(),
+                    dst.as_addr_mut(),
                     None,
                 )
                 .unwrap()
@@ -1643,7 +1624,7 @@ mod tests {
 
             // Re-serializing the deserialized value reproduces its bcs.
             let mut out = vec![];
-            unsafe { serialize_impl(table, dst.as_ptr(), layout, &mut out).unwrap() };
+            unsafe { serialize_impl(table, dst.as_addr(), layout, &mut out).unwrap() };
             assert_eq!(out, bytes);
 
             bufs.push(dst);
@@ -1652,7 +1633,7 @@ mod tests {
         // Compare and equals match the value's `Ord`/`Eq` across every pair.
         for (i, vi) in values.iter().enumerate() {
             for (j, vj) in values.iter().enumerate() {
-                let (pi, pj) = (bufs[i].as_ptr(), bufs[j].as_ptr());
+                let (pi, pj) = (bufs[i].as_addr(), bufs[j].as_addr());
                 unsafe {
                     assert_eq!(compare_impl(table, pi, pj, id).unwrap(), vi.cmp(vj));
                     assert_eq!(equals_impl(table, pi, pj, id).unwrap(), vi == vj);
@@ -1669,8 +1650,9 @@ mod tests {
         table.push(vector_layout(U64_TY, U64_LAYOUT_ID));
         let mut heap = Heap::new(128);
         let mut buf = AlignedBuf::zeroed(16);
-        // SAFETY: the precondition check panics before any access through `dst`.
-        let unaligned = unsafe { buf.as_mut_ptr().add(1) };
+        // SAFETY: `buf` is 16 bytes, so `+1` stays in bounds; the precondition
+        // check panics before any access through `dst`.
+        let unaligned = unsafe { buf.as_addr_mut().add(1) };
         let _ = unsafe { deserialize(&table, &mut heap, U64_TY, &[], unaligned) };
     }
 
@@ -1957,8 +1939,8 @@ mod prop_tests {
                         Some(size)
                     );
 
-                    let px = &x as *const $t as *const u8;
-                    let py = &y as *const $t as *const u8;
+                    let px = MemAddr::from_ref(&x);
+                    let py = MemAddr::from_ref(&y);
 
                     // Serialize matches the BCS encoding.
                     let out = unsafe { serialize(&table, px, $ty).unwrap() };
@@ -1971,9 +1953,11 @@ mod prop_tests {
                     // Deserialize reproduces the value's in-memory bytes.
                     let mut dst = AlignedBuf::zeroed(size);
                     unsafe {
-                        deserialize(&table, &mut heap, $ty, &bytes, dst.as_mut_ptr()).unwrap()
+                        deserialize(&table, &mut heap, $ty, &bytes, dst.as_addr_mut()).unwrap()
                     };
-                    let x_bytes = unsafe { std::slice::from_raw_parts(px, size) };
+                    // SAFETY: `x` is a live `$t`, a pointer-free value of
+                    // `size` initialized bytes.
+                    let x_bytes = unsafe { px.as_bytes(size) };
                     prop_assert_eq!(dst.as_slice(), x_bytes);
 
                     // Compare and equals match Rust's ordering and equality.

@@ -10,9 +10,14 @@ value layout, the calling convention, or the GC.
 
 ## Safety model
 
-The interpreter uses raw pointer arithmetic throughout. Correctness rests on
-three invariants held jointly by the compiler, the verifier, and the runtime.
-Any change that could break one needs a matching verifier check or a proof:
+The interpreter addresses memory directly. Every raw access goes through
+`MemAddr` (crate `mono-move-mem`) and the VM-level wrappers on top of it —
+`Frame`/`FrameMeta`, `FatRef` and `Obj` in `mono_move_core::memory` — so
+the pointer arithmetic itself is confined to a handful of
+`unsafe` methods (see `../AGENTS.md`, "Raw memory access"). Correctness rests
+on three invariants held jointly by the compiler, the verifier, and the
+runtime. Any change that could break one needs a matching verifier check or a
+proof:
 
 1. **Frame metadata integrity** — saved `fp`/`pc`/`func_ptr` are written only by
    call/return (the call protocol also sets the checked-frame flag, packed into
@@ -22,7 +27,9 @@ Any change that could break one needs a matching verifier check or a proof:
    heap pointers. The GC trusts them to find roots.
 3. **Object header integrity** — `descriptor_id` and `size_in_bytes` sit at
    `obj_ptr - 8` and `obj_ptr - 4`, written by the allocator. User micro-ops
-   address only offsets `>= 0`, so they cannot reach the header.
+   address only offsets `>= 0`, so they cannot reach the header; in the code,
+   `Obj::header()` and `Frame::meta()` are the only ways to form a negative
+   offset from a data pointer.
 
 `mono_move_core::verify_function` (run by the loader on every lowered function
 before it is cached) checks frame-access bounds, metadata overlap, jump targets, and

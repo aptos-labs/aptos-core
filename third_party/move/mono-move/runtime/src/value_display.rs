@@ -10,15 +10,10 @@
 // bound on depth. Replace it with a common iterative value traversal that the
 // comparison and BCS walks can share.
 
-use crate::{
-    error::{RuntimeError, RuntimeInvariantViolation},
-    memory::{
-        read_account_address, read_bool, read_enum_tag, read_int, read_ptr, read_u8, read_vec_len,
-    },
-    types::VEC_DATA_OFFSET,
-};
+use crate::error::{RuntimeError, RuntimeInvariantViolation};
 use mono_move_core::{
     interner::InternedIdentifier,
+    memory::{vec_bytes_or_empty, vec_len_or_zero, MemAddr, Obj},
     types::{is_nominal, type_to_string, view_name, view_type, InternedType, Type},
     value_layout::U8_LAYOUT_ID,
     FieldValueLayout, FormatOptions, LayoutId, LayoutKind, LayoutProvider, VMInternalError,
@@ -42,7 +37,7 @@ use std::fmt::Write;
 /// reference first and passes the pointee.
 pub unsafe fn display<L: LayoutProvider + ?Sized>(
     layouts: &L,
-    base: *const u8,
+    base: MemAddr,
     ty: InternedType,
     options: &FormatOptions,
     out: &mut String,
@@ -62,7 +57,7 @@ pub unsafe fn display<L: LayoutProvider + ?Sized>(
 /// `base` must point to a fully initialized value with layout `id`.
 unsafe fn display_impl<L: LayoutProvider + ?Sized>(
     layouts: &L,
-    base: *const u8,
+    base: MemAddr,
     id: LayoutId,
     options: &FormatOptions,
     depth: usize,
@@ -74,9 +69,9 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
 
     match &layout.kind {
         LayoutKind::Bool => {
-            // SAFETY: a bool occupies one readable byte at `base`.
+            // SAFETY: a bool occupies one initialized byte at `base`.
             out.push_str(
-                if unsafe { read_bool(base, 0usize) } {
+                if unsafe { base.load_bool() } {
                     "true"
                 } else {
                     "false"
@@ -89,12 +84,12 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
             // its width.
             let suffix = unsafe {
                 match layout.size {
-                    1 => write_int(out, read_u8(base, 0usize), "u8")?,
-                    2 => write_int(out, read_int::<u16>(base, 0usize), "u16")?,
-                    4 => write_int(out, read_int::<u32>(base, 0usize), "u32")?,
-                    8 => write_int(out, read_int::<u64>(base, 0usize), "u64")?,
-                    16 => write_int(out, read_int::<u128>(base, 0usize), "u128")?,
-                    32 => write_int(out, read_int::<U256>(base, 0usize), "u256")?,
+                    1 => write_int(out, base.load::<u8>(), "u8")?,
+                    2 => write_int(out, base.load::<u16>(), "u16")?,
+                    4 => write_int(out, base.load::<u32>(), "u32")?,
+                    8 => write_int(out, base.load::<u64>(), "u64")?,
+                    16 => write_int(out, base.load::<u128>(), "u128")?,
+                    32 => write_int(out, base.load::<U256>(), "u256")?,
                     _ => return Err(bad_int_width("unsigned")),
                 }
             };
@@ -108,12 +103,12 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
             // its width.
             let suffix = unsafe {
                 match layout.size {
-                    1 => write_int(out, read_int::<i8>(base, 0usize), "i8")?,
-                    2 => write_int(out, read_int::<i16>(base, 0usize), "i16")?,
-                    4 => write_int(out, read_int::<i32>(base, 0usize), "i32")?,
-                    8 => write_int(out, read_int::<i64>(base, 0usize), "i64")?,
-                    16 => write_int(out, read_int::<i128>(base, 0usize), "i128")?,
-                    32 => write_int(out, read_int::<I256>(base, 0usize), "i256")?,
+                    1 => write_int(out, base.load::<i8>(), "i8")?,
+                    2 => write_int(out, base.load::<i16>(), "i16")?,
+                    4 => write_int(out, base.load::<i32>(), "i32")?,
+                    8 => write_int(out, base.load::<i64>(), "i64")?,
+                    16 => write_int(out, base.load::<i128>(), "i128")?,
+                    32 => write_int(out, base.load::<I256>(), "i256")?,
                     _ => return Err(bad_int_width("signed")),
                 }
             };
@@ -138,28 +133,36 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
             Ok(())
         },
         LayoutKind::Vector { elem_id, .. } => {
-            // SAFETY: vector values hold an 8-byte heap pointer to their data,
-            // which stores the length.
-            let vec = unsafe { read_ptr(base, 0usize) };
-            let len = unsafe { read_vec_len(vec) } as usize;
+            // SAFETY: vector values hold an 8-byte heap pointer to their data
+            // (null for the empty vector), which stores the length.
+            let vec = unsafe { base.load_ptr() };
+            let len = unsafe { vec_len_or_zero(vec) } as usize;
 
             let elem = layouts.layout(*elem_id).ok_or({
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
             })?;
             if options.vec_u8_as_hex && *elem_id == U8_LAYOUT_ID {
                 out.push_str("0x");
-                for i in 0..len {
-                    // SAFETY: the `i`th byte lies within the data region.
-                    let byte = unsafe { *vec.add(VEC_DATA_OFFSET + i) };
+                // SAFETY: a `vector<u8>` value is null when empty; otherwise
+                // its `len` bytes are initialized `u8` elements.
+                for byte in unsafe { vec_bytes_or_empty(vec) } {
                     write!(out, "{:02x}", byte).map_err(write_failed)?;
                 }
                 return Ok(());
             }
+            if len == 0 {
+                out.push_str("[]");
+                return Ok(());
+            }
 
-            let elem_size = elem.size as usize;
+            let elem_size = elem.size;
+            // SAFETY: the vector is a live heap object: the empty (null) case
+            // was excluded above.
+            let vec = unsafe { Obj::new(vec) };
             let elems = (0..len).map(|i| Child {
-                // SAFETY: the `i`th element lies within the data region.
-                ptr: unsafe { vec.add(VEC_DATA_OFFSET + i * elem_size) },
+                // SAFETY: `i < len`, so the `i`th element lies within the
+                // vector's data region.
+                ptr: unsafe { vec.vec_elem(i as u64, elem_size) },
                 id: *elem_id,
                 name: None,
             });
@@ -195,18 +198,19 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
         },
         LayoutKind::FrozenEnum { variants, .. } => {
             let nominal = nominal_of(layout)?;
-            // SAFETY: enum values hold a heap pointer to an object storing the
-            // tag followed by the variant body.
-            let obj = unsafe { read_ptr(base, 0usize) };
-            let tag = unsafe { read_enum_tag(obj) };
+            // SAFETY: enum values hold a non-null heap pointer to an object
+            // storing the tag followed by the variant body.
+            let obj = unsafe { Obj::new(base.load_ptr()) };
+            let tag = unsafe { obj.enum_tag() };
             let variant = variants.get(tag as usize).ok_or({
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
                     tag,
                     variant_count: variants.len(),
                 })
             })?;
-            // SAFETY: the variant body lives at the data offset.
-            let body = unsafe { obj.add(ENUM_DATA_OFFSET) };
+            // SAFETY: the variant body lives at `ENUM_DATA_OFFSET` within the
+            // enum object.
+            let body = unsafe { obj.field(ENUM_DATA_OFFSET) };
 
             let body_layout = layouts.layout(variant.id).ok_or({
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
@@ -248,7 +252,7 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
 /// One rendered child of an aggregate: where it lives, how it is laid out, and
 /// the field name printed ahead of it, if any.
 struct Child {
-    ptr: *const u8,
+    ptr: MemAddr,
     id: LayoutId,
     name: Option<InternedIdentifier>,
 }
@@ -261,14 +265,14 @@ struct Child {
 /// `base` must point to a fully initialized value holding exactly `fields`.
 unsafe fn display_fields<L: LayoutProvider + ?Sized>(
     layouts: &L,
-    base: *const u8,
+    base: MemAddr,
     fields: &[FieldValueLayout],
     options: &FormatOptions,
     depth: usize,
     out: &mut String,
 ) -> VMResult<()> {
     let children = fields.iter().map(|field| Child {
-        // SAFETY: every field lies at its offset within the value.
+        // SAFETY: the field offset is within the value's layout.
         ptr: unsafe { base.add(field.offset as usize) },
         id: field.id,
         name: Some(field.name),
@@ -333,7 +337,7 @@ where
 /// `body` must point to a fully initialized variant body holding `fields`.
 unsafe fn display_option<L: LayoutProvider + ?Sized>(
     layouts: &L,
-    body: *const u8,
+    body: MemAddr,
     fields: &[FieldValueLayout],
     options: &FormatOptions,
     depth: usize,
@@ -344,7 +348,7 @@ unsafe fn display_option<L: LayoutProvider + ?Sized>(
         return Ok(());
     };
     out.push_str("Some(");
-    // SAFETY: the payload lies at its offset within the variant body.
+    // SAFETY: the payload's field offset is within the variant body's layout.
     unsafe {
         display_impl(
             layouts,
@@ -365,7 +369,7 @@ unsafe fn display_option<L: LayoutProvider + ?Sized>(
 ///
 /// `base` must point to a fully initialized `String` holding `fields`.
 unsafe fn display_string(
-    base: *const u8,
+    base: MemAddr,
     fields: &[FieldValueLayout],
     out: &mut String,
 ) -> VMResult<()> {
@@ -376,18 +380,11 @@ unsafe fn display_string(
             ),
         )));
     };
-    // SAFETY: the field holds an 8-byte heap pointer to the vector data, which
-    // stores the length ahead of the bytes. An empty vector is a null pointer,
-    // so the data region is only addressed for a non-zero length.
-    let bytes = unsafe {
-        let vec = read_ptr(base.add(bytes.offset as usize), 0usize);
-        let len = read_vec_len(vec) as usize;
-        if len == 0 {
-            &[]
-        } else {
-            std::slice::from_raw_parts(vec.add(VEC_DATA_OFFSET), len)
-        }
-    };
+    // SAFETY: the field offset is within the `String` layout and the field
+    // holds an 8-byte heap pointer to the vector data, which stores the length
+    // ahead of the bytes. An empty vector is a null pointer; otherwise its
+    // `len` bytes are initialized `u8` elements with no pointer slots.
+    let bytes = unsafe { vec_bytes_or_empty(base.add(bytes.offset as usize).load_ptr()) };
     let text = std::str::from_utf8(bytes).map_err(|_| {
         RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(
             "`String` must hold UTF-8 bytes".to_string(),
@@ -495,14 +492,15 @@ fn bad_int_width(signedness: &str) -> VMInternalError {
 /// # Safety
 ///
 /// `base` must be readable for `layout.size` bytes.
-unsafe fn read_address(base: *const u8, layout: &ValueLayout) -> VMResult<AccountAddress> {
+unsafe fn read_address(base: MemAddr, layout: &ValueLayout) -> VMResult<AccountAddress> {
     if layout.size as usize != AccountAddress::LENGTH {
         return Err(VMInternalError::new(RuntimeError::InvariantViolation(
             RuntimeInvariantViolation::Unreachable("Unexpected address width".to_string()),
         )));
     }
-    // SAFETY: caller guarantees `AccountAddress::LENGTH` readable bytes.
-    Ok(unsafe { read_account_address(base, 0usize) })
+    // SAFETY: caller guarantees `layout.size == AccountAddress::LENGTH`
+    // initialized bytes at `base`.
+    Ok(unsafe { base.load::<AccountAddress>() })
 }
 
 #[cfg(test)]
@@ -732,9 +730,9 @@ mod tests {
         // SAFETY: the slot is aligned and wider than any test type's in-memory
         // size, and holds an initialized value of `ty` on a live heap.
         unsafe {
-            write_value(guard, &mut heap, ty, value, slot.as_mut_ptr())
+            write_value(guard, &mut heap, ty, value, slot.as_addr_mut())
                 .expect("write_value succeeds");
-            display(guard, slot.as_ptr(), ty, options, &mut out).expect("display succeeds");
+            display(guard, slot.as_addr(), ty, options, &mut out).expect("display succeeds");
         }
         out
     }

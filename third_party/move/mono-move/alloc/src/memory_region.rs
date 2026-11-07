@@ -4,6 +4,7 @@
 //! An owned, [`MAX_ALIGN`]-aligned VM memory buffer.
 
 use crate::MAX_ALIGN;
+use mono_move_mem::MemAddr;
 use std::{
     alloc::{self, Layout},
     mem::MaybeUninit,
@@ -16,7 +17,7 @@ pub struct MemoryRegion {
 
 // SAFETY: A region uniquely owns its allocation and holds no thread-affine
 // state, so moving that ownership to another thread is sound. Deliberately not
-// `Sync`: callers write through `as_ptr` with no synchronization.
+// `Sync`: callers write through `base` with no synchronization.
 unsafe impl Send for MemoryRegion {}
 
 impl MemoryRegion {
@@ -55,7 +56,7 @@ impl MemoryRegion {
         // SAFETY: `region.ptr` is a valid, `size`-byte allocation just returned
         // by `Self::new` above.
         unsafe {
-            std::ptr::write_bytes(region.ptr, 0xAA, size);
+            region.base().fill(0xAA, size);
         }
         region
     }
@@ -88,7 +89,7 @@ impl MemoryRegion {
         // SAFETY: `ptr` is a valid allocation of `layout.size()` bytes, and
         // `&mut self` rules out a concurrent reader.
         unsafe {
-            std::ptr::write_bytes(self.ptr, 0xAA, self.layout.size());
+            self.base().fill(0xAA, self.layout.size());
         }
     }
 
@@ -113,11 +114,17 @@ impl MemoryRegion {
         Self { ptr, layout }
     }
 
-    /// Returns the region's base pointer. Writes must not overlap a live
+    /// The region's base address. Writes must not overlap a live
     /// [`Self::as_uninit_slice`] borrow.
     #[inline(always)]
-    pub fn as_ptr(&self) -> *mut u8 {
-        self.ptr
+    pub fn base(&self) -> MemAddr {
+        MemAddr::from_ptr(self.ptr)
+    }
+
+    /// One past the region's last byte. Never dereferenced; for bounds.
+    #[inline(always)]
+    pub fn end(&self) -> MemAddr {
+        self.base().wrapping_add(self.len())
     }
 
     #[inline(always)]
@@ -130,22 +137,24 @@ impl MemoryRegion {
         self.layout.size() == 0
     }
 
-    /// Checks whether `len` bytes at `ptr` fit within the region's address bounds,
+    /// Checks whether `len` bytes at `addr` fit within the region's address bounds,
     /// allowing an empty range at its end. Uses integer arithmetic to reject
     /// out-of-bounds or overflowing ranges without forming out-of-bounds pointers.
     #[inline(always)]
-    pub fn contains_range(&self, ptr: *const u8, len: usize) -> bool {
-        ptr.addr().wrapping_sub(self.ptr.addr()).saturating_add(len) <= self.len()
+    pub fn contains_range(&self, addr: MemAddr, len: usize) -> bool {
+        addr.as_usize()
+            .wrapping_sub(self.ptr.addr())
+            .saturating_add(len)
+            <= self.len()
     }
 
     /// Borrows the region as bytes that may be uninitialized or contain pointers.
-    /// Writes through [`Self::as_ptr`] are forbidden while this borrow is live.
+    /// Writes through [`Self::base`] are forbidden while this borrow is live.
     #[inline(always)]
     pub fn as_uninit_slice(&self) -> &[MaybeUninit<u8>] {
-        // SAFETY: the allocation is non-null and valid for `self.len()` bytes.
-        // `MaybeUninit<u8>` permits uninitialized bytes; callers must not write
-        // through raw pointers while the slice is borrowed.
-        unsafe { std::slice::from_raw_parts(self.ptr.cast(), self.len()) }
+        // SAFETY: the allocation is non-null and valid for `self.len()` bytes;
+        // callers must not write through raw pointers while the slice is borrowed.
+        unsafe { self.base().as_uninit_bytes(self.len()) }
     }
 }
 
