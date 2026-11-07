@@ -22,7 +22,7 @@ use mono_move_core::{
 use mono_move_output::to_contract_events;
 use mono_move_runtime::{serialize, SessionEffects, WriteClass};
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
-use std::{cell::RefCell, collections::HashMap, ptr::NonNull};
+use std::{collections::HashMap, ptr::NonNull};
 
 // TODO(security): audit all error messages and make sure they do not lead to
 // deep recursions or OOMs.
@@ -240,63 +240,11 @@ fn merge_group(
     if members.is_empty() {
         Ok((group_op(existed, None)?, None))
     } else {
-        let blob = encode_group(&members)
+        let blob = bcs::to_bytes(&members)
             .map_err(|e| format!("failed to encode the members of group {group_key:?}: {e}"))?;
         let op = group_op(existed, Some(Bytes::from(blob)))?;
         Ok((op, Some(members)))
     }
-}
-
-thread_local! {
-    /// The BCS bytes of every member tag this thread has encoded. A tag is
-    /// a few allocations' worth of serde work and the same handful recur in
-    /// every group.
-    static TAG_BYTES: RefCell<HashMap<StructTag, Bytes>> = RefCell::new(HashMap::new());
-}
-
-/// The group's blob: BCS of the member map, which orders entries by their
-/// encoded tags, with the tags' encoding cached.
-fn encode_group(members: &GroupMembers) -> Result<Vec<u8>, bcs::Error> {
-    let mut entries = TAG_BYTES.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        members
-            .iter()
-            .map(|(tag, bytes)| {
-                let tag_bytes = match cache.get(tag) {
-                    Some(tag_bytes) => tag_bytes.clone(),
-                    None => {
-                        let tag_bytes = Bytes::from(bcs::to_bytes(tag)?);
-                        cache.insert(tag.clone(), tag_bytes.clone());
-                        tag_bytes
-                    },
-                };
-                Ok((tag_bytes, bytes))
-            })
-            .collect::<Result<Vec<_>, bcs::Error>>()
-    })?;
-    entries.sort_by(|a, b| a.0.cmp(&b.0));
-    let mut out = Vec::with_capacity(
-        entries
-            .iter()
-            .map(|(tag, bytes)| tag.len() + bytes.len() + 5)
-            .sum::<usize>()
-            + 5,
-    );
-    put_uleb128(&mut out, entries.len());
-    for (tag, bytes) in entries {
-        out.extend_from_slice(&tag);
-        put_uleb128(&mut out, bytes.len());
-        out.extend_from_slice(bytes);
-    }
-    Ok(out)
-}
-
-fn put_uleb128(out: &mut Vec<u8>, mut value: usize) {
-    while value >= 0x80 {
-        out.push((value as u8) | 0x80);
-        value >>= 7;
-    }
-    out.push(value as u8);
 }
 
 /// Builds the write op for a resource-group slot: creation/modification/
@@ -315,47 +263,4 @@ fn group_op(existed: bool, new_bytes: Option<Bytes>) -> Result<WriteOp, String> 
             return Err("an empty group emitted a write".to_string());
         },
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use move_core_types::{account_address::AccountAddress, ident_str, language_storage::TypeTag};
-    use std::collections::BTreeMap;
-
-    fn tag(name: &'static str, type_args: Vec<TypeTag>) -> StructTag {
-        StructTag {
-            address: AccountAddress::ONE,
-            module: ident_str!("m").to_owned(),
-            name: ident_str!(name).to_owned(),
-            type_args,
-        }
-    }
-
-    #[test]
-    fn encode_group_matches_bcs() {
-        let big = Bytes::from(vec![7u8; 300]);
-        let cases = [
-            BTreeMap::from([(tag("B", vec![]), Bytes::from_static(b"x"))]),
-            BTreeMap::from([
-                (tag("B", vec![]), Bytes::from_static(b"x")),
-                (tag("A", vec![TypeTag::U64]), big.clone()),
-                (
-                    tag("A", vec![TypeTag::Struct(Box::new(tag("C", vec![])))]),
-                    Bytes::new(),
-                ),
-            ]),
-        ];
-        for members in cases {
-            assert_eq!(
-                encode_group(&members).unwrap(),
-                bcs::to_bytes(&members).unwrap()
-            );
-            // The second encoding hits the tag cache.
-            assert_eq!(
-                encode_group(&members).unwrap(),
-                bcs::to_bytes(&members).unwrap()
-            );
-        }
-    }
 }
