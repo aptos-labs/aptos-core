@@ -5,6 +5,7 @@
 
 use crate::{monomorphic_natives, NativeEntry};
 use mono_move_core::{
+    memory::MemAddr,
     native::{NativeContext, NativeContextFamily, NativeExtension, NativeStatus},
     VMResult,
 };
@@ -39,7 +40,7 @@ impl Default for RandomnessContext {
 }
 
 impl NativeExtension for RandomnessContext {
-    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {}
+    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>) {}
 
     fn on_checkpoint(&mut self) {}
 

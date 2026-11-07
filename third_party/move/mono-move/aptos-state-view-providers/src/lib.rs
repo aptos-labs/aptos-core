@@ -17,6 +17,7 @@ use aptos_types::state_store::{state_key::StateKey, StateView};
 use bytes::Bytes;
 use mono_move_aptos_transaction_executor::{decode_group_members, AptosDataProvider, GroupMembers};
 use mono_move_core::{
+    memory::Obj,
     nominal_tag,
     storage::{
         module_provider::ModuleProvider,
@@ -36,7 +37,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, move_resource::MoveStructType,
 };
 use shared_dsa::UnorderedMap;
-use std::{cell::RefCell, ptr::NonNull};
+use std::cell::RefCell;
 use thiserror::Error;
 
 /// Default size of the provider's value arena. Occupancy is bounded by one
@@ -259,13 +260,13 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
 
         let mut inner = self.inner.borrow_mut();
         let arena = inner.arena.clone();
-        let obj = arena.with_heap_mut(|heap: &mut Heap| -> Result<NonNull<u8>, _> {
+        let obj = arena.with_heap_mut(|heap: &mut Heap| -> Result<Obj, _> {
             let obj = heap
                 .alloc_object(OBJECT_HEADER_SIZE + layout.size as usize, descriptor)
                 .ok_or_else(|| internal("resource arena is full".to_string()))?;
             // SAFETY: `obj` is a freshly reserved object sized for the value's
             // layout; `deserialize_into` writes the flat value there.
-            unsafe { deserialize_into(self.guard, heap, ty, &blob, obj.as_ptr()) }
+            unsafe { deserialize_into(self.guard, heap, ty, &blob, obj.addr()) }
                 .map_err(|e| internal(format!("stored value failed to deserialize: {e}")))?;
             Ok(obj)
         })?;

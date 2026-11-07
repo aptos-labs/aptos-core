@@ -8,6 +8,7 @@ mod common;
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
+    memory::MemAddr,
     native::{NativeExtension, NativeExtensions},
     types::EMPTY_TYPE_LIST,
     Code, FrameLayoutInfo, Function, FunctionDefinitionIndex, MicroOp, SortedSafePointEntries,
@@ -24,7 +25,7 @@ struct CheckpointProbe {
 }
 
 impl NativeExtension for CheckpointProbe {
-    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {}
+    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>) {}
 
     fn on_checkpoint(&mut self) {
         self.depth += 1;

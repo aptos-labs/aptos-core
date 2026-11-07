@@ -5,6 +5,7 @@
 
 use crate::{monomorphic_natives, NativeEntry};
 use mono_move_core::{
+    memory::MemAddr,
     native::{
         NativeContext, NativeContextFamily, NativeExtension, NativeStatus, RootPool, VMValue,
     },
@@ -28,7 +29,7 @@ impl StorageUsageAtEpochBoundary {
 }
 
 impl NativeExtension for StorageUsageAtEpochBoundary {
-    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {}
+    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>) {}
 
     fn on_checkpoint(&mut self) {}
 
@@ -48,20 +49,21 @@ struct Usage {
 impl<'a> VMValue<'a> for Usage {
     const FRAME_SLOT_SIZE: usize = USAGE_BYTES_OFFSET + 8;
 
-    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
+    unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {
+        // SAFETY: both fields lie within the slot (this function's contract).
         unsafe {
             Usage {
-                items: u64::read_from_frame(pool, frame_ptr, offset),
-                bytes: u64::read_from_frame(pool, frame_ptr, offset + USAGE_BYTES_OFFSET),
+                items: u64::read_from_frame(pool, slot),
+                bytes: u64::read_from_frame(pool, slot.add(USAGE_BYTES_OFFSET)),
             }
         }
     }
 
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
+    unsafe fn write_to_frame(self, slot: MemAddr) {
+        // SAFETY: both fields lie within the slot (this function's contract).
         unsafe {
-            self.items.write_to_frame(frame_ptr, offset);
-            self.bytes
-                .write_to_frame(frame_ptr, offset + USAGE_BYTES_OFFSET);
+            self.items.write_to_frame(slot);
+            self.bytes.write_to_frame(slot.add(USAGE_BYTES_OFFSET));
         }
     }
 }

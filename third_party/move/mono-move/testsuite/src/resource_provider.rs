@@ -11,6 +11,7 @@
 
 use aptos_types::on_chain_config::{Features, OnChainConfig};
 use mono_move_core::{
+    memory::Obj,
     nominal_tag,
     storage::resource_provider::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
@@ -23,7 +24,7 @@ use mono_move_runtime::{deserialize_into, Heap, SharedArena, DEFAULT_HEAP_SIZE};
 use move_core_types::account_address::AccountAddress;
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::resolver::ResourceResolver;
-use std::{cell::RefCell, collections::HashMap, ptr::NonNull, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 /// Size of a provider's materialization arena: the interpreter's, so a value
 /// that fit when it was written fits when it is read back.
@@ -43,7 +44,7 @@ struct Materialized {
     /// read pins it; never reset, so every interpreter reading a value keeps
     /// it alive.
     arena: Arc<SharedArena>,
-    cache: HashMap<InMemoryStorageKey, NonNull<u8>>,
+    cache: HashMap<InMemoryStorageKey, Obj>,
 }
 
 impl<'guard, 'ctx> InMemoryResourceProvider<'guard, 'ctx> {
@@ -146,7 +147,7 @@ fn materialize_one(
     guard: &ExecutionGuard,
     ty: InternedType,
     blob: &[u8],
-) -> Result<NonNull<u8>, ResourceProviderError> {
+) -> Result<Obj, ResourceProviderError> {
     let layout = guard.layout_by_ty(ty).ok_or_else(|| {
         ResourceProviderError::InvariantViolation("no layout for a stored value's type".to_string())
     })?;
@@ -166,7 +167,7 @@ fn materialize_one(
         })?;
     // SAFETY: `obj` is a fresh allocation of the type's size, and `blob` is
     // the BCS encoding of a value of type `ty`.
-    unsafe { deserialize_into(guard, heap, ty, blob, obj.as_ptr()) }.map_err(|err| {
+    unsafe { deserialize_into(guard, heap, ty, blob, obj.addr()) }.map_err(|err| {
         ResourceProviderError::InvariantViolation(format!("a stored value does not decode: {err}"))
     })?;
     Ok(obj)

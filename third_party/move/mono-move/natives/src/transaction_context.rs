@@ -12,6 +12,7 @@ use aptos_types::{
     },
 };
 use mono_move_core::{
+    memory::MemAddr,
     native::{
         native_invariant_violation, NativeContext, NativeContextFamily, NativeExtension,
         NativeStatus, TableHandle, VMValue,
@@ -92,7 +93,7 @@ impl TransactionContextExtension {
 }
 
 impl NativeExtension for TransactionContextExtension {
-    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {}
+    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>) {}
 
     // TODO(completeness): In the legacy VM, the AUID and the monotonic counter reset at every session start.
     // However because each legacy VM session gets a fresh `session_hash` / `session_counter`,

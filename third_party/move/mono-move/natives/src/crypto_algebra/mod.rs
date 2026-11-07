@@ -50,6 +50,7 @@ pub(crate) use aptos_types::crypto::algebra::{
     E_RAND_INSECURE_NOT_IMPLEMENTED,
 };
 use mono_move_core::{
+    memory::MemAddr,
     native::{
         native_invariant_violation, NativeContext, NativeContextFamily, NativeExtension,
         NativeStatus,
@@ -320,7 +321,7 @@ impl AlgebraStore {
 }
 
 impl NativeExtension for AlgebraStore {
-    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {
+    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>) {
         // Elements are referenced by handle and hold no VM heap pointers.
     }
 

@@ -9,14 +9,13 @@
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
     heap::{heap_alloc, AllocationError, AllocationResult, Heap},
-    memory::{read_descriptor, read_obj_size, read_ptr, read_u64, read_vec_len, write_ptr},
     types::VEC_DATA_OFFSET,
 };
 use mono_move_core::{
+    memory::{MemAddr, Obj, ObjHeader},
     DescriptorId, DescriptorProvider, ObjectDescriptorInner, CAPTURED_DATA_VALUES_OFFSET,
-    CLOSURE_CAPTURED_DATA_PTR_OFFSET, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, OBJECT_HEADER_SIZE,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, ENUM_DATA_OFFSET, OBJECT_HEADER_SIZE,
 };
-use std::ptr::NonNull;
 
 impl Heap {
     /// Single-pass deep copy of the value tree rooted at the given source.
@@ -26,32 +25,26 @@ impl Heap {
     /// allocation that does not fit. There is no GC during copying: on
     /// out-of-memory the caller may have to run GC and retry.
     ///
-    /// # Safety
-    ///
-    /// Source must point to the data region of a live object whose header is
-    /// at `src - OBJECT_HEADER_SIZE` and is valid.
-    pub(crate) unsafe fn try_deep_copy<P: DescriptorProvider + ?Sized>(
+    /// `src` is a live object by [`Obj`]'s construction invariant; its header
+    /// must be valid (object-header integrity).
+    pub(crate) fn try_deep_copy<P: DescriptorProvider + ?Sized>(
         &mut self,
         descriptors: &P,
-        src: NonNull<u8>,
-    ) -> AllocationResult<NonNull<u8>> {
-        // SAFETY: caller's contract on `src`.
-        let src_size = unsafe { read_obj_size(src.as_ptr()) } as usize;
-        let src_desc_id = DescriptorId(unsafe { read_descriptor(src.as_ptr()) });
+        src: Obj,
+    ) -> AllocationResult<Obj> {
+        let ObjHeader { descriptor, size } = src.header();
+        let src_size = size as usize;
+        let src_desc_id = DescriptorId(descriptor);
         debug_assert!(src_size >= OBJECT_HEADER_SIZE);
 
-        let new_raw = heap_alloc(self, src_size, src_desc_id)?;
-        // SAFETY: `heap_alloc` returns non-null on success and this is an
-        // object pointer that cannot be null.
-        let new = unsafe { NonNull::new_unchecked(new_raw) };
+        let new = heap_alloc(self, src_size, src_desc_id)?;
 
-        // SAFETY: regions don't overlap (different allocations).
+        // SAFETY: `src` is live with `src_size - OBJECT_HEADER_SIZE` bytes of
+        // payload (its header says so), `new` was just allocated with the same
+        // size, and the two are distinct allocations, so they don't overlap.
         unsafe {
-            std::ptr::copy_nonoverlapping(
-                src.as_ptr().cast_const(),
-                new.as_ptr(),
-                src_size - OBJECT_HEADER_SIZE,
-            );
+            src.addr()
+                .copy_to_nonoverlapping(new.addr(), src_size - OBJECT_HEADER_SIZE);
         }
         let desc = descriptors.descriptor(src_desc_id).ok_or_else(|| {
             RuntimeError::InvariantViolation(RuntimeInvariantViolation::DescriptorNotFound {
@@ -68,7 +61,9 @@ impl Heap {
                 pointer_offsets, ..
             } => {
                 for &offset in pointer_offsets {
-                    self.try_deep_copy_at_offset(descriptors, new, offset as usize)?;
+                    // SAFETY: the descriptor lists `offset` as a pointer slot
+                    // of this struct layout.
+                    unsafe { self.try_deep_copy_slot(descriptors, new.field(offset as usize))? };
                 }
             },
             ObjectDescriptorInner::CapturedData { pointer_offsets } => {
@@ -82,20 +77,23 @@ impl Heap {
                             <= src_size - OBJECT_HEADER_SIZE,
                         "captured-data pointer offset {offset} exceeds object payload"
                     );
-                    self.try_deep_copy_at_offset(
-                        descriptors,
-                        new,
-                        CAPTURED_DATA_VALUES_OFFSET + offset as usize,
-                    )?;
+                    // SAFETY: the descriptor lists `offset` as a pointer slot
+                    // within the values region (asserted in-bounds above).
+                    unsafe {
+                        self.try_deep_copy_slot(
+                            descriptors,
+                            new.field(CAPTURED_DATA_VALUES_OFFSET + offset as usize),
+                        )?
+                    };
                 }
             },
             ObjectDescriptorInner::Enum {
                 variant_pointer_offsets,
                 ..
             } => {
-                // SAFETY: tag lives at `ENUM_TAG_OFFSET` of every enum
-                // payload.
-                let tag = unsafe { read_u64(new.as_ptr(), ENUM_TAG_OFFSET) } as usize;
+                // SAFETY: the descriptor says `new` is an enum, so its tag
+                // lives at `ENUM_TAG_OFFSET`.
+                let tag = unsafe { new.enum_tag() } as usize;
                 if tag >= variant_pointer_offsets.len() {
                     return Err(AllocationError::from(RuntimeError::InvariantViolation(
                         RuntimeInvariantViolation::EnumTagOutOfRange {
@@ -105,63 +103,85 @@ impl Heap {
                     )));
                 }
                 for &offset in &variant_pointer_offsets[tag] {
-                    self.try_deep_copy_at_offset(
-                        descriptors,
-                        new,
-                        ENUM_DATA_OFFSET + offset as usize,
-                    )?;
+                    // SAFETY: the descriptor lists `offset` as a pointer slot
+                    // of the active variant, relative to the data after the tag.
+                    unsafe {
+                        self.try_deep_copy_slot(
+                            descriptors,
+                            new.field(ENUM_DATA_OFFSET + offset as usize),
+                        )?
+                    };
                 }
             },
             ObjectDescriptorInner::Vector {
                 elem_size,
                 elem_pointer_offsets,
             } => {
-                // SAFETY: length lives at `VEC_LENGTH_OFFSET` of every
-                // vector payload.
-                let length = unsafe { read_vec_len(new.as_ptr()) as usize };
+                // SAFETY: the descriptor says `new` is a vector, so its length
+                // lives at `VEC_LENGTH_OFFSET`.
+                let length = unsafe { new.vec_len() };
                 // Length comes from the GC-maintained object header, not from
                 // attacker-controlled bytes, so a debug assertion suffices
                 // (unlike the enum tag, which is validated unconditionally).
                 debug_assert!(
-                    VEC_DATA_OFFSET + length.saturating_mul(*elem_size as usize)
+                    VEC_DATA_OFFSET + (length as usize).saturating_mul(*elem_size as usize)
                         <= src_size - OBJECT_HEADER_SIZE,
                     "vector length {length} exceeds object payload"
                 );
-                let elem_size = *elem_size as usize;
                 for i in 0..length {
                     for &offset in elem_pointer_offsets {
-                        let offset = VEC_DATA_OFFSET + i * elem_size + offset as usize;
-                        self.try_deep_copy_at_offset(descriptors, new, offset)?;
+                        // SAFETY: `i < length` is within the vector's data
+                        // region and `offset` is a pointer slot of its element
+                        // layout.
+                        unsafe {
+                            self.try_deep_copy_slot(
+                                descriptors,
+                                new.vec_elem(i, *elem_size).add(offset as usize),
+                            )?
+                        };
                     }
                 }
             },
             ObjectDescriptorInner::Closure => {
-                self.try_deep_copy_at_offset(descriptors, new, CLOSURE_CAPTURED_DATA_PTR_OFFSET)?;
+                // SAFETY: the descriptor says `new` is a closure, whose only
+                // heap pointer is `captured_data_ptr` at a fixed offset.
+                unsafe {
+                    self.try_deep_copy_slot(
+                        descriptors,
+                        new.field(CLOSURE_CAPTURED_DATA_PTR_OFFSET),
+                    )?
+                };
             },
         }
 
         Ok(new)
     }
 
-    /// Deep-copy the parent's pointer at offset and patch it with the copied
-    /// value.
-    fn try_deep_copy_at_offset<P: DescriptorProvider + ?Sized>(
+    /// Deep-copies the object the pointer slot at `slot` points at (if any)
+    /// and patches the slot with the copy.
+    ///
+    /// # Safety
+    ///
+    /// `slot` must be a pointer slot of a freshly copied object, located by
+    /// that object's descriptor: in-bounds, pointer-aligned, and holding null
+    /// or the data pointer of a live object.
+    unsafe fn try_deep_copy_slot<P: DescriptorProvider + ?Sized>(
         &mut self,
         descriptors: &P,
-        parent: NonNull<u8>,
-        offset: usize,
+        slot: MemAddr,
     ) -> AllocationResult<()> {
-        // SAFETY: parent's descriptor invariant says `field_off + 8`
-        // bytes are in-bounds of the parent's data region.
-        let Some(child_src) = NonNull::new(unsafe { read_ptr(parent.as_ptr(), offset) }) else {
+        // SAFETY: `slot` is a pointer slot (this function's contract).
+        let child_src = unsafe { slot.load_ptr() };
+        if child_src.is_null() {
             return Ok(());
-        };
-        // SAFETY: the parent's descriptor lists this offset as a heap pointer,
-        // so `child_src` points to the data region of a live object.
-        let child_dst = unsafe { self.try_deep_copy(descriptors, child_src)? };
+        }
+        // SAFETY: the parent's descriptor lists this slot as a heap pointer,
+        // so a non-null `child_src` is the data pointer of a live object.
+        let child_src = unsafe { Obj::new(child_src) };
+        let child_dst = self.try_deep_copy(descriptors, child_src)?;
         // SAFETY: same slot as the read above.
         unsafe {
-            write_ptr(parent.as_ptr(), offset, child_dst.as_ptr());
+            slot.store_ptr(child_dst.addr());
         }
         Ok(())
     }

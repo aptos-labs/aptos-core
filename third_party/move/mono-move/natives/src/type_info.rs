@@ -8,6 +8,7 @@ use crate::{
     NativeEntry,
 };
 use mono_move_core::{
+    memory::MemAddr,
     native::{
         native_invariant_violation, NativeContext, NativeContextFamily, NativeStatus, RootPool,
         VMValue, Vector,
@@ -65,13 +66,13 @@ struct TypeInfo<'a> {
 impl<'a> VMValue<'a> for TypeInfo<'a> {
     const FRAME_SLOT_SIZE: usize = TYPE_INFO_STRUCT_NAME_OFFSET + 8;
 
-    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
+    unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {
+        // SAFETY: all three fields lie within the slot (this function's
+        // contract).
         unsafe {
-            let account_address = AccountAddress::read_from_frame(pool, frame_ptr, offset);
-            let module_name =
-                Vector::read_from_frame(pool, frame_ptr, offset + TYPE_INFO_MODULE_NAME_OFFSET);
-            let struct_name =
-                Vector::read_from_frame(pool, frame_ptr, offset + TYPE_INFO_STRUCT_NAME_OFFSET);
+            let account_address = AccountAddress::read_from_frame(pool, slot);
+            let module_name = Vector::read_from_frame(pool, slot.add(TYPE_INFO_MODULE_NAME_OFFSET));
+            let struct_name = Vector::read_from_frame(pool, slot.add(TYPE_INFO_STRUCT_NAME_OFFSET));
             TypeInfo {
                 account_address,
                 module_name,
@@ -80,13 +81,15 @@ impl<'a> VMValue<'a> for TypeInfo<'a> {
         }
     }
 
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
+    unsafe fn write_to_frame(self, slot: MemAddr) {
+        // SAFETY: all three fields lie within the slot (this function's
+        // contract).
         unsafe {
-            self.account_address.write_to_frame(frame_ptr, offset);
+            self.account_address.write_to_frame(slot);
             self.module_name
-                .write_to_frame(frame_ptr, offset + TYPE_INFO_MODULE_NAME_OFFSET);
+                .write_to_frame(slot.add(TYPE_INFO_MODULE_NAME_OFFSET));
             self.struct_name
-                .write_to_frame(frame_ptr, offset + TYPE_INFO_STRUCT_NAME_OFFSET);
+                .write_to_frame(slot.add(TYPE_INFO_STRUCT_NAME_OFFSET));
         }
     }
 }

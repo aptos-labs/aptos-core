@@ -13019,6 +13019,7 @@ version = "0.1.0"
 dependencies = [
  "bumpalo",
  "crossbeam-utils",
+ "mono-move-mem",
  "parking_lot 0.12.5",
 ]
 
@@ -13082,6 +13083,7 @@ dependencies = [
  "bitflags 2.13.2",
  "bytes",
  "mono-move-alloc",
+ "mono-move-mem",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
@@ -13147,6 +13149,14 @@ dependencies = [
  "shared-dsa",
  "specializer",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "mono-move-mem"
+version = "0.1.0"
+dependencies = [
+ "ethnum",
+ "move-core-types",
 ]
 
 [[package]]

@@ -8,8 +8,10 @@ use super::{
     value::{Boxed, Opaque, Ref, TableHandle, VMValue, Vector},
 };
 use crate::{
-    interner::InternedModuleId, memory::MemoryRegion, types::InternedType, DescriptorId,
-    FormatOptions, VMResult,
+    interner::InternedModuleId,
+    memory::{MemAddr, MemoryRegion},
+    types::InternedType,
+    DescriptorId, FormatOptions, VMResult,
 };
 use core::{cell::RefMut, cmp::Ordering, mem::MaybeUninit};
 use move_core_types::{
@@ -207,7 +209,7 @@ pub trait NativeContext {
     ///
     /// `base` must point to a fully initialized value of type `ty` that stays
     /// live for the duration of the call.
-    unsafe fn bcs_serialize_value(&self, base: *const u8, ty: InternedType) -> VMResult<Vec<u8>>;
+    unsafe fn bcs_serialize_value(&self, base: MemAddr, ty: InternedType) -> VMResult<Vec<u8>>;
 
     /// BCS serialized size of the value of type `ty` stored at `base`.
     ///
@@ -215,7 +217,7 @@ pub trait NativeContext {
     ///
     /// `base` must point to a fully initialized value of type `ty` that stays
     /// live for the duration of the call.
-    unsafe fn bcs_serialized_size(&self, base: *const u8, ty: InternedType) -> VMResult<usize>;
+    unsafe fn bcs_serialized_size(&self, base: MemAddr, ty: InternedType) -> VMResult<usize>;
 
     /// Deserializes `bytes` as a value of type `ty`, returning its in-frame
     /// representation, or `None` when `bytes` is not a valid encoding of `ty`.
@@ -243,7 +245,7 @@ pub trait NativeContext {
     ///
     /// `a` and `b` must point to valid values of type `ty` that stay
     /// live for the duration of the call.
-    unsafe fn compare(&self, a: *const u8, b: *const u8, ty: InternedType) -> VMResult<Ordering>;
+    unsafe fn compare(&self, a: MemAddr, b: MemAddr, ty: InternedType) -> VMResult<Ordering>;
 
     /// Renders the value of type `ty` at `base` as text.
     ///
@@ -256,7 +258,7 @@ pub trait NativeContext {
     /// live for the duration of the call.
     unsafe fn format_value(
         &self,
-        base: *const u8,
+        base: MemAddr,
         ty: InternedType,
         options: &FormatOptions,
     ) -> VMResult<String>;
