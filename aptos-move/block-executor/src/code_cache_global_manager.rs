@@ -16,17 +16,17 @@ use aptos_types::{
         config::{BlockExecutorLocalConfig, BlockExecutorModuleCacheLocalConfig},
         transaction_slice_metadata::TransactionSliceMetadata,
     },
-    error::PanicError,
     chain_id::ChainId,
+    error::PanicError,
     on_chain_config::{
         ConfigurationResource, Features, GasSchedule, GasScheduleV2, StorageGasSchedule,
     },
     state_store::{state_key::StateKey, StateView},
     vm::modules::AptosModuleExtension,
 };
-use bytes::Bytes;
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
+use bytes::Bytes;
 use cfg_if::cfg_if;
 use mono_move_global_context::GlobalContext;
 use move_binary_format::{
@@ -144,7 +144,11 @@ where
         config: &BlockExecutorModuleCacheLocalConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<(), VMStatus> {
-        self.check_ready_impl(Some(storage_environment), config, transaction_slice_metadata)
+        self.check_ready_impl(
+            Some(storage_environment),
+            config,
+            transaction_slice_metadata,
+        )
     }
 
     /// Whether the cached environment can serve a block that follows the last one and was
@@ -179,18 +183,17 @@ where
 
         // Next, check the environment. If the current environment has not been set, or is
         // different, we reset it to the new one, and flush the module cache.
-        let storage_environment = match storage_environment {
-            Some(environment) => environment,
-            None => match &self.environment {
-                Some(environment) => environment.clone(),
-                None => {
-                    return Err(VMStatus::error(
+        let storage_environment =
+            match storage_environment {
+                Some(environment) => environment,
+                None => match &self.environment {
+                    Some(environment) => environment.clone(),
+                    None => return Err(VMStatus::error(
                         move_core_types::vm_status::StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                         Some("no environment to keep".to_string()),
-                    ))
+                    )),
                 },
-            },
-        };
+            };
         let environment_requires_update = self.environment.as_ref() != Some(&storage_environment);
         if environment_requires_update {
             if storage_environment.gas_feature_version() >= RELEASE_V1_34 {
@@ -304,9 +307,10 @@ impl AptosModuleCacheManager {
                 // Rebuilding the environment deserializes the gas schedule and hashes every
                 // config, so it is only done when one of its inputs changed.
                 let inputs = EnvironmentInputs::read(&state_view);
-                let storage_environment = (!guard
-                    .environment_applies(&inputs, &transaction_slice_metadata))
-                .then(|| AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view));
+                let storage_environment =
+                    (!guard.environment_applies(&inputs, &transaction_slice_metadata)).then(|| {
+                        AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view)
+                    });
                 guard.check_ready_impl(
                     storage_environment,
                     &self.local_config.module_cache_config,

@@ -24,6 +24,7 @@ METRICS = [
     ("execution wall", "execution_us"),
     ("worker cpu", "worker_cpu_total_us"),
     ("  execute_vm", "worker_cpu_execute_vm_us"),
+    ("  execute_vm_wasted", "worker_cpu_execute_vm_wasted_us"),
     ("  execute_apply", "worker_cpu_execute_apply_us"),
     ("  materialize", "worker_cpu_materialize_us"),
     ("  commit_hooks", "worker_cpu_commit_hooks_us"),
@@ -33,6 +34,7 @@ METRICS = [
     ("cold reads us", "cold_read_us"),
     ("minor faults /txn", "minor_faults_per_txn"),
     ("aborts /txn", "aborts_per_txn"),
+    ("interrupts /txn", "interrupts_per_txn"),
     ("inner TPS", "inner_tps"),
 ]
 
