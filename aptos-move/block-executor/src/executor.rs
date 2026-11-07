@@ -22,7 +22,8 @@ use crate::{
     },
     scheduler_wrapper::SchedulerWrapper,
     single_transaction_executor::{
-        SharedViewArgs, SingleTransactionExecutor, ViewMode, EXECUTION_POOL, MEMBER_GROUP_WRITES,
+        SharedViewArgs, SingleTransactionExecutor, ViewMode, EXECUTION_POOL,
+        EXECUTION_POOL_MAX_KEYS, MEMBER_GROUP_WRITES,
     },
     task::{ExecutionStatus, TxnOutput},
     txn_commit_hook::TransactionCommitHook,
@@ -35,7 +36,6 @@ use crate::{
 use aptos_aggregator::delayed_change::{ApplyBase, DelayedChange};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_infallible::Mutex;
 use aptos_logger::{error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, TxnIndex},
@@ -62,6 +62,7 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, init_speculative_logs, prelude::*};
 use claims::assert_none;
 use core::panic;
+use dashmap::DashSet;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
@@ -95,7 +96,7 @@ where
     block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<E::Key, E::Tag>>,
     /// Under member-level group writes: the groups committed transactions
     /// wrote, and the member keys their write sets carry.
-    written_groups: &'a Mutex<(HashSet<E::Key>, HashSet<T::Key>)>,
+    written_groups: &'a (DashSet<E::Key>, DashSet<T::Key>),
     /// Collects the keys committed transactions read and wrote, for hot-state
     /// promotion. Fed from the parallel post-commit phase, not the serial
     /// commit hook: the promotion set does not depend on the order.
@@ -1120,16 +1121,14 @@ where
             })?;
         }
         if *MEMBER_GROUP_WRITES && executor.supports_member_group_writes() {
-            let mut written = shared_sync_params.written_groups.lock();
+            let (group_keys, member_keys) = shared_sync_params.written_groups;
             last_input_output.for_each_resource_group_key_and_tags(
                 txn_idx,
                 |group_key, tags| {
                     for tag in tags {
-                        written
-                            .1
-                            .insert(executor.member_storage_key(group_key, tag)?);
+                        member_keys.insert(executor.member_storage_key(group_key, tag)?);
                     }
-                    written.0.insert(group_key.clone());
+                    group_keys.insert(group_key.clone());
                     Ok(())
                 },
             )?;
@@ -1640,14 +1639,18 @@ where
                 .as_ref()
                 .is_some_and(|executor| executor.supports_member_group_writes())
         {
-            let (group_keys, member_keys) =
-                std::mem::take(&mut *shared_sync_params.written_groups.lock());
+            let (group_keys, member_keys) = shared_sync_params.written_groups;
+            let group_keys = group_keys.iter().map(|key| key.clone()).collect::<Vec<_>>();
+            let member_keys = member_keys
+                .iter()
+                .map(|key| key.clone())
+                .collect::<HashSet<_>>();
             let executor = maybe_executor
                 .as_ref()
                 .ok_or_else(|| code_invariant_error("Group writes require an executor"))?;
             let next_txn_idx = final_results.dereference().len() as TxnIndex;
             let group_writes = executor.finalize_group_writes(
-                group_keys.into_iter().collect(),
+                group_keys,
                 SharedViewArgs {
                     base_view,
                     runtime_environment: environment.runtime_environment(),
@@ -1752,7 +1755,7 @@ where
             SchedulerV2::new(num_txns, num_workers)
         };
 
-        let written_groups = Mutex::new((HashSet::new(), HashSet::new()));
+        let written_groups = (DashSet::new(), DashSet::new());
         let hot_state_accumulator = block_limit_processor
             .dereference()
             .new_hot_state_accumulator(module_cache_manager_guard.environment().hot_state_config());
@@ -1851,10 +1854,11 @@ where
                 }
             };
 
-        if pooled && !has_error {
+        if pooled && !has_error && versioned_cache.num_keys() <= *EXECUTION_POOL_MAX_KEYS {
             // Every committed transaction's writes are the base of the next block
             // on this fork; the manager drops the pool if the fork changes.
             let num_committed = final_results.dereference().len() as TxnIndex;
+            let _timer = counters::EXECUTION_POOL_COLLAPSE_SECONDS.start_timer();
             versioned_cache.collapse_to_base(num_committed);
             module_cache_manager_guard.store_execution_pool(versioned_cache);
             DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler));
@@ -1962,7 +1966,7 @@ where
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         let maybe_executor = ExplicitSyncWrapper::new(None);
 
-        let written_groups = Mutex::new((HashSet::new(), HashSet::new()));
+        let written_groups = (DashSet::new(), DashSet::new());
         let hot_state_accumulator = block_limit_processor
             .dereference()
             .new_hot_state_accumulator(module_cache_manager_guard.environment().hot_state_config());

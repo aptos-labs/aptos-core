@@ -195,6 +195,14 @@ pub static MEMBER_GROUP_WRITES: Lazy<bool> =
 pub static EXECUTION_POOL: Lazy<bool> =
     Lazy::new(|| std::env::var("APTOS_EXECUTION_POOL").is_ok_and(|v| v == "1"));
 
+/// A pool with more keys than this is dropped after the block instead of kept.
+pub static EXECUTION_POOL_MAX_KEYS: Lazy<usize> = Lazy::new(|| {
+    std::env::var("APTOS_EXECUTION_POOL_MAX_KEYS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(500_000)
+});
+
 /// Builds the legacy `LatestView` from the view ingredients.
 fn build_latest_view<'a, T: Transaction, S: TStateView<Key = T::Key>>(
     shared: SharedViewArgs<'a, S>,

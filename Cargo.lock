@@ -8383,6 +8383,7 @@ dependencies = [
  "hashbrown 0.15.3",
  "lock_api",
  "parking_lot_core 0.9.12",
+ "rayon",
 ]
 
 [[package]]

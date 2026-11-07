@@ -17,6 +17,7 @@ use claims::{assert_ok, assert_some};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use equivalent::Equivalent;
+use rayon::prelude::*;
 use std::{
     collections::btree_map::{self, BTreeMap},
     fmt::Debug,
@@ -508,8 +509,12 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     /// the base value for the next block on the same fork. Entries of
     /// transactions past the committed prefix, dependencies and estimates are
     /// dropped; a trailing deletion stays as a deleted base.
-    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) {
-        self.values.iter_mut().for_each(|mut v| {
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex)
+    where
+        K: Send + Sync,
+        V: Send + Sync,
+    {
+        self.values.par_iter_mut().for_each(|mut v| {
             let Some(idx) = v
                 .versioned_map
                 .range(..ShiftedTxnIndex::new(num_committed))

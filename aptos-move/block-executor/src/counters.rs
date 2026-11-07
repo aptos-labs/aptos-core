@@ -397,6 +397,16 @@ pub static EXECUTION_POOL_REUSED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Collapsing the multi-version map to base values at the end of a block.
+pub static EXECUTION_POOL_COLLAPSE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_execution_pool_collapse_seconds",
+        "Time to collapse the multi-version map for the next block",
+        exponential_buckets(/*start=*/ 1e-5, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Aborted readers held back until the next writer above them executed again.
 pub static PREDICTED_STALLS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
