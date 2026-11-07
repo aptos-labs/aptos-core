@@ -974,3 +974,32 @@ working set repeats (no-op: 146k → 195k inner TPS), −4% on account
 generation, neutral on transfer; worker CPU −33% / −6% / −1%; +0.4–0.6 GB
 RSS; outputs identical (root hashes equal base on every run). Nothing
 end-to-end in pipelined mode. Flag `APTOS_EXECUTION_POOL=1`, MonoMove only.
+
+### The curve with every lever on (run 42398445427, five per sender, split stages, MonoMove)
+
+`all` = `BLOCK_STM_SENDER_HINTS=1 BLOCK_STM_IDLE_BACKOFF=1 APTOS_EXECUTION_POOL=1`
+at commit d13b62ef1f. Inner block-executor TPS (thousands) and aborts per
+transaction; worker CPU in µs/txn.
+
+| | 2T base | 2T all | 16T base | 16T all | 2→16 base | 2→16 all | all/base 16T |
+|---|---|---|---|---|---|---|---|
+| no-op | 31.6k (0.82 ab) | 46.6k (0.01) | 121k (1.94) | 194k (0.11) | 3.84x | 4.16x | 1.60x |
+| transfer | 17.5k (0.46) | 18.7k (0.00) | 72.9k (2.05) | 89.3k (0.16) | 4.17x | 4.79x | 1.22x |
+| account generation | 16.2k (0.46) | 17.0k (0.00) | 66.7k (2.03) | 77.1k (0.15) | 4.12x | 4.52x | 1.16x |
+| order book, one market | 7.5k (1.12) | 7.5k (1.07) | 7.1k (6.88) | 7.7k (5.33) | 0.94x | 1.02x | 1.08x |
+
+| worker CPU µs/txn | 2T base | 2T all | 16T base | 16T all |
+|---|---|---|---|---|
+| no-op | 54 | 37 | 103 | 58 |
+| transfer | 106 | 100 | 182 | 146 |
+| account generation | 113 | 109 | 186 | 160 |
+| order book | 255 | 256 | 1563 | 841 |
+
+Sender hints take the chained-sender aborts to ~0.1/txn and are most of
+the transfer and account-generation gain; the pool is most of no-op's
+(its working set repeats); idle backoff halves the order book's worker
+CPU without moving its chain-bound throughput. The 2→16 scaling factor
+improves on every independent workload because the levers remove
+per-transaction work that grew with the thread count (re-executions,
+base insertions) rather than the fixed per-block part, which is what
+remains between 4.8x and 8x.
