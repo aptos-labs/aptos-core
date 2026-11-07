@@ -21,6 +21,7 @@ use aptos_types::{
         state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
         StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
@@ -37,6 +38,73 @@ use std::{
 };
 
 pub type StateCacheShard = DashMap<StateKey, StateSlot>;
+
+/// A block's writes as the next block sees them before the block's state has
+/// been folded into a `LedgerState`: the last value written to each key, the
+/// version after the block, and the storage usage after it. Lets a block
+/// execute while its parent's output is still being indexed.
+#[derive(Debug)]
+pub struct PendingWrites {
+    slots: HashMap<StateKey, StateSlot>,
+    next_version: Version,
+    usage: StateStorageUsage,
+}
+
+impl PendingWrites {
+    /// `writes` are one block's value writes in order, `(key, version, value)`
+    /// with `None` for a deletion. `old_slots` must answer for every written
+    /// key with the slot the block itself read, which is what the storage
+    /// usage delta is computed against.
+    pub fn new(
+        writes: impl IntoIterator<Item = (StateKey, Version, Option<StateValue>)>,
+        next_version: Version,
+        base_usage: StateStorageUsage,
+        old_slots: impl Fn(&StateKey) -> Option<StateSlot>,
+    ) -> Result<Self> {
+        let mut slots = HashMap::new();
+        for (key, version, value) in writes {
+            let slot = StateSlot::from_db_get(key.clone(), value.map(|v| (version, v)));
+            slots.insert(key, slot);
+        }
+        let usage = if base_usage.is_untracked() {
+            base_usage
+        } else {
+            let mut items = base_usage.items() as i64;
+            let mut bytes = base_usage.bytes() as i64;
+            for (key, slot) in &slots {
+                let key_size = key.size() as i64;
+                if slot.is_occupied() {
+                    items += 1;
+                    bytes += key_size + slot.size() as i64;
+                }
+                let old = old_slots(key)
+                    .ok_or_else(|| anyhow::anyhow!("written key {key:?} was never read"))?;
+                if old.is_occupied() {
+                    items -= 1;
+                    bytes -= key_size + old.size() as i64;
+                }
+            }
+            StateStorageUsage::new(items as usize, bytes as usize)
+        };
+        Ok(Self {
+            slots,
+            next_version,
+            usage,
+        })
+    }
+
+    pub fn next_version(&self) -> Version {
+        self.next_version
+    }
+
+    pub fn usage(&self) -> StateStorageUsage {
+        self.usage
+    }
+
+    pub fn num_keys(&self) -> usize {
+        self.slots.len()
+    }
+}
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -101,6 +169,10 @@ pub struct CachedStateView {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
 
+    /// Writes of blocks that executed but whose state is not yet in
+    /// `speculative`, oldest first. Consulted before `speculative`.
+    pending: Vec<Arc<PendingWrites>>,
+
     /// The in-memory state on top of known persisted state.
     speculative: StateDelta,
 
@@ -153,15 +225,51 @@ impl CachedStateView {
         persisted_state: State,
         state: State,
     ) -> Self {
-        let version = state.version();
+        Self::new_with_pending(id, reader, hot_state, persisted_state, state, vec![])
+    }
+
+    /// A view of `state` with the writes of `pending` blocks on top, as if
+    /// those blocks' state had already been folded in. The view's version and
+    /// usage are the last pending block's.
+    pub fn new_with_pending(
+        id: StateViewId,
+        reader: Arc<dyn DbReader>,
+        hot_state: Arc<dyn HotStateView>,
+        persisted_state: State,
+        state: State,
+        pending: Vec<Arc<PendingWrites>>,
+    ) -> Self {
+        let version = match pending.last() {
+            Some(last) => last.next_version().checked_sub(1),
+            None => state.version(),
+        };
 
         Self {
             id,
+            pending,
             speculative: state.into_delta(persisted_state),
             hot: hot_state,
             cold: reader,
             memorized: ShardedStateCache::new_empty(version),
         }
+    }
+
+    /// Builds a view like [`Self::new`], with `pending` blocks' writes on top.
+    pub fn new_pending(
+        id: StateViewId,
+        reader: Arc<dyn DbReader>,
+        state: State,
+        pending: Vec<Arc<PendingWrites>>,
+    ) -> StateViewResult<Self> {
+        let (hot_state, persisted_state) = reader.get_persisted_state()?;
+        Ok(Self::new_with_pending(
+            id,
+            reader,
+            hot_state,
+            persisted_state,
+            state,
+            pending,
+        ))
     }
 
     pub fn new_dummy(state: &State) -> Self {
@@ -235,7 +343,15 @@ impl CachedStateView {
     fn get_unmemorized(&self, state_key: &StateKey) -> Result<StateSlot> {
         COUNTER.inc_with(&["sv_unmemorized"]);
 
-        let ret = if let Some(slot) = self.speculative.get_state_slot(state_key) {
+        let pending = self
+            .pending
+            .iter()
+            .rev()
+            .find_map(|writes| writes.slots.get(state_key).cloned());
+        let ret = if let Some(slot) = pending {
+            COUNTER.inc_with(&["sv_hit_pending"]);
+            slot
+        } else if let Some(slot) = self.speculative.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_speculative"]);
             slot
         } else if let Some(slot) = self.hot.get_state_slot(state_key.crypto_hash_ref()) {
@@ -256,7 +372,10 @@ impl CachedStateView {
     }
 
     pub fn next_version(&self) -> Version {
-        self.speculative.next_version()
+        match self.pending.last() {
+            Some(last) => last.next_version(),
+            None => self.speculative.next_version(),
+        }
     }
 
     pub fn current_state(&self) -> &State {
@@ -300,11 +419,14 @@ impl TStateView for CachedStateView {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-        Ok(self.speculative.current.usage())
+        Ok(match self.pending.last() {
+            Some(last) => last.usage(),
+            None => self.speculative.current.usage(),
+        })
     }
 
     fn next_version(&self) -> Version {
-        self.speculative.next_version()
+        CachedStateView::next_version(self)
     }
 }
 

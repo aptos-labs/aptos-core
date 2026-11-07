@@ -52,7 +52,28 @@ DEFAULT_WORKLOADS = "no-op,apt-fa-transfer,account-generation,order-book-no-matc
 
 WORKLOAD_NAMES = os.environ.get("WORKLOADS", DEFAULT_WORKLOADS)
 THREADS = [int(t) for t in os.environ.get("THREADS", "2,4,8,16").split(",")]
-VMS = os.environ.get("VMS", "v1,mono").split(",")
+# Variants of each VM to replay, as `name:ENV=1 OTHER=2` entries separated by
+# `;`, so that an A/B of a runtime knob runs on the same recorded blocks. The
+# default is one unnamed variant with no extra environment.
+VARIANTS = [
+    (entry.split(":", 1)[0], entry.split(":", 1)[1] if ":" in entry else "")
+    for entry in (os.environ.get("VARIANTS") or "default:").split(";")
+    if entry
+]
+# A VM label is `v1` or `mono`, suffixed with `/variant` when there is more
+# than one variant. Every table keys on the label.
+VMS = [
+    f"{vm}/{name}" if len(VARIANTS) > 1 else vm
+    for vm in os.environ.get("VMS", "v1,mono").split(",")
+    for name, _ in VARIANTS
+]
+
+
+def vm_and_variant(label):
+    """Splits a VM label into the VM and its variant's environment prefix."""
+    vm, _, name = label.partition("/")
+    env = next((env for n, env in VARIANTS if n == name), "") if name else VARIANTS[0][1]
+    return vm, (env + " " if env else "")
 REPEATS = int(os.environ.get("REPEATS", default=3))
 NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS", default=100))
 # Overrides every workload's block size when set.
@@ -70,6 +91,8 @@ MONO_METERED = bool(os.environ.get("MONO_METERED"))
 # Run the stages one after another (the default), so that the execution
 # stage's counters are its own, or pipelined as a node runs them.
 SPLIT_STAGES = os.environ.get("SPLIT_STAGES", "1") != "0"
+# Overlap each block's output indexing with the next block's execution.
+PIPELINED = bool(os.environ.get("PIPELINED"))
 NUM_INIT_ACCOUNTS = int(os.environ.get("NUM_INIT_ACCOUNTS", default=2000000))
 CREATE_DB_THREADS = int(os.environ.get("CREATE_DB_THREADS", default=32))
 OUT_DIR = os.environ.get("OUT_DIR", default="scaling-sweep-out")
@@ -176,10 +199,13 @@ def replay_command(workload, threads, vm, recorded_db, checkpoint_dir, blocks_pa
     profiler can wrap the program alone. `tag` names the replay's block
     timeline file.
     """
+    vm, variant_env = vm_and_variant(vm)
     override = "--enable-feature-after-init" if vm == "mono" else "--disable-feature-after-init"
-    env = "RUST_BACKTRACE=1 "
+    env = "RUST_BACKTRACE=1 " + variant_env
     if MONO_METERED and vm == "mono":
         env += "MONO_MOVE_METERED=1 "
+    if PIPELINED:
+        env += "APTOS_PIPELINED_EXECUTION=1 "
     if tag:
         timeline_dir = os.path.join(OUT_DIR, "timeline")
         os.makedirs(timeline_dir, exist_ok=True)
@@ -252,7 +278,7 @@ def parse_run(output, workload, threads, vm, repeat):
         "feature flag overrides",
     )
     mono_enabled = MONO_MOVE_FLAG in enabled
-    if mono_enabled != (vm == "mono"):
+    if mono_enabled != (vm_and_variant(vm)[0] == "mono"):
         raise ValueError(f"{vm} run had MonoMove {'enabled' if mono_enabled else 'disabled'}")
     if row["concurrency"] != threads:
         raise ValueError(
@@ -294,6 +320,11 @@ def parse_run(output, workload, threads, vm, repeat):
         get_last(stage + r"interrupted incarnations per txn: " + NUMBER, output, "interrupts")
     )
     row["max_rss_kib"] = int(get_last(stage + r"max rss: (\d+) KiB", output, "max rss"))
+    # The ledger's root hash after the replay: identical bytes in, identical
+    # state out, so two replays of the same recording must agree.
+    row["root_hash"] = get_last(
+        r"final state: version \d+, root hash ([0-9a-f]+)", output, "final root hash"
+    )
     row["workflow_timer_us"] = {
         name: float(value)
         for name, value in re.findall(stage + r"workflow timer us/txn: ([^=]+)=" + NUMBER, output)
@@ -521,7 +552,9 @@ def growth_comparison(medians, workload):
             if v1 is not None and mono is not None:
                 cells.append(f"{mono - v1:+.2f}")
         rows.append(cells)
-    headers = [f"growth {lo}T→{hi}T (us/txn)"] + VMS + (["mono − v1"] if set(VMS) == {"v1", "mono"} else [])
+    headers = [f"growth {lo}T→{hi}T (us/txn)"] + VMS + (
+        ["mono − v1"] if set(VMS) == {"v1", "mono"} else []
+    )
     return tabulate(rows, headers=headers, tablefmt="github")
 
 
@@ -564,16 +597,16 @@ def speedup_table(medians, workloads):
     for w in workloads:
         cells = [w.name]
         for t in THREADS:
-            v1 = medians.get((w.name, "v1", t))
-            mono = medians.get((w.name, "mono", t))
-            if v1 and mono:
+            v1 = medians.get((w.name, VMS[0], t))
+            mono = medians.get((w.name, VMS[-1], t))
+            if v1 and mono and VMS[0] != VMS[-1]:
                 cells.append(f"{v1['inner_tps']:.0f} / {mono['inner_tps']:.0f} = {mono['inner_tps'] / v1['inner_tps']:.2f}x")
             else:
                 cells.append("-")
         rows.append(cells)
     return tabulate(
         rows,
-        headers=["inner block executor TPS, v1 / mono"] + [f"{t}T" for t in THREADS],
+        headers=[f"inner block executor TPS, {VMS[0]} / {VMS[-1]}"] + [f"{t}T" for t in THREADS],
         tablefmt="github",
     )
 
@@ -607,7 +640,8 @@ def build_report(workloads, medians, profile_rows, failures, machine):
         "",
         f"{NUM_BLOCKS} blocks per workload, {REPEATS} repeats, {NUM_INIT_ACCOUNTS} account DB, "
         f"{TXNS_PER_SENDER} transaction(s) per sender per block, threads {THREADS}, "
-        f"stages {'split' if SPLIT_STAGES else 'pipelined'}, MonoMove "
+        f"stages {'split' if SPLIT_STAGES else 'pipelined'}, "
+        f"{'pipelined' if PIPELINED else 'serial'} block indexing, MonoMove "
         f"{'metered' if MONO_METERED else 'unmetered'}. Every metric is a "
         "median over repeats, in "
         "microseconds per transaction unless marked. Worker metrics are summed over all "

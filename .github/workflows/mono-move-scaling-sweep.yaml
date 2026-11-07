@@ -52,6 +52,16 @@ on:
         required: false
         type: string
         default: ""
+      VARIANTS:
+        description: "Variants replayed on the same recording, as name:ENV=1;name2:ENV=2 (default one variant)"
+        required: false
+        type: string
+        default: ""
+      PIPELINED:
+        description: "Overlap each block's output indexing with the next block's execution"
+        required: false
+        type: boolean
+        default: false
       MONO_METERED:
         description: "Charge gas on MonoMove (placeholder schedule), so it writes its fee like V1"
         required: false
@@ -166,6 +176,8 @@ jobs:
           TXNS_PER_SENDER: ${{ inputs.TXNS_PER_SENDER }}
           MONO_METERED: ${{ inputs.MONO_METERED && '1' || '' }}
           SPLIT_STAGES: ${{ inputs.SPLIT_STAGES && '1' || '0' }}
+          PIPELINED: ${{ inputs.PIPELINED && '1' || '' }}
+          VARIANTS: ${{ inputs.VARIANTS }}
           # jemalloc reads one or the other depending on the symbol prefix it
           # was built with.
           MALLOC_CONF: ${{ inputs.MALLOC_CONF }}
