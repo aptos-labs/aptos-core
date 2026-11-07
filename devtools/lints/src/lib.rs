@@ -47,6 +47,11 @@ pub fn register_lints(sess: &Session, lint_store: &mut LintStore) {
     }));
 }
 
+/// `ui/` holds UI tests in rustc's and clippy's sense (and under their
+/// conventional name): each `ui/<lint>.rs` is compiled through the dylint
+/// driver and the exact diagnostics it produces are diffed against
+/// `ui/<lint>.stderr`. They pin what a lint flags, what it leaves alone, and
+/// what it says.
 #[test]
 fn ui() {
     dylint_testing::ui_test(env!("CARGO_PKG_NAME"), "ui");

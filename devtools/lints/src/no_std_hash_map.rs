@@ -79,7 +79,7 @@ impl NoStdHashMap {
         *self.applies.get_or_insert_with(|| self.scope.applies(cx))
     }
 
-    fn report(&self, cx: &LateContext<'_>, span: Span, what: &str) {
+    fn report(&self, cx: &LateContext<'_>, span: Span, what: Banned) {
         if self.reported_locals.iter().any(|l| l.contains(span)) {
             return;
         }
@@ -87,7 +87,7 @@ impl NoStdHashMap {
             cx,
             NO_STD_HASH_MAP,
             span,
-            format!("`{what}` has nondeterministic iteration order"),
+            format!("`{}` has nondeterministic iteration order", what.name()),
             None,
             "use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or \
              `BTreeMap` / `BTreeSet` when ordered iteration is needed",
@@ -95,52 +95,72 @@ impl NoStdHashMap {
     }
 }
 
-/// The banned collection a definition is, if any.
-fn banned_def(tcx: TyCtxt<'_>, def_id: DefId) -> Option<&'static str> {
+/// A collection the lint rejects.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum Banned {
+    StdHashMap,
+    StdHashSet,
+    HashbrownHashMap,
+    HashbrownHashSet,
+}
+
+impl Banned {
+    /// How the diagnostic names it, whatever the site wrote (an alias such as
+    /// `FxHashMap` is reported as the std type it expands to).
+    fn name(self) -> &'static str {
+        match self {
+            Banned::StdHashMap => "std::collections::HashMap",
+            Banned::StdHashSet => "std::collections::HashSet",
+            Banned::HashbrownHashMap => "hashbrown::HashMap",
+            Banned::HashbrownHashSet => "hashbrown::HashSet",
+        }
+    }
+}
+
+/// Whether a definition is a banned collection. std's are recognised by
+/// their diagnostic items, independent of how they were imported; hashbrown
+/// has none, so it is matched by definition path.
+fn find_banned_def(tcx: TyCtxt<'_>, def_id: DefId) -> Option<Banned> {
     if tcx.is_diagnostic_item(sym::HashMap, def_id) {
-        return Some("std::collections::HashMap");
+        return Some(Banned::StdHashMap);
     }
     if tcx.is_diagnostic_item(sym::HashSet, def_id) {
-        return Some("std::collections::HashSet");
+        return Some(Banned::StdHashSet);
     }
-    let path = tcx.def_path_str(def_id);
-    match path.as_str() {
-        "hashbrown::map::HashMap" | "hashbrown::HashMap" => Some("hashbrown::HashMap"),
-        "hashbrown::set::HashSet" | "hashbrown::HashSet" => Some("hashbrown::HashSet"),
+    match tcx.def_path_str(def_id).as_str() {
+        "hashbrown::map::HashMap" | "hashbrown::HashMap" => Some(Banned::HashbrownHashMap),
+        "hashbrown::set::HashSet" | "hashbrown::HashSet" => Some(Banned::HashbrownHashSet),
         _ => None,
     }
 }
 
 /// The banned collection mentioned anywhere inside a type, if any.
-fn banned_in_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: Ty<'tcx>) -> Option<&'static str> {
+fn find_banned_in_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: Ty<'tcx>) -> Option<Banned> {
     ty.walk().find_map(|arg| {
         let ty = arg.as_type()?;
         match ty.kind() {
-            ty::Adt(adt, _) => banned_def(tcx, adt.did()),
+            ty::Adt(adt, _) => find_banned_def(tcx, adt.did()),
             _ => None,
         }
     })
 }
 
-/// The banned collection a written type path names, if any. Resolves type
-/// aliases (`FxHashMap<K, V>` is `HashMap<K, V, FxBuildHasher>`).
-fn banned_in_hir_ty<'tcx>(cx: &LateContext<'tcx>, ty: &hir::Ty<'tcx, AmbigArg>) -> Option<&'static str> {
-    let hir::TyKind::Path(qpath) = &ty.kind else {
-        return None;
-    };
-    banned_in_qpath(cx, qpath, ty.hir_id)
-}
-
-fn banned_in_qpath<'tcx>(
+/// The banned collection a written path names, if any, looking through
+/// type aliases (`FxHashMap<K, V>` is `HashMap<K, V, FxBuildHasher>`).
+fn find_banned_in_path<'tcx>(
     cx: &LateContext<'tcx>,
     qpath: &QPath<'tcx>,
     hir_id: hir::HirId,
-) -> Option<&'static str> {
+) -> Option<Banned> {
     match cx.qpath_res(qpath, hir_id) {
-        Res::Def(hir::def::DefKind::TyAlias, def_id) => {
-            banned_in_ty(cx.tcx, cx.tcx.type_of(def_id).instantiate_identity().skip_normalization())
-        },
-        Res::Def(_, def_id) => banned_def(cx.tcx, def_id),
+        Res::Def(hir::def::DefKind::TyAlias, def_id) => find_banned_in_ty(
+            cx.tcx,
+            cx.tcx
+                .type_of(def_id)
+                .instantiate_identity()
+                .skip_normalization(),
+        ),
+        Res::Def(_, def_id) => find_banned_def(cx.tcx, def_id),
         _ => None,
     }
 }
@@ -151,7 +171,9 @@ impl<'tcx> LateLintPass<'tcx> for NoStdHashMap {
         if !self.applies(cx) {
             return;
         }
-        if let Some(what) = banned_in_hir_ty(cx, ty) {
+        if let hir::TyKind::Path(qpath) = &ty.kind
+            && let Some(what) = find_banned_in_path(cx, qpath, ty.hir_id)
+        {
             self.report(cx, ty.span, what);
         }
     }
@@ -165,11 +187,11 @@ impl<'tcx> LateLintPass<'tcx> for NoStdHashMap {
         let found = match local.ty {
             Some(ty) => match &ty.kind {
                 hir::TyKind::Path(qpath) => {
-                    banned_in_qpath(cx, qpath, ty.hir_id).map(|what| (ty.span, what))
+                    find_banned_in_path(cx, qpath, ty.hir_id).map(|what| (ty.span, what))
                 },
                 _ => None,
             },
-            None => banned_in_ty(cx.tcx, cx.typeck_results().pat_ty(local.pat))
+            None => find_banned_in_ty(cx.tcx, cx.typeck_results().pat_ty(local.pat))
                 .map(|what| (local.span, what)),
         };
         if let Some((span, what)) = found {

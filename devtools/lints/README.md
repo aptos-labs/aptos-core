@@ -26,7 +26,8 @@ The first run builds the lint library and a driver for its pinned nightly
 ## Scoping
 
 Lints are scoped by **crate name** in `/dylint.toml`, not by path or inside
-the lint:
+the lint. The file lives at the repo root because dylint reads it from the
+workspace being linted, the same way clippy finds `clippy.toml`:
 
 ```toml
 [aptos_lints.no_std_hash_map]
@@ -47,6 +48,22 @@ On the item or statement:
 
 (`dylint_lib` is a cfg dylint sets, so the attribute is inert under a normal
 build and never triggers `unknown_lints`.) Say why in a comment.
+
+## Layout
+
+```
+src/lib.rs            registers every lint
+src/scope.rs          per-lint crate scoping, read from /dylint.toml
+src/<lint>.rs         one module per lint
+ui/<lint>.rs          UI test: cases the lint must and must not flag
+ui/<lint>.stderr      the exact diagnostics that file must produce
+```
+
+`ui/` is rustc's and clippy's convention for lint tests ("UI" as in what the
+user sees): a source file is compiled through the driver and its diagnostics
+are diffed, byte for byte, against the blessed `.stderr`. They pin a lint's
+observable behaviour, so a change to what a lint flags or says shows up as a
+`.stderr` diff in review.
 
 ## Adding a lint
 
