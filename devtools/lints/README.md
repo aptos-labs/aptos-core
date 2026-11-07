@@ -70,9 +70,9 @@ observable behaviour, so a change to what a lint flags or says shows up as a
 1. New module in `src/`, `declare_lint!` + `impl_lint_pass!`, a `Scope` field
    read in `register_lints` (`src/lib.rs`), a `Scope` entry in
    `scope::Config`.
-2. `ui/<lint>.rs` with the cases it must and must not flag; run
-   `cargo test`, review `/tmp/<lint>.stage-id.stderr`, copy it to
-   `ui/<lint>.stderr`.
+2. `ui/<lint>.rs` (with the repo's license header, like any `.rs` file)
+   with the cases it must and must not flag; run `cargo test`, review
+   `/tmp/<lint>.stage-id.stderr`, copy it to `ui/<lint>.stderr`.
 3. A scope entry in `/dylint.toml`.
 
 ## Maintenance
