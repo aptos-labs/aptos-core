@@ -44,6 +44,17 @@ impl CommittedSlots {
         }
     }
 
+    /// Whether a key is hot is the hot-state LRU's to say when the slot is
+    /// consulted, which it only is for keys the LRU does not have; a slot
+    /// recorded as hot would contradict it once evicted.
+    fn cold(slot: StateSlot) -> StateSlot {
+        if slot.is_hot() {
+            slot.to_cold()
+        } else {
+            slot
+        }
+    }
+
     pub fn get(&self, key: &StateKey) -> Option<StateSlot> {
         self.slots.get(key).map(|slot| slot.clone())
     }
@@ -72,7 +83,7 @@ impl CommittedSlots {
         reads.shards.par_iter().for_each(|shard| {
             for entry in shard.iter() {
                 self.slots
-                    .insert(entry.key().clone(), entry.value().clone());
+                    .insert(entry.key().clone(), Self::cold(entry.value().clone()));
             }
         });
         for batch in [
@@ -85,7 +96,7 @@ impl CommittedSlots {
             batch.shards.par_iter().for_each(|shard| {
                 for (key, update) in shard {
                     if let Some(slot) = update.to_result_slot((*key).clone()) {
-                        self.slots.insert((*key).clone(), slot);
+                        self.slots.insert((*key).clone(), Self::cold(slot));
                     }
                 }
             });
