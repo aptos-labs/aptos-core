@@ -4,11 +4,10 @@
 //! Read / write of native arg and return values through a frame slot.
 
 use crate::{
-    align::MAX_ALIGN,
-    memory::{read_fat_ptr, read_ptr, read_u64, write_fat_ptr, write_ptr},
+    memory::{vec_bytes_or_empty, vec_len_or_zero, FatRef, MemAddr},
     native::native_vector_index_out_of_bounds,
     root_pool::{ObjectHandle, ReferenceHandle, RootPool},
-    VMResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    VMResult,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -32,7 +31,7 @@ pub trait VMValue<'a>: Sized {
     /// Byte size of the slot that holds this value. (Heap memory not included.)
     const FRAME_SLOT_SIZE: usize;
 
-    /// Read a value out of a frame at the given byte offset.
+    /// Read a value out of the frame slot at `slot`.
     ///
     /// If the value requires heap allocation, its pointer needs to be rooted in the
     /// [`RootPool`] so it can survive GC. A handle is then returned, which
@@ -40,51 +39,41 @@ pub trait VMValue<'a>: Sized {
     ///
     /// # Safety
     ///
-    /// Memory access must be within the current frame's arg / return region.
-    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self;
+    /// `slot` must be within the current frame's arg / return region (or a
+    /// vector element of this type), with [`Self::FRAME_SLOT_SIZE`]
+    /// initialized bytes.
+    unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self;
 
-    /// Write a value into a frame at the given byte offset.
+    /// Write a value into the frame slot at `slot`.
     ///
     /// # Safety
     ///
-    /// Memory access must be within the current frame's arg / return region.
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize);
+    /// `slot` must be within the current frame's arg / return region, with
+    /// [`Self::FRAME_SLOT_SIZE`] writable bytes.
+    unsafe fn write_to_frame(self, slot: MemAddr);
 }
 
 /// Implements [`VMValue`] for an integer type.
 ///
-/// Uses aligned or unaligned access based on the the VM's [`MAX_ALIGN`].
+/// Uses aligned or unaligned access based on the VM's
+/// [`MAX_ALIGN`](crate::MAX_ALIGN), via [`MemAddr::load`] / [`MemAddr::store`].
 macro_rules! impl_vm_value_for_integer {
     ($t:ty) => {
         impl<'a> VMValue<'a> for $t {
             const FRAME_SLOT_SIZE: usize = core::mem::size_of::<$t>();
 
             #[inline]
-            unsafe fn read_from_frame(
-                _pool: &'a RootPool,
-                frame_ptr: *const u8,
-                offset: usize,
-            ) -> Self {
-                let p = unsafe { frame_ptr.add(offset) as *const $t };
-                unsafe {
-                    if core::mem::align_of::<$t>() <= MAX_ALIGN {
-                        core::ptr::read(p)
-                    } else {
-                        core::ptr::read_unaligned(p)
-                    }
-                }
+            unsafe fn read_from_frame(_pool: &'a RootPool, slot: MemAddr) -> Self {
+                // SAFETY: the caller keeps `slot` within the frame's arg /
+                // return region, where the slot holds an initialized `$t`.
+                unsafe { slot.load::<$t>() }
             }
 
             #[inline]
-            unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
-                let p = unsafe { frame_ptr.add(offset) as *mut $t };
-                unsafe {
-                    if core::mem::align_of::<$t>() <= MAX_ALIGN {
-                        core::ptr::write(p, self);
-                    } else {
-                        core::ptr::write_unaligned(p, self);
-                    }
-                }
+            unsafe fn write_to_frame(self, slot: MemAddr) {
+                // SAFETY: the caller keeps `slot` within the frame's arg /
+                // return region.
+                unsafe { slot.store(self) }
             }
         }
     };
@@ -109,25 +98,26 @@ impl<'a> VMValue<'a> for () {
     const FRAME_SLOT_SIZE: usize = 0;
 
     #[inline]
-    unsafe fn read_from_frame(_pool: &'a RootPool, _frame_ptr: *const u8, _offset: usize) -> Self {}
+    unsafe fn read_from_frame(_pool: &'a RootPool, _slot: MemAddr) -> Self {}
 
     #[inline]
-    unsafe fn write_to_frame(self, _frame_ptr: *mut u8, _offset: usize) {}
+    unsafe fn write_to_frame(self, _slot: MemAddr) {}
 }
 
 impl<'a> VMValue<'a> for bool {
     const FRAME_SLOT_SIZE: usize = 1;
 
     #[inline]
-    unsafe fn read_from_frame(_pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
-        unsafe { core::ptr::read_unaligned(frame_ptr.add(offset)) != 0 }
+    unsafe fn read_from_frame(_pool: &'a RootPool, slot: MemAddr) -> Self {
+        // SAFETY: the caller keeps `slot` within the frame's arg / return
+        // region, where the slot holds an initialized boolean byte.
+        unsafe { slot.load_bool() }
     }
 
     #[inline]
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
-        unsafe {
-            core::ptr::write_unaligned(frame_ptr.add(offset), self as u8);
-        }
+    unsafe fn write_to_frame(self, slot: MemAddr) {
+        // SAFETY: the caller keeps `slot` within the frame's arg / return region.
+        unsafe { slot.store_bool(self) }
     }
 }
 
@@ -135,15 +125,17 @@ impl<'a> VMValue<'a> for AccountAddress {
     const FRAME_SLOT_SIZE: usize = AccountAddress::LENGTH;
 
     #[inline]
-    unsafe fn read_from_frame(_pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
-        unsafe { core::ptr::read_unaligned(frame_ptr.add(offset) as *const AccountAddress) }
+    unsafe fn read_from_frame(_pool: &'a RootPool, slot: MemAddr) -> Self {
+        // SAFETY: the caller keeps `slot` within the frame's arg / return
+        // region, where the slot holds an initialized `address`; the load is a
+        // byte copy, so slot alignment does not matter.
+        unsafe { slot.load::<AccountAddress>() }
     }
 
     #[inline]
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
-        unsafe {
-            core::ptr::write_unaligned(frame_ptr.add(offset) as *mut AccountAddress, self);
-        }
+    unsafe fn write_to_frame(self, slot: MemAddr) {
+        // SAFETY: the caller keeps `slot` within the frame's arg / return region.
+        unsafe { slot.store(self) }
     }
 }
 
@@ -167,12 +159,14 @@ impl TableHandle {
 impl<'a> VMValue<'a> for TableHandle {
     const FRAME_SLOT_SIZE: usize = <AccountAddress as VMValue<'a>>::FRAME_SLOT_SIZE;
 
-    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
-        Self(unsafe { AccountAddress::read_from_frame(pool, frame_ptr, offset) })
+    unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {
+        // SAFETY: forwarded to the caller; same slot shape as `address`.
+        Self(unsafe { AccountAddress::read_from_frame(pool, slot) })
     }
 
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
-        unsafe { self.0.write_to_frame(frame_ptr, offset) }
+    unsafe fn write_to_frame(self, slot: MemAddr) {
+        // SAFETY: forwarded to the caller; same slot shape as `address`.
+        unsafe { self.0.write_to_frame(slot) }
     }
 }
 
@@ -180,17 +174,18 @@ impl Ref<'_, TableHandle> {
     /// Reads the referenced table handle out by value.
     pub fn get(&self) -> TableHandle {
         // SAFETY: `TableHandle` is `repr(transparent)` over the address bytes the
-        // reference points at, and a frame slot is not guaranteed to be aligned.
-        TableHandle(unsafe { core::ptr::read_unaligned(self.ptr() as *const AccountAddress) })
+        // live reference points at; the load is a byte copy, so slot alignment
+        // does not matter.
+        TableHandle(unsafe { self.addr().load::<AccountAddress>() })
     }
 }
 
 impl Ref<'_, AccountAddress> {
     /// Reads the referenced address out by value.
     pub fn get(&self) -> AccountAddress {
-        // SAFETY: the reference points at a live `address`, and a frame slot is
-        // not guaranteed to be aligned.
-        unsafe { core::ptr::read_unaligned(self.ptr() as *const AccountAddress) }
+        // SAFETY: the reference points at a live `address`; the load is a byte
+        // copy, so slot alignment does not matter.
+        unsafe { self.addr().load::<AccountAddress>() }
     }
 }
 
@@ -221,13 +216,13 @@ impl<'a, T> Ref<'a, T> {
         }
     }
 
-    /// Raw pointer to the referenced value.
+    /// Address of the referenced value.
     ///
     /// Stale if GC runs -- it is the caller's responsibility to only use it in a transient
     /// manner.
     #[inline]
-    pub fn ptr(&self) -> *mut u8 {
-        self.handle.ptr()
+    pub fn addr(&self) -> MemAddr {
+        self.handle.addr()
     }
 }
 
@@ -241,8 +236,9 @@ impl<'a, V> Ref<'a, Vector<'a, V>> {
     /// pointing to the old instance.
     #[inline]
     pub fn borrow(&self) -> Vector<'a, V> {
-        // SAFETY: `self` references valid a `vector<V>` value.
-        let vec_ptr = unsafe { read_ptr(self.handle.ptr(), 0usize) };
+        // SAFETY: `self` references a valid `vector<V>` value, whose slot is
+        // the vector's 8-byte heap pointer.
+        let vec_ptr = unsafe { self.addr().load_ptr() };
 
         // It is still safer to root the vector, even if an external owner may exist.
         //
@@ -258,20 +254,21 @@ impl<'a, T> VMValue<'a> for Ref<'a, T> {
     const FRAME_SLOT_SIZE: usize = 16;
 
     #[inline]
-    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
-        // SAFETY: the slot holds a 16-byte fat reference `(base, offset)`.
-        let (base, byte_offset) = unsafe { read_fat_ptr(frame_ptr, offset) };
+    unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {
+        // SAFETY: the caller keeps `slot` within the frame's arg / return
+        // region, where the slot holds a 16-byte fat reference `(base, offset)`.
+        let fat = unsafe { FatRef::load_from(slot) };
         Ref {
-            // SAFETY: `(base, offset)` is a valid Move reference read from the frame.
-            handle: unsafe { pool.root_reference(base, byte_offset) },
+            // SAFETY: `fat` is a valid Move reference read from the frame.
+            handle: unsafe { pool.root_reference(fat) },
             _marker: PhantomData,
         }
     }
 
     #[inline]
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
-        let (base, byte_offset) = self.handle.fat();
-        unsafe { write_fat_ptr(frame_ptr, offset, base, byte_offset) };
+    unsafe fn write_to_frame(self, slot: MemAddr) {
+        // SAFETY: the caller keeps `slot` within the frame's arg / return region.
+        unsafe { self.handle.fat().store_to(slot) };
     }
 }
 
@@ -297,25 +294,20 @@ impl<'a, V> Vector<'a, V> {
         }
     }
 
-    /// Current heap pointer of the vector object. (Null when unallocated/empty.)
+    /// Current heap address of the vector object. (Null when unallocated/empty.)
     ///
     /// Stale if GC runs -- it is the caller's responsibility to only use it in a transient
     /// manner.
     #[inline]
-    pub fn ptr(&self) -> *mut u8 {
-        self.handle.ptr()
+    pub fn addr(&self) -> MemAddr {
+        self.handle.addr()
     }
 
     /// The number of elements in the vector.
     #[inline]
     pub fn len(&self) -> u64 {
-        let p = self.ptr();
-        if p.is_null() {
-            0
-        } else {
-            // SAFETY: a non-null vector object holds its length at the start.
-            unsafe { read_u64(p, VEC_LENGTH_OFFSET) }
-        }
+        // SAFETY: the handle roots a vector object (null when empty).
+        unsafe { vec_len_or_zero(self.addr()) }
     }
 
     /// Whether the vector has no elements.
@@ -349,14 +341,15 @@ impl<'a, V: VMValue<'a>> Vector<'a, V> {
         if i >= len {
             return Err(native_vector_index_out_of_bounds(i, len));
         }
-        // SAFETY: element `i` (bounds-checked above) lives at `VEC_DATA_OFFSET +
-        // i * FRAME_SLOT_SIZE` in the vector object; `read_from_frame` reads it
-        // and roots any heap pointer it carries.
+        // SAFETY: element `i` (bounds-checked above, so the vector is non-null)
+        // lives at `VEC_DATA_OFFSET + i * FRAME_SLOT_SIZE` in the vector object;
+        // `read_from_frame` reads it and roots any heap pointer it carries.
         Ok(unsafe {
             V::read_from_frame(
                 self.handle.pool(),
-                self.ptr(),
-                VEC_DATA_OFFSET + i as usize * <V as VMValue<'a>>::FRAME_SLOT_SIZE,
+                self.handle
+                    .obj()
+                    .vec_elem(i, <V as VMValue<'a>>::FRAME_SLOT_SIZE as u32),
             )
         })
     }
@@ -372,15 +365,10 @@ impl Vector<'_, u8> {
     /// across allocations.
     #[inline]
     pub unsafe fn as_bytes(&self) -> &[u8] {
-        let p = self.ptr();
-        if p.is_null() {
-            return &[];
-        }
-        // SAFETY: `self` points to a valid `vector<u8>` on the VM's heap.
-        unsafe {
-            let len = read_u64(p, VEC_LENGTH_OFFSET) as usize;
-            std::slice::from_raw_parts(p.add(VEC_DATA_OFFSET), len)
-        }
+        // SAFETY: the handle holds null or a live `vector<u8>` on the VM's
+        // heap with `len` initialized bytes, and the caller does not hold the
+        // slice across an allocation.
+        unsafe { vec_bytes_or_empty(self.addr()) }
     }
 }
 
@@ -388,17 +376,19 @@ impl<'a, V> VMValue<'a> for Vector<'a, V> {
     const FRAME_SLOT_SIZE: usize = 8;
 
     #[inline]
-    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
-        // SAFETY: the slot holds the vector's 8-byte heap pointer.
-        let ptr = unsafe { read_ptr(frame_ptr, offset) };
+    unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {
+        // SAFETY: the caller keeps `slot` within the frame's arg / return
+        // region, where the slot holds the vector's 8-byte heap pointer.
+        let ptr = unsafe { slot.load_ptr() };
         // SAFETY: `ptr` is the vector's heap object pointer.
         Vector::from_handle(unsafe { pool.root_object(ptr) })
     }
 
     #[inline]
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
+    unsafe fn write_to_frame(self, slot: MemAddr) {
         // Write the vector's current heap pointer into the destination slot.
-        unsafe { write_ptr(frame_ptr, offset, self.ptr()) };
+        // SAFETY: the caller keeps `slot` within the frame's arg / return region.
+        unsafe { slot.store_ptr(self.addr()) };
     }
 }
 
@@ -422,12 +412,12 @@ impl<'a, T> Boxed<'a, T> {
         }
     }
 
-    /// Current heap pointer of the boxed object.
+    /// Current heap address of the boxed object.
     ///
     /// Stale if GC runs -- only for transient use.
     #[inline]
-    pub fn ptr(&self) -> *mut u8 {
-        self.handle.ptr()
+    pub fn addr(&self) -> MemAddr {
+        self.handle.addr()
     }
 }
 
@@ -437,22 +427,25 @@ impl<'a, T> VMValue<'a> for Boxed<'a, T> {
     const FRAME_SLOT_SIZE: usize = 8;
 
     #[inline]
-    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
-        // SAFETY: the slot holds the object's 8-byte heap pointer.
-        let ptr = unsafe { read_ptr(frame_ptr, offset) };
+    unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {
+        // SAFETY: the caller keeps `slot` within the frame's arg / return
+        // region, where the slot holds the object's 8-byte heap pointer.
+        let ptr = unsafe { slot.load_ptr() };
         // SAFETY: `ptr` is the object's heap pointer.
         Boxed::from_handle(unsafe { pool.root_object(ptr) })
     }
 
     #[inline]
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
-        unsafe { write_ptr(frame_ptr, offset, self.ptr()) };
+    unsafe fn write_to_frame(self, slot: MemAddr) {
+        // SAFETY: the caller keeps `slot` within the frame's arg / return region.
+        unsafe { slot.store_ptr(self.addr()) };
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{align::MAX_ALIGN, memory::Obj};
 
     // `#[repr(align(N))]` needs a literal, so the buffers below use `u64`
     // backing to get `MAX_ALIGN`.
@@ -471,31 +464,38 @@ mod tests {
     fn ref_preserves_value_after_source_slot_overwritten() {
         let pool = RootPool::new();
 
-        // A real allocation: `Ref::ptr` offsets `base`, which needs provenance.
+        // A real allocation: `Ref::addr` offsets `base`, which needs provenance.
         let backing = vec![0u64; 0x400];
-        let base = backing.as_ptr() as *mut u8;
-        // SAFETY: 0x1000 is within `backing`.
+        let base = MemAddr::from_ref(backing.as_slice());
+        // SAFETY: 0x1000 is within `backing` (0x2000 bytes).
         let unrelated = unsafe { base.add(0x1000) };
 
         // Slot 0 holds the reference; slot 1 takes the write-back. The frame is
         // `MAX_ALIGN`-aligned because the fat-pointer halves are written as
         // aligned 8-byte stores.
         let mut frame = [0u64; 4];
-        let frame_ptr: *mut u8 = frame.as_mut_ptr().cast();
+        let frame_addr = MemAddr::from_mut(&mut frame);
         let offset = 24_u64;
-        unsafe { write_fat_ptr(frame_ptr, 0usize, base, offset) };
+        // SAFETY: slot 0 is the aligned first 16 bytes of `frame`.
+        unsafe { FatRef::new(base, offset).store_to(frame_addr) };
 
-        let reference: Ref<Opaque> = unsafe { Ref::read_from_frame(&pool, frame_ptr, 0) };
+        let reference: Ref<Opaque> = unsafe { Ref::read_from_frame(&pool, frame_addr) };
 
         // Overwrite slot 0 with unrelated bytes, as a later `set_return` would.
-        unsafe { write_fat_ptr(frame_ptr, 0usize, unrelated, 7) };
+        // SAFETY: as above.
+        unsafe { FatRef::new(unrelated, 7).store_to(frame_addr) };
 
-        // Reading the pointer still resolves the original referent.
-        assert_eq!(reference.ptr(), unsafe { base.add(offset as usize) });
+        // Reading the address still resolves the original referent.
+        assert_eq!(reference.addr(), unsafe { base.add(offset as usize) });
 
         // Writing the reference into slot 1 writes the original fat pointer.
-        unsafe { reference.write_to_frame(frame_ptr, 16) };
-        assert_eq!(unsafe { read_fat_ptr(frame_ptr, 16usize) }, (base, offset));
+        // SAFETY: slot 1 is the aligned second 16 bytes of `frame`.
+        unsafe { reference.write_to_frame(frame_addr.add(16)) };
+        // SAFETY: slot 1 is the aligned second 16 bytes of `frame`, just written.
+        assert_eq!(
+            unsafe { FatRef::load_from(frame_addr.add(16)) },
+            FatRef::new(base, offset)
+        );
     }
 
     /// Lays out a `vector<u8>` heap object -- `[len: u64][bytes...]` -- in an
@@ -504,9 +504,13 @@ mod tests {
     fn byte_vec_object_for_test(bytes: &[u8]) -> Vec<u64> {
         let mut buf = vec![0u64; 1 + bytes.len().div_ceil(8)];
         buf[0] = bytes.len() as u64;
-        // SAFETY: `buf` has room for `bytes.len()` bytes after the length word.
+        // SAFETY: `buf` has room for `bytes.len()` initialized (zeroed) bytes
+        // after the length word, and nothing else accesses them while the slice
+        // is live. The object has no header, which nothing here reads.
         let data = unsafe {
-            std::slice::from_raw_parts_mut(buf.as_mut_ptr().add(1) as *mut u8, bytes.len())
+            Obj::new(MemAddr::from_mut(buf.as_mut_slice()))
+                .vec_data()
+                .as_bytes_mut(bytes.len())
         };
         data.copy_from_slice(bytes);
         buf
@@ -517,11 +521,16 @@ mod tests {
     fn nested_byte_vec_object_for_test(inners: &[Vec<u64>]) -> Vec<u64> {
         let mut outer = vec![0u64; 1 + inners.len()];
         outer[0] = inners.len() as u64;
-        let outer_ptr: *mut u8 = outer.as_mut_ptr().cast();
+        // SAFETY: `outer` is non-null; it has no header, which nothing here reads.
+        let outer_obj = unsafe { Obj::new(MemAddr::from_mut(outer.as_mut_slice())) };
         for (slot, inner) in inners.iter().enumerate() {
             // SAFETY: `outer` has an aligned pointer slot for each inner vector.
-            // `write_ptr` preserves each inner buffer's pointer provenance.
-            unsafe { write_ptr(outer_ptr, VEC_DATA_OFFSET + slot * 8, inner.as_ptr().cast()) };
+            // `store_ptr` preserves each inner buffer's pointer provenance.
+            unsafe {
+                outer_obj
+                    .vec_elem(slot as u64, 8)
+                    .store_ptr(MemAddr::from_ref(inner.as_slice()))
+            };
         }
         outer
     }
@@ -540,11 +549,11 @@ mod tests {
         ];
 
         let mut outer = nested_byte_vec_object_for_test(&inners);
-        let outer_ptr: *mut u8 = outer.as_mut_ptr().cast();
+        let outer_addr = MemAddr::from_mut(outer.as_mut_slice());
 
         // SAFETY: `outer` is a valid `vector<vector<u8>>` object and the inner
         // buffers outlive the reads.
-        let vec: Vector<Vector<u8>> = Vector::from_handle(unsafe { pool.root_object(outer_ptr) });
+        let vec: Vector<Vector<u8>> = Vector::from_handle(unsafe { pool.root_object(outer_addr) });
 
         assert_eq!(vec.len(), 3);
         // Bind each inner handle so its bytes outlive the borrow.
@@ -568,10 +577,10 @@ mod tests {
             byte_vec_object_for_test(b"b"),
         ];
         let mut outer = nested_byte_vec_object_for_test(&inners);
-        let outer_ptr: *mut u8 = outer.as_mut_ptr().cast();
+        let outer_addr = MemAddr::from_mut(outer.as_mut_slice());
 
         // SAFETY: `outer` is a valid `vector<vector<u8>>` object.
-        let vec: Vector<Vector<u8>> = Vector::from_handle(unsafe { pool.root_object(outer_ptr) });
+        let vec: Vector<Vector<u8>> = Vector::from_handle(unsafe { pool.root_object(outer_addr) });
 
         assert_eq!(vec.len(), 2);
         assert!(vec.get_element(0).is_ok());
@@ -588,8 +597,7 @@ mod tests {
     fn get_element_empty_vector_errors() {
         let pool = RootPool::new();
         // A null-backed vector reads as empty.
-        let vec: Vector<u64> =
-            Vector::from_handle(unsafe { pool.root_object(std::ptr::null_mut()) });
+        let vec: Vector<u64> = Vector::from_handle(unsafe { pool.root_object(MemAddr::NULL) });
         assert_eq!(vec.len(), 0);
         assert!(vec.get_element(0).is_err());
     }

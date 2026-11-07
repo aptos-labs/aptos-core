@@ -23,6 +23,7 @@ use serde::Deserialize;
 #[serde(default)]
 pub struct Config {
     pub no_std_hash_map: Scope,
+    pub raw_memory_access: Scope,
 }
 
 impl Config {

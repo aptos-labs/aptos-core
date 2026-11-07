@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{native::native_invariant_violation, VMResult};
+use crate::{memory::MemAddr, native::native_invariant_violation, VMResult};
 use std::{
     any::{Any, TypeId},
     cell::{Ref, RefCell, RefMut},
@@ -22,7 +22,7 @@ pub trait NativeExtension: Any {
     ///
     /// `relocate` must not re-enter the heap or GC (e.g. by allocating), and
     /// must return a valid relocated address for each live pointer (or `None`).
-    unsafe fn relocate_roots(&mut self, relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>);
+    unsafe fn relocate_roots(&mut self, relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>);
 
     /// Called when a checkpoint is taken (the start of a new sub-session). An
     /// extension with rollback-able state snapshots it here; one that the legacy
@@ -145,7 +145,7 @@ impl NativeExtensions {
     /// safely during GC.
     pub unsafe fn relocate_all_roots(
         &self,
-        relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>,
+        relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>,
     ) -> VMResult<()> {
         for ext in self.map.values() {
             let mut ext = ext.try_borrow_mut().map_err(|_| {
@@ -200,7 +200,7 @@ mod tests {
 
     struct Counter(u64);
     impl NativeExtension for Counter {
-        unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {
+        unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>) {
         }
 
         fn on_checkpoint(&mut self) {}
@@ -212,7 +212,7 @@ mod tests {
 
     struct Flag(bool);
     impl NativeExtension for Flag {
-        unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {
+        unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>) {
         }
 
         fn on_checkpoint(&mut self) {}
@@ -281,7 +281,7 @@ mod tests {
         snapshots: Vec<u64>,
     }
     impl NativeExtension for Checkpointed {
-        unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {
+        unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>) {
         }
 
         fn on_checkpoint(&mut self) {

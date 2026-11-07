@@ -16,14 +16,14 @@ use aptos_types::{
 };
 use bytes::Bytes;
 use mono_move_core::{
-    nominal_tag, storage::resource_provider::InMemoryStorageKey, types::InternedType,
+    memory::Obj, nominal_tag, storage::resource_provider::InMemoryStorageKey, types::InternedType,
     value_layout::LayoutProvider,
 };
 use mono_move_output::to_contract_events;
 use mono_move_runtime::{serialize, SessionEffects, WriteClass};
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
 use shared_dsa::UnorderedMap;
-use std::{collections::BTreeMap, ptr::NonNull};
+use std::collections::BTreeMap;
 
 // TODO(security): audit all error messages and make sure they do not lead to
 // deep recursions or OOMs.
@@ -105,9 +105,9 @@ fn drain_write_set(
     // SAFETY: written pointers refer to live values in the effects' frozen
     // heap, `layouts` describes their interned types, and no GC runs during the
     // drain.
-    let written_bytes = |ptr: NonNull<u8>, ty: InternedType| -> Result<Bytes, String> {
+    let written_bytes = |ptr: Obj, ty: InternedType| -> Result<Bytes, String> {
         // SAFETY: forwarded from this function's contract.
-        let blob = unsafe { serialize(layouts, ptr.as_ptr(), ty) }
+        let blob = unsafe { serialize(layouts, ptr.addr(), ty) }
             .map_err(|e| format!("failed to serialize written value: {e}"))?;
         Ok(Bytes::from(blob))
     };

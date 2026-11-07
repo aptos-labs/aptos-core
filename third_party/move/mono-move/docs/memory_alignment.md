@@ -284,6 +284,8 @@ Alignment correctness depends on three layers cooperating; if any of them is wro
 
 The combination of (1) computing aligned offsets, (2) verifying them statically, and (3) maintaining aligned base pointers gives end-to-end alignment safety without runtime alignment checks on the hot path.
 
+The choice between an aligned and an unaligned access is made in one place: `MemAddr::load`/`store` (crate `mono-move-mem`) perform an aligned access when the type's Rust alignment is within `MAX_ALIGN` and an unaligned one otherwise (so `u128`, Rust alignment 16, is always accessed unaligned). Sites that know an address is not naturally aligned — layout walks over BCS-shaped bytes, native views of struct fields — say so explicitly with `load_unaligned`/`store_unaligned`.
+
 > TODO: the specializer rounds `pl_sum` up to `MAX_ALIGN` so the callee's `fp` lands on a `MAX_ALIGN`-aligned offset ([§3.2](#32-the-stack)). This is currently a specializer-side convention with no static verifier check — a bug there silently misaligns every callee frame. Either extend the verifier to enforce `(pl_sum + FRAME_METADATA_SIZE) % MAX_ALIGN == 0`, or add a `debug_assert!` on the call path.
 
 ## 7. Optimizations
