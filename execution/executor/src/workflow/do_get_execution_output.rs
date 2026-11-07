@@ -68,9 +68,11 @@ pub struct DoGetExecutionOutput;
 
 /// A block's outputs as the VM produced them, before indexing.
 /// With the execution pool, the slots the previous blocks left behind for
-/// the keys the pool serves. Lives as long as the process, like the pool.
+/// the keys the pool serves. Lives as long as the process, like the pool,
+/// and holds the same keys; its budget is looser so that it is the pool
+/// that empties first.
 static COMMITTED_SLOTS: Lazy<CommittedSlots> =
-    Lazy::new(|| CommittedSlots::new(*EXECUTION_POOL_MAX_KEYS));
+    Lazy::new(|| CommittedSlots::new(2 * *EXECUTION_POOL_MAX_KEYS));
 
 pub struct RawBlockExecution {
     pub transactions: Vec<Transaction>,
@@ -572,7 +574,10 @@ impl Parser {
         )?;
         if *EXECUTION_POOL {
             let _timer = OTHER_TIMERS.timer_with(&["absorb_committed_slots"]);
-            COMMITTED_SLOTS.absorb(to_commit.state_update_refs());
+            COMMITTED_SLOTS.absorb(
+                base_state_view.memorized_reads(),
+                to_commit.state_update_refs(),
+            );
         }
         let state_reads = base_state_view.into_memorized_reads();
         // Beside `result_state`: same inputs, same chaining off the parent,
