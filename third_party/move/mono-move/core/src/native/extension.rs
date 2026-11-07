@@ -43,8 +43,14 @@ pub trait NativeExtension: Any {
 /// This is currently ensured by storing each extension in its own [`RefCell`];
 /// the extra indirection is unlikely to matter performance-wise.
 ///
-/// Ordered by `TypeId` so the whole-collection walks (GC root relocation,
-/// checkpoint, rollback) visit extensions in a deterministic order.
+/// Keyed by `TypeId`, which orders the whole-collection walks (GC root
+/// relocation, checkpoint, rollback). That order is fixed within a build but
+/// not across compiler versions, since `TypeId`'s ordering is its hash; it
+/// only affects to-space layout and which extension reports an error first,
+/// never a committed result.
+//
+// TODO(cleanup): key the walks by registration order (a `Vec` plus a
+// `TypeId -> index` lookup) so the order is independent of the compiler.
 #[derive(Default)]
 pub struct NativeExtensions {
     map: BTreeMap<TypeId, RefCell<Box<dyn NativeExtension>>>,

@@ -5,9 +5,9 @@ name: "mono-move-lints"
 # runs share one definition. Which crates each lint applies to is configured
 # in /dylint.toml.
 #
-# Mirrors mono-move-miri.yaml: the required check `mono-move-lints-required`
-# always reports; `changes` decides whether the lints run, so only mono-move
-# PRs pay for the nightly driver build.
+# The required check `mono-move-lints-required` always reports; `changes`
+# decides whether the lints run, so only mono-move PRs pay for the nightly
+# driver build.
 on:
   # `pull_request`, never `pull_request_target`: this runs untrusted PR code on
   # a self-hosted runner, and `pull_request_target` would hand that code a
