@@ -197,6 +197,11 @@ impl TwoChainTimeoutCertificate {
         self.timeout.hqc_round()
     }
 
+    /// The quorum cert carried by the timeout, certifying highest_hqc_round
+    pub fn quorum_cert(&self) -> &QuorumCert {
+        self.timeout.quorum_cert()
+    }
+
     pub fn signatures_with_rounds(&self) -> &AggregateSignatureWithRounds {
         &self.signatures_with_rounds
     }
