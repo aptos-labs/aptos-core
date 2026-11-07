@@ -880,3 +880,97 @@ step primes the state cache for every updated key (off the critical path in
 pipelined mode). And the previous block's registered readers must be
 dropped from every entry the next block can write to, or they would be
 invalidated as if they were the new block's transactions.
+
+### Execution pool, iterations 4 to 6 (commits 8c09c81454, 47c617deca, 24a24c771e, 8a23843bc0; runs 42387704455, 42390576269, 42392236313)
+
+Three more rounds on the collapse and on what the pool costs the commit path.
+
+| transfer, 16T, split stages | inner µs/txn | worker CPU | collapse (wall) | `get_state_value` time | state-view gets /txn |
+|---|---|---|---|---|---|
+| base | 11.0 | 145 | – | 1.3 | 0.12 |
+| pool, touched keys, readers touch too (8c09c81454) | 18.4 | 142 | 7.75 | 29.4 | 3.25 |
+| pool, touched keys, block-tagged readers (47c617deca) | 14.6 | 141 | 4.05 | 27.7 | 3.25 |
+| pool, plus committed slots (24a24c771e) | 14.6 | 142 | 4.03 | 27.1 | 0.78 |
+
+- Tracking touched keys cut the collapse from "the whole map" to "what the
+  block wrote", but the first version counted reads as touches (a reader
+  registers on an entry, and the collapse had to drop those registrations),
+  which on transfer is most of the map again. Tagging every dependency set
+  with the block it was registered under lets a stale set be dropped on
+  first access instead, so only written keys are visited: 4 µs/txn.
+- 4 µs/txn for 7 items per transaction (3 resources, 2 group members, 2
+  group sizes) is 0.6 µs wall per item, which with `par_chunks` over 16+
+  threads means the walk was not running in parallel in practice. Rather
+  than chase why, the collapse is now lazy (8a23843bc0): each per-key map
+  carries the block it belongs to, the map records how many transactions
+  each block committed, and whoever first touches a key under a later
+  block settles it (latest committed entry becomes the base, the rest go,
+  or the key is forgotten if nothing committed). Ending a block pushes one
+  number and bumps a counter. Keys nobody touches again keep their old
+  entries until the pool is dropped at its key budget.
+- The priming the pool needs ("must cache read") was 23–29 µs/txn of CPU
+  on the IO pool: a `rayon` task per written key, and for keys last written
+  before the measurement window, a cold DB read (0.7/txn at 25–35 µs) to
+  learn the old slot. The committed-slots map (`CommittedSlots`, kept by the
+  executor next to the pool, same fork-continuity rule, 2x the pool's key
+  budget) answers from what the previous blocks read or wrote; the
+  state-view gets fell from 3.25 to 0.78 per transaction. The remaining 0.78
+  were keys the pool holds from a read rather than a write, which the first
+  version did not record; the memorized reads of every block now go in
+  before its writes, as cold slots (the hot-state LRU is the authority on
+  hotness for the keys it holds, and the state update asserts cold for the
+  ones it does not).
+
+The no-op numbers held throughout (5.7–5.8 inner µs/txn, 171–175k TPS vs
+145k base, worker CPU 53 vs 82).
+
+### Execution pool with lazy settling (commits 8a23843bc0, a74932ba64, 55674aadcc; runs 42393849381 split, 42393851872 pipelined)
+
+| 16T, split stages | inner µs/txn | inner TPS | worker CPU | `execute_vm` CPU | cold DB reads /txn | RSS |
+|---|---|---|---|---|---|---|
+| no-op base | 6.83 | 146k | 81 | 61 | 1.02 | 1.76 GB |
+| no-op pool | 5.13 (−25%) | 195k | 54 (−33%) | 35 | 0.04 | 1.67 GB |
+| transfer base | 10.68 | 94k | 142 | 97 | 0.83 | 1.68 GB |
+| transfer pool | 10.59 | 94k | 140 | 90 | 0.83 | 2.10 GB |
+| account generation base | 13.05 | 77k | 159 | 118 | 3.02 | 1.53 GB |
+| account generation pool | 12.55 (−4%) | 80k | 150 | 105 | 2.04 | 2.08 GB |
+
+The collapse is gone from the block boundary (0.06 µs/txn, the counter
+push). What the pool buys depends on what the block reads that an earlier
+block touched. The sweep's senders are 2000 accounts cycling every two
+blocks (`--main-signer-accounts 2000`), receivers a pool of 200k that
+never repeat. On no-op every read is a sender key and every one is served
+from the pool: a third of the worker CPU goes (`set_base_value` /
+`set_raw_base_values`, the state-view lookups and the cold RocksDB read
+behind them). On transfer the sender's account and store come from the
+pool (`execute_vm` −7 µs/txn) but the receiver's store is a fresh key
+either way (cold reads unchanged at 0.83/txn), and the saving is eaten by
+two costs the pool adds on the worker: `execute_apply` +3 µs/txn (a
+500k-key map misses the cache where a 5k-key one did not) and
+`materialize` +2.6 µs/txn. The second is structural: a group member
+written in an earlier block stays a `MonoValue::Write` in the pool
+forever, so every later blob assembly re-serializes it, where a fresh
+block would clone the stored bytes. Writing the materialized bytes back
+into the entry at commit would remove it. A 2M-key budget (`big`, run
+42397060800) changes nothing: the working set already fits. Pipelined
+end-to-end TPS is unchanged on all three (commit-bound).
+
+The pool's parse-side work (`absorb`, the committed-slot priming) showed
+up as +76 µs/txn of CPU on the global rayon pool (62 → 138, transfer). The
+profile (run 42395301955) puts almost none of it on the work itself
+(`CommittedSlots::get` 0.7%, DashMap inserts 1–2%): it is rayon's idle
+loop (`Sleep::sleep`, `crossbeam_epoch::try_advance`, `wake_specific_thread`),
+64 workers woken for each small parallel region and spinning for a job
+that 16 shards cannot give them, on 32 pinned CPUs. The lookups now ride
+the priming's own per-key tasks on the IO pool and the absorb fans out to
+four tasks (d13b62ef1f): rayon-global is back to 65–71 µs/txn (base
+58–63) and process CPU per transaction is the same as base on all three
+workloads (runs 42397060800 split, 42397063238 pipelined). Same lesson as
+the eager collapse earlier: the "serial-looking" 4 µs/txn was not the
+walk, it was the pool's threads contending.
+
+Pool verdict: on MonoMove at 16 threads, −25% inner time where the
+working set repeats (no-op: 146k → 195k inner TPS), −4% on account
+generation, neutral on transfer; worker CPU −33% / −6% / −1%; +0.4–0.6 GB
+RSS; outputs identical (root hashes equal base on every run). Nothing
+end-to-end in pipelined mode. Flag `APTOS_EXECUTION_POOL=1`, MonoMove only.
