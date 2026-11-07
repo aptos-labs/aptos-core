@@ -165,4 +165,5 @@ pub mod types;
 mod unit_tests;
 mod value_exchange;
 pub mod view;
+pub mod worker_phases;
 mod worker_pool;

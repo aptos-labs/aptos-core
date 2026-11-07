@@ -38,9 +38,10 @@ pub(crate) fn executed_output(
     gas_used: u64,
     status: TransactionStatus,
     auxiliary_data: TransactionAuxiliaryData,
+    member_level: bool,
 ) -> Result<(TransactionOutput, MaterializedGroups), MaterializationError> {
-    let (write_set, groups) =
-        drain_write_set(effects, layouts, provider).map_err(MaterializationError::new)?;
+    let (write_set, groups) = drain_write_set(effects, layouts, provider, member_level)
+        .map_err(MaterializationError::new)?;
     let events = to_contract_events(effects, layouts)
         .map_err(|e| MaterializationError::new(vec![format!("event finalization failed: {e}")]))?;
     let output = TransactionOutput::new(write_set, events, gas_used, status, auxiliary_data);
@@ -92,6 +93,7 @@ fn drain_write_set(
     effects: &SessionEffects,
     layouts: &impl LayoutProvider,
     provider: &dyn AptosDataProvider,
+    member_level: bool,
 ) -> Result<(WriteSet, MaterializedGroups), Vec<String>> {
     let mut writes: Vec<(StateKey, WriteOp)> = vec![];
     let mut group_ops: HashMap<InMemoryStorageKey, HashMap<StructTag, MemberOp>> = HashMap::new();
@@ -117,6 +119,21 @@ fn drain_write_set(
                 // TODO(correctness): ops carry no `StateValueMetadata` (slot
                 // deposits, refunds, creation time); the legacy VM's
                 // `WriteOpConverter` fills these.
+                let op = match class {
+                    WriteClass::Creation(ptr) => {
+                        WriteOp::legacy_creation(written_bytes(ptr, key.value_ty())?)
+                    },
+                    WriteClass::Modification(ptr) => {
+                        WriteOp::legacy_modification(written_bytes(ptr, key.value_ty())?)
+                    },
+                    WriteClass::Deletion => WriteOp::legacy_deletion(),
+                };
+                writes.push((state_key, op));
+            },
+            Some(_) if member_level => {
+                // The member's own resource key names the write; the block
+                // assembles the group's blob once, after its last transaction.
+                let state_key = key.as_state_key().map_err(|e| format!("{e:#}"))?;
                 let op = match class {
                     WriteClass::Creation(ptr) => {
                         WriteOp::legacy_creation(written_bytes(ptr, key.value_ty())?)

@@ -16,12 +16,17 @@ use aptos_types::{
         config::{BlockExecutorLocalConfig, BlockExecutorModuleCacheLocalConfig},
         transaction_slice_metadata::TransactionSliceMetadata,
     },
+    chain_id::ChainId,
     error::PanicError,
-    state_store::StateView,
+    on_chain_config::{
+        ConfigurationResource, Features, GasSchedule, GasScheduleV2, StorageGasSchedule,
+    },
+    state_store::{state_key::StateKey, StateView},
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
+use bytes::Bytes;
 use cfg_if::cfg_if;
 use mono_move_global_context::GlobalContext;
 use move_binary_format::{
@@ -34,7 +39,7 @@ use move_core_types::{
 use move_vm_runtime::{Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::code::WithSize;
 use parking_lot::{Mutex, MutexGuard};
-use std::{hash::Hash, ops::Deref, sync::Arc};
+use std::{any::Any, hash::Hash, ops::Deref, sync::Arc};
 
 /// A global context for the MonoMove executor.
 fn new_global_context(num_workers: usize) -> Arc<GlobalContext> {
@@ -63,6 +68,32 @@ macro_rules! alert_or_println {
 pub type ModuleHotCacheSnapshot =
     GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>;
 
+/// The on-chain values an [AptosEnvironment] is built from. Reading and
+/// comparing them is far cheaper than rebuilding the environment, which
+/// deserializes the gas schedule and hashes every config, so a block whose
+/// inputs match the cached environment's keeps it.
+#[derive(PartialEq)]
+struct EnvironmentInputs(Vec<Option<Bytes>>);
+
+impl EnvironmentInputs {
+    fn read(state_view: &impl StateView) -> Option<Self> {
+        let keys = [
+            StateKey::on_chain_config::<Features>(),
+            StateKey::on_chain_config::<ChainId>(),
+            StateKey::on_chain_config::<ConfigurationResource>(),
+            StateKey::on_chain_config::<GasScheduleV2>(),
+            StateKey::on_chain_config::<GasSchedule>(),
+            StateKey::on_chain_config::<StorageGasSchedule>(),
+        ];
+        let mut values = Vec::with_capacity(keys.len());
+        for key in keys {
+            let value = state_view.get_state_value(&key.ok()?).ok()?;
+            values.push(value.map(|value| value.bytes().clone()));
+        }
+        Some(Self(values))
+    }
+}
+
 /// Manages module caches and the execution environment, possibly across multiple blocks.
 pub struct ModuleCacheManager<K, D, V, E> {
     /// Records the last observed metadata associated with a batch of executed transactions. When a
@@ -73,10 +104,17 @@ pub struct ModuleCacheManager<K, D, V, E> {
     /// The execution environment, initially set to [None]. The environment, as long as it does not
     /// change, can be kept for multiple block executions.
     environment: Option<AptosEnvironment>,
+    /// What `environment` was built from, so the next block can tell whether it still applies
+    /// without rebuilding it.
+    environment_inputs: Option<EnvironmentInputs>,
     /// Module cache, initially empty, that can be used for parallel block execution. It is the
     /// responsibility of [ModuleCacheManager] to ensure it stays in sync with the environment and
     /// the state.
     module_cache: GlobalModuleCache<K, D, V, E>,
+    /// The multi-version map the last block left behind, collapsed to base
+    /// values, for the next block on the same fork. Typed by the executor that
+    /// uses it; dropped whenever the module cache is flushed.
+    execution_pool: Option<Box<dyn Any + Send + Sync>>,
 }
 
 impl<K, D, V, E> ModuleCacheManager<K, D, V, E>
@@ -91,7 +129,9 @@ where
         Self {
             transaction_slice_metadata: TransactionSliceMetadata::unknown(),
             environment: None,
+            environment_inputs: None,
             module_cache: GlobalModuleCache::empty(),
+            execution_pool: None,
         }
     }
 
@@ -102,9 +142,38 @@ where
     ///   3. Checks if environment is set and is the same. If not, resets it. Module caches are
     ///      flushed in case of resets.
     ///   4. Checks sizes of type and module caches. If they are too large, caches are flushed.
+    #[cfg(test)]
     fn check_ready(
         &mut self,
         storage_environment: AptosEnvironment,
+        config: &BlockExecutorModuleCacheLocalConfig,
+        transaction_slice_metadata: TransactionSliceMetadata,
+    ) -> Result<(), VMStatus> {
+        self.check_ready_impl(
+            Some(storage_environment),
+            config,
+            transaction_slice_metadata,
+        )
+    }
+
+    /// Whether the cached environment can serve a block that follows the last one and was
+    /// built from `inputs`.
+    fn environment_applies(
+        &self,
+        inputs: &Option<EnvironmentInputs>,
+        transaction_slice_metadata: &TransactionSliceMetadata,
+    ) -> bool {
+        self.environment.is_some()
+            && inputs.is_some()
+            && &self.environment_inputs == inputs
+            && transaction_slice_metadata.is_immediately_after(&self.transaction_slice_metadata)
+    }
+
+    /// `storage_environment` is [None] only when [Self::environment_applies] said the cached
+    /// environment can be kept.
+    fn check_ready_impl(
+        &mut self,
+        storage_environment: Option<AptosEnvironment>,
         config: &BlockExecutorModuleCacheLocalConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<(), VMStatus> {
@@ -112,12 +181,25 @@ where
         if !transaction_slice_metadata.is_immediately_after(&self.transaction_slice_metadata) {
             self.module_cache.flush_all_caches();
             self.environment = None;
+            self.environment_inputs = None;
+            self.execution_pool = None;
         }
         // Record the new metadata for this slice of transactions.
         self.transaction_slice_metadata = transaction_slice_metadata;
 
         // Next, check the environment. If the current environment has not been set, or is
         // different, we reset it to the new one, and flush the module cache.
+        let storage_environment =
+            match storage_environment {
+                Some(environment) => environment,
+                None => match &self.environment {
+                    Some(environment) => environment.clone(),
+                    None => return Err(VMStatus::error(
+                        move_core_types::vm_status::StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                        Some("no environment to keep".to_string()),
+                    )),
+                },
+            };
         let environment_requires_update = self.environment.as_ref() != Some(&storage_environment);
         if environment_requires_update {
             if storage_environment.gas_feature_version() >= RELEASE_V1_34 {
@@ -133,6 +215,7 @@ where
 
             self.environment = Some(storage_environment);
             self.module_cache.flush_all_caches();
+            self.execution_pool = None;
         }
 
         let environment = self.environment.as_ref().expect("Environment must be set");
@@ -226,17 +309,21 @@ impl AptosModuleCacheManager {
         state_view: &impl StateView,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<AptosModuleCacheManagerGuard<'_>, VMStatus> {
-        // Get the current environment from storage.
-        let storage_environment =
-            AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
-
         Ok(match self.legacy_module_cache_manager.try_lock() {
             Some(mut guard) => {
-                guard.check_ready(
+                // Rebuilding the environment deserializes the gas schedule and hashes every
+                // config, so it is only done when one of its inputs changed.
+                let inputs = EnvironmentInputs::read(&state_view);
+                let storage_environment =
+                    (!guard.environment_applies(&inputs, &transaction_slice_metadata)).then(|| {
+                        AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view)
+                    });
+                guard.check_ready_impl(
                     storage_environment,
                     &self.local_config.module_cache_config,
                     transaction_slice_metadata,
                 )?;
+                guard.environment_inputs = inputs;
                 AptosModuleCacheManagerGuard::Guard {
                     guard,
                     global_context: self.global_context.clone(),
@@ -248,7 +335,9 @@ impl AptosModuleCacheManager {
                 // If this is true, we failed to acquire a lock, and so default storage environment
                 // and empty (thread-local) module caches will be used.
                 AptosModuleCacheManagerGuard::None {
-                    environment: storage_environment,
+                    environment: AptosEnvironment::new_with_delayed_field_optimization_enabled(
+                        &state_view,
+                    ),
                     module_cache: GlobalModuleCache::empty(),
                     global_context: new_global_context(self.local_config.concurrency_level),
                 }
@@ -353,6 +442,29 @@ impl<'a> AptosModuleCacheManagerGuard<'a> {
         match self {
             Guard { guard, .. } => &mut guard.module_cache,
             None { module_cache, .. } => module_cache,
+        }
+    }
+
+    /// The execution pool the previous block left for this one, if it is of
+    /// type `P` and the blocks are consecutive. Taking it leaves none behind.
+    pub fn take_execution_pool<P: Any + Send + Sync>(&mut self) -> Option<P> {
+        use AptosModuleCacheManagerGuard::*;
+        match self {
+            Guard { guard, .. } => guard
+                .execution_pool
+                .take()
+                .and_then(|pool| pool.downcast::<P>().ok())
+                .map(|pool| *pool),
+            None { .. } => Option::None,
+        }
+    }
+
+    /// Leaves an execution pool for the next block. Without a manager (no
+    /// guard) the pool is dropped.
+    pub fn store_execution_pool<P: Any + Send + Sync>(&mut self, pool: P) {
+        use AptosModuleCacheManagerGuard::*;
+        if let Guard { guard, .. } = self {
+            guard.execution_pool = Some(Box::new(pool));
         }
     }
 

@@ -400,6 +400,7 @@ where
                 counts.push(count);
             }
         }
+        crate::block_timeline::flush();
         (
             counts.into_iter().min(),
             Arc::try_unwrap(self.staged_result).unwrap().into_inner(),
@@ -428,6 +429,8 @@ pub struct ExecuteBlockMessage {
 }
 
 pub struct LedgerUpdateMessage {
+    /// Position of the block in the run, for the block timeline.
+    pub block_index: usize,
     pub first_block_start_time: Instant,
     pub current_block_start_time: Instant,
     pub execution_time: Duration,
@@ -440,6 +443,7 @@ pub struct LedgerUpdateMessage {
 
 /// Message from execution stage to commit stage.
 pub struct CommitBlockMessage {
+    pub(crate) block_index: usize,
     pub(crate) block_id: HashValue,
     pub(crate) first_block_start_time: Instant,
     pub(crate) current_block_start_time: Instant,

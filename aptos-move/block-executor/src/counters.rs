@@ -379,6 +379,54 @@ pub static BLOCKSTM_VERSION_NUMBER: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Incarnations the kill switch stopped before they finished.
+pub static INTERRUPTED_INCARNATIONS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_execution_interrupted_incarnations",
+        "Incarnations stopped early because their reads were already invalidated"
+    )
+    .unwrap()
+});
+
+/// Blocks that started from the multi-version map the previous block left.
+pub static EXECUTION_POOL_REUSED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_execution_pool_reused",
+        "Blocks executed on the previous block's multi-version map"
+    )
+    .unwrap()
+});
+
+/// Collapsing the multi-version map to base values at the end of a block.
+pub static EXECUTION_POOL_COLLAPSE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_execution_pool_collapse_seconds",
+        "Time to collapse the multi-version map for the next block",
+        exponential_buckets(/*start=*/ 1e-5, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Aborted readers held back until the next writer above them executed again.
+pub static PREDICTED_STALLS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_execution_predicted_stalls",
+        "Aborted transactions stalled on the next writer of an invalidated key"
+    )
+    .unwrap()
+});
+
+/// Worker time by phase, in microseconds. `clock` is `wall` or `cpu`; the gap
+/// between the two is time the worker spent descheduled.
+pub static WORKER_PHASE_MICROS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_execution_worker_phase_micros",
+        "Block-STM worker time by phase, in microseconds, by wall and thread CPU clock",
+        &["phase", "clock"]
+    )
+    .unwrap()
+});
+
 pub static PAR_EXEC_POOL_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "par_exec_pool_size",

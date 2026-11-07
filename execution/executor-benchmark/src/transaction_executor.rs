@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{metrics::TIMER, pipeline::LedgerUpdateMessage};
+use crate::{block_timeline::StageSpan, metrics::TIMER, pipeline::LedgerUpdateMessage};
 use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
@@ -66,6 +66,7 @@ where
         );
         let num_input_txns = executable_block.transactions.num_transactions();
         assert!(num_input_txns > 0);
+        let span = StageSpan::start("execute", self.num_blocks_processed, num_input_txns);
         {
             let _timer = TIMER.timer_with(&["execute"]);
             self.executor
@@ -76,7 +77,9 @@ where
                 )
                 .unwrap();
         }
+        span.finish();
         let msg = LedgerUpdateMessage {
+            block_index: self.num_blocks_processed,
             current_block_start_time,
             first_block_start_time: *self.maybe_first_block_start_time.as_ref().unwrap(),
             partition_time,

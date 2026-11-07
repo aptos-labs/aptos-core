@@ -7,6 +7,7 @@
 use crate::context::ExecutionGuard;
 use anyhow::Result;
 use aptos_types::vm::module_metadata::{get_metadata, get_randomness_annotation};
+use arc_swap::ArcSwap;
 use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{
     intern_struct_tag,
@@ -19,8 +20,7 @@ use move_binary_format::{
     file_format::{FunctionAttribute, StructDefinitionIndex, Visibility},
 };
 use move_core_types::identifier::IdentStr;
-use parking_lot::Mutex;
-use shared_dsa::{Entry, UnorderedMap, UnorderedSet};
+use shared_dsa::{UnorderedMap, UnorderedSet};
 use specializer::{FunctionIR, ModuleIR};
 use std::sync::{Arc, OnceLock};
 
@@ -130,6 +130,9 @@ pub struct FunctionSlot {
     pub mandatory_dependencies: Arc<[LoadedModuleSlot]>,
 }
 
+type InstantiatedFunctions =
+    UnorderedMap<(InternedIdentifier, InternedTypeList), Arc<FunctionSlot>>;
+
 impl FunctionSlot {
     /// Returns a new slot owning the monomorphic function with its mandatory
     /// dependencies.
@@ -175,15 +178,20 @@ pub struct LoadedModule {
     /// Lowered code for generic functions, one slot per (name, type
     /// arguments) pair. Filled on first call with that instantiation.
     ///
+    /// Every call of a generic function looks its instantiation up here, from
+    /// every worker at once, so reads take no lock: they load the current
+    /// snapshot and an insert publishes a copy with one more entry. Inserts
+    /// are rare, once per instantiation for the module's lifetime.
+    ///
     /// # Invariants
     ///
     /// 1. The type argument list in each key is non-empty. Non-generic
     ///    functions are stored in [`Self::functions`].
     /// 2. The type arguments are fully concrete — they're the actual
     ///    runtime types the function was monomorphized for.
-    // TODO(cleanup): revisit data structure used for actual monomorphized function storage.
-    instantiated_functions:
-        Mutex<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
+    /// 3. A slot is never removed or replaced; every snapshot after the one
+    ///    that introduced it holds the same `Arc`.
+    instantiated_functions: ArcSwap<InstantiatedFunctions>,
     /// Maps the name of a group member defined in this module (a nominal type)
     /// to its group container type (also a nominal type). Built once when the
     /// module is loaded. If struct's or enum's name is not in the map, then it
@@ -243,7 +251,7 @@ impl LoadedModule {
             mandatory_dependencies,
             functions,
             function_indices,
-            instantiated_functions: Mutex::new(UnorderedMap::new()),
+            instantiated_functions: ArcSwap::from_pointee(UnorderedMap::new()),
             resource_group_members,
             randomness_annotated,
             public_pack_apis,
@@ -401,24 +409,25 @@ impl LoadedModule {
             .map(|&idx| FunctionDefinitionIndex(idx as u16))
     }
 
-    /// Returns the function and its mandatory dependencies for the given
-    /// instantiation. If the function has not been monomorphized yet, returns
-    /// [`None`].
-    pub fn get_instantiated_function_ptr(
+    /// Returns the function slot for the given instantiation. If the function
+    /// has not been monomorphized yet, returns [`None`].
+    pub fn get_instantiated_function(
         &self,
         name: InternedIdentifier,
         ty_args: InternedTypeList,
-    ) -> Option<(FunctionPtr, Arc<[LoadedModuleSlot]>)> {
-        self.instantiated_functions
-            .lock()
-            .get(&(name, ty_args))
-            .map(|f| (f.function, f.mandatory_dependencies.clone()))
+    ) -> Option<&FunctionSlot> {
+        let snapshot = self.instantiated_functions.load();
+        let slot = snapshot.get(&(name, ty_args))?;
+        // SAFETY: a slot is never removed or replaced (invariant 3), so the
+        // `Arc` in the current snapshot, or in any later one, keeps it alive
+        // until this module is dropped, which needs exclusive access.
+        Some(unsafe { &*Arc::as_ptr(slot) })
     }
 
     /// Inserts monomorphized function into instantiation cache, returning the
     /// pointer to the inserted function. If the slot for the function is
-    /// occupied (concurrent insertion), is a no-op and returns the existing
-    /// pointer.
+    /// occupied (concurrent insertion), frees the caller's function and
+    /// returns the existing pointer.
     pub fn set_instantiated_function(
         &self,
         name: InternedIdentifier,
@@ -426,10 +435,29 @@ impl LoadedModule {
         function: Function,
         function_ms: Arc<[LoadedModuleSlot]>,
     ) -> FunctionPtr {
-        match self.instantiated_functions.lock().entry((name, ty_args)) {
-            Entry::Occupied(e) => e.get().function,
-            Entry::Vacant(e) => e.insert(FunctionSlot::new(function, function_ms)).function,
+        let key = (name, ty_args);
+        let slot = Arc::new(FunctionSlot::new(function, function_ms));
+        self.instantiated_functions.rcu(|current| {
+            if current.contains_key(&key) {
+                return Arc::clone(current);
+            }
+            let mut next = UnorderedMap::clone(current);
+            next.insert(key, Arc::clone(&slot));
+            Arc::new(next)
+        });
+        let published = self.instantiated_functions.load();
+        let winner = published
+            .get(&key)
+            .expect("the instantiation was just published or already present");
+        if !Arc::ptr_eq(winner, &slot) {
+            // Lost the race: `slot` was never published and `winner` keeps
+            // the map's copy, so this is the last reference to the loser.
+            if let Ok(loser) = Arc::try_unwrap(slot) {
+                // SAFETY: the loser has no aliases, it was never published.
+                unsafe { loser.function.free_unchecked() };
+            }
         }
+        winner.function
     }
 
     /// Returns the group container type the named struct or enum is a member
@@ -479,7 +507,13 @@ impl Drop for LoadedModule {
             }
             false
         });
-        self.instantiated_functions.lock().for_each_value(|slot| {
+        let instantiated = self
+            .instantiated_functions
+            .swap(Arc::new(UnorderedMap::new()));
+        // Exclusive at drop time, so no snapshot other than this one is held.
+        let mut instantiated =
+            Arc::try_unwrap(instantiated).unwrap_or_else(|shared| UnorderedMap::clone(&shared));
+        instantiated.for_each_value(|slot| {
             // SAFETY: see impl-level comment — no aliases at drop time.
             unsafe { slot.function.free_unchecked() };
         });

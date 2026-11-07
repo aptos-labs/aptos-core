@@ -416,8 +416,13 @@ impl Default for SegmentedArena {
 }
 
 fn new_segment(size: usize) -> Arc<SharedArena> {
+    // Uninitialized rather than zeroed: `heap_alloc` zeroes every object it
+    // hands out, and a zeroed allocation this large is served by `madvise`,
+    // which flushes the TLB of every core the process runs on.
     #[allow(clippy::arc_with_non_send_sync)]
-    Arc::new(SharedArena::new(size))
+    Arc::new(SharedArena {
+        heap: RefCell::new(Heap::from_region(MemoryRegion::new_uninit(size))),
+    })
 }
 
 /// Outcome of a bump-allocation attempt.

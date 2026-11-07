@@ -23,7 +23,7 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     block_executor::value::{SpeculativeValue, ValueWithLayout},
-    error::{PanicError, PanicOr},
+    error::{code_invariant_error, PanicError, PanicOr},
     state_store::TStateView,
     transaction::{AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction},
     vm::modules::AptosModuleExtension,
@@ -35,6 +35,7 @@ use move_binary_format::CompiledModule;
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::{
     cell::RefCell,
@@ -137,7 +138,70 @@ pub trait SingleTransactionExecutor {
         &self,
         key: Self::Key,
     ) -> Result<<Self::Txn as Transaction>::Key, PanicError>;
+
+    /// Whether this executor emits member-level group writes when asked to.
+    fn supports_member_group_writes(&self) -> bool {
+        false
+    }
+
+    /// Whether the multi-version map may be kept across blocks for this
+    /// executor (the values it stores must stay valid after the block).
+    fn uses_execution_pool() -> bool {
+        false
+    }
+
+    /// Under member-level group writes, the storage key a group member's
+    /// write is recorded under: the member's own resource key.
+    fn member_storage_key(
+        &self,
+        _group_key: &Self::Key,
+        _tag: &Self::Tag,
+    ) -> Result<<Self::Txn as Transaction>::Key, PanicError> {
+        Err(code_invariant_error(
+            "Member-level group writes are not supported by this executor",
+        ))
+    }
+
+    /// Under member-level group writes, the stored blob of every group the
+    /// block wrote, as the state holds it after the block's last transaction.
+    fn finalize_group_writes<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(
+        &self,
+        _group_keys: Vec<Self::Key>,
+        _shared: SharedViewArgs<'_, S>,
+        _mode: ViewMode<'_, Self::Input>,
+        _next_txn_idx: TxnIndex,
+    ) -> Result<
+        Vec<(
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+        )>,
+        PanicError,
+    > {
+        Err(code_invariant_error(
+            "Member-level group writes are not supported by this executor",
+        ))
+    }
 }
+
+/// Each transaction's write set names only the resource-group members it
+/// changed, under the members' own resource keys, and the block assembles
+/// each written group's blob once at its end.
+pub static MEMBER_GROUP_WRITES: Lazy<bool> =
+    Lazy::new(|| std::env::var("APTOS_MEMBER_GROUP_WRITES").is_ok_and(|v| v == "1"));
+
+/// The multi-version map is kept from one block to the next on the same fork,
+/// collapsed to base values, so keys the previous block touched need no base
+/// value from the state view.
+pub static EXECUTION_POOL: Lazy<bool> =
+    Lazy::new(|| std::env::var("APTOS_EXECUTION_POOL").is_ok_and(|v| v == "1"));
+
+/// A pool with more keys than this is dropped after the block instead of kept.
+pub static EXECUTION_POOL_MAX_KEYS: Lazy<usize> = Lazy::new(|| {
+    std::env::var("APTOS_EXECUTION_POOL_MAX_KEYS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(500_000)
+});
 
 /// Builds the legacy `LatestView` from the view ingredients.
 fn build_latest_view<'a, T: Transaction, S: TStateView<Key = T::Key>>(

@@ -15,13 +15,16 @@ use aptos_types::{
 };
 use claims::{assert_ok, assert_some};
 use crossbeam::utils::CachePadded;
-use dashmap::DashMap;
+use dashmap::{
+    mapref::one::{Ref, RefMut},
+    DashMap,
+};
 use equivalent::Equivalent;
 use std::{
     collections::btree_map::{self, BTreeMap},
     fmt::Debug,
     hash::Hash,
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
 };
 
 pub(crate) const FLAG_DONE: bool = false;
@@ -53,23 +56,40 @@ struct EntryCell<V> {
 /// transactions that update the given access path & the corresponding entries.
 struct VersionedValue<V> {
     versioned_map: BTreeMap<ShiftedTxnIndex, CachePadded<Entry<EntryCell<V>>>>,
+    /// The block whose entries the map holds. A map left behind by an
+    /// earlier block is collapsed to that block's committed value on its
+    /// first access under the current one.
+    block: u32,
 }
 
 /// Maps each key (access path) to an internal versioned value representation.
 pub struct VersionedData<K, V> {
-    values: DashMap<K, VersionedValue<V>>,
+    // Keyed by a random-state ahash rather than the default SipHash: the map
+    // is probed on every read and write of every worker, and the keys are
+    // short and already well distributed.
+    values: DashMap<K, VersionedValue<V>, ahash::RandomState>,
     total_base_value_size: AtomicU64,
+    /// The block the map currently serves; incremented by a collapse. Tags
+    /// read registrations and per-key maps, so that what an earlier block
+    /// left behind is settled on first access rather than all at once.
+    block: AtomicU32,
+    /// How many transactions each earlier block committed, by block.
+    committed: Vec<TxnIndex>,
 }
 
 fn new_write_entry<V>(
     incarnation: Incarnation,
     value: V,
     dependencies: BTreeMap<TxnIndex, Incarnation>,
+    block: u32,
 ) -> Entry<EntryCell<V>> {
     Entry::new(EntryCell {
         incarnation,
         value,
-        dependencies: Mutex::new(RegisteredReadDependencies::from_dependencies(dependencies)),
+        dependencies: Mutex::new(RegisteredReadDependencies::from_dependencies(
+            dependencies,
+            block,
+        )),
     })
 }
 
@@ -92,9 +112,44 @@ impl<V> Entry<V> {
 
 impl<V> Default for VersionedValue<V> {
     fn default() -> Self {
+        Self::new(0)
+    }
+}
+
+impl<V> VersionedValue<V> {
+    fn new(block: u32) -> Self {
         Self {
             versioned_map: BTreeMap::new(),
+            block,
         }
+    }
+
+    /// Brings a map left by an earlier block up to `block`: its latest entry
+    /// among that block's `num_committed` transactions becomes the base, the
+    /// rest go. Returns false if nothing was committed, i.e. the key is
+    /// unknown again.
+    fn settle(&mut self, num_committed: TxnIndex, block: u32) -> bool {
+        self.block = block;
+        let Some(idx) = self
+            .versioned_map
+            .range(..ShiftedTxnIndex::new(num_committed))
+            .next_back()
+            .map(|(idx, _)| idx.clone())
+        else {
+            self.versioned_map.clear();
+            return false;
+        };
+        let entry = self
+            .versioned_map
+            .remove(&idx)
+            .expect("the entry was just found");
+        self.versioned_map.clear();
+        let EntryCell { value, .. } = CachePadded::into_inner(entry).value;
+        self.versioned_map.insert(
+            ShiftedTxnIndex::zero_idx(),
+            CachePadded::new(new_write_entry(0, value, BTreeMap::new(), block)),
+        );
+        true
     }
 }
 
@@ -107,6 +162,7 @@ impl<V: SpeculativeValue> VersionedValue<V> {
         &self,
         txn_idx: TxnIndex,
         new_value: &V,
+        block: u32,
     ) -> (BTreeMap<TxnIndex, Incarnation>, bool) {
         let mut affected_deps = BTreeMap::new();
         let mut still_valid = false;
@@ -127,7 +183,7 @@ impl<V: SpeculativeValue> VersionedValue<V> {
             } = &entry.value;
 
             // Take dependencies above txn_idx
-            affected_deps = dependencies.lock().split_off(txn_idx + 1);
+            affected_deps = dependencies.lock().for_block(block).split_off(txn_idx + 1);
             if !affected_deps.is_empty() {
                 still_valid = if ONLY_COMPARE_METADATA {
                     value.eq_metadata(new_value)
@@ -149,6 +205,7 @@ impl<V: SpeculativeValue> VersionedValue<V> {
         txn_idx: TxnIndex,
         mut dependencies: BTreeMap<TxnIndex, Incarnation>,
         removed_value: &V,
+        block: u32,
     ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
         // If we have dependencies and a next (lower) entry exists, validate against it.
         if !dependencies.is_empty() {
@@ -177,6 +234,7 @@ impl<V: SpeculativeValue> VersionedValue<V> {
                 if still_valid {
                     next_lower_deps
                         .lock()
+                        .for_block(block)
                         .extend_with_higher_dependencies(std::mem::take(&mut dependencies))?;
                 }
             }
@@ -189,6 +247,7 @@ impl<V: SpeculativeValue> VersionedValue<V> {
         &self,
         reader_txn_idx: TxnIndex,
         maybe_reader_incarnation: Option<Incarnation>,
+        block: u32,
     ) -> Result<MVDataOutput<V>, MVDataError> {
         use MVDataError::*;
         use MVDataOutput::*;
@@ -220,6 +279,7 @@ impl<V: SpeculativeValue> VersionedValue<V> {
                 // TODO(BlockSTMv2): convert to PanicErrors after MVHashMap refactoring.
                 assert_ok!(dependencies
                     .lock()
+                    .for_block(block)
                     .insert(reader_txn_idx, reader_incarnation));
             }
 
@@ -236,9 +296,72 @@ impl<V: SpeculativeValue> VersionedValue<V> {
 impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     pub(crate) fn empty() -> Self {
         Self {
-            values: DashMap::new(),
+            values: DashMap::with_hasher(ahash::RandomState::new()),
             total_base_value_size: AtomicU64::new(0),
+            block: AtomicU32::new(0),
+            committed: Vec::new(),
         }
+    }
+
+    pub(crate) fn block(&self) -> u32 {
+        self.block.load(Ordering::Relaxed)
+    }
+
+    /// How many transactions `block`, an earlier block, committed.
+    pub(crate) fn num_committed(&self, block: u32) -> TxnIndex {
+        self.committed[block as usize]
+    }
+
+    /// The map for `key`, settled to the current block. None if the key is
+    /// unknown, including when an earlier block left only uncommitted
+    /// entries behind.
+    fn get<Q>(&self, key: &Q) -> Option<Ref<'_, K, VersionedValue<V>>>
+    where
+        Q: Equivalent<K> + Hash,
+    {
+        let block = self.block();
+        let v = self.values.get(key)?;
+        if v.block == block {
+            return Some(v);
+        }
+        drop(v);
+        // Settle under the shard's write lock; whoever gets there first does
+        // it, the rest see a settled map.
+        self.get_mut(key)?;
+        self.values.get(key)
+    }
+
+    fn get_mut<Q>(&self, key: &Q) -> Option<RefMut<'_, K, VersionedValue<V>>>
+    where
+        Q: Equivalent<K> + Hash,
+    {
+        let block = self.block();
+        let mut v = self.values.get_mut(key)?;
+        if v.block != block {
+            let num_committed = self.num_committed(v.block);
+            if !v.settle(num_committed, block) {
+                drop(v);
+                // Unless a writer got in between: its entry stays.
+                self.values
+                    .remove_if(key, |_, v| v.versioned_map.is_empty());
+                return None;
+            }
+        }
+        Some(v)
+    }
+
+    /// The map for `key`, settled, created empty if unknown.
+    fn entry(&self, key: K) -> RefMut<'_, K, VersionedValue<V>> {
+        let block = self.block();
+        let mut v = self
+            .values
+            .entry(key)
+            .or_insert_with(|| VersionedValue::new(block));
+        if v.block != block {
+            let num_committed = self.num_committed(v.block);
+            v.settle(num_committed, block);
+        }
+        v
     }
 
     pub(crate) fn num_keys(&self) -> usize {
@@ -259,7 +382,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     {
         // Use dashmap's get method which accepts a reference when Borrow is implemented
         // The equivalent crate automatically implements the right traits.
-        let v = self.values.get(key).expect("Path must exist");
+        let v = self.get(key).expect("Path must exist");
         v.versioned_map
             .get(&ShiftedTxnIndex::new(txn_idx))
             .expect("Entry by the txn must exist to mark estimate")
@@ -273,7 +396,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         Q: Equivalent<K> + Hash,
     {
         // TODO: investigate logical deletion.
-        let mut v = self.values.get_mut(key).expect("Path must exist");
+        let mut v = self.get_mut(key).expect("Path must exist");
         assert_some!(
             v.versioned_map.remove(&ShiftedTxnIndex::new(txn_idx)),
             "Entry for key / idx must exist to be deleted"
@@ -291,7 +414,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     where
         Q: Equivalent<K> + Hash + Debug,
     {
-        let mut v = self.values.get_mut(key).ok_or_else(|| {
+        let mut v = self.get_mut(key).ok_or_else(|| {
             code_invariant_error(format!("Path must exist for remove_v2: {:?}", key))
         })?;
 
@@ -311,8 +434,9 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
             value,
             dependencies,
         } = &removed_entry.value;
-        let removed_deps = take_dependencies(dependencies);
-        v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(txn_idx, removed_deps, value)
+        let block = self.block();
+        let removed_deps = take_dependencies(dependencies, block);
+        v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(txn_idx, removed_deps, value, block)
     }
 
     // Fetches data but does not record a read dependency. This is used for BlockSTMv1
@@ -325,9 +449,8 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     where
         Q: Equivalent<K> + Hash,
     {
-        self.values
-            .get(key)
-            .map(|v| v.read(txn_idx, None))
+        self.get(key)
+            .map(|v| v.read(txn_idx, None, self.block()))
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
 
@@ -344,9 +467,8 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     where
         Q: Equivalent<K> + Hash,
     {
-        self.values
-            .get(key)
-            .map(|v| v.read(txn_idx, Some(incarnation)))
+        self.get(key)
+            .map(|v| v.read(txn_idx, Some(incarnation), self.block()))
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
 
@@ -357,7 +479,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     /// may need to repeat the read afterward, as a concurrent caller might have exchanged and
     /// stored a different delayed field ID.
     pub fn set_base_value(&self, key: K, base_value: V, on_occupied: impl FnOnce(&mut V, V)) {
-        let mut v = self.values.entry(key).or_default();
+        let mut v = self.entry(key);
         // For base value, incarnation is irrelevant, and is always set to 0.
 
         use btree_map::Entry::*;
@@ -371,6 +493,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
                     0,
                     base_value,
                     BTreeMap::new(),
+                    self.block(),
                 )));
             },
             Occupied(mut o) => {
@@ -387,11 +510,12 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         incarnation: Incarnation,
         value: V,
         dependencies: BTreeMap<TxnIndex, Incarnation>,
+        block: u32,
     ) -> Result<(), PanicError> {
         let value_clone = value.clone();
         let prev_entry = versioned_values.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
-            CachePadded::new(new_write_entry(incarnation, value, dependencies)),
+            CachePadded::new(new_write_entry(incarnation, value, dependencies, block)),
         );
 
         // Check that the previous entry for txn_idx, if present, had lower incarnation.
@@ -442,8 +566,15 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         incarnation: Incarnation,
         value: V,
     ) -> Result<(), PanicError> {
-        let mut v = self.values.entry(key).or_default();
-        Self::write_impl(&mut v, txn_idx, incarnation, value, BTreeMap::new())
+        let mut v = self.entry(key);
+        Self::write_impl(
+            &mut v,
+            txn_idx,
+            incarnation,
+            value,
+            BTreeMap::new(),
+            self.block(),
+        )
     }
 
     /// Write a value at a given key (and version) for BlockSTMv2.
@@ -455,9 +586,10 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         incarnation: Incarnation,
         value: V,
     ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
-        let mut v = self.values.entry(key).or_default();
+        let mut v = self.entry(key);
+        let block = self.block();
         let (affected_dependencies, validation_passed) =
-            v.split_off_affected_read_dependencies::<ONLY_COMPARE_METADATA>(txn_idx, &value);
+            v.split_off_affected_read_dependencies::<ONLY_COMPARE_METADATA>(txn_idx, &value, block);
 
         // Asserted (local, easily checkable invariant), since affected dependencies are obtained
         // by calling split_off at txn_idx + 1.
@@ -471,7 +603,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
             (BTreeMap::new(), affected_dependencies)
         };
 
-        Self::write_impl(&mut v, txn_idx, incarnation, value, deps_to_retain)?;
+        Self::write_impl(&mut v, txn_idx, incarnation, value, deps_to_retain, block)?;
 
         Ok(deps_to_return)
     }
@@ -488,10 +620,15 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     ) -> bool {
         let value_clone = value.clone();
 
-        let mut v = self.values.entry(key).or_default();
+        let mut v = self.entry(key);
         let prev_entry = v.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
-            CachePadded::new(new_write_entry(incarnation, value, BTreeMap::new())),
+            CachePadded::new(new_write_entry(
+                incarnation,
+                value,
+                BTreeMap::new(),
+                self.block(),
+            )),
         );
 
         // Changes versioned metadata that was stored.
@@ -499,6 +636,34 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
             let EntryCell { value, .. } = &entry.value;
             !value.eq_metadata(&value_clone)
         })
+    }
+
+    /// Ends the block after `num_committed` of its transactions committed:
+    /// their writes are the base of the next block on this fork. Nothing is
+    /// visited here; each key settles on its first access under the next
+    /// block.
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) {
+        self.committed.push(num_committed);
+        self.block.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Transactions that registered a read of the entry written at txn_idx, if any.
+    pub fn readers_of<Q>(&self, key: &Q, txn_idx: TxnIndex, out: &mut Vec<TxnIndex>)
+    where
+        Q: Equivalent<K> + Hash,
+    {
+        if let Some(v) = self.get(key) {
+            if let Some(entry) = v.versioned_map.get(&ShiftedTxnIndex::new(txn_idx)) {
+                out.extend(
+                    entry
+                        .value
+                        .dependencies
+                        .lock()
+                        .for_block(self.block())
+                        .reader_indices(),
+                );
+            }
+        }
     }
 
     #[cfg(test)]
@@ -603,6 +768,7 @@ mod tests {
                 0,
                 TestValueWithMetadata::new(10, 100),
                 deps_idx0,
+                0,
             )),
         );
         v.versioned_map.insert(
@@ -611,16 +777,17 @@ mod tests {
                 0,
                 TestValueWithMetadata::new(20, 200),
                 deps_idx7,
+                0,
             )),
         );
 
         // Add some dependencies via read() calls.
-        let _ = v.read(3, Some(0)); // This adds (3, 0) to latest write <= 3 (write at idx 0).
-        let _ = v.read(3, Some(1)); // Add another incarnation of txn 3.
-        let _ = v.read(7, Some(1)); // This adds (7, 1) to write at idx 0.
-                                    // TODO: when using PanicErrors, check is_ok(), and is_err() when adding duplicate or
-                                    // outdated incarnation.
-        let _ = v.read(10, Some(2)); // Only the latest added (higher) incarnations must be recorded.
+        let _ = v.read(3, Some(0), 0); // This adds (3, 0) to latest write <= 3 (write at idx 0).
+        let _ = v.read(3, Some(1), 0); // Add another incarnation of txn 3.
+        let _ = v.read(7, Some(1), 0); // This adds (7, 1) to write at idx 0.
+                                       // TODO: when using PanicErrors, check is_ok(), and is_err() when adding duplicate or
+                                       // outdated incarnation.
+        let _ = v.read(10, Some(2), 0); // Only the latest added (higher) incarnations must be recorded.
 
         // Get pre-call state of dependencies.
         let mut recorded_deps_idx0 =
@@ -632,6 +799,7 @@ mod tests {
         let (affected_deps, validation_passed) = v.split_off_affected_read_dependencies::<false>(
             idx,
             &TestValueWithMetadata::new(10, 100),
+            0,
         );
         assert_eq!(
             affected_deps, expected_deps,
@@ -647,6 +815,7 @@ mod tests {
             let (remaining_deps, _) = v.split_off_affected_read_dependencies::<false>(
                 6,
                 &TestValueWithMetadata::new(10, 100),
+                0,
             );
             assert!(remaining_deps.is_empty());
             recorded_deps_idx0.retain(|txn_idx, _| *txn_idx <= idx);
@@ -680,10 +849,11 @@ mod tests {
                 0,
                 TestValueWithMetadata::new(10, 100),
                 BTreeMap::from([(5, 2)]),
+                0,
             )),
         );
 
-        let _ = v.read(5, Some(outdated_incarnation));
+        let _ = v.read(5, Some(outdated_incarnation), 0);
     }
 
     #[test]
@@ -699,7 +869,7 @@ mod tests {
                         let deps = BTreeMap::from([(1, 0)]);
                         v.versioned_map.insert(
                             ShiftedTxnIndex::new(0),
-                            CachePadded::new(new_write_entry(0, TestValueWithMetadata::new(10, 100), deps)),
+                            CachePadded::new(new_write_entry(0, TestValueWithMetadata::new(10, 100), deps, 0)),
                         );
 
                         // Create test value based on parameters
@@ -719,6 +889,7 @@ mod tests {
                         let (deps, validation_passed) = v.split_off_affected_read_dependencies::<{ $only_compare_metadata }>(
                             0,
                             &test_value.clone(),
+                            0,
                         );
 
                         // Verify results
@@ -740,6 +911,7 @@ mod tests {
                             1,
                             BTreeMap::from([(2, 0)]),
                             &test_value,
+                            0,
                         ).unwrap();
 
                         if expected_validation {
@@ -775,6 +947,7 @@ mod tests {
                 0,
                 TestValueWithMetadata::new(10, 100),
                 BTreeMap::new(),
+                0,
             )),
         );
 
@@ -782,6 +955,7 @@ mod tests {
             0,
             BTreeMap::from([(2, 0)]),
             &TestValueWithMetadata::new(10, 100),
+            0,
         )
         .unwrap();
     }
@@ -797,6 +971,7 @@ mod tests {
                 0,
                 TestValueWithMetadata::new(10, 100),
                 BTreeMap::new(),
+                0,
             )),
         );
 
@@ -807,6 +982,7 @@ mod tests {
                 1,
                 dependency_2_0.clone(),
                 &TestValueWithMetadata::new(10, 100),
+                0,
             )
             .unwrap()
         );
@@ -816,6 +992,7 @@ mod tests {
                 1,
                 dependency_2_0.clone(),
                 &TestValueWithMetadata::new(10, 100),
+                0,
             )
             .unwrap()
         );
@@ -827,6 +1004,7 @@ mod tests {
                 0,
                 TestValueWithMetadata::new(10, 100),
                 BTreeMap::new(),
+                0,
             )),
         );
         assert_eq!(
@@ -834,6 +1012,7 @@ mod tests {
                 1,
                 dependency_2_0.clone(),
                 &TestValueWithMetadata::new(10, 100),
+                0,
             )
             .unwrap()
             .len(),
@@ -850,12 +1029,14 @@ mod tests {
             1,
             dependency_2_0.clone(),
             &TestValueWithMetadata::new(10, 100),
+            0,
         ));
         // Error if removed dependencies contain a smaller or equal idx than itself.
         assert_err!(v.handle_removed_dependencies::<false>(
             2,
             dependency_2_0,
             &TestValueWithMetadata::new(10, 100),
+            0,
         ));
 
         assert_eq!(
@@ -863,6 +1044,7 @@ mod tests {
                 2,
                 BTreeMap::from([(3, 1)]),
                 &TestValueWithMetadata::new(10, 100),
+                0,
             )
             .unwrap()
             .len(),
@@ -978,5 +1160,71 @@ mod tests {
         // Try to remove a non-existent entry at index 1
         assert_err!(versioned_data.remove_v2::<_, false>(&(), 1));
         assert_err!(versioned_data.remove_v2::<_, true>(&(), 1));
+    }
+}
+
+#[cfg(test)]
+mod collapse_tests {
+    use super::*;
+    use crate::types::test::{KeyType, TestValue};
+    use claims::assert_matches;
+
+    fn value(v: u32) -> TestValue {
+        TestValue::new(vec![v])
+    }
+
+    /// After a collapse, every key reads its last committed value as the base
+    /// with no versions above it, and a key written only past the committed
+    /// prefix is unknown again.
+    #[test]
+    fn collapse_keeps_committed_latest_as_base() {
+        let mut data = VersionedData::<KeyType<u32>, TestValue>::empty();
+        let committed = KeyType(1);
+        let only_above = KeyType(2);
+        let base_only = KeyType(3);
+        data.set_base_value(committed.clone(), value(0), |_, _| {});
+        data.set_base_value(base_only.clone(), value(7), |_, _| {});
+        assert_ok!(data.write(committed.clone(), 3, 0, value(3)));
+        assert_ok!(data.write(committed.clone(), 8, 0, value(8)));
+        assert_ok!(data.write(only_above.clone(), 9, 0, value(9)));
+        // Readers of this block register on the entries; they must not survive.
+        assert_ok!(data.fetch_data_and_record_dependency(&committed, 5, 1));
+
+        data.collapse_to_base(5);
+
+        let read = data.fetch_data_no_record(&committed, 0);
+        assert_matches!(read, Ok(MVDataOutput::Versioned(Err(_), v)) if v == value(3));
+        let read = data.fetch_data_no_record(&committed, 100);
+        assert_matches!(read, Ok(MVDataOutput::Versioned(Err(_), v)) if v == value(3));
+        assert_matches!(
+            data.fetch_data_no_record(&only_above, 100),
+            Err(MVDataError::Uninitialized)
+        );
+        let read = data.fetch_data_no_record(&base_only, 100);
+        assert_matches!(read, Ok(MVDataOutput::Versioned(Err(_), v)) if v == value(7));
+        // A write in the next block invalidates no reader of the old block.
+        assert!(assert_ok!(data.write_v2::<false>(committed, 2, 0, value(2))).is_empty());
+    }
+
+    /// A key left alone for several blocks settles against the committed
+    /// prefix of the block that last wrote it, not the latest one.
+    #[test]
+    fn settles_against_the_block_that_wrote_it() {
+        let mut data = VersionedData::<KeyType<u32>, TestValue>::empty();
+        let kept = KeyType(1);
+        let dropped = KeyType(2);
+        assert_ok!(data.write(kept.clone(), 3, 0, value(3)));
+        assert_ok!(data.write(dropped.clone(), 7, 0, value(7)));
+        data.collapse_to_base(5);
+        // The next block commits fewer transactions and touches neither key.
+        assert_ok!(data.write(KeyType(3), 1, 0, value(1)));
+        data.collapse_to_base(2);
+
+        let read = data.fetch_data_no_record(&kept, 0);
+        assert_matches!(read, Ok(MVDataOutput::Versioned(Err(_), v)) if v == value(3));
+        assert_matches!(
+            data.fetch_data_no_record(&dropped, 100),
+            Err(MVDataError::Uninitialized)
+        );
     }
 }

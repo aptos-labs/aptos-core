@@ -12,14 +12,16 @@ use crate::{
     },
     types::partial_state_compute_result::PartialStateComputeResult,
     workflow::{
-        do_get_execution_output::DoGetExecutionOutput, do_ledger_update::DoLedgerUpdate,
+        do_get_execution_output::{DoGetExecutionOutput, RawBlockExecution},
+        do_ledger_update::DoLedgerUpdate,
         do_state_checkpoint::DoStateCheckpoint,
     },
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
+    execution_output::ExecutionOutput, state_compute_result::StateComputeResult,
+    BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};
@@ -33,21 +35,25 @@ use aptos_storage_interface::{
         state_summary::{
             ProvableCollateralStateSummary, ProvablePositionStateSummary, ProvableStateSummary,
         },
-        state_view::cached_state_view::CachedStateView,
+        state_view::cached_state_view::{CachedStateView, PendingWrites},
     },
     DbReaderWriter,
 };
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{ExecutableBlock, ExecutableTransactions},
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     ledger_info::LedgerInfoWithSignatures,
-    state_store::StateViewId,
+    state_store::{StateViewId, TStateView},
+    transaction::Version,
 };
 use aptos_vm::VMBlockExecutor;
 use block_tree::BlockTree;
 use fail::fail_point;
+use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use std::sync::Arc;
 
 pub mod block_tree;
@@ -172,10 +178,26 @@ where
     }
 }
 
+/// Experiment knob: overlap a block's output indexing with the next block's
+/// execution. `APTOS_PIPELINED_EXECUTION=1` turns it on.
+static PIPELINED_EXECUTION: Lazy<bool> =
+    Lazy::new(|| std::env::var_os("APTOS_PIPELINED_EXECUTION").is_some());
+
+/// A block the VM has executed whose outputs are still being indexed on
+/// another thread. The next block reads its writes through the view until
+/// the indexed state is in the block tree.
+struct PendingBlock {
+    block_id: HashValue,
+    parent_block_id: HashValue,
+    writes: Arc<PendingWrites>,
+    parse: std::thread::JoinHandle<ExecutorResult<ExecutionOutput>>,
+}
+
 struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
     block_executor: V,
+    pending: Mutex<Option<PendingBlock>>,
 }
 
 impl<V> BlockExecutorInner<V>
@@ -188,6 +210,200 @@ where
             db,
             block_tree,
             block_executor: V::new(),
+            pending: Mutex::new(None),
+        })
+    }
+
+    /// Waits for the pending block's indexing and puts it in the block tree.
+    fn finish_pending(&self, pending: &mut Option<PendingBlock>) -> ExecutorResult<()> {
+        let Some(block) = pending.take() else {
+            return Ok(());
+        };
+        let _timer = OTHER_TIMERS.timer_with(&["pipelined_wait_for_parse"]);
+        let output = block
+            .parse
+            .join()
+            .map_err(|_| ExecutorError::InternalError {
+                error: "block indexing thread panicked".into(),
+            })??;
+        self.block_tree.add_block(
+            block.parent_block_id,
+            block.block_id,
+            PartialStateComputeResult::new(output),
+        )?;
+        Ok(())
+    }
+
+    /// Every read of the block tree from outside execution goes through here,
+    /// so a pending block is never missing from it.
+    fn flush_pending(&self) -> ExecutorResult<()> {
+        let mut pending = self.pending.lock();
+        self.finish_pending(&mut pending)
+    }
+
+    /// Executes `block` against its parent's writes while the parent's outputs
+    /// are still being indexed, then hands this block's outputs to the
+    /// indexing thread. Falls back to the serial path for anything it does
+    /// not handle: sharded blocks, reconfigurations, trading-native overlays.
+    fn execute_pipelined(
+        &self,
+        block: ExecutableBlock,
+        parent_block_id: HashValue,
+        onchain_config: BlockExecutorConfigFromOnchain,
+    ) -> ExecutorResult<Option<ExecutableBlock>> {
+        let mut pending = self.pending.lock();
+        let overlays = match pending.as_ref() {
+            Some(p) if p.block_id == parent_block_id => vec![Arc::clone(&p.writes)],
+            _ => {
+                self.finish_pending(&mut pending)?;
+                vec![]
+            },
+        };
+        let base_block_id = match pending.as_ref() {
+            Some(p) => p.parent_block_id,
+            None => parent_block_id,
+        };
+        let base_block = self
+            .block_tree
+            .get_blocks_opt(&[base_block_id])?
+            .pop()
+            .expect("Must exist.")
+            .ok_or(ExecutorError::BlockNotFound(base_block_id))?;
+        let base_output = &base_block.output;
+        let ExecutableTransactions::Unsharded(transactions) = block.transactions else {
+            self.finish_pending(&mut pending)?;
+            return Ok(Some(block));
+        };
+        if base_output.has_reconfiguration()
+            || base_output.result_positions().is_some()
+            || base_output.result_orders().is_some()
+            || base_output.result_collateral().is_some()
+        {
+            self.finish_pending(&mut pending)?;
+            return Ok(Some(ExecutableBlock {
+                block_id: block.block_id,
+                transactions: ExecutableTransactions::Unsharded(transactions),
+                auxiliary_info: block.auxiliary_info,
+            }));
+        }
+        let block_id = block.block_id;
+        info!(
+            block_id = block_id,
+            first_version = overlays
+                .last()
+                .map_or(base_output.execution_output.next_version(), |w| w
+                    .next_version()),
+            "execute_block (pipelined)"
+        );
+
+        let state_view = {
+            let _timer = OTHER_TIMERS.timer_with(&["get_state_view"]);
+            CachedStateView::new_pending(
+                StateViewId::BlockExecution { block_id },
+                Arc::clone(&self.db.reader),
+                base_output.result_state().latest().clone(),
+                overlays,
+            )?
+        };
+        let raw = {
+            let _timer = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.start_timer();
+            DoGetExecutionOutput::execute_raw(
+                &self.block_executor,
+                transactions,
+                block.auxiliary_info,
+                state_view,
+                onchain_config,
+                TransactionSliceMetadata::block(parent_block_id, block_id),
+            )?
+        };
+        let writes = {
+            let _timer = OTHER_TIMERS.timer_with(&["pipelined_pending_writes"]);
+            Self::pending_writes(&raw)?
+        };
+
+        // This block's indexing chains on the parent's result, so the parent
+        // has to be in the tree first.
+        self.finish_pending(&mut pending)?;
+        let parent_state = self
+            .block_tree
+            .get_block(parent_block_id)?
+            .output
+            .result_state()
+            .clone();
+        if raw.has_reconfiguration() {
+            let output = DoGetExecutionOutput::parse_raw(raw, &parent_state, None, None, None)?;
+            DoGetExecutionOutput::update_counters_async(&output);
+            self.block_tree.add_block(
+                parent_block_id,
+                block_id,
+                PartialStateComputeResult::new(output),
+            )?;
+            return Ok(None);
+        }
+        let parse = std::thread::Builder::new()
+            .name("block_parse".to_string())
+            .spawn(move || {
+                let _timer = OTHER_TIMERS.timer_with(&["pipelined_parse"]);
+                let output = DoGetExecutionOutput::parse_raw(raw, &parent_state, None, None, None)?;
+                DoGetExecutionOutput::update_counters_async(&output);
+                Ok(output)
+            })
+            .expect("Failed to spawn the block indexing thread");
+        *pending = Some(PendingBlock {
+            block_id,
+            parent_block_id,
+            writes: Arc::new(writes),
+            parse,
+        });
+        Ok(None)
+    }
+
+    /// The writes the next block will see from `raw` before it is indexed.
+    fn pending_writes(raw: &RawBlockExecution) -> Result<PendingWrites> {
+        let first_version = raw.state_view.next_version();
+        let block_writes = raw.block_writes.as_ref();
+        let last_version = raw.next_version().saturating_sub(1);
+        let writes = raw
+            .transaction_outputs
+            .par_iter()
+            .enumerate()
+            .flat_map_iter(move |(i, output)| {
+                let version = first_version + i as Version;
+                // Member writes are not state keys: the next block reads the
+                // group's blob, which enters at the block's last version.
+                output
+                    .write_set()
+                    .write_op_iter()
+                    .filter(move |(key, _)| {
+                        block_writes.is_none_or(|w| !w.member_keys.contains(key))
+                    })
+                    .map(move |(key, op)| {
+                        (
+                            key.clone(),
+                            version,
+                            op.as_base_op().as_state_value_opt().flatten().cloned(),
+                        )
+                    })
+            })
+            .chain(
+                block_writes
+                    .into_par_iter()
+                    .flat_map_iter(|w| w.group_writes.iter())
+                    .map(move |(key, op)| {
+                        (
+                            key.clone(),
+                            last_version,
+                            op.as_base_op().as_state_value_opt().flatten().cloned(),
+                        )
+                    }),
+            );
+        THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+            PendingWrites::new(
+                writes,
+                raw.next_version(),
+                raw.state_view.get_usage()?,
+                |key| raw.state_view.memorized_reads().get_cloned(key),
+            )
         })
     }
 }
@@ -207,6 +423,15 @@ where
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<()> {
         let _timer = BLOCK_EXECUTION_WORKFLOW_WHOLE.start_timer();
+        let block = if *PIPELINED_EXECUTION {
+            match self.execute_pipelined(block, parent_block_id, onchain_config)? {
+                None => return Ok(()),
+                Some(block) => block,
+            }
+        } else {
+            self.flush_pending()?;
+            block
+        };
         let ExecutableBlock {
             block_id,
             transactions,
@@ -425,6 +650,7 @@ where
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "ledger_update"
         );
+        self.flush_pending()?;
         let committed_block_id = self.committed_block_id();
         let mut block_vec = self
             .block_tree
@@ -528,6 +754,7 @@ where
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "pre_commit_block",
         );
+        self.flush_pending()?;
 
         let block = self.block_tree.get_block(block_id)?;
 
@@ -550,6 +777,7 @@ where
 
     fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()> {
         let _timer = OTHER_TIMERS.timer_with(&["commit_ledger"]);
+        self.flush_pending()?;
 
         let block_id = ledger_info_with_sigs.ledger_info().consensus_block_id();
         info!(
@@ -584,6 +812,7 @@ where
     }
 
     fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        self.flush_pending()?;
         let mut block_vec = self.block_tree.get_blocks_opt(&[block_id])?;
         let block = block_vec
             .pop()

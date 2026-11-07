@@ -65,8 +65,7 @@ use hashbrown::{hash_map::EntryRef, HashMap};
 use mono_move_core::{
     storage::resource_provider::{InMemoryStorageKey, Version},
     types::InternedType,
-    LayoutProvider,
-    ResourceProvider, StorageRead, VMResult,
+    LayoutProvider, ResourceProvider, StorageRead, VMResult,
 };
 use std::ptr::NonNull;
 

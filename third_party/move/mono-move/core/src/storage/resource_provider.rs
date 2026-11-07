@@ -221,6 +221,13 @@ pub trait ResourceProvider {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError>;
+
+    /// Polled by the interpreter every few basic blocks. An error stops the
+    /// transaction; parallel execution uses it to cut short an incarnation
+    /// whose reads were already invalidated.
+    fn check_interrupted(&self) -> Result<(), ResourceProviderError> {
+        Ok(())
+    }
 }
 
 /// Empty storage with no resources.

@@ -7,9 +7,12 @@ use crate::{
     workflow::{do_collateral::DoCollateral, do_orders::DoOrders, do_positions::DoPositions},
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_block_executor::txn_provider::TxnProvider;
+use aptos_block_executor::{
+    single_transaction_executor::{EXECUTION_POOL, EXECUTION_POOL_MAX_KEYS},
+    txn_provider::default::DefaultTxnProvider,
+};
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
@@ -29,7 +32,10 @@ use aptos_storage_interface::state_store::{
     orders::OrderParent,
     positions::PositionParent,
     state::LedgerState,
-    state_view::cached_state_view::{CachedStateView, PrimingPolicy},
+    state_view::{
+        cached_state_view::{CachedStateView, PrimingPolicy},
+        committed_slots::CommittedSlots,
+    },
 };
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_types::transaction::ExecutionStatus;
@@ -48,16 +54,52 @@ use aptos_types::{
     },
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        AuxiliaryInfoTrait, BlockOutput, PersistedAuxiliaryInfo, Transaction, TransactionOutput,
-        TransactionStatus, Version,
+        AuxiliaryInfoTrait, BlockOutput, BlockWrites, PersistedAuxiliaryInfo, Transaction,
+        TransactionOutput, TransactionStatus, Version,
     },
-    write_set::{TransactionWrite, WriteSet},
+    write_set::{TransactionWrite, WriteOp, WriteSet},
 };
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use std::sync::Arc;
 
 pub struct DoGetExecutionOutput;
+
+/// A block's outputs as the VM produced them, before indexing.
+/// With the execution pool, the slots the previous blocks left behind for
+/// the keys the pool serves. Lives as long as the process, like the pool,
+/// and holds the same keys; its budget is looser so that it is the pool
+/// that empties first.
+static COMMITTED_SLOTS: Lazy<CommittedSlots> =
+    Lazy::new(|| CommittedSlots::new(2 * *EXECUTION_POOL_MAX_KEYS));
+
+pub struct RawBlockExecution {
+    pub transactions: Vec<Transaction>,
+    pub transaction_outputs: Vec<TransactionOutput>,
+    pub auxiliary_infos: Vec<AuxiliaryInfo>,
+    pub state_view: CachedStateView,
+    pub onchain_config: BlockExecutorConfigFromOnchain,
+    pub is_block: bool,
+    pub block_writes: Option<BlockWrites<StateKey, WriteOp>>,
+}
+
+impl RawBlockExecution {
+    /// The version right after this block.
+    pub fn next_version(&self) -> Version {
+        self.state_view.next_version() + self.transactions.len() as Version
+    }
+
+    /// Whether the block ends an epoch, after which nothing may be pipelined.
+    pub fn has_reconfiguration(&self) -> bool {
+        self.transaction_outputs.iter().any(|output| {
+            output
+                .events()
+                .iter()
+                .any(ContractEvent::is_new_epoch_event)
+        })
+    }
+}
 
 impl DoGetExecutionOutput {
     pub fn by_transaction_execution<V: VMBlockExecutor>(
@@ -101,7 +143,13 @@ impl DoGetExecutionOutput {
             )?,
         };
 
-        let ret = out.clone();
+        Self::update_counters_async(&out);
+        Ok(out)
+    }
+
+    /// Updates the per-transaction metrics off the critical path.
+    pub fn update_counters_async(out: &ExecutionOutput) {
+        let out = out.clone();
         THREAD_MANAGER.get_background_pool().spawn(move || {
             let _timer = OTHER_TIMERS.timer_with(&["async_update_counters__by_execution"]);
             for x in [&out.to_commit, &out.to_retry, &out.to_discard] {
@@ -112,8 +160,6 @@ impl DoGetExecutionOutput {
                 )
             }
         });
-
-        Ok(ret)
     }
 
     fn by_transaction_execution_unsharded<V: VMBlockExecutor>(
@@ -128,6 +174,34 @@ impl DoGetExecutionOutput {
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
+        let raw = Self::execute_raw::<V>(
+            executor,
+            transactions,
+            auxiliary_infos,
+            state_view,
+            onchain_config,
+            transaction_slice_metadata,
+        )?;
+        Self::parse_raw(
+            raw,
+            parent_state,
+            parent_positions,
+            parent_orders,
+            parent_collateral,
+        )
+    }
+
+    /// Runs the VM over the block and returns its outputs before they are
+    /// indexed into an [ExecutionOutput], so the indexing can overlap with the
+    /// next block's execution.
+    pub fn execute_raw<V: VMBlockExecutor>(
+        executor: &V,
+        transactions: Vec<SignatureVerifiedTransaction>,
+        auxiliary_infos: Vec<AuxiliaryInfo>,
+        state_view: CachedStateView,
+        onchain_config: BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata: TransactionSliceMetadata,
+    ) -> Result<RawBlockExecution> {
         let txn_provider = DefaultTxnProvider::new(transactions, auxiliary_infos.clone());
         let block_output = Self::execute_block::<V>(
             executor,
@@ -136,7 +210,7 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
-        let (mut transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+        let (mut transaction_outputs, block_epilogue_txn, block_writes) = block_output.into_parts();
         let (transactions, mut auxiliary_infos) = txn_provider.into_inner();
         let mut transactions = transactions
             .into_iter()
@@ -165,22 +239,49 @@ impl DoGetExecutionOutput {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
 
+        Ok(RawBlockExecution {
+            transactions,
+            transaction_outputs,
+            auxiliary_infos,
+            state_view,
+            onchain_config,
+            is_block: transaction_slice_metadata
+                .append_state_checkpoint_to_block()
+                .is_some(),
+            block_writes,
+        })
+    }
+
+    /// Indexes a block's raw outputs on top of its parent's state.
+    pub fn parse_raw(
+        raw: RawBlockExecution,
+        parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
+        parent_orders: Option<OrderParent<'_>>,
+        parent_collateral: Option<CollateralParent<'_>>,
+    ) -> Result<ExecutionOutput> {
+        let RawBlockExecution {
+            transactions,
+            transaction_outputs,
+            auxiliary_infos,
+            state_view,
+            onchain_config,
+            is_block,
+            block_writes,
+        } = raw;
         Parser::parse()
             .first_version(state_view.next_version())
             .transactions(transactions)
             .transaction_outputs(transaction_outputs)
             .auxiliary_infos(auxiliary_infos)
+            .maybe_block_writes(block_writes)
             .parent_state(parent_state)
             .maybe_parent_positions(parent_positions)
             .maybe_parent_orders(parent_orders)
             .maybe_parent_collateral(parent_collateral)
             .base_state_view(state_view)
             .prime_state_cache(false)
-            .is_block(
-                transaction_slice_metadata
-                    .append_state_checkpoint_to_block()
-                    .is_some(),
-            )
+            .is_block(is_block)
             .transaction_info_v1(onchain_config.transaction_info_v1())
             .hot_state_root_in_txn_info(onchain_config.hot_state_root_in_txn_info())
             .compute_trading_native_state_roots(onchain_config.compute_trading_native_state_roots())
@@ -381,6 +482,7 @@ impl Parser {
         mut transactions: Vec<Transaction>,
         mut transaction_outputs: Vec<TransactionOutput>,
         auxiliary_infos: Vec<AuxiliaryInfo>,
+        block_writes: Option<BlockWrites<StateKey, WriteOp>>,
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
         parent_orders: Option<OrderParent<'_>>,
@@ -431,7 +533,8 @@ impl Parser {
                 transactions,
                 transaction_outputs,
                 persisted_auxiliary_infos,
-            );
+            )
+            .with_block_writes(block_writes);
             TransactionsToKeep::index(first_version, to_commit, is_block)
         };
         let next_epoch_state = {
@@ -444,7 +547,9 @@ impl Parser {
 
         base_state_view.prime_cache(
             to_commit.state_update_refs(),
-            if prime_state_cache {
+            // With the execution pool, a key the previous block wrote is read from
+            // the pool, not the state view, so its old slot has to be fetched here.
+            if prime_state_cache || *EXECUTION_POOL {
                 PrimingPolicy::All
             } else {
                 // Most of the transaction reads should already be in the cache, but some module
@@ -455,6 +560,7 @@ impl Parser {
                 // the keys, not the values.
                 PrimingPolicy::MakeHotOnly
             },
+            EXECUTION_POOL.then(|| &*COMMITTED_SLOTS),
         )?;
 
         let (result_state, hot_state_updates) = parent_state.update_with_memorized_reads(
@@ -463,6 +569,13 @@ impl Parser {
             to_commit.state_update_refs(),
             base_state_view.memorized_reads(),
         )?;
+        if *EXECUTION_POOL {
+            let _timer = OTHER_TIMERS.timer_with(&["absorb_committed_slots"]);
+            COMMITTED_SLOTS.absorb(
+                base_state_view.memorized_reads(),
+                to_commit.state_update_refs(),
+            );
+        }
         let state_reads = base_state_view.into_memorized_reads();
         // Beside `result_state`: same inputs, same chaining off the parent,
         // and the same split at the inner state checkpoint.

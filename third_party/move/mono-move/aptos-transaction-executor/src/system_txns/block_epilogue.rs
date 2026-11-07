@@ -15,9 +15,8 @@ impl<'guard> AptosTransactionExecutor<'guard> {
     /// the outcome falls back to an empty success carrying the failure, and the
     /// failed session's writes are dropped.
     //
-    // TODO(completeness): the legacy VM currently ignores the payload's
-    // `to_make_hot` keys and emits no hot-state output, and so do we; revisit
-    // when that changes.
+    // The payload's `to_make_hot` keys are not applied here: the block
+    // executor adds them to the materialized output.
     pub fn execute_block_epilogue_transaction(
         &self,
         block_epilogue: &BlockEpiloguePayload,
