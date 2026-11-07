@@ -2258,7 +2258,7 @@ impl<'a> LoweringState<'a> {
     fn derive_native_abi(&self, cs: &CallSiteInfo) -> VMResult<NativeABI> {
         let callee_base = self.ctx.frame_data_size + FRAME_METADATA_SIZE as u32;
         let to_slot = |s: &TypedSlot| FrameSlot {
-            offset: s.slot.offset.0 - callee_base,
+            offset: FrameOffset(s.slot.offset.0 - callee_base),
             size: s.slot.size,
         };
         let args: Vec<FrameSlot> = cs.arg_slots.iter().map(to_slot).collect();

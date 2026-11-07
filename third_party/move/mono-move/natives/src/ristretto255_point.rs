@@ -23,6 +23,7 @@ use curve25519_dalek::{
     traits::{Identity, VartimeMultiscalarMul},
 };
 use mono_move_core::{
+    memory::MemAddr,
     native::{
         native_invariant_violation, NativeContext, NativeContextFamily, NativeExtension,
         NativeStatus, Ref, Vector,
@@ -103,7 +104,7 @@ impl RistrettoPointStore {
 }
 
 impl NativeExtension for RistrettoPointStore {
-    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {
+    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>) {
         // Points are referenced by handle and hold no VM heap pointers.
     }
 
@@ -140,8 +141,9 @@ impl NativeExtension for RistrettoPointStore {
 /// pointer and the handle is read immediately.
 pub(crate) fn point_handle(point: &Ref<u64>) -> u64 {
     // SAFETY: `handle` is the 0th (and only) field of `RistrettoPoint`, so the
-    // reference points at that `u64`.
-    unsafe { core::ptr::read_unaligned(point.ptr() as *const u64) }
+    // reference points at that `u64`, live for the call. The referent is not
+    // necessarily 8-aligned, so the load is unaligned.
+    unsafe { point.addr().load_unaligned::<u64>() }
 }
 
 /// `0x1::ristretto255::point_identity_internal(): u64`

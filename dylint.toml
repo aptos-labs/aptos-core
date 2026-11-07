@@ -16,3 +16,12 @@ exempt = [
     "mono-move-lean-link",
     "vm-comparison",
 ]
+
+[aptos_lints.raw_memory_access]
+# Every VM crate: raw memory access goes through mono_move_mem::MemAddr.
+crates = ["mono-move-*", "specializer"]
+exempt = [
+    "mono-move-mem",       # the choke point itself
+    "mono-move-alloc",     # the allocator that hands out the memory
+    "mono-move-lean-link", # C ABI buffers for the Lean harness
+]

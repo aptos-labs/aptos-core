@@ -59,6 +59,7 @@ FORWARD=(
 
 # Packages Miri runs.
 RUN_PACKAGES=(
+  mono-move-mem
   mono-move-alloc
   mono-move-core
   mono-move-global-context

@@ -6,6 +6,7 @@
 use crate::{monomorphic_natives, polymorphic_natives, NativeEntry};
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use mono_move_core::{
+    memory::MemAddr,
     native::{NativeContext, NativeContextFamily, NativeExtension, NativeStatus},
     types::is_resource_type,
     VMResult,
@@ -32,7 +33,7 @@ impl ObjectContextExtension {
 }
 
 impl NativeExtension for ObjectContextExtension {
-    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {}
+    unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(MemAddr) -> Option<MemAddr>) {}
 
     fn on_checkpoint(&mut self) {}
 

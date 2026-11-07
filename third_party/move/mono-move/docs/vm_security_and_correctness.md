@@ -34,6 +34,8 @@ Values in MonoMove are stored as untyped raw bytes. The VM must prevent type con
 - No off-by-one or other incorrect offset computations.
 - No out-of-bounds access into containers (vectors, structs, etc.).
 
+**Single choke point.** All raw memory access in the VM goes through `MemAddr` (`mono-move-mem`), with the VM's layout knowledge layered on top (`Frame`, `FatRef`, `Obj`). No other crate holds or dereferences a raw pointer; the `raw_memory_access` lint (`devtools/lints`) enforces this. The point of the rule is that every property above has exactly one place where a runtime check can be attached.
+
 **Allocation failure handling.** Stack overflow and heap allocation failure must be treated as errors and handled gracefully (i.e., abort the transaction), never ignored.
 
 **Centralized memory management.** All significant memory allocation must go through the VM's memory manager. Native functions, in particular, should not maintain independent shadow memory spaces, as this makes it difficult to enforce global memory limits and opens the door to untracked resource consumption.

@@ -65,6 +65,8 @@ impl VerexBuffer {
         }
     }
 
+    // The buffer is a C ABI allocation, not VM memory, so it is viewed
+    // directly rather than through `MemAddr`.
     fn into_vec(self) -> Vec<u8> {
         if self.data.is_null() {
             return Vec::new();
@@ -92,6 +94,8 @@ pub extern "C" fn verex_monovm_abi_version() -> u32 {
 ///
 /// `request` must be readable for `request_len` bytes when it is non-null,
 /// and `response` must be writable.
+// `request` is a C ABI buffer, not VM memory, so it is viewed directly
+// rather than through `MemAddr`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn verex_monovm_run(
     request: *const u8,
