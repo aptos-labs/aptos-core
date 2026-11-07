@@ -11,7 +11,10 @@
 mod parallel;
 mod sequential;
 
-use crate::{mono_move::MonoValue, scheduler_wrapper::SchedulerWrapper, view::wait_for_dependency};
+use crate::{
+    counters::INTERRUPTED_INCARNATIONS, mono_move::MonoValue, scheduler_wrapper::SchedulerWrapper,
+    view::wait_for_dependency,
+};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDataError, MVDataOutput, MVGroupError, TxnIndex, Version as MVVersion},
     MVHashMap,
@@ -193,6 +196,19 @@ where
     fn abort(&self, msg: impl ToString) -> ResourceProviderError {
         self.speculative_failure.set(true);
         ResourceProviderError::SpeculativeAbort(msg.to_string())
+    }
+
+    /// Fails once this incarnation has been aborted or the block halted, so
+    /// the rest of its execution is not spent on an output nobody will use.
+    pub(crate) fn check_interrupted(&self) -> Result<(), ResourceProviderError> {
+        if self
+            .scheduler
+            .interrupt_requested(self.txn_idx, self.incarnation)
+        {
+            INTERRUPTED_INCARNATIONS.inc();
+            return Err(self.abort("Incarnation was aborted during execution"));
+        }
+        Ok(())
     }
 
     /// Blocks until `dep_idx` resolves, failing the read if the block halted

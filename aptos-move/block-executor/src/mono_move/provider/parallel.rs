@@ -150,6 +150,10 @@ impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMParallelProvide
             },
         }
     }
+
+    fn check_interrupted(&self) -> Result<(), ResourceProviderError> {
+        self.reader.check_interrupted()
+    }
 }
 
 impl<S: TStateView<Key = StateKey>> AptosDataProvider for BlockSTMParallelProvider<'_, '_, S> {

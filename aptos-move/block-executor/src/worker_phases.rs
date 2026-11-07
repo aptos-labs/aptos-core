@@ -22,6 +22,9 @@ pub enum WorkerPhase {
     Scheduler,
     /// Inside the VM: `SingleTransactionExecutor::execute`.
     ExecuteVm,
+    /// Inside the VM, for an incarnation that was aborted by the time it
+    /// returned, so the work is redone.
+    ExecuteVmWasted,
     /// After the VM returns: applying the write set to the multi-version map,
     /// recording the read set, and notifying the scheduler.
     ExecuteApply,
@@ -32,10 +35,11 @@ pub enum WorkerPhase {
 }
 
 impl WorkerPhase {
-    pub const ALL: [WorkerPhase; 6] = [
+    pub const ALL: [WorkerPhase; 7] = [
         WorkerPhase::CommitHooks,
         WorkerPhase::Scheduler,
         WorkerPhase::ExecuteVm,
+        WorkerPhase::ExecuteVmWasted,
         WorkerPhase::ExecuteApply,
         WorkerPhase::Materialize,
         WorkerPhase::ModuleValidation,
@@ -46,9 +50,10 @@ impl WorkerPhase {
             WorkerPhase::CommitHooks => 0,
             WorkerPhase::Scheduler => 1,
             WorkerPhase::ExecuteVm => 2,
-            WorkerPhase::ExecuteApply => 3,
-            WorkerPhase::Materialize => 4,
-            WorkerPhase::ModuleValidation => 5,
+            WorkerPhase::ExecuteVmWasted => 3,
+            WorkerPhase::ExecuteApply => 4,
+            WorkerPhase::Materialize => 5,
+            WorkerPhase::ModuleValidation => 6,
         }
     }
 
@@ -57,6 +62,7 @@ impl WorkerPhase {
             WorkerPhase::CommitHooks => "commit_hooks",
             WorkerPhase::Scheduler => "scheduler",
             WorkerPhase::ExecuteVm => "execute_vm",
+            WorkerPhase::ExecuteVmWasted => "execute_vm_wasted",
             WorkerPhase::ExecuteApply => "execute_apply",
             WorkerPhase::Materialize => "materialize",
             WorkerPhase::ModuleValidation => "module_validation",
@@ -115,6 +121,19 @@ impl WorkerPhaseTracker {
     pub(crate) fn switch(phase: WorkerPhase) {
         ACCUMULATOR.with(|acc| {
             if let Some(acc) = acc.borrow_mut().as_mut() {
+                acc.charge();
+                acc.phase = phase;
+            }
+        });
+    }
+
+    /// Like [`Self::switch`], but charges the elapsed interval to `charge_to`
+    /// instead of the current phase. The VM phase uses it once it knows
+    /// whether the incarnation's work survives.
+    pub(crate) fn switch_charging(charge_to: WorkerPhase, phase: WorkerPhase) {
+        ACCUMULATOR.with(|acc| {
+            if let Some(acc) = acc.borrow_mut().as_mut() {
+                acc.phase = charge_to;
                 acc.charge();
                 acc.phase = phase;
             }

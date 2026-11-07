@@ -379,6 +379,15 @@ pub static BLOCKSTM_VERSION_NUMBER: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Incarnations the kill switch stopped before they finished.
+pub static INTERRUPTED_INCARNATIONS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_execution_interrupted_incarnations",
+        "Incarnations stopped early because their reads were already invalidated"
+    )
+    .unwrap()
+});
+
 /// Worker time by phase, in microseconds. `clock` is `wall` or `cpu`; the gap
 /// between the two is time the worker spent descheduled.
 pub static WORKER_PHASE_MICROS: Lazy<IntCounterVec> = Lazy::new(|| {

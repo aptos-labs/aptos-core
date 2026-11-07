@@ -92,6 +92,7 @@ PHASES = [
     "commit_hooks",
     "scheduler",
     "execute_vm",
+    "execute_vm_wasted",
     "execute_apply",
     "materialize",
     "module_validation",
@@ -289,6 +290,9 @@ def parse_run(output, workload, threads, vm, repeat):
         get_last(stage + r"state view lookups per txn: (.*)", output, "state view lookups")
     ).items():
         row[f"{key}_per_txn"] = value
+    row["interrupts_per_txn"] = float(
+        get_last(stage + r"interrupted incarnations per txn: " + NUMBER, output, "interrupts")
+    )
     row["max_rss_kib"] = int(get_last(stage + r"max rss: (\d+) KiB", output, "max rss"))
     row["workflow_timer_us"] = {
         name: float(value)
@@ -425,6 +429,7 @@ METRIC_ROWS = [
     ("worker scope wall", "worker_scope_us", "inside the worker scope, where the workers run"),
     ("worker cpu total", "worker_cpu_total_us", "thread CPU summed over all workers"),
     ("worker cpu execute_vm", "worker_cpu_execute_vm_us", "inside the VM's execute"),
+    ("worker cpu execute_vm_wasted", "worker_cpu_execute_vm_wasted_us", "VM time of incarnations that were aborted"),
     ("worker cpu execute_apply", "worker_cpu_execute_apply_us", "applying writes, recording reads"),
     ("worker cpu materialize", "worker_cpu_materialize_us", "output materialization"),
     ("worker cpu commit_hooks", "worker_cpu_commit_hooks_us", "sequential commit path"),
@@ -442,6 +447,7 @@ METRIC_ROWS = [
     ("voluntary ctx switches /txn", "voluntary_ctx_switches_per_txn", ""),
     ("involuntary ctx switches /txn", "involuntary_ctx_switches_per_txn", ""),
     ("speculative aborts /txn", "aborts_per_txn", ""),
+    ("interrupted incarnations /txn", "interrupts_per_txn", "stopped early by the kill switch"),
     ("cold state reads /txn", "cold_reads_per_txn", "state view lookups that reached the DB"),
     ("cold state reads", "cold_read_us", "time inside those DB reads"),
     ("hot state promotions /txn", "hot_promotions_per_txn", "keys the block epilogues made hot"),

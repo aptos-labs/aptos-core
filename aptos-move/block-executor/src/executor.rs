@@ -393,7 +393,18 @@ where
         WorkerPhaseTracker::switch(WorkerPhase::ExecuteVm);
         let (execution_result, mut read_set) =
             executor.execute(shared, mode, txn, auxiliary_info, idx_to_execute)?;
-        WorkerPhaseTracker::switch(WorkerPhase::ExecuteApply);
+        // An incarnation aborted by the time the VM returns is executed again,
+        // so its VM time was wasted.
+        let wasted = execution_result.is_speculative_failure()
+            || scheduler.is_halted_or_aborted(idx_to_execute, incarnation);
+        WorkerPhaseTracker::switch_charging(
+            if wasted {
+                WorkerPhase::ExecuteVmWasted
+            } else {
+                WorkerPhase::ExecuteVm
+            },
+            WorkerPhase::ExecuteApply,
+        );
 
         if read_set.is_incorrect_use() {
             return Err(code_invariant_error(format!(
