@@ -8,7 +8,7 @@ use crate::{
     scheduler_status::ExecutionStatuses,
 };
 use aptos_infallible::Mutex;
-use aptos_mvhashmap::types::{Incarnation, Invalidated, TxnIndex};
+use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::{code_invariant_error, PanicError};
 use concurrent_queue::{ConcurrentQueue, PopError};
 use crossbeam::utils::CachePadded;
@@ -130,15 +130,14 @@ pub(crate) struct AbortManager<'a> {
     // invalidated a read by the said transaction. If the incarnation is stored in the
     // entry, then start_abort call was successful, implying a promise to call finish_abort.
     invalidated_dependencies: BTreeMap<TxnIndex, Option<Incarnation>>,
-    // Transactions this manager aborted, keyed by the writer whose entry they read
-    // next (the highest-indexed writer between the owner and the reader at the
-    // invalidated key). That writer's own read was invalidated or is about to be,
-    // so the reader is held back until the writer has executed again.
+    // Readers of the entries of transactions this manager aborted, keyed by that
+    // transaction: the entries are about to be replaced, so the readers are held
+    // back until it has executed again.
     predicted_stalls: BTreeMap<TxnIndex, BTreeSet<TxnIndex>>,
 }
 
-/// Holds an aborted reader back until the next writer above it at the same key has
-/// executed again, instead of letting it re-execute against that writer's stale entry.
+/// Holds the readers of an aborted transaction's entries back until it has executed
+/// again, instead of letting them re-execute against entries that are about to change.
 pub(crate) static PREDICTIVE_STALLS: Lazy<bool> =
     Lazy::new(|| std::env::var("BLOCK_STM_PREDICTIVE_STALL").is_ok_and(|v| v == "1"));
 
@@ -169,24 +168,12 @@ impl<'a> AbortManager<'a> {
 
     pub(crate) fn invalidate_dependencies(
         &mut self,
-        invalidated: Invalidated,
+        dependencies: BTreeMap<TxnIndex, Incarnation>,
     ) -> Result<(), PanicError> {
         // Might want to consider iterating over incarnations in reverse order to ensure
         // that invalidate method implementation can avoid outdated try_abort calls.
-        for (txn_idx, incarnation) in invalidated.dependencies {
+        for (txn_idx, incarnation) in dependencies {
             self.invalidate(txn_idx, incarnation)?;
-        }
-        if *PREDICTIVE_STALLS {
-            for (reader, writer) in invalidated.next_writers {
-                // Only a reader this manager aborted is known to be pending; stalling
-                // one aborted elsewhere could race with its re-execution.
-                if matches!(self.invalidated_dependencies.get(&reader), Some(Some(_))) {
-                    self.predicted_stalls
-                        .entry(writer)
-                        .or_default()
-                        .insert(reader);
-                }
-            }
         }
         Ok(())
     }
@@ -257,6 +244,26 @@ impl<'a> AbortManager<'a> {
         }
 
         Ok(())
+    }
+
+    /// Transactions this manager aborted.
+    pub(crate) fn aborted(&self) -> impl Iterator<Item = TxnIndex> + '_ {
+        self.invalidated_dependencies
+            .iter()
+            .filter_map(|(txn_idx, outcome)| outcome.map(|_| *txn_idx))
+    }
+
+    /// Holds readers of an aborted transaction's current entries back until it has
+    /// executed again: those entries are about to be replaced.
+    pub(crate) fn stall_readers_on(
+        &mut self,
+        writer: TxnIndex,
+        readers: impl IntoIterator<Item = TxnIndex>,
+    ) {
+        self.predicted_stalls
+            .entry(writer)
+            .or_default()
+            .extend(readers);
     }
 
     /// Attempts to initiate an abort for the given transaction and incarnation via the scheduler.
@@ -999,17 +1006,6 @@ impl SchedulerV2 {
                 .record_dependencies(invalidated_set.keys().copied());
         }
 
-        // Predicted stalls are recorded while their readers are still aborted (before
-        // finish_abort makes them schedulable). A writer that was not itself aborted
-        // here is already executing or executed, so its stall state is final now; a
-        // writer that was is handled right after its own finish_abort below, in index
-        // order, which is before any of its readers' (they are all above it).
-        for writer in predicted_stalls.keys().copied().collect::<Vec<_>>() {
-            if !matches!(invalidated_set.get(&writer), Some(Some(_))) {
-                let readers = predicted_stalls.remove(&writer).expect("key was just read");
-                self.record_predicted_stalls(writer, readers)?;
-            }
-        }
         let mut stall_propagation_queue: BTreeSet<usize> = BTreeSet::new();
         for (txn_idx, maybe_incarnation) in invalidated_set {
             if let Some(incarnation) = maybe_incarnation {
@@ -1017,6 +1013,9 @@ impl SchedulerV2 {
                     .finish_abort(txn_idx, incarnation, false)?;
                 stall_propagation_queue.insert(txn_idx as usize);
             }
+            // Its readers are stalled right after its own finish_abort, in index order:
+            // they are all above it and still aborted or executing, so a reader that
+            // this manager aborted cannot be scheduled before its stall is in place.
             if let Some(readers) = predicted_stalls.remove(&txn_idx) {
                 self.record_predicted_stalls(txn_idx, readers)?;
             }

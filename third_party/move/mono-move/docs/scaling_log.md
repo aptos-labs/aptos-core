@@ -513,3 +513,75 @@ copying. Not pursued tonight: the stage is not the end-to-end bottleneck (see
 the timeline above), so the remaining outside-Block-STM cost matters only
 for the VM comparison, where it is now 2.9–6.1 µs/txn on MonoMove against
 12 µs/txn inside Block-STM.
+
+## 2026-11-07: Block-STM v2 scheduling (commit 3881709981, runs 42325161687 / 42325171548 / 42325181250)
+
+Design notes and the full list of ideas are in `block_stm_v2_opportunities.md`.
+Three flags, off by default, A/B'd on the same recording in one job:
+`BLOCK_STM_SENDER_HINTS` (a transaction's first execution waits for the
+previous transaction of the same sender to execute once),
+`BLOCK_STM_PREDICTIVE_STALL` (an aborted reader waits for the writer whose
+entry it reads next), `BLOCK_STM_IDLE_BACKOFF` (idle workers yield, then
+sleep 5 µs between polls).
+
+### Sender hints: the chained-sender penalty is gone
+
+Five transactions per sender (the e2e harness shape), 16 threads:
+
+| 16T | base inner µs/txn (TPS) | hints | aborts/txn base → hints | worker CPU |
+|---|---|---|---|---|
+| no-op, V1 | 33.2 (30.1k) | 22.0 (45.5k) | 1.95 → 0.00 | −36% |
+| no-op, MonoMove | 8.2 (122k) | 5.4 (184k) | 1.94 → 0.11 | −40% |
+| transfer, V1 | 44.1 (22.7k) | 33.0 (30.3k) | 1.97 → 0.00 | −28% |
+| transfer, MonoMove | 13.4 (74.5k) | 10.7 (93.8k) | 2.06 → 0.18 | −23% |
+
+At 2 threads the same flag is worth +8% (transfer) to +32% (no-op, MonoMove).
+The hinted schedule is faster than independent senders on the same build
+(no-op MonoMove 184k against 134–150k with one transaction per sender):
+a sender's five transactions run back to back on one worker, so its
+account and store are inserted into the map once and stay in cache.
+MonoMove's residual 0.1–0.2 aborts/txn are its group-slot collisions, the
+same as with one transaction per sender.
+
+The hint costs one pass over the block (`sender_predecessors`, a
+`HashMap<AccountAddress, TxnIndex>`), and needs no change to validation:
+a deferred transaction is simply not in the initial queue and is entered
+when its predecessor finishes incarnation 0.
+
+### Predictive stalls: no effect on chains, and why
+
+Two variants ran: hold an aborted reader for the next writer above it at
+the invalidated key, and let a writer that was aborted mid-execution stall
+the readers its applied writes invalidated. Neither changed a number
+(0.00 stalls, aborts identical to base). On a sender chain the reader
+always reads the entry immediately below, so there is no "next writer"
+between the aborting writer and the reader; and an incarnation aborted
+mid-execution is stopped by the kill switch on both VMs, so it applies no
+writes and invalidates nobody. The cascade (4+3+2+1 aborts per chain of
+five) is readers re-executing against the aborted transaction's *existing*
+stale entries, which only the third variant addresses: when a transaction
+is aborted, the readers currently registered on its entries are stalled
+until it has executed again. That variant is implemented after this run,
+under the same flag, and is measured next. The order-book runs, where the
+window of 16 does leave gaps between writers, are below.
+
+### Idle backoff: returns 14 cores on the serial workload
+
+Order book, 16 threads, worker CPU µs/txn:
+
+| | base | backoff | all three flags |
+|---|---|---|---|
+| MonoMove scheduler (spinning) | 776 | 207 | 213 |
+| MonoMove total | 1652 | 1044 | 1011 |
+| MonoMove inner TPS | 7202 | 7724 (+7%) | 7672 (+7%) |
+| V1 scheduler (spinning) | 6080 | 1156 | 1212 |
+| V1 total | 14242 | 9139 | 8571 |
+| V1 inner TPS | 851 | 852 | 854 |
+
+The spin was also slowing the chain's own worker on MonoMove: 7% more
+throughput with 14 workers asleep instead of polling the execution queue's
+mutex. The remaining 207 µs/txn of "scheduler" CPU is the 5 µs sleeps
+themselves: a `nanosleep` round trip costs a few µs of kernel time, so 14
+workers sleeping in 5 µs slices still burn a third of a core each. The
+sleep now backs off to 100 µs; with 14 sleepers the expected pick-up
+latency for new work stays under 10 µs.
