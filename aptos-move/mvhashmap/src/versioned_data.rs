@@ -557,7 +557,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     /// the base value for the next block on the same fork. Entries of
     /// transactions past the committed prefix, dependencies and estimates are
     /// dropped; a trailing deletion stays as a deleted base.
-    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) -> usize
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex)
     where
         K: Send + Sync,
         V: Send + Sync,
@@ -575,7 +575,6 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         // `par_bridge` hands keys out one at a time under a lock; chunks of a
         // plain vector parallelize cleanly.
         let touched = touched.into_iter().collect::<Vec<_>>();
-        let num_touched = touched.len();
         touched.par_chunks(64).flatten().for_each(|key| {
             let Some(mut v) = self.values.get_mut(key) else {
                 return;
@@ -601,7 +600,6 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
                 CachePadded::new(new_write_entry(0, value, BTreeMap::new(), block)),
             );
         });
-        num_touched
     }
 
     /// Transactions that registered a read of the entry written at txn_idx, if any.

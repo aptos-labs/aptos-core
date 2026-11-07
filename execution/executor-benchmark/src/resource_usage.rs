@@ -391,19 +391,6 @@ fn workflow_timer_secs() -> BTreeMap<String, f64> {
         ("aptos_executor_other_timers_seconds", "executor"),
         ("aptos_storage_interface_timer_seconds", "storage"),
     ];
-    // Labelled block-executor families: the label value names the entry.
-    const LABELLED: [(&str, &str, &str); 2] = [
-        (
-            "aptos_execution_pool_collapse_part_seconds",
-            "part",
-            "block_executor/pool_collapse",
-        ),
-        (
-            "aptos_execution_pool_collapsed_keys",
-            "part",
-            "block_executor/pool_collapsed_keys",
-        ),
-    ];
     // Unlabelled block-executor histograms, reported under their own name.
     const PLAIN: [(&str, &str); 1] = [(
         "aptos_execution_pool_collapse_seconds",
@@ -414,27 +401,6 @@ fn workflow_timer_secs() -> BTreeMap<String, f64> {
         if let Some((_, name)) = PLAIN.iter().find(|(name, _)| *name == family.name()) {
             if let Some(metric) = family.get_metric().first() {
                 out.insert(name.to_string(), metric.get_histogram().get_sample_sum());
-            }
-            continue;
-        }
-        if let Some((_, label_name, prefix)) =
-            LABELLED.iter().find(|(name, _, _)| *name == family.name())
-        {
-            for metric in family.get_metric() {
-                let Some(label) = metric.get_label().iter().find(|l| l.name() == *label_name)
-                else {
-                    continue;
-                };
-                let value = match family.get_field_type() {
-                    aptos_metrics_core::MetricType::HISTOGRAM => {
-                        metric.get_histogram().get_sample_sum()
-                    },
-                    aptos_metrics_core::MetricType::COUNTER => metric.get_counter().get_value(),
-                    aptos_metrics_core::MetricType::GAUGE
-                    | aptos_metrics_core::MetricType::SUMMARY
-                    | aptos_metrics_core::MetricType::UNTYPED => continue,
-                };
-                out.insert(format!("{prefix}/{}", label.value()), value);
             }
             continue;
         }
