@@ -438,9 +438,13 @@ pub fn add_prelude(
         table_instances.append(&mut bv_table_instances);
     }
     context.insert("vec_instances", &vec_instances);
+    // Table, tuple, key and native instances are emitted once per normalized
+    // instantiation (`Type::normalize_inst`), as `normalized_inst_id` keys other
+    // entities: function types differing only in abilities are one Boogie type.
     let tuple_instances = mono_info
         .tuple_inst
         .iter()
+        .unique_by(|elems| Type::normalize_inst(elems))
         .map(|elems| TupleInfo::new(env, options, elems))
         .collect_vec();
     context.insert("tuple_instances", &tuple_instances);
@@ -448,7 +452,7 @@ pub fn add_prelude(
         .table_inst
         .values()
         .flat_map(|ty_args| ty_args.iter().map(|(kty, _)| kty))
-        .unique()
+        .unique_by(|kty| Type::normalize_inst(std::slice::from_ref(*kty)))
         .map(|ty| TypeInfo::new(env, options, ty, false))
         .collect_vec();
     context.insert("table_key_instances", &table_key_instances);
@@ -458,11 +462,14 @@ pub fn add_prelude(
             .iter()
             .filter(|(id, _)| env.get_module(**id).get_full_name_str() == module)
             .flat_map(|(_, insts)| {
-                insts.iter().map(|inst| {
-                    inst.iter()
-                        .map(|i| TypeInfo::new(env, options, i, false))
-                        .collect::<Vec<_>>()
-                })
+                insts
+                    .iter()
+                    .unique_by(|inst| Type::normalize_inst(inst))
+                    .map(|inst| {
+                        inst.iter()
+                            .map(|i| TypeInfo::new(env, options, i, false))
+                            .collect::<Vec<_>>()
+                    })
             })
             .sorted()
             .collect_vec()
@@ -546,6 +553,16 @@ pub fn add_prelude(
     }
     cmp_instances.sort();
     cmp_instances.dedup();
+    // One comparison per normalized type and rendering (the bv twin keeps its own).
+    let cmp_instances = cmp_instances
+        .into_iter()
+        .unique_by(|(ty, info)| {
+            (
+                Type::normalize_inst(std::slice::from_ref(ty)),
+                info.suffix.clone(),
+            )
+        })
+        .collect_vec();
     // Mark each MapImpl's K as `cmp_available` when its suffix is in `cmp_instances`,
     // so ordering-role templates can skip K's without an emitted cmp function.
     let cmp_k_suffixes: BTreeSet<String> = cmp_instances
@@ -695,6 +712,7 @@ impl MapImpl {
     ) -> Self {
         let insts: Vec<(TypeInfo, TypeInfo)> = ty_args
             .iter()
+            .unique_by(|(kty, vty)| Type::normalize_inst(&[kty.clone(), vty.clone()]))
             .map(|(kty, vty)| {
                 (
                     TypeInfo::new(env, options, kty, false),

@@ -33,11 +33,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// instantiation, with nested function types normalized. Abilities are not part of Boogie
 /// names, so instantiations differing only in them are one entity.
 pub fn normalized_inst_id<Id: Clone>(id: QualifiedId<Id>, inst: &[Type]) -> QualifiedInstId<Id> {
-    id.instantiate(
-        inst.iter()
-            .map(|t| t.clone().normalize_nested_funs())
-            .collect(),
-    )
+    id.instantiate(Type::normalize_inst(inst))
 }
 
 /// Tracks which entities an emission loop has already translated. Keyed on the entity,

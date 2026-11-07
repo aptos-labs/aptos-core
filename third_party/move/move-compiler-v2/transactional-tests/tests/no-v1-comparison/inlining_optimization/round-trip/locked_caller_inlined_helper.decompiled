@@ -2,11 +2,11 @@
 
 //# publish
 module 0x42::m {
-    fun helper(p0: |u64|(u64)): u64 {
+    fun helper(p0: |u64|u64): u64 {
         p0(1)
     }
     #[module_lock]
-    public fun locked(p0: |u64|(u64)): u64 {
+    public fun locked(p0: |u64|u64): u64 {
         helper(p0)
     }
     public fun touch(p0: u64): u64 {

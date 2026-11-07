@@ -5,22 +5,22 @@ module 0xc0ffee::m {
     struct DropStore has drop, store {
         x: u64,
     }
-    fun lambda_first(p0: DropStore, p1: |u64|(u64) has drop): bool {
+    fun lambda_first(p0: DropStore, p1: |u64|u64 has drop): bool {
         (|x| with_capture(p0, x)) == p1
     }
     public fun with_capture(p0: DropStore, p1: u64): u64 {
         let DropStore{x: _v0} = p0;
         _v0 + p1
     }
-    fun lambda_first_neq(p0: DropStore, p1: |u64|(u64) has drop): bool {
+    fun lambda_first_neq(p0: DropStore, p1: |u64|u64 has drop): bool {
         (|x| with_capture(p0, x)) != p1
     }
-    fun lambda_second(p0: DropStore, p1: |u64|(u64) has drop): bool {
-        let _v0: |u64|(u64) has drop = |x| with_capture(p0, x);
+    fun lambda_second(p0: DropStore, p1: |u64|u64 has drop): bool {
+        let _v0: |u64|u64 has drop = |x| with_capture(p0, x);
         p1 == _v0
     }
-    fun lambda_second_neq(p0: DropStore, p1: |u64|(u64) has drop): bool {
-        let _v0: |u64|(u64) has drop = |x| with_capture(p0, x);
+    fun lambda_second_neq(p0: DropStore, p1: |u64|u64 has drop): bool {
+        let _v0: |u64|u64 has drop = |x| with_capture(p0, x);
         p1 != _v0
     }
     fun main() {

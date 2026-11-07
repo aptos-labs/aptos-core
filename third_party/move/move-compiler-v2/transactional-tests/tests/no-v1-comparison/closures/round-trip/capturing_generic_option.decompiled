@@ -7,9 +7,9 @@ module 0x42::test {
         value: u64,
     }
     struct Validator has key {
-        check: |u64|(bool) has copy + drop + store,
+        check: |u64|bool has copy + drop + store,
     }
-    fun apply_validator(p0: ||(bool)): bool {
+    fun apply_validator(p0: ||bool): bool {
         p0()
     }
     #[persistent]

@@ -2,32 +2,32 @@
 
 //# publish
 module 0xc0ffee::n {
-    fun create_adder(p0: u64): |u64|(|u64|(u64)) has copy {
+    fun create_adder(p0: u64): |u64|(|u64|u64) has copy {
         |x| lambda__2__create_adder(p0, x)
     }
-    fun lambda__2__create_adder(p0: u64, p1: u64): |u64|(u64) {
+    fun lambda__2__create_adder(p0: u64, p1: u64): |u64|u64 {
         |x| lambda__1__create_adder(p0, p1, x)
     }
-    fun create_multiplier(p0: u64): |u64|(|u64|(u64)) has copy {
+    fun create_multiplier(p0: u64): |u64|(|u64|u64) has copy {
         |x| lambda__2__create_multiplier(p0, x)
     }
-    fun lambda__2__create_multiplier(p0: u64, p1: u64): |u64|(u64) {
+    fun lambda__2__create_multiplier(p0: u64, p1: u64): |u64|u64 {
         |x| lambda__1__create_multiplier(p0, p1, x)
     }
     fun test_composed_captures() {
-        let _v0: |u64|(|u64|(u64)) has copy + drop = |x| lambda__2__test_composed_captures(2, x);
-        let _v1: |u64|(|u64|(u64)) has copy + drop = |x| lambda__4__test_composed_captures(2, x);
+        let _v0: |u64|(|u64|u64) has copy + drop = |x| lambda__2__test_composed_captures(2, x);
+        let _v1: |u64|(|u64|u64) has copy + drop = |x| lambda__4__test_composed_captures(2, x);
         let _v2 = |x| lambda__6__test_composed_captures(_v0, _v1, x);
         let _v3 = _v2(3);
         assert!(_v3(4) == 54, 0);
     }
-    fun lambda__2__test_composed_captures(p0: u64, p1: u64): |u64|(u64) {
+    fun lambda__2__test_composed_captures(p0: u64, p1: u64): |u64|u64 {
         |x| lambda__1__test_composed_captures(p0, p1, x)
     }
-    fun lambda__4__test_composed_captures(p0: u64, p1: u64): |u64|(u64) {
+    fun lambda__4__test_composed_captures(p0: u64, p1: u64): |u64|u64 {
         |x| lambda__3__test_composed_captures(p0, p1, x)
     }
-    fun lambda__6__test_composed_captures(p0: |u64|(|u64|(u64)), p1: |u64|(|u64|(u64)), p2: u64): |u64|(u64) {
+    fun lambda__6__test_composed_captures(p0: |u64|(|u64|u64), p1: |u64|(|u64|u64), p2: u64): |u64|u64 {
         |x| lambda__5__test_composed_captures(p2, p0, p1, x)
     }
     fun test_nested_functions() {
@@ -41,7 +41,7 @@ module 0xc0ffee::n {
         _v1 = _v2(2);
         assert!(_v1(4) == 120, 2);
     }
-    fun lambda__2__test_nested_functions(p0: u64, p1: u64, p2: u64): |u64|(u64) {
+    fun lambda__2__test_nested_functions(p0: u64, p1: u64, p2: u64): |u64|u64 {
         |x| lambda__1__test_nested_functions(p2, p0, p1, x)
     }
     fun lambda__1__create_adder(p0: u64, p1: u64, p2: u64): u64 {
@@ -56,7 +56,7 @@ module 0xc0ffee::n {
     fun lambda__3__test_composed_captures(p0: u64, p1: u64, p2: u64): u64 {
         p0 + p1 + p2
     }
-    fun lambda__5__test_composed_captures(p0: u64, p1: |u64|(|u64|(u64)), p2: |u64|(|u64|(u64)), p3: u64): u64 {
+    fun lambda__5__test_composed_captures(p0: u64, p1: |u64|(|u64|u64), p2: |u64|(|u64|u64), p3: u64): u64 {
         let _v0 = p2(p0);
         let _v1 = _v0(p3);
         let _v2 = p1(p0);

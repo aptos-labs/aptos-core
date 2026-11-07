@@ -1782,9 +1782,11 @@ impl Type {
                 );
                 Type::Struct(struct_id.module_id, struct_id.id, from_slice(args))
             },
+            // A single result is the type itself, not a one-element tuple, as in the
+            // source builder and `from_type_tag`: the forms must agree for type equality.
             SignatureToken::Function(args, result, abilities) => Type::Fun(
                 Box::new(Type::tuple(from_slice(args))),
-                Box::new(Type::Tuple(from_slice(result))),
+                Box::new(Type::tuple(from_slice(result))),
                 *abilities,
             ),
         }
@@ -1860,6 +1862,15 @@ impl Type {
     pub fn normalize_fun(self) -> Type {
         assert!(matches!(self, Type::Fun(..)), "expected fun type");
         self.normalize_nested_funs()
+    }
+
+    /// Normalize every function type nested in an instantiation (see
+    /// `normalize_nested_funs`): the key under which instantiations that are one
+    /// Boogie entity are deduplicated.
+    pub fn normalize_inst(inst: &[Type]) -> Vec<Type> {
+        inst.iter()
+            .map(|ty| ty.clone().normalize_nested_funs())
+            .collect()
     }
 
     /// Normalize every function type nested anywhere inside `self` into the
@@ -3978,7 +3989,9 @@ impl fmt::Display for TypeDisplay<'_> {
                 }
                 f.write_str("|")?;
                 if !t.is_unit() {
-                    if t.is_function() {
+                    // A function-typed result, also behind a reference, is parenthesized so
+                    // the `has` clause stays with the outer type when the text is parsed back.
+                    if t.skip_reference().is_function() {
                         write!(f, "({})", t.display(self.context))?;
                     } else {
                         write!(f, "{}", t.display(self.context))?;

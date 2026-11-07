@@ -37,8 +37,8 @@ module 0x42::mod3 {
         y: u8,
     }
     public fun test_items(p0: signer, p1: bool): bool {
-        let _v0: |address|(bool) has copy + drop + store = |x| mod2::item_exists<MyStruct1>(x);
-        let _v1: |address|(bool) has copy + drop + store = |x| mod2::item_exists<MyStruct2>(x);
+        let _v0: |address|bool has copy + drop + store = |x| mod2::item_exists<MyStruct1>(x);
+        let _v1: |address|bool has copy + drop + store = |x| mod2::item_exists<MyStruct2>(x);
         let _v2 = signer::address_of(&p0);
         if (!exists<MyStruct1>(_v2)) {
             let _v3 = MyStruct1{x: 3};
@@ -46,12 +46,12 @@ module 0x42::mod3 {
             let _v4 = &p0;
             move_to<MyStruct1>(_v4, _v3)
         };
-        if (p1) mod2::save_item<|address|(bool) has copy + drop + store>(&p0, _v0) else mod2::save_item<|address|(bool) has copy + drop + store>(&p0, _v1);
-        assert!(mod2::item_exists<|address|(bool) has copy + drop + store>(_v2), 14566554180833181696);
-        let _v5 = mod2::get_item<|address|(bool) has copy + drop + store>(_v2);
+        if (p1) mod2::save_item<|address|bool has copy + drop + store>(&p0, _v0) else mod2::save_item<|address|bool has copy + drop + store>(&p0, _v1);
+        assert!(mod2::item_exists<|address|bool has copy + drop + store>(_v2), 14566554180833181696);
+        let _v5 = mod2::get_item<|address|bool has copy + drop + store>(_v2);
         let _v6 = _v5(_v2);
         assert!(p1 == _v6, 14566554180833181696);
-        let _v7 = mod2::remove_item<|address|(bool) has copy + drop + store>(_v2);
+        let _v7 = mod2::remove_item<|address|bool has copy + drop + store>(_v2);
         true
     }
 }
@@ -63,11 +63,11 @@ module 0x42::mod4 {
         fv: T0,
     }
     fun check_exists(p0: &signer) {
-        assert!(exists<Wrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(@0x42), 404);
+        assert!(exists<Wrapper<|&u64, &mut u8|&u64 has copy + drop + store>>(@0x42), 404);
     }
     fun initialize(p0: &signer) {
-        let _v0 = Wrapper<|&u64, &mut u8|(&u64) has copy + drop + store>{fv: |x,y| test(x, y)};
-        move_to<Wrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(p0, _v0);
+        let _v0 = Wrapper<|&u64, &mut u8|&u64 has copy + drop + store>{fv: |x,y| test(x, y)};
+        move_to<Wrapper<|&u64, &mut u8|&u64 has copy + drop + store>>(p0, _v0);
     }
     #[persistent]
     fun test(p0: &u64, p1: &mut u8): &u64 {
@@ -82,14 +82,14 @@ module 0x42::mod5 {
         fvs: vector<T0>,
     }
     fun check_exists(p0: &signer) {
-        assert!(exists<VecWrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(@0x42), 404);
+        assert!(exists<VecWrapper<|&u64, &mut u8|&u64 has copy + drop + store>>(@0x42), 404);
     }
     fun initialize(p0: &signer) {
         let _v0: |&u64, &mut u8|&u64 has copy + drop = |x,y| test(x, y);
-        let _v1 = 0x1::vector::empty<|&u64, &mut u8|(&u64) has copy + drop + store>();
-        0x1::vector::push_back<|&u64, &mut u8|(&u64) has copy + drop + store>(&mut _v1, _v0);
-        let _v2 = VecWrapper<|&u64, &mut u8|(&u64) has copy + drop + store>{fvs: _v1};
-        move_to<VecWrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(p0, _v2);
+        let _v1 = 0x1::vector::empty<|&u64, &mut u8|&u64 has copy + drop + store>();
+        0x1::vector::push_back<|&u64, &mut u8|&u64 has copy + drop + store>(&mut _v1, _v0);
+        let _v2 = VecWrapper<|&u64, &mut u8|&u64 has copy + drop + store>{fvs: _v1};
+        move_to<VecWrapper<|&u64, &mut u8|&u64 has copy + drop + store>>(p0, _v2);
     }
     #[persistent]
     fun test(p0: &u64, p1: &mut u8): &u64 {

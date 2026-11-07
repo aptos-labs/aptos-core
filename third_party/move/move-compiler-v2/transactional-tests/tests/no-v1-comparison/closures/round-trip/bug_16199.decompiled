@@ -8,13 +8,13 @@ module 0xc0ffee::m {
         let _v2 = _v1(2);
         assert!(_v2(3) == 6, 14566554180833181696);
     }
-    fun lambda__3__test(p0: u64): |u64|(|u64|(u64)) {
+    fun lambda__3__test(p0: u64): |u64|(|u64|u64) {
         |x| lambda__2__test(p0, x)
     }
     fun lambda__1__test(p0: u64, p1: u64, p2: u64): u64 {
         p0 + p1 + p2
     }
-    fun lambda__2__test(p0: u64, p1: u64): |u64|(u64) {
+    fun lambda__2__test(p0: u64, p1: u64): |u64|u64 {
         |x| lambda__1__test(p0, p1, x)
     }
 }

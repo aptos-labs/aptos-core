@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/table_closure_value.move:16:5: error: no denotation for `serialize_fun`: a type argument without values is not carried by the denotation
+tests/sources/functional/table_closure_value.move:33:5: error: no denotation for `serialize_fun_copy`: a type argument without values is not carried by the denotation
+tests/sources/functional/table_closure_value.move:69:5: error: no denotation for `register`: a type argument without values is not carried by the denotation
+tests/sources/functional/table_closure_value.move:76:5: error: no denotation for `is_registered`: a type argument without values is not carried by the denotation
+tests/sources/functional/table_closure_value.move:9:5: error: no denotation for `fun_keys`: a type argument without values is not carried by the denotation
+tests/sources/functional/table_closure_value.move:22:5: error: no denotation for `new_callbacks_store_only`: a type argument without values is not carried by the denotation
+tests/sources/functional/table_closure_value.move:26:5: error: no denotation for `fun_keys_no_store`: a type argument without values is not carried by the denotation
+tests/sources/functional/table_closure_value.move:57:5: error: no denotation for `new_callbacks`: a type argument without values is not carried by the denotation
