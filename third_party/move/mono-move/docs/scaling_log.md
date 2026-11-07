@@ -654,3 +654,62 @@ pipelined mode those stages set the end-to-end rate (commit at 63 µs/txn
 wall for transfers), which is why a 2.5x faster execution stage gives
 +12% end to end. Past this point the throughput question is a storage
 question, not a VM one.
+
+Second attempt (commit b2b0725d0b, run 42333543734): keeping the slots in
+the per-worker maps and skipping the second collect brings the build to
+1.9–2.1 µs/txn (no-op 0.9–1.5). Its profile is now mostly rayon's own
+fork, steal and yield for a job of about 12 µs of CPU per transaction
+spread over 16 threads: the work is too small for a pool round trip and
+too large to do serially. The right place for it is inside Block-STM's
+post-commit materialization, which already visits every output, inserting
+into a shared overlay as transactions commit; that is the execution-pool
+shape from `execution_pool_and_group_writes.md`. With this build the
+pipelined execution stage is 15.0 µs/txn for a MonoMove transfer against
+16.0 serial, and the work outside Block-STM is 4.5 µs/txn of which 2 is
+this build and about 2 is block-tree and channel handling.
+
+## 2026-11-07 morning: where things stand
+
+Branch `george/mono-scaling-sweep`, PR #20915. Commits tonight, in order:
+`9fac1bf2a2` block timeline and pipelined mode in the sweep; `3d041648db`
+mvhashmap on ahash; `c5fed0aec0` environment cache; `14f77fad07` MonoMove
+kill switch; `35d80c2ab4` pipelined indexing; `3881709981` predictive
+stalls, sender hints, idle backoff (flags, off by default); `6a96a24020`
+output bytes by kind; `44281b41b7` stall the readers of an aborted
+transaction's entries; `a190e9a329` and `b2b0725d0b` parallel overlay
+build; tests for the flags. Design notes: `block_stm_v2_opportunities.md`,
+`execution_pool_and_group_writes.md`.
+
+What moved the numbers:
+
+1. **Sender hints** (`BLOCK_STM_SENDER_HINTS=1`): the e2e harness shape (five
+   transactions per sender) goes from 2.0 aborts/txn to 0 on V1 and 0.1–0.2
+   on MonoMove, +26–52% throughput at 16 threads on both VMs, −23–40% worker
+   CPU. Independent workloads unchanged. This is the one to turn on.
+2. **Idle backoff** (`BLOCK_STM_IDLE_BACKOFF=1`): on a serial-chain block, 14
+   idle workers stop burning 776 (MonoMove) / 6080 (V1) µs/txn spinning;
+   +7% throughput on MonoMove from less contention on the queue.
+3. **Predictive stalls** (`BLOCK_STM_PREDICTIVE_STALL=1`): −20% aborts and
+   −10–17% VM CPU on the order book, nothing on sender chains (stale
+   incarnations there are discards with no entries). CPU only.
+4. **Environment cache** and **pipelined indexing with the parallel
+   overlay**: the work outside Block-STM per block goes from 6.2 to 4.5
+   µs/txn on a MonoMove transfer (−1.5 ms per block of 1000); the execution
+   stage from 16.9 to 15.0.
+5. Kill switch, ahash, MALLOC_CONF: kept where free, none a throughput
+   lever.
+
+What did not move, and why: the order book is bound by its chain (140
+µs per link on MonoMove, 7.1–7.7k TPS at any thread count); MonoMove's
+ratio to V1 at 16 threads is set by the fixed per-block costs, which are
+the same milliseconds on both VMs and a larger share of MonoMove's shorter
+block (block size 4000 recovers most of it); and in pipelined mode the
+node is commit-bound at 31–68 µs/txn, with the storage pipeline costing
+the same ~390 µs/txn of CPU on both VMs against MonoMove's 158 of
+execution. The next levers are outside the VM: member-level group writes
+(write set −60–70%, protocol change, write-up in
+`execution_pool_and_group_writes.md`) and the state-tree update.
+
+Open questions for the user: whether sender hints should become the
+default (a one-line change) and whether the member-level group write
+format is worth a protocol proposal.

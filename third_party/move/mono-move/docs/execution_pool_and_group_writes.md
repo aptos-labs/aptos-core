@@ -74,9 +74,26 @@ on MonoMove, 4.9), once per transaction that touched the group. The state
 tree, the ledger's write-set column, state sync and the API all see the
 blob.
 
-Output bytes for one APT transfer (V1, metered, `aptos_processed_txns_output_bytes_by_kind`):
-_to be filled from the next sweep run; the counter was added after the
-overnight batch._
+Output bytes per transaction by kind of write (`aptos_processed_txns_output_bytes_by_kind`,
+key plus value bytes; events are their BCS size):
+
+| 16T | resource | group blobs | events | total (BCS) |
+|---|---|---|---|---|
+| no-op, V1 (metered) | 230 | 1070 | 106 | 1481 |
+| no-op, MonoMove (unmetered) | 230 | 0 | 106 | 352 |
+| transfer, V1 | 230 | 1399 | 305 | 2037 |
+| transfer, MonoMove | 230 | 661 | 305 | 1221 |
+| account generation, V1 | 230 | 1399 | 106 | 1839 |
+
+A metered no-op writes 1070 bytes of group blobs for its fee alone: the
+sender's store group (`ObjectCore` plus `FungibleStore`, about 330 bytes
+with the member tags and key) and, by the remaining size, the APT
+metadata object's group at `0xa`, whose `ConcurrentSupply` member changes
+with every burn and drags the `Metadata` member along. The members that
+change are a few dozen bytes each. Member-level writes would cut V1's
+write set by 60–70% on these workloads; the unmetered MonoMove numbers
+show the shape (its transfer carries two store blobs, 661 bytes, for two
+balance changes of 8 bytes each).
 
 ### Change
 
@@ -97,7 +114,11 @@ the block's state update is built (`TransactionsToKeep::index` /
   twice (once per side) per transfer. The exact share needs the by-kind
   counter from the next run.
 - Commit-stage bytes: the state tree still stores one blob per group key
-  per block (the last), unchanged; the ledger write-set column shrinks.
+  per block (the last), unchanged; the ledger write-set column shrinks by
+  the 60–70% above, and so does what state sync ships and what the
+  transaction-info hash covers. The commit stage is the end-to-end bound in
+  pipelined mode (`scaling_log.md`), so this is where the saving would show
+  as TPS.
 
 ### Protocol change
 
