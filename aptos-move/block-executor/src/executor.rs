@@ -15,7 +15,10 @@ use crate::{
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
-    scheduler_v2::{AbortManager, CommitResult, SchedulerV2, TaskKind, IDLE_BACKOFF, SENDER_HINTS},
+    scheduler_v2::{
+        AbortManager, CommitResult, SchedulerV2, TaskKind, IDLE_BACKOFF, PREDICTIVE_STALLS,
+        SENDER_HINTS,
+    },
     scheduler_wrapper::SchedulerWrapper,
     single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
     task::{ExecutionStatus, TxnOutput},
@@ -31,7 +34,7 @@ use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{error, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, Invalidated, TxnIndex},
+    types::{Incarnation, TxnIndex},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
@@ -124,6 +127,36 @@ where
         }
     }
 
+    /// Readers of the entries each aborted transaction wrote are held back until it has
+    /// executed again; its next incarnation replaces those entries.
+    fn stall_readers_of_aborted(
+        abort_manager: &mut AbortManager,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
+        versioned_cache: &MVHashMap<E::Key, E::Tag, E::Value, DelayedFieldID>,
+    ) -> Result<(), PanicError> {
+        let mut readers = vec![];
+        for aborted in abort_manager.aborted().collect::<Vec<_>>() {
+            readers.clear();
+            last_input_output.for_each_resource_key_no_aggregator_v1(aborted, |key| {
+                versioned_cache
+                    .data()
+                    .readers_of(key, aborted, &mut readers);
+                Ok(())
+            })?;
+            last_input_output.for_each_resource_group_key_and_tags(aborted, |key, tags| {
+                versioned_cache.group_data().readers_of(
+                    key,
+                    tags.into_iter(),
+                    aborted,
+                    &mut readers,
+                );
+                Ok(())
+            })?;
+            abort_manager.stall_readers_on(aborted, readers.iter().copied());
+        }
+        Ok(())
+    }
+
     /// For each transaction, the previous transaction of the same sender in the block,
     /// which it will conflict with on the sender's account.
     fn sender_predecessors(block: &TP, num_txns: TxnIndex) -> Vec<Option<TxnIndex>> {
@@ -198,11 +231,11 @@ where
                     },
                     None => {
                         // Clean up the write from previous incarnation.
-                        abort_manager.invalidate_dependencies(Invalidated::from_dependencies(
+                        abort_manager.invalidate_dependencies(
                             versioned_cache
                                 .data()
                                 .remove_v2::<_, false>(prev_key_ref, idx_to_execute)?,
-                        ))?;
+                        )?;
                     },
                 }
                 Ok(())
@@ -269,19 +302,19 @@ where
                     },
                     None => {
                         // Clean up the write from previous incarnation.
-                        abort_manager.invalidate_dependencies(Invalidated::from_dependencies(
+                        abort_manager.invalidate_dependencies(
                             // Invalidate the readers of group metadata.
                             versioned_cache
                                 .data()
                                 .remove_v2::<_, true>(group_key_ref, idx_to_execute)?,
-                        ))?;
-                        abort_manager.invalidate_dependencies(Invalidated::from_dependencies(
+                        )?;
+                        abort_manager.invalidate_dependencies(
                             versioned_cache.group_data().remove_v2(
                                 group_key_ref,
                                 idx_to_execute,
                                 prev_tags,
                             )?,
-                        ))?;
+                        )?;
                     },
                 }
                 Ok(())
@@ -488,6 +521,10 @@ where
             &config.onchain.block_gas_limit_type,
             txn.user_txn_bytes_len() as u64,
         )?;
+
+        if *PREDICTIVE_STALLS {
+            Self::stall_readers_of_aborted(&mut abort_manager, last_input_output, versioned_cache)?;
+        }
 
         // It is important to call finish_execution after recording the input/output.
         // CAUTION: once any update has been applied to the shared data structures, there should
@@ -1376,7 +1413,10 @@ where
                     if *IDLE_BACKOFF {
                         empty_polls += 1;
                         if empty_polls > 64 {
-                            std::thread::sleep(Duration::from_micros(5));
+                            // Doubling from 5 µs up to 100 µs: a nanosleep costs a few
+                            // µs of kernel time itself, so short slices still burn CPU.
+                            let micros = (5u64 << (empty_polls - 65).min(5)).min(100);
+                            std::thread::sleep(Duration::from_micros(micros));
                         } else if empty_polls > 8 {
                             std::thread::yield_now();
                         } else {

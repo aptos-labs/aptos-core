@@ -4,30 +4,10 @@
 use aptos_aggregator::types::DelayedFieldsSpeculativeError;
 use aptos_types::error::PanicOr;
 use move_core_types::value::MoveTypeLayout;
-use std::{collections::BTreeMap, sync::atomic::AtomicU32};
+use std::sync::atomic::AtomicU32;
 
 pub type AtomicTxnIndex = AtomicU32;
 pub type TxnIndex = u32;
-
-/// Read dependencies a BlockSTMv2 write invalidated, and for each invalidated
-/// reader the highest-indexed transaction below it that holds a write entry at
-/// the same key, if one exists above the writer. That is the entry the reader
-/// sees when it executes again; the scheduler can hold the reader back until
-/// that writer has executed again as well.
-#[derive(Debug, Default)]
-pub struct Invalidated {
-    pub dependencies: BTreeMap<TxnIndex, Incarnation>,
-    pub next_writers: Vec<(TxnIndex, TxnIndex)>,
-}
-
-impl Invalidated {
-    pub fn from_dependencies(dependencies: BTreeMap<TxnIndex, Incarnation>) -> Self {
-        Self {
-            dependencies,
-            next_writers: vec![],
-        }
-    }
-}
 pub type Incarnation = u32;
 
 /// Custom error type representing storage version. Result<Index, StorageVersion>

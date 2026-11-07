@@ -58,19 +58,33 @@ invalidated once by an incarnation above 0, so on a chain of five the second
 wave of re-executions is 3+2+1 wasted incarnations per chain, 60% of the
 aborts.
 
-Change: when a write at `i` invalidates reader `r`, the mvhashmap also
-reports the highest writer `w` with `i < w < r` at that key (the entry `r`
-reads next). The scheduler records `r` as a dependency of `w` and propagates
-`w`'s stall state: `r` is held until `w` has executed again. The record is
-made in index order inside the abort loop, so `r` is still in the aborted
-state and cannot be scheduled before its stall is in place. Recorded
-dependencies are never removed, so from then on `w` and `r` behave like any
-invalidated pair in v2. No change to validation or commit; a wrong
-prediction costs a delay, not correctness.
+Two variants that cannot work, found by measurement (0.00 stalls on every
+workload):
 
-Expected: chains 2.0 → 0.8 aborts/txn (only the first wave), order book
-6.3 → about 1 (one per txn from the first wave of each window). Measured:
-see `scaling_log.md`.
+- "Hold the aborted reader for the next writer between the aborting writer
+  and the reader at that key." There never is one: a write at `i` only
+  splits off readers registered on the entry at or below `i`, and an entry
+  between `i` and the reader would itself have invalidated the reader when
+  it was written. The only exception is a write that passed value
+  validation (V1 only).
+- "A writer aborted while it ran stalls the readers its applied writes
+  invalidated." Both VMs stop an aborted incarnation through the kill
+  switch, so it applies nothing and invalidates nobody.
+
+The variant that matches the cascade: when a transaction is aborted, the
+readers currently registered on its *existing* entries (the ones its last
+incarnation wrote, found through its recorded write keys and
+`VersionedData::readers_of`) are recorded as its dependencies and stalled
+until it has executed again. Those entries are about to be replaced, so a
+reader that re-executes against them is wasted. The record is made inside
+the abort loop in index order, right after the transaction's own
+`finish_abort`, so none of its readers (all above it) can be scheduled
+before the stall is in place. A wrong prediction (the next incarnation
+writes the same value) costs a delay, not correctness.
+
+Expected: chains 2.0 → 1.4 aborts/txn without sender hints (the first wave
+and the second wave's first abort remain), order book 6.3 → about 2.
+Measured: see `scaling_log.md`.
 
 ## D2. Kill switch for MonoMove (done, measured)
 

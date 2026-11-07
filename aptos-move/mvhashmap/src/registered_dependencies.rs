@@ -125,6 +125,10 @@ impl RegisteredReadDependencies {
         self.dependencies
     }
 
+    pub(crate) fn reader_indices(&self) -> impl Iterator<Item = TxnIndex> + '_ {
+        self.dependencies.keys().copied()
+    }
+
     #[cfg(test)]
     pub(crate) fn clone_dependencies_for_test(&self) -> BTreeMap<TxnIndex, Incarnation> {
         self.dependencies.clone()
