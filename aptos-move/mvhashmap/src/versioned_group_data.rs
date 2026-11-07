@@ -19,9 +19,11 @@ use aptos_types::{
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use claims::{assert_ok, assert_some};
-use dashmap::{DashMap, DashSet};
+use dashmap::{
+    mapref::one::{Ref, RefMut},
+    DashMap,
+};
 use equivalent::Equivalent;
-use rayon::prelude::*;
 use serde::Serialize;
 use std::{
     collections::{
@@ -62,7 +64,6 @@ impl SizeAndDependencies {
 
 // TODO(BlockSTMv2): Refactoring of Data and Groups multi-versioned map logic
 // so size dependencies can be handled in a unified way.
-#[derive(Default)]
 struct VersionedGroupSize {
     size_entries: BTreeMap<ShiftedTxnIndex, SizeEntry<SizeAndDependencies>>,
     // Determines whether it is safe for size queries to read the value from an entry marked as
@@ -71,6 +72,42 @@ struct VersionedGroupSize {
     // TODO: Handle remove similarly. May want to depend on transaction indices, i.e. if size
     // has changed early in the block, it may not have an influence on much later transactions.
     size_has_changed: bool,
+    /// The block whose entries this holds; settled on first access under a
+    /// later one, like the member map.
+    block: u32,
+}
+
+impl VersionedGroupSize {
+    fn new(block: u32) -> Self {
+        Self {
+            size_entries: BTreeMap::new(),
+            size_has_changed: false,
+            block,
+        }
+    }
+
+    /// Keeps the latest size among the `num_committed` transactions of the
+    /// block that left these entries as the base. Returns false if there is
+    /// none, i.e. the group is uninitialized again.
+    fn settle(&mut self, num_committed: TxnIndex, block: u32) -> bool {
+        self.block = block;
+        self.size_has_changed = false;
+        let Some(size) = self
+            .size_entries
+            .range(..ShiftedTxnIndex::new(num_committed))
+            .next_back()
+            .map(|(_, entry)| entry.value.size)
+        else {
+            self.size_entries.clear();
+            return false;
+        };
+        self.size_entries.clear();
+        self.size_entries.insert(
+            ShiftedTxnIndex::zero_idx(),
+            SizeEntry::new(SizeAndDependencies::from_size(size)),
+        );
+        true
+    }
 }
 
 /// Maps each key (access path) to an internal VersionedValue.
@@ -93,9 +130,6 @@ pub struct VersionedGroupData<K, T, V> {
     // must correspond to the outputs recorded by the committed transaction incarnations.
     // (and the correctness of the outputs is the responsibility of BlockSTM validation).
     group_tags: DashMap<K, HashSet<T>, ahash::RandomState>,
-    /// Groups whose size was written since the map was last collapsed: the
-    /// only ones that can hold size entries above the base.
-    touched_groups: DashSet<K, ahash::RandomState>,
 }
 
 // This struct allows us to reference a group key and tag without cloning
@@ -146,7 +180,6 @@ where
             values: VersionedData::empty(),
             group_sizes: DashMap::with_hasher(ahash::RandomState::new()),
             group_tags: DashMap::with_hasher(ahash::RandomState::new()),
-            touched_groups: DashSet::with_hasher(ahash::RandomState::new()),
         }
     }
 
@@ -154,10 +187,46 @@ where
         self.group_sizes.len()
     }
 
-    fn touch(&self, group_key: &K) {
-        if !self.touched_groups.contains(group_key) {
-            self.touched_groups.insert(group_key.clone());
+    /// The sizes of `group_key`, settled to the current block. None if the
+    /// group is uninitialized.
+    fn sizes(&self, group_key: &K) -> Option<Ref<'_, K, VersionedGroupSize>> {
+        let block = self.values.block();
+        let sizes = self.group_sizes.get(group_key)?;
+        if sizes.block == block {
+            return Some(sizes);
         }
+        drop(sizes);
+        self.sizes_mut(group_key)?;
+        self.group_sizes.get(group_key)
+    }
+
+    fn sizes_mut(&self, group_key: &K) -> Option<RefMut<'_, K, VersionedGroupSize>> {
+        let block = self.values.block();
+        let mut sizes = self.group_sizes.get_mut(group_key)?;
+        if sizes.block != block {
+            let num_committed = self.values.num_committed(sizes.block);
+            if !sizes.settle(num_committed, block) {
+                drop(sizes);
+                self.group_sizes.remove(group_key);
+                self.group_tags.remove(group_key);
+                return None;
+            }
+        }
+        Some(sizes)
+    }
+
+    /// The sizes of `group_key`, settled, created empty if uninitialized.
+    fn sizes_entry(&self, group_key: K) -> RefMut<'_, K, VersionedGroupSize> {
+        let block = self.values.block();
+        let mut sizes = self
+            .group_sizes
+            .entry(group_key)
+            .or_insert_with(|| VersionedGroupSize::new(block));
+        if sizes.block != block {
+            let num_committed = self.values.num_committed(sizes.block);
+            sizes.settle(num_committed, block);
+        }
+        sizes
     }
 
     pub fn set_raw_base_values(
@@ -165,7 +234,7 @@ where
         group_key: K,
         base_values: Vec<(T, V)>,
     ) -> anyhow::Result<()> {
-        let mut group_sizes = self.group_sizes.entry(group_key.clone()).or_default();
+        let mut group_sizes = self.sizes_entry(group_key.clone());
 
         // Currently the size & value are written while holding the sizes lock.
         if let Vacant(entry) = group_sizes.size_entries.entry(ShiftedTxnIndex::zero_idx()) {
@@ -221,7 +290,7 @@ where
         size: ResourceGroupSize,
         prev_tags: HashSet<T>,
     ) -> Result<bool, PanicError> {
-        let mut group_sizes = self.group_sizes.get_mut(&group_key).ok_or_else(|| {
+        let mut group_sizes = self.sizes_mut(&group_key).ok_or_else(|| {
             // Due to read-before-write.
             code_invariant_error("Group (sizes) must be initialized to write to")
         })?;
@@ -281,7 +350,7 @@ where
 
         // We write data first, without holding the sizes lock, then write size.
         // Hence when size is observed, values should already be written.
-        let mut group_sizes = self.group_sizes.get_mut(&group_key).ok_or_else(|| {
+        let mut group_sizes = self.sizes_mut(&group_key).ok_or_else(|| {
             // Currently, we rely on read-before-write to make sure the group would have
             // been initialized, which would have created an entry in group_sizes. Group
             // being initialized sets up data-structures, such as superset_tags, which
@@ -329,48 +398,14 @@ where
             )),
         );
         drop(group_sizes);
-        self.touch(&group_key);
 
         Ok(invalidated_dependencies.take())
     }
 
-    /// Keeps every group's latest members and size below `num_committed` as
-    /// its base for the next block on the same fork.
-    pub fn collapse_to_base(&mut self, num_committed: TxnIndex)
-    where
-        K: Send + Sync,
-        T: Send + Sync,
-        V: Send + Sync,
-    {
+    /// Ends the block after `num_committed` of its transactions committed;
+    /// members and sizes settle on first access under the next block.
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) {
         self.values.collapse_to_base(num_committed);
-        // A group with no committed size is uninitialized again, so that the
-        // next read provisions it from the state view.
-        let touched = std::mem::replace(
-            &mut self.touched_groups,
-            DashSet::with_hasher(ahash::RandomState::new()),
-        );
-        let touched = touched.into_iter().collect::<Vec<_>>();
-        touched.par_chunks(64).flatten().for_each(|group_key| {
-            let Some(mut sizes) = self.group_sizes.get_mut(group_key) else {
-                return;
-            };
-            let Some(size) = sizes
-                .size_entries
-                .range(..ShiftedTxnIndex::new(num_committed))
-                .next_back()
-                .map(|(_, entry)| entry.value.size)
-            else {
-                drop(sizes);
-                self.group_sizes.remove(group_key);
-                self.group_tags.remove(group_key);
-                return;
-            };
-            sizes.size_entries.clear();
-            sizes.size_entries.insert(
-                ShiftedTxnIndex::zero_idx(),
-                SizeEntry::new(SizeAndDependencies::from_size(size)),
-            );
-        });
     }
 
     /// Transactions that registered a read of a member or the size the group's
@@ -388,7 +423,7 @@ where
             self.values
                 .readers_of(&GroupKeyRef { group_key, tag }, txn_idx, out);
         }
-        if let Some(sizes) = self.group_sizes.get(group_key) {
+        if let Some(sizes) = self.sizes(group_key) {
             if let Some(entry) = sizes.size_entries.get(&ShiftedTxnIndex::new(txn_idx)) {
                 out.extend(
                     entry
@@ -411,8 +446,7 @@ where
             self.values.mark_estimate(&key_ref, txn_idx);
         }
 
-        self.group_sizes
-            .get(group_key)
+        self.sizes(group_key)
             .expect("Path must exist")
             .size_entries
             .get(&ShiftedTxnIndex::new(txn_idx))
@@ -433,8 +467,7 @@ where
         // TODO: consider setting size_has_changed flag if e.g. the size observed
         // after remove is different.
         assert_some!(
-            self.group_sizes
-                .get_mut(group_key)
+            self.sizes_mut(group_key)
                 .expect("Path must exist")
                 .size_entries
                 .remove(&ShiftedTxnIndex::new(txn_idx)),
@@ -451,7 +484,7 @@ where
         let mut invalidated_dependencies = RegisteredReadDependencies::new();
         self.remove_impl::<true>(group_key, txn_idx, tags, &mut invalidated_dependencies)?;
 
-        let mut group_sizes = self.group_sizes.get_mut(group_key).ok_or_else(|| {
+        let mut group_sizes = self.sizes_mut(group_key).ok_or_else(|| {
             code_invariant_error(format!(
                 "Group sizes at key {:?} must exist for remove_v2",
                 group_key
@@ -552,7 +585,7 @@ where
         group_key: &K,
         txn_idx: TxnIndex,
     ) -> Result<ResourceGroupSize, MVGroupError> {
-        match self.group_sizes.get(group_key) {
+        match self.sizes(group_key) {
             Some(g) => {
                 Self::get_latest_entry(&g.size_entries, txn_idx, ReadPosition::BeforeCurrentTxn)
                     .map_or(Err(MVGroupError::Uninitialized), |(idx, size)| {
@@ -576,7 +609,7 @@ where
         txn_idx: TxnIndex,
         incarnation: Incarnation,
     ) -> Result<ResourceGroupSize, MVGroupError> {
-        match self.group_sizes.get(group_key) {
+        match self.sizes(group_key) {
             Some(g) => {
                 Self::get_latest_entry(&g.size_entries, txn_idx, ReadPosition::BeforeCurrentTxn)
                     .map_or(Err(MVGroupError::Uninitialized), |(_, size)| {
