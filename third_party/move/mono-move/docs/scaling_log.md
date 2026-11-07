@@ -585,3 +585,46 @@ themselves: a `nanosleep` round trip costs a few µs of kernel time, so 14
 workers sleeping in 5 µs slices still burn a third of a core each. The
 sleep now backs off to 100 µs; with 14 sleepers the expected pick-up
 latency for new work stays under 10 µs.
+
+### Predictive stalls, third variant (commit 44281b41b7, runs 42328913619 / 42328923186)
+
+Readers registered on an aborted transaction's entries are stalled until
+it has executed again. On sender chains: still zero. A unit test with real
+transactions (`e2e-testsuite` `same_sender_chain_with_scheduling_flags`,
+with a debug print) showed why: an incarnation that runs with a stale
+sequence number is *discarded* by the prologue, so it writes nothing, has
+no entries, and nothing can be stalled on it. Every reader of the chain
+reads the last successful writer's entry, and the cascade is "the next
+transaction in the chain succeeds and invalidates all the others again".
+Sender hints are the right tool for that shape, and they are measured
+above. A mock-executor chain, where aborted incarnations do write, records
+stalls as designed (`chain_stalls_readers_of_aborted`).
+
+On the order book the aborted incarnations do write (orders placed on a
+stale book), and the variant fires:
+
+| 16T | aborts/txn | stalls/txn | VM CPU µs/txn (useful + wasted) | inner TPS |
+|---|---|---|---|---|
+| MonoMove base | 6.35 | – | 609 + 112 | 7104 |
+| MonoMove pred | 5.13 | 2.89 | 549 + 87 | 6855 |
+| MonoMove all three flags | 5.20 | 3.01 | 539 + 86 | 7583 |
+| V1 base | 5.92 | – | 6114 + 1362 | 849 |
+| V1 pred | 4.63 | 3.21 | 5069 + 1034 | 852 |
+| V1 all three flags | 4.74 | 3.27 | 5110 + 1050 | 855 |
+
+A fifth of the aborts and 10–17% of VM CPU, no throughput: the chain
+bound again. Worth keeping as a CPU saver; the lever on this shape remains
+the chain itself (D6 window, or a hint from the transaction naming its hot
+object).
+
+Regression check on the independent workloads (run 42328932781, all
+three flags against base, 2 and 16 threads): every number within 2%, as
+expected (0.03 aborts/txn, no stalls, no idle workers).
+
+### Parallel overlay build (commit a190e9a329, run 42329987632)
+
+`PendingWrites::new` now folds the block's writes on the execution pool and
+merges by version. `pipelined_pending_writes` went from 3.1 to 2.4–2.9
+µs/txn, far less than the parallelism should give, so the cost is not the
+map inserts. A perf profile of the pipelined stage is queued (run
+42331262428) to find what the per-write cost is.

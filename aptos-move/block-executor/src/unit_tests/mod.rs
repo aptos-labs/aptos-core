@@ -14,6 +14,7 @@ use crate::{
             ValueType,
         },
     },
+    counters,
     errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
     scheduler::{
@@ -1192,4 +1193,48 @@ fn no_conflict_task_count() {
         }
         assert_matches!(s.next_task(), SchedulerTask::Done);
     }
+}
+
+/// A chain of read-modify-writes on one key: with predictive stalls on, aborted
+/// transactions hold back the readers of their entries, so stalls are recorded.
+#[test]
+fn chain_stalls_readers_of_aborted() {
+    // SAFETY: the test runs single-threaded until the executor starts, and the
+    // flag is read once, on first use.
+    unsafe { std::env::set_var("BLOCK_STM_PREDICTIVE_STALL", "1") };
+    let key = random::<[u8; 32]>();
+    let transactions = (0..200)
+        .map(|_| {
+            MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, MockEvent>::new(
+                vec![(KeyType(key), false)],
+                vec![(KeyType(key), random_value(false), false)],
+                vec![],
+                vec![],
+                1,
+            ))
+        })
+        .collect();
+    let before = counters::PREDICTED_STALLS.get();
+    let mut guard = AptosModuleCacheManagerGuard::none();
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
+    let data_view = MockStateView::empty();
+    let output = BlockExecutor::<
+        MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+        LegacyTransactionExecutor<MockTask<KeyType<[u8; 32]>, MockEvent>>,
+        MockStateView<KeyType<[u8; 32]>>,
+        NoOpTransactionCommitHook<usize>,
+        _,
+        AuxiliaryInfo,
+    >::new(BlockExecutorConfig::new_no_block_limit(8), None)
+    .execute_transactions_parallel_v2(
+        &txn_provider,
+        &data_view,
+        &TransactionSliceMetadata::unknown(),
+        &mut guard,
+    );
+    BaselineOutput::generate(txn_provider.get_txns(), None).assert_parallel_output(&output);
+    assert!(
+        counters::PREDICTED_STALLS.get() > before,
+        "no predicted stalls on a serial chain"
+    );
 }

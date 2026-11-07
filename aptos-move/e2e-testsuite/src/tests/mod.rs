@@ -12,6 +12,7 @@
 //! Set env REGENERATE_GOLDENFILES to update the golden files when running tests..
 
 mod account_universe;
+mod block_stm_scheduling;
 mod create_account;
 mod execution_strategies;
 mod genesis;
