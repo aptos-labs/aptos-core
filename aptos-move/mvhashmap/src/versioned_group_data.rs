@@ -321,28 +321,37 @@ where
         V: Send + Sync,
     {
         self.values.collapse_to_base(num_committed);
-        self.group_sizes.par_iter_mut().for_each(|mut sizes| {
-            let Some(size) = sizes
-                .size_entries
-                .range(..ShiftedTxnIndex::new(num_committed))
-                .next_back()
-                .map(|(_, entry)| entry.value.size)
-            else {
-                sizes.size_entries.clear();
-                return;
-            };
-            sizes.size_entries.clear();
-            sizes.size_entries.insert(
-                ShiftedTxnIndex::zero_idx(),
-                SizeEntry::new(SizeAndDependencies::from_size(size)),
-            );
-        });
         // A group with no committed size is uninitialized again, so that the
         // next read provisions it from the state view.
         self.group_sizes
-            .retain(|_, sizes| !sizes.size_entries.is_empty());
+            .shards_mut()
+            .par_iter_mut()
+            .for_each(|shard| {
+                shard.get_mut().retain(|(_, sizes)| {
+                    let Some(size) = sizes
+                        .size_entries
+                        .range(..ShiftedTxnIndex::new(num_committed))
+                        .next_back()
+                        .map(|(_, entry)| entry.value.size)
+                    else {
+                        return false;
+                    };
+                    sizes.size_entries.clear();
+                    sizes.size_entries.insert(
+                        ShiftedTxnIndex::zero_idx(),
+                        SizeEntry::new(SizeAndDependencies::from_size(size)),
+                    );
+                    true
+                });
+            });
         self.group_tags
-            .retain(|key, _| self.group_sizes.contains_key(key));
+            .shards_mut()
+            .par_iter_mut()
+            .for_each(|shard| {
+                shard
+                    .get_mut()
+                    .retain(|(key, _)| self.group_sizes.contains_key(key));
+            });
     }
 
     /// Transactions that registered a read of a member or the size the group's

@@ -514,32 +514,33 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         K: Send + Sync,
         V: Send + Sync,
     {
-        self.values.par_iter_mut().for_each(|mut v| {
-            let Some(idx) = v
-                .versioned_map
-                .range(..ShiftedTxnIndex::new(num_committed))
-                .next_back()
-                .map(|(idx, _)| idx.clone())
-            else {
+        // One pass per shard, in parallel: a key with only uncommitted entries
+        // is unknown again (its base is read from the state view when next
+        // needed), and the kept entry is rebuilt so that readers registered on
+        // it, which belong to this block, are dropped.
+        self.values.shards_mut().par_iter_mut().for_each(|shard| {
+            shard.get_mut().retain(|(_, v)| {
+                let Some(idx) = v
+                    .versioned_map
+                    .range(..ShiftedTxnIndex::new(num_committed))
+                    .next_back()
+                    .map(|(idx, _)| idx.clone())
+                else {
+                    return false;
+                };
+                let entry = v
+                    .versioned_map
+                    .remove(&idx)
+                    .expect("the entry was just found");
                 v.versioned_map.clear();
-                return;
-            };
-            let entry = v
-                .versioned_map
-                .remove(&idx)
-                .expect("the entry was just found");
-            v.versioned_map.clear();
-            // Readers registered on the entry belong to this block; the next
-            // block's indices start over.
-            let EntryCell { value, .. } = CachePadded::into_inner(entry).value;
-            v.versioned_map.insert(
-                ShiftedTxnIndex::zero_idx(),
-                CachePadded::new(new_write_entry(0, value, BTreeMap::new())),
-            );
+                let EntryCell { value, .. } = CachePadded::into_inner(entry).value;
+                v.versioned_map.insert(
+                    ShiftedTxnIndex::zero_idx(),
+                    CachePadded::new(new_write_entry(0, value, BTreeMap::new())),
+                );
+                true
+            });
         });
-        // A key with only uncommitted entries is unknown again: its base is
-        // read from the state view when next needed.
-        self.values.retain(|_, v| !v.versioned_map.is_empty());
     }
 
     /// Transactions that registered a read of the entry written at txn_idx, if any.
