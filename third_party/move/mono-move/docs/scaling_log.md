@@ -712,7 +712,8 @@ execution. The next levers are outside the VM: member-level group writes
 
 Open questions for the user: whether sender hints should become the
 default (a one-line change) and whether the member-level group write
-format is worth a protocol proposal.
+format is worth a protocol proposal. The full 2–16 thread curve with the
+hints on is in the last section below.
 
 ### Open question: V1's state view reads
 
