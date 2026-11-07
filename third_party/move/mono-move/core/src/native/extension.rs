@@ -2,10 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{native::native_invariant_violation, VMResult};
-use fxhash::FxHashMap;
 use std::{
     any::{Any, TypeId},
     cell::{Ref, RefCell, RefMut},
+    collections::BTreeMap,
 };
 
 /// An extensible state defined by a native function. Persisted throughout
@@ -42,15 +42,24 @@ pub trait NativeExtension: Any {
 /// there is at most one borrow of the same extension at a time.
 /// This is currently ensured by storing each extension in its own [`RefCell`];
 /// the extra indirection is unlikely to matter performance-wise.
+///
+/// Keyed by `TypeId`, which orders the whole-collection walks (GC root
+/// relocation, checkpoint, rollback). That order is fixed within a build but
+/// not across compiler versions, since `TypeId`'s ordering is its hash; it
+/// only affects to-space layout and which extension reports an error first,
+/// never a committed result.
+//
+// TODO(cleanup): key the walks by registration order (a `Vec` plus a
+// `TypeId -> index` lookup) so the order is independent of the compiler.
 #[derive(Default)]
 pub struct NativeExtensions {
-    map: FxHashMap<TypeId, RefCell<Box<dyn NativeExtension>>>,
+    map: BTreeMap<TypeId, RefCell<Box<dyn NativeExtension>>>,
 }
 
 impl NativeExtensions {
     pub fn new() -> Self {
         Self {
-            map: FxHashMap::default(),
+            map: BTreeMap::new(),
         }
     }
 

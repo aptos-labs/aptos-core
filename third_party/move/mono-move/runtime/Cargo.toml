@@ -32,3 +32,7 @@ num = { workspace = true }
 paste = { workspace = true }
 proptest = { workspace = true }
 serde = { workspace = true }
+
+[lints.rust]
+# `cfg_attr(dylint_lib = ...)` scopes custom-lint suppressions to `cargo dylint`.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(dylint_lib, values("aptos_lints"))'] }

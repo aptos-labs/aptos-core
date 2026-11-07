@@ -22,7 +22,7 @@ use mono_move_core::{
 use mono_move_output::to_contract_events;
 use mono_move_runtime::{serialize, SessionEffects, WriteClass};
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
-use std::{collections::HashMap, ptr::NonNull};
+use std::{collections::BTreeMap, ptr::NonNull};
 
 // TODO(security): audit all error messages and make sure they do not lead to
 // deep recursions or OOMs.
@@ -94,7 +94,7 @@ fn drain_write_set(
     provider: &dyn AptosDataProvider,
 ) -> Result<(WriteSet, MaterializedGroups), Vec<String>> {
     let mut writes: Vec<(StateKey, WriteOp)> = vec![];
-    let mut group_ops: HashMap<StateKey, HashMap<StructTag, MemberOp>> = HashMap::new();
+    let mut group_ops: BTreeMap<StateKey, BTreeMap<StructTag, MemberOp>> = BTreeMap::new();
     let mut materialized_groups = MaterializedGroups::new();
     let mut failures: Vec<String> = vec![];
 
@@ -200,7 +200,7 @@ fn drain_write_set(
 fn merge_group(
     provider: &dyn AptosDataProvider,
     group_key: &StateKey,
-    member_ops: HashMap<StructTag, MemberOp>,
+    member_ops: BTreeMap<StructTag, MemberOp>,
 ) -> Result<(WriteOp, Option<GroupMembers>), String> {
     let old = provider
         .group_members(group_key)

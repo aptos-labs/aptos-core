@@ -3,6 +3,20 @@
 Conventions for every crate under `third_party/move/mono-move/`. Crate-specific
 docs live in each crate's `AGENTS.md`; design rationale in `docs/`.
 
+## Custom lints
+
+`devtools/lints` holds repo-specific lints run with `cargo dylint`
+(`scripts/dylint.sh` here runs them over every mono-move crate; CI does the
+same on mono-move PRs). They are deny-by-default; a hit is a review finding.
+Suppress one deliberately with
+`#[cfg_attr(dylint_lib = "aptos_lints", allow(<lint>))]` plus a comment.
+Current lints:
+
+- `no_std_hash_map` — no `std`/`hashbrown` hash maps or sets in the
+  consensus-critical crates; use `shared_dsa::{UnorderedMap, UnorderedSet}`
+  (which expose no iteration, so nothing can depend on hash order) or
+  `BTreeMap`/`BTreeSet` when ordered iteration is needed.
+
 ## TODO labels
 
 Every inline TODO is `// TODO(<group>): message`, where `<group>` is one or more
