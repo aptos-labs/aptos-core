@@ -30,7 +30,10 @@ pub struct BlockGasLimitProcessor<K, T> {
     txn_read_write_summaries: Vec<ReadWriteSummary<K, T>>,
     start_time: Instant,
     print_conflicts_info: bool,
-    hot_state_op_accumulator: Option<BlockHotStateOpAccumulator<K>>,
+    /// Whether the block promotes keys to the hot state. The keys are collected
+    /// by a [BlockHotStateOpAccumulator] the caller owns, outside this
+    /// processor's lock, and handed to [Self::get_block_end_info].
+    hot_state_accumulation_enabled: bool,
     /// When set, `should_end_block` returned true and this label identifies which limit fired.
     /// `"gas"` for the per-block effective-gas limit; `"output_size"` for the output-size limit.
     halted_by: Option<&'static str>,
@@ -47,9 +50,7 @@ where
         hot_state_config: Option<&OnChainHotStateConfig>,
         init_size: usize,
     ) -> Self {
-        let hot_state_op_accumulator = block_gas_limit_type
-            .add_block_limit_outcome_onchain()
-            .then(|| BlockHotStateOpAccumulator::new(hot_state_config));
+        let _ = hot_state_config;
         Self {
             block_gas_limit_type,
             block_gas_limit_override,
@@ -62,7 +63,7 @@ where
             start_time: Instant::now(),
             // TODO: have a configuration for it.
             print_conflicts_info: *PRINT_CONFLICTS_INFO,
-            hot_state_op_accumulator,
+            hot_state_accumulation_enabled: block_gas_limit_type.add_block_limit_outcome_onchain(),
             halted_by: None,
         }
     }
@@ -122,23 +123,14 @@ where
 
     /// Returns whether hot state promotions are being accumulated for this block. Callers
     /// use this to skip extracting the per-transaction key sets when they would be unused.
-    pub(crate) fn is_hot_state_accumulation_enabled(&self) -> bool {
-        self.hot_state_op_accumulator.is_some()
-    }
-
-    /// Feeds the hot state accumulator with the keys the transaction read (the VM-observed
-    /// read set carried by the output) and the keys it writes. Called per transaction in
-    /// commit order.
-    pub(crate) fn accumulate_hot_state_rw<'a>(
-        &mut self,
-        writes: impl Iterator<Item = &'a K>,
-        reads: impl Iterator<Item = &'a K>,
-    ) where
-        K: 'a,
-    {
-        if let Some(accumulator) = &mut self.hot_state_op_accumulator {
-            accumulator.add_transaction(writes, reads);
-        }
+    /// The accumulator for a block this processor accounts for, if the block
+    /// promotes keys to the hot state.
+    pub(crate) fn new_hot_state_accumulator(
+        &self,
+        hot_state_config: Option<&OnChainHotStateConfig>,
+    ) -> Option<BlockHotStateOpAccumulator<K>> {
+        self.hot_state_accumulation_enabled
+            .then(|| BlockHotStateOpAccumulator::new(hot_state_config))
     }
 
     fn block_gas_limit(&self) -> Option<u64> {
@@ -254,7 +246,10 @@ where
             num_committed as usize,
             is_parallel,
         );
-        counters::update_txn_gas_counters(&self.txn_fee_statements, is_parallel);
+        // Several histogram observations per transaction; done off the commit
+        // path, which the whole block waits on here.
+        let txn_fee_statements = self.txn_fee_statements.clone();
+        rayon::spawn(move || counters::update_txn_gas_counters(&txn_fee_statements, is_parallel));
 
         if let Some(reason) = self.halted_by {
             let mode = if is_parallel {
@@ -305,6 +300,7 @@ where
         &self,
         convert: F,
         key_size: S,
+        hot_state_accumulator: Option<&BlockHotStateOpAccumulator<K>>,
     ) -> Result<TBlockEndInfoExt<O>, PanicError>
     where
         O: Debug + Ord,
@@ -329,32 +325,22 @@ where
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
 
-        let to_make_hot = self.get_keys_to_make_hot(convert, &key_size)?;
-        if self.hot_state_op_accumulator.is_some() {
-            counters::HOT_STATE_PROMOTIONS_PER_BLOCK.observe(to_make_hot.len() as f64);
-            let promoted_bytes: usize = to_make_hot.iter().map(key_size).sum();
-            counters::HOT_STATE_PROMOTION_BYTES_PER_BLOCK.observe(promoted_bytes as f64);
-        }
-        Ok(TBlockEndInfoExt::new(inner, to_make_hot))
-    }
-
-    fn get_keys_to_make_hot<O, F, S>(
-        &self,
-        convert: F,
-        key_size: S,
-    ) -> Result<BTreeSet<O>, PanicError>
-    where
-        O: Ord,
-        F: Fn(&K) -> Result<O, PanicError>,
-        S: Fn(&O) -> usize,
-    {
-        match self.hot_state_op_accumulator.as_ref() {
-            Some(acc) => acc.get_keys_to_make_hot(convert, key_size),
-            None => {
-                warn!("BlockHotStateOpAccumulator is not set.");
-                Ok(BTreeSet::new())
+        let to_make_hot = match hot_state_accumulator {
+            Some(acc) => {
+                let keys = acc.get_keys_to_make_hot(convert, &key_size)?;
+                counters::HOT_STATE_PROMOTIONS_PER_BLOCK.observe(keys.len() as f64);
+                let promoted_bytes: usize = keys.iter().map(key_size).sum();
+                counters::HOT_STATE_PROMOTION_BYTES_PER_BLOCK.observe(promoted_bytes as f64);
+                keys
             },
-        }
+            None => {
+                if self.hot_state_accumulation_enabled {
+                    warn!("BlockHotStateOpAccumulator is not set.");
+                }
+                BTreeSet::new()
+            },
+        };
+        Ok(TBlockEndInfoExt::new(inner, to_make_hot))
     }
 }
 

@@ -7,9 +7,11 @@ use crate::{
     workflow::{do_collateral::DoCollateral, do_orders::DoOrders, do_positions::DoPositions},
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_block_executor::txn_provider::TxnProvider;
+use aptos_block_executor::{
+    single_transaction_executor::EXECUTION_POOL, txn_provider::default::DefaultTxnProvider,
+};
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
@@ -533,7 +535,9 @@ impl Parser {
 
         base_state_view.prime_cache(
             to_commit.state_update_refs(),
-            if prime_state_cache {
+            // With the execution pool, a key the previous block wrote is read from
+            // the pool, not the state view, so its old slot has to be fetched here.
+            if prime_state_cache || *EXECUTION_POOL {
                 PrimingPolicy::All
             } else {
                 // Most of the transaction reads should already be in the cache, but some module

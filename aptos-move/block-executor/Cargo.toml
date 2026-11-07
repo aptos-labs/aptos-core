@@ -17,6 +17,7 @@ testing = []
 fuzzing = ["criterion", "proptest", "proptest-derive"]
 
 [dependencies]
+ahash = { workspace = true }
 ambassador = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
