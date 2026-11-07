@@ -328,15 +328,24 @@ impl CachedStateView {
         )
     }
 
-    pub fn prime_cache(&self, updates: &StateUpdateRefs, policy: PrimingPolicy) -> Result<()> {
+    /// Memorizes the old slot of every key `updates` touches that this view
+    /// was never asked for. `committed` answers for keys the previous blocks
+    /// left behind; the rest are read through the state layers.
+    pub fn prime_cache(
+        &self,
+        updates: &StateUpdateRefs,
+        policy: PrimingPolicy,
+        committed: Option<&CommittedSlots>,
+    ) -> Result<()> {
         let _timer = TIMER.timer_with(&["prime_state_cache"]);
+        let committed = committed.and_then(|c| c.for_block(self.next_version()));
 
         IO_POOL.install(|| {
             if let Some(updates) = updates.for_last_checkpoint_batched() {
-                self.prime_cache_for_batched_updates(updates, policy)?;
+                self.prime_cache_for_batched_updates(updates, policy, committed)?;
             }
             if let Some(updates) = updates.for_latest_batched() {
-                self.prime_cache_for_batched_updates(updates, policy)?;
+                self.prime_cache_for_batched_updates(updates, policy, committed)?;
             }
             Ok(())
         })
@@ -346,6 +355,7 @@ impl CachedStateView {
         &self,
         updates: &BatchedStateUpdateRefs,
         policy: PrimingPolicy,
+        committed: Option<&CommittedSlots>,
     ) -> Result<()> {
         updates.shards.par_iter().try_for_each(|shard| {
             self.prime_cache_for_keys(
@@ -356,6 +366,7 @@ impl CachedStateView {
                         _ => Some(k),
                     })
                     .cloned(),
+                committed,
             )
         })
     }
@@ -363,48 +374,22 @@ impl CachedStateView {
     fn prime_cache_for_keys<'a, T: IntoIterator<Item = &'a StateKey> + Send>(
         &self,
         keys: T,
+        committed: Option<&CommittedSlots>,
     ) -> Result<()> {
         rayon::scope(|s| {
             keys.into_iter()
                 .filter(|key| !self.memorized.contains(key))
                 .for_each(|key| {
+                    if let Some(slot) = committed.and_then(|c| c.get(key)) {
+                        self.memorized.try_insert(key, &slot);
+                        return;
+                    }
                     s.spawn(move |_| {
                         self.get_state_value(key).expect("Must succeed.");
                     })
                 });
         });
         Ok(())
-    }
-
-    /// Memorizes, for the keys `updates` writes that this view was never
-    /// asked for, the slot the previous blocks left behind. Only the keys
-    /// `committed` does not know remain for `prime_cache`.
-    pub fn prime_cache_from_committed(
-        &self,
-        updates: &StateUpdateRefs,
-        committed: &CommittedSlots,
-    ) {
-        let _timer = TIMER.timer_with(&["prime_state_cache_from_committed"]);
-        let Some(committed) = committed.for_block(self.next_version()) else {
-            return;
-        };
-        for batch in [
-            updates.for_last_checkpoint_batched(),
-            updates.for_latest_batched(),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            batch.shards.par_iter().for_each(|shard| {
-                for key in shard.keys() {
-                    if !self.memorized.contains(key) {
-                        if let Some(slot) = committed.get(key) {
-                            self.memorized.try_insert(key, &slot);
-                        }
-                    }
-                }
-            });
-        }
     }
 
     /// Consumes `Self` and returns the state and all the memorized state reads.
