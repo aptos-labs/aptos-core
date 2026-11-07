@@ -397,7 +397,7 @@ def profile_replay(workload, threads, vm, recorded_db, checkpoint_dir, blocks_pa
     """Records one replay under `perf` and summarizes it. Returns the parsed
     run, which is reported separately from the unprofiled repeats.
     """
-    name = f"{workload.name}-{vm}-{threads}t"
+    name = f"{workload.name}-{vm.replace('/', '-')}-{threads}t"
     data = os.path.join(prof_dir, f"{name}.perf.data")
     env, program = replay_command(workload, threads, vm, recorded_db, checkpoint_dir, blocks_path)
     output = execute_command(
