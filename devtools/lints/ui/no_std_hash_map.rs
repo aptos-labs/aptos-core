@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 // Cases the `no_std_hash_map` lint must flag, and ones it must not.
 #![allow(dead_code, unused_variables, unused_imports)]
 
