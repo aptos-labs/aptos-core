@@ -60,6 +60,7 @@ pub(crate) struct ResourceUsage {
     cold_state_read_secs: f64,
     /// State view lookups by where they were served from.
     state_view_counters: BTreeMap<&'static str, u64>,
+    output_bytes_by_kind: BTreeMap<String, u64>,
     /// Seconds by named timer in the executor's block workflow and the state
     /// store, keyed `family/name`. The state store's are thread-local and
     /// flushed once a second, so they can lag.
@@ -117,6 +118,7 @@ impl ResourceUsage {
                 .with_label_values(&[COLD_STATE_READ_API, "Ok"])
                 .get_sample_sum(),
             state_view_counters: state_view_counters(),
+            output_bytes_by_kind: output_bytes_by_kind(),
             workflow_timer_secs: workflow_timer_secs(),
             worker_phase_micros,
             thread_group_cpu_secs: thread_group_cpu_secs(),
@@ -175,6 +177,16 @@ impl ResourceUsage {
                     (
                         *k,
                         v - self.state_view_counters.get(k).copied().unwrap_or(0),
+                    )
+                })
+                .collect(),
+            output_bytes_by_kind: end
+                .output_bytes_by_kind
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        v - self.output_bytes_by_kind.get(k).copied().unwrap_or(0),
                     )
                 })
                 .collect(),
@@ -271,6 +283,15 @@ impl ResourceUsage {
             self.predicted_stalls as f64 / num_txns,
         );
         info!(
+            "{} resources: output bytes per txn by kind: {}",
+            prefix,
+            self.output_bytes_by_kind
+                .iter()
+                .map(|(kind, bytes)| format!("{}={:.1}", kind, *bytes as f64 / num_txns))
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
+        info!(
             "{} resources: state view lookups per txn: {}",
             prefix,
             STATE_VIEW_COUNTERS
@@ -334,6 +355,30 @@ fn state_view_counters() -> BTreeMap<&'static str, u64> {
                 .find(|name| **name == label.value())
             {
                 out.insert(*name, metric.get_counter().get_value() as u64);
+            }
+        }
+    }
+    out
+}
+
+/// Output bytes of executed transactions by kind of write, from the registry.
+fn output_bytes_by_kind() -> BTreeMap<String, u64> {
+    let mut out = BTreeMap::new();
+    for family in aptos_metrics_core::gather() {
+        if family.name() != "aptos_processed_txns_output_bytes_by_kind" {
+            continue;
+        }
+        for metric in family.get_metric() {
+            let labels = metric.get_label();
+            let process = labels.iter().find(|l| l.name() == "process");
+            let kind = labels.iter().find(|l| l.name() == "kind");
+            if let (Some(process), Some(kind)) = (process, kind) {
+                if process.value() == "execution" {
+                    out.insert(
+                        kind.value().to_string(),
+                        metric.get_counter().get_value() as u64,
+                    );
+                }
             }
         }
     }

@@ -319,6 +319,10 @@ def parse_run(output, workload, threads, vm, repeat):
     row["interrupts_per_txn"] = float(
         get_last(stage + r"interrupted incarnations per txn: " + NUMBER, output, "interrupts")
     )
+    for key, value in parse_kv(
+        get_last(stage + r"output bytes per txn by kind: (.*)", output, "output bytes by kind")
+    ).items():
+        row[f"output_bytes_{key}_per_txn"] = value
     row["predicted_stalls_per_txn"] = float(
         get_last(stage + r"predicted stalls per txn: " + NUMBER, output, "predicted stalls")
     )
