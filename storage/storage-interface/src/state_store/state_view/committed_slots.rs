@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::state_update_refs::StateUpdateRefs;
+use crate::state_store::{
+    state_update_refs::StateUpdateRefs, state_view::cached_state_view::ShardedStateCache,
+};
 use aptos_types::{
     state_store::{state_key::StateKey, state_slot::StateSlot},
     transaction::Version,
@@ -10,10 +12,10 @@ use dashmap::DashMap;
 use parking_lot::Mutex;
 use rayon::prelude::*;
 
-/// The last write to every key a run of consecutive blocks made, as the slot
-/// it left behind. A block that read such a key from the execution pool
-/// never asked the state view for it, so its memorized reads lack the old
-/// slot the state update needs; this answers for those keys without a
+/// The slot of every key a run of consecutive blocks read or wrote, as the
+/// last of them left it. A block that reads such a key from the execution
+/// pool never asks the state view for it, so its memorized reads lack the
+/// old slot the state update needs; this answers for those keys without a
 /// lookup through the state layers or the DB.
 pub struct CommittedSlots {
     slots: DashMap<StateKey, StateSlot, ahash::RandomState>,
@@ -59,13 +61,20 @@ impl CommittedSlots {
         *self.next_version.lock() = None;
     }
 
-    /// Records a block's writes. The block must start where the absorbed
-    /// blocks end, otherwise the record starts over from this block.
-    pub fn absorb(&self, updates: &StateUpdateRefs) {
+    /// Records a block: what it read from the state view, which the pool has
+    /// from now on, then what it wrote. The block must start where the
+    /// absorbed blocks end, otherwise the record starts over from it.
+    pub fn absorb(&self, reads: &ShardedStateCache, updates: &StateUpdateRefs) {
         let mut next_version = self.next_version.lock();
         if *next_version != Some(updates.per_version.first_version) {
             self.slots.clear();
         }
+        reads.shards.par_iter().for_each(|shard| {
+            for entry in shard.iter() {
+                self.slots
+                    .insert(entry.key().clone(), entry.value().clone());
+            }
+        });
         for batch in [
             updates.for_last_checkpoint_batched(),
             updates.for_latest_batched(),
