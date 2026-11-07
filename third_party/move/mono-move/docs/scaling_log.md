@@ -1003,3 +1003,20 @@ improves on every independent workload because the levers remove
 per-transaction work that grew with the thread count (re-executions,
 base insertions) rather than the fixed per-block part, which is what
 remains between 4.8x and 8x.
+
+### Two materialize micro-changes, measured within noise and reverted (runs 42400099836, 42401311941)
+
+The transfer profile charged a third of `materialize` to assembling the
+group blob (`merge_group`: the tag superset, a map read per member, the
+members' serialization, BCS of the member map). Two changes aimed at it:
+the group slot's entry carrying the members its writer assembled, for the
+next writer to merge on (672565629b), and the blob encoded directly with
+each tag's BCS bytes cached per thread instead of re-serialized
+(357e1c038e). Neither moved `materialize` or the inner time outside the
+run-to-run spread (±2%; transfer materialize 28.6 → 30.8 → 28.7 base,
+31.9 → 31.4 → 29.8 pool). The per-member work is a few hundred
+nanoseconds each, not the microseconds the inclusive percentages
+suggested; both reverted. What is left in `materialize` is spread over the
+hot-state bookkeeping (a concurrent-set insert per read and write key),
+event encoding, state-key interning and output construction, none above
+2–3 µs/txn.
