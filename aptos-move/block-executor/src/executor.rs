@@ -1858,8 +1858,21 @@ where
             // Every committed transaction's writes are the base of the next block
             // on this fork; the manager drops the pool if the fork changes.
             let num_committed = final_results.dereference().len() as TxnIndex;
-            let _timer = counters::EXECUTION_POOL_COLLAPSE_SECONDS.start_timer();
-            versioned_cache.collapse_to_base(num_committed);
+            let timer = counters::EXECUTION_POOL_COLLAPSE_SECONDS.start_timer();
+            let stats = versioned_cache.collapse_to_base(num_committed);
+            timer.stop_and_record();
+            for (part, keys, secs) in [
+                ("data", stats.data_keys, stats.data),
+                ("members", stats.member_keys, stats.group),
+                ("groups", stats.groups, Duration::ZERO),
+            ] {
+                counters::EXECUTION_POOL_COLLAPSED_KEYS
+                    .with_label_values(&[part])
+                    .inc_by(keys as u64);
+                counters::EXECUTION_POOL_COLLAPSE_PART_SECONDS
+                    .with_label_values(&[part])
+                    .observe(secs.as_secs_f64());
+            }
             module_cache_manager_guard.store_execution_pool(versioned_cache);
             DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler));
         } else {
