@@ -133,7 +133,7 @@ fn value_type(value: &MonoValue) -> Result<ValueType, PanicError> {
             StateValueMetadata::none(),
             WriteOpKind::Modification,
         ),
-        MonoValue::GroupMetadata { .. } => {
+        MonoValue::GroupMetadata => {
             return Err(code_invariant_error("Group metadata is not a mock write"))
         },
     })
@@ -260,7 +260,7 @@ impl TxnOutput for MonoMockOutput {
                         (
                             *group_key,
                             (
-                                MonoValue::group_metadata(),
+                                MonoValue::GroupMetadata,
                                 // Every `MonoValue` reports no serialized
                                 // length, so this is also what the map computes.
                                 ResourceGroupSize::zero_combined(),
@@ -584,7 +584,7 @@ fn member_bytes(value: &MonoValue) -> Result<Bytes, PanicError> {
         // SAFETY: the entry holding this pointer also holds its pin.
         MonoValue::Write { ptr, .. } => Ok(unsafe { blob_bytes(*ptr) }.into()),
         MonoValue::Deletion => Err(code_invariant_error("A deleted group member was assembled")),
-        MonoValue::GroupMetadata { .. } => Err(code_invariant_error(
+        MonoValue::GroupMetadata => Err(code_invariant_error(
             "Group metadata was assembled as a member",
         )),
     }

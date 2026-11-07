@@ -14,7 +14,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDataOutput, TxnIndex},
+    types::{Incarnation, TxnIndex},
     MVHashMap,
 };
 use aptos_types::state_store::{state_key::StateKey, TStateView};
@@ -94,9 +94,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
             // Deleted members are dropped when the group is assembled, and a
             // group's own slot never appears among its members.
             MonoValue::Deletion => Err(anyhow!("a deleted group member was assembled")),
-            MonoValue::GroupMetadata { .. } => {
-                Err(anyhow!("group metadata was assembled as a member"))
-            },
+            MonoValue::GroupMetadata => Err(anyhow!("group metadata was assembled as a member")),
         }
     }
 }
@@ -173,18 +171,6 @@ impl<S: TStateView<Key = StateKey>> AptosDataProvider for BlockSTMParallelProvid
         &self,
         group_key: &InMemoryStorageKey,
     ) -> Result<Option<GroupMembers>, ResourceProviderError> {
-        // The latest writer below this transaction has committed; if its
-        // materialization already assembled the group, start from that.
-        if let Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata { assembled })) = self
-            .reader
-            .versioned_map()
-            .data()
-            .fetch_data_no_record(group_key, self.reader.txn_idx())
-        {
-            if let Some(members) = assembled.get() {
-                return Ok((!members.is_empty()).then(|| (**members).clone()));
-            }
-        }
         let members = self
             .reader
             .versioned_map()

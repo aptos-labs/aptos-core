@@ -14,7 +14,7 @@ use crate::{
 };
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_infallible::Mutex;
-use aptos_mvhashmap::types::{MVDataOutput, TxnIndex};
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::value::SpeculativeValue,
     error::{code_invariant_error, PanicError, PanicOr},
@@ -32,8 +32,7 @@ use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
-    production_natives, AptosDataProvider, AptosTransactionExecutor, DiscardReason, GroupMembers,
-    TxnOutcome,
+    production_natives, AptosDataProvider, AptosTransactionExecutor, DiscardReason, TxnOutcome,
 };
 use mono_move_core::{
     nominal_tag,
@@ -48,7 +47,7 @@ use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     ptr::NonNull,
-    sync::{Arc, OnceLock},
+    sync::Arc,
 };
 
 mod provider;
@@ -84,21 +83,7 @@ pub enum MonoValue {
     /// The value Block-STM versions at a resource group's own slot. MonoMove
     /// carries no group metadata, but the slot still has to hold an entry: the
     /// block executor writes and removes it alongside the group's members.
-    GroupMetadata {
-        /// The group's members as the writing transaction's materialization
-        /// assembled them, once it has. A later writer of the group merges
-        /// on top of this instead of collecting and serializing every member
-        /// again.
-        assembled: Arc<OnceLock<Arc<GroupMembers>>>,
-    },
-}
-
-impl MonoValue {
-    pub(crate) fn group_metadata() -> Self {
-        MonoValue::GroupMetadata {
-            assembled: Arc::new(OnceLock::new()),
-        }
-    }
+    GroupMetadata,
 }
 
 // SAFETY: The value stores the pointer to the immutable value in a frozen,
@@ -118,10 +103,7 @@ impl SpeculativeValue for MonoValue {
         // Only a group slot carries metadata, and MonoMove's is always the same.
         matches!(
             (self, other),
-            (
-                MonoValue::GroupMetadata { .. },
-                MonoValue::GroupMetadata { .. }
-            )
+            (MonoValue::GroupMetadata, MonoValue::GroupMetadata)
         )
     }
 
@@ -136,16 +118,14 @@ impl SpeculativeValue for MonoValue {
             MonoValue::Write { .. } => None,
             MonoValue::RawFromStorage(_) => None,
             MonoValue::Deletion => None,
-            MonoValue::GroupMetadata { .. } => None,
+            MonoValue::GroupMetadata => None,
         }
     }
 
     fn write_op_kind(&self) -> WriteOpKind {
         match self {
             MonoValue::Write { kind, .. } => kind.clone(),
-            MonoValue::RawFromStorage(_) | MonoValue::GroupMetadata { .. } => {
-                WriteOpKind::Modification
-            },
+            MonoValue::RawFromStorage(_) | MonoValue::GroupMetadata => WriteOpKind::Modification,
             MonoValue::Deletion => WriteOpKind::Deletion,
         }
     }
@@ -354,7 +334,7 @@ impl TxnOutput for MonoTxnOutput {
                 (
                     group_key.clone(),
                     (
-                        MonoValue::group_metadata(),
+                        MonoValue::GroupMetadata,
                         // Every `MonoValue` reports no serialized length, so
                         // this is also what the map computes for the group.
                         ResourceGroupSize::zero_combined(),
@@ -725,7 +705,9 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     incarnation,
                     &self.arena,
                 );
-                let (output, groups) = outcome
+                // Groups are assembled from the versioned map on demand, so
+                // nothing is cached back here.
+                let (output, _groups) = outcome
                     .materialize_with(
                         &guard,
                         &provider,
@@ -734,17 +716,6 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                         *MEMBER_GROUP_WRITES,
                     )
                     .map_err(materialization_failed)?;
-                // Hand each assembled group to this transaction's entry at the
-                // group's slot, for the next writer of the group to merge on.
-                for (group_key, members) in groups {
-                    if let Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata { assembled })) =
-                        versioned_map
-                            .data()
-                            .fetch_data_no_record(&group_key, txn_idx + 1)
-                    {
-                        let _ = assembled.set(Arc::new(members.unwrap_or_default()));
-                    }
-                }
                 output
             },
         };
@@ -832,7 +803,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                                     })?;
                                 Bytes::from(blob)
                             },
-                            MonoValue::Deletion | MonoValue::GroupMetadata { .. } => {
+                            MonoValue::Deletion | MonoValue::GroupMetadata => {
                                 return Err(code_invariant_error(
                                     "A deleted member or group metadata was assembled",
                                 ))
