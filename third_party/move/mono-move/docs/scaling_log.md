@@ -815,3 +815,27 @@ hashing), and the transaction accumulator does the same (18). Both are
 cache-shaped problems (the node LRU cache misses), not hashing. The hashing
 itself is about 65 µs/txn across the two pools. None of this depends on the
 VM or on the write-set format.
+
+### The serial commit hook (commit 83294696f8)
+
+Block-STM v2 commits transactions in order under one lock; the profile put
+2.5 µs/txn of MonoMove worker CPU there (10 on V1), half of it the
+hot-state accumulator inserting every committed transaction's read and
+written keys into two hash sets, plus the block-end gas histograms (5000
+observations while every worker waits). The promotion set is reads minus
+writes over the block, which does not depend on the order, so the
+accumulator is now concurrent and fed from the parallel post-commit phase,
+and the histograms run on the rayon pool. Five per sender with hints,
+before → after:
+
+| 16T | commit-hook CPU µs/txn | inner wall µs/txn |
+|---|---|---|
+| no-op, MonoMove | 2.8 → 2.2 | 5.46 → 5.44 |
+| transfer, MonoMove | 4.2 → 3.1 | 10.67 → 10.75 |
+| transfer, V1 | 10.5 → 9.2 | 33.3 → 33.3 |
+
+CPU down a quarter, wall unchanged: at 16 threads the hook holder is busy
+a fifth of the time but the other workers never wait for it, so it was not
+on the critical path. Kept, since it is what would bind first at higher
+thread counts (the remaining 2–3 µs/txn is the gas-limit accounting and
+the commit queue).
