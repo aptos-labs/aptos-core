@@ -729,3 +729,32 @@ present would each be a cold negative lookup), or the counter's window
 misses MonoMove's reads in some configurations. Not resolved tonight;
 the V1 figure alone is worth a look since it is a V1-only 8%, and the
 MonoMove figure needs the counter checked before it is trusted.
+
+### The scaling curve with the hints on (run 42336069071, five per sender)
+
+Inner TPS (Block-STM only) and aborts per transaction, 2 to 16 threads,
+`BLOCK_STM_SENDER_HINTS=1 BLOCK_STM_IDLE_BACKOFF=1` against base, same job:
+
+| | 2T | 4T | 8T | 16T | 16T/2T |
+|---|---|---|---|---|---|
+| no-op, V1 base | 6.8k (0.50) | 9.9k (1.39) | 16.9k (1.76) | 30.3k (1.95) | 4.5x |
+| no-op, V1 hints | 7.7k (0) | 13.8k (0) | 25.3k (0) | 45.9k (0) | 6.0x |
+| no-op, MonoMove base | 32.3k (0.82) | 47.2k (1.33) | 75.2k (1.77) | 123k (1.94) | 3.8x |
+| no-op, MonoMove hints | 41.9k (0.01) | 70.0k (0.02) | 119k (0.05) | 183k (0.11) | 4.4x |
+| transfer, V1 base | 4.7k (0.49) | 7.3k (1.51) | 12.6k (1.84) | 22.6k (1.96) | 4.8x |
+| transfer, V1 hints | 5.1k (0) | 9.3k (0) | 16.9k (0) | 30.1k (0) | 5.9x |
+| transfer, MonoMove base | 17.5k (0.46) | 26.1k (1.46) | 43.8k (1.82) | 72.8k (2.07) | 4.2x |
+| transfer, MonoMove hints | 19.2k (0.01) | 33.1k (0.03) | 57.2k (0.08) | 93.7k (0.18) | 4.9x |
+| account gen, V1 base | 4.0k (0.47) | 6.6k (1.32) | 11.1k (1.81) | 19.8k (1.96) | 4.9x |
+| account gen, V1 hints | 4.3k (0) | 7.8k (0) | 14.1k (0) | 25.1k (0) | 5.8x |
+| account gen, MonoMove base | 16.5k (0.47) | 24.7k (1.57) | 40.8k (1.87) | 68.9k (2.04) | 4.2x |
+| account gen, MonoMove hints | 18.0k (0) | 30.8k (0.03) | 52.0k (0.07) | 84.7k (0.15) | 4.7x |
+| order book, V1 | 845 | 842 | 862 | 854 | 1.0x |
+| order book, MonoMove | 7.7k | 7.7k | 7.8k | 7.0k → 7.8k with hints | 1.0x |
+
+With the hints the chained workloads scale like independent ones. MonoMove
+still scales 4.4–4.9x against V1's 5.8–6.0x from 2 to 16 threads, which is
+the fixed per-block cost (the same milliseconds on both VMs, a larger share
+of MonoMove's shorter block) measured at the start of this log, and the
+ratio of MonoMove to V1 at 16 threads is 3.4x (account generation) to
+4.0x (no-op) against 3.8–4.6x at 2 threads.
