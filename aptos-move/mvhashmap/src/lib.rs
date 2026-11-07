@@ -107,14 +107,10 @@ where
     }
 
     /// Keeps the map for the next block on the same fork: every key's latest
-    /// value becomes its base, with no versions, dependencies or delayed
-    /// fields left. The module and script caches are left as they are.
-    pub fn collapse_to_base(&mut self, num_committed: TxnIndex)
-    where
-        K: Send + Sync,
-        T: Send + Sync,
-        V: Send + Sync,
-    {
+    /// committed value is its base there, settled on first access, with no
+    /// versions, dependencies or delayed fields left. The module and script
+    /// caches are left as they are.
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) {
         self.data.collapse_to_base(num_committed);
         self.group_data.collapse_to_base(num_committed);
         self.delayed_fields = VersionedDelayedFields::empty();

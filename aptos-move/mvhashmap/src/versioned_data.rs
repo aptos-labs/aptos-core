@@ -15,9 +15,11 @@ use aptos_types::{
 };
 use claims::{assert_ok, assert_some};
 use crossbeam::utils::CachePadded;
-use dashmap::{DashMap, DashSet};
+use dashmap::{
+    mapref::one::{Ref, RefMut},
+    DashMap,
+};
 use equivalent::Equivalent;
-use rayon::prelude::*;
 use std::{
     collections::btree_map::{self, BTreeMap},
     fmt::Debug,
@@ -54,6 +56,10 @@ struct EntryCell<V> {
 /// transactions that update the given access path & the corresponding entries.
 struct VersionedValue<V> {
     versioned_map: BTreeMap<ShiftedTxnIndex, CachePadded<Entry<EntryCell<V>>>>,
+    /// The block whose entries the map holds. A map left behind by an
+    /// earlier block is collapsed to that block's committed value on its
+    /// first access under the current one.
+    block: u32,
 }
 
 /// Maps each key (access path) to an internal versioned value representation.
@@ -63,13 +69,12 @@ pub struct VersionedData<K, V> {
     // short and already well distributed.
     values: DashMap<K, VersionedValue<V>, ahash::RandomState>,
     total_base_value_size: AtomicU64,
-    /// Keys written since the map was last collapsed: the only keys that can
-    /// hold entries above the base, so the only ones a collapse has to visit.
-    touched: DashSet<K, ahash::RandomState>,
     /// The block the map currently serves; incremented by a collapse. Tags
-    /// read registrations, so the previous block's readers are dropped from
-    /// an entry on its first access under the new block.
+    /// read registrations and per-key maps, so that what an earlier block
+    /// left behind is settled on first access rather than all at once.
     block: AtomicU32,
+    /// How many transactions each earlier block committed, by block.
+    committed: Vec<TxnIndex>,
 }
 
 fn new_write_entry<V>(
@@ -107,9 +112,44 @@ impl<V> Entry<V> {
 
 impl<V> Default for VersionedValue<V> {
     fn default() -> Self {
+        Self::new(0)
+    }
+}
+
+impl<V> VersionedValue<V> {
+    fn new(block: u32) -> Self {
         Self {
             versioned_map: BTreeMap::new(),
+            block,
         }
+    }
+
+    /// Brings a map left by an earlier block up to `block`: its latest entry
+    /// among that block's `num_committed` transactions becomes the base, the
+    /// rest go. Returns false if nothing was committed, i.e. the key is
+    /// unknown again.
+    fn settle(&mut self, num_committed: TxnIndex, block: u32) -> bool {
+        self.block = block;
+        let Some(idx) = self
+            .versioned_map
+            .range(..ShiftedTxnIndex::new(num_committed))
+            .next_back()
+            .map(|(idx, _)| idx.clone())
+        else {
+            self.versioned_map.clear();
+            return false;
+        };
+        let entry = self
+            .versioned_map
+            .remove(&idx)
+            .expect("the entry was just found");
+        self.versioned_map.clear();
+        let EntryCell { value, .. } = CachePadded::into_inner(entry).value;
+        self.versioned_map.insert(
+            ShiftedTxnIndex::zero_idx(),
+            CachePadded::new(new_write_entry(0, value, BTreeMap::new(), block)),
+        );
+        true
     }
 }
 
@@ -258,8 +298,8 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         Self {
             values: DashMap::with_hasher(ahash::RandomState::new()),
             total_base_value_size: AtomicU64::new(0),
-            touched: DashSet::with_hasher(ahash::RandomState::new()),
             block: AtomicU32::new(0),
+            committed: Vec::new(),
         }
     }
 
@@ -267,10 +307,59 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         self.block.load(Ordering::Relaxed)
     }
 
-    fn touch(&self, key: &K) {
-        if !self.touched.contains(key) {
-            self.touched.insert(key.clone());
+    /// How many transactions `block`, an earlier block, committed.
+    pub(crate) fn num_committed(&self, block: u32) -> TxnIndex {
+        self.committed[block as usize]
+    }
+
+    /// The map for `key`, settled to the current block. None if the key is
+    /// unknown, including when an earlier block left only uncommitted
+    /// entries behind.
+    fn get<Q>(&self, key: &Q) -> Option<Ref<'_, K, VersionedValue<V>>>
+    where
+        Q: Equivalent<K> + Hash,
+    {
+        let block = self.block();
+        let v = self.values.get(key)?;
+        if v.block == block {
+            return Some(v);
         }
+        drop(v);
+        // Settle under the shard's write lock; whoever gets there first does
+        // it, the rest see a settled map.
+        self.get_mut(key)?;
+        self.values.get(key)
+    }
+
+    fn get_mut<Q>(&self, key: &Q) -> Option<RefMut<'_, K, VersionedValue<V>>>
+    where
+        Q: Equivalent<K> + Hash,
+    {
+        let block = self.block();
+        let mut v = self.values.get_mut(key)?;
+        if v.block != block {
+            let num_committed = self.num_committed(v.block);
+            if !v.settle(num_committed, block) {
+                drop(v);
+                self.values.remove(key);
+                return None;
+            }
+        }
+        Some(v)
+    }
+
+    /// The map for `key`, settled, created empty if unknown.
+    fn entry(&self, key: K) -> RefMut<'_, K, VersionedValue<V>> {
+        let block = self.block();
+        let mut v = self
+            .values
+            .entry(key)
+            .or_insert_with(|| VersionedValue::new(block));
+        if v.block != block {
+            let num_committed = self.num_committed(v.block);
+            v.settle(num_committed, block);
+        }
+        v
     }
 
     pub(crate) fn num_keys(&self) -> usize {
@@ -291,7 +380,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     {
         // Use dashmap's get method which accepts a reference when Borrow is implemented
         // The equivalent crate automatically implements the right traits.
-        let v = self.values.get(key).expect("Path must exist");
+        let v = self.get(key).expect("Path must exist");
         v.versioned_map
             .get(&ShiftedTxnIndex::new(txn_idx))
             .expect("Entry by the txn must exist to mark estimate")
@@ -305,7 +394,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         Q: Equivalent<K> + Hash,
     {
         // TODO: investigate logical deletion.
-        let mut v = self.values.get_mut(key).expect("Path must exist");
+        let mut v = self.get_mut(key).expect("Path must exist");
         assert_some!(
             v.versioned_map.remove(&ShiftedTxnIndex::new(txn_idx)),
             "Entry for key / idx must exist to be deleted"
@@ -323,10 +412,9 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     where
         Q: Equivalent<K> + Hash + Debug,
     {
-        let mut v = self.values.get_mut(key).ok_or_else(|| {
+        let mut v = self.get_mut(key).ok_or_else(|| {
             code_invariant_error(format!("Path must exist for remove_v2: {:?}", key))
         })?;
-        self.touch(v.key());
 
         // Get the entry to be removed
         let removed_entry = v
@@ -359,8 +447,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     where
         Q: Equivalent<K> + Hash,
     {
-        self.values
-            .get(key)
+        self.get(key)
             .map(|v| v.read(txn_idx, None, self.block()))
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
@@ -378,8 +465,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     where
         Q: Equivalent<K> + Hash,
     {
-        self.values
-            .get(key)
+        self.get(key)
             .map(|v| v.read(txn_idx, Some(incarnation), self.block()))
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
@@ -391,7 +477,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     /// may need to repeat the read afterward, as a concurrent caller might have exchanged and
     /// stored a different delayed field ID.
     pub fn set_base_value(&self, key: K, base_value: V, on_occupied: impl FnOnce(&mut V, V)) {
-        let mut v = self.values.entry(key).or_default();
+        let mut v = self.entry(key);
         // For base value, incarnation is irrelevant, and is always set to 0.
 
         use btree_map::Entry::*;
@@ -478,8 +564,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         incarnation: Incarnation,
         value: V,
     ) -> Result<(), PanicError> {
-        self.touch(&key);
-        let mut v = self.values.entry(key).or_default();
+        let mut v = self.entry(key);
         Self::write_impl(
             &mut v,
             txn_idx,
@@ -499,8 +584,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         incarnation: Incarnation,
         value: V,
     ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
-        self.touch(&key);
-        let mut v = self.values.entry(key).or_default();
+        let mut v = self.entry(key);
         let block = self.block();
         let (affected_dependencies, validation_passed) =
             v.split_off_affected_read_dependencies::<ONLY_COMPARE_METADATA>(txn_idx, &value, block);
@@ -534,8 +618,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     ) -> bool {
         let value_clone = value.clone();
 
-        self.touch(&key);
-        let mut v = self.values.entry(key).or_default();
+        let mut v = self.entry(key);
         let prev_entry = v.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
             CachePadded::new(new_write_entry(
@@ -553,53 +636,13 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         })
     }
 
-    /// Keeps, for every key, only its latest entry below `num_committed`, as
-    /// the base value for the next block on the same fork. Entries of
-    /// transactions past the committed prefix, dependencies and estimates are
-    /// dropped; a trailing deletion stays as a deleted base.
-    pub fn collapse_to_base(&mut self, num_committed: TxnIndex)
-    where
-        K: Send + Sync,
-        V: Send + Sync,
-    {
-        // Only keys touched since the last collapse can hold entries above
-        // the base or readers of this block; the rest are already base-only.
-        // A key with only uncommitted entries is unknown again (its base is
-        // read from the state view when next needed), and the kept entry is
-        // rebuilt so that readers registered on it are dropped.
-        let block = self.block.fetch_add(1, Ordering::Relaxed) + 1;
-        let touched = std::mem::replace(
-            &mut self.touched,
-            DashSet::with_hasher(ahash::RandomState::new()),
-        );
-        // `par_bridge` hands keys out one at a time under a lock; chunks of a
-        // plain vector parallelize cleanly.
-        let touched = touched.into_iter().collect::<Vec<_>>();
-        touched.par_chunks(64).flatten().for_each(|key| {
-            let Some(mut v) = self.values.get_mut(key) else {
-                return;
-            };
-            let Some(idx) = v
-                .versioned_map
-                .range(..ShiftedTxnIndex::new(num_committed))
-                .next_back()
-                .map(|(idx, _)| idx.clone())
-            else {
-                drop(v);
-                self.values.remove(key);
-                return;
-            };
-            let entry = v
-                .versioned_map
-                .remove(&idx)
-                .expect("the entry was just found");
-            v.versioned_map.clear();
-            let EntryCell { value, .. } = CachePadded::into_inner(entry).value;
-            v.versioned_map.insert(
-                ShiftedTxnIndex::zero_idx(),
-                CachePadded::new(new_write_entry(0, value, BTreeMap::new(), block)),
-            );
-        });
+    /// Ends the block after `num_committed` of its transactions committed:
+    /// their writes are the base of the next block on this fork. Nothing is
+    /// visited here; each key settles on its first access under the next
+    /// block.
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) {
+        self.committed.push(num_committed);
+        self.block.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Transactions that registered a read of the entry written at txn_idx, if any.
@@ -607,7 +650,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     where
         Q: Equivalent<K> + Hash,
     {
-        if let Some(v) = self.values.get(key) {
+        if let Some(v) = self.get(key) {
             if let Some(entry) = v.versioned_map.get(&ShiftedTxnIndex::new(txn_idx)) {
                 out.extend(
                     entry
@@ -1159,5 +1202,27 @@ mod collapse_tests {
         assert_matches!(read, Ok(MVDataOutput::Versioned(Err(_), v)) if v == value(7));
         // A write in the next block invalidates no reader of the old block.
         assert!(assert_ok!(data.write_v2::<false>(committed, 2, 0, value(2))).is_empty());
+    }
+
+    /// A key left alone for several blocks settles against the committed
+    /// prefix of the block that last wrote it, not the latest one.
+    #[test]
+    fn settles_against_the_block_that_wrote_it() {
+        let mut data = VersionedData::<KeyType<u32>, TestValue>::empty();
+        let kept = KeyType(1);
+        let dropped = KeyType(2);
+        assert_ok!(data.write(kept.clone(), 3, 0, value(3)));
+        assert_ok!(data.write(dropped.clone(), 7, 0, value(7)));
+        data.collapse_to_base(5);
+        // The next block commits fewer transactions and touches neither key.
+        assert_ok!(data.write(KeyType(3), 1, 0, value(1)));
+        data.collapse_to_base(2);
+
+        let read = data.fetch_data_no_record(&kept, 0);
+        assert_matches!(read, Ok(MVDataOutput::Versioned(Err(_), v)) if v == value(3));
+        assert_matches!(
+            data.fetch_data_no_record(&dropped, 100),
+            Err(MVDataError::Uninitialized)
+        );
     }
 }
