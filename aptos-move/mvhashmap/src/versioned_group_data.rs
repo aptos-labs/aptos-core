@@ -21,6 +21,7 @@ use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_
 use claims::{assert_ok, assert_some};
 use dashmap::DashMap;
 use equivalent::Equivalent;
+use rayon::prelude::*;
 use serde::Serialize;
 use std::{
     collections::{
@@ -313,9 +314,14 @@ where
 
     /// Keeps every group's latest members and size below `num_committed` as
     /// its base for the next block on the same fork.
-    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) {
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex)
+    where
+        K: Send + Sync,
+        T: Send + Sync,
+        V: Send + Sync,
+    {
         self.values.collapse_to_base(num_committed);
-        self.group_sizes.iter_mut().for_each(|mut sizes| {
+        self.group_sizes.par_iter_mut().for_each(|mut sizes| {
             let Some(size) = sizes
                 .size_entries
                 .range(..ShiftedTxnIndex::new(num_committed))

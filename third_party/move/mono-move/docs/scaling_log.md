@@ -759,3 +759,59 @@ the fixed per-block cost (the same milliseconds on both VMs, a larger share
 of MonoMove's shorter block) measured at the start of this log, and the
 ratio of MonoMove to V1 at 16 threads is 3.4x (account generation) to
 4.0x (no-op) against 3.8–4.6x at 2 threads.
+
+## 2026-11-07, session 2: protocol-level experiments on MonoMove
+
+Direction for this session: MonoMove only, protocol changes allowed, the
+question is how far end-to-end throughput can be stretched.
+
+### Member-level group writes, B4 (commit 85bdcca081, flag `APTOS_MEMBER_GROUP_WRITES=1`)
+
+A transaction's write set names the group members it changed under their
+own resource keys; the block executor assembles each written group's blob
+once at the end of the block, from the multi-version map, and the state
+takes those blobs at the block's last version (member keys never reach the
+state). The ledger keeps the member-level write sets. Runs 42378999479
+(pipelined mode, end to end) and 42379007905 (split stages), MonoMove, 16
+threads:
+
+| 16T, pipelined | end-to-end TPS | output bytes/txn | materialize CPU µs/txn | storage CPU µs/txn (smt + non_exe + io) |
+|---|---|---|---|---|
+| transfer, unmetered | 15.1k → 15.7k | 1221 → 830 | 27.6 → 28.3 | 284 → 286 |
+| transfer, metered | 14.5k → 12.9k | 1963 → 964 | 38.1 → 22.9 | 320 → 311 |
+| no-op, metered | 18.0k → 16.9k | 1431 → 626 | 28.7 → 15.7 | 156 → 148 |
+| account gen, unmetered | 15.9k → 15.8k | 688 → 669 | 23.0 → 30.6 | 229 → 229 |
+
+The write set shrinks 30–55% and the per-transaction group assembly goes
+(−40% materialize CPU in metered mode), but end-to-end throughput does not
+move: the storage pipeline's CPU is the same to the microsecond. The commit
+cost is per updated *state key*, and member-level writes leave the set of
+updated keys (one blob per group per block) exactly as it was; the write-set
+bytes only touch the ledger column, a minor part of `io`. The first
+prototype also assembled the blobs serially at block end, which doubled the
+execution stage's wall time (inner 11.7 → 24.0 µs/txn with unchanged CPU);
+83294696f8 assembles them on one arena per worker in parallel (remeasured
+below).
+
+Verdict: not a throughput lever for this pipeline. It remains a ledger-size
+and execution-CPU saving (which would matter for state sync bandwidth), at
+the price of a format change and of state at a version inside a block no
+longer following from the write sets.
+
+### What the commit stage actually spends (run 42331397445, perf, idle samples removed)
+
+Transfer, MonoMove, 16T, real CPU per transaction in the storage threads:
+
+| thread pool | real µs/txn | largest items |
+|---|---|---|
+| `smt_update` | 156 | reading Jellyfish Merkle nodes from RocksDB 40, in-memory sparse Merkle combine/hash 66, keccak 28 |
+| `non_exe` | 136 | transaction accumulator node reads from RocksDB 18, ledger update assembly 15, write-batch puts 11, keccak 36 |
+| `io` | 89 | state KV shard commits (RocksDB write batches) 66 |
+| `rayon-global` | 35 | layered map (speculative state) 15 |
+
+Two things stand out for the storage side: the state Merkle update reads
+its sibling nodes from RocksDB per key (40 µs/txn of CPU on top of the
+hashing), and the transaction accumulator does the same (18). Both are
+cache-shaped problems (the node LRU cache misses), not hashing. The hashing
+itself is about 65 µs/txn across the two pools. None of this depends on the
+VM or on the write-set format.
