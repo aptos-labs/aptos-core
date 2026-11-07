@@ -48,10 +48,14 @@ impl SizeAndDependencies {
     fn from_size_and_dependencies(
         size: ResourceGroupSize,
         dependencies: BTreeMap<TxnIndex, Incarnation>,
+        block: u32,
     ) -> Self {
         Self {
             size,
-            dependencies: Mutex::new(RegisteredReadDependencies::from_dependencies(dependencies)),
+            dependencies: Mutex::new(RegisteredReadDependencies::from_dependencies(
+                dependencies,
+                block,
+            )),
         }
     }
 }
@@ -89,8 +93,8 @@ pub struct VersionedGroupData<K, T, V> {
     // must correspond to the outputs recorded by the committed transaction incarnations.
     // (and the correctness of the outputs is the responsibility of BlockSTM validation).
     group_tags: DashMap<K, HashSet<T>, ahash::RandomState>,
-    /// Groups whose size was written, or read with a registered dependency,
-    /// since the map was last collapsed.
+    /// Groups whose size was written since the map was last collapsed: the
+    /// only ones that can hold size entries above the base.
     touched_groups: DashSet<K, ahash::RandomState>,
 }
 
@@ -295,13 +299,19 @@ where
         // reading an entry by a lower txn index. However, if the size has changed, then
         // those read dependencies will be added to invalidated_dependencies, and the
         // store_deps variable will be empty.
+        let block = self.values.block();
         let store_deps: BTreeMap<TxnIndex, Incarnation> = Self::get_latest_entry(
             &group_sizes.size_entries,
             txn_idx,
             ReadPosition::AfterCurrentTxn,
         )
         .map_or_else(BTreeMap::new, |(_, size_entry)| {
-            let new_deps = size_entry.value.dependencies.lock().split_off(txn_idx + 1);
+            let new_deps = size_entry
+                .value
+                .dependencies
+                .lock()
+                .for_block(block)
+                .split_off(txn_idx + 1);
 
             if size_entry.value.size == size {
                 // Validation passed.
@@ -315,7 +325,7 @@ where
         group_sizes.size_entries.insert(
             ShiftedTxnIndex::new(txn_idx),
             SizeEntry::new(SizeAndDependencies::from_size_and_dependencies(
-                size, store_deps,
+                size, store_deps, block,
             )),
         );
         drop(group_sizes);
@@ -339,8 +349,9 @@ where
             &mut self.touched_groups,
             DashSet::with_hasher(ahash::RandomState::new()),
         );
-        touched.into_iter().par_bridge().for_each(|group_key| {
-            let Some(mut sizes) = self.group_sizes.get_mut(&group_key) else {
+        let touched = touched.into_iter().collect::<Vec<_>>();
+        touched.par_chunks(64).flatten().for_each(|group_key| {
+            let Some(mut sizes) = self.group_sizes.get_mut(group_key) else {
                 return;
             };
             let Some(size) = sizes
@@ -350,8 +361,8 @@ where
                 .map(|(_, entry)| entry.value.size)
             else {
                 drop(sizes);
-                self.group_sizes.remove(&group_key);
-                self.group_tags.remove(&group_key);
+                self.group_sizes.remove(group_key);
+                self.group_tags.remove(group_key);
                 return;
             };
             sizes.size_entries.clear();
@@ -379,7 +390,14 @@ where
         }
         if let Some(sizes) = self.group_sizes.get(group_key) {
             if let Some(entry) = sizes.size_entries.get(&ShiftedTxnIndex::new(txn_idx)) {
-                out.extend(entry.value.dependencies.lock().reader_indices());
+                out.extend(
+                    entry
+                        .value
+                        .dependencies
+                        .lock()
+                        .for_block(self.values.block())
+                        .reader_indices(),
+                );
             }
         }
     }
@@ -450,7 +468,9 @@ where
             })?;
 
         // Handle dependencies for the removed size entry.
-        let mut removed_size_deps = take_dependencies(&removed_size_entry.value.dependencies);
+        let block = self.values.block();
+        let mut removed_size_deps =
+            take_dependencies(&removed_size_entry.value.dependencies, block);
         if let Some((_, next_lower_entry)) = Self::get_latest_entry(
             &group_sizes.size_entries,
             txn_idx,
@@ -464,6 +484,7 @@ where
                     .value
                     .dependencies
                     .lock()
+                    .for_block(block)
                     .extend_with_higher_dependencies(std::mem::take(&mut removed_size_deps))?;
             }
         }
@@ -557,11 +578,15 @@ where
     ) -> Result<ResourceGroupSize, MVGroupError> {
         match self.group_sizes.get(group_key) {
             Some(g) => {
-                self.touch(group_key);
                 Self::get_latest_entry(&g.size_entries, txn_idx, ReadPosition::BeforeCurrentTxn)
                     .map_or(Err(MVGroupError::Uninitialized), |(_, size)| {
                         // TODO(BlockSTMv2): convert to PanicErrors after MVHashMap refactoring.
-                        assert_ok!(size.value.dependencies.lock().insert(txn_idx, incarnation));
+                        assert_ok!(size
+                            .value
+                            .dependencies
+                            .lock()
+                            .for_block(self.values.block())
+                            .insert(txn_idx, incarnation));
                         Ok(size.value.size)
                     })
             },
@@ -941,7 +966,7 @@ mod test {
                 .value
                 .dependencies;
             assert_eq!(
-                take_dependencies(mid_deps),
+                take_dependencies(mid_deps, 0),
                 all_size_deps
                     .clone()
                     .into_iter()
@@ -960,7 +985,7 @@ mod test {
                 .value
                 .dependencies;
             assert_eq!(
-                take_dependencies(base_deps),
+                take_dependencies(base_deps, 0),
                 all_size_deps
                     .into_iter()
                     .filter(|&(idx, _)| idx <= mid_idx)
