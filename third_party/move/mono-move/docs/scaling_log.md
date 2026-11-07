@@ -713,3 +713,16 @@ execution. The next levers are outside the VM: member-level group writes
 Open questions for the user: whether sender hints should become the
 default (a one-line change) and whether the member-level group write
 format is worth a protocol proposal.
+
+### Open question: V1's state view reads
+
+`CachedStateView` counters over the execution stage (transfer, 16T, one
+transaction per sender): V1 makes 2.6 `get_state_slot` calls per
+transaction, 1.84 served by the speculative layer and 0.74 by RocksDB, for
+42 µs/txn of its worker CPU (`storage/get_state_value` timer, 8% of V1's
+total). MonoMove makes 0.08 per transaction on the same recording, even
+though its base reads go through the same `get_state_value`. Either V1
+reads keys MonoMove does not (existence checks on keys that are never
+present would each be a cold negative lookup), or the two VMs resolve the
+same keys through different paths. Not resolved tonight; worth a look
+since it is a V1-only 8%.
