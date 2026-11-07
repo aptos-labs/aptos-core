@@ -391,8 +391,19 @@ fn workflow_timer_secs() -> BTreeMap<String, f64> {
         ("aptos_executor_other_timers_seconds", "executor"),
         ("aptos_storage_interface_timer_seconds", "storage"),
     ];
+    // Unlabelled block-executor histograms, reported under their own name.
+    const PLAIN: [(&str, &str); 1] = [(
+        "aptos_execution_pool_collapse_seconds",
+        "block_executor/pool_collapse",
+    )];
     let mut out = BTreeMap::new();
     for family in aptos_metrics_core::gather() {
+        if let Some((_, name)) = PLAIN.iter().find(|(name, _)| *name == family.name()) {
+            if let Some(metric) = family.get_metric().first() {
+                out.insert(name.to_string(), metric.get_histogram().get_sample_sum());
+            }
+            continue;
+        }
         let Some((_, short)) = FAMILIES.iter().find(|(name, _)| *name == family.name()) else {
             continue;
         };

@@ -604,7 +604,7 @@ crossbeam-utils = "0.8.23"
 csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
-dashmap = { version = "7.0.0-rc2", features = ["inline-more", "rayon"] }
+dashmap = { version = "7.0.0-rc2", features = ["inline-more", "rayon", "raw-api"] }
 datatest-stable = "0.3.3"
 dearbitrary = { version = "1.0.4", features = ["derive"] }
 debug-ignore = { version = "1.0.3", features = ["serde"] }
