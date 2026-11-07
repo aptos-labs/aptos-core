@@ -336,13 +336,13 @@ where
 
     /// Keeps every group's latest members and size below `num_committed` as
     /// its base for the next block on the same fork.
-    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) -> (usize, usize)
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex)
     where
         K: Send + Sync,
         T: Send + Sync,
         V: Send + Sync,
     {
-        let member_keys = self.values.collapse_to_base(num_committed);
+        self.values.collapse_to_base(num_committed);
         // A group with no committed size is uninitialized again, so that the
         // next read provisions it from the state view.
         let touched = std::mem::replace(
@@ -350,7 +350,6 @@ where
             DashSet::with_hasher(ahash::RandomState::new()),
         );
         let touched = touched.into_iter().collect::<Vec<_>>();
-        let num_groups = touched.len();
         touched.par_chunks(64).flatten().for_each(|group_key| {
             let Some(mut sizes) = self.group_sizes.get_mut(group_key) else {
                 return;
@@ -372,7 +371,6 @@ where
                 SizeEntry::new(SizeAndDependencies::from_size(size)),
             );
         });
-        (member_keys, num_groups)
     }
 
     /// Transactions that registered a read of a member or the size the group's

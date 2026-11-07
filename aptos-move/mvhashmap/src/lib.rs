@@ -11,12 +11,7 @@ use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, Script};
 use move_vm_types::code::{ModuleCache, ModuleCode, SyncModuleCache, SyncScriptCache};
 use serde::Serialize;
-use std::{
-    fmt::Debug,
-    hash::Hash,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 mod registered_dependencies;
 pub mod types;
@@ -41,15 +36,6 @@ mod unit_tests;
 /// different multi-version data-structures (MVData and MVGroupData). It would also
 /// allow performing a check on the path once during initialization (to determine
 /// if the path is for a resource or a group), and then checking invariants.
-/// What a collapse visited and how long each part took.
-pub struct CollapseStats {
-    pub data_keys: usize,
-    pub data: Duration,
-    pub member_keys: usize,
-    pub groups: usize,
-    pub group: Duration,
-}
-
 pub struct MVHashMap<K, T, V, I> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
@@ -123,25 +109,15 @@ where
     /// Keeps the map for the next block on the same fork: every key's latest
     /// value becomes its base, with no versions, dependencies or delayed
     /// fields left. The module and script caches are left as they are.
-    pub fn collapse_to_base(&mut self, num_committed: TxnIndex) -> CollapseStats
+    pub fn collapse_to_base(&mut self, num_committed: TxnIndex)
     where
         K: Send + Sync,
         T: Send + Sync,
         V: Send + Sync,
     {
-        let start = Instant::now();
-        let data_keys = self.data.collapse_to_base(num_committed);
-        let data = start.elapsed();
-        let (member_keys, groups) = self.group_data.collapse_to_base(num_committed);
-        let group = start.elapsed() - data;
+        self.data.collapse_to_base(num_committed);
+        self.group_data.collapse_to_base(num_committed);
         self.delayed_fields = VersionedDelayedFields::empty();
-        CollapseStats {
-            data_keys,
-            data,
-            member_keys,
-            groups,
-            group,
-        }
     }
 
     /// Takes module from module cache and returns an iterator to the taken keys and modules.
