@@ -5,7 +5,7 @@ use crate::{
     registered_dependencies::{
         check_lowest_dependency_idx, take_dependencies, RegisteredReadDependencies,
     },
-    types::{Incarnation, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex},
+    types::{Incarnation, Invalidated, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex},
 };
 use anyhow::Result;
 use aptos_infallible::Mutex;
@@ -185,6 +185,32 @@ impl<V: SpeculativeValue> VersionedValue<V> {
             }
         }
         Ok(dependencies)
+    }
+
+    /// For each reader (ascending, all above txn_idx), the highest-indexed
+    /// entry strictly between txn_idx and the reader, if any: the write the
+    /// reader sees next instead of the one at txn_idx.
+    fn next_writers(
+        &self,
+        txn_idx: TxnIndex,
+        readers: impl Iterator<Item = TxnIndex>,
+    ) -> Vec<(TxnIndex, TxnIndex)> {
+        let mut ret = vec![];
+        let mut writers = self
+            .versioned_map
+            .range(ShiftedTxnIndex::new(txn_idx + 1)..)
+            .filter_map(|(idx, _)| idx.idx().ok())
+            .peekable();
+        let mut last_writer = None;
+        for reader in readers {
+            while writers.peek().is_some_and(|w| *w < reader) {
+                last_writer = writers.next();
+            }
+            if let Some(writer) = last_writer {
+                ret.push((reader, writer));
+            }
+        }
+        ret
     }
 
     // 'maybe_reader_incarnation' is None for BlockSTMv1 and always set for BlockSTMv2.
@@ -450,14 +476,15 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     }
 
     /// Write a value at a given key (and version) for BlockSTMv2.
-    /// Returns invalidated affected read dependencies (dependencies that failed push validation).
+    /// Returns invalidated affected read dependencies (dependencies that failed push validation),
+    /// each with the next writer above txn_idx whose entry it would read.
     pub fn write_v2<const ONLY_COMPARE_METADATA: bool>(
         &self,
         key: K,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
         value: V,
-    ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
+    ) -> Result<Invalidated, PanicError> {
         let mut v = self.values.entry(key).or_default();
         let (affected_dependencies, validation_passed) =
             v.split_off_affected_read_dependencies::<ONLY_COMPARE_METADATA>(txn_idx, &value);
@@ -476,7 +503,11 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
 
         Self::write_impl(&mut v, txn_idx, incarnation, value, deps_to_retain)?;
 
-        Ok(deps_to_return)
+        let next_writers = v.next_writers(txn_idx, deps_to_return.keys().copied());
+        Ok(Invalidated {
+            dependencies: deps_to_return,
+            next_writers,
+        })
     }
 
     /// Versioned write of metadata at a given resource group key (and version). Returns true
@@ -923,6 +954,7 @@ mod tests {
         assert!(versioned_data
             .write_v2::<true>((), 1, 1, TestValueWithMetadata::new(10, 100),)
             .unwrap()
+            .dependencies
             .is_empty());
         check_versioned_data_deps(
             &versioned_data,

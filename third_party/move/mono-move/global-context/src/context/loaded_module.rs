@@ -442,7 +442,7 @@ impl LoadedModule {
                 return Arc::clone(current);
             }
             let mut next = UnorderedMap::clone(current);
-            next.insert(key.clone(), Arc::clone(&slot));
+            next.insert(key, Arc::clone(&slot));
             Arc::new(next)
         });
         let published = self.instantiated_functions.load();

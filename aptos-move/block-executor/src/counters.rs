@@ -388,6 +388,15 @@ pub static INTERRUPTED_INCARNATIONS: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Aborted readers held back until the next writer above them executed again.
+pub static PREDICTED_STALLS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_execution_predicted_stalls",
+        "Aborted transactions stalled on the next writer of an invalidated key"
+    )
+    .unwrap()
+});
+
 /// Worker time by phase, in microseconds. `clock` is `wall` or `cpu`; the gap
 /// between the two is time the worker spent descheduled.
 pub static WORKER_PHASE_MICROS: Lazy<IntCounterVec> = Lazy::new(|| {
