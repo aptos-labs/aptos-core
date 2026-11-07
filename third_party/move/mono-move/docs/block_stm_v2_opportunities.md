@@ -195,12 +195,10 @@ the commit stage is the bottleneck and these cores are taken from it.
 - Group writes as members (B4): V1's `finalize_group` is 9.4 µs/txn, MonoMove
   pays `group_members_at` 4.9 to assemble the group blob per transaction.
   Writing only the changed member and assembling the blob once per group
-  per block at commit removes both. Protocol change: the write set of a
-  transaction no longer contains the group blob, so the transaction output
-  hash changes unless the blob is assembled before the output is hashed,
-  which is at `materialize` (post-commit, once per transaction) — the saving
-  is then only the speculative assembly, not the final one. Needs a
-  write-up before code.
+  per block at commit removes both, and cuts the write set by 60–70% on
+  the sweep workloads. It is a protocol change (the transaction output
+  hash covers the write set). Write-up in
+  `execution_pool_and_group_writes.md`.
 
 ## Order of attack
 
