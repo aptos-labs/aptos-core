@@ -407,6 +407,28 @@ pub static EXECUTION_POOL_COLLAPSE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// The parts of the collapse: the resource map, the group member map and the
+/// group sizes.
+pub static EXECUTION_POOL_COLLAPSE_PART_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_execution_pool_collapse_part_seconds",
+        "Time to collapse one part of the multi-version map",
+        &["part"],
+        exponential_buckets(/*start=*/ 1e-5, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Keys the collapse visited, per part.
+pub static EXECUTION_POOL_COLLAPSED_KEYS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_execution_pool_collapsed_keys",
+        "Keys visited by the multi-version map collapse",
+        &["part"]
+    )
+    .unwrap()
+});
+
 /// Aborted readers held back until the next writer above them executed again.
 pub static PREDICTED_STALLS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
