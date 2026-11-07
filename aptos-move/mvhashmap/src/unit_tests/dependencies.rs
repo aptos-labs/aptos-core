@@ -133,7 +133,8 @@ fn test_dependencies(
                                                 0,
                                                 MockValue::new(Some(*v)),
                                             )
-                                            .unwrap(),
+                                            .unwrap()
+                                            .dependencies,
                                     );
                                     None
                                 },
@@ -146,7 +147,8 @@ fn test_dependencies(
                                                 0,
                                                 MockValue::new(Some(*v)),
                                             )
-                                            .unwrap(),
+                                            .unwrap()
+                                            .dependencies,
                                     );
                                     sleep(Duration::from_millis(sleep_millis));
                                     process_deps(

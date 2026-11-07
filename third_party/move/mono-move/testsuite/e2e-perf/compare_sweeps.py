@@ -35,6 +35,7 @@ METRICS = [
     ("minor faults /txn", "minor_faults_per_txn"),
     ("aborts /txn", "aborts_per_txn"),
     ("interrupts /txn", "interrupts_per_txn"),
+    ("predicted stalls /txn", "predicted_stalls_per_txn"),
     ("inner TPS", "inner_tps"),
 ]
 

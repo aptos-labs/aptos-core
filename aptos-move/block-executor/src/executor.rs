@@ -15,7 +15,7 @@ use crate::{
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
-    scheduler_v2::{AbortManager, CommitResult, SchedulerV2, TaskKind},
+    scheduler_v2::{AbortManager, CommitResult, SchedulerV2, TaskKind, IDLE_BACKOFF, SENDER_HINTS},
     scheduler_wrapper::SchedulerWrapper,
     single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
     task::{ExecutionStatus, TxnOutput},
@@ -31,7 +31,7 @@ use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{error, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, TxnIndex},
+    types::{Incarnation, Invalidated, TxnIndex},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
@@ -65,6 +65,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::{PhantomData, Sync},
     sync::atomic::{AtomicBool, AtomicU32, Ordering},
+    time::Duration,
 };
 
 type CommittedOutput<E> = <<E as SingleTransactionExecutor>::Output as TxnOutput>::CommittedOutput;
@@ -121,6 +122,18 @@ where
             transaction_commit_hook,
             phantom: PhantomData,
         }
+    }
+
+    /// For each transaction, the previous transaction of the same sender in the block,
+    /// which it will conflict with on the sender's account.
+    fn sender_predecessors(block: &TP, num_txns: TxnIndex) -> Vec<Option<TxnIndex>> {
+        let mut last_by_sender = HashMap::new();
+        (0..num_txns)
+            .map(|txn_idx| {
+                let sender = block.get_txn(txn_idx).try_as_signed_user_txn()?.sender();
+                last_by_sender.insert(sender, txn_idx)
+            })
+            .collect()
     }
 
     /// Verifies that all pre-written keys are present in the actual write set.
@@ -185,11 +198,11 @@ where
                     },
                     None => {
                         // Clean up the write from previous incarnation.
-                        abort_manager.invalidate_dependencies(
+                        abort_manager.invalidate_dependencies(Invalidated::from_dependencies(
                             versioned_cache
                                 .data()
                                 .remove_v2::<_, false>(prev_key_ref, idx_to_execute)?,
-                        )?;
+                        ))?;
                     },
                 }
                 Ok(())
@@ -256,19 +269,19 @@ where
                     },
                     None => {
                         // Clean up the write from previous incarnation.
-                        abort_manager.invalidate_dependencies(
+                        abort_manager.invalidate_dependencies(Invalidated::from_dependencies(
                             // Invalidate the readers of group metadata.
                             versioned_cache
                                 .data()
                                 .remove_v2::<_, true>(group_key_ref, idx_to_execute)?,
-                        )?;
-                        abort_manager.invalidate_dependencies(
+                        ))?;
+                        abort_manager.invalidate_dependencies(Invalidated::from_dependencies(
                             versioned_cache.group_data().remove_v2(
                                 group_key_ref,
                                 idx_to_execute,
                                 prev_tags,
                             )?,
-                        )?;
+                        ))?;
                     },
                 }
                 Ok(())
@@ -1271,6 +1284,7 @@ where
         let global_module_cache = shared_sync_params.global_module_cache;
 
         let _phases = WorkerPhaseTracker::start(WorkerPhase::Scheduler);
+        let mut empty_polls = 0u32;
         loop {
             WorkerPhaseTracker::switch(WorkerPhase::CommitHooks);
             while scheduler.commit_hooks_try_lock() {
@@ -1307,7 +1321,11 @@ where
             }
 
             WorkerPhaseTracker::switch(WorkerPhase::Scheduler);
-            match scheduler.next_task(worker_id)? {
+            let task = scheduler.next_task(worker_id)?;
+            if !matches!(task, TaskKind::NextTask) {
+                empty_polls = 0;
+            }
+            match task {
                 TaskKind::Execute(txn_idx, incarnation) => {
                     WorkerPhaseTracker::switch(WorkerPhase::ExecuteApply);
                     if incarnation > num_workers.pow(2) + num_txns + 30 {
@@ -1353,7 +1371,19 @@ where
                     self.record_finalized_output(txn_idx, txn_idx, output, shared_sync_params)?;
                 },
                 TaskKind::NextTask => {
-                    // TODO: Anything intelligent to do here?.
+                    // Nothing to do: back off so that idle workers stop contending
+                    // on the scheduler's queue and atomics with the ones that have work.
+                    if *IDLE_BACKOFF {
+                        empty_polls += 1;
+                        if empty_polls > 64 {
+                            std::thread::sleep(Duration::from_micros(5));
+                        } else if empty_polls > 8 {
+                            std::thread::yield_now();
+                        } else {
+                            std::hint::spin_loop();
+                        }
+                    }
+                    continue;
                 },
                 TaskKind::ModuleValidation(txn_idx, incarnation, modules_to_validate) => {
                     WorkerPhaseTracker::switch(WorkerPhase::ModuleValidation);
@@ -1594,7 +1624,15 @@ where
                 }
             }
         }
-        let scheduler = SchedulerV2::new(num_txns, num_workers);
+        let scheduler = if *SENDER_HINTS {
+            SchedulerV2::new_with_predecessors(
+                num_txns,
+                num_workers,
+                &Self::sender_predecessors(signature_verified_block, num_txns),
+            )
+        } else {
+            SchedulerV2::new(num_txns, num_workers)
+        };
 
         let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
             base_view,

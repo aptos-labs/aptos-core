@@ -367,3 +367,149 @@ re-executes rather than parking.
 - `.github/workflows/mono-move-scaling-sweep.yaml`: one job per workload on
   ephemeral runners. Dispatch with
   `gh workflow run mono-move-scaling-sweep.yaml --ref <branch> -f ...`.
+
+## 2026-11-07: overnight batch
+
+Each experiment is one commit on the branch and one CI sweep against the
+commit before it, on the same recording. Cross-instance noise on the runner
+is ±5–10% per job and moves both VMs together, so V1 is the control in every
+comparison below: an effect that is not larger than the V1 shift is noise.
+
+### Block size 1000 vs 4000: fixed and variable per-block cost (run 42313751859)
+
+Same transactions, blocks of 4000 instead of 1000, 16 threads, µs/txn:
+
+| apt-fa-transfer, 16T | inner (Block-STM) | execution stage | outside Block-STM |
+|---|---|---|---|
+| V1, 1000 | 32.7 | 40.9 | 8.2 |
+| V1, 4000 | 31.7 | 36.4 | 4.7 |
+| MonoMove, 1000 | 10.7 | 16.9 | 6.2 |
+| MonoMove, 4000 | 9.4 | 12.8 | 3.4 |
+
+Solving the two block sizes for a fixed and a variable part: the work
+outside Block-STM is 1.7–2.2 ms per block plus 2.9–4.2 µs per transaction
+(env rebuild, cache lock, `State::update` and index allocation are the fixed
+part; `TransactionsToKeep::index`, cache priming and output conversion the
+variable part). Inside Block-STM the fixed part is only 0.27 ms per block
+(mvhashmap and scheduler construction, worker start and drain, epilogue).
+MonoMove's execution stage drops 24% with the larger block, V1's 11%: the
+fixed per-block cost is the same milliseconds on both and MonoMove's block is
+shorter. Order book and account generation did not run (job flake).
+
+### Environment cache (commit c5fed0aec0)
+
+`AptosModuleCacheManager::try_lock` rebuilt `AptosEnvironment` on every block:
+read six config resources, deserialize the gas schedule and features, build
+the native table. The manager now keeps the six raw config values and
+rebuilds only when one changed or the block is not the immediate successor.
+Outside-Block-STM time per transaction, blocks of 1000, both thread counts:
+
+| | before | after |
+|---|---|---|
+| order book, MonoMove | 7.2–7.5 | 5.8 |
+| order book, V1 | 8.8–9.2 | 7.7 |
+| apt-fa-transfer, MonoMove | 6.2–6.6 | 5.3 (5 per sender) |
+| apt-fa-transfer, V1 | 8.2–8.6 | 7.1 (5 per sender) |
+
+About 1.0–1.4 µs/txn, 1.0–1.4 ms per block, shared. MonoMove still goes
+through the manager for the module cache lock and the gas parameters it
+reads from the environment; a MonoMove-only path that skips the environment
+entirely would remove the remaining lock and check, under 0.3 ms per block.
+
+### mvhashmap hasher (commit 3d041648db, run 42313734661)
+
+`versioned_data`, `versioned_group_data` and `versioned_delayed_fields` hash
+their DashMaps with `ahash` instead of SipHash. In the 16-thread profiles
+SipHash drops from 4.9 to 1.6 µs/txn of worker CPU on MonoMove and from 13.4
+to 11.5 on V1 (the remainder is the executor-side `HashMap<StateKey, _>`s in
+the read and write sets and the state view, which still use SipHash). Inner
+wall clock moves inside noise: no-op both VMs −11%, transfer MonoMove +1% V1
++4%, account generation both +7%. Kept: it is a few percent of worker CPU
+for free, but it is not the scaling gap.
+
+### jemalloc purge (run 42313769089, `MALLOC_CONF=dirty_decay_ms:-1,muzzy_decay_ms:-1`)
+
+No effect at all: inner wall, worker CPU, system CPU and minor faults all
+within 3% of the default, and the TLB-shootdown IPI share in the profiles is
+unchanged (6.6 µs/txn at 16T on both VMs with and without purging). The IPIs
+are not jemalloc's purge. Candidates: `munmap` of the per-block arena regions
+and thread migration between cores; both are per block, not per transaction,
+and would shrink with block size, which matches the 4000-block result. Not
+worth a code change at this point.
+
+### Kill switch for MonoMove (commit 14f77fad07, runs 42316388679 / 42316422942)
+
+V1 stops an aborted incarnation at the next gas charge; MonoMove ran it to
+the end. `ResourceProvider::check_interrupted` is polled every 64 basic
+blocks and on every call, and raises an abort when the scheduler has already
+invalidated the incarnation. Order book (the conflict-heavy workload),
+MonoMove, 16 threads:
+
+| | before | after |
+|---|---|---|
+| aborts/txn | 6.1 | 6.3 |
+| interrupts/txn | – | 0.48 |
+| worker CPU in VM, µs/txn | 714 | 598 useful + 109 cut short |
+| inner TPS | 7157 | 7273 |
+
+The kill switch cuts 16% of VM CPU and no wall clock. The order book is a
+serial chain through the market object: at 16 threads every transaction is
+executed about seven times and the critical path is the chain of useful
+executions, 140 µs each, 7.1k TPS at both 2 and 16 threads. The abort of
+transaction i arrives when i−1 applies its writes, which is when i is itself
+about to finish, so only 8% of aborts (0.48 of 6.3) catch a running
+incarnation. On the chained no-op and transfer workloads (2 aborts/txn) the
+interrupt count is zero: those aborts always arrive after the incarnation
+completed. The kill switch is a CPU saver, not a throughput lever; the lever
+on this workload is not executing i until i−1 has applied (see D below).
+
+### End-to-end timeline in pipelined mode (run 42313786309, `BLOCK_TIMELINE_PATH`)
+
+The benchmark's normal mode (stages pipelined, not `--split-stages`), 16
+threads, per stage: time inside a block per transaction and the gap between
+consecutive blocks on that stage.
+
+| 16 threads | execute inside / gap | ledger update inside / gap | commit inside / gap | end to end TPS |
+|---|---|---|---|---|
+| no-op, V1 | 26.8 / 8.7 | 5.6 / 30.1 | 36.7 / 0.0 | 26.4k |
+| no-op, MonoMove | 10.1 / 20.7 | 4.5 / 26.5 | 31.1 / 0.0 | 31.0k |
+| transfer, V1 | 39.9 / 28.5 | 13.4 / 54.0 | 68.2 / 0.0 | 13.8k |
+| transfer, MonoMove | 17.9 / 44.7 | 12.7 / 49.3 | 63.0 / 0.0 | 15.5k |
+| account gen, V1 | 46.0 / 21.3 | 62.8 / 0.5 | 68.1 / 0.0 | 14.0k |
+| account gen, MonoMove | 19.8 / 39.4 | 11.0 / 48.0 | 59.8 / 0.0 | 16.3k |
+
+In pipelined mode the end-to-end rate is the commit stage's (zero gap: it
+never waits for input) on every workload, 31–68 µs/txn, and the execution
+stage idles 45–70% of the time on MonoMove. A 2.5x faster execution stage
+buys 10–17% end to end. Commit is `StateStore::commit` + RocksDB writes +
+`save_transactions`; it is where the next investigation has to go if end-to-end
+TPS is the target. The `--split-stages` numbers above measure the execution
+stage in isolation, which is the right measurement for the VM comparison but
+not for what the node would deliver.
+
+### Pipelined indexing (commit 35d80c2ab4, runs 42319845686 / 42319862775)
+
+`APTOS_PIPELINED_EXECUTION=1`: block N+1 executes against block N's raw
+write set (a `PendingWrites` overlay in the state view) while a thread
+indexes block N (`parse_raw_output`: `TransactionsToKeep::index`, cache
+priming, `State::update`). Root hashes are identical to the serial path on
+every workload and VM. Execution stage, 16 threads, µs/txn, same job:
+
+| 16T | serial | pipelined | parse off the critical path | overlay build on it |
+|---|---|---|---|---|
+| no-op, MonoMove | 9.88 | 9.47 | 3.0 | 1.6 |
+| transfer, MonoMove | 19.07 | 18.18 | 5.3 | 3.1 |
+| account gen, MonoMove | 18.01 | 17.10 | 5.2 | 2.9 |
+| transfer, V1 | 46.88 | 44.28 | 5.6 | 3.1 |
+
+The stage shrinks 4–6%, less than the 4–5 µs/txn the parse step costs,
+because building the overlay (clone every write's key and value into a
+`HashMap`, then look each key up in the memorized reads for the usage delta)
+takes 3 µs/txn on the critical path, and about 2 µs/txn of block-tree and
+channel work remains. The overlay build is single-threaded over 5–6 writes
+per transaction at about 500 ns each; it can be built in parallel, or the
+state view can read through the raw write set and memorized reads without
+copying. Not pursued tonight: the stage is not the end-to-end bottleneck (see
+the timeline above), so the remaining outside-Block-STM cost matters only
+for the VM comparison, where it is now 2.9–6.1 µs/txn on MonoMove against
+12 µs/txn inside Block-STM.

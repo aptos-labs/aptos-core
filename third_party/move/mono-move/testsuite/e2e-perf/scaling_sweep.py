@@ -319,6 +319,9 @@ def parse_run(output, workload, threads, vm, repeat):
     row["interrupts_per_txn"] = float(
         get_last(stage + r"interrupted incarnations per txn: " + NUMBER, output, "interrupts")
     )
+    row["predicted_stalls_per_txn"] = float(
+        get_last(stage + r"predicted stalls per txn: " + NUMBER, output, "predicted stalls")
+    )
     row["max_rss_kib"] = int(get_last(stage + r"max rss: (\d+) KiB", output, "max rss"))
     # The ledger's root hash after the replay: identical bytes in, identical
     # state out, so two replays of the same recording must agree.
@@ -479,6 +482,7 @@ METRIC_ROWS = [
     ("involuntary ctx switches /txn", "involuntary_ctx_switches_per_txn", ""),
     ("speculative aborts /txn", "aborts_per_txn", ""),
     ("interrupted incarnations /txn", "interrupts_per_txn", "stopped early by the kill switch"),
+    ("predicted stalls /txn", "predicted_stalls_per_txn", "aborted readers held back for the next writer"),
     ("cold state reads /txn", "cold_reads_per_txn", "state view lookups that reached the DB"),
     ("cold state reads", "cold_read_us", "time inside those DB reads"),
     ("hot state promotions /txn", "hot_promotions_per_txn", "keys the block epilogues made hot"),

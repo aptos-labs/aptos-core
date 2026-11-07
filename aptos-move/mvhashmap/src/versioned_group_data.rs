@@ -4,7 +4,8 @@
 use crate::{
     registered_dependencies::{take_dependencies, RegisteredReadDependencies},
     types::{
-        Incarnation, MVDataError, MVDataOutput, MVGroupError, ShiftedTxnIndex, TxnIndex, Version,
+        Incarnation, Invalidated, MVDataError, MVDataOutput, MVGroupError, ShiftedTxnIndex,
+        TxnIndex, Version,
     },
     versioned_data::Entry as SizeEntry,
     VersionedData,
@@ -210,7 +211,7 @@ where
             // Due to read-before-write.
             code_invariant_error("Group (sizes) must be initialized to write to")
         })?;
-        let (mut ret, _) = self.data_write_impl::<false>(
+        let (mut ret, _, _) = self.data_write_impl::<false>(
             &group_key,
             txn_idx,
             incarnation,
@@ -260,8 +261,8 @@ where
         values: impl IntoIterator<Item = (T, V)>,
         size: ResourceGroupSize,
         prev_tags: HashSet<&T>,
-    ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
-        let (_, mut invalidated_dependencies) =
+    ) -> Result<Invalidated, PanicError> {
+        let (_, mut invalidated_dependencies, next_writers) =
             self.data_write_impl::<true>(&group_key, txn_idx, incarnation, values, prev_tags)?;
 
         // We write data first, without holding the sizes lock, then write size.
@@ -308,7 +309,10 @@ where
             )),
         );
 
-        Ok(invalidated_dependencies.take())
+        Ok(Invalidated {
+            dependencies: invalidated_dependencies.take(),
+            next_writers,
+        })
     }
 
     /// Mark all entry from transaction 'txn_idx' at access path 'key' as an estimated write
@@ -627,10 +631,11 @@ where
         incarnation: Incarnation,
         values: impl IntoIterator<Item = (T, V)>,
         mut prev_tags: HashSet<&T>,
-    ) -> Result<(bool, RegisteredReadDependencies), PanicError> {
+    ) -> Result<(bool, RegisteredReadDependencies, Vec<(TxnIndex, TxnIndex)>), PanicError> {
         let mut ret_v1 = false;
         // Creating a RegisteredReadDependencies wrapper in order to do proper extending.
         let mut ret_v2 = RegisteredReadDependencies::new();
+        let mut next_writers = vec![];
         let mut tags_to_write = vec![];
 
         {
@@ -647,12 +652,14 @@ where
                 ret_v1 |= !prev_tags.remove(&tag);
 
                 if V2 {
-                    ret_v2.extend(self.values.write_v2::<false>(
+                    let invalidated = self.values.write_v2::<false>(
                         (group_key.clone(), tag),
                         txn_idx,
                         incarnation,
                         value,
-                    )?);
+                    )?;
+                    ret_v2.extend(invalidated.dependencies);
+                    next_writers.extend(invalidated.next_writers);
                 } else {
                     self.values
                         .write((group_key.clone(), tag), txn_idx, incarnation, value)?;
@@ -671,7 +678,7 @@ where
 
         self.remove_impl::<V2>(group_key, txn_idx, prev_tags, &mut ret_v2)?;
 
-        Ok((ret_v1, ret_v2))
+        Ok((ret_v1, ret_v2, next_writers))
     }
 
     fn convert_tagged_data(
@@ -839,7 +846,7 @@ mod test {
                     .filter(|&(idx, _)| idx > mid_idx && idx <= high_idx && !mid_size_matches_low),
             )
             .collect::<BTreeMap<_, _>>();
-        assert_eq!(write_invalidated_deps, expected_invalidated);
+        assert_eq!(write_invalidated_deps.dependencies, expected_invalidated);
         // Remove the high index entry and check dependency handling
         let remove_invalidated_deps = group_data
             .remove_v2(&group_key, high_idx, HashSet::from([&tag]))
@@ -1016,7 +1023,7 @@ mod test {
             // If writing (B, A), depA0 should be invalidated
             BTreeMap::from([(8, 0)])
         };
-        assert_eq!(write_invalidated, expected_invalidated);
+        assert_eq!(write_invalidated.dependencies, expected_invalidated);
 
         // Remove txn 9's output
         let remove_invalidated = group_data

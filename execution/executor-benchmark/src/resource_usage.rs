@@ -54,6 +54,7 @@ pub(crate) struct ResourceUsage {
     hot_state_promotions: f64,
     /// Incarnations the kill switch stopped early.
     interrupted_incarnations: u64,
+    predicted_stalls: u64,
     /// Cold state reads that reached the DB, and the seconds they took.
     cold_state_reads: u64,
     cold_state_read_secs: f64,
@@ -108,6 +109,7 @@ impl ResourceUsage {
             hot_state_promotions: block_executor_counters::HOT_STATE_PROMOTIONS_PER_BLOCK
                 .get_sample_sum(),
             interrupted_incarnations: block_executor_counters::INTERRUPTED_INCARNATIONS.get(),
+            predicted_stalls: block_executor_counters::PREDICTED_STALLS.get(),
             cold_state_reads: DB_API_LATENCY_SECONDS
                 .with_label_values(&[COLD_STATE_READ_API, "Ok"])
                 .get_sample_count(),
@@ -163,6 +165,7 @@ impl ResourceUsage {
             worker_loop_secs: end.worker_loop_secs - self.worker_loop_secs,
             hot_state_promotions: end.hot_state_promotions - self.hot_state_promotions,
             interrupted_incarnations: end.interrupted_incarnations - self.interrupted_incarnations,
+            predicted_stalls: end.predicted_stalls - self.predicted_stalls,
             cold_state_reads: end.cold_state_reads - self.cold_state_reads,
             cold_state_read_secs: end.cold_state_read_secs - self.cold_state_read_secs,
             state_view_counters: end
@@ -261,6 +264,11 @@ impl ResourceUsage {
             "{} resources: interrupted incarnations per txn: {:.3}",
             prefix,
             self.interrupted_incarnations as f64 / num_txns,
+        );
+        info!(
+            "{} resources: predicted stalls per txn: {:.3}",
+            prefix,
+            self.predicted_stalls as f64 / num_txns,
         );
         info!(
             "{} resources: state view lookups per txn: {}",
