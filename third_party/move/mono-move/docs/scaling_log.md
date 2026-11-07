@@ -720,9 +720,12 @@ format is worth a protocol proposal.
 transaction per sender): V1 makes 2.6 `get_state_slot` calls per
 transaction, 1.84 served by the speculative layer and 0.74 by RocksDB, for
 42 µs/txn of its worker CPU (`storage/get_state_value` timer, 8% of V1's
-total). MonoMove makes 0.08 per transaction on the same recording, even
-though its base reads go through the same `get_state_value`. Either V1
+total). MonoMove's count on the same recording is 0.01–1.8 depending on the run
+(no-op serial 1.76 with 0.9 cold, the same binary in pipelined mode 0.009;
+account generation 0.12), while V1's is stable at 1.5–3.7, even though
+MonoMove's base reads go through the same `get_state_value`. Either V1
 reads keys MonoMove does not (existence checks on keys that are never
-present would each be a cold negative lookup), or the two VMs resolve the
-same keys through different paths. Not resolved tonight; worth a look
-since it is a V1-only 8%.
+present would each be a cold negative lookup), or the counter's window
+misses MonoMove's reads in some configurations. Not resolved tonight;
+the V1 figure alone is worth a look since it is a V1-only 8%, and the
+MonoMove figure needs the counter checked before it is trusted.
