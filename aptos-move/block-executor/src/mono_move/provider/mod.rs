@@ -112,7 +112,7 @@ pub(crate) fn storage_read(
                 "Undecoded storage bytes served as a read",
             ))
         },
-        MonoValue::GroupMetadata { .. } => {
+        MonoValue::GroupMetadata => {
             return Err(invariant_violation("Group metadata served as a read"))
         },
     })
