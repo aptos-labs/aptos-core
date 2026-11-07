@@ -10,7 +10,8 @@ use anyhow::{anyhow, ensure, Result};
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_block_executor::txn_provider::TxnProvider;
 use aptos_block_executor::{
-    single_transaction_executor::EXECUTION_POOL, txn_provider::default::DefaultTxnProvider,
+    single_transaction_executor::{EXECUTION_POOL, EXECUTION_POOL_MAX_KEYS},
+    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
@@ -31,7 +32,10 @@ use aptos_storage_interface::state_store::{
     orders::OrderParent,
     positions::PositionParent,
     state::LedgerState,
-    state_view::cached_state_view::{CachedStateView, PrimingPolicy},
+    state_view::{
+        cached_state_view::{CachedStateView, PrimingPolicy},
+        committed_slots::CommittedSlots,
+    },
 };
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_types::transaction::ExecutionStatus;
@@ -57,11 +61,17 @@ use aptos_types::{
 };
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use std::sync::Arc;
 
 pub struct DoGetExecutionOutput;
 
 /// A block's outputs as the VM produced them, before indexing.
+/// With the execution pool, the slots the previous blocks left behind for
+/// the keys the pool serves. Lives as long as the process, like the pool.
+static COMMITTED_SLOTS: Lazy<CommittedSlots> =
+    Lazy::new(|| CommittedSlots::new(*EXECUTION_POOL_MAX_KEYS));
+
 pub struct RawBlockExecution {
     pub transactions: Vec<Transaction>,
     pub transaction_outputs: Vec<TransactionOutput>,
@@ -533,6 +543,10 @@ impl Parser {
                 .transpose()?
         };
 
+        if *EXECUTION_POOL {
+            base_state_view
+                .prime_cache_from_committed(to_commit.state_update_refs(), &COMMITTED_SLOTS);
+        }
         base_state_view.prime_cache(
             to_commit.state_update_refs(),
             // With the execution pool, a key the previous block wrote is read from
@@ -556,6 +570,10 @@ impl Parser {
             to_commit.state_update_refs(),
             base_state_view.memorized_reads(),
         )?;
+        if *EXECUTION_POOL {
+            let _timer = OTHER_TIMERS.timer_with(&["absorb_committed_slots"]);
+            COMMITTED_SLOTS.absorb(to_commit.state_update_refs());
+        }
         let state_reads = base_state_view.into_memorized_reads();
         // Beside `result_state`: same inputs, same chaining off the parent,
         // and the same split at the inner state checkpoint.
