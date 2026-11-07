@@ -15,7 +15,7 @@ use aptos_types::{
 };
 use claims::{assert_ok, assert_some};
 use crossbeam::utils::CachePadded;
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use equivalent::Equivalent;
 use rayon::prelude::*;
 use std::{
@@ -63,6 +63,9 @@ pub struct VersionedData<K, V> {
     // short and already well distributed.
     values: DashMap<K, VersionedValue<V>, ahash::RandomState>,
     total_base_value_size: AtomicU64,
+    /// Keys written, or read with a registered dependency, since the map was
+    /// last collapsed: the only keys a collapse has to visit.
+    touched: DashSet<K, ahash::RandomState>,
 }
 
 fn new_write_entry<V>(
@@ -242,6 +245,13 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         Self {
             values: DashMap::with_hasher(ahash::RandomState::new()),
             total_base_value_size: AtomicU64::new(0),
+            touched: DashSet::with_hasher(ahash::RandomState::new()),
+        }
+    }
+
+    fn touch(&self, key: &K) {
+        if !self.touched.contains(key) {
+            self.touched.insert(key.clone());
         }
     }
 
@@ -298,6 +308,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         let mut v = self.values.get_mut(key).ok_or_else(|| {
             code_invariant_error(format!("Path must exist for remove_v2: {:?}", key))
         })?;
+        self.touch(v.key());
 
         // Get the entry to be removed
         let removed_entry = v
@@ -350,7 +361,10 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     {
         self.values
             .get(key)
-            .map(|v| v.read(txn_idx, Some(incarnation)))
+            .map(|v| {
+                self.touch(v.key());
+                v.read(txn_idx, Some(incarnation))
+            })
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
 
@@ -446,6 +460,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         incarnation: Incarnation,
         value: V,
     ) -> Result<(), PanicError> {
+        self.touch(&key);
         let mut v = self.values.entry(key).or_default();
         Self::write_impl(&mut v, txn_idx, incarnation, value, BTreeMap::new())
     }
@@ -459,6 +474,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         incarnation: Incarnation,
         value: V,
     ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
+        self.touch(&key);
         let mut v = self.values.entry(key).or_default();
         let (affected_dependencies, validation_passed) =
             v.split_off_affected_read_dependencies::<ONLY_COMPARE_METADATA>(txn_idx, &value);
@@ -492,6 +508,7 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     ) -> bool {
         let value_clone = value.clone();
 
+        self.touch(&key);
         let mut v = self.values.entry(key).or_default();
         let prev_entry = v.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
@@ -514,32 +531,39 @@ impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
         K: Send + Sync,
         V: Send + Sync,
     {
-        // One pass per shard, in parallel: a key with only uncommitted entries
-        // is unknown again (its base is read from the state view when next
-        // needed), and the kept entry is rebuilt so that readers registered on
-        // it, which belong to this block, are dropped.
-        self.values.shards_mut().par_iter_mut().for_each(|shard| {
-            shard.get_mut().retain(|(_, v)| {
-                let Some(idx) = v
-                    .versioned_map
-                    .range(..ShiftedTxnIndex::new(num_committed))
-                    .next_back()
-                    .map(|(idx, _)| idx.clone())
-                else {
-                    return false;
-                };
-                let entry = v
-                    .versioned_map
-                    .remove(&idx)
-                    .expect("the entry was just found");
-                v.versioned_map.clear();
-                let EntryCell { value, .. } = CachePadded::into_inner(entry).value;
-                v.versioned_map.insert(
-                    ShiftedTxnIndex::zero_idx(),
-                    CachePadded::new(new_write_entry(0, value, BTreeMap::new())),
-                );
-                true
-            });
+        // Only keys touched since the last collapse can hold entries above
+        // the base or readers of this block; the rest are already base-only.
+        // A key with only uncommitted entries is unknown again (its base is
+        // read from the state view when next needed), and the kept entry is
+        // rebuilt so that readers registered on it are dropped.
+        let touched = std::mem::replace(
+            &mut self.touched,
+            DashSet::with_hasher(ahash::RandomState::new()),
+        );
+        touched.into_iter().par_bridge().for_each(|key| {
+            let Some(mut v) = self.values.get_mut(&key) else {
+                return;
+            };
+            let Some(idx) = v
+                .versioned_map
+                .range(..ShiftedTxnIndex::new(num_committed))
+                .next_back()
+                .map(|(idx, _)| idx.clone())
+            else {
+                drop(v);
+                self.values.remove(&key);
+                return;
+            };
+            let entry = v
+                .versioned_map
+                .remove(&idx)
+                .expect("the entry was just found");
+            v.versioned_map.clear();
+            let EntryCell { value, .. } = CachePadded::into_inner(entry).value;
+            v.versioned_map.insert(
+                ShiftedTxnIndex::zero_idx(),
+                CachePadded::new(new_write_entry(0, value, BTreeMap::new())),
+            );
         });
     }
 
