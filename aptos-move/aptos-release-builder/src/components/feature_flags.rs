@@ -182,6 +182,7 @@ pub enum FeatureFlag {
     CheckFunctionTypeAbilities,
     DisableEagerModuleInitialization,
     CheckPhantomParamsBehindReferences,
+    CheckBorrowFieldHandleShape,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -477,6 +478,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CheckPhantomParamsBehindReferences => {
                 AptosFeatureFlag::CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES
             },
+            FeatureFlag::CheckBorrowFieldHandleShape => {
+                AptosFeatureFlag::CHECK_BORROW_FIELD_HANDLE_SHAPE
+            },
         }
     }
 }
@@ -698,6 +702,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES => {
                 FeatureFlag::CheckPhantomParamsBehindReferences
+            },
+            AptosFeatureFlag::CHECK_BORROW_FIELD_HANDLE_SHAPE => {
+                FeatureFlag::CheckBorrowFieldHandleShape
             },
         }
     }

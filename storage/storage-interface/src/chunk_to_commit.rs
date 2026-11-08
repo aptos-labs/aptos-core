@@ -10,7 +10,7 @@ use crate::state_store::{
     state_summary::LedgerStateSummary,
     state_update_refs::StateUpdateRefs,
     state_view::cached_state_view::ShardedStateCache,
-    state_with_summary::{LedgerStateWithSummary, LedgerWithSummary, StateWithSummary},
+    state_with_summary::{LedgerStateWithSummary, LedgerWithSummary},
     HotStateUpdates,
 };
 use aptos_types::transaction::{
@@ -74,27 +74,15 @@ impl ChunkToCommit<'_> {
     }
 
     pub fn result_ledger_state_with_summary(&self) -> LedgerStateWithSummary {
-        let latest = StateWithSummary::new(
-            self.state.latest().clone(),
-            self.state_summary.latest().clone(),
-        );
-        let last_checkpoint = StateWithSummary::new(
-            self.state.last_checkpoint().clone(),
-            self.state_summary.last_checkpoint().clone(),
-        );
-        LedgerStateWithSummary::from_latest_and_last_checkpoint(latest, last_checkpoint)
+        LedgerStateWithSummary::from_state_and_summary(
+            self.state.clone(),
+            self.state_summary.clone(),
+        )
     }
 
     pub fn estimated_total_state_updates(&self) -> usize {
-        let for_last_checkpoint = self
-            .state_update_refs
+        self.state_update_refs
             .for_last_checkpoint_batched()
-            .map_or(0, |x| x.len());
-        let for_latest = self
-            .state_update_refs
-            .for_latest_batched()
-            .map_or(0, |x| x.len());
-
-        for_latest + for_last_checkpoint
+            .map_or(0, |x| x.len())
     }
 }

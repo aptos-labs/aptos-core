@@ -850,41 +850,23 @@ pub fn test_sync_transactions_impl(
     let mut estimated_buffer_size = 0;
     let mut snapshot_versions = vec![];
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
-        // if batch has more than 2 transactions, save them in two batches
-        let batch1_len = txns_to_commit.len() / 2;
-        if batch1_len > 0 {
-            let txns_to_commit_batch = &txns_to_commit[..batch1_len];
-            db.save_transactions_for_test(
-                txns_to_commit_batch,
-                cur_ver, /* first_version */
-                None,    /* ledger_info_with_sigs */
-                false,   /* sync_commit */
-            )
-            .unwrap();
-
-            if let Some(v) = gen_snapshot_version(
-                &mut estimated_buffer_size,
-                txns_to_commit_batch,
-                cur_ver,
-                snapshot_size_threshold,
-            ) {
-                snapshot_versions.push(v);
-            }
-        }
-        let ver = cur_ver + batch1_len as Version;
-        let txns_to_commit_batch = &txns_to_commit[batch1_len..];
+        // Like state sync, commit some blocks without a ledger info, except at epoch ends.
+        let ledger_info_opt = (batch_idx % 2 == 1
+            || batch_idx + 1 == num_batches
+            || ledger_info_with_sigs.ledger_info().ends_epoch())
+        .then_some(ledger_info_with_sigs);
         db.save_transactions_for_test(
-            txns_to_commit_batch,
-            ver,
-            Some(ledger_info_with_sigs),
+            txns_to_commit,
+            cur_ver, /* first_version */
+            ledger_info_opt,
             false, /* sync_commit */
         )
         .unwrap();
 
         if let Some(v) = gen_snapshot_version(
             &mut estimated_buffer_size,
-            txns_to_commit_batch,
-            ver,
+            txns_to_commit,
+            cur_ver,
             snapshot_size_threshold,
         ) {
             snapshot_versions.push(v);

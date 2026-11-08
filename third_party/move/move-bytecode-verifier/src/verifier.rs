@@ -74,6 +74,9 @@ pub struct VerifierConfig {
     /// When enabled, checks phantom type parameter positions inside references
     /// in struct fields (e.g., `|&T|u64` is invalid for phantom `T`).
     pub check_phantom_params_behind_references: bool,
+    /// Checks the signature shape of every function handle with a borrow field struct API
+    /// attribute, including imported ones, before reference safety trusts the attribute.
+    pub check_borrow_field_handle_shape: bool,
 }
 
 /// Scope of verification.
@@ -279,6 +282,7 @@ impl VerifierConfig {
         sig_checker_v2_fix_function_signatures: true,
         check_function_type_abilities: true,
         check_phantom_params_behind_references: true,
+        check_borrow_field_handle_shape: true,
 
         enable_enum_types: true,
         enable_resource_access_control: false,
@@ -331,6 +335,7 @@ impl VerifierConfig {
             sig_checker_v2_fix_function_signatures: true,
             check_function_type_abilities: true,
             check_phantom_params_behind_references: true,
+            check_borrow_field_handle_shape: true,
 
             enable_enum_types: true,
             enable_resource_access_control: false,

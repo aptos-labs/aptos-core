@@ -70,7 +70,7 @@ impl DbWriter for AptosDB {
 
             chunk
                 .state_summary
-                .latest()
+                .last_checkpoint()
                 .global_state_summary
                 .log_generation("db_save");
 
