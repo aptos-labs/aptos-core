@@ -129,7 +129,7 @@ impl AptosDB {
             transactions,
             transaction_outputs,
             persisted_auxiliary_infos,
-        );
+        )?;
 
         let live = self.state_store.live()?;
         let current = live.current_state_locked().clone();

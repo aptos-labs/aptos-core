@@ -394,7 +394,7 @@ pub trait DbReader: Send + Sync {
         /// `enable_trading_native` is off).
         fn get_persisted_position_state_summary(&self) -> Result<NativeStateWithSummary>;
 
-        /// The pre-committed position tip (latest + last_checkpoint), including
+        /// The pre-committed position tip, including
         /// committed writes the merklized snapshot in
         /// `get_persisted_position_state_summary` may not yet reflect. Used by
         /// execution to seed the parent position summary when no in-memory

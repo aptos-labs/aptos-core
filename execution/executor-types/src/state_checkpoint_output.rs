@@ -85,7 +85,7 @@ pub struct Inner {
     /// Per-transaction hot state root, laid out like `state_checkpoint_hashes`.
     /// `None` (the whole option) unless the hot-state-root-in-txn-info feature is on.
     pub hot_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
-    /// Native-position summary after this chunk (latest + last_checkpoint),
+    /// Native-position summary after this chunk,
     /// computed at execution time, persisted at commit without recompute.
     /// `None` unless the position-state-root feature is on.
     pub position_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,

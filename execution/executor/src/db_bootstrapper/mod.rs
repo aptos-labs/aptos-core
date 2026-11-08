@@ -154,7 +154,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
     let base_state_view = CachedStateView::new(
         StateViewId::Miscellaneous,
         Arc::clone(&db.reader),
-        ledger_summary.state.latest().clone(),
+        ledger_summary.state.last_checkpoint().clone(),
     )?;
     let onchain_config = genesis_onchain_config(&base_state_view)?;
 
@@ -213,7 +213,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         let state_view = CachedStateView::new(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
-            output.result_state().latest().clone(),
+            output.result_state().last_checkpoint().clone(),
         )?;
         let next_epoch = epoch
             .checked_add(1)

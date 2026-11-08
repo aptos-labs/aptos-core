@@ -514,13 +514,13 @@ proptest! {
                 .unwrap();
             version += num_txns as Version;
         }
-        let hot_root_hashes = |db: &AptosDB| {
+        let hot_root_hash = |db: &AptosDB| {
             let live = db.state_store.live().unwrap();
             let state = live.current_state_locked();
-            [state.latest(), state.last_checkpoint()]
-                .map(|s| (s.version(), s.summary().hot_root_hash().unwrap()))
+            let checkpoint = state.last_checkpoint();
+            (checkpoint.version(), checkpoint.summary().hot_root_hash().unwrap())
         };
-        prop_assert_eq!(hot_root_hashes(&db), hot_root_hashes(&ref_db));
+        prop_assert_eq!(hot_root_hash(&db), hot_root_hash(&ref_db));
 
         drop(db);
         drop(ref_db);

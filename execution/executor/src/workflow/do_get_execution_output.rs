@@ -432,7 +432,7 @@ impl Parser {
                 transaction_outputs,
                 persisted_auxiliary_infos,
             );
-            TransactionsToKeep::index(first_version, to_commit, is_block)
+            TransactionsToKeep::index(first_version, to_commit, is_block)?
         };
         let next_epoch_state = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__next_epoch_state"]);

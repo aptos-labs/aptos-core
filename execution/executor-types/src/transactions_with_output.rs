@@ -97,12 +97,35 @@ impl TransactionsToKeep {
         first_version: Version,
         transactions_with_output: TransactionsWithOutput,
         must_be_block: bool,
-    ) -> Self {
+    ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["transactions_to_keep__index"]);
 
         let (all_checkpoint_indices, is_reconfig) =
             Self::get_all_checkpoint_indices(&transactions_with_output, must_be_block);
+        // Only whole blocks are executed, but outputs diverging from the chain can still end
+        // elsewhere, e.g. a reconfig txn at a block end emitting no new epoch event.
+        let num_txns = transactions_with_output.len();
+        ensure!(
+            num_txns == 0 || all_checkpoint_indices.last() == Some(&(num_txns - 1)),
+            "{} txns from version {} end in the middle of a block.",
+            num_txns,
+            first_version,
+        );
 
+        Ok(Self::new_impl(
+            first_version,
+            transactions_with_output,
+            is_reconfig,
+            all_checkpoint_indices,
+        ))
+    }
+
+    fn new_impl(
+        first_version: Version,
+        transactions_with_output: TransactionsWithOutput,
+        is_reconfig: bool,
+        all_checkpoint_indices: Vec<usize>,
+    ) -> Self {
         TransactionsToKeepBuilder {
             transactions_with_output,
             is_reconfig,
@@ -127,7 +150,7 @@ impl TransactionsToKeep {
         transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
         persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
-    ) -> Self {
+    ) -> Result<Self> {
         let txns_with_output = TransactionsWithOutput::new(
             transactions,
             transaction_outputs,
@@ -137,7 +160,7 @@ impl TransactionsToKeep {
     }
 
     pub fn new_empty() -> Self {
-        Self::make(0, vec![], vec![], vec![])
+        Self::new_impl(0, TransactionsWithOutput::new_empty(), false, vec![])
     }
 
     pub fn new_dummy_success(txns: Vec<Transaction>) -> Self {
@@ -147,7 +170,11 @@ impl TransactionsToKeep {
                 transaction_index: i as u32,
             })
             .collect();
-        Self::make(0, txns, txn_outputs, persisted_auxiliary_infos)
+        // Dummy txns don't necessarily end at a block end, so the last one is taken as one.
+        let all_checkpoint_indices = txns.len().checked_sub(1).into_iter().collect();
+        let txns_with_output =
+            TransactionsWithOutput::new(txns, txn_outputs, persisted_auxiliary_infos);
+        Self::new_impl(0, txns_with_output, false, all_checkpoint_indices)
     }
 
     /// Whether the last txn of this block/chunk is reconfig.
