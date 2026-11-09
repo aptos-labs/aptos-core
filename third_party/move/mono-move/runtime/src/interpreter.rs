@@ -1063,6 +1063,7 @@ impl<'guard> InterpreterContext<'guard> {
             mut read_write_set,
             reentrancy: _,
             rng: _,
+            enable_debugging: _,
         } = self;
 
         // The call stack is gone and every handle is scoped to one allocation,
