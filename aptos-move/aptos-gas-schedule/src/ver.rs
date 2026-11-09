@@ -9,6 +9,9 @@
 ///
 /// Change log:
 /// - V55 (`RELEASE_V1_50`):
+///   - New `txn.high_limit_txn_excess_price_multiplier` parameter: transactions with a
+///     staking-backed limits request pay this multiple of the gas price for execution and IO gas
+///     used above the base limits
 ///   - New `txn.min_module_bytecode_version` parameter gating module publishing on a minimum
 ///     bytecode version
 ///   - Gas parameters for value graph traversal
