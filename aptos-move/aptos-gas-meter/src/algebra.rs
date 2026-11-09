@@ -570,6 +570,47 @@ mod tests {
     }
 
     #[test]
+    fn single_charge_pierces_both_limits_from_partial_usage() {
+        let request = staking_request(110);
+        let mut algebra = new_algebra(LATEST_GAS_FEATURE_VERSION, Some(&request));
+
+        assert!(algebra.charge_execution(InternalGas::new(60_000)).is_ok());
+        assert_used(&algebra, 60_000, 0);
+
+        // Crosses the base limit and the max limit of 110,000 (billed as
+        // 200,000) at once: 40,000 at 1x and 20,000 at 10x.
+        let err = algebra
+            .charge_execution(InternalGas::new(60_000))
+            .unwrap_err();
+        assert_eq!(err.major_status(), StatusCode::EXECUTION_LIMIT_REACHED);
+        assert_used(&algebra, 300_000, 0);
+    }
+
+    #[test]
+    fn charge_landing_on_base_limit_stays_at_base_price() {
+        let request = staking_request(400);
+        let mut algebra = new_algebra(LATEST_GAS_FEATURE_VERSION, Some(&request));
+
+        assert!(algebra.charge_execution(InternalGas::new(100_000)).is_ok());
+        assert_used(&algebra, 100_000, 0);
+
+        // Everything above the base limit is priced at 10x.
+        assert!(algebra.charge_execution(InternalGas::new(1_000)).is_ok());
+        assert_used(&algebra, 110_000, 0);
+
+        // Lands exactly on the max limit of 400,000 (billed as 3,100,000),
+        // which is still allowed.
+        let mut algebra = new_algebra(LATEST_GAS_FEATURE_VERSION, Some(&request));
+        assert!(algebra.inject_balance(Gas::new(10)).is_ok());
+        assert!(algebra.charge_execution(InternalGas::new(400_000)).is_ok());
+        assert_eq!(algebra.execution_gas_used(), 3_100_000.into());
+        assert!(algebra.check_consistency().is_ok());
+        let err = algebra.charge_execution(InternalGas::new(1)).unwrap_err();
+        assert_eq!(err.major_status(), StatusCode::EXECUTION_LIMIT_REACHED);
+        assert_eq!(algebra.execution_gas_used(), 3_100_010.into());
+    }
+
+    #[test]
     fn excess_out_of_gas_uses_remaining_balance() {
         let request = staking_request(400);
         let mut algebra = new_algebra(LATEST_GAS_FEATURE_VERSION, Some(&request));
