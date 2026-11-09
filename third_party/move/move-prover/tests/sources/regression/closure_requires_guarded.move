@@ -3,7 +3,8 @@
 
 // A closure target's spec holds only under its `requires`. Invoking the closure with an
 // argument that violates it gives an unknown outcome: no result, abort or memory facts.
-// Each `*_fails` claim is false and must fail; each `*_ok` claim must verify.
+// Each `*_fails` claim is false and must fail; each `*_ok` claim must verify; each
+// `*_unprovable` claim is intentionally unprovable and must fail.
 
 module 0x42::closure_requires_guarded {
     struct R has key { v: u64 }
@@ -130,12 +131,13 @@ module 0x42::closure_requires_guarded {
         ensures result < 256;
     }
 
-    // Outside the precondition the result is still the target's result.
-    fun opaque_result_of_ok(): u8 {
+    // Intentionally unprovable: outside the precondition nothing relates the result to the
+    // target's result function.
+    fun opaque_result_of_unprovable(): u8 {
         let f: |u64| u8 has drop = |x| narrow(x);
         f(100)
     }
-    spec opaque_result_of_ok {
+    spec opaque_result_of_unprovable {
         pragma aborts_if_is_partial;
         ensures result == result_of<narrow>(100);
     }
