@@ -227,6 +227,8 @@ fn mono_non_empty_group_transaction_tests(
 
     // MonoMove does not serve group size or metadata queries, so all three
     // percentages stay off.
+    //
+    // TODO(completeness): serve metadata and group sizes and test them here.
     let transactions = transaction_gen
         .into_iter()
         .map(|txn_gen| {

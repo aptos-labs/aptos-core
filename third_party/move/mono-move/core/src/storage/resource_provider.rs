@@ -12,11 +12,17 @@ use move_core_types::{account_address::AccountAddress, language_storage::StructT
 use std::{ptr::NonNull, sync::Arc};
 use thiserror::Error;
 
+/// Block-STM index of a transaction in the block.
+pub type TxnIdx = u32;
+
+/// Block-STM incarnation of a transaction: how many times it was re-executed.
+pub type Incarnation = u32;
+
 /// Version of the read value (which can come from storage or from other
 /// transaction write). [`None`] means the value comes from pre-block storage,
 /// [`Some`] carries the Block-STM transaction index and incarnation that wrote
 /// it.
-pub type Version = Option<(u32, u32)>;
+pub type Version = Option<(TxnIdx, Incarnation)>;
 
 /// Key into the in-memory global storage of a single transaction.
 ///
@@ -48,6 +54,10 @@ pub enum InMemoryStorageKey {
     /// A resource group's own storage slot, identified by the address it is
     /// published under and the group's type. Group members keep their
     /// [`Self::Resource`] keys and are addressed as tags within this slot.
+    //
+    // TODO(cleanup): the only reason why we need it here is Block-STM treats
+    // group metadata reads/writes as some dummy resources. Until this is
+    // refactored, we keep this here.
     ResourceGroup {
         address: AccountAddress,
         group_ty: InternedType,
@@ -143,6 +153,8 @@ pub enum ResourceProviderError {
     /// transaction runs under has been halted or the value it depends on is
     /// still unresolved. The transaction's outcome must be thrown away, not
     /// committed.
+    //
+    // TODO(cleanup): replace with Interrupted variant when killswitch lands.
     #[error("resource provider speculative abort: {0}")]
     SpeculativeAbort(String),
 }

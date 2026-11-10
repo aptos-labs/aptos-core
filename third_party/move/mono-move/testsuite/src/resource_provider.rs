@@ -121,8 +121,9 @@ impl ResourceProvider for InMemoryResourceProvider<'_, '_> {
             // session commits table writes, so transactional sources can keep tables
             // across tasks.
             InMemoryStorageKey::TableItem { .. } => Ok(StorageRead::DoesNotExist { version: None }),
-            // Resource groups are a storage-layer concern; this provider serves
-            // members directly by their own key.
+            // TODO(testing): members are served by their own key and the group is
+            // ignored. Serve them from the group's slot so transactional sources
+            // cover resource-group placement.
             InMemoryStorageKey::ResourceGroup { .. } => {
                 Ok(StorageRead::DoesNotExist { version: None })
             },
