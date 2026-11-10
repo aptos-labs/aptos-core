@@ -65,9 +65,12 @@ of a crate that defines such a struct:
    exemption sound: natives build `VMValue`s that the context writes while
    holding its cells.
 
-The shape that satisfies 2 to 4 without thought: reborrow once in the entry
+The check is over-conservative by design, and every finding says so. The
+shape that satisfies 2 to 4 without thought: reborrow once in the entry
 point, then call only free helpers that take the components, so the borrow
-checker sees every use.
+checker sees every use. A site that needs something else opts out with
+`allow(unsafe_cell_reborrow)` and a comment, and then owns the soundness
+argument.
 
 ```toml
 [aptos_lints.unsafe_cell_reborrow]

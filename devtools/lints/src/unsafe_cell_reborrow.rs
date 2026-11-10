@@ -1,18 +1,24 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! `unsafe_cell_reborrow`: the discipline for `&self` methods that mutate
-//! through `UnsafeCell` fields ("cells").
+//! `unsafe_cell_reborrow`: a deliberately conservative check of how `&self`
+//! methods reborrow through `UnsafeCell` fields ("cells").
 //!
 //! A struct whose methods take `&self` but need `&mut` access to some state
 //! keeps it in an `UnsafeCell` field, `UnsafeCell<&mut T>` for a borrowed
-//! component or `UnsafeCell<T>` for an owned one, and reborrows
-//! `&mut **self.cell.get()` (or `&mut *` for the owned form) inside each
-//! method. That is sound only if each cell has at most one live reborrow at
-//! any instant and no reborrow outlives the activation that made it. The
-//! borrow checker cannot see this, so this lint enforces a coarse,
-//! over-conservative discipline on every function in a crate that defines
-//! such a struct:
+//! component or `UnsafeCell<T>` for an owned one, and reborrows it inside each
+//! method: `&mut **self.cell.get()` or `&mut *self.cell.get()`. That is sound
+//! only if each cell has at most one live reborrow at any instant and no
+//! reborrow outlives the activation that made it. The borrow checker cannot
+//! see this, so this lint enforces a coarse discipline on every function in a
+//! crate that defines such a struct. It is over-conservative by design: a
+//! reborrow counts as held for the whole function, and anything the lint
+//! cannot see is assumed to reborrow. The accepted shape is to reborrow once
+//! in the entry point and pass the reference down to callees; a site that
+//! needs something else opts out with `allow(unsafe_cell_reborrow)` and a
+//! comment, and then owns the soundness argument.
+//!
+//! The rules:
 //!
 //! 1. Cell fields are private and appear only at a *site*, written
 //!    `&mut **self.cell.get()` / `&mut *self.cell.get()` (or `&` for a shared
@@ -41,16 +47,23 @@
 //! Rules 1 to 5 run in any crate that defines a cell struct; rule 6 runs in
 //! every crate in scope. Which crates, and which traits are inert and which
 //! are contexts, is configured in `dylint.toml`.
+//!
+//! Layout of this file: the cells and the shared helpers; the scan of one
+//! body (rules 1 and 2); the crate-wide analysis over the call graph (rules 3
+//! to 5); the inert impls (rule 6).
 
 use crate::scope::Scope;
-use clippy_utils::{diagnostics::span_lint_hir_and_then, get_parent_expr};
+use clippy_utils::{
+    diagnostics::span_lint_hir_and_then,
+    get_parent_expr,
+    visitors::{for_each_expr, for_each_expr_without_closures},
+};
 use rustc_data_structures::fx::FxHashMap;
 use rustc_hir::{
     self as hir,
     attrs::lang_items::LangItem,
     def::{DefKind, Res},
     def_id::{DefId, LocalDefId},
-    intravisit::{self, Visitor},
     BorrowKind, Expr, ExprKind, HirId, UnOp,
 };
 use rustc_lint::{LateContext, LateLintPass};
@@ -58,22 +71,23 @@ use rustc_middle::ty::{self, Instance, InstanceKind, Ty, TyCtxt, TypeckResults, 
 use rustc_session::{declare_lint, impl_lint_pass};
 use rustc_span::{Span, Symbol};
 use serde::Deserialize;
-use std::collections::{BTreeMap, BTreeSet};
+use std::{collections::BTreeSet, ops::ControlFlow};
 
 declare_lint! {
     /// ### What it does
     ///
     /// Checks the discipline for structs that mutate through `UnsafeCell`
-    /// fields from `&self` methods: one reborrow per
-    /// cell per function, no call that may reborrow a held cell, no escape
-    /// of a reborrow, and no call into unseen code while a cell is held.
+    /// fields from `&self` methods: one reborrow per cell per function, no
+    /// call that may reborrow a held cell, no escape of a reborrow, and no
+    /// call into unseen code while a cell is held.
     ///
     /// ### Why is this bad?
     ///
     /// Two live reborrows of the same cell, or a reborrow that outlives its
     /// function, are undefined behaviour that compiles and runs. The borrow
     /// checker cannot see through the cell, so the rules must be checked
-    /// here.
+    /// here. The check is deliberately conservative; a site that needs more
+    /// opts out and owns the argument.
     ///
     /// ### Example
     ///
@@ -84,7 +98,7 @@ declare_lint! {
     /// }
     /// ```
     ///
-    /// Use instead: reborrow once in the entry point and pass the component
+    /// Use instead: reborrow once in the entry point and pass the reference
     /// down, so the borrow checker sees every use.
     ///
     /// ```rust,ignore
@@ -95,7 +109,7 @@ declare_lint! {
     /// ```
     pub UNSAFE_CELL_REBORROW,
     Deny,
-    "overlapping or escaping reborrow of an `UnsafeCell` field"
+    "conservative check of reborrows through `UnsafeCell` fields"
 }
 
 /// Configuration, from `[aptos_lints.unsafe_cell_reborrow]` in `dylint.toml`.
@@ -131,67 +145,55 @@ impl<'tcx> LateLintPass<'tcx> for UnsafeCellReborrow {
         }
         let cells = find_cells(cx);
         if !cells.is_empty() {
-            Analysis::new(cx, &self.config, cells).run();
+            Analysis {
+                cx,
+                config: &self.config,
+                cells,
+                bodies: FxHashMap::default(),
+                transitive: FxHashMap::default(),
+            }
+            .run();
         }
         check_inert_impls(cx, &self.config);
     }
 }
+
+/// What every finding says about the check and the two ways out.
+const HELP: &str =
+    "this is a deliberately conservative check of `UnsafeCell` reborrows (the rules \
+    are in devtools/lints/README.md); either reborrow once at the entry point and pass the \
+    reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and \
+    own the soundness argument yourself";
 
 fn report(cx: &LateContext<'_>, hir_id: HirId, span: Span, msg: String, notes: &[(Span, String)]) {
     span_lint_hir_and_then(cx, UNSAFE_CELL_REBORROW, hir_id, span, msg, |diag| {
         for (span, note) in notes {
             diag.span_note(*span, note.clone());
         }
-        diag.help("see `unsafe_cell_reborrow` in devtools/lints/README.md for the rules");
+        diag.help(HELP);
     });
 }
 
-/// `def_path_str` without the generic arguments it prints for impl self
-/// types (`Ctx::<'a>::leaf` becomes `Ctx::leaf`).
-fn callee_name(tcx: TyCtxt<'_>, def_id: DefId) -> String {
-    let path = tcx.def_path_str(def_id);
-    let mut out = String::with_capacity(path.len());
-    let mut depth = 0usize;
-    let mut chars = path.chars().peekable();
-    while let Some(c) = chars.next() {
-        match c {
-            ':' if depth == 0 && chars.peek() == Some(&':') => {
-                chars.next();
-                // Skip a `::<...>` segment entirely.
-                if chars.peek() == Some(&'<') {
-                    chars.next();
-                    depth = 1;
-                } else {
-                    out.push_str("::");
-                }
-            },
-            '<' if depth > 0 => depth += 1,
-            '>' if depth > 0 => depth -= 1,
-            _ if depth > 0 => {},
-            _ => out.push(c),
-        }
-    }
-    out
+fn type_of<'tcx>(tcx: TyCtxt<'tcx>, def_id: DefId) -> Ty<'tcx> {
+    tcx.type_of(def_id)
+        .instantiate_identity()
+        .skip_normalization()
 }
 
-/// The full path of a definition, crate name included (unlike
-/// `def_path_str`, which omits the local crate's name).
-fn full_path(cx: &LateContext<'_>, def_id: DefId) -> String {
-    cx.get_def_path(def_id)
+/// Whether `list` names `def_id` by its full path (crate name included).
+fn is_listed(cx: &LateContext<'_>, list: &[String], def_id: DefId) -> bool {
+    let path = cx
+        .get_def_path(def_id)
         .iter()
         .map(Symbol::as_str)
         .collect::<Vec<_>>()
-        .join("::")
-}
-
-fn trait_listed(cx: &LateContext<'_>, list: &[String], trait_def_id: DefId) -> bool {
-    let path = full_path(cx, trait_def_id);
-    list.iter().any(|t| *t == path)
+        .join("::");
+    list.iter().any(|l| *l == path)
 }
 
 /// Whether `trait_def_id` is, or has as a supertrait, a trait in `list`.
 fn reaches_listed_trait(cx: &LateContext<'_>, list: &[String], trait_def_id: DefId) -> bool {
-    ty::elaborate::supertrait_def_ids(cx.tcx, trait_def_id).any(|t| trait_listed(cx, list, t))
+    ty::elaborate::supertrait_def_ids(cx.tcx, trait_def_id).any(|t| is_listed(cx, list, t))
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +215,10 @@ struct Cell<'tcx> {
 
 type CellIdx = usize;
 
+fn cell_name(tcx: TyCtxt<'_>, cell: &Cell<'_>) -> String {
+    format!("`{}.{}`", tcx.item_name(cell.owner), cell.field)
+}
+
 /// Every `UnsafeCell` field of every struct in the crate (rule 1's privacy
 /// check happens here too).
 fn find_cells<'tcx>(cx: &LateContext<'tcx>) -> Vec<Cell<'tcx>> {
@@ -224,11 +230,7 @@ fn find_cells<'tcx>(cx: &LateContext<'tcx>) -> Vec<Cell<'tcx>> {
             continue;
         };
         for field in data.fields() {
-            let ty = tcx
-                .type_of(field.def_id)
-                .instantiate_identity()
-                .skip_normalization();
-            let ty::Adt(adt, args) = ty.kind() else {
+            let ty::Adt(adt, args) = type_of(tcx, field.def_id.to_def_id()).kind() else {
                 continue;
             };
             if !tcx.is_lang_item(adt.did(), LangItem::UnsafeCell) {
@@ -264,210 +266,60 @@ fn find_cells<'tcx>(cx: &LateContext<'tcx>) -> Vec<Cell<'tcx>> {
     cells
 }
 
-// ---------------------------------------------------------------------------
-// Per-body scan
-// ---------------------------------------------------------------------------
-
-/// What a call may be, as far as the lint can tell.
-enum Callee {
-    /// A function or closure of this crate.
-    Local(LocalDefId),
-    /// A function of another crate (including a trait default method).
-    External,
-    /// A trait method the receiver type does not pin down: a type parameter
-    /// or a trait object.
-    Dynamic { trait_def_id: Option<DefId> },
-    /// A call through a function value: pointer, `dyn Fn`, type parameter.
-    Value,
+fn is_cell_struct(cells: &[Cell<'_>], ty: Ty<'_>) -> bool {
+    matches!(ty.peel_refs().kind(), ty::Adt(adt, _) if cells.iter().any(|c| c.owner == adt.did()))
 }
 
-struct Call {
-    hir_id: HirId,
-    span: Span,
-    callee: Callee,
-    /// What the callee is called, for diagnostics.
-    name: String,
-    /// The receiver or an argument can reach a cell struct.
-    tainted: bool,
-    /// The receiver is a field projection of a cell struct (`self.loader.f()`).
-    through_field: bool,
-    /// Closures passed as arguments.
-    closure_args: Vec<LocalDefId>,
+/// A type that mentions a cell struct anywhere: `&S`, `Option<&S>`, a closure
+/// capturing one, ...
+fn mentions_cell_struct<'tcx>(cells: &[Cell<'tcx>], ty: Ty<'tcx>) -> bool {
+    ty.walk()
+        .any(|arg| arg.as_type().is_some_and(|ty| is_cell_struct(cells, ty)))
 }
 
-#[derive(Default)]
-struct BodyInfo {
-    /// Reborrow sites: cell, the expression, its span.
-    sites: Vec<(CellIdx, HirId, Span)>,
-    calls: Vec<Call>,
-    /// Closures defined in this body.
-    closures: Vec<LocalDefId>,
-    /// Uses of a cell field other than at a site.
-    misuses: Vec<(HirId, Span, CellIdx)>,
-}
-
-struct BodyScan<'a, 'tcx> {
-    cx: &'a LateContext<'tcx>,
-    cells: &'a [Cell<'tcx>],
-    typeck: &'tcx TypeckResults<'tcx>,
-    typing_env: TypingEnv<'tcx>,
-    info: BodyInfo,
-}
-
-impl<'a, 'tcx> BodyScan<'a, 'tcx> {
-    fn tcx(&self) -> TyCtxt<'tcx> {
-        self.cx.tcx
-    }
-
-    fn is_cell_struct(&self, ty: Ty<'tcx>) -> bool {
-        matches!(ty.peel_refs().kind(), ty::Adt(adt, _) if self.cells.iter().any(|c| c.owner == adt.did()))
-    }
-
-    /// The cell `base.ident` names, if any.
-    fn cell_field(&self, base: &Expr<'tcx>, ident: Symbol) -> Option<CellIdx> {
-        let ty::Adt(adt, _) = self.typeck.expr_ty_adjusted(base).peel_refs().kind() else {
-            return None;
-        };
-        self.cells
-            .iter()
-            .position(|c| c.owner == adt.did() && c.field == ident)
-    }
-
-    fn is_cell_field_expr(&self, expr: &Expr<'tcx>) -> bool {
-        matches!(expr.kind, ExprKind::Field(base, ident) if self.cell_field(base, ident.name).is_some())
-    }
-
-    /// A value whose type mentions a cell struct: `&S`, `Option<&S>`, a
-    /// closure capturing one, ...
-    fn is_tainted(&self, expr: &Expr<'tcx>) -> bool {
-        ty_mentions_cell_struct(self.cells, self.typeck.expr_ty_adjusted(expr))
-    }
-
-    /// `self.field` (through any `&`/`*`), with `self` a cell struct.
-    fn is_field_of_cell_struct(&self, mut expr: &Expr<'tcx>) -> bool {
-        loop {
-            match expr.kind {
-                ExprKind::AddrOf(_, _, inner) | ExprKind::Unary(UnOp::Deref, inner) => expr = inner,
-                ExprKind::Field(base, _) => {
-                    return self.is_cell_struct(self.typeck.expr_ty_adjusted(base));
-                },
-                _ => return false,
-            }
+/// Visits `ty` and everything a value of it can contain (through references,
+/// generic arguments, the fields of this crate's own ADTs, closure captures,
+/// tuples and arrays), stopping at the first `Some` from `f`. A cell struct is
+/// not entered: its fields are only reachable at a site.
+fn find_in_ty<'tcx, R>(
+    tcx: TyCtxt<'tcx>,
+    cells: &[Cell<'tcx>],
+    ty: Ty<'tcx>,
+    mut f: impl FnMut(Ty<'tcx>) -> Option<R>,
+) -> Option<R> {
+    let mut seen: Vec<Ty<'tcx>> = Vec::new();
+    let mut stack = vec![ty];
+    while let Some(ty) = stack.pop() {
+        if seen.contains(&ty) {
+            continue;
         }
-    }
-
-    /// `args` is `None` when typeck recorded none for the call, which it
-    /// skips for a callee with no generics at all; such a callee is a plain
-    /// function or inherent method, resolved by its definition alone.
-    fn resolve(&self, def_id: DefId, args: Option<ty::GenericArgsRef<'tcx>>) -> Callee {
-        let tcx = self.tcx();
-        let Some(args) = args else {
-            return local_or_external(def_id);
-        };
-        // A trait item needs at least its `Self` argument to resolve.
-        if tcx.trait_of_assoc(def_id).is_some() && args.is_empty() {
-            return local_or_external(def_id);
+        seen.push(ty);
+        if let Some(found) = f(ty) {
+            return Some(found);
         }
-        match Instance::try_resolve(tcx, self.typing_env, def_id, args) {
-            Ok(Some(instance)) => match instance.def {
-                InstanceKind::Virtual(..) => Callee::Dynamic {
-                    trait_def_id: self.tcx().trait_of_assoc(def_id),
-                },
-                _ => local_or_external(instance.def_id()),
+        match ty.kind() {
+            ty::Ref(_, inner, _)
+            | ty::RawPtr(inner, _)
+            | ty::Array(inner, _)
+            | ty::Slice(inner) => {
+                stack.push(*inner);
             },
-            // Depends on a type parameter the body does not pin down.
-            Ok(None) | Err(_) => match self.tcx().trait_of_assoc(def_id) {
-                Some(trait_def_id) => Callee::Dynamic {
-                    trait_def_id: Some(trait_def_id),
-                },
-                None => local_or_external(def_id),
+            ty::Adt(adt, args) => {
+                stack.extend(args.types());
+                if adt.did().is_local() && !is_cell_struct(cells, ty) {
+                    stack.extend(adt.all_fields().map(|field| {
+                        tcx.type_of(field.did)
+                            .instantiate(tcx, args)
+                            .skip_normalization()
+                    }));
+                }
             },
+            ty::Closure(_, args) => stack.extend(args.as_closure().upvar_tys().iter()),
+            ty::Tuple(tys) => stack.extend(tys.iter()),
+            _ => {},
         }
     }
-
-    fn push_call(
-        &mut self,
-        expr: &Expr<'tcx>,
-        callee: Callee,
-        name: String,
-        receiver: Option<&Expr<'tcx>>,
-        args: &[Expr<'tcx>],
-    ) {
-        let tainted =
-            receiver.is_some_and(|r| self.is_tainted(r)) || args.iter().any(|a| self.is_tainted(a));
-        let through_field = receiver.is_some_and(|r| self.is_field_of_cell_struct(r));
-        let closure_args = args
-            .iter()
-            .filter_map(
-                |a| match self.typeck.expr_ty_adjusted(a).peel_refs().kind() {
-                    ty::Closure(def_id, _) => def_id.as_local(),
-                    _ => None,
-                },
-            )
-            .collect();
-        self.info.calls.push(Call {
-            hir_id: expr.hir_id,
-            span: expr.span,
-            callee,
-            name,
-            tainted,
-            through_field,
-            closure_args,
-        });
-    }
-
-    fn method_call(&mut self, expr: &Expr<'tcx>, receiver: &Expr<'tcx>, args: &[Expr<'tcx>]) {
-        let callee = match self.typeck.type_dependent_def_id(expr.hir_id) {
-            Some(def_id) => self.resolve(def_id, self.typeck.node_args_opt(expr.hir_id)),
-            None => Callee::Value,
-        };
-        let name = match self.typeck.type_dependent_def_id(expr.hir_id) {
-            Some(def_id) => callee_name(self.tcx(), def_id),
-            None => "<unknown>".to_string(),
-        };
-        self.push_call(expr, callee, name, Some(receiver), args);
-    }
-
-    fn call(&mut self, expr: &Expr<'tcx>, callee: &Expr<'tcx>, args: &[Expr<'tcx>]) {
-        if let ExprKind::Path(qpath) = &callee.kind {
-            match self.cx.qpath_res(qpath, callee.hir_id) {
-                Res::Def(DefKind::Fn | DefKind::AssocFn, def_id) => {
-                    let resolved = self.resolve(def_id, self.typeck.node_args_opt(callee.hir_id));
-                    let name = callee_name(self.tcx(), def_id);
-                    self.push_call(expr, resolved, name, None, args);
-                    return;
-                },
-                // A constructor: not a call.
-                Res::Def(DefKind::Ctor(..), _) | Res::SelfCtor(_) => return,
-                _ => {},
-            }
-        }
-        // A call through a value.
-        let callee_ty = self.typeck.expr_ty_adjusted(callee).peel_refs();
-        let (resolved, name) = match callee_ty.kind() {
-            ty::Closure(def_id, _) => (local_or_external(*def_id), "closure".to_string()),
-            ty::FnDef(def_id, args) => (
-                self.resolve(*def_id, Some(args.skip_binder())),
-                callee_name(self.tcx(), *def_id),
-            ),
-            _ => (Callee::Value, "function value".to_string()),
-        };
-        self.push_call(expr, resolved, name, None, args);
-    }
-}
-
-fn local_or_external(def_id: DefId) -> Callee {
-    match def_id.as_local() {
-        Some(local) => Callee::Local(local),
-        None => Callee::External,
-    }
-}
-
-fn ty_mentions_cell_struct<'tcx>(cells: &[Cell<'tcx>], ty: Ty<'tcx>) -> bool {
-    ty.walk().any(|arg| match arg.as_type().map(|t| *t.kind()) {
-        Some(ty::Adt(adt, _)) => cells.iter().any(|c| c.owner == adt.did()),
-        _ => false,
-    })
+    None
 }
 
 /// A site is exactly `&mut <*…*><field>.get()` or `&<*…*><field>.get()`
@@ -499,35 +351,245 @@ fn site_span<'tcx>(cx: &LateContext<'tcx>, field_expr: &Expr<'tcx>, derefs: usiz
     (inner.hir_id == place.hir_id).then_some(borrow.span)
 }
 
-impl<'tcx> Visitor<'tcx> for BodyScan<'_, 'tcx> {
-    // The default `NestedFilter` skips nested bodies: each closure is scanned
-    // as a body of its own and linked to its definer through `closures`.
-    fn visit_expr(&mut self, expr: &'tcx Expr<'tcx>) {
+// ---------------------------------------------------------------------------
+// One body (rules 1 and 2)
+// ---------------------------------------------------------------------------
+
+/// What a call may be, as far as the lint can tell.
+enum Callee {
+    /// A function or closure of this crate, with a body to follow.
+    Local(LocalDefId),
+    /// A function of another crate, including a trait default method.
+    External(DefId),
+    /// A trait method the receiver type does not pin down: a type parameter
+    /// or a trait object.
+    Dynamic(DefId),
+    /// A call through a value: a function pointer, `dyn Fn`, a type parameter.
+    Value,
+}
+
+impl Callee {
+    fn describe(&self, tcx: TyCtxt<'_>) -> String {
+        match self {
+            Callee::Local(def_id) => match tcx.opt_item_name(def_id.to_def_id()) {
+                Some(name) => format!("`{name}`"),
+                None => "a closure".to_string(),
+            },
+            Callee::External(def_id) | Callee::Dynamic(def_id) => {
+                format!("`{}`", tcx.def_path_str(*def_id))
+            },
+            Callee::Value => "a function value".to_string(),
+        }
+    }
+}
+
+fn local_or_external(def_id: DefId) -> Callee {
+    match def_id.as_local() {
+        Some(local) => Callee::Local(local),
+        None => Callee::External(def_id),
+    }
+}
+
+struct Call {
+    hir_id: HirId,
+    span: Span,
+    callee: Callee,
+    /// The receiver or an argument can reach a cell struct.
+    tainted: bool,
+    /// The receiver is a field of a cell struct (`self.loader.f()`).
+    through_field: bool,
+    /// Closures passed as arguments.
+    closure_args: Vec<LocalDefId>,
+}
+
+#[derive(Default)]
+struct BodyInfo {
+    /// The one reborrow site per cell (rule 2), with its span.
+    sites: Vec<(CellIdx, Span)>,
+    calls: Vec<Call>,
+    /// Closures defined in this body; each is a body of its own.
+    closures: Vec<LocalDefId>,
+}
+
+struct BodyScan<'a, 'tcx> {
+    cx: &'a LateContext<'tcx>,
+    cells: &'a [Cell<'tcx>],
+    typeck: &'tcx TypeckResults<'tcx>,
+    typing_env: TypingEnv<'tcx>,
+    info: BodyInfo,
+}
+
+/// Scans one body, reporting rules 1 and 2 on the way. Closures inside it are
+/// scanned as bodies of their own and linked through `BodyInfo::closures`.
+fn scan_body<'tcx>(cx: &LateContext<'tcx>, cells: &[Cell<'tcx>], owner: LocalDefId) -> BodyInfo {
+    let tcx = cx.tcx;
+    let body = tcx.hir_body_owned_by(owner);
+    let mut scan = BodyScan {
+        cx,
+        cells,
+        typeck: tcx.typeck_body(body.id()),
+        typing_env: TypingEnv::post_analysis(tcx, owner),
+        info: BodyInfo::default(),
+    };
+    for_each_expr_without_closures(body, |expr| {
+        scan.visit(expr);
+        ControlFlow::<()>::Continue(())
+    });
+    scan.info
+}
+
+impl<'tcx> BodyScan<'_, 'tcx> {
+    fn visit(&mut self, expr: &'tcx Expr<'tcx>) {
         match expr.kind {
             ExprKind::Field(base, ident) => {
-                if let Some(cell) = self.cell_field(base, ident.name) {
-                    match site_span(self.cx, expr, self.cells[cell].derefs) {
-                        Some(span) => self.info.sites.push((cell, expr.hir_id, span)),
-                        None => self.info.misuses.push((expr.hir_id, expr.span, cell)),
-                    }
+                let Some(cell) = self.cell_field(base, ident.name) else {
+                    return;
+                };
+                let name = cell_name(self.cx.tcx, &self.cells[cell]);
+                match site_span(self.cx, expr, self.cells[cell].derefs) {
+                    None => report(
+                        self.cx,
+                        expr.hir_id,
+                        expr.span,
+                        format!(
+                            "{name} used outside a reborrow site; the only permitted form is \
+                             `&mut {stars}self.{}.get()` (or `&{stars}`)",
+                            self.cells[cell].field,
+                            stars = "*".repeat(self.cells[cell].derefs),
+                        ),
+                        &[],
+                    ),
+                    Some(span) => match self.info.sites.iter().find(|(c, _)| *c == cell) {
+                        Some((_, first)) => report(
+                            self.cx,
+                            expr.hir_id,
+                            span,
+                            format!("{name} is reborrowed more than once in this function"),
+                            &[(*first, "first reborrowed here".to_string())],
+                        ),
+                        None => self.info.sites.push((cell, span)),
+                    },
                 }
             },
             ExprKind::MethodCall(segment, receiver, args, _) => {
                 // The `.get()` of a site is not a call of interest.
-                if !(segment.ident.as_str() == "get" && self.is_cell_field_expr(receiver)) {
-                    self.method_call(expr, receiver, args);
+                let on_cell = matches!(receiver.kind, ExprKind::Field(base, ident)
+                    if self.cell_field(base, ident.name).is_some());
+                if segment.ident.as_str() == "get" && on_cell {
+                    return;
                 }
+                let callee = match self.typeck.type_dependent_def_id(expr.hir_id) {
+                    Some(def_id) => self.resolve(def_id, self.typeck.node_args_opt(expr.hir_id)),
+                    None => Callee::Value,
+                };
+                self.push_call(expr, callee, Some(receiver), args);
             },
-            ExprKind::Call(callee, args) => self.call(expr, callee, args),
+            ExprKind::Call(callee, args) => {
+                let resolved = match callee.kind {
+                    ExprKind::Path(ref qpath) => match self.cx.qpath_res(qpath, callee.hir_id) {
+                        Res::Def(DefKind::Fn | DefKind::AssocFn, def_id) => {
+                            self.resolve(def_id, self.typeck.node_args_opt(callee.hir_id))
+                        },
+                        // A constructor is not a call.
+                        Res::Def(DefKind::Ctor(..), _) | Res::SelfCtor(_) => return,
+                        _ => self.value_callee(callee),
+                    },
+                    _ => self.value_callee(callee),
+                };
+                self.push_call(expr, resolved, None, args);
+            },
             ExprKind::Closure(closure) => self.info.closures.push(closure.def_id),
             _ => {},
         }
-        intravisit::walk_expr(self, expr);
+    }
+
+    /// The cell `base.ident` names, if any.
+    fn cell_field(&self, base: &Expr<'tcx>, ident: Symbol) -> Option<CellIdx> {
+        let ty::Adt(adt, _) = self.typeck.expr_ty_adjusted(base).peel_refs().kind() else {
+            return None;
+        };
+        self.cells
+            .iter()
+            .position(|c| c.owner == adt.did() && c.field == ident)
+    }
+
+    /// A call through a value: `f(x)` with `f` a closure, a function item, or
+    /// something opaque.
+    fn value_callee(&self, callee: &Expr<'tcx>) -> Callee {
+        match self.typeck.expr_ty_adjusted(callee).peel_refs().kind() {
+            ty::Closure(def_id, _) => local_or_external(*def_id),
+            ty::FnDef(def_id, args) => self.resolve(*def_id, Some(args.skip_binder())),
+            _ => Callee::Value,
+        }
+    }
+
+    /// Resolves a callee to the body that will run, as far as the receiver
+    /// type pins it down. `args` is `None` when typeck recorded none, which
+    /// it skips for a callee without generics; a trait item needs at least
+    /// its `Self` argument to resolve.
+    fn resolve(&self, def_id: DefId, args: Option<ty::GenericArgsRef<'tcx>>) -> Callee {
+        let tcx = self.cx.tcx;
+        let is_trait_item = tcx.trait_of_assoc(def_id).is_some();
+        let Some(args) = args.filter(|args| !(is_trait_item && args.is_empty())) else {
+            return local_or_external(def_id);
+        };
+        match Instance::try_resolve(tcx, self.typing_env, def_id, args) {
+            Ok(Some(instance)) if !matches!(instance.def, InstanceKind::Virtual(..)) => {
+                local_or_external(instance.def_id())
+            },
+            // A trait object, or a type parameter the body does not pin down.
+            _ if is_trait_item => Callee::Dynamic(def_id),
+            _ => local_or_external(def_id),
+        }
+    }
+
+    fn push_call(
+        &mut self,
+        expr: &Expr<'tcx>,
+        callee: Callee,
+        receiver: Option<&Expr<'tcx>>,
+        args: &[Expr<'tcx>],
+    ) {
+        let tainted = receiver
+            .into_iter()
+            .chain(args)
+            .any(|e| mentions_cell_struct(self.cells, self.typeck.expr_ty_adjusted(e)));
+        let through_field = receiver.is_some_and(|r| self.is_field_of_cell_struct(r));
+        let closure_args = args
+            .iter()
+            .filter_map(
+                |a| match self.typeck.expr_ty_adjusted(a).peel_refs().kind() {
+                    ty::Closure(def_id, _) => def_id.as_local(),
+                    _ => None,
+                },
+            )
+            .collect();
+        self.info.calls.push(Call {
+            hir_id: expr.hir_id,
+            span: expr.span,
+            callee,
+            tainted,
+            through_field,
+            closure_args,
+        });
+    }
+
+    /// `self.field` (through any `&` / `*`), with `self` a cell struct.
+    fn is_field_of_cell_struct(&self, mut expr: &Expr<'tcx>) -> bool {
+        loop {
+            match expr.kind {
+                ExprKind::AddrOf(_, _, inner) | ExprKind::Unary(UnOp::Deref, inner) => expr = inner,
+                ExprKind::Field(base, _) => {
+                    return is_cell_struct(self.cells, self.typeck.expr_ty_adjusted(base));
+                },
+                _ => return false,
+            }
+        }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Crate-wide analysis
+// The crate (rules 3 to 5)
 // ---------------------------------------------------------------------------
 
 struct Analysis<'a, 'tcx> {
@@ -540,65 +602,35 @@ struct Analysis<'a, 'tcx> {
     transitive: FxHashMap<LocalDefId, BTreeSet<CellIdx>>,
 }
 
-impl<'a, 'tcx> Analysis<'a, 'tcx> {
-    fn new(cx: &'a LateContext<'tcx>, config: &'a Config, cells: Vec<Cell<'tcx>>) -> Self {
-        Self {
-            cx,
-            config,
-            cells,
-            bodies: FxHashMap::default(),
-            transitive: FxHashMap::default(),
-        }
-    }
-
-    fn cell_name(&self, cell: CellIdx) -> String {
-        let c = &self.cells[cell];
-        format!("`{}.{}`", self.cx.tcx.item_name(c.owner), c.field)
-    }
-
+impl<'tcx> Analysis<'_, 'tcx> {
     fn run(mut self) {
-        let tcx = self.cx.tcx;
-        for owner in tcx.hir_body_owners() {
-            let body = tcx.hir_body_owned_by(owner);
-            let mut scan = BodyScan {
-                cx: self.cx,
-                cells: &self.cells,
-                typeck: tcx.typeck_body(body.id()),
-                typing_env: TypingEnv::post_analysis(tcx, owner),
-                info: BodyInfo::default(),
-            };
-            scan.visit_body(body);
-            self.bodies.insert(owner, scan.info);
+        let owners: Vec<LocalDefId> = self.cx.tcx.hir_body_owners().collect();
+        for &owner in &owners {
+            let info = scan_body(self.cx, &self.cells, owner);
+            self.bodies.insert(owner, info);
         }
         self.compute_transitive();
-        // In definition order, so diagnostics come out in a stable order.
-        let mut owners: Vec<LocalDefId> = self.bodies.keys().copied().collect();
-        owners.sort_by_key(|owner| owner.local_def_index.as_u32());
-        for owner in owners {
-            self.check_body(owner, &self.bodies[&owner]);
+        for &owner in &owners {
+            self.check_calls(&self.bodies[&owner]);
+            self.check_signature(owner);
         }
-        self.check_signatures();
     }
 
     /// Fixpoint over the call graph restricted to this crate.
     fn compute_transitive(&mut self) {
         for (owner, info) in &self.bodies {
-            let own: BTreeSet<_> = info.sites.iter().map(|(cell, ..)| *cell).collect();
+            let own = info.sites.iter().map(|(cell, _)| *cell).collect();
             self.transitive.insert(*owner, own);
         }
         loop {
             let mut changed = false;
             for (owner, info) in &self.bodies {
                 let mut set = self.transitive[owner].clone();
-                let callees = info
-                    .closures
-                    .iter()
-                    .copied()
-                    .chain(info.calls.iter().filter_map(|c| match c.callee {
-                        Callee::Local(def_id) => Some(def_id),
-                        _ => None,
-                    }));
-                for callee in callees {
+                let callees = info.calls.iter().filter_map(|c| match c.callee {
+                    Callee::Local(def_id) => Some(def_id),
+                    _ => None,
+                });
+                for callee in info.closures.iter().copied().chain(callees) {
                     if let Some(theirs) = self.transitive.get(&callee) {
                         set.extend(theirs.iter().copied());
                     }
@@ -614,73 +646,51 @@ impl<'a, 'tcx> Analysis<'a, 'tcx> {
         }
     }
 
+    fn reaches_cells(&self, body: LocalDefId) -> bool {
+        self.transitive
+            .get(&body)
+            .is_some_and(|set| !set.is_empty())
+    }
+
     fn captures_cell_struct(&self, closure: LocalDefId) -> bool {
-        let ty = self
-            .cx
-            .tcx
-            .type_of(closure)
-            .instantiate_identity()
-            .skip_normalization();
-        let ty::Closure(_, args) = ty.kind() else {
+        let ty::Closure(_, args) = type_of(self.cx.tcx, closure.to_def_id()).kind() else {
             return false;
         };
         args.as_closure()
             .upvar_tys()
             .iter()
-            .any(|ty| ty_mentions_cell_struct(&self.cells, ty))
+            .any(|ty| mentions_cell_struct(&self.cells, ty))
     }
 
-    fn check_body(&self, owner: LocalDefId, info: &BodyInfo) {
-        let cx = self.cx;
-        for (hir_id, span, cell) in &info.misuses {
-            report(
-                cx,
-                *hir_id,
-                *span,
-                format!(
-                    "{} used outside a reborrow site; the only permitted form is \
-                     `&mut {stars}self.{}.get()` (or `&{stars}`)",
-                    self.cell_name(*cell),
-                    self.cells[*cell].field,
-                    stars = "*".repeat(self.cells[*cell].derefs),
-                ),
-                &[],
-            );
-        }
-
-        // Rule 2: one site per cell.
-        let mut first: BTreeMap<CellIdx, Span> = BTreeMap::new();
-        for (cell, hir_id, span) in &info.sites {
-            match first.get(cell) {
-                None => {
-                    first.insert(*cell, *span);
-                },
-                Some(earlier) => report(
-                    cx,
-                    *hir_id,
-                    *span,
-                    format!(
-                        "{} is reborrowed more than once in this function",
-                        self.cell_name(*cell)
-                    ),
-                    &[(*earlier, "first reborrowed here".to_string())],
-                ),
-            }
-        }
-        let held: Vec<(CellIdx, Span)> = first.into_iter().collect();
-
+    /// Rules 3 and 4 for every call of one body.
+    fn check_calls(&self, info: &BodyInfo) {
+        let tcx = self.cx.tcx;
+        let held = &info.sites;
+        let held_names = || {
+            held.iter()
+                .map(|(cell, _)| cell_name(tcx, &self.cells[*cell]))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let held_notes = || {
+            held.iter()
+                .map(|(cell, span)| {
+                    (
+                        *span,
+                        format!("{} is reborrowed here", cell_name(tcx, &self.cells[*cell])),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
         for call in &info.calls {
             // Rule 3: a closure that can reach the struct or a cell goes nowhere.
-            let bad_closure = call.closure_args.iter().any(|closure| {
-                let reaches_cells = self
-                    .transitive
-                    .get(closure)
-                    .is_some_and(|set| !set.is_empty());
-                reaches_cells || self.captures_cell_struct(*closure)
-            });
+            let bad_closure = call
+                .closure_args
+                .iter()
+                .any(|c| self.reaches_cells(*c) || self.captures_cell_struct(*c));
             if bad_closure {
                 report(
-                    cx,
+                    self.cx,
                     call.hir_id,
                     call.span,
                     "a closure that can reach a cell struct is passed as an argument; call it \
@@ -688,218 +698,114 @@ impl<'a, 'tcx> Analysis<'a, 'tcx> {
                         .to_string(),
                     &[],
                 );
-                // One finding per call: the closure is the problem, whatever
-                // the callee is.
                 continue;
             }
             if held.is_empty() {
                 continue;
             }
-            let held_names = || {
-                held.iter()
-                    .map(|(cell, _)| self.cell_name(*cell))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            };
-            let held_notes = || {
-                held.iter()
-                    .map(|(cell, span)| {
-                        (
-                            *span,
-                            format!("{} is reborrowed here", self.cell_name(*cell)),
+            let problem = match &call.callee {
+                Callee::Local(callee) => {
+                    let overlap = held
+                        .iter()
+                        .filter(|(cell, _)| {
+                            self.transitive
+                                .get(callee)
+                                .is_some_and(|s| s.contains(cell))
+                        })
+                        .map(|(cell, _)| cell_name(tcx, &self.cells[*cell]))
+                        .collect::<Vec<_>>();
+                    (!overlap.is_empty()).then(|| {
+                        format!(
+                            "{} may reborrow {}, which this function already holds",
+                            call.callee.describe(tcx),
+                            overlap.join(", ")
                         )
                     })
-                    .collect::<Vec<_>>()
-            };
-            match &call.callee {
-                Callee::Local(callee) => {
-                    let Some(theirs) = self.transitive.get(callee) else {
-                        continue;
-                    };
-                    let overlap: Vec<_> = held
-                        .iter()
-                        .filter(|(cell, _)| theirs.contains(cell))
-                        .collect();
-                    if overlap.is_empty() {
-                        continue;
-                    }
-                    let names = overlap
-                        .iter()
-                        .map(|(cell, _)| self.cell_name(*cell))
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    let notes: Vec<_> = overlap
-                        .iter()
-                        .map(|(cell, span)| {
-                            (
-                                *span,
-                                format!("{} is reborrowed here", self.cell_name(*cell)),
-                            )
-                        })
-                        .collect();
-                    report(
-                        cx,
-                        call.hir_id,
-                        call.span,
+                },
+                Callee::External(_) if call.tainted => Some(format!(
+                    "a cell struct reaches {}, outside this crate, while {} is held",
+                    call.callee.describe(tcx),
+                    held_names()
+                )),
+                Callee::Dynamic(method) if !call.through_field => {
+                    let inert = tcx
+                        .trait_of_assoc(*method)
+                        .is_some_and(|t| is_listed(self.cx, &self.config.inert_traits, t));
+                    (!inert).then(|| {
                         format!(
-                            "`{}` may reborrow {names}, which this function already holds",
-                            call.name
-                        ),
-                        &notes,
-                    );
+                            "{} is called on a type parameter or trait object while {} is held; \
+                             the callee may reach the struct through its caller",
+                            call.callee.describe(tcx),
+                            held_names()
+                        )
+                    })
                 },
-                Callee::External => {
-                    if call.tainted {
-                        report(
-                            cx,
-                            call.hir_id,
-                            call.span,
-                            format!(
-                                "a cell struct reaches `{}`, whose body is outside this crate, \
-                                 while {} is held",
-                                call.name,
-                                held_names()
-                            ),
-                            &held_notes(),
-                        );
-                    }
-                },
-                Callee::Dynamic { trait_def_id } => {
-                    let inert = trait_def_id
-                        .is_some_and(|t| trait_listed(cx, &self.config.inert_traits, t));
-                    if !call.through_field && !inert {
-                        report(
-                            cx,
-                            call.hir_id,
-                            call.span,
-                            format!(
-                                "`{}` is called on a type parameter or trait object while {} is \
-                                 held; the callee may reach the struct through its caller",
-                                call.name,
-                                held_names()
-                            ),
-                            &held_notes(),
-                        );
-                    }
-                },
-                Callee::Value => {
-                    if !call.through_field {
-                        report(
-                            cx,
-                            call.hir_id,
-                            call.span,
-                            format!(
-                                "call through a {} while {} is held; the callee may reach the \
-                                 struct through its caller",
-                                call.name,
-                                held_names()
-                            ),
-                            &held_notes(),
-                        );
-                    }
-                },
-            }
-        }
-
-        // Rule 5 for a function with a site: its return type. Methods of a
-        // cell struct are covered by `check_signatures` instead.
-        let tcx = cx.tcx;
-        let is_cell_struct_method =
-            tcx.impl_of_assoc(owner.to_def_id())
-                .is_some_and(|impl_def_id| {
-                    let self_ty = tcx
-                        .type_of(impl_def_id)
-                        .instantiate_identity()
-                        .skip_normalization();
-                    ty_mentions_cell_struct(&self.cells, self_ty)
-                });
-        if let Some((_, site)) = held.first()
-            && !is_cell_struct_method
-        {
-            let output = match tcx.def_kind(owner) {
-                DefKind::Fn | DefKind::AssocFn => {
-                    Some(tcx.fn_sig(owner).skip_binder().skip_binder().output())
-                },
-                DefKind::Closure => {
-                    let ty = tcx
-                        .type_of(owner)
-                        .instantiate_identity()
-                        .skip_normalization();
-                    match ty.kind() {
-                        ty::Closure(_, args) => {
-                            Some(args.as_closure().sig().skip_binder().output())
-                        },
-                        _ => None,
-                    }
-                },
+                Callee::Value if !call.through_field => Some(format!(
+                    "a call through a function value while {} is held; the callee may reach the \
+                     struct through its caller",
+                    held_names()
+                )),
                 _ => None,
             };
-            if let Some(output) = output
-                && let Some(what) = self.holds_target_ref(output)
-            {
-                report(
-                    cx,
-                    tcx.local_def_id_to_hir_id(owner),
-                    tcx.def_span(owner),
-                    format!("the return type of this function can hold {what}, so a reborrow can escape"),
-                    &[(*site, "reborrowed here".to_string())],
-                );
+            if let Some(problem) = problem {
+                report(self.cx, call.hir_id, call.span, problem, &held_notes());
             }
         }
     }
 
-    /// Rule 5 for every method of a cell struct: no parameter can hold a
-    /// reference to a cell target (a plain `&mut T` parameter is fine: it
-    /// cannot store one), and neither can the return type.
-    fn check_signatures(&self) {
+    /// Rule 5: a reborrow must not be able to leave through a signature.
+    /// Applies to every method of a cell struct (its public API) and to any
+    /// other function or closure with a site. A plain `&mut T` parameter is
+    /// fine, it cannot store a reference; a constructor is exempt, it takes
+    /// the components in.
+    fn check_signature(&self, owner: LocalDefId) {
         let tcx = self.cx.tcx;
-        for id in tcx.hir_crate_items(()).impl_items() {
-            let item = tcx.hir_impl_item(id);
-            let hir::ImplItemKind::Fn(..) = item.kind else {
+        let def_id = owner.to_def_id();
+        let is_method =
+            tcx.def_kind(def_id) == DefKind::AssocFn && tcx.associated_item(def_id).is_method();
+        let of_cell_struct = tcx
+            .impl_of_assoc(def_id)
+            .is_some_and(|impl_id| mentions_cell_struct(&self.cells, type_of(tcx, impl_id)));
+        if !(is_method && of_cell_struct) && self.bodies[&owner].sites.is_empty() {
+            return;
+        }
+        let (inputs, output) = match tcx.def_kind(def_id) {
+            DefKind::Fn | DefKind::AssocFn => {
+                let sig = tcx.fn_sig(def_id).skip_binder().skip_binder();
+                (sig.inputs().to_vec(), sig.output())
+            },
+            DefKind::Closure => {
+                let ty::Closure(_, args) = type_of(tcx, def_id).kind() else {
+                    return;
+                };
+                let sig = args.as_closure().sig().skip_binder();
+                (sig.inputs().to_vec(), sig.output())
+            },
+            _ => return,
+        };
+        let mut problems = Vec::new();
+        for input in inputs.into_iter().skip(usize::from(is_method)) {
+            if matches!(input.kind(), ty::Ref(_, inner, _) if self.is_target(*inner)) {
                 continue;
-            };
-            let def_id = item.owner_id.to_def_id();
-            let Some(impl_def_id) = tcx.impl_of_assoc(def_id) else {
-                continue;
-            };
-            let self_ty = tcx
-                .type_of(impl_def_id)
-                .instantiate_identity()
-                .skip_normalization();
-            if !ty_mentions_cell_struct(&self.cells, self_ty) {
-                continue;
             }
-            if !tcx.associated_item(def_id).is_method() {
-                // A constructor takes the components in.
-                continue;
+            if let Some(what) = self.holds_target_ref(input) {
+                problems.push(format!("a parameter can hold {what}"));
             }
-            let sig = tcx.fn_sig(def_id).skip_binder().skip_binder();
-            let mut problems = Vec::new();
-            for input in sig.inputs().iter().skip(1) {
-                let pass_through =
-                    matches!(input.kind(), ty::Ref(_, inner, _) if self.is_target(*inner));
-                if pass_through {
-                    continue;
-                }
-                if let Some(what) = self.holds_target_ref(*input) {
-                    problems.push(format!("a parameter can hold {what}"));
-                }
-            }
-            if let Some(what) = self.holds_target_ref(sig.output()) {
-                problems.push(format!("the return type can hold {what}"));
-            }
-            for problem in problems {
-                report(
-                    self.cx,
-                    item.hir_id(),
-                    item.span,
-                    format!(
-                        "in `{}`, {problem}, so a reborrow can escape",
-                        callee_name(tcx, def_id)
-                    ),
-                    &[],
-                );
-            }
+        }
+        if let Some(what) = self.holds_target_ref(output) {
+            problems.push(format!("the return type can hold {what}"));
+        }
+        for problem in problems {
+            report(
+                self.cx,
+                tcx.local_def_id_to_hir_id(owner),
+                tcx.def_span(owner),
+                format!(
+                    "in {}, {problem}, so a reborrow can escape",
+                    Callee::Local(owner).describe(tcx)
+                ),
+                &[],
+            );
         }
     }
 
@@ -912,87 +818,55 @@ impl<'a, 'tcx> Analysis<'a, 'tcx> {
             .any(|c| matches!(c.target.kind(), ty::Adt(t, _) if t.did() == adt.did()))
     }
 
-    /// If `ty` can contain a reference to a cell target, a description of
-    /// how. Walks generic arguments everywhere and fields of this crate's
-    /// ADTs; a trait object or opaque type is treated as able to hold one.
+    /// If a value of `ty` can hold a reference to a cell target, what it is.
+    /// A trait object or an opaque type is assumed able to.
     fn holds_target_ref(&self, ty: Ty<'tcx>) -> Option<String> {
         let tcx = self.cx.tcx;
-        let mut seen: Vec<Ty<'tcx>> = Vec::new();
-        let mut stack = vec![ty];
-        while let Some(ty) = stack.pop() {
-            if seen.contains(&ty) {
-                continue;
-            }
-            seen.push(ty);
-            match ty.kind() {
-                ty::Ref(_, inner, _) | ty::RawPtr(inner, _) => {
-                    if self.is_target(inner.peel_refs()) {
-                        return Some(format!("a reference to `{}`", inner.peel_refs()));
-                    }
-                    stack.push(*inner);
-                },
-                ty::Dynamic(..) => return Some("a trait object".to_string()),
-                ty::Alias(_, alias)
-                    if matches!(alias.kind(tcx), ty::AliasTyKind::Opaque { .. }) =>
-                {
-                    return Some("an opaque type".to_string());
-                },
-                ty::Adt(adt, args) => {
-                    stack.extend(args.types());
-                    if adt.did().is_local() {
-                        for field in adt.all_fields() {
-                            stack.push(
-                                tcx.type_of(field.did)
-                                    .instantiate(tcx, args)
-                                    .skip_normalization(),
-                            );
-                        }
-                    }
-                },
-                ty::Closure(_, args) => stack.extend(args.as_closure().upvar_tys().iter()),
-                ty::Tuple(tys) => stack.extend(tys.iter()),
-                ty::Array(elem, _) | ty::Slice(elem) => stack.push(*elem),
-                _ => {},
-            }
-        }
-        None
+        find_in_ty(tcx, &self.cells, ty, |ty| match ty.kind() {
+            ty::Ref(_, inner, _) | ty::RawPtr(inner, _) if self.is_target(inner.peel_refs()) => {
+                Some(format!("a reference to `{}`", inner.peel_refs()))
+            },
+            ty::Dynamic(..) => Some("a trait object".to_string()),
+            ty::Alias(_, alias) if matches!(alias.kind(tcx), ty::AliasTyKind::Opaque { .. }) => {
+                Some("an opaque type".to_string())
+            },
+            _ => None,
+        })
     }
 }
 
 // ---------------------------------------------------------------------------
-// Rule 6: impls of inert traits
+// Inert impls (rule 6)
 // ---------------------------------------------------------------------------
 
-/// Every impl of an inert trait in the crate: its self type must not reach a
-/// context trait, and its methods must not call one.
+/// Every impl of an inert trait in the crate: its self type must not be able
+/// to reach a context trait, through a bounded type parameter or a trait
+/// object, and its methods must not call one.
 fn check_inert_impls<'tcx>(cx: &LateContext<'tcx>, config: &Config) {
     if config.inert_traits.is_empty() || config.context_traits.is_empty() {
         return;
     }
     let tcx = cx.tcx;
+    let reaches_context =
+        |trait_def_id| reaches_listed_trait(cx, &config.context_traits, trait_def_id);
     for id in tcx.hir_crate_items(()).free_items() {
         let item = tcx.hir_item(id);
         let hir::ItemKind::Impl(impl_) = item.kind else {
             continue;
         };
-        let impl_def_id = item.owner_id.to_def_id();
-        let Some(trait_def_id) = impl_
-            .of_trait
-            .and_then(|header| header.trait_ref.trait_def_id())
-        else {
+        let Some(trait_def_id) = impl_.of_trait.and_then(|h| h.trait_ref.trait_def_id()) else {
             continue;
         };
-        if !trait_listed(cx, &config.inert_traits, trait_def_id) {
+        if !is_listed(cx, &config.inert_traits, trait_def_id) {
             continue;
         }
+        let impl_def_id = item.owner_id.to_def_id();
         let inert = tcx.item_name(trait_def_id);
 
-        // A type parameter bounded by a context trait.
         for (clause, span) in tcx.explicit_clauses_of(impl_def_id).clauses {
-            let Some(pred) = clause.as_trait_clause() else {
-                continue;
-            };
-            if reaches_listed_trait(cx, &config.context_traits, pred.def_id()) {
+            if let Some(pred) = clause.as_trait_clause()
+                && reaches_context(pred.def_id())
+            {
                 report(
                     cx,
                     item.hir_id(),
@@ -1006,12 +880,11 @@ fn check_inert_impls<'tcx>(cx: &LateContext<'tcx>, config: &Config) {
                 );
             }
         }
-        // A trait object of a context trait anywhere in the self type.
-        let self_ty = tcx
-            .type_of(impl_def_id)
-            .instantiate_identity()
-            .skip_normalization();
-        if let Some(found) = find_context_object(cx, config, self_ty) {
+        let object = find_in_ty(tcx, &[], type_of(tcx, impl_def_id), |ty| match ty.kind() {
+            ty::Dynamic(preds, ..) => preds.principal_def_id().filter(|p| reaches_context(*p)),
+            _ => None,
+        });
+        if let Some(found) = object {
             report(
                 cx,
                 item.hir_id(),
@@ -1024,123 +897,40 @@ fn check_inert_impls<'tcx>(cx: &LateContext<'tcx>, config: &Config) {
                 &[],
             );
         }
-        // A method of a context trait called from the impl.
         for item_id in impl_.items {
-            let impl_item = tcx.hir_impl_item(*item_id);
-            let hir::ImplItemKind::Fn(_, body_id) = impl_item.kind else {
+            let hir::ImplItemKind::Fn(_, body_id) = tcx.hir_impl_item(*item_id).kind else {
                 continue;
             };
-            let mut scan = ContextCallScan {
-                cx,
-                config,
-                typeck: tcx.typeck_body(body_id),
-                inert,
-            };
-            scan.visit_body(tcx.hir_body(body_id));
-        }
-    }
-}
-
-/// A `dyn` of a context trait inside `ty` (through generic arguments and the
-/// fields of this crate's ADTs).
-fn find_context_object<'tcx>(
-    cx: &LateContext<'tcx>,
-    config: &Config,
-    ty: Ty<'tcx>,
-) -> Option<DefId> {
-    let tcx = cx.tcx;
-    let mut seen: Vec<Ty<'tcx>> = Vec::new();
-    let mut stack = vec![ty];
-    while let Some(ty) = stack.pop() {
-        if seen.contains(&ty) {
-            continue;
-        }
-        seen.push(ty);
-        match ty.kind() {
-            ty::Dynamic(preds, ..) => {
-                if let Some(principal) = preds.principal_def_id()
-                    && reaches_listed_trait(cx, &config.context_traits, principal)
+            let typeck = tcx.typeck_body(body_id);
+            for_each_expr(tcx, tcx.hir_body(body_id), |expr| {
+                let callee = match expr.kind {
+                    ExprKind::MethodCall(..) => typeck.type_dependent_def_id(expr.hir_id),
+                    ExprKind::Call(callee, _) => match callee.kind {
+                        ExprKind::Path(ref qpath) => match cx.qpath_res(qpath, callee.hir_id) {
+                            Res::Def(DefKind::AssocFn, def_id) => Some(def_id),
+                            _ => None,
+                        },
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if let Some(def_id) = callee
+                    && let Some(trait_def_id) = tcx.trait_of_assoc(def_id)
+                    && reaches_context(trait_def_id)
                 {
-                    return Some(principal);
+                    report(
+                        cx,
+                        expr.hir_id,
+                        expr.span,
+                        format!(
+                            "impl of inert trait `{inert}` calls `{}`, a context trait method",
+                            tcx.def_path_str(def_id)
+                        ),
+                        &[],
+                    );
                 }
-            },
-            ty::Adt(adt, args) => {
-                stack.extend(args.types());
-                if adt.did().is_local() {
-                    for field in adt.all_fields() {
-                        stack.push(
-                            tcx.type_of(field.did)
-                                .instantiate(tcx, args)
-                                .skip_normalization(),
-                        );
-                    }
-                }
-            },
-            ty::Ref(_, inner, _)
-            | ty::RawPtr(inner, _)
-            | ty::Array(inner, _)
-            | ty::Slice(inner) => {
-                stack.push(*inner);
-            },
-            ty::Tuple(tys) => stack.extend(tys.iter()),
-            _ => {},
+                ControlFlow::<()>::Continue(())
+            });
         }
-    }
-    None
-}
-
-struct ContextCallScan<'a, 'tcx> {
-    cx: &'a LateContext<'tcx>,
-    config: &'a Config,
-    typeck: &'tcx TypeckResults<'tcx>,
-    inert: Symbol,
-}
-
-impl<'tcx> ContextCallScan<'_, 'tcx> {
-    fn check_callee(&self, expr: &Expr<'tcx>, def_id: DefId) {
-        let tcx = self.cx.tcx;
-        if let Some(trait_def_id) = tcx.trait_of_assoc(def_id)
-            && reaches_listed_trait(self.cx, &self.config.context_traits, trait_def_id)
-        {
-            report(
-                self.cx,
-                expr.hir_id,
-                expr.span,
-                format!(
-                    "impl of inert trait `{}` calls `{}`, a context trait method",
-                    self.inert,
-                    tcx.def_path_str(def_id)
-                ),
-                &[],
-            );
-        }
-    }
-}
-
-impl<'tcx> Visitor<'tcx> for ContextCallScan<'_, 'tcx> {
-    type NestedFilter = rustc_middle::hir::nested_filter::OnlyBodies;
-
-    fn maybe_tcx(&mut self) -> Self::MaybeTyCtxt {
-        self.cx.tcx
-    }
-
-    fn visit_expr(&mut self, expr: &'tcx Expr<'tcx>) {
-        match expr.kind {
-            ExprKind::MethodCall(..) => {
-                if let Some(def_id) = self.typeck.type_dependent_def_id(expr.hir_id) {
-                    self.check_callee(expr, def_id);
-                }
-            },
-            ExprKind::Call(callee, _) => {
-                if let ExprKind::Path(qpath) = &callee.kind
-                    && let Res::Def(DefKind::AssocFn, def_id) =
-                        self.cx.qpath_res(qpath, callee.hir_id)
-                {
-                    self.check_callee(expr, def_id);
-                }
-            },
-            _ => {},
-        }
-        intravisit::walk_expr(self, expr);
     }
 }
