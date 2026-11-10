@@ -1,0 +1,96 @@
+VerexE2ETests/Check/References/ConditionalHolders.lean:37:4: error: the specification clause `ensures !c ==> b == v` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:36:7: error: verex verification failed: the automatic verification of `repoint_false` failed; provide a proof in the module:
+  verify repoint_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/ConditionalHolders.lean:51:4: error: the specification clause `ensures false` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:50:7: error: verex verification failed: the automatic verification of `repoint_vacuous` failed; provide a proof in the module:
+  verify repoint_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/ConditionalHolders.lean:83:4: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:82:7: error: verex verification failed: the automatic verification of `f_false` failed; provide a proof in the module:
+  verify f_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/ConditionalHolders.lean:95:4: error: the specification clause `ensures false` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:94:7: error: verex verification failed: the automatic verification of `f_vacuous` failed; provide a proof in the module:
+  verify f_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/ConditionalHolders.lean:131:4: error: the specification clause `ensures spec.result[1] == v` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:130:7: error: verex verification failed: the automatic verification of `f_false` failed; provide a proof in the module:
+  verify f_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/ConditionalHolders.lean:145:4: error: the specification clause `ensures false` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:144:7: error: verex verification failed: the automatic verification of `f_vacuous` failed; provide a proof in the module:
+  verify f_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/ConditionalHolders.lean:180:4: error: the specification clause `ensures spec.result[1] == v` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:179:7: error: verex verification failed: the automatic verification of `f_false` failed; provide a proof in the module:
+  verify f_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/ConditionalHolders.lean:194:4: error: the specification clause `ensures false` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:193:7: error: verex verification failed: the automatic verification of `f_vacuous` failed; provide a proof in the module:
+  verify f_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/ConditionalHolders.lean:230:4: error: the specification clause `ensures spec.result[1] == v` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:227:7: error: verex verification failed: the automatic verification of `f_false` failed; provide a proof in the module:
+  verify f_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/ConditionalHolders.lean:246:4: error: the specification clause `ensures false` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:243:7: error: verex verification failed: the automatic verification of `f_vacuous` failed; provide a proof in the module:
+  verify f_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/ConditionalHolders.lean:285:4: error: the specification clause `ensures result == a + 1` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:282:7: error: verex verification failed: the automatic verification of `f_false` failed; provide a proof in the module:
+  verify f_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/ConditionalHolders.lean:301:4: error: the specification clause `ensures false` is not established
+VerexE2ETests/Check/References/ConditionalHolders.lean:298:7: error: verex verification failed: the automatic verification of `f_vacuous` failed; provide a proof in the module:
+  verify f_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

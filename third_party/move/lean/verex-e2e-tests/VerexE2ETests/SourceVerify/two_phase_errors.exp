@@ -1,0 +1,56 @@
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:22:3: error: the specification clause `ensures result == n` is not established
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:20:6: error: verex verification failed: the automatic verification of `two_phase_local_false` failed; provide a proof in the module:
+  verify two_phase_local_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:30:3: error: the specification clause `ensures c.n == old(c.n)` is not established
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:28:6: error: verex verification failed: the automatic verification of `two_phase_free_false` failed; provide a proof in the module:
+  verify two_phase_free_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:37:3: error: the specification clause `ensures v[old(v).length] == v.length` is not established
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:36:6: error: verex verification failed: the automatic verification of `push_len_false` failed; provide a proof in the module:
+  verify push_len_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:45:3: error: the specification clause `ensures h.r == old(h).r` is not established
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:43:6: error: verex verification failed: the automatic verification of `holder_false` failed; provide a proof in the module:
+  verify holder_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:54:3: error: the specification clause `ensures v.length == old(v).length` is not established
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:52:6: error: verex verification failed: the automatic verification of `index_self_false` failed; provide a proof in the module:
+  verify index_self_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:62:3: error: the specification clause `ensures c.n == old(c.n)` is not established
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:60:6: error: verex verification failed: the automatic verification of `index_operand_false` failed; provide a proof in the module:
+  verify index_operand_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:71:3: error: the specification clause `ensures result == 2 * n` is not established
+VerexE2ETests/SourceVerify/two_phase_errors.spec.lean:69:6: error: verex verification failed: the automatic verification of `across_blocks_false` failed; provide a proof in the module:
+  verify across_blocks_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

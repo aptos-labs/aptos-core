@@ -174,7 +174,7 @@ def checkRustExporterBaseline : IO Unit := do
       | .error diagnostics =>
           throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
     unless checked.evidence == #[{
-        producer := "verex-rust-export via rustc Public"
+        producer := "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)"
         description :=
           "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target"
         trusted := true }] do
@@ -206,6 +206,271 @@ def checkRustExporterBaseline : IO Unit := do
 
 #guard_msgs in
 #eval checkRustExporterBaseline
+
+/-- A crate's modules are scopes of its one namespace, and so are the types
+whose inherent impls declare associated functions: each name carries the
+scope it is declared in, and the namespace declares its scopes, each after
+its parent module. Malformed scopes are rejected. -/
+def checkRustModuleScopes : IO Unit := do
+  let file := "modules.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/raw-unit" / file)
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error message =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not decode: {message}"
+  unless Import.encodeJson raw == text do
+    throw <| IO.userError s!"Rust exporter baseline {file} is not canonical RawUnit JSON v1"
+  let checked ← match validate raw with
+    | .ok checked => pure checked
+    | .error diagnostics =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
+  let some ns := checked.namespaces[0]?
+    | throw <| IO.userError s!"Rust exporter baseline {file} lost its namespace"
+  unless ns.scopes.map (fun scope => (scope.path, scope.kind)) ==
+      #[(#["Pair"], .inherent), (#["inner"], .module), (#["inner", "nested"], .module)] do
+    throw <| IO.userError s!"Rust exporter baseline {file} lost its scopes"
+  let scopeOf (name : String) := checked.tables.names.find? (·.name == name) |>.map (·.scope)
+  unless scopeOf "first" == some #["Pair"] && scopeOf "helper" == some #[] &&
+      scopeOf "second" == some #["inner"] && scopeOf "id" == some #["inner", "nested"] &&
+      scopeOf "Wrapper" == some #["inner", "nested"] do
+    throw <| IO.userError s!"Rust exporter baseline {file} named a declaration in the wrong scope"
+  let some rawNs := raw.namespaces[0]?
+    | throw <| IO.userError s!"Rust exporter baseline {file} lost its namespace"
+  let rejects (scopes : Array ScopeDecl) (code : String) : Bool :=
+    match validate { raw with namespaces := raw.namespaces.set! 0 { rawNs with scopes } } with
+    | .ok _ => false
+    | .error diagnostics => diagnostics.any (·.code == code)
+  let pair := rawNs.scopes[0]!
+  let inner := rawNs.scopes[1]!
+  let nested := rawNs.scopes[2]!
+  unless rejects #[pair, inner] "VIR-SCOPE-UNDECLARED" &&
+      rejects #[pair, nested, inner] "VIR-SCOPE-PARENT" &&
+      rejects #[pair, { inner with kind := .inherent }, nested] "VIR-SCOPE-PARENT" &&
+      rejects #[pair, inner, nested, inner] "VIR-SCOPE-DUPLICATE" &&
+      rejects #[pair, inner, nested, { inner with path := #[] }] "VIR-SCOPE-EMPTY" do
+    throw <| IO.userError "malformed module scopes were not rejected"
+
+#guard_msgs in
+#eval checkRustModuleScopes
+
+/-- A dependency crate is a namespace of the unit, not a verification target,
+declaring the types the crate reaches in their modules' scopes. A type whose
+shape the crate observes (matches, constructs, or projects) carries it; any
+other is opaque, and constructing an opaque type is rejected. -/
+def checkRustDependencyTypes : IO Unit := do
+  let file := "dependency_types.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/raw-unit" / file)
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error message =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not decode: {message}"
+  unless Import.encodeJson raw == text do
+    throw <| IO.userError s!"Rust exporter baseline {file} is not canonical RawUnit JSON v1"
+  let checked ← match validate raw with
+    | .ok checked => pure checked
+    | .error diagnostics =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
+  unless (prepareExecution #[semantics] checked).isOk &&
+      (prepareVerification #[semantics] checked).isOk do
+    throw <| IO.userError s!"Rust exporter baseline {file} does not prepare for execution \
+      and verification"
+  let nonTarget := checked.namespaces.extract 1 checked.namespaces.size |>.all fun ns =>
+    ns.pragmas == #[.assign "verify" (.constant (.bool false))]
+  let shape (name : String) : Option (Array String × Nat × Bool) :=
+    checked.namespaces.findSome? fun dependency =>
+      (dependency.structs.find? fun declaration =>
+          (checked.tables.names[declaration.name.index]?).any (·.name == name)).map
+        fun declaration =>
+          ((checked.tables.names[declaration.name.index]?.map (·.scope)).getD #[],
+            declaration.variants.size, declaration.properties.any (·.tag == opaqueTag))
+  unless checked.tables.namespaces.map (·.segments) ==
+        #[#["dependency_types"], #["alloc"], #["core"]] && nonTarget &&
+      shape "Option" == some (#["option"], 2, false) &&
+      shape "Result" == some (#["result"], 2, false) &&
+      shape "Vec" == some (#["vec"], 0, true) do
+    throw <| IO.userError s!"Rust exporter baseline {file} lost its dependency namespaces"
+  -- `wrap` constructs `Some`; with `Option` opaque, that construction is rejected.
+  let some core := raw.namespaces.find? fun ns =>
+      raw.tables.namespaces[ns.identity.index]?.map (·.segments) == some #["core"]
+    | throw <| IO.userError s!"Rust exporter baseline {file} lost its `core` namespace"
+  let opaqueStruct (declaration : StructDecl) : StructDecl :=
+    { declaration with
+      fields := #[], variants := #[], properties := #[{ profile := .rust, tag := opaqueTag }] }
+  let opaqueCore := { core with structs := core.structs.map opaqueStruct }
+  let masked := { raw with namespaces := raw.namespaces.map fun ns =>
+    if ns.identity == core.identity then opaqueCore else ns }
+  match validate masked with
+  | .error diagnostics =>
+      unless diagnostics.any (·.code == "VIR-NOMINAL-OPAQUE") do
+        throw <| IO.userError s!"constructing an opaque type was not rejected: {repr diagnostics}"
+  | .ok _ => throw <| IO.userError "constructing an opaque type was not rejected"
+
+#guard_msgs in
+#eval checkRustDependencyTypes
+
+/-- A dependency crate's function the crate calls is declared in its
+namespace by its generic signature, without its body, in the scope of its
+type, trait impl, or primitive type. A trait method called on a concrete type
+resolves to its impl's method, as codegen resolves it, which the unit's
+evidence states. -/
+def checkRustDependencyCalls : IO Unit := do
+  let file := "dependency_calls.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/raw-unit" / file)
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error message =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not decode: {message}"
+  unless Import.encodeJson raw == text do
+    throw <| IO.userError s!"Rust exporter baseline {file} is not canonical RawUnit JSON v1"
+  let checked ← match validate raw with
+    | .ok checked => pure checked
+    | .error diagnostics =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
+  let declared := checked.namespaces.extract 1 checked.namespaces.size |>.flatMap fun ns =>
+    ns.functions.filterMap fun function => do
+      let name ← checked.tables.names[function.name.index]?
+      guard <| function.body matches .absent
+      guard <| function.profileData.any (·.tag == dependencyTag)
+      return (name.scope, name.name, function.signature.generics.size)
+  let expected : Array (Array String × String × Nat) := #[
+    (#["vec", "Vec"], "len", 2), (#["vec", "Vec"], "push", 2),
+    (#["option", "<std::option::Option<T> as std::clone::Clone>"], "clone", 1),
+    (#["primitive", "u32"], "checked_add", 0), (#["option", "Option"], "unwrap_or", 1)]
+  unless declared == expected do
+    throw <| IO.userError s!"Rust exporter baseline {file} declared {repr declared}"
+  -- `or_zero` copies an `Option<u32>`, which is `Copy` since `u32` is.
+  unless (prepareExecution #[semantics] checked).isOk do
+    throw <| IO.userError s!"Rust exporter baseline {file} does not prepare for execution"
+  unless checked.evidence.size == 2 do
+    throw <| IO.userError s!"Rust exporter baseline {file} lost its resolution evidence"
+  -- A Rust function has a body exactly when it is not a dependency's.
+  let rejects (namespaces : Array RawNamespace) : Bool :=
+    match validate { raw with namespaces } with
+    | .ok _ => false
+    | .error diagnostics => diagnostics.any (·.code == "VIR-FUNCTION-BODY")
+  let retag (index : Nat) (properties : Array ProfileValue) : Array RawNamespace :=
+    raw.namespaces.modify index fun ns =>
+      { ns with functions := ns.functions.modify 0 (fun function =>
+          { function with profileData := properties }) }
+  let some core := (raw.namespaces.zipIdx.find? fun (ns, index) =>
+      index > 0 && ns.functions.size > 0).map (·.2)
+    | throw <| IO.userError s!"Rust exporter baseline {file} lost its dependency functions"
+  unless rejects (retag core #[]) &&
+      rejects (retag 0 #[{ profile := .rust, tag := dependencyTag }]) do
+    throw <| IO.userError "a body contradicting `function.dependency` was not rejected"
+
+#guard_msgs in
+#eval checkRustDependencyCalls
+
+/-- An opaque constant and a call of an opaque function, which no diverging region
+holds, are rejected at their nodes. -/
+def checkRustOpaqueNodes : IO Unit := do
+  for file in #["opaque_constant.exp.json", "opaque_callee.exp.json"] do
+    let text ← readBaselineJson ("rust-exporter/tests/opaque-unit" / file)
+    match decodeAndValidate text with
+    | .ok _ => throw <| IO.userError s!"Rust exporter baseline {file} validated"
+    | .error diagnostics =>
+        unless diagnostics.all (·.code == "VIR-OPAQUE-SURVIVOR") do
+          throw <| IO.userError s!"Rust exporter baseline {file} diagnosed {repr diagnostics}"
+
+#guard_msgs in
+#eval checkRustOpaqueNodes
+
+/-- A collapse leaves no call of an opaque function in any body, only its node in
+the arena. The import prunes such a declaration; validation rejects it unpruned. -/
+def checkRustOpaquePruning : IO Unit := do
+  let file := "opaque_callee.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/opaque-unit" / file)
+  let raw ← match VerexIR.Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error message => throw <| IO.userError message
+  let some ns := raw.namespaces[0]?
+    | throw <| IO.userError s!"Rust exporter baseline {file} has no namespace"
+  let some function := ns.functions[0]?
+    | throw <| IO.userError s!"Rust exporter baseline {file} has no function"
+  -- The body's call of the opaque function becomes a recursive call.
+  let recursive : VerexIR.ExprId := ⟨ns.expressions.size⟩
+  let body := match function.body with
+    | .cfg graph => .cfg { graph with blocks := graph.blocks.map fun block =>
+        match block.terminator with
+        | .call _ destination unwind =>
+            { block with terminator := .call recursive destination unwind }
+        | _ => block }
+    | body => body
+  let some original := ns.expressions.findIdx? (· matches
+      { kind := .operation (.call (.function _)) .., .. }) |>.bind (ns.expressions[·]?)
+    | throw <| IO.userError s!"Rust exporter baseline {file} has no call"
+  let .operation _ _ arguments surface := original.kind
+    | throw <| IO.userError s!"Rust exporter baseline {file} has no call"
+  let collapsed := { raw with namespaces := raw.namespaces.set! 0 { ns with
+    expressions := ns.expressions.push { original with
+      kind := .operation (.call (.function { namespaceId := ns.identity, name := function.name }))
+        #[] arguments surface }
+    functions := ns.functions.set! 0 { function with body } } }
+  match validate collapsed with
+  | .ok _ => throw <| IO.userError "an unpruned opaque function validated"
+  | .error diagnostics =>
+      unless diagnostics.all (·.code == "VIR-OPAQUE-SURVIVOR") do
+        throw <| IO.userError s!"an unpruned opaque function diagnosed {repr diagnostics}"
+  let pruned := VerexIR.Rust.Library.pruneOpaqueFunctions collapsed
+  if pruned.namespaces.any (·.functions.any (·.profileData.any
+      (·.tag == rustOpaqueFunctionTag))) then
+    throw <| IO.userError "an uncalled opaque function was not pruned"
+  match validate pruned with
+  | .ok _ => pure ()
+  | .error diagnostics =>
+      throw <| IO.userError s!"a pruned unit diagnosed {repr diagnostics}"
+  -- A unit whose bodies still call it keeps it, for validation to reject.
+  let kept := VerexIR.Rust.Library.pruneOpaqueFunctions raw
+  unless kept.namespaces.any (·.functions.any (·.profileData.any
+      (·.tag == rustOpaqueFunctionTag))) do
+    throw <| IO.userError "a called opaque function was pruned"
+
+#guard_msgs in
+#eval checkRustOpaquePruning
+
+/-- A type with a `Copy` impl applying it to its own parameters carries the
+`copy` ability, conditional on its type arguments: the local `Point`, and
+`Option`, which is copied at `Option<u32>`. -/
+def checkRustCopyTypes : IO Unit := do
+  let file := "copy_types.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/raw-unit" / file)
+  let checked ← match decodeAndValidate text with
+    | .ok checked => pure checked
+    | .error diagnostics =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
+  let abilities := checked.namespaces.flatMap fun ns => ns.structs.filterMap fun declaration =>
+    (checked.tables.names[declaration.name.index]?).map (·.name, declaration.abilities)
+  unless abilities == #[("Point", #[.copy]), ("Option", #[.copy])] &&
+      (prepareExecution #[semantics] checked).isOk &&
+      (prepareVerification #[semantics] checked).isOk do
+    throw <| IO.userError s!"Rust exporter baseline {file} lost its `Copy` types: {repr abilities}"
+
+#guard_msgs in
+#eval checkRustCopyTypes
+
+/-- An ADT states a destructor where it has a `Drop` impl; an opaque one also
+where its hidden fields reach one or it holds a type argument. What a visible
+field reaches is read from the field's type. A field's type parameter is not
+one, nor is a reference's referent or a phantom. -/
+def checkRustDestructors : IO Unit := do
+  let file := "destructors.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/raw-unit" / file)
+  let checked ← match decodeAndValidate text with
+    | .ok checked => pure checked
+    | .error diagnostics =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
+  let stated := checked.namespaces.flatMap fun ns => ns.structs.filterMap fun declaration =>
+    if declaration.properties.any (·.tag == destructorTag) then
+      (checked.tables.names[declaration.name.index]?).map (·.name)
+    else none
+  unless stated == #["Guard", "Box", "Rc", "String", "Vec", "Cell"] &&
+      (prepareExecution #[semantics] checked).isOk &&
+      (prepareVerification #[semantics] checked).isOk do
+    throw <| IO.userError s!"Rust exporter baseline {file} lost its destructors: {repr stated}"
+
+#guard_msgs in
+#eval checkRustDestructors
 
 def checkRustExporterCallBaseline : IO Unit := do
   let file := "call.exp.json"
@@ -530,8 +795,8 @@ def checkRustExporterEnumBaseline : IO Unit := do
   let some ns := raw.namespaces[0]?
     | throw <| IO.userError s!"Rust exporter baseline {file} lost its namespace"
   let hasDiscriminant := ns.expressions.any fun expression => match expression.kind with
-    | .operation (.data (.discriminant reference)) _ arguments _ =>
-        arguments.size == 1 && raw.tables.names[reference.name.index]?.map (·.name) == some "Choice"
+    | .operation (.readDiscriminant place) instantiations arguments _ =>
+        arguments.isEmpty && instantiations.isEmpty && place.index < ns.places.size
     | _ => false
   let hasProjectedPayload := (ns.places.any fun place => place matches .downcast _ _) &&
     (ns.places.any fun place => place matches .field ..)
@@ -607,7 +872,13 @@ def checkRustExporterDropBaseline : IO Unit := do
 private def hasStructurizedPanic (unit : ValidatedUnit) : Bool :=
   unit.namespaces.any fun ns =>
     (ns.functions.all fun function => function.body matches .structured _) &&
-      ns.expressions.any (·.kind == .throw_ .panic #[])
+      ns.expressions.any fun expression => match expression.kind with
+        | .throw_ .panic #[] => true
+        | .operation (.primitive primitive) _ _ _ => match primitive with
+          | .checkedDivide .panic | .checkedModulo .panic | .checkedNegate .panic
+          | .checkVectorIndex .panic => true
+          | _ => false
+        | _ => false
 
 def checkRustExporterAssertBaseline : IO Unit := do
   let file := "assert.exp.json"
@@ -745,8 +1016,8 @@ def checkRustExporterSliceBaseline : IO Unit := do
         throw <| IO.userError s!"Rust exporter baseline {file} does not decode: {message}"
   unless Import.encodeJson raw == text do
     throw <| IO.userError s!"Rust exporter baseline {file} is not canonical RawUnit JSON v1"
-  unless raw.tables.types.any (fun type => type matches .vector _ none) do
-    throw <| IO.userError s!"Rust exporter baseline {file} lost its dynamic slice type"
+  unless raw.tables.types.any (fun type => type matches .slice _) do
+    throw <| IO.userError s!"Rust exporter baseline {file} lost its distinct slice type"
   let hasDereferenceAndLength := raw.namespaces.any fun ns =>
     (ns.expressions.any fun expression =>
       expression.kind matches .operation (.reference .dereference) _ _ _) &&
@@ -1208,7 +1479,7 @@ def checkRustExporterGenericEnumBaseline : IO Unit := do
         raw.tables.types[argument.typeId.index]? == some (.integer (.bits 32) false)
     | _ => false
   let hasDiscriminant := ns.expressions.any fun expression =>
-    expression.kind matches .operation (.data (.discriminant _)) _ #[_] _
+    expression.kind matches .operation (.readDiscriminant _) #[] #[] _
   unless hasGenericEnum && hasConcreteNominal && hasDiscriminant do
     throw <| IO.userError s!"Rust exporter baseline {file} lost its generic enum or discriminant"
   let checked ← match validate raw with
@@ -1490,5 +1761,227 @@ def checkRustExporterCharacterBaseline : IO Unit := do
 
 #guard_msgs in
 #eval checkRustExporterCharacterBaseline
+
+/-- The temporary compiler bridge exports typed const binders, declared Copy
+bounds, explicit lifetime relations, and promoted values without opaque nodes. -/
+def checkRustPolyfillBaseline : IO Unit := do
+  let text ← readBaselineJson "rust-exporter/tests/raw-unit/polyfill.exp.json"
+  let unit ← match decodeAndValidate text with
+    | .ok unit => pure unit
+    | .error diagnostics => throw <| IO.userError s!"polyfill fixture does not validate: {repr diagnostics}"
+  let functions := unit.namespaces[0]!.functions
+  let find (name : String) := functions.find? fun f => unit.tables.names[f.name.index]!.name == name
+  let some constant := find "constant" | throw <| IO.userError "missing const-generic function"
+  let binder := constant.signature.generics[0]!
+  unless binder.kind == .const && binder.type.any (fun use =>
+      unit.tables.types[use.typeId.index]? == some (.integer .pointer false)) do
+    throw <| IO.userError "const parameter lost its declared usize type"
+  for name in #["twice", "unused_copy", "super_copy"] do
+    let some function := find name | throw <| IO.userError s!"missing {name}"
+    unless function.signature.generics[0]!.abilities.contains .copy do
+      throw <| IO.userError s!"{name} lost its declared Copy bound"
+  for name in #["shorten", "get"] do
+    let some function := find name | throw <| IO.userError s!"missing {name}"
+    unless function.signature.predicates.any (· matches .lifetimeOutlives ..) do
+      throw <| IO.userError s!"{name} lost its outlives predicate"
+  let executable ← match prepareExecution #[semantics] unit with
+    | .ok executable => pure executable
+    | .error diagnostics => throw <| IO.userError s!"polyfill fixture is not executable: {repr diagnostics}"
+  for (name, expected) in #[("promoted", 5), ("promoted_array", 2)] do
+    let some index := functions.findIdx? (fun f => unit.tables.names[f.name.index]!.name == name)
+      | throw <| IO.userError s!"missing {name}"
+    match Interpreter.run executable 48 { namespaceId := ⟨0⟩, functionId := ⟨index⟩ } #[] with
+      | .ok (_, { value := .returned #[.integer value], .. }) =>
+          unless value == expected do throw <| IO.userError s!"{name} returned {value}"
+      | result => throw <| IO.userError s!"{name} did not execute: {repr result}"
+
+#guard_msgs in
+#eval checkRustPolyfillBaseline
+
+/-- Static dictionaries retain one generic body, forward evidence, and update
+the mutable receiver. Corrupting a dictionary's signature or parameter index
+must be rejected before execution. -/
+def checkStaticMethodEvidence (fixture : String) (genericNames : Array String) (expectedDictionaries : Nat) : IO Unit := do
+  let text ← readBaselineJson s!"rust-exporter/tests/evidence-unit/{fixture}.exp.json"
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error error => throw <| IO.userError error
+  let unit ← match validate raw with
+    | .ok unit => pure unit
+    | .error errors => throw <| IO.userError s!"static evidence rejected: {repr errors}"
+  let ns := raw.namespaces[0]!
+  for name in genericNames do
+    let functions := ns.functions.filter fun f => raw.tables.names[f.name.index]!.name == name
+    unless functions.size == 1 && functions[0]!.signature.generics.size == 1 &&
+        functions[0]!.signature.parameters.size == 2 do
+      throw <| IO.userError s!"{name} is not a single generic body with its dictionary"
+  let dictionaries := ns.expressions.filterMap fun expression => match expression.kind with
+    | .operation (.call (.closure target _)) _ _ _ => some target
+    | _ => none
+  unless dictionaries.size == expectedDictionaries && dictionaries.toList.eraseDups.length == dictionaries.size do
+    throw <| IO.userError "method implementations did not produce the expected distinct dictionaries"
+  let corrupt := { raw with namespaces := raw.namespaces.modify 0 fun ns =>
+    { ns with expressions := ns.expressions.map fun expression => match expression.kind with
+      | .operation (.call (.closure target mask)) types args surface =>
+          if target == dictionaries[0]! then
+            { expression with kind := .operation (.call (.closure dictionaries[1]! mask)) types args surface }
+          else expression
+      | _ => expression } }
+  if (validate corrupt).isOk then
+    throw <| IO.userError "a method dictionary with the wrong receiver type was accepted"
+  let malformed := { raw with namespaces := raw.namespaces.modify 0 fun ns =>
+    { ns with functions := ns.functions.modify 0 fun function => { function with
+        attributes := function.attributes.push
+          (.assign "method_evidence" (.constant (.integer 999)) none) } } }
+  match validate malformed with
+    | .error errors => unless errors.any (·.code == "VIR-METHOD-EVIDENCE") do
+        throw <| IO.userError s!"wrong malformed-evidence diagnostic: {repr errors}"
+    | .ok _ => throw <| IO.userError "an out-of-range dictionary parameter was accepted"
+  let some generic := ns.functions.find? fun f =>
+      raw.tables.names[f.name.index]!.name == genericNames[0]!
+    | throw <| IO.userError "missing generic dictionary function"
+  let dictionaryType := generic.signature.parameters[1]!.typeUse.typeId
+  let missingReceiver := { raw with tables := { raw.tables with
+    types := raw.tables.types.modify dictionaryType.index fun type => match type with
+      | .function _ result abilities => .function #[] result abilities
+      | other => other } }
+  match validate missingReceiver with
+    | .error errors => unless errors.any (·.code == "VIR-METHOD-EVIDENCE") do
+        throw <| IO.userError s!"wrong missing-receiver diagnostic: {repr errors}"
+    | .ok _ => throw <| IO.userError "method evidence without a receiver was accepted"
+  let executable ← match prepareExecution #[semantics] unit with
+    | .ok executable => pure executable
+    | .error errors => throw <| IO.userError s!"static evidence is not executable: {repr errors}"
+  for (name, input, expected) in #[
+      ("counter", RuntimeValue.integer 0, RuntimeValue.integer 2),
+      ("counter", .integer 41, .integer 43),
+      ("counter", .integer 18446744073709551614, .integer 0),
+      ("counter", .integer 18446744073709551615, .integer 1),
+      ("toggle", .bool false, .bool false), ("toggle", .bool true, .bool true)] do
+    let some index := unit.namespaces[0]!.functions.findIdx? fun f =>
+        unit.tables.names[f.name.index]!.name == name
+      | throw <| IO.userError s!"missing {name}"
+    match Interpreter.run executable 128 { namespaceId := ⟨0⟩, functionId := ⟨index⟩ } #[input] with
+      | .ok (_, { value := .returned #[result], .. }) =>
+          unless result == expected do throw <| IO.userError s!"{name}: {repr result} != {repr expected}"
+      | result => throw <| IO.userError s!"{name} did not execute: {repr result}"
+
+#guard_msgs in
+#eval checkStaticMethodEvidence "static_step" #["step_twice", "forward"] 2
+
+#guard_msgs in
+#eval checkStaticMethodEvidence "static_fnmut" #["apply_mut", "forward", "apply_bool", "apply_unit"] 3
+
+/-- Declared Fn dictionaries borrow their receiver immutably, including two
+independent bounds and a generic result. Changing its receiver type must still
+fail the ordinary invocation checks. -/
+def checkSharedMethodEvidence : IO Unit := do
+  let text ← readBaselineJson "rust-exporter/tests/evidence-unit/static_fn.exp.json"
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error error => throw <| IO.userError error
+  let unit ← match validate raw with
+    | .ok unit => pure unit
+    | .error errors => throw <| IO.userError s!"shared evidence rejected: {repr errors}"
+  let mut count := 0
+  for function in raw.namespaces[0]!.functions do
+    for attr in function.attributes do
+      if let .assign "method_evidence" (.constant (.integer index)) _ := attr then
+        count := count + 1
+        let parameter := function.signature.parameters[index.toNat]!
+        let some (.function parameters _ _) := raw.tables.types[parameter.typeUse.typeId.index]?
+          | throw <| IO.userError "missing dictionary type"
+        let receiver := parameters[0]!
+        let some (.reference reference) := raw.tables.types[receiver.index]?
+          | throw <| IO.userError "missing dictionary receiver"
+        unless reference.kind == .shared do
+          throw <| IO.userError "Fn evidence changed the receiver to mutable"
+        let malformed := { raw with tables := { raw.tables with
+          types := raw.tables.types.modify parameter.typeUse.typeId.index fun type => match type with
+            | .function parameters result abilities =>
+                .function (parameters.set! 0 reference.referent) result abilities
+            | other => other } }
+        match validate malformed with
+          | .error errors => unless errors.any (·.code == "VIR-SEMANTIC-TYPE") do
+              throw <| IO.userError s!"wrong receiver-mismatch diagnostic: {repr errors}"
+          | .ok _ => throw <| IO.userError "shared dictionary with a mismatched receiver was accepted"
+  unless count == 5 do throw <| IO.userError s!"expected five Fn dictionaries, got {count}"
+  unless (prepareExecution #[semantics] unit).isOk do
+    throw <| IO.userError "shared evidence is not executable"
+
+#guard_msgs in
+#eval checkSharedMethodEvidence
+
+/-- Consuming dictionaries take F by value without granting it Copy. Their
+ordinary invocation signature and marker bounds remain checked. -/
+def checkConsumingMethodEvidence : IO Unit := do
+  let text ← readBaselineJson "rust-exporter/tests/evidence-unit/static_fnonce.exp.json"
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error error => throw <| IO.userError error
+  let unit ← match validate raw with
+    | .ok unit => pure unit
+    | .error errors => throw <| IO.userError s!"consuming evidence rejected: {repr errors}"
+  let mut count := 0
+  for function in raw.namespaces[0]!.functions do
+    for attr in function.attributes do
+      if let .assign "method_evidence" (.constant (.integer index)) _ := attr then
+        count := count + 1
+        let parameter := function.signature.parameters[index.toNat]!
+        let some (.function parameters _ _) := raw.tables.types[parameter.typeUse.typeId.index]?
+          | throw <| IO.userError "missing consuming dictionary type"
+        unless parameters[0]? == some function.signature.parameters[0]!.typeUse.typeId do
+          throw <| IO.userError "consuming dictionary does not take the original receiver by value"
+        if function.signature.generics[0]!.abilities.contains .copy then
+          throw <| IO.userError "consuming receiver gained a Copy bound"
+        let malformed := { raw with tables := { raw.tables with
+          types := raw.tables.types.modify parameter.typeUse.typeId.index fun type => match type with
+            | .function _ result abilities => .function #[] result abilities
+            | other => other } }
+        match validate malformed with
+          | .error errors => unless errors.any (·.code == "VIR-METHOD-EVIDENCE") do
+              throw <| IO.userError s!"wrong missing-receiver diagnostic: {repr errors}"
+          | .ok _ => throw <| IO.userError "consuming dictionary without a receiver was accepted"
+  unless count == 3 do throw <| IO.userError s!"expected three consuming dictionaries, got {count}"
+  unless (prepareExecution #[semantics] unit).isOk do
+    throw <| IO.userError "consuming evidence is not executable"
+
+#guard_msgs in
+#eval checkConsumingMethodEvidence
+
+/-- Native expectations also hold through dictionary captures, receiver adapters,
+argument tuples and generic/aggregate results in the interpreter. -/
+def checkEvidenceComposition : IO Unit := do
+  let text ← readBaselineJson "rust-exporter/tests/fixtures/evidence_composition.exp.json"
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error error => throw <| IO.userError error
+  let unit ← match validate raw with
+    | .ok unit => pure unit
+    | .error errors => throw <| IO.userError s!"evidence composition rejected: {repr errors}"
+  let executable ← match prepareExecution #[semantics] unit with
+    | .ok executable => pure executable
+    | .error errors => throw <| IO.userError s!"evidence composition not executable: {repr errors}"
+  let some pairIndex := unit.namespaces[0]!.structs.findIdx? fun declaration =>
+      unit.tables.names[declaration.name.index]!.name == "Pair"
+    | throw <| IO.userError "missing Pair"
+  let pairHandle : StructHandle := { namespaceId := ⟨0⟩, structId := pairIndex }
+  for value in #[0, 41, 18446744073709551614, 18446744073709551615] do
+    for (name, expected) in #[
+        ("nested", RuntimeValue.integer ((value + 2) % 18446744073709551616)),
+        ("shared", .integer value), ("argument", .integer value), ("arguments", .integer value),
+        ("pair", .tuple #[.integer ((value + 1) % 18446744073709551616), .bool true]),
+        ("multiple", .integer ((value + 2) % 18446744073709551616)),
+        ("record", .nominal pairHandle none #[.integer ((value + 1) % 18446744073709551616), .bool true])] do
+      let some index := unit.namespaces[0]!.functions.findIdx? fun f =>
+          unit.tables.names[f.name.index]!.name == name
+        | throw <| IO.userError s!"missing {name}"
+      match Interpreter.run executable 256 { namespaceId := ⟨0⟩, functionId := ⟨index⟩ } #[.integer value] with
+        | .ok (_, { value := .returned #[result], .. }) =>
+            unless result == expected do throw <| IO.userError s!"{name}: {repr result} != {repr expected}"
+        | result => throw <| IO.userError s!"{name} did not execute: {repr result}"
+
+#guard_msgs in
+#eval checkEvidenceComposition
 
 end VerexIR.Rust.Tests

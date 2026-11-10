@@ -1,0 +1,201 @@
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:6:3: error: the specification clause `ensures 2 * result == n * (n + 1)` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:10:15: error: the loop invariant `2 * total == n * (n - 1) - iter.iter.end * (iter.iter.end - 1)` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `rev_range_sum` failed; provide a proof in the module:
+  verify rev_range_sum by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:13:3: error: the specification clause `ensures n > 0 ==> result == 0` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:12:6: error: verex verification failed: the automatic verification of `rev_first` failed; provide a proof in the module:
+  verify rev_first by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:17:3: error: the specification clause `ensures result == n` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:20:15: error: the loop invariant `!iter.iter.exhausted ==> iter.iter.end <= n && total == n - iter.iter.end` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `rev_inclusive_count` failed; provide a proof in the module:
+  verify rev_inclusive_count by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | invariant_2_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:26:15: error: the loop invariant `iter.iter.pos == 0 && iter.iter.slice == values && iter.iter.end == values.length` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:23:6: error: verex verification failed: the automatic verification of `rev_slice_count` failed; provide a proof in the module:
+  verify rev_slice_count by lean =>
+    verex_obligations
+    verex_on
+    | invariant_1_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:30:3: error: the specification clause `ensures values.length > 0 ==> result == values[0]` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:31:3: error: the specification clause `ensures values.length == 0 ==> result == default` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:29:6: error: verex verification failed: the automatic verification of `rev_slice_first` failed; provide a proof in the module:
+  verify rev_slice_first by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:33:1: error: `no panic when aborts at call 1 of next` is not established: the call `for (i, _x) in values.iter().enumerate() {
+        total += i;
+    }` at VerexE2ETests/SourceVerify/library_iter_adapters_errors.rs:44:5 may panic
+  from: ↑values.values.size ≤ 1000; iter_result.val.fst = values ∧ iter_result.val.snd.fst.val = 0 ∧ iter_result.val.snd.snd.fst.val = ↑values.values.size; VerexIR.Proofs.Denote.Var.here.selectCertified enumerate_result = iter_result ∧ enumerate_result.val.snd.fst.val = 0; into_iter_result = enumerate_result; iter_0_0_2.val = ↑values.values.size; iter_0_0_1.val ≤ iter_0_0_2.val; total.val ≤ iter_0_1.val * 1000; fst✝³.elim True fun reference => True; (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).snd.fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).snd.snd; (VerexIR.Proofs.Denote.NTy.int 32 false).slice.deepHolds ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).fst.fst; (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).fst.snd.fst; (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).fst.snd.snd.fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).fst.snd.snd.snd; iter_0_0_1.val < iter_0_0_2.val ∧ iter_0_1.val = 18446744073709551615
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:33:1: error: `no panic when aborts at op 1` is not established: the operation `total += i` at VerexE2ETests/SourceVerify/library_iter_adapters_errors.rs:45:9 may panic
+  from: ↑values.values.size ≤ 1000; iter_result.val.fst = values ∧ iter_result.val.snd.fst.val = 0 ∧ iter_result.val.snd.snd.fst.val = ↑values.values.size; VerexIR.Proofs.Denote.Var.here.selectCertified enumerate_result = iter_result ∧ enumerate_result.val.snd.fst.val = 0; into_iter_result = enumerate_result; iter_0_0_2.val = ↑values.values.size; iter_0_0_1.val ≤ iter_0_0_2.val; total.val ≤ iter_0_1.val * 1000; fst✝¹³.elim True fun reference => True; (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).snd.fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).snd.snd; (VerexIR.Proofs.Denote.NTy.int 32 false).slice.deepHolds ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).fst.fst; (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).fst.snd.fst; (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).fst.snd.snd.fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ((values, iter_0_0_1, iter_0_0_2, PUnit.unit), iter_0_1, PUnit.unit).fst.snd.snd.snd; ¬(iter_0_0_1.val < iter_0_0_2.val ∧ iter_0_1.val = 18446744073709551615); VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.tuple (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil))) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) next_at_1_result.val = "Some" ↔ iter_0_0_1.val < iter_0_0_2.val; (VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.tuple (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil))) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) next_at_1_result.val = "Some" → ((VerexIR.Proofs.Denote.withSome (VerexIR.Proofs.Denote.Which.here.there.projectCertified? next_at_1_result) (fun fields x => some fields.fst) none).getD ((VerexIR.Proofs.Denote.NTy.tuple (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil))).inhabitant ⋯)).fst.val = iter_0_1.val) ∧ (VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.tuple (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil))) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) next_at_1_result.val = "Some" → ((VerexIR.Proofs.Denote.withSome (VerexIR.Proofs.Denote.Which.here.there.projectCertified? next_at_1_result) (fun fields x => some fields.fst) none).getD ((VerexIR.Proofs.Denote.NTy.tuple (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil))).inhabitant ⋯)).snd.fst = values.values[iter_0_0_1.val.toNat]?.getD (VerexIR.Proofs.Denote.NTy.plainInhabitantOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 32 false) ⋯)); value_0.val.fst.fst = values ∧ value_0.val.fst.snd.snd.fst.val = iter_0_0_2.val; value_0.val.fst.snd.fst.val = if iter_0_0_1.val < iter_0_0_2.val then iter_0_0_1.val + 1 else iter_0_0_1.val; value_0.val.snd.fst.val = if iter_0_0_1.val < iter_0_0_2.val then iter_0_1.val + 1 else iter_0_1.val; VerexIR.IntegerValueFits (VerexIR.IntWidth.bits 64) true entry✝; attempt_1._verexJoinEntry_1_13 prepared✝ «native_core::primitive::slice::iter» «native_core::iter::traits::iterator::Iterator::enumerate» «native_core::iter::traits::collect::<I as std::iter::IntoIterator>::into_iter» «native_core::iter::adapters::enumerate::<std::iter::Enumerate<I> as std::iter::Iterator>::next.at_1» values assumed permitted iter_result iter_ensures_1 enumerate_result enumerate_ensures_1 into_iter_result final into_iter_ensures_1 recursive✝ loopHypothesis✝ fst✝¹³ fst✝¹² fst✝¹¹ fst✝¹⁰ total iter_0_0_1 iter_0_0_2 invariant_1_2 iter_0_1 invariant_1_3 invariant_2 left✝¹⁰ left✝⁹ left✝⁸ left✝⁷ left✝⁶ left✝⁵ right✝¹ left✝⁴ left✝³ left✝² right✝ invariantHolds✝¹ value_0 next_at_1_result next_at_1_returns next_ensures_1 next_ensures_2 next_ensures_3 next_ensures_4 next_ensures_5 invariantHolds✝ entry✝ entry; (if 0 = entry✝ then some (some values, some total, some value_0, some (value_0.val, value_0), some next_at_1_result, fst✝¹¹, fst✝¹⁰, ()) else none) = none; VerexIR.Proofs.Denote.withSome (VerexIR.Proofs.Denote.Which.here.there.projectCertified? val✝¹) (fun fields x => some fields.fst) none = some (fst✝³, fst✝², PUnit.unit); (if 1 = entry✝ then some (some values, some total, some value_0, some (value_0.val, value_0), some next_at_1_result, fst✝¹¹, fst✝¹⁰, ()) else none) = some (fst✝⁹, fst✝⁸, fst✝⁷, fst✝⁶, some val✝¹, fst✝⁵, fst✝⁴, PUnit.unit); VerexIR.Proofs.Denote.withSome (VerexIR.Proofs.Denote.Which.here.there.projectCertified? val✝¹) (fun fields x => some fields.fst) none = some (fst✝¹, fst✝, PUnit.unit); fst✝⁸ = some val✝; ¬(0 ≤ val✝.val + fst✝³.val ∧ val✝.val + fst✝³.val ≤ 18446744073709551615)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:33:6: error: a loop invariant at an iteration is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:35:3: error: the specification clause `ensures result <= values.length * 1000` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:37:15: error: the loop invariant `iter.iter.slice == values && iter.iter.end == values.length && iter.iter.pos <= iter.iter.end` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:38:15: error: the loop invariant `total <= iter.count * 1000` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:33:6: error: verex verification failed: the automatic verification of `enumerate_sum` failed; provide a proof in the module:
+  verify enumerate_sum by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of next => verex_prepare; sorry
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | invariant_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | invariant_1_step => verex_prepare; sorry
+    | invariant_2_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:42:3: error: the specification clause `ensures result < values.length ==> values[result + 1] == target` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:47:15: error: the loop invariant `∀ (k in 0 .. iter.iter.pos), values[k] != target` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:40:6: error: verex verification failed: the automatic verification of `position` failed; provide a proof in the module:
+  verify position by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:51:3: error: the specification clause `ensures result < n * 1000` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:55:15: error: the loop invariant `total <= iter.count * 1000` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:49:6: error: verex verification failed: the automatic verification of `enumerate_range` failed; provide a proof in the module:
+  verify enumerate_range by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:58:3: error: the specification clause `ensures result == n / 2` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:57:6: error: verex verification failed: the automatic verification of `count_steps` failed; provide a proof in the module:
+  verify count_steps by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:64:3: error: the specification clause `ensures n > 0 ==> result == 1` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:63:6: error: verex verification failed: the automatic verification of `first_step` failed; provide a proof in the module:
+  verify first_step by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:67:1: error: `no panic when aborts at call 1 of step_by` is not established: the call `(0..n).step_by(step)` at VerexE2ETests/SourceVerify/library_iter_adapters_errors.rs:82:20 may panic
+  from: (VerexIR.Proofs.Denote.NTy.int 32 false).deepHolds ({ val := 0, fits := ⋯ }, n, ()).fst; (VerexIR.Proofs.Denote.NTy.int 32 false).deepHolds ({ val := 0, fits := ⋯ }, n, ()).snd.fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ({ val := 0, fits := ⋯ }, n, ()).snd.snd; step.val = 0
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:67:6: error: verex verification failed: the automatic verification of `no_step` failed; provide a proof in the module:
+  verify no_step by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of step_by => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:73:3: error: the specification clause `ensures ∀ (k in 0 .. result), entries[k].key != key` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:75:15: error: the loop invariant `iter.iter.slice == entries && iter.iter.end == entries.length && iter.iter.pos <= iter.iter.end` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:77:15: error: the loop invariant `∀ (k in 0 .. iter.iter.pos), entries[k].key != key` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:70:6: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (1000000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:70:6: error: verex verification failed: the automatic verification of `find_entry` exceeded its budget of 1000000 maxHeartbeats after deciding 35 leaves (stage interrupted); provide a proof in the module:
+  verify find_entry by lean =>
+    verex_obligations
+    verex_on
+    | ensures_3 => verex_prepare; sorry
+    | invariant_1_step => verex_prepare; sorry
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:79:6: error: the continuation after `core::iter::adapters::enumerate::<std::iter::Enumerate<I> as std::iter::Iterator>::next.at_0` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:80:3: error: the specification clause `ensures values.length > 0 ==> result == values.length - 1` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:79:6: error: verex verification failed: the automatic verification of `last_rank` failed; provide a proof in the module:
+  verify last_rank by lean =>
+    verex_obligations
+    verex_on
+    | after_next_at_0 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:82:6: error: the continuation after `core::iter::adapters::rev::<std::iter::Rev<I> as std::iter::Iterator>::next.at_3` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:83:3: error: the specification clause `ensures values.length > 0 ==> result == 0` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:82:6: error: verex verification failed: the automatic verification of `last_of_enumerated` failed; provide a proof in the module:
+  verify last_of_enumerated by lean =>
+    verex_obligations
+    verex_on
+    | after_next_at_3 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:87:3: error: the specification clause `ensures result < values.length ==> ∀ (k in 0 .. result), values[k] != target` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:91:15: error: the loop invariant `∀ (k in iter.iter.iter.end .. values.length), values[k] != target` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:86:6: error: verex verification failed: the automatic verification of `last_position` failed; provide a proof in the module:
+  verify last_position by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:94:3: error: the specification clause `ensures result == contains(values, target)` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:98:15: error: the loop invariant `∀ (k in 0 .. iter.iter.end), values[k] != target` is not established at entry
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:93:6: error: verex verification failed: the automatic verification of `rev_contains` failed; provide a proof in the module:
+  verify rev_contains by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | invariant_3_entry => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:100:1: error: `no panic when aborts at op 1` is not established: the operation `i + 1` at VerexE2ETests/SourceVerify/library_iter_adapters_errors.rs:136:17 may panic
+  from: iter_result.val.fst = values ∧ iter_result.val.snd.fst.val = 0 ∧ iter_result.val.snd.snd.fst.val = ↑values.values.size; VerexIR.Proofs.Denote.Var.here.selectCertified rev_result = iter_result; VerexIR.Proofs.Denote.Var.here.selectCertified enumerate_result = rev_result ∧ enumerate_result.val.snd.fst.val = 0; into_iter_result = enumerate_result; iter_0_0_1.val = 0; total.val = iter_0_1.val; iter_0_1.val = ↑values.values.size - iter_0_0_2.val; fst✝¹³.elim True fun reference => True; iter_0_0_2.val ≤ ↑values.values.size; (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds (((values, iter_0_0_1, iter_0_0_2, PUnit.unit), PUnit.unit), iter_0_1, PUnit.unit).snd.fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil (((values, iter_0_0_1, iter_0_0_2, PUnit.unit), PUnit.unit), iter_0_1, PUnit.unit).snd.snd; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil (((values, iter_0_0_1, iter_0_0_2, PUnit.unit), PUnit.unit), iter_0_1, PUnit.unit).fst.snd; (VerexIR.Proofs.Denote.NTy.int 32 false).slice.deepHolds (((values, iter_0_0_1, iter_0_0_2, PUnit.unit), PUnit.unit), iter_0_1, PUnit.unit).fst.fst.fst; (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds (((values, iter_0_0_1, iter_0_0_2, PUnit.unit), PUnit.unit), iter_0_1, PUnit.unit).fst.fst.snd.fst; (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds (((values, iter_0_0_1, iter_0_0_2, PUnit.unit), PUnit.unit), iter_0_1, PUnit.unit).fst.fst.snd.snd.fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil (((values, iter_0_0_1, iter_0_0_2, PUnit.unit), PUnit.unit), iter_0_1, PUnit.unit).fst.fst.snd.snd.snd; ¬(iter_0_0_1.val < iter_0_0_2.val ∧ iter_0_1.val = 18446744073709551615); VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.tuple (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil))) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) next_at_0_result.val = "Some" ↔ iter_0_0_1.val < iter_0_0_2.val; (VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.tuple (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil))) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) next_at_0_result.val = "Some" → ((VerexIR.Proofs.Denote.withSome (VerexIR.Proofs.Denote.Which.here.there.projectCertified? next_at_0_result) (fun fields x => some fields.fst) none).getD ((VerexIR.Proofs.Denote.NTy.tuple (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil))).inhabitant ⋯)).fst.val = iter_0_1.val) ∧ (VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.tuple (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil))) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) next_at_0_result.val = "Some" → ((VerexIR.Proofs.Denote.withSome (VerexIR.Proofs.Denote.Which.here.there.projectCertified? next_at_0_result) (fun fields x => some fields.fst) none).getD ((VerexIR.Proofs.Denote.NTy.tuple (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil))).inhabitant ⋯)).snd.fst = values.values[(iter_0_0_2.val - 1).toNat]?.getD (VerexIR.Proofs.Denote.NTy.plainInhabitantOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 32 false) ⋯)); value_0.val.fst.fst.fst = values ∧ value_0.val.fst.fst.snd.fst.val = iter_0_0_1.val; value_0.val.fst.fst.snd.snd.fst.val = if iter_0_0_1.val < iter_0_0_2.val then iter_0_0_2.val - 1 else iter_0_0_2.val; value_0.val.snd.fst.val = if iter_0_0_1.val < iter_0_0_2.val then iter_0_1.val + 1 else iter_0_1.val; VerexIR.IntegerValueFits (VerexIR.IntWidth.bits 64) true entry✝; attempt_1._verexJoinEntry_1_11 prepared✝ «native_core::primitive::slice::iter» «native_core::iter::traits::iterator::Iterator::rev» «native_core::iter::traits::iterator::Iterator::enumerate» «native_core::iter::traits::collect::<I as std::iter::IntoIterator>::into_iter» «native_core::iter::adapters::enumerate::<std::iter::Enumerate<I> as std::iter::Iterator>::next.at_0» values assumed permitted iter_result iter_ensures_1 rev_result rev_ensures_1 enumerate_result enumerate_ensures_1 into_iter_result final into_iter_ensures_1 recursive✝ loopHypothesis✝ fst✝¹³ fst✝¹² fst✝¹¹ fst✝¹⁰ total iter_0_0_1 invariant_1_1 iter_0_0_2 iter_0_1 invariant_4 invariant_3 left✝¹² invariant_2 left✝¹¹ left✝¹⁰ left✝⁹ left✝⁸ left✝⁷ right✝² right✝¹ left✝⁶ left✝⁵ left✝⁴ left✝³ left✝² right✝ invariantHolds✝¹ value_0 next_at_0_result next_at_0_returns next_ensures_1 next_ensures_2 next_ensures_3 next_ensures_4 next_ensures_5 invariantHolds✝ entry✝ entry; (if 0 = entry✝ then some (some values, some total, some value_0, some (value_0.val, value_0), some next_at_0_result, fst✝¹¹, fst✝¹⁰, ()) else none) = none; VerexIR.Proofs.Denote.withSome (VerexIR.Proofs.Denote.Which.here.there.projectCertified? val✝) (fun fields x => some fields.fst) none = some (fst✝³, fst✝², PUnit.unit); (if 1 = entry✝ then some (some values, some total, some value_0, some (value_0.val, value_0), some next_at_0_result, fst✝¹¹, fst✝¹⁰, ()) else none) = some (fst✝⁹, fst✝⁸, fst✝⁷, fst✝⁶, some val✝, fst✝⁵, fst✝⁴, PUnit.unit); VerexIR.Proofs.Denote.withSome (VerexIR.Proofs.Denote.Which.here.there.projectCertified? val✝) (fun fields x => some fields.fst) none = some (fst✝¹, fst✝, PUnit.unit); ¬(0 ≤ fst✝³.val + 1 ∧ fst✝³.val + 1 ≤ 18446744073709551615)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:100:6: error: a loop invariant at an iteration is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:101:3: error: the specification clause `ensures result == values.length + 1` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:103:15: error: the loop invariant `iter.iter.iter.pos == 0 && iter.iter.iter.slice == values` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:104:15: error: the loop invariant `iter.iter.iter.end <= values.length` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:105:15: error: the loop invariant `iter.count == values.length - iter.iter.iter.end` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:106:15: error: the loop invariant `total == iter.count` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:100:6: error: verex verification failed: the automatic verification of `rev_ranks` failed; provide a proof in the module:
+  verify rev_ranks by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | invariant_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | invariant_1_step => verex_prepare; sorry
+    | invariant_2_step => verex_prepare; sorry
+    | invariant_3_step => verex_prepare; sorry
+    | invariant_4_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:110:3: error: the specification clause `ensures result == n` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:112:15: error: the loop invariant `iter.iter.end == n && !iter.iter.exhausted && iter.iter.start <= n + 1` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:108:6: error: verex verification failed: the automatic verification of `enumerate_inclusive` failed; provide a proof in the module:
+  verify enumerate_inclusive by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | invariant_1_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

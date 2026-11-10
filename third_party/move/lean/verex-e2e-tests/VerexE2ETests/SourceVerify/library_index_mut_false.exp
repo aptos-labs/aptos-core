@@ -1,0 +1,25 @@
+VerexE2ETests/SourceVerify/library_index_mut_false.spec.lean:6:3: error: the specification clause `ensures values == old(values)` is not established
+VerexE2ETests/SourceVerify/library_index_mut_false.spec.lean:4:6: error: verex verification failed: the automatic verification of `store` failed; provide a proof in the module:
+  verify store by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_index_mut_false.spec.lean:8:1: error: `no panic when aborts at call 1 of index_mut` is not established: the call `[position]` at VerexE2ETests/SourceVerify/library_index_mut_false.rs:9:11 may panic
+  from: value.fst = value.snd.fst; values_final = value.snd.snd; ↑values.values.size ≤ position.val
+VerexE2ETests/SourceVerify/library_index_mut_false.spec.lean:8:6: error: verex verification failed: the automatic verification of `unguarded` failed; provide a proof in the module:
+  verify unguarded by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of index_mut => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_index_mut_false.spec.lean:13:3: error: the specification clause `ensures values[0] == old(values)[0]` is not established
+VerexE2ETests/SourceVerify/library_index_mut_false.spec.lean:11:6: error: verex verification failed: the automatic verification of `other_position` failed; provide a proof in the module:
+  verify other_position by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

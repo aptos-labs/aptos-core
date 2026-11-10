@@ -6,10 +6,14 @@ import VerexIR
 /-!
 # Initial Rust semantic profile
 
-M0 registers the Rust profile and deliberately admits no Rust-specific
-extension tag.  Core VIR values can already be validated under this profile;
-the MIR mapper will add supported Rust vocabulary only through a reviewed
-shared-VIR extension, never through an unchecked string payload.
+M0 registers the Rust profile and admits four Rust-specific tags: the property
+`struct.opaque` of a dependency's type whose shape the crate does not see, the
+property `struct.destructor` of a type whose drop runs a destructor, the
+property `function.dependency` of a dependency's function, declared without its
+body, and the property `function.opaque` of one the crate cannot state.
+Core VIR values can already be validated under this profile; the MIR mapper
+adds supported Rust vocabulary only through a reviewed shared-VIR extension,
+never through an unchecked string payload.
 -/
 
 namespace VerexIR.Rust
@@ -19,7 +23,7 @@ open VerexIR.Import
 open VerexIR.Validation
 
 def profileName : String := "rust"
-def profileVersion : Nat := 2
+def profileVersion : Nat := 5
 
 /-- Pointer width used by synthetic in-tree Rust fixtures. Detached artifacts
 record the selected rustc target's width instead. -/
@@ -37,6 +41,18 @@ def config : ProfileConfig :=
 
 private def unknown (kind : String) (value : ProfileValue) : Array Diagnostic :=
   #[.error "VIR-RUST-TAG" s!"unsupported Rust {kind} tag `{value.tag}`"]
+
+/-- See `VerexIR.rustOpaqueTag`. -/
+def opaqueTag : String := VerexIR.rustOpaqueTag
+
+/-- See `VerexIR.rustDependencyTag`. -/
+def dependencyTag : String := VerexIR.rustDependencyTag
+
+/-- See `VerexIR.rustOpaqueFunctionTag`. -/
+def opaqueFunctionTag : String := VerexIR.rustOpaqueFunctionTag
+
+/-- See `VerexIR.rustClosureTag`. -/
+def closureTag : String := VerexIR.rustClosureTag
 
 def schema : ProfileSchema where
   profile := .rust
@@ -56,9 +72,18 @@ def schema : ProfileSchema where
         "the Rust profile requires `target_pointer_width` to be 16, 32, or 64"])
   checkReference := fun _ => #[]
   checkType := unknown "type"
-  checkOperation := unknown "operation"
+  checkOperation := fun value =>
+    if value.tag == "borrow.two_phase" || value.tag == "borrow.reference_copy" then #[]
+    else unknown "operation" value
   checkSurface := unknown "surface"
-  checkProperty := unknown "property"
+  checkProperty := fun value =>
+    if value.tag == closureTag || value.tag == VerexIR.rustRefusedTag ||
+        (value.tag == opaqueTag || value.tag == destructorTag || value.tag == dependencyTag ||
+          value.tag == VerexIR.rustShapeOnlyTag ||
+          value.tag == opaqueFunctionTag) && value.payload.isEmpty then #[]
+    else unknown "property" value
+  opaqueNominal := fun properties => properties.any (·.tag == opaqueTag)
+  bodiless := fun properties => some (properties.any (·.tag == dependencyTag))
 
 /-- M0 semantic policy for core-only Rust-profile fixtures. Rust-specific
 operations are not silently accepted until the profile inventory is added. -/
@@ -66,7 +91,14 @@ def semantics : SemanticProfile where
   profile := .rust
   name := profileName
   version := profileVersion
-  classify := fun _ _ => none
+  classify := fun site value => match site with
+    | .property =>
+        if value.tag == opaqueTag || value.tag == destructorTag || value.tag == dependencyTag ||
+            value.tag == opaqueFunctionTag || value.tag == closureTag ||
+            value.tag == VerexIR.rustRefusedTag || value.tag == VerexIR.rustShapeOnlyTag then
+          some .frontendOnly
+        else none
+    | _ => none
   rollbackThrow := fun _ => false
 
 /-- Validate an isolated Rust-profile raw unit. Multi-profile clients build a

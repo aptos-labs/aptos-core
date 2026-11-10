@@ -1,0 +1,136 @@
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:5:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:4:6: error: verex verification failed: the automatic verification of `viewing_reference` failed; provide a proof in the module:
+  verify viewing_reference by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:8:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:7:6: error: verex verification failed: the automatic verification of `nested_reference` failed; provide a proof in the module:
+  verify nested_reference by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:11:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:10:6: error: verex verification failed: the automatic verification of `stored_reference` failed; provide a proof in the module:
+  verify stored_reference by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:14:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:13:6: error: verex verification failed: the automatic verification of `enum_reference` failed; provide a proof in the module:
+  verify enum_reference by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:17:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:16:6: error: verex verification failed: the automatic verification of `passed_reference` failed; provide a proof in the module:
+  verify passed_reference by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:20:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:19:6: error: verex verification failed: the automatic verification of `holder_reference` failed; provide a proof in the module:
+  verify holder_reference by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:23:3: error: the specification clause `ensures result == v + 1` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:22:6: error: verex verification failed: the automatic verification of `viewing_value` failed; provide a proof in the module:
+  verify viewing_value by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:26:3: error: the specification clause `ensures result == v + 1` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:25:6: error: verex verification failed: the automatic verification of `observed_at_site` failed; provide a proof in the module:
+  verify observed_at_site by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:29:3: error: the specification clause `ensures result == v + 1` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:28:6: error: verex verification failed: the automatic verification of `observed_stored_at_site` failed; provide a proof in the module:
+  verify observed_stored_at_site by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:32:3: error: the specification clause `ensures result == v + 1` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:31:6: error: verex verification failed: the automatic verification of `observed_enum_at_site` failed; provide a proof in the module:
+  verify observed_enum_at_site by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:35:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:34:6: error: verex verification failed: the automatic verification of `peek_site` failed; provide a proof in the module:
+  verify peek_site by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:38:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:37:6: error: verex verification failed: the automatic verification of `take_site` failed; provide a proof in the module:
+  verify take_site by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:41:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:40:6: error: verex verification failed: the automatic verification of `take_seen_site` failed; provide a proof in the module:
+  verify take_seen_site by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:44:3: error: the specification clause `ensures result == v + 1` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:43:6: error: verex verification failed: the automatic verification of `made_site` failed; provide a proof in the module:
+  verify made_site by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:47:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:46:6: error: verex verification failed: the automatic verification of `deep_site` failed; provide a proof in the module:
+  verify deep_site by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:50:3: error: the specification clause `ensures result == v + 1` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:49:6: error: verex verification failed: the automatic verification of `body_local_view` failed; provide a proof in the module:
+  verify body_local_view by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:53:3: error: the specification clause `ensures result == v + 1` is not established
+VerexE2ETests/SourceVerify/generic_views_false.spec.lean:52:6: error: verex verification failed: the automatic verification of `body_local_through` failed; provide a proof in the module:
+  verify body_local_through by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

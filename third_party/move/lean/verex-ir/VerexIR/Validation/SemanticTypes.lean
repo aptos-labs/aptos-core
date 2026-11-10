@@ -23,6 +23,7 @@ inductive SemTy where
   | integer (width : IntWidth) (signed : Bool)
   | tuple (elements : List SemTy)
   | vector (element : SemTy) (length : Option ConstValue)
+  | slice (element : SemTy)
   | nominal (name : QualifiedName) (arguments : List SemArg)
   | function (arguments : List SemTy) (result : SemTy)
   | reference (kind : ReferenceKind) (referent : SemTy)
@@ -49,6 +50,7 @@ private def SemTy.describe : SemTy → String
   | .integer _ signed => s!"{if signed then "i" else "u"}size"
   | .tuple elements => s!"({SemTy.describeList elements})"
   | .vector element _ => s!"vector<{element.describe}>"
+  | .slice element => s!"slice<{element.describe}>"
   | .nominal name arguments => s!"{name.name}<{SemArg.describeList arguments}>"
   | .function arguments result => s!"|{SemTy.describeList arguments}| {result.describe}"
   | .reference .shared referent => s!"&{referent.describe}"
@@ -82,6 +84,7 @@ def SemTy.beq : SemTy → SemTy → Bool
   | .integer w s, .integer w' s' => decide (w = w') && s == s'
   | .tuple xs, .tuple ys => SemTy.beqList xs ys
   | .vector x l, .vector y l' => SemTy.beq x y && decide (l = l')
+  | .slice x, .slice y => SemTy.beq x y
   | .nominal n xs, .nominal m ys => decide (n = m) && SemArg.beqList xs ys
   | .function xs r, .function ys r' => SemTy.beqList xs ys && SemTy.beq r r'
   | .reference k x, .reference k' y => decide (k = k') && SemTy.beq x y
@@ -108,6 +111,9 @@ theorem SemTy.beq_iff : ∀ a b : SemTy, SemTy.beq a b = true ↔ a = b
   | .tuple xs, b => by
       cases b <;> simp only [SemTy.beq, Bool.false_eq_true, reduceCtorEq, SemTy.tuple.injEq]
       exact SemTy.beqList_iff _ _
+  | .slice x, b => by
+      cases b <;> simp only [SemTy.beq, Bool.false_eq_true, reduceCtorEq, SemTy.slice.injEq]
+      exact SemTy.beq_iff _ _
   | .vector x l, b => by
       cases b <;> simp only [SemTy.beq, Bool.false_eq_true, reduceCtorEq, SemTy.vector.injEq,
         Bool.and_eq_true, decide_eq_true_eq]
@@ -154,11 +160,41 @@ instance : DecidableEq SemTy := fun a b => decidable_of_iff _ (SemTy.beq_iff a b
 instance : DecidableEq SemArg := fun a b => decidable_of_iff _ (SemArg.beq_iff a b)
 
 mutual
+/-- A by-value type has a finite statically shaped representation. Slice
+referents are unsized, but references themselves are sized. Rigid parameters
+range over sized types until unsized binders have an explicit checked contract. -/
+def SemTy.sized : SemTy → Bool
+  | .slice _ => false
+  | .tuple elements => SemTy.sizedList elements
+  | .vector element _ | .ghost element => element.sized
+  | .nominal _ arguments => SemArg.sizedList arguments
+  | _ => true
+
+def SemTy.sizedList : List SemTy → Bool
+  | [] => true
+  | type :: rest => type.sized && SemTy.sizedList rest
+
+def SemArg.sized : SemArg → Bool
+  | .type type => type.sized
+  | _ => true
+
+def SemArg.sizedList : List SemArg → Bool
+  | [] => true
+  | argument :: rest => argument.sized && SemArg.sizedList rest
+end
+
+/-- The current generic binder contract: each type actual is sized. -/
+def SizedArguments (arguments : Array SemArg) : Prop :=
+  ∀ argument ∈ arguments, argument.sized = true
+
+
+mutual
 /-- Replace each rigid parameter by the type the arguments hold at its
 position; a parameter without one stays. -/
 def SemTy.subst (arguments : Array SemArg) : SemTy → SemTy
   | .tuple elements => .tuple (SemTy.substList arguments elements)
   | .vector element bound => .vector (element.subst arguments) bound
+  | .slice element => .slice (element.subst arguments)
   | .nominal name nominalArguments => .nominal name (SemArg.substList arguments nominalArguments)
   | .function parameters result =>
       .function (SemTy.substList arguments parameters) (result.subst arguments)
@@ -180,6 +216,50 @@ def SemArg.subst (arguments : Array SemArg) : SemArg → SemArg
 def SemArg.substList (arguments : Array SemArg) : List SemArg → List SemArg
   | [] => []
   | argument :: rest => argument.subst arguments :: SemArg.substList arguments rest
+end
+
+mutual
+theorem SemTy.sized_subst {arguments : Array SemArg} (sized : SizedArguments arguments) :
+    ∀ type : SemTy, type.sized = true → (type.subst arguments).sized = true
+  | .tuple elements, checked => SemTy.sizedList_subst sized elements checked
+  | .vector element _, checked => SemTy.sized_subst sized element checked
+  | .ghost element, checked => SemTy.sized_subst sized element checked
+  | .nominal _ actuals, checked => SemArg.sizedList_subst sized actuals checked
+  | .param index, _ => by
+      simp only [SemTy.subst]
+      split
+      · rename_i type found
+        exact sized (.type type) (Array.mem_of_getElem? found)
+      · rfl
+  | .slice _, checked => by cases checked
+  | .unit, _ | .never, _ | .bool, _ | .character, _ | .string, _ | .bytes, _
+  | .address, _ | .signer, _ | .integer .., _ | .function .., _ | .reference .., _
+  | .profile _, _ => rfl
+
+theorem SemTy.sizedList_subst {arguments : Array SemArg} (sized : SizedArguments arguments) :
+    ∀ types : List SemTy, SemTy.sizedList types = true →
+      SemTy.sizedList (SemTy.substList arguments types) = true
+  | [], _ => rfl
+  | type :: rest, checked => by
+      simp only [SemTy.sizedList, Bool.and_eq_true] at checked
+      simp only [SemTy.substList, SemTy.sizedList, Bool.and_eq_true]
+      exact ⟨SemTy.sized_subst sized type checked.1,
+        SemTy.sizedList_subst sized rest checked.2⟩
+
+theorem SemArg.sized_subst {arguments : Array SemArg} (sized : SizedArguments arguments) :
+    ∀ argument : SemArg, argument.sized = true → (argument.subst arguments).sized = true
+  | .type type, checked => SemTy.sized_subst sized type checked
+  | .const _, _ | .erased, _ => rfl
+
+theorem SemArg.sizedList_subst {arguments : Array SemArg} (sized : SizedArguments arguments) :
+    ∀ actuals : List SemArg, SemArg.sizedList actuals = true →
+      SemArg.sizedList (SemArg.substList arguments actuals) = true
+  | [], _ => rfl
+  | argument :: rest, checked => by
+      simp only [SemArg.sizedList, Bool.and_eq_true] at checked
+      simp only [SemArg.substList, SemArg.sizedList, Bool.and_eq_true]
+      exact ⟨SemArg.sized_subst sized argument checked.1,
+        SemArg.sizedList_subst sized rest checked.2⟩
 end
 
 theorem SemTy.substList_eq_map (arguments : Array SemArg) :
@@ -211,6 +291,7 @@ def SemTy.resolveFuel (tables : Tables) (env : Array SemArg) : Nat → TypeId �
       | .integer width signed => some (.integer width signed)
       | .tuple elements => .tuple <$> elements.toList.mapM (resolveFuel tables env fuel)
       | .vector element bound => (.vector · bound) <$> resolveFuel tables env fuel element
+      | .slice element => .slice <$> resolveFuel tables env fuel element
       | .nominal name arguments => do
           let name ← tables.names[name.index]?
           let arguments ← arguments.toList.mapM fun
@@ -263,6 +344,10 @@ theorem SemTy.resolveFuel_mono (tables : Tables) (env : Array SemArg) :
               obtain ⟨types, resolved, rfl⟩ := h
               exact ⟨types, List.mapM_some_of_forall resolved fun x _ y => lift x y, rfl⟩
           | vector element bound =>
+              simp only [Option.map_eq_map, Option.map_eq_some_iff] at h ⊢
+              obtain ⟨resolved, found, rfl⟩ := h
+              exact ⟨resolved, lift _ _ found, rfl⟩
+          | slice element =>
               simp only [Option.map_eq_map, Option.map_eq_some_iff] at h ⊢
               obtain ⟨resolved, found, rfl⟩ := h
               exact ⟨resolved, lift _ _ found, rfl⟩
@@ -347,6 +432,10 @@ theorem SemTy.resolveFuel_subst (tables : Tables) (env : Array SemArg) (argument
                 List.mapM_some_map found fun x _ y => ih x y, ?_⟩
               simp [SemTy.subst, SemTy.substList_eq_map]
           | vector element bound =>
+              simp only [Option.map_eq_map, Option.map_eq_some_iff] at h ⊢
+              obtain ⟨inner, found, rfl⟩ := h
+              exact ⟨_, ih _ _ found, by simp [SemTy.subst]⟩
+          | slice element =>
               simp only [Option.map_eq_map, Option.map_eq_some_iff] at h ⊢
               obtain ⟨inner, found, rfl⟩ := h
               exact ⟨_, ih _ _ found, by simp [SemTy.subst]⟩
@@ -456,6 +545,8 @@ def NodeResolves (tables : Tables) (env : Array SemArg) : Ty → SemTy → Prop
       ∃ resolved, ResolvesAll tables env elements.toList resolved ∧ type = .tuple resolved
   | .vector element bound, type =>
       ∃ resolved, Resolves tables env element resolved ∧ type = .vector resolved bound
+  | .slice element, type =>
+      ∃ resolved, Resolves tables env element resolved ∧ type = .slice resolved
   | .nominal name arguments, type =>
       ∃ spelled resolved, tables.names[name.index]? = some spelled ∧
         ArgumentsResolve tables env arguments.toList resolved ∧ type = .nominal spelled resolved
@@ -540,6 +631,10 @@ theorem Resolves.node {tables : Tables} {env : Array SemArg} {typeId : TypeId} {
             simp only [Option.map_eq_map, Option.map_eq_some_iff] at resolved
             obtain ⟨inner, found, rfl⟩ := resolved
             exact ⟨inner, ⟨fuel, found⟩, rfl⟩
+        | slice element =>
+            simp only [Option.map_eq_map, Option.map_eq_some_iff] at resolved
+            obtain ⟨inner, found, rfl⟩ := resolved
+            exact ⟨inner, ⟨fuel, found⟩, rfl⟩
         | nominal name arguments =>
             simp only [Option.bind_eq_some_iff, Option.some.injEq] at resolved
             obtain ⟨spelled, named, types, found, rfl⟩ := resolved
@@ -567,6 +662,11 @@ theorem Resolves.node {tables : Tables} {env : Array SemArg} {typeId : TypeId} {
         simp only [SemTy.resolveFuel, entry, Option.bind_eq_bind, Option.bind_some,
           found fuel (Nat.le_refl _), Option.map_eq_map, Option.map_some]
     | vector element bound =>
+        obtain ⟨inner, ⟨fuel, found⟩, rfl⟩ := holds
+        refine ⟨fuel + 1, ?_⟩
+        simp only [SemTy.resolveFuel, entry, Option.bind_eq_bind, Option.bind_some, found,
+          Option.map_eq_map, Option.map_some]
+    | slice element =>
         obtain ⟨inner, ⟨fuel, found⟩, rfl⟩ := holds
         refine ⟨fuel + 1, ?_⟩
         simp only [SemTy.resolveFuel, entry, Option.bind_eq_bind, Option.bind_some, found,
@@ -819,6 +919,19 @@ theorem Resolves.instantiate {ns : Validation.ValidatedNamespace}
                 exact ⟨inner, (ih _ _ mapped inner).mp resolves, rfl⟩
               · rintro ⟨inner, resolves, rfl⟩
                 exact ⟨inner, (ih _ _ mapped inner).mpr resolves, rfl⟩
+          | slice element =>
+              simp only [Option.bind_eq_some_iff, Option.some.injEq] at h
+              obtain ⟨instantiated, mapped, index, found, rfl⟩ := h
+              obtain ⟨node, at_index, same⟩ := findIdx?_node found
+              have node_eq : node = .slice instantiated := by simpa using same
+              subst node_eq
+              rw [Resolves.node at_index]
+              simp only [NodeResolves]
+              constructor
+              · rintro ⟨inner, resolves, rfl⟩
+                exact ⟨inner, (ih _ _ mapped inner).mp resolves, rfl⟩
+              · rintro ⟨inner, resolves, rfl⟩
+                exact ⟨inner, (ih _ _ mapped inner).mpr resolves, rfl⟩
           | nominal name nominalArguments =>
               simp only [Option.bind_eq_some_iff, Option.some.injEq] at h
               obtain ⟨instantiated, mapped, index, found, rfl⟩ := h
@@ -909,5 +1022,30 @@ theorem Resolves.instantiate {ns : Validation.ValidatedNamespace}
               subst h
               rw [Resolves.node entry]
               simp only [NodeResolves]
+
+/-- A type without its outer shared references: a shared reference is the
+value it observes. -/
+def SemTy.unshared : SemTy → SemTy
+  | .reference .shared referent => referent.unshared
+  | type => type
+
+/-- Sized generic actuals cannot disguise an unsized slice behind a type
+parameter. A runtime slice referent therefore has an explicit slice node. -/
+theorem Resolves.slice_node {tables : Tables} {env : Array SemArg} {typeId : TypeId}
+    {element : SemTy} (sized : SizedArguments env)
+    (resolved : Resolves tables env typeId (.slice element)) :
+    ∃ inner, tables.types[typeId.index]? = some (.slice inner) := by
+  cases entry : tables.types[typeId.index]? with
+  | none =>
+      obtain ⟨fuel, found⟩ := resolved
+      cases fuel <;> simp [SemTy.resolveFuel, entry] at found
+  | some node =>
+      have shape := (Resolves.node entry _).mp resolved
+      cases node with
+      | slice inner => exact ⟨inner, rfl⟩
+      | typeParameter index =>
+          have invalid := sized (.type (.slice element)) (Array.mem_of_getElem? shape)
+          cases invalid
+      | _ => simp [NodeResolves] at shape
 
 end VerexIR

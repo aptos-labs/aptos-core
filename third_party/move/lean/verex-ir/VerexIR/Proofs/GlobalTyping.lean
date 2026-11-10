@@ -40,6 +40,13 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
       Denote.NTy.TypedAs unit (.tuple elements) (.tuple types)
   | vector {element : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit element type) :
       Denote.NTy.TypedAs unit (.vector element) (.vector type none)
+  | slice {element : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit element type) :
+      Denote.NTy.TypedAs unit (.slice element) (.slice type)
+  | sliceRef {element : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit element type) :
+      Denote.NTy.TypedAs unit (.sliceRef element) (.reference .mutable (.slice type))
+  /-- An array: a vector of its length. -/
+  | array {element : NTy} {type : SemTy} {length : Nat} (typed : Denote.NTy.TypedAs unit element type) :
+      Denote.NTy.TypedAs unit (.array element length) (.vector type (some (.integer length)))
   /-- A table owner's hidden contents: its entries, pairs of a key and a value. -/
   | table {key value : NTy} {keyType valueType : SemTy}
       (typedKey : Denote.NTy.TypedAs unit key keyType)
@@ -203,12 +210,27 @@ theorem Denote.NTy.typedAs_of_core {unit : ValidatedUnit} :
   | .bytes, type, checked => by
       simp only [NTy.typedAsCore, beq_iff_eq] at checked
       subst checked; exact .scalar rfl
+  | .char, type, checked => by
+      simp only [NTy.typedAsCore, beq_iff_eq] at checked
+      subst checked; exact .scalar rfl
   | .tuple elements, type, checked => by
       cases type <;> simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
       exact .tuple (NRow.typedAs_of_check elements _ checked)
   | .ghost slot, type, checked => by
       cases type <;> simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
       exact .ghost (NTy.typedAs_of_core slot _ checked)
+  | .slice element, type, checked => by
+      cases type <;> simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+      exact .slice (NTy.typedAs_of_core element _ checked)
+  | .sliceRef element, type, checked => by
+      cases type with
+      | reference kind referent =>
+          cases kind with
+          | mutable =>
+              cases referent <;> simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+              exact .sliceRef (NTy.typedAs_of_core element _ checked)
+          | shared => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+      | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
   | .vector element, type, checked => by
       cases type with
       | vector type length =>
@@ -217,6 +239,20 @@ theorem Denote.NTy.typedAs_of_core {unit : ValidatedUnit} :
               simp only [NTy.typedAsCore] at checked
               exact .vector (NTy.typedAs_of_core element _ checked)
           | some _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+      | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+  | .array element length, type, checked => by
+      cases type with
+      | vector type bound =>
+          cases bound with
+          | none => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+          | some bound =>
+              cases bound with
+              | integer actual =>
+                  simp only [NTy.typedAsCore, Bool.and_eq_true, beq_iff_eq] at checked
+                  obtain ⟨same, typed⟩ := checked
+                  subst same
+                  exact .array (NTy.typedAs_of_core element _ typed)
+              | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
       | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
   | .table key value, type, checked => by
       cases type with
@@ -342,7 +378,7 @@ theorem Denote.NRow.parametersTypedAs_of_check {unit : ValidatedUnit} :
             (NRow.parametersTypedAs_of_check rest shared types checked.2)
       | .reference .mutable _, checked | .unit, checked | .never, checked | .bool, checked
       | .character, checked | .string, checked | .bytes, checked | .address, checked
-      | .signer, checked | .integer _ _, checked | .tuple _, checked | .vector _ _, checked
+      | .signer, checked | .integer _ _, checked | .tuple _, checked | .slice _, checked | .vector _ _, checked
       | .nominal _ _, checked | .function _ _, checked | .profile _, checked
       | .param _, checked => simp only [NRow.parametersCheck, Bool.false_eq_true] at checked
   | .nil, _ :: _, _, checked | .nil, [], _ :: _, checked | .cons _ _, [], _, checked
@@ -384,7 +420,7 @@ theorem _root_.VerexIR.SemTy.sizeOf_unshared_le : (type : SemTy) →
       simp only [SemTy.unshared, SemTy.reference.sizeOf_spec]
       omega
   | .reference .mutable _ | .unit | .never | .bool | .character | .string | .bytes | .address
-  | .signer | .integer _ _ | .tuple _ | .vector _ _ | .nominal _ _ | .function _ _ | .profile _
+  | .signer | .integer _ _ | .tuple _ | .slice _ | .vector _ _ | .nominal _ _ | .function _ _ | .profile _
   | .param _ | .ghost _ => Nat.le_refl _
 
 /-- Ghost slot types substitute through their slots. -/
@@ -433,7 +469,7 @@ theorem _root_.VerexIR.SemTy.unshared_subst {arguments : Array SemArg} :
   | .param index, _, notParam => absurd rfl (notParam index)
   | .reference .mutable _, _, _ | .unit, _, _ | .never, _, _ | .bool, _, _ | .character, _, _
   | .string, _, _ | .bytes, _, _ | .address, _, _ | .signer, _, _ | .integer _ _, _, _
-  | .tuple _, _, _ | .vector _ _, _, _ | .nominal _ _, _, _ | .function _ _, _, _
+  | .tuple _, _, _ | .slice _, _, _ | .vector _ _, _, _ | .nominal _ _, _, _ | .function _ _, _, _
   | .profile _, _, _ | .ghost _, _, _ => rfl
 
 /-- A type parameter is read only as itself. -/
@@ -475,6 +511,17 @@ theorem _root_.VerexIR.Validation.OwnerLayout.canonicalTypes_subst (layout : Own
     by_cases dummy : layout.canonical.dummy = true <;>
     by_cases length : layout.canonical.length = true <;> simp [handle, dummy, length, SemTy.subst]
 
+/-- Dropping a mark keeps a typing: no typed type is marked, so the entry a
+substitution reads is the type it stands for
+(`doc/designs/denotation.md`, "Instances at a reference"). -/
+theorem Denote.NTy.TypedAs.unmark {unit : ValidatedUnit} {τ : NTy} {type : SemTy}
+    (typed : Denote.NTy.TypedAs unit τ type) : Denote.NTy.TypedAs unit τ.unmark type := by
+  cases τ <;>
+    first
+      | (cases typed with | scalar scalar => simp [Denote.NTy.scalarType?] at scalar)
+      | exact typed
+      | cases typed
+
 mutual
 /-- A native type reads, under a substitution, as its reading under the
 arguments it agrees with. -/
@@ -485,16 +532,19 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
       (τ.substWith types).TypedAs unit (type.subst arguments)
   | .bool, _, .scalar scalar, _ | .int _ _, _, .scalar scalar, _ | .num, _, .scalar scalar, _ | .address, _, .scalar scalar, _
   | .signer, _, .scalar scalar, _ | .string, _, .scalar scalar, _
-  | .bytes, _, .scalar scalar, _ => by
+  | .bytes, _, .scalar scalar, _ | .char, _, .scalar scalar, _ => by
       simp only [NTy.scalarType?, Option.some.injEq] at scalar
       subst scalar
       exact .scalar rfl
   | .unit, _, .scalar scalar, _ | .tuple _, _, .scalar scalar, _
   | .struct _ _ _, _, .scalar scalar, _
   | .enum _ _ _ _ _, _, .scalar scalar, _ | .vector _, _, .scalar scalar, _
+  | .slice _, _, .scalar scalar, _ | .sliceRef _, _, .scalar scalar, _
+  | .array _ _, _, .scalar scalar, _
   | .table _ _, _, .scalar scalar, _ | .ghost _, _, .scalar scalar, _
   | .ref _, _, .scalar scalar, _ | .param _, _, .scalar scalar, _
-  | .function _ _ _, _, .scalar scalar, _ => by simp [NTy.scalarType?] at scalar
+  | .function _ _ _, _, .scalar scalar, _ | .nominal _ _ _, _, .scalar scalar, _ => by
+      simp [NTy.scalarType?] at scalar
   | _, _, .unit, _ => .unit
   | _, _, .tuple typed, mentioned => by
       simp only [NTy.paramsAll] at mentioned
@@ -503,6 +553,15 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
   | _, _, .vector typed, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       exact .vector (NTy.TypedAs.subst agree typed mentioned)
+  | _, _, .slice typed, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      exact .slice (NTy.TypedAs.subst agree typed mentioned)
+  | _, _, .sliceRef typed, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      exact .sliceRef (NTy.TypedAs.subst agree typed mentioned)
+  | _, _, .array typed, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      exact .array (NTy.TypedAs.subst agree typed mentioned)
   | _, _, .table typedKey typedValue, mentioned => by
       simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
       simp only [NTy.substWith, SemTy.subst, SemTy.substList]
@@ -547,7 +606,7 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
       simp only [NTy.paramsAll] at mentioned
       obtain ⟨type, argument, typed, _⟩ := agree index mentioned
       simp only [NTy.substWith, SemTy.subst, argument]
-      exact typed
+      exact typed.unmark
   | _, _, .function typedParameters typedResults packed, mentioned => by
       simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
       subst packed
@@ -634,7 +693,8 @@ theorem Denote.NTy.readsUnique {unit : ValidatedUnit} :
   | .address, _, _, .scalar leftScalar, .scalar rightScalar
   | .signer, _, _, .scalar leftScalar, .scalar rightScalar
   | .string, _, _, .scalar leftScalar, .scalar rightScalar
-  | .bytes, _, _, .scalar leftScalar, .scalar rightScalar => by
+  | .bytes, _, _, .scalar leftScalar, .scalar rightScalar
+  | .char, _, _, .scalar leftScalar, .scalar rightScalar => by
       rw [leftScalar] at rightScalar; exact Option.some.inj rightScalar
   | .tuple elements, _, _, leftTyped, rightTyped => by
       cases leftTyped with
@@ -642,12 +702,30 @@ theorem Denote.NTy.readsUnique {unit : ValidatedUnit} :
       | tuple leftRow => cases rightTyped with
         | scalar scalar => simp [NTy.scalarType?] at scalar
         | tuple rightRow => rw [NRow.readsUnique elements leftRow rightRow]
+  | .slice element, _, _, leftTyped, rightTyped => by
+      cases leftTyped with
+      | scalar scalar => simp [NTy.scalarType?] at scalar
+      | slice leftElement => cases rightTyped with
+        | scalar scalar => simp [NTy.scalarType?] at scalar
+        | slice rightElement => rw [NTy.readsUnique element leftElement rightElement]
+  | .sliceRef element, _, _, leftTyped, rightTyped => by
+      cases leftTyped with
+      | scalar scalar => simp [NTy.scalarType?] at scalar
+      | sliceRef leftElement => cases rightTyped with
+        | scalar scalar => simp [NTy.scalarType?] at scalar
+        | sliceRef rightElement => rw [NTy.readsUnique element leftElement rightElement]
   | .vector element, _, _, leftTyped, rightTyped => by
       cases leftTyped with
       | scalar scalar => simp [NTy.scalarType?] at scalar
       | vector leftElement => cases rightTyped with
         | scalar scalar => simp [NTy.scalarType?] at scalar
         | vector rightElement => rw [NTy.readsUnique element leftElement rightElement]
+  | .array element _, _, _, leftTyped, rightTyped => by
+      cases leftTyped with
+      | scalar scalar => simp [NTy.scalarType?] at scalar
+      | array leftElement => cases rightTyped with
+        | scalar scalar => simp [NTy.scalarType?] at scalar
+        | array rightElement => rw [NTy.readsUnique element leftElement rightElement]
   | .table key value, _, _, leftTyped, rightTyped => by
       cases leftTyped with
       | scalar scalar => simp [NTy.scalarType?] at scalar
@@ -788,16 +866,16 @@ theorem resolveNominal?_sameNames {unit : ValidatedUnit} {a b : ValidatedNamespa
 theorem ntyOfFuel_sameTables {unit : ValidatedUnit} {i j : NamespaceId} {a b : ValidatedNamespace}
     (ha : unit.namespaces[i.index]? = some a) (hb : unit.namespaces[j.index]? = some b)
     (types : a.tables.types = b.tables.types) (names : a.tables.names = b.tables.names) (fuel : Nat) :
-    ntyOfFuel (unitTypes unit) unit fuel i = ntyOfFuel (unitTypes unit) unit fuel j := by
+    ∀ env, ntyOfFuel (unitTypes unit) unit env fuel i = ntyOfFuel (unitTypes unit) unit env fuel j := by
   have lookup : unitTypes unit i = unitTypes unit j := by
     funext t; simp only [unitTypes, ha, hb, Option.bind_some, types]
   have shared : sharedReference (unitTypes unit) i = sharedReference (unitTypes unit) j := by
     funext t; simp only [sharedReference, lookup]
   have resolve := resolveNominal?_sameNames (unit := unit) names
   induction fuel with
-  | zero => funext t; simp only [ntyOfFuel]
+  | zero => intro env; funext t; simp only [ntyOfFuel]
   | succ fuel ih =>
-    funext t
+    intro env; funext t
     simp only [ntyOfFuel, ha, hb, Option.bind_eq_bind, Option.bind_some, ih, shared, resolve, lookup]
 
 theorem resolveFuel_sameTables {left right : Tables}
@@ -983,14 +1061,19 @@ mutual
 /-- Whether a type mentions no function type. -/
 def Denote.NTy.closureFree : NTy → Bool
   | .function _ _ _ => false
+  -- Its rows, which its type does not show, may hold one.
+  | .nominal _ _ _ => false
   | .tuple elements => Denote.NRow.closureFree elements
   | .struct _ _ fields => Denote.NRow.closureFree fields
   | .enum _ _ _ rows _ => Denote.NRows.closureFree rows
+  | .slice element | .sliceRef element => Denote.NTy.closureFree element
   | .vector element => Denote.NTy.closureFree element
+  | .array element _ => Denote.NTy.closureFree element
   | .table key value => Denote.NTy.closureFree key && Denote.NTy.closureFree value
   | .ref referent => Denote.NTy.closureFree referent
   | .ghost slot => Denote.NTy.closureFree slot
-  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .param _ => true
+  | .observed referent => Denote.NTy.closureFree referent
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char | .param _ => true
 
 def Denote.NRow.closureFree : NRow → Bool
   | .nil => true

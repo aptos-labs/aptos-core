@@ -91,6 +91,7 @@ mutual
     | .tuple elements => do
         let elements ← elements.mapM (typeShape unit · (fuel - 1))
         pure s!"tuple:{repr elements}"
+    | .slice element => pure s!"slice:{← typeShape unit element (fuel - 1)}"
     | .vector element length =>
         pure s!"vector:{← typeShape unit element (fuel - 1)}:{repr length}"
     | .nominal name arguments => do
@@ -225,7 +226,7 @@ mutual
         | .operation operation _ arguments _ =>
             let state := arguments.foldl visitExpression state
             match operation with
-            | .move place | .copy place | .borrow _ place | .read place | .write place |
+            | .move place | .copy place | .borrow _ place | .read place | .readDiscriminant place | .write place |
                 .drop place => sourcePlaceReachability ns place state (fuel - 1)
             | _ => state
         | .block statements result =>
@@ -266,7 +267,7 @@ mutual
     let state := { state with places := state.places.push id }
     match ns.places[id.index]? with
     | some (.deref base) | some (.field base ..) | some (.ghostField base ..) |
-        some (.subslice base ..) | some (.downcast base _) =>
+        some (.subslice base ..) | some (.unsize base) | some (.downcast base _) =>
         sourcePlaceReachability ns base state (fuel - 1)
     | some (.index base index) =>
         sourceExpressionReachability ns index
@@ -615,7 +616,8 @@ private def checkFunctionShapeRoundTrip (directory : System.FilePath) (baseline 
     "nested_reference.exp.json", "reference_composite.exp.json", "never.exp.json",
     "generic_adt.exp.json", "generic_lifetime_adt.exp.json",
     "generic_const_adt.exp.json", "nested_generic_adt.exp.json",
-    "generic_identity.exp.json", "subslice.exp.json"]
+    "generic_identity.exp.json", "subslice.exp.json", "unsize.exp.json",
+    "unsize_mutable.exp.json"]
   if semanticBaselines.contains baseline then
     checkSemanticRoundTrip baseline rendered.text original imported.unit
   let originalShapes ← match functionShapes original with
@@ -634,6 +636,35 @@ private def checkFunctionShapeRoundTrip (directory : System.FilePath) (baseline 
     | .error message => throw <| IO.userError message
   unless importedNominals == originalNominals do
     throw <| IO.userError s!"nominal declaration shape changed after source re-import:\n{rendered.text}"
+
+/-- The library's models reach the source backend: an owned vector and string
+print as `Vec<T>` and `String`; a borrowed vector stays `&Vec<T>`, a slice
+prints as `&[T]`, and a string view as `&str`. The rendering re-imports to the unit it came from. A unit that calls a function of
+the library keeps its dependency's namespace, which this backend does not
+reconstruct. -/
+private def checkModeledTypesRoundTrip (directory : System.FilePath) : IO Unit := do
+  let original ← importRustFile {
+    source := "rust-exporter/tests/raw-unit/owned_vector.rs"
+    output := directory / "owned-vector.raw.json" }
+  let source ← match Rust.Source.render original.unit with
+    | .ok source => pure source
+    | .error message => throw <| IO.userError s!"owned vectors do not render: {message}"
+  for expected in #[": Vec<u32>", "-> Vec<u32>", ": &Vec<u32>", ": &[u32]", ": String", "-> String", ": &str"] do
+    unless (source.splitOn expected).length > 1 do
+      throw <| IO.userError s!"owned vector rendering lacks `{expected}`:\n{source}"
+  let sourcePath := directory / "owned-vector-roundtrip.rs"
+  IO.FS.writeFile sourcePath source
+  let imported ← importRustFile {
+    source := sourcePath, output := directory / "owned-vector-roundtrip.raw.json" }
+  checkSemanticRoundTrip "owned_vector.rs" source original.unit imported.unit
+  let calling ← importRustFile {
+    source := "rust-exporter/tests/raw-unit/dependency_calls.rs"
+    output := directory / "dependency-calls.raw.json" }
+  match Rust.Source.render calling.unit with
+  | .error message =>
+      unless message == "standard Rust source currently requires exactly one owned namespace" do
+        throw <| IO.userError s!"a unit with dependency calls fails unexpectedly: {message}"
+  | .ok _ => throw <| IO.userError "a unit with dependency calls now renders: extend this check"
 
 private def checkMappedRendering (baseline : String) : IO Unit := do
   let baselinePath : System.FilePath := "rust-exporter/tests/raw-unit" / baseline
@@ -885,6 +916,12 @@ def checkCanonicalRustSourceRoundTrips : IO Unit :=
         arguments := fixed #[rustReference .shared 0
           (.vector #[.integer 7, .integer 9, .integer 11])],
         initialState := lending 1 },
+      { baseline := "unsize.exp.json", functionId := 1,
+        arguments := fixed #[.vector #[.integer 7, .integer 9, .integer 11]] },
+      { baseline := "unsize.exp.json", functionId := 2,
+        arguments := fixed #[rustReference .shared 0
+          (.vector #[.integer 7, .integer 9, .integer 11])],
+        initialState := lending 1 },
       { baseline := "partial_move.exp.json", arguments := nestedPairArgument }
     ]
     if selectedBaseline.isNone then
@@ -896,14 +933,16 @@ def checkCanonicalRustSourceRoundTrips : IO Unit :=
       for baseline in #["reference.exp.json", "mutable_reference.exp.json",
           "nested_reference.exp.json", "reference_composite.exp.json", "never.exp.json",
           "match_guard.exp.json", "array_index.exp.json", "slice.exp.json",
-          "slice_from_end.exp.json", "subslice.exp.json",
-          "generic_adt.exp.json", "generic_lifetime_adt.exp.json",
+          "slice_from_end.exp.json", "subslice.exp.json", "unsize.exp.json",
+          "unsize_mutable.exp.json", "generic_adt.exp.json", "generic_lifetime_adt.exp.json",
           "generic_const_adt.exp.json", "nested_generic_adt.exp.json",
           "generic_enum.exp.json", "generic_identity.exp.json"] do
         if let some failure ← captureFailure s!"function shape {baseline}"
             (Benchmark.measure "shape.function" baseline <|
               checkFunctionShapeRoundTrip directory baseline) then
           failures := failures.push failure
+      if let some failure ← captureFailure "modeled types" (checkModeledTypesRoundTrip directory) then
+        failures := failures.push failure
       if let some failure ← captureFailure "generic function rendering"
           (Benchmark.measure "shape.generic_render" "basic.exp.json"
             checkGenericFunctionRendering) then

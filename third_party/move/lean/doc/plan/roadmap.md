@@ -178,7 +178,7 @@ Designs: [`denotation.md`](../designs/denotation.md),
   a witness per declaration would discharge.
 - **Denotation coverage not carried.** Signed bitwise operations, `bytes`
   and fixed-length vectors, unspecified pure callees used as summaries,
-  references inside an aggregate, range patterns over characters; generics:
+  references inside an enum, range patterns over characters; generics:
   the storage-aliasing instances, a generic caller of a callee whose storage
   depends on a type parameter, generic storage instantiated at a struct, the
   Rust profile denotations. Unmeasured: kernel `rfl` against `simp only
@@ -299,8 +299,9 @@ Design: [`vir-design.md`](../designs/vir-design.md).
   consumer outside this repository depends on it.
 - Prophetic residue: a loan-typing environment for walker-level
   preservation through a live borrow; non-lexical loan death; a design for
-  two-phase borrows and interior mutability before such constructs are
-  admitted.
+  two-phase borrows before two-phase constructs are admitted (interior
+  mutability is designed in
+  [`interior-mutability.md`](../designs/interior-mutability.md)).
 - The secure Lean-source discovery TODO in `vir-design.md`, before
   Lean-source discovery is a production compiler feature.
 
@@ -344,52 +345,23 @@ Design: [`monovm-link-design.md`](../designs/monovm-link-design.md).
 
 ## 7. Rust frontend
 
-Design: [`rust-mir-design.md`](../designs/rust-mir-design.md); proposal
-[`unsafe-pointers.md`](unsafe-pointers.md).
+Designs: [`rust-verification.md`](../designs/rust-verification.md) (the model
+of Rust source verification), [`rust-mir-design.md`](../designs/rust-mir-design.md)
+(the frontend), [`unsafe-pointers.md`](../designs/unsafe-pointers.md), and
+[`interior-mutability.md`](../designs/interior-mutability.md). Open work:
+[`rust-verification.md`](rust-verification.md) in the plan.
 
-- The M0 gate is blocked upstream: `FnDef` exposes no predicates and there
-  is no const-fn binder type query
-  ([rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892));
-  the answer stays an upstream query, not a private `rustc_middle` read.
-- Then M1 mapper completion and Charon differential tests; M1.5 a prebuilt
-  exporter and sysroot distribution (today the managed path builds the
-  exporter from the checkout); M2 contracts and `verify` for Rust through
-  `denote`, constrained and const-generic function metadata, semantic
-  normalization of the remaining validation-only bodies, generic function
-  contracts and evidence, proof summaries (general range indexing stays
-  behind the standard-library dependency model); M3 regions over the
-  prophetic model: dependency and unknown-aggregate alias propagation,
-  nominal variance, the remaining use-site constraints, returned-reference
-  region precision (argument-changing recursive and external result-source
-  selection stays conservative); M4 drops and panics: cleanup edges,
-  `Resume`, effectful drop glue and drop flags are rejection boundaries
-  today; M5 the unsafe profile; M6 library models; M7 alignment proofs.
-- Milestone contents the design no longer spells out: M0 is the exporter
-  and import contract; M1.5 build integration with a managed toolchain. M3
-  also covers moves and initializedness in the VIR borrow checker, with
-  rustc's borrow check kept as admission evidence and differential oracle,
-  and positive/negative agreement tests against Rust execution. M4 covers
-  `panic=abort` only; unwinding and `catch_unwind` need their own approved
-  milestone. M6 is reference-bearing values and interior mutability beyond
-  library models: references nested in products and ADTs (the denotation
-  rejects a reference inside an aggregate), signature region relationships
-  at modular boundaries, and an abstract `RefCell` store with dynamic borrow
-  state and guard drop ([`rust-mir-design.md`](../designs/rust-mir-design.md),
-  "Interior mutability and `RefCell`"); it needs the two-phase and
-  interior-mutability design of §4 first. M7: a theorem that generic
-  type/const/evidence instantiation preserves function meaning, so generic
-  theorems transfer to concrete calls, and import alignment composed with
-  `f.verified` into a theorem about the Rust MIR body.
-- Mapper forms still rejected: symbolic const-dependent types; destructive
-  and provenance administration, pointer-alignment assertions and reachable
-  `unreachable` blocks (M4 for destruction and cleanup, M5 for retag,
-  provenance and alignment).
-- Function values in Rust: the native model of
-  [`higher-order-functions.md`](../designs/higher-order-functions.md),
-  "Function values as native data", read for Rust — a closure type as a
-  struct of its upvars, `dyn Fn*` as the link set's closure structs plus
-  `foreign`, function pointers as nullary constructors per target and
-  instantiation — is designed and not implemented.
+- The missing M0 queries are supplied by the confined
+  [`rustc_public` polyfill](rustc-public-polyfill.md), an accepted temporary
+  exception until [rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892)
+  is fixed in the pinned toolchain. Replace and remove its helpers as the public
+  queries become available. Compiler-private types must not cross the bridge.
+- Beside it, the open milestones M1.5 to M7 — the prebuilt exporter and
+  sysroot, general trait evidence, region precision, drops and panics, the
+  unsafe profile, the remaining library models and the alignment proofs — with
+  what is open in each, and the deferred-work register. What is attacked in
+  which order, with the measurements that check it, is the Order section of
+  [`rust-verification.md`](rust-verification.md).
 
 ## 8. Surface and backends
 
@@ -451,7 +423,8 @@ Designs: [`higher-order-functions.md`](../designs/higher-order-functions.md),
 - Unsupported, diagnosed: explicit enum-field write frames; write frames at
   dependency-interface boundaries. Not scheduled: closures whose targets
   return references; function types as type arguments
-  (`Option<|u64|u64>`); Rust capturing closures and `Fn*` traits.
+  (`Option<|u64|u64>`); Rust `Fn*` traits as static dictionaries
+  ([`rust-verification.md`](../designs/rust-verification.md)).
 - **State labels.** Reads of a removed resource's contents under a label
   (`unmodified_memory_at_label::swap`); a free label with no defining
   operation (`nonlinear_cfg_error`); a witness for a target without a
@@ -469,6 +442,59 @@ Designs: [`higher-order-functions.md`](../designs/higher-order-functions.md),
   owed by the callee and discharged by the `ghostWrites` fixed point; a
   callee of unknown body gets no such conjunct. It adds an obligation to
   every memory-writing function; size it first.
+
+## Backburner
+
+Wanted, and deferred on purpose: taken up only when no track above needs
+the work.
+
+- **Quantifier syntax aligned with Move.** VerexSL's `∀ (i : T), P` should
+  move toward Move's spelling, `forall i: T @ P`, with `forall` and `@`
+  also accepted as symbol tokens.
+- **Stale loop references in Rust specifications.** How a specification
+  file notices that a loop it addresses moved. Loops are `loop k` as the
+  proof language numbers them; Move detects no shift, and the proposed
+  anchor spells the loop's condition (`rust-verification.md` in the plan, open
+  decision 1). A labeled loop (`'outer: loop`) could anchor by its label,
+  as VerexSL's `loop @outer`; MIR carries no labels, so the exporter would
+  take the label from the loop's source span.
+- **Skolems generalized to references.** A generic function is proved over
+  skolem values, and `class Skolems` gives each type parameter a codec whose
+  encodings are `Plain`, loan-free by construction
+  ([`denotation.md`](../designs/denotation.md), "Skolem family"). A type
+  argument that holds a mutable reference is therefore outside what a generic
+  theorem quantifies over, and the design's answer is to verify such an
+  instance monomorphically: a body is inlined, and a native, opaque or
+  recursive callee is rejected, its generic contract not transferring. That
+  rejection is what a `for` loop over `iter_mut` meets, through the identity
+  `<I as IntoIterator>::into_iter`, which the library declares as a native
+  (`library_iter_mut_errors`; the `while let` form verifies). Carrying loans
+  and prophecies in the skolem family would remove the restriction at its
+  root rather than per callee, and with it the per-shape sprawl that natives
+  at reference instances otherwise need. It reopens the generic-proof
+  foundation and the assumption family of `compileFunction_agrees`, so it
+  waits for a track that needs it.
+- **References as types, and sharing spelled as one.** A shared reference
+  has no `NTy`: it erases to its referent, and what survives of it is
+  `Sharing`, a pair of boolean masks on `NTy.function` recording which
+  parameters and results were declared shared
+  ([`denotation.md`](../designs/denotation.md), "Instances at a reference").
+  The masks exist only because the referent lost its reference, so they have
+  to be carried, substituted and matched beside every function type, and a
+  type argument standing for a shared reference needs a mark in the
+  substitution to reach the slot that reads them. Lifting sharing into a
+  constructor, `shared τ`, removes the residue: the mask becomes the
+  parameter's own type, and the existing `ref`/`sliceRef` are then spelled
+  `mut`/`mutSlice` for the other half of the distinction. It is a wide,
+  largely mechanical change over `NTy` and everything that reads a
+  signature, so it should not run concurrently with the restriction of
+  signature sharing to a declaration's top level, which is rewriting the
+  same declarations.
+
+- **Full and faithful position tracking.** Preserve exact source spans
+  through lowering, rendering, and obligation generation down to
+  sub-expressions (as the Move Prover does), rather than relying on post-hoc
+  AST shape alignment and clause-level obligation ranges.
 
 ## Not scheduled
 

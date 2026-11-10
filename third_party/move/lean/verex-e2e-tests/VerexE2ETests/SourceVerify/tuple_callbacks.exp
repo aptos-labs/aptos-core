@@ -1,0 +1,4 @@
+VerexE2ETests/SourceVerify/tuple_callbacks.rs:4:1: info: `apply` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/tuple_callbacks.rs:4:1: info: `forward` uses concrete verification: Given interpretation does not yet support behavioral contract interpretation
+VerexE2ETests/SourceVerify/tuple_callbacks.rs:4:1: info: `apply_generic` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/tuple_callbacks.rs:4:1: info: `apply_nested` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation

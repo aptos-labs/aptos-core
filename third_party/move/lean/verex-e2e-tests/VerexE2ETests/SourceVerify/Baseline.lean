@@ -34,6 +34,21 @@ directory: the framework's standard library. -/
 private def packages : Array (String × System.FilePath) :=
   #[("MoveStdlib", "../../../../aptos-move/framework/move-stdlib")]
 
+/-- Rust crates verified whole, each named by its baseline in this directory,
+with its manifest and package. -/
+private def crates : Array (String × System.FilePath × String) :=
+  #[("CargoFixture", "../verex-rust/Tests/CargoFixture/Cargo.toml", "verex-rust-cargo-fixture")]
+
+/-- The reports of a crate, with its directory and the temporary rendering's
+removed so the baseline is stable. -/
+private def crateReportsOf (environment : Lean.Environment) (directory manifest : System.FilePath)
+    (package : String) : IO String := do
+  let reports ← VerexIR.Rust.SourceVerify.verifyCrate environment
+    { manifest, package, output := directory / "crate.raw.json" } (directory / "crate.lean")
+  let root ← IO.FS.realPath (manifest.parent.getD ".")
+  let text := "\n".intercalate (reports.map (·.render)).toList
+  pure <| (text.replace s!"{directory}/" "").replace s!"{root}/" ""
+
 /-- A package's own files: its manifest, and the Move sources and proof files
 under `sources`, without its build output and tests. -/
 private def packageInput (package path : System.FilePath) : Bool :=
@@ -87,6 +102,19 @@ private def testStaleRendering (environment : Lean.Environment) (directory : Sys
   unless (reports.splitOn "is older than `").length > 1 do
     throw <| IO.userError s!"a stale rendering does not warn:\n{reports}"
 
+/-- A fixture whose stem ends in `_errors` or `_false` is expected to produce
+at least one `error:` line.  Zero errors is a harness failure regardless of
+`UB=1`, and never removes the `.exp`. -/
+private def isErrorFixture (source : System.FilePath) : Bool :=
+  let stem := source.fileStem.getD ""
+  stem.endsWith "_errors" || stem.endsWith "_false"
+
+private def checkSourceOutput (source : System.FilePath) (output : String) : IO Unit := do
+  if isErrorFixture source && !(output.splitOn "\n" |>.any (·.contains "error:")) then
+    throw <| IO.userError s!"fixture {source} is an `_errors`/`_false` fixture \
+      but produced no `error:` lines"
+  Baseline.checkOutput (source.withExtension "exp") output
+
 def testBaselines : IO Unit := do
   let sources := (← Baseline.sourceFiles featureDir ".move") ++
     (← Baseline.sourceFiles featureDir ".rs")
@@ -95,11 +123,17 @@ def testBaselines : IO Unit := do
   let environment ← VerexMove.SourceVerify.importEnvironment
   IO.FS.withTempDir fun directory => do
     for source in sources do
-      Baseline.checkOutput (source.withExtension "exp") (← reportsOf environment directory source)
+      checkSourceOutput source (← reportsOf environment directory source)
       let proofFile := VerexMove.Proofs.proofFile source
       if source.extension == some "move" && (← proofFile.pathExists) then
         Baseline.checkOutput (source.withExtension "proof.exp")
           (← editorReportsOf environment proofFile)
+    for (name, manifest, package) in crates do
+      if (← Baseline.selectedFixtures).all (·.contains name) then
+        Baseline.checkOutput (featureDir / s!"{name}.exp")
+          (← crateReportsOf environment directory manifest package)
+    -- A selection of other fixtures names sources alone.
+    if (← Baseline.selectedFixtures).isSome then return
     testStaleRendering environment directory
     for (name, package) in packages do
       let reports ← Baseline.withStagedDirectory package (directory / name)

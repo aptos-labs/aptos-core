@@ -1,0 +1,82 @@
+VerexE2ETests/SourceVerify/no_panic.spec.lean:6:1: error: `no panic when aborts at op 1` is not established: the operation `dividend / divisor` at VerexE2ETests/SourceVerify/no_panic.rs:5:5 may panic
+  from: divisor.val = 0
+VerexE2ETests/SourceVerify/no_panic.spec.lean:6:6: error: verex verification failed: the automatic verification of `divide` failed; provide a proof in the module:
+  verify divide by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/no_panic.spec.lean:16:6: error: verification failed with a residual obligation:
+case right.left
+dividend divisor : (VerexIR.Proofs.Denote.NTy.int 32 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+a✝³ : ¬divisor.val = 0
+named : VerexIR.SpecInt (VerexIR.IntWidth.bits 32) false
+a✝² : named.val = dividend.val / divisor.val
+a✝¹ : 0 ≤ dividend.val / divisor.val
+a✝ : dividend.val / divisor.val ≤ 4294967295
+⊢ ¬dividend.val = 0
+VerexE2ETests/SourceVerify/no_panic.spec.lean:17:3: error: the specification clause `panics_if dividend == 0` is not established
+VerexE2ETests/SourceVerify/no_panic.spec.lean:16:6: error: verex verification failed: the automatic verification of `wrong_permission` failed; provide a proof in the module:
+  verify wrong_permission by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | panics_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/no_panic.spec.lean:19:1: error: `no panic when aborts at op 1` is not established: the operation `left + right` at VerexE2ETests/SourceVerify/no_panic.rs:25:5 may panic
+  from: ¬(0 ≤ left.val + right.val ∧ left.val + right.val ≤ 4294967295)
+VerexE2ETests/SourceVerify/no_panic.spec.lean:19:6: error: verex verification failed: the automatic verification of `sum` failed; provide a proof in the module:
+  verify sum by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/no_panic.spec.lean:22:1: error: `no panic when aborts at call 1 of divide` is not established: the call `divide(dividend, dividend)` at VerexE2ETests/SourceVerify/no_panic.rs:29:28 may panic
+  from: dividend.val = 0
+VerexE2ETests/SourceVerify/no_panic.spec.lean:22:6: error: verex verification failed: the automatic verification of `calls_divide` failed; provide a proof in the module:
+  verify calls_divide by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of divide => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/no_panic.spec.lean:25:1: error: `no panic when aborts at op 3` is not established: the operation `c / b + c / a` at VerexE2ETests/SourceVerify/no_panic.rs:36:9 may panic
+  from: ¬a.val = 0; a.val ≤ 10; ¬b.val = 0; named✝.val = c.val / b.val; 0 ≤ c.val / b.val; c.val / b.val ≤ 4294967295; ¬a.val = 0; named.val = c.val / a.val; 0 ≤ c.val / a.val; c.val / a.val ≤ 4294967295; ¬(0 ≤ named✝.val + named.val ∧ named✝.val + named.val ≤ 4294967295)
+VerexE2ETests/SourceVerify/no_panic.spec.lean:25:1: error: `no panic when aborts at op 2` is not established: the operation `c / b` at VerexE2ETests/SourceVerify/no_panic.rs:36:9 may panic
+  from: ¬a.val = 0; a.val ≤ 10; b.val = 0
+VerexE2ETests/SourceVerify/no_panic.spec.lean:25:1: error: `no panic when aborts at op 1` is not established: the operation `a / b` at VerexE2ETests/SourceVerify/no_panic.rs:34:9 may panic
+  from: ¬a.val = 0; a.val > 10; b.val = 0
+VerexE2ETests/SourceVerify/no_panic.spec.lean:25:6: error: verex verification failed: the automatic verification of `two_divisions` failed; provide a proof in the module:
+  verify two_divisions by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 3 => verex_prepare; sorry
+    | no_panic when aborts at op 2 => verex_prepare; sorry
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/no_panic.spec.lean:45:3: error: no path takes `when aborts at op 2`; the paths' decisions: [aborts at op 1]
+VerexE2ETests/SourceVerify/no_panic.spec.lean:44:8: error: verex verification failed: the proof of `unrouted` does not establish its specification
+VerexE2ETests/SourceVerify/no_panic.spec.lean:64:1: error: `no panic when aborts at op 1` is not established: the operation `s = s / d` at VerexE2ETests/SourceVerify/no_panic.rs:68:9 may panic
+  from: n.val ≤ 10; val✝¹.val < n.val; d.val = 0
+VerexE2ETests/SourceVerify/no_panic.spec.lean:64:6: error: verex verification failed: the automatic verification of `in_loop` failed; provide a proof in the module:
+  verify in_loop by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/no_panic.rs:52:1: error: `no panic when aborts at op 1` is not established: the operation `100 / a` at VerexE2ETests/SourceVerify/no_panic.rs:56:9 may panic
+  from: a.val ≤ 0; a.val = 0
+VerexE2ETests/SourceVerify/no_panic.rs:52:1: error: verex verification failed: the automatic verification of `unspecified` failed; provide a proof in the module:
+  verify unspecified by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -42,6 +42,7 @@ structure TypingView where
   /-- Whether a type parameter has a node, below the most binders a function has. -/
   parameterNodes : IndexedArena Bool
   parameterLimit : Nat
+  pointerWidth : Option Nat
   typeCount : Nat
   fuel : Nat
 
@@ -83,6 +84,7 @@ def TypingView.of (unit : ValidatedUnit) : TypingView :=
     parameterNodes := .ofArray
       ((List.range (parameterLimitOf unit)).map (parameterNodeAt unit.tables.types)).toArray
     parameterLimit := parameterLimitOf unit
+    pointerWidth := targetPointerWidth? unit
     typeCount := unit.tables.types.size
     fuel := typeFuel unit }
 
@@ -110,45 +112,53 @@ def resolveNominal? (name : NameId) : Option StructHandle := do
 
 mutual
 /-- `ntyOfFuel`, read through the view. -/
-def ntyFuel : Nat → NamespaceId → TypeId → Option NTy
-  | 0, _, _ => none
-  | fuel + 1, namespaceId, typeId => do
+def ntyFuel : NRow → Nat → NamespaceId → TypeId → Option NTy
+  | _, 0, _, _ => none
+  | env, fuel + 1, namespaceId, typeId => do
       let ty ← view.lookup namespaceId typeId
       match ty with
       | .unit => some .unit
       | .bool => some .bool
       | .integer (.bits width) signed => if width == 0 then none else some (.int width signed)
+      | .integer .pointer signed => (.int · signed) <$> view.pointerWidth
       | .integer .unbounded true => some .num
+      | .never => some .unit
       | .address => some .address
       | .signer => some .signer
       | .string => some .string
       | .bytes => some .bytes
+      | .character => some .char
       | .reference reference =>
           match reference.kind with
-          | .shared => ntyFuel fuel namespaceId reference.referent
-          | .mutable => .ref <$> ntyFuel fuel namespaceId reference.referent
+          | .shared => NTy.erase <$> ntyFuel env fuel namespaceId reference.referent
+          | .mutable =>
+              match view.lookup namespaceId reference.referent with
+              | some (.slice element) => .sliceRef <$> ntyFuel env fuel namespaceId element
+              | _ => .ref <$> ntyFuel env fuel namespaceId reference.referent
       | .tuple elements =>
-          (.tuple ∘ NRow.ofList) <$> elements.toList.mapM (ntyFuel fuel namespaceId)
-      | .vector element none => .vector <$> ntyFuel fuel namespaceId element
+          (.tuple ∘ NRow.ofList) <$> elements.toList.mapM (ntyFuel env fuel namespaceId)
+      | .slice element => .slice <$> ntyFuel env fuel namespaceId element
+      | .vector element none => .vector <$> ntyFuel env fuel namespaceId element
+      | .vector element (some (.integer length)) =>
+          if length < 0 ∨ 2 ^ 64 ≤ length then none
+          else (.array · length.toNat) <$> ntyFuel env fuel namespaceId element
       | .nominal name arguments => do
           let handle ← view.resolveNominal? name
-          let generic ← structFuel fuel handle
-          if arguments.isEmpty then some generic else
+          if arguments.isEmpty then structFuel .nil fuel handle else
             let θ ← arguments.toList.mapM fun argument => match argument with
-              | .typeArg value => ntyFuel fuel namespaceId value.typeId
-              | _ => none
-            some (generic.subst (NRow.ofList θ))
-      | .typeParameter index => some (.param index)
+              | .typeArg value => ntyFuel env fuel namespaceId value.typeId
+              | .lifetime _ | .const _ => some .unit
+              | .evidence _ => none
+            structFuel (NRow.ofList θ) fuel handle
+      | .typeParameter index => some (env.argument index).unmark
       | .function arguments result _ => do
-          let parameters ← arguments.toList.mapM (ntyFuel fuel namespaceId)
-          let results ← match ← view.lookup namespaceId result with
-            | .unit => some []
-            | .tuple elements => elements.toList.mapM (ntyFuel fuel namespaceId)
-            | _ => (fun τ => [τ]) <$> ntyFuel fuel namespaceId result
-          let resultIds ← match ← view.lookup namespaceId result with
-            | .unit => some []
-            | .tuple elements => some elements.toList
-            | _ => some [result]
+          let parameters ← arguments.toList.mapM (ntyFuel env fuel namespaceId)
+          let isUnit : Bool := match ← view.lookup namespaceId result with
+            | .unit => true
+            | .typeParameter index => (env.argument index).unmark == .unit
+            | _ => false
+          let results ← if isUnit then some [] else (fun τ => [τ]) <$> ntyFuel env fuel namespaceId result
+          let resultIds := if isUnit then [] else [result]
           some (.function (NRow.ofList parameters)
             { parameters := arguments.toList.map (sharedReference view.lookup namespaceId)
               results := resultIds.map (sharedReference view.lookup namespaceId) }
@@ -156,23 +166,25 @@ def ntyFuel : Nat → NamespaceId → TypeId → Option NTy
       | _ => none
 
 /-- `structNTyFuel`, read through the view. -/
-def structFuel : Nat → StructHandle → Option NTy
-  | 0, _ => none
-  | fuel + 1, handle => do
+def structFuel : NRow → Nat → StructHandle → Option NTy
+  | _, 0, _ => none
+  | env, fuel + 1, handle => do
       let info ← view.declarationAt? handle
       let declaration := info.declaration
       let row := fun (fields : Array FieldDecl) =>
         NRow.ofList <$> fields.toList.mapM fun field =>
-          ntyFuel fuel handle.namespaceId (info.links.typeId field.type.typeId)
-      let arguments := NRow.ofList ((List.range declaration.generics.size).map .param)
+          ntyFuel env fuel handle.namespaceId (info.links.typeId field.type.typeId)
+      let arguments := NRow.ofList
+        ((List.range declaration.generics.size).map fun index => env.getD index (.param index))
       let ghosts ← NRow.ofList <$> declaration.ghosts.toList.mapM fun ghost =>
-        NTy.ghost <$> ntyFuel fuel handle.namespaceId (info.links.typeId ghost.type.typeId)
+        NTy.ghost <$> ntyFuel env fuel handle.namespaceId (info.links.typeId ghost.type.typeId)
       let withGhosts := fun (fields : NRow) =>
         if declaration.ghosts.isEmpty then fields else fields ++ ghosts
       match info.layout with
       | some layout =>
           some (.struct handle arguments
-            (withGhosts layout.leadingRow ++ .cons (.table (.param 0) (.param 1)) .nil))
+            (withGhosts layout.leadingRow ++
+              .cons (.table (env.getD 0 (.param 0)) (env.getD 1 (.param 1))) .nil))
       | none =>
       if declaration.variants.isEmpty then
         some (.struct handle arguments (withGhosts (← row declaration.fields)))
@@ -186,7 +198,7 @@ def structFuel : Nat → StructHandle → Option NTy
 end
 
 def nty (namespaceId : NamespaceId) (typeId : TypeId) : Option NTy :=
-  view.ntyFuel view.fuel namespaceId typeId
+  view.ntyFuel .nil view.fuel namespaceId typeId
 
 /-- `SemTy.resolveFuel`, read through the view. -/
 def resolveFuel (env : Array SemArg) : Nat → TypeId → Option SemTy
@@ -204,6 +216,7 @@ def resolveFuel (env : Array SemArg) : Nat → TypeId → Option SemTy
       | .signer => some .signer
       | .integer width signed => some (.integer width signed)
       | .tuple elements => .tuple <$> elements.toList.mapM (resolveFuel env fuel)
+      | .slice element => .slice <$> resolveFuel env fuel element
       | .vector element bound => (.vector · bound) <$> resolveFuel env fuel element
       | .nominal name arguments => do
           let name ← view.names.get? name.index
@@ -269,8 +282,13 @@ def typedAs : NTy → SemTy → Bool
   | .signer, type => type == .signer
   | .string, type => type == .string
   | .bytes, type => type == .bytes
+  | .char, type => type == .character
   | .tuple elements, .tuple types => rowTypedAs elements types
+  | .slice element, .slice type => typedAs element type
+  | .sliceRef element, .reference .mutable (.slice type) => typedAs element type
   | .vector element, .vector type none => typedAs element type
+  | .array element length, .vector type (some (.integer actual)) =>
+      actual == (length : Int) && typedAs element type
   | .table key value, .vector (.tuple [keyType, valueType]) none =>
       typedAs key keyType && typedAs value valueType
   | .struct source nativeArguments fields, .nominal name arguments =>
@@ -456,27 +474,28 @@ theorem TypingView.resolve_of {ns : ValidatedNamespace} (tables : ns.tables = un
   rfl
 
 theorem TypingView.ntyFuel_of (shared : TablesShared unit) (fuel : Nat) :
-    (∀ namespaceId typeId, (TypingView.of unit).ntyFuel fuel namespaceId typeId =
-      ntyOfFuel (unitTypes unit) unit fuel namespaceId typeId) ∧
-    (∀ handle, (TypingView.of unit).structFuel fuel handle =
-      structNTyFuel (unitTypes unit) unit fuel handle) := by
+    (∀ env namespaceId typeId, (TypingView.of unit).ntyFuel env fuel namespaceId typeId =
+      ntyOfFuel (unitTypes unit) unit env fuel namespaceId typeId) ∧
+    (∀ env handle, (TypingView.of unit).structFuel env fuel handle =
+      structNTyFuel (unitTypes unit) unit env fuel handle) := by
   induction fuel with
   | zero =>
-      exact ⟨fun _ _ => by simp only [TypingView.ntyFuel, ntyOfFuel],
-        fun _ => by simp only [TypingView.structFuel, structNTyFuel]⟩
+      exact ⟨fun _ _ _ => by simp only [TypingView.ntyFuel, ntyOfFuel],
+        fun _ _ => by simp only [TypingView.structFuel, structNTyFuel]⟩
   | succ fuel ih =>
       obtain ⟨nty, struct⟩ := ih
-      have ntyAt : ∀ namespaceId, (TypingView.of unit).ntyFuel fuel namespaceId =
-          ntyOfFuel (unitTypes unit) unit fuel namespaceId := fun namespaceId =>
-        funext (nty namespaceId)
-      refine ⟨fun namespaceId typeId => ?_, fun handle => ?_⟩
+      have ntyAt : ∀ env namespaceId, (TypingView.of unit).ntyFuel env fuel namespaceId =
+          ntyOfFuel (unitTypes unit) unit env fuel namespaceId := fun env namespaceId =>
+        funext (nty env namespaceId)
+      have width : (TypingView.of unit).pointerWidth = targetPointerWidth? unit := rfl
+      refine ⟨fun env namespaceId typeId => ?_, fun env handle => ?_⟩
       · cases found : unit.namespaces[namespaceId.index]? with
         | none =>
             simp [TypingView.ntyFuel, ntyOfFuel, TypingView.lookup_of shared, unitTypes, found]
         | some ns =>
             simp only [TypingView.ntyFuel, ntyOfFuel, TypingView.lookup_of shared, found,
               TypingView.resolveNominal?_of shared found, Option.bind_eq_bind, Option.bind_some,
-              nty, ntyAt, struct]
+              nty, ntyAt, struct, width]
             refine congrArg (Option.bind _) (funext fun ty => ?_)
             cases ty <;> rfl
       · simp only [TypingView.structFuel, structNTyFuel, TypingView.declarationAt?_of]
@@ -495,7 +514,7 @@ theorem TypingView.ntyFuel_of (shared : TablesShared unit) (fuel : Nat) :
 
 theorem TypingView.nty_of (shared : TablesShared unit) (namespaceId : NamespaceId)
     (typeId : TypeId) : (TypingView.of unit).nty namespaceId typeId = ntyOf unit namespaceId typeId :=
-  (TypingView.ntyFuel_of shared _).1 namespaceId typeId
+  (TypingView.ntyFuel_of shared _).1 .nil namespaceId typeId
 
 theorem TypingView.resolveAt_of {unit : ValidatedUnit} {ns : ValidatedNamespace}
     (tables : ns.tables = unit.tables) (arguments : List SemArg) (typeIds : List TypeId) :
@@ -580,7 +599,7 @@ theorem TypingView.typedAs_of (shared : TablesShared unit) :
     (fun row types => (TypingView.of unit).rowTypedAs row types = NRow.typedAsCheck unit row types)
     (fun row arguments => (TypingView.of unit).argumentsTypedAs row arguments =
       NRow.argumentsCheck unit row arguments)
-  case case12 =>
+  case case16 =>
     intro source nativeArguments fields name arguments argumentsEq layoutRows fieldRows
     simp only [TypingView.typedAs, NTy.typedAsCore, argumentsEq]
     cases found : (TypingView.of unit).declarationAt? source with
@@ -636,7 +655,7 @@ theorem TypingView.typedAs_of (shared : TablesShared unit) :
               cases ghostsRead <;> cases fieldsRead <;> simp only [fieldRows]
             · have nonempty : info.declaration.variants.isEmpty = false := by simpa using empty
               simp [nonempty]
-  case case13 =>
+  case case17 =>
     intro source nativeArguments names rows distinct name arguments argumentsEq variants
     simp only [TypingView.typedAs, NTy.typedAsCore, argumentsEq]
     cases found : (TypingView.of unit).declarationAt? source with
@@ -649,7 +668,7 @@ theorem TypingView.typedAs_of (shared : TablesShared unit) :
           Option.bind_eq_bind, Option.bind_some, tables, TypingView.variantNames?,
           TypingView.names_of, variants info found, Option.some_beq_some, links_eq,
           ValidatedNamespace.nameOf, ValidatedNamespace.nameId]
-  case case30 =>
+  case case34 =>
     intro source arguments name names fields rest fieldRows later info found
     obtain ⟨ns, namespace_eq, declaration_eq, _, _, links_eq⟩ := TypingView.declarationAt?_some found
     have tables := shared.tables namespace_eq

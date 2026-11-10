@@ -1,2 +1,0 @@
-Move prover returns: exiting with verification errors
-tests/sources/regression/fun_type_arity_injectivity.move:23:5: error: no denotation for `both_arities`: a function value of `two_out` is not supported: `two_out` returns a tuple

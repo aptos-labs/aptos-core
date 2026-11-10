@@ -4,6 +4,7 @@
 import VerexIR.Proofs.Denote.Solve.VectorSizes
 import VerexIR.Proofs.Denote.NominalQuote
 import VerexIR.Proofs.Denote.GivenOwn
+import VerexIR.Proofs.Denote.Utf8
 
 /-!
 # The solver: the normal form
@@ -153,7 +154,125 @@ existing equations; field types remain named. -/
 simproc ↓ [vir_denote_norm] nominalPlainOrder
     (NTy.plainOrderOf _ _ _ _ _) := fun e => do
   nominalOperation e (e.getArg! 2)
-    #[``NTy.plainOrderOf.eq_10] #[``NTy.plainOrderOf.eq_11]
+    #[``NTy.plainOrderOf.eq_11] #[``NTy.plainOrderOf.eq_12]
+
+theorem NTy.plainViewed_struct [Carriers] (prophecies : Bool) (source : StructHandle)
+    (arguments fields : NRow) (values : (NTy.struct source arguments fields).plain) :
+    NTy.plainViewed prophecies (.struct source arguments fields) values =
+      HListPlain.plainViewed prophecies fields values := rfl
+theorem NTy.plainViewed_enum [Carriers] (prophecies : Bool) (source : StructHandle)
+    (arguments : NRow) (names : List String) (rows : NRows) (distinct : names.Nodup)
+    (value : (NTy.enum source arguments names rows distinct).plain) :
+    NTy.plainViewed prophecies (.enum source arguments names rows distinct) value =
+      variantPlainViewed prophecies names rows value := rfl
+theorem NTy.viewed_struct [Carriers] (prophecies : Bool) (source : StructHandle)
+    (arguments fields : NRow) (value : (NTy.struct source arguments fields).carrier) :
+    NTy.viewed prophecies (.struct source arguments fields) value = value := rfl
+theorem NTy.viewed_enum [Carriers] (prophecies : Bool) (source : StructHandle)
+    (arguments : NRow) (names : List String) (rows : NRows) (distinct : names.Nodup)
+    (value : (NTy.enum source arguments names rows distinct).carrier) :
+    NTy.viewed prophecies (.enum source arguments names rows distinct) value = value := rfl
+
+/-- A clause's view of a named declaration's plain value reads its fields'
+views; the constructor equations of `NTy.plainViewed` do not see a descriptor. -/
+simproc [vir_denote_norm] nominalPlainViewed
+    (@NTy.plainViewed ?carriers _ _ _) := fun e => do
+  nominalOperation e (e.getArg! 2) #[``NTy.plainViewed_struct] #[``NTy.plainViewed_enum]
+
+theorem NTy.plainObserve_struct [Carriers] (source : StructHandle)
+    (arguments fields : NRow) (values : (NTy.struct source arguments fields).plain) :
+    NTy.plainObserve (.struct source arguments fields) values =
+      HListPlain.plainObserve fields values := rfl
+theorem NTy.plainObserve_enum [Carriers] (source : StructHandle)
+    (arguments : NRow) (names : List String) (rows : NRows) (distinct : names.Nodup)
+    (value : (NTy.enum source arguments names rows distinct).plain) :
+    NTy.plainObserve (.enum source arguments names rows distinct) value =
+      variantPlainObserve names rows value := rfl
+theorem NTy.plainUnerase_struct [Carriers] (source : StructHandle)
+    (arguments fields : NRow) (values : (NTy.struct source arguments fields).erase.plain) :
+    NTy.plainUnerase (.struct source arguments fields) values =
+      HListPlain.plainUnerase fields values := rfl
+theorem NTy.plainUnerase_enum [Carriers] (source : StructHandle)
+    (arguments : NRow) (names : List String) (rows : NRows) (distinct : names.Nodup)
+    (value : (NTy.enum source arguments names rows distinct).erase.plain) :
+    NTy.plainUnerase (.enum source arguments names rows distinct) value =
+      variantPlainUnerase names rows value := rfl
+
+/-- What a shared view of a named declaration's value holds is what its fields'
+views hold. -/
+simproc [vir_denote_norm] nominalPlainObserve
+    (@NTy.plainObserve ?carriers _ _) := fun e => do
+  nominalOperation e (e.getArg! 1) #[``NTy.plainObserve_struct] #[``NTy.plainObserve_enum]
+
+/-- A shared view of a named declaration as a clause reads it. -/
+simproc [vir_denote_norm] nominalPlainUnerase
+    (@NTy.plainUnerase ?carriers _ _) := fun e => do
+  nominalOperation e (e.getArg! 1) #[``NTy.plainUnerase_struct] #[``NTy.plainUnerase_enum]
+
+/-- Settling a value of a named declaration only forgets its certificates:
+the declaration is no reference, whatever its fields hold. Read before the
+definition unfolds over the descriptor, which none of its arms matches. -/
+dsimproc ↓ [vir_denote, vir_denote_norm] nominalSettle
+    (@VerexIR.Proofs.Denote.NTy.settle ?carriers _ _) := fun e => do
+  let_expr VerexIR.Proofs.Denote.NTy.settle carriers τ value := e | return .continue
+  unless isNominalType (← getEnv) τ do return .continue
+  return .done (mkApp3 (mkConst ``NTy.forget) carriers τ value)
+
+/-- A lent value of a type parameter, certified, is the certified value it
+was lent from, whatever its certificate is spelled at
+(`Carriers.lent_certify_of`). A certificate held as a local is stated at the
+parameter's type (`NTy.deepHolds (.param _)`), which is the family's own
+statement only by unfolding, so the lemma does not match it. -/
+simproc [vir_denote, vir_denote_norm] certifiedLentValue (ParamPlain.certify _ _ _) := fun e => do
+  unless e.isAppOfArity ``ParamPlain.certify 5 do return .continue
+  let arguments := e.getAppArgs
+  let (family, lent, held) := (arguments[2]!, arguments[3]!, arguments[4]!)
+  unless family.isAppOfArity ``Carriers.lent 2 && lent.isAppOfArity ``ParamPlain.of 4 do
+    return .continue
+  let value := lent.appArg!
+  let proof? ← (try
+      some <$> withDefault (mkAppOptM ``Carriers.lent_certify_of
+        #[some (family.getArg! 0), some family.appArg!, some value, some held])
+    catch _ => pure none)
+  let some proof := proof? | return .continue
+  return .visit { expr := value, proof? := some proof }
+
+/-- An operation of a type parameter's lent values at the family a call
+induces, as the outer family's native operation at the type the parameter
+stands for (`Carriers.instantiate`, `lent`): certifying is `NTy.ofDeepHolds`,
+lending `NTy.forget`, the invariant `NTy.deepHolds`. The row is substituted
+as spelled, and the two spellings convert by the induced family's
+definition. -/
+private def inducedLentOperation (e : Lean.Expr) (native : Name) (operands : Nat) :
+    SimpM Simp.DStep := do
+  let arguments := e.getAppArgs
+  unless arguments.size == 3 + operands do return .continue
+  let family := arguments[2]!.consumeMData
+  unless family.isAppOfArity ``Carriers.lent 2 do return .continue
+  let some (θ, outer) := inducedCarriers? (family.getArg! 0).consumeMData | return .continue
+  let some row := substitutionRow? θ | return .continue
+  let some τ := FamilyTransport.substituteNTy row (mkApp (mkConst ``NTy.param) family.appArg!)
+      (some (← getEnv)) | return .continue
+  -- A marked entry stands for its referent (`NTy.unmark`).
+  let mut τ := τ
+  while τ.isAppOfArity ``NTy.observed 1 do τ := τ.appArg!
+  let result := mkAppN (mkConst native) (#[outer, τ] ++ arguments.extract 3 arguments.size)
+  unless ← withDefault (isDefEq e result) do return .continue
+  return .visit result
+
+dsimproc ↓ [vir_denote, vir_denote_norm] inducedLentCertify (ParamPlain.certify _ _ _) :=
+  fun e => inducedLentOperation e ``NTy.ofDeepHolds 2
+
+dsimproc ↓ [vir_denote, vir_denote_norm] inducedLentOf (ParamPlain.of _ _) :=
+  fun e => inducedLentOperation e ``NTy.forget 1
+
+dsimproc ↓ [vir_denote, vir_denote_norm] inducedLentHolds (ParamPlain.holds _ _) :=
+  fun e => inducedLentOperation e ``NTy.deepHolds 1
+
+/-- A clause's view of a certified value of a named declaration is the value. -/
+simproc [vir_denote_norm] nominalViewed
+    (@NTy.viewed ?carriers _ _ _) := fun e => do
+  nominalOperation e (e.getArg! 2) #[``NTy.viewed_struct] #[``NTy.viewed_enum]
 
 /-- Resource dispatch observes only the identity of a named declaration. -/
 simproc [vir_denote_norm] nominalHandle (NTy.handle? _) := fun e => do
@@ -203,6 +322,149 @@ simproc [vir_denote, vir_denote_norm] nominalPlainPatternBinding
 simproc [vir_denote, vir_denote_norm] nominalCertifiedPlaceRead
     (@Proj.getCertified? ?carriers _ _ _ _ _ _) := fun e => do
   nominalOperation e (e.getArg! 3) #[``Proj.getCertified?_field] #[``Proj.getCertified?_variant]
+
+-- Rewrite primitive literals before unfolding the dependent carrier match.
+-- These equations preserve the literal directly, avoiding repeated reductions
+-- of the full native type recursion when a continuation is normalized.
+@[vir_denote_norm ↓] theorem ofGround_unit [Carriers] (value : Unit) :
+    NTy.unit.ofGround rfl value = value := rfl
+@[vir_denote_norm ↓] theorem ofGround_bool [Carriers] (value : Bool) :
+    NTy.bool.ofGround rfl value = value := rfl
+@[vir_denote_norm ↓] theorem ofGround_int [Carriers] (width : Nat) (signed : Bool)
+    (value : (NTy.int width signed).groundCarrier) :
+    (NTy.int width signed).ofGround rfl value = value := rfl
+@[vir_denote_norm ↓] theorem ofGround_num [Carriers] (value : NTy.num.groundCarrier) :
+    NTy.num.ofGround rfl value = value := rfl
+@[vir_denote_norm ↓] theorem ofGround_address [Carriers] (value : NTy.address.groundCarrier) :
+    NTy.address.ofGround rfl value = value := rfl
+@[vir_denote_norm ↓] theorem ofGround_signer [Carriers] (value : NTy.signer.groundCarrier) :
+    NTy.signer.ofGround rfl value = value := rfl
+@[vir_denote_norm ↓] theorem ofGround_string [Carriers] (value : String) :
+    NTy.string.ofGround rfl value = value := rfl
+@[vir_denote_norm ↓] theorem ofGround_bytes [Carriers] (value : NTy.bytes.groundCarrier) :
+    NTy.bytes.ofGround rfl value = value := rfl
+@[vir_denote_norm ↓] theorem ofGround_char [Carriers] (value : NTy.char.groundCarrier) :
+    NTy.char.ofGround rfl value = value := rfl
+
+-- The same constructor-first rule avoids traversing a dependent result match.
+@[vir_denote_norm ↓] theorem ofBody_one {unit : VerexIR.Validation.ValidatedUnit}
+    [FunctionCarriers unit] [Skolems unit] (type : NTy) (value : type.carrier) :
+    ResultShape.ofBody (.one type) value = value := rfl
+@[vir_denote_norm ↓] theorem ofBody_none {unit : VerexIR.Validation.ValidatedUnit}
+    [FunctionCarriers unit] [Skolems unit] (value : NTy.unit.carrier) :
+    ResultShape.ofBody .none value = () := rfl
+
+-- Reduce constructed slice readings without unfolding symbolic loans, so their
+-- shared extent remains available to the size normalization lemmas.
+@[vir_denote_norm] theorem sliceOfArrays_extent {α : Type} {extent : Nat}
+    (current final : SpecArray α extent) :
+    (SpecSliceRef.ofArrays current final).extent = extent := rfl
+
+-- Settlement compares the dependent arrays themselves, before a caller reads
+-- their vector contents. Expose constructed projections at that boundary too.
+@[vir_denote_norm] theorem sliceOfArrays_current {α : Type} {extent : Nat}
+    (current final : SpecArray α extent) :
+    (SpecSliceRef.ofArrays current final).current = current := rfl
+
+@[vir_denote_norm] theorem sliceOfArrays_final {α : Type} {extent : Nat}
+    (current final : SpecArray α extent) :
+    (SpecSliceRef.ofArrays current final).final = final := rfl
+
+@[vir_denote_norm] theorem sliceWithCurrent_extent {α : Type}
+    (value : SpecSliceRef α) (current : SpecArray α value.extent) :
+    (value.withCurrent current).extent = value.extent := rfl
+
+@[vir_denote_norm] theorem sliceWithCurrent_current {α : Type}
+    (value : SpecSliceRef α) (current : SpecArray α value.extent) :
+    (value.withCurrent current).current = current := rfl
+
+@[vir_denote_norm] theorem sliceWithCurrent_final {α : Type}
+    (value : SpecSliceRef α) (current : SpecArray α value.extent) :
+    (value.withCurrent current).final = value.final := rfl
+
+@[vir_denote_norm] theorem sliceCurrent_vector {α : Type} (value : SpecSliceRef α) :
+    value.current.vector = value.currentVector := rfl
+
+@[vir_denote_norm] theorem sliceFinal_vector {α : Type} (value : SpecSliceRef α) :
+    value.final.vector = value.finalVector := rfl
+
+-- A loop frame keeps the settled prophecy. Its equality preserves both
+-- the element contents and the extent already shared by the typed carrier.
+@[vir_denote_norm ↓] theorem sliceFinalFrame_iff {α : Type} (left right : SpecSliceRef α) :
+    SpecSliceRef.settled left.finalVector = SpecSliceRef.settled right.finalVector ↔
+      left.extent = right.extent ∧ left.finalVector.values = right.finalVector.values := by
+  constructor
+  · intro same
+    have vectors : left.finalVector = right.finalVector := by
+      simpa using congrArg SpecSliceRef.finalVector same
+    exact ⟨by simpa using congrArg (fun vector => vector.values.size) vectors,
+      congrArg SpecVector.values vectors⟩
+  · rintro ⟨_, same⟩
+    exact congrArg SpecSliceRef.settled (SpecVector.ext same)
+
+-- Keep whole-vector equality for opaque specification functions as well as
+-- element-array equality for the indexed-write rules.
+theorem sliceArray_eq_final {α : Type}
+    (value : SpecSliceRef α) (current : SpecArray α value.extent) :
+    current = value.final ↔ current.vector = value.finalVector ∧
+      current.vector.values = value.finalVector.values :=
+  ⟨fun same => ⟨congrArg SpecArray.vector same,
+      congrArg (fun array => array.vector.values) same⟩,
+    fun same => SpecArray.ext same.1⟩
+
+-- Preserve whole-array prophecy substitution for constructed slice borrows;
+-- expose the contents only when the final projection belongs to a symbolic slice.
+simproc ↓ [vir_denote_norm] sliceSettlement (@Eq _ _ (@SpecSliceRef.final _ _)) := fun e => do
+  let_expr Eq _ current final := e | return .continue
+  let_expr SpecSliceRef.final _ reference := final | return .continue
+  if reference.isAppOf ``SpecSliceRef.ofArrays || reference.isAppOf ``SpecSliceRef.withCurrent ||
+      reference.isAppOf ``SpecSliceRef.settled || reference.isAppOf ``SpecSliceRef.map then
+    return .continue
+  let lemma ← mkAppM ``sliceArray_eq_final #[reference, current]
+  let some (_, result) := (← inferType lemma).iff? | return .continue
+  return .visit { expr := result, proof? := some (← mkAppM ``propext #[lemma]) }
+
+@[vir_denote_norm] theorem sliceOfArrays_currentVector {α : Type} {extent : Nat}
+    (current final : SpecArray α extent) :
+    (SpecSliceRef.ofArrays current final).currentVector = current.vector := rfl
+
+@[vir_denote_norm] theorem sliceOfArrays_finalVector {α : Type} {extent : Nat}
+    (current final : SpecArray α extent) :
+    (SpecSliceRef.ofArrays current final).finalVector = final.vector := rfl
+
+@[vir_denote_norm] theorem sliceWithCurrent_currentVector {α : Type}
+    (value : SpecSliceRef α) (current : SpecArray α value.extent) :
+    (value.withCurrent current).currentVector = current.vector := rfl
+
+attribute [vir_denote_norm] SpecSliceRef.withCurrent_finalVector
+  SpecSliceRef.map_currentVector SpecSliceRef.map_finalVector SpecSliceRef.map_extent
+
+-- Keep symbolic encodings opaque: only the proved validity relation is
+-- rewritten, never the decoder's recursive implementation on unknown bytes.
+attribute [vir_denote_norm ↓] Utf8.valid_iff Utf8.bounded_valid_iff
+  Utf8.encoding_exists_iff
+attribute [vir_denote_norm] Utf8.validate_stringBytes
+
+/-- Evaluate at most 64 literal bytes. The computed answer selects a result;
+reflexivity certifies it by kernel reduction, with no native decision axiom.
+An unknown vector or byte stops before unfolding the UTF-8 validator. -/
+simproc [vir_denote_norm] literalUtf8Validity
+    (ByteArray.validateUTF8 (Utf8.toByteArray _)) := fun e => do
+  let_expr ByteArray.validateUTF8 encoded := e | return .continue
+  let_expr Utf8.toByteArray vector := encoded | return .continue
+  let vector ← whnf vector
+  let_expr VerexIR.SpecVector.mk _ values _ := vector | return .continue
+  let some (_, elements) := values.arrayLit? | return .continue
+  if elements.length > 64 then return .continue
+  let mut bytes := ByteArray.empty
+  for element in elements do
+    let value ← whnf (← mkAppM ``VerexIR.SpecInt.val #[element])
+    let some value := value.int? | return .continue
+    unless 0 ≤ value && value < 256 do return .continue
+    bytes := bytes.push (UInt8.ofNat value.toNat)
+  let result := toExpr bytes.validateUTF8
+  let proof ← mkExpectedTypeHint (← mkEqRefl e) (← mkEq e result)
+  return .done { expr := result, proof? := some proof }
 
 /-- A structural update of an array literal at literal positions: the
 positions move, the elements are not inspected. -/
@@ -355,6 +617,122 @@ dsimproc ↓ [vir_denote, vir_denote_norm] reduceParameterSubst
   let env ← getEnv
   reduceSubst (fun row subject => substituteNTy row subject (some env)) e row τ
 
+/-- The mark of a spelled type dropped (`NTy.unmark`): a marked type is its
+referent's, and a type spelled by any other constructor, or a named
+declaration, carries none. A type that is not spelled keeps the application:
+the definition's own equations would be tried at every such term, with a side
+condition that it is no mark. -/
+dsimproc ↓ [vir_denote, vir_denote_norm] reduceUnmark
+    (VerexIR.Proofs.Denote.NTy.unmark _) := fun e => do
+  let_expr VerexIR.Proofs.Denote.NTy.unmark τ := e | return .continue
+  let spelled := τ.consumeMData
+  if spelled.isAppOfArity ``VerexIR.Proofs.Denote.NTy.observed 1 then
+    return .visit (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.unmark) spelled.appArg!)
+  let env ← getEnv
+  let .const head _ := spelled.getAppFn | return .continue
+  if isNominalType env spelled then return .done τ
+  match env.find? head with
+  | some (.ctorInfo info) =>
+      if info.induct == ``VerexIR.Proofs.Denote.NTy then return .done τ else return .continue
+  | _ => return .continue
+
+mutual
+/-- The type a shared view of a spelled type holds (`NTy.erase`), evaluated. A
+named declaration holding no mutable reference keeps its name, at its erased
+arguments; one holding some is written out, as its quotation writes it
+(`quoteNative`). A type that is not spelled keeps the application. -/
+private partial def erasedType (τ : Lean.Expr) : MetaM Lean.Expr := do
+  let τ := τ.consumeMData
+  match_expr τ with
+  | VerexIR.Proofs.Denote.NTy.ref referent => erasedType referent
+  | VerexIR.Proofs.Denote.NTy.sliceRef element =>
+      return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.slice) (← erasedType element)
+  | VerexIR.Proofs.Denote.NTy.tuple elements =>
+      return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.tuple) (← erasedRow elements)
+  | VerexIR.Proofs.Denote.NTy.struct source arguments fields =>
+      return mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.struct) source
+        (← erasedRow arguments) (← erasedRow fields)
+  | VerexIR.Proofs.Denote.NTy.enum source arguments names rows distinct =>
+      return mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.enum)
+        #[source, ← erasedRow arguments, names, ← erasedRows rows, distinct]
+  | VerexIR.Proofs.Denote.NTy.slice element =>
+      return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.slice) (← erasedType element)
+  | VerexIR.Proofs.Denote.NTy.vector element =>
+      return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.vector) (← erasedType element)
+  | VerexIR.Proofs.Denote.NTy.array element length =>
+      return mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.array) (← erasedType element) length
+  | VerexIR.Proofs.Denote.NTy.table key value =>
+      return mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.table) (← erasedType key)
+        (← erasedType value)
+  | VerexIR.Proofs.Denote.NTy.ghost slot =>
+      return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.ghost) (← erasedType slot)
+  | VerexIR.Proofs.Denote.NTy.observed referent =>
+      return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.observed) (← erasedType referent)
+  | VerexIR.Proofs.Denote.NTy.unit => return τ
+  | VerexIR.Proofs.Denote.NTy.bool => return τ
+  | VerexIR.Proofs.Denote.NTy.int _ _ => return τ
+  | VerexIR.Proofs.Denote.NTy.num => return τ
+  | VerexIR.Proofs.Denote.NTy.address => return τ
+  | VerexIR.Proofs.Denote.NTy.signer => return τ
+  | VerexIR.Proofs.Denote.NTy.string => return τ
+  | VerexIR.Proofs.Denote.NTy.bytes => return τ
+  | VerexIR.Proofs.Denote.NTy.char => return τ
+  | VerexIR.Proofs.Denote.NTy.param _ => return τ
+  | VerexIR.Proofs.Denote.NTy.function _ _ _ => return τ
+  | VerexIR.Proofs.Denote.NTy.nominal _ _ _ => return τ
+  | _ =>
+      unless isNominalType (← getEnv) τ do
+        return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.erase) τ
+      let view ← nativeTypeView τ
+      let erased ← erasedType view
+      if erased == view then return τ
+      let named := mkAppN τ.getAppFn (← τ.getAppArgs.mapM erasedType)
+      if (← nativeTypeView named) == erased then return named
+      return erased
+
+private partial def erasedRow (row : Lean.Expr) : MetaM Lean.Expr := do
+  let row := row.consumeMData
+  match_expr row with
+  | VerexIR.Proofs.Denote.NRow.nil => return row
+  | VerexIR.Proofs.Denote.NRow.cons head tail =>
+      return mkApp2 (mkConst ``VerexIR.Proofs.Denote.NRow.cons) (← erasedType head)
+        (← erasedRow tail)
+  | _ => return mkApp (mkConst ``VerexIR.Proofs.Denote.NRow.erase) row
+
+private partial def erasedRows (rows : Lean.Expr) : MetaM Lean.Expr := do
+  let rows := rows.consumeMData
+  match_expr rows with
+  | VerexIR.Proofs.Denote.NRows.nil => return rows
+  | VerexIR.Proofs.Denote.NRows.cons fields tail =>
+      return mkApp2 (mkConst ``VerexIR.Proofs.Denote.NRows.cons) (← erasedRow fields)
+        (← erasedRows tail)
+  | _ => return mkApp (mkConst ``VerexIR.Proofs.Denote.NRows.erase) rows
+end
+
+/-- A spelled type's shared view, evaluated (`erasedType`): the definition is
+reducible, so its application is not indexed by its own equations, and a named
+declaration's is not reached by them at all. -/
+dsimproc ↓ [vir_denote, vir_denote_norm] reduceErase
+    (VerexIR.Proofs.Denote.NTy.erase _) := fun e => do
+  let_expr VerexIR.Proofs.Denote.NTy.erase τ := e | return .continue
+  let erased ← erasedType τ
+  if erased == e.consumeMData then return .continue
+  return .done erased
+
+dsimproc ↓ [vir_denote, vir_denote_norm] reduceEraseRow
+    (VerexIR.Proofs.Denote.NRow.erase _) := fun e => do
+  let_expr VerexIR.Proofs.Denote.NRow.erase row := e | return .continue
+  let erased ← erasedRow row
+  if erased == e.consumeMData then return .continue
+  return .done erased
+
+dsimproc ↓ [vir_denote, vir_denote_norm] reduceEraseRows
+    (VerexIR.Proofs.Denote.NRows.erase _) := fun e => do
+  let_expr VerexIR.Proofs.Denote.NRows.erase rows := e | return .continue
+  let erased ← erasedRows rows
+  if erased == e.consumeMData then return .continue
+  return .done erased
+
 /-- A frame's parameter replacement constructs the same named declaration
 at its replaced arguments. Only the explicit arguments are traversed; the
 field layout stays behind the descriptor. Unknown argument syntax retains
@@ -390,15 +768,16 @@ dsimproc ↓ [vir_denote, vir_denote_norm] resolvedCast (cast _ _) := fun e => d
   unless ← withTransparency .default (isDefEq α β) do return .continue
   return .visit value
 
-/-- Forgetting the certificates of a vector or a table whose type carries
+/-- Forgetting the certificates of a sequence or a table whose type carries
 none: the value itself.  At a certificate-free type the certified and the
 plain carrier are one type and the forgetting is the identity on it
 (`NTy.forget_eq_cast_of_certificateFree`), whose transport then resolves
 (`resolvedCast`).
 
-Read before the structural equations, and only at the two types whose
+Read before the structural equations, and only at the types whose
 equations distribute the forgetting into a map of an *unapplied*
-`NTy.forget` over the elements (`NTy.forget_vector`, `NTy.forget_table`).
+`NTy.forget` over the elements (`NTy.forget_vector`, `NTy.forget_table`, and
+a slice's, an array's and a slice reference's likewise).
 No equation reaches such a map: the ones that close a forgetting
 (`NTy.forget_int`, …) are stated at an applied value.  So a vector of
 integers would keep two spellings, the value and the map over it, and a
@@ -412,7 +791,10 @@ simproc ↓ [vir_denote, vir_denote_norm] forgottenCertificateFree
   let τ := τ.consumeMData
   if τ.hasExprMVar || τ.hasFVar || τ.hasLooseBVars then return .continue
   unless τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.vector 1 ||
-      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.table 2 do
+      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.table 2 ||
+      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.slice 1 ||
+      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.array 2 ||
+      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1 do
     return .continue
   -- The equation is not reflexive at a certificate-free vector or table,
   -- where it states that a map of the identity is the array mapped, so
@@ -443,7 +825,10 @@ simproc ↓ [vir_denote, vir_denote_norm] certifiedCertificateFree
   let τ := τ.consumeMData
   if τ.hasExprMVar || τ.hasFVar || τ.hasLooseBVars then return .continue
   unless τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.vector 1 ||
-      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.table 2 do
+      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.table 2 ||
+      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.slice 1 ||
+      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.array 2 ||
+      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1 do
     return .continue
   let some (transported, proof) ← (try withNewMCtxDepth <| withTransparency .default do
       unless (← whnf (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.certificateFree) τ)).isConstOf
@@ -1446,13 +1831,14 @@ mutual
 none of its parts is a type parameter's or a function value's, compared by an
 erasure, or a ghost slot, which equality ignores. -/
 def NTy.comparesByValue : NTy → Bool
-  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes => true
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char => true
   | .tuple row | .struct _ _ row => NRow.comparesByValue row
   | .enum _ _ _ rows _ => NRows.comparesByValue rows
-  | .vector element => element.comparesByValue
+  | .vector element | .slice element | .array element _ => element.comparesByValue
   | .table key value => key.comparesByValue && value.comparesByValue
   | .ref referent => referent.comparesByValue
-  | .ghost _ | .param _ | .function _ _ _ => false
+  | .sliceRef _ | .ghost _ | .param _ | .function _ _ _ | .nominal _ _ _
+  | .observed _ => false
 
 def NRow.comparesByValue : NRow → Bool
   | .nil => true
@@ -1487,6 +1873,7 @@ theorem NTy.plainEqual_iff_eq : (τ : NTy) → τ.comparesByValue = true → (le
   | .signer, _, _, _ => by simp [NTy.plainEqual, NTy.plainEqualOf]
   | .string, _, _, _ => by simp [NTy.plainEqual, NTy.plainEqualOf]
   | .bytes, _, _, _ => by simp [NTy.plainEqual, NTy.plainEqualOf]
+  | .char, _, _, _ => by simp [NTy.plainEqual, NTy.plainEqualOf]
   | .tuple row, plain, left, right => by
       show HListPlain.equal false row left right = true ↔ _
       exact HListPlain.equal_iff_eq row (by simpa [NTy.comparesByValue] using plain) left right
@@ -1499,12 +1886,19 @@ theorem NTy.plainEqual_iff_eq : (τ : NTy) → τ.comparesByValue = true → (le
       show variantPlain.equal false names rows left right = true ↔ _
       exact variantPlain.equal_iff_eq names rows (by simpa [NTy.comparesByValue] using plain)
         left right
-  | .vector element, plain, left, right => by
+  | .vector element, plain, left, right | .slice element, plain, left, right => by
       show listEqual (NTy.plainEqual false element) left.values.toList right.values.toList = true ↔ _
       rw [listEqual_iff_eq _
         (NTy.plainEqual_iff_eq element (by simpa [NTy.comparesByValue] using plain))]
       exact ⟨fun same => SpecVector.ext (Array.toList_inj.mp same),
         fun same => congrArg (·.values.toList) same⟩
+  | .array element _, plain, left, right => by
+      show listEqual (NTy.plainEqual false element) left.vector.values.toList
+          right.vector.values.toList = true ↔ _
+      rw [listEqual_iff_eq _
+        (NTy.plainEqual_iff_eq element (by simpa [NTy.comparesByValue] using plain))]
+      exact ⟨fun same => SpecArray.ext (SpecVector.ext (Array.toList_inj.mp same)),
+        fun same => congrArg (·.vector.values.toList) same⟩
   | .table key value, plain, left, right => by
       have plains : key.comparesByValue = true ∧ value.comparesByValue = true := by
         simpa [NTy.comparesByValue] using plain
@@ -1572,6 +1966,7 @@ theorem NTy.equal_iff_eq : (τ : NTy) → τ.comparesByValue = true → (left ri
   | .signer, _, _, _ => by simp [NTy.equal]
   | .string, _, _, _ => by simp [NTy.equal]
   | .bytes, _, _, _ => by simp [NTy.equal]
+  | .char, _, _, _ => by simp [NTy.equal]
   | .tuple row, plain, left, right => by
       simp only [NTy.equal]
       exact HList.equal_iff_eq row (by simpa [NTy.comparesByValue] using plain) left right
@@ -1585,12 +1980,18 @@ theorem NTy.equal_iff_eq : (τ : NTy) → τ.comparesByValue = true → (left ri
       rw [variantPlain.equal_iff_eq names rows (by simpa [NTy.comparesByValue] using plain)
         left.val right.val]
       exact Subtype.ext_iff.symm
-  | .vector element, plain, left, right => by
+  | .vector element, plain, left, right | .slice element, plain, left, right => by
       simp only [NTy.equal]
       rw [listEqual_iff_eq _
         (NTy.equal_iff_eq element (by simpa [NTy.comparesByValue] using plain))]
       exact ⟨fun same => SpecVector.ext (Array.toList_inj.mp same),
         fun same => congrArg (·.values.toList) same⟩
+  | .array element _, plain, left, right => by
+      simp only [NTy.equal]
+      rw [listEqual_iff_eq _
+        (NTy.equal_iff_eq element (by simpa [NTy.comparesByValue] using plain))]
+      exact ⟨fun same => SpecArray.ext (SpecVector.ext (Array.toList_inj.mp same)),
+        fun same => congrArg (·.vector.values.toList) same⟩
   | .table key value, plain, left, right => by
       have plains : key.comparesByValue = true ∧ value.comparesByValue = true := by
         simpa [NTy.comparesByValue] using plain
@@ -1603,7 +2004,8 @@ theorem NTy.equal_iff_eq : (τ : NTy) → τ.comparesByValue = true → (left ri
       have plain : referent.comparesByValue = true := by simpa [NTy.comparesByValue] using plain
       simp only [NTy.equal, Bool.and_eq_true, NTy.plainEqual_iff_eq referent plain,
         NTy.equal_iff_eq referent plain, Prod.ext_iff]
-  | .ghost _, plain, _, _ | .param _, plain, _, _ | .function _ _ _, plain, _, _ => by
+  | .sliceRef _, plain, _, _ | .ghost _, plain, _, _ | .param _, plain, _, _ | .function _ _ _, plain, _, _
+  | .nominal _ _ _, plain, _, _ | .observed _, plain, _, _ => by
       simp [NTy.comparesByValue] at plain
 
 /-- Rows comparing by value compare as the equation of the rows. -/
@@ -2372,6 +2774,24 @@ private def rowSpelling? (spelled : Lean.Expr) : MetaM (Option RowSpelling) := d
   -- once at each spelling has them as unrelated terms.
   let carrierView ← if spelled.isAppOfArity ``NTy.carrier 2 then
       nativeTypeView (spelled.getArg! 1) else pure spelled
+  -- A mutable reference's carrier is the pair of its current and its
+  -- prophecy (`NTy.carrier`, `.ref`): the current at the plain layer, in the
+  -- worker's spelling, which is canonical, and the prophecy certified.
+  if spelled.isAppOfArity ``NTy.carrier 2 && carrierView.isAppOfArity ``NTy.ref 1 then
+    let carriers := spelled.getArg! 0
+    let referent := carrierView.getArg! 0
+    let current := mkApp2 (mkConst ``NTy.plainOf)
+      (mkApp (mkConst ``Carriers.toPlain) carriers) referent
+    let prophecy := mkApp2 (mkConst ``NTy.carrier) carriers referent
+    return some (.pair (mkApp2 (mkConst ``Prod [levelZero, levelZero]) current prophecy))
+  -- At the plain layer a reference is the pair of its current and its
+  -- prophecy, both plain (`NTy.plainOf`, `.ref`).
+  if let some spelling := plainSpelling? spelled then
+    if let .ty τ := spelling.payload then
+      let τ ← nativeTypeView τ
+      if τ.isAppOfArity ``NTy.ref 1 then
+        let component := spelling.tyOf (τ.getArg! 0)
+        return some (.pair (mkApp2 (mkConst ``Prod [levelZero, levelZero]) component component))
   let row? : Option (Lean.Expr × Lean.Expr × Option PlainSpelling) ←
     if spelled.isAppOfArity ``HList 2 then pure (some (spelled.getArg! 0, spelled.getArg! 1, none))
     else if spelled.isAppOfArity ``NTy.carrier 2 &&
@@ -2848,6 +3268,14 @@ simproc [vir_denote_norm] literalOptionalCertifiedRead (VerexIR.SpecInt.val _) :
 
 attribute [vir_denote_norm] Option.bind_fun_some
 
+/-- A lookup followed by a total step resolves nothing exactly where the lookup
+does: a place the check before it resolves is refuted by that check's fact. -/
+theorem option_bind_some_eq_none_iff {α β : Type} (o : Option α) (f : α → β) :
+    (o.bind fun a => some (f a)) = none ↔ o = none := by
+  cases o <;> simp
+
+attribute [vir_denote_norm] option_bind_some_eq_none_iff
+
 /-- A quantifier over a range with literal bounds is its instances, one per
 position, when the range is short (at most 64 positions): the first position
 is split off until the range is empty, each step decided by the kernel. -/
@@ -2935,7 +3363,8 @@ attribute [vir_denote_norm high] VerexIR.Proofs.Denote.Skolems.type_instantiate
 attribute [vir_denote_norm] VerexIR.Proofs.Denote.Skolems.type_runtime VerexIR.Proofs.Denote.NTy.substWith
   VerexIR.Proofs.Denote.NRow.substWith VerexIR.Proofs.Denote.NRows.substWith
 -- A resource type at an induced frame is its substitution, evaluated, so
--- that a callee's slot and the caller's are one term.
+-- that a callee's slot and the caller's are one term. A parameter's entry is
+-- read with its mark dropped, which evaluates with it (`reduceUnmark`).
 attribute [vir_denote, vir_denote_norm] VerexIR.Proofs.Denote.NTy.subst
   VerexIR.Proofs.Denote.NRow.subst VerexIR.Proofs.Denote.NRows.subst
   VerexIR.Proofs.Denote.NRow.getD
@@ -3304,7 +3733,8 @@ theorem self_eq_extract_iff {α : Type} {as : Array α} {i j : Nat} :
     as = as.extract i j ↔ as.size = 0 ∨ i = 0 ∧ as.size ≤ j := by
   rw [eq_comm]; exact Array.extract_eq_self_iff
 
--- A slice, read by its size and elements.
+-- A slice, read by its size and elements; a vector's by its array's.
+attribute [vir_denote_norm] VerexIR.SpecVector.values_extract
 attribute [vir_denote_norm] Array.extract_size Array.size_extract Array.getElem?_extract
   Array.extract_eq_self_iff self_eq_extract_iff Array.extract_size_left
 -- An operation on a mapped array, as the mapped result.
@@ -3557,6 +3987,27 @@ simproc [vir_denote_norm] valuesOfNest
 attribute [vir_denote_norm] VerexIR.Proofs.Denote.wrapInt_unsigned
   VerexIR.Proofs.Denote.wrapInt_signed VerexIR.Proofs.Denote.ModularOp.run_val
   VerexIR.Proofs.Denote.BitOp.run_val
+-- Rust's primitives: a flag as the exact result's range, a character's validity
+-- as its code point's.
+attribute [vir_denote_norm] VerexIR.Proofs.Denote.ModularOp.overflows_unsigned_succ
+  VerexIR.Proofs.Denote.ModularOp.overflows_signed_succ VerexIR.Proofs.Denote.ModularOp.eval_add
+  VerexIR.Proofs.Denote.ModularOp.eval_subtract VerexIR.Proofs.Denote.ModularOp.eval_multiply
+  VerexIR.Proofs.Denote.isUnicodeScalar_eq_true
+/-- What `pop` leaves after `push`: the vector pushed to. -/
+theorem SpecVector_extract_push_size {α : Type} (vector : VerexIR.SpecVector α) (element : α)
+    (length : Nat) (room : vector.values.size + 1 < 2 ^ 64) (whole : length = vector.values.size) :
+    (vector.push element).extract 0 length = vector := by
+  subst whole
+  apply VerexIR.SpecVector.ext
+  simp only [VerexIR.SpecVector.values_extract, VerexIR.SpecVector.values_push element room]
+  apply Array.ext
+  · simp
+  · intro position _ inner
+    simp only [Array.getElem_extract, Nat.zero_add]
+    exact Array.getElem_push_lt inner
+
+attribute [vir_denote_norm] SpecVector_extract_push_size
+
 attribute [vir_denote_norm] VerexIR.Proofs.wp_pure
   VerexIR.Proofs.wp_abort VerexIR.Proofs.wp_given VerexIR.Proofs.Spec.pure_bind
   VerexIR.Proofs.Spec.abort_bind VerexIR.Proofs.Denote.wp_abortAt VerexIR.Proofs.Denote.wp_opAt

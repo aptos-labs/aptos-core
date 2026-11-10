@@ -9,7 +9,7 @@ verex namespace match_guard where
     | Some (0 : u32) = 1
 
   fun positive_or(value : Maybe, fallback : u32) -> u32 :=
-    match discriminant[Maybe, isize](value) with
+    match core.readDiscriminant[isize](value) with
       | 1 => do
         let candidate' := &value.0
         if *candidate' > 0u32 then value.0 else fallback

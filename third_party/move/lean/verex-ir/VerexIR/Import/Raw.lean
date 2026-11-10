@@ -19,7 +19,7 @@ version. A decoder must validate this value before constructing `RawUnit`.
 The defaults are the current version, which the codec and validation read. -/
 structure Version where
   major : Nat := 1
-  minor : Nat := 6
+  minor : Nat := 9
   deriving Repr, BEq, Inhabited
 
 /-- MIR unwind behavior detached from compiler-local block identities. -/
@@ -29,6 +29,11 @@ inductive RawUnwindAction where
   | terminate (reason : String)
   | cleanup (target : BlockId)
   deriving Repr, BEq, Inhabited
+
+/-- The block an unwind action transfers to, if any. -/
+def RawUnwindAction.cleanupTarget : RawUnwindAction → Array BlockId
+  | .cleanup target => #[target]
+  | .continue_ | .unreachable | .terminate _ => #[]
 
 /-- Destination written by a returning MIR call and its normal successor. -/
 structure RawCallDestination where
@@ -80,6 +85,17 @@ inductive RawTerminator where
   | abort
   deriving Repr, BEq, Inhabited
 
+/-- The blocks a terminator may transfer to, its cleanup edge included. -/
+def RawTerminator.successors : RawTerminator → Array BlockId
+  | .goto target => #[target]
+  | .branch _ thenTarget elseTarget => #[thenTarget, elseTarget]
+  | .switch _ cases defaultTarget => cases.map (·.2) |>.push defaultTarget
+  | .call _ destination unwind =>
+      destination.toArray.map (·.target) ++ RawUnwindAction.cleanupTarget unwind
+  | .drop _ target unwind | .assert _ _ _ target unwind =>
+      #[target] ++ RawUnwindAction.cleanupTarget unwind
+  | .return_ _ | .throw_ _ _ | .unreachable | .resume | .abort => #[]
+
 /-- One raw CFG block: a sequence of detached MIR/VIR statements followed by
 exactly one explicit terminator. -/
 structure RawBasicBlock where
@@ -125,6 +141,8 @@ structure RawNamespaceInterface where
   /-- Specification-function signatures this namespace exports, likewise
   without bodies. -/
   specFunctions : Array SpecFunctionDecl := #[]
+  /-- The scopes its names are declared in, each after its parent. -/
+  scopes : Array ScopeDecl := #[]
   deriving Repr, BEq, Inhabited
 
 /-- Unit-wide statement about an upstream producer, check, or assumption.

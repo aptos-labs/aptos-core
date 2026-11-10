@@ -779,6 +779,28 @@ function value does not depend on its captures' ghost slots, which the
 runtime ignores, so a lemma transferring `KeepsMemoryAt` along
 `eraseGhosts`-equality is the fix.
 
+### V29. A read at a computed position beside a write at a named one
+
+1 test. A clause reads a vector at the position its source expression
+computes (`features[feature / 8]`) while the body wrote at the local a
+`let` named (`byte_index`), the two related by the leaf's `named_eq`
+hypothesis alone. The automatic stages decide the leaf without unnaming its
+positions, so the read-after-write rules (`Array.getElem?_setIfInBounds_*`)
+do not fire and the clause is left open:
+
+```text
+functional/bitwise_features.move:81:9: error: the specification clause `ensures include == spec_contains(features, feature)` is not established
+```
+
+Tests: `functional/bitwise_features.move` (`set`). `verex_unname` on the
+prepared leaf aligns the positions and the lookup then reduces, which
+`verex_unname_positions` is meant to do in `verex_prepared_leaf`; it reports
+`no named position` here. Aligning them is not sufficient on its own: the
+residue is the bitvector fact `m &&& (v ||| m) > 0` for the symbolic mask
+`m = 1 <<< (feature % 8) % 256`, which no closer decides. Both the stage
+that unnames a decided leaf's positions and the bitvector reasoning over a
+symbolic shift are open.
+
 ## Outside the unit tests
 
 ### O1. `vector` functions with lambdas are unsupported declarations

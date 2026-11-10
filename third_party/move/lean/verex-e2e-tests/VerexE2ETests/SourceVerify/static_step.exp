@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/static_step.rs:22:5: info: `step_twice` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/static_step.rs:22:5: info: `forward` uses concrete verification: Given interpretation does not yet support behavioral contract interpretation

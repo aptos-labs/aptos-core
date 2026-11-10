@@ -3,6 +3,7 @@
 
 import VerexRust.Driver
 import VerexSL.Print
+import VerexIR.Proofs.Denote.Compile
 import VerexIR.TestInfra
 
 /-!
@@ -11,7 +12,10 @@ import VerexIR.TestInfra
 Every `.rs` file in this feature directory is discovered automatically and
 crosses the pinned rustc MIR exporter and validated Rust VIR before its
 canonical VerexSL source, or its current concrete error, is compared with
-the side-by-side `.exp.lean`.
+the side-by-side `.exp.lean`: the crate's namespace after the dependency crates
+it reaches. The rendering is lowered back and each of the crate's functions
+compiled to its denotation, as verification compiles it; a function that has
+none is recorded after the source with the construct that stops it.
 -/
 
 namespace VerexE2ETests.RustToVerexSL
@@ -29,17 +33,36 @@ private def loadOriginal (artifact source : System.FilePath) :
       output := artifact }
   pure result.unit
 
+/-- The functions of the rendering's own namespace that compile to no
+denotation, each with the construct that stops it, as comments. -/
+private def denotationGaps (environment : Lean.Environment) (source : System.FilePath)
+    (unit : VerexIR.Validation.ValidatedUnit) : IO String := do
+  let reimported ← match VerexSL.Print.reimportUnit environment unit with
+    | .ok reimported => pure reimported
+    | .error error => throw <| IO.userError s!"generated Rust VerexSL does not lower: {error}"
+  let some ns := reimported.namespaces[0]?
+    | throw <| IO.userError s!"{source}: the rendering has no namespace"
+  let gaps := ns.functions.zipIdx.filterMap fun (declaration, index) =>
+    match VerexIR.Proofs.Denote.compileFunction reimported
+        { namespaceId := ns.identity, functionId := ⟨index⟩ } with
+    | .ok _ => none
+    | .error reason =>
+        let name := (reimported.tables.names[declaration.name.index]?.map (·.name)).getD "?"
+        some s!"-- no denotation for `{name}`: {reason}\n"
+  pure <| if gaps.isEmpty then "" else "\n" ++ String.join gaps.toList
+
 private def render (environment : Lean.Environment) (source : System.FilePath)
     (unit : VerexIR.Validation.ValidatedUnit) : IO String := do
   let printed ← VerexIR.Rust.Benchmark.measureExcept "e2e.verex_print" source.toString fun _ =>
-    VerexSL.Print.render environment unit
+    VerexSL.Print.renderUnit environment unit
   match printed with
   | .ok output =>
       let formatted ← VerexIR.Rust.Benchmark.measureExcept "e2e.verex_reimport"
-          source.toString fun _ =>
-        VerexSL.Print.formatSource environment output 80 "<generated Rust VerexSL>"
+          source.toString fun _ => do
+        VerexSL.Print.renderUnit environment (← VerexSL.Print.reimportUnit environment unit)
       match formatted with
-      | .ok reprinted => if reprinted == output then pure output else
+      | .ok reprinted => if reprinted == output then
+            pure (output ++ (← denotationGaps environment source unit)) else
           throw <| IO.userError s!"generated Rust VerexSL is not a canonical fixed point:\n\
             {Baseline.formatDiff "<first print>" output reprinted}"
       | .error error =>

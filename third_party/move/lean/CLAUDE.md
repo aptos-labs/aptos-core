@@ -127,9 +127,10 @@ and a harness failure of the verifier is never written as a baseline; see
 Between edit batches, run `scripts/smoke.sh`, described in
 [`.cursor/skills/verex-smoke/SKILL.md`](../../../.cursor/skills/verex-smoke/SKILL.md):
 it builds in place and runs the fixtures that catch this stack's regressions,
-read-only against their `.exp`, and refuses `UB=1`. `--no-exe` skips the
-executable and the two items needing it. Green smoke is not the commit gate; the
-four suites and the Move Prover's lean gate are.
+read-only against their `.exp`, and refuses `UB=1`. `--rust` runs the Rust path
+instead, `--no-exe` skips the executable and the two items needing it. Green
+smoke is not the commit gate; the four suites and the Move Prover's lean gate
+are.
 
 While iterating, build libraries, not executables: `lake build` in `verex-ir`,
 `lake build VerexMove` in `verex-move`, and `lake build VerexE2ETests` in
@@ -200,6 +201,42 @@ and buildable between their landings. The rules that make that hold:
 
 For the inner loop inside one module, prefer the language server (previous
 section); `lake build` remains the gate before any port.
+
+### Diagnosing a failure
+
+A probe is expensive here: a scratch file that imports `VerexSL` and runs
+`verify` interprets the verifier and takes minutes, and a rebuild after an edit
+of the solver or of `Types.lean` takes longer. Analyse the code first, and
+spend a probe only on a question the source cannot answer.
+
+- **Read before running.** Start from the message and the code that emits it
+  (`grep` the text), then read the definitions on the path through the language
+  server's queries. State the hypothesis the probe is to decide before writing
+  it; a probe run to "see what happens" usually has to be run again.
+- **Compare the sides.** After a merge or a restack, `git show <rev>:<file>`
+  and `git diff` of the two parents answer most questions without elaborating
+  anything: which side a binder, an arity, or a match arm comes from. A branch
+  tip is not evidence that a test passed there; check that it built.
+- **Check the signature, not the source text.** Section `variable`s reach a
+  declaration by use: a theorem takes every instance variable whose
+  dependencies it has, and a definition also takes one its body's proofs use,
+  which `omit` does not prevent. `#check @name` on the built package is the
+  cheap, decisive query; metaprograms that build the application with
+  `mkAppN` or test it with `isAppOfArity` must agree with what it prints.
+- **Positional names move.** Equation lemmas (`f.eq_12`) and constructor
+  indices are numbered by arm order, so inserting an arm silently retargets a
+  metaprogram that names one. Search for such names when adding a constructor.
+- **Reducible definitions hide from the simplifier's index.** `NTy.subst`,
+  `NRow.subst` and `NTy.unmark` are reducible, so a closed application of one
+  is indexed by what it reduces to: a `simproc` on the unreduced pattern does
+  not fire, and "made no progress" on such a term is not a defect. A residue
+  like `(NTy.int 64 false).unmark` is the same type to a tactic and a different
+  term to a metaprogram that matches syntax.
+- **Make the one probe small.** Isolate the target
+  (`scripts/isolate-target.py`), set `pragma verify = false` and verify the one
+  function, and print the one hypothesis or argument in question rather than
+  the whole goal. Prefer the built executable (`verex-move elaborate`) over
+  `lake env lean` for anything repeated.
 
 ### Baselines and generated fixtures
 

@@ -1,0 +1,10 @@
+VerexE2ETests/SourceVerify/library_iter.spec.lean:49:3: error: the specification clause `ensures values.length > 0 ==> result == values[values.length - 1]` is not established
+VerexE2ETests/SourceVerify/library_iter.spec.lean:54:15: error: the loop invariant `iter.pos > 0 ==> last == values[iter.pos - 1]` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter.spec.lean:48:6: error: verex verification failed: the automatic verification of `last_or` failed; provide a proof in the module:
+  verify last_or by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

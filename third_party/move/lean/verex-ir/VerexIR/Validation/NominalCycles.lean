@@ -11,7 +11,7 @@ open VerexIR.Import
 
 private def children : Ty → Array TypeId
   | .tuple elements => elements
-  | .vector element _ | .typeDomain element => #[element]
+  | .vector element _ | .slice element | .typeDomain element => #[element]
   | .resourceDomain _ arguments => arguments.getD #[]
   | .nominal _ arguments => arguments.filterMap fun
       | .typeArg value => some value.typeId

@@ -1,0 +1,17 @@
+VerexE2ETests/SourceVerify/opaque_callee_index_errors.spec.lean:12:3: error: `no panic when aborts at call 1 of index` is not established: the call `[i + 1]` at VerexE2ETests/SourceVerify/opaque_callee_index_errors.rs:35:36 may panic
+  from: VerexIR.IntegerValueFits (VerexIR.IntWidth.bits 64) true entry✝⁵; opaque_callee_index_errors.unit.nominal.namespace.0.declaration✝⁻⁰.vector.deepHolds (self_entries, ()).fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil (self_entries, ()).snd; VerexIR.Proofs.Denote.variantPlain.deepHolds ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) entry; attempt_1._verexJoinEntry_1_8 prepared✝ «native_alloc::vec::Vec::len» «native_alloc::vec::<std::vec::Vec<T, A> as std::ops::Index<I>>::index.at_0» self_entries key assumed permitted final entry✝⁵ entry✝⁴ entry✝³ entry✝¹ entry✝ entry ⋯; (if 0 = entry✝⁵ then some (some ⟨(self_entries, ()), ⋯⟩, some key, some ⟨entry, ⋯⟩, none, none, none, ()) else none) = none; VerexIR.Proofs.Denote.Which.here.there.project? val✝¹.val = some (fst✝, PUnit.unit); (if 1 = entry✝⁵ then some (some ⟨(self_entries, ()), ⋯⟩, some key, some ⟨entry, ⋯⟩, none, none, none, ()) else none) = some (some val✝, fst✝⁴, some val✝¹, fst✝³, fst✝², fst✝¹, PUnit.unit); named.val = fst✝.val + 1; 0 ≤ fst✝.val + 1; fst✝.val + 1 ≤ 18446744073709551615; ↑val✝.val.fst.values.size ≤ named.val
+VerexE2ETests/SourceVerify/opaque_callee_index_errors.spec.lean:12:8: error: verex verification failed: the automatic verification of `Map::next_or_zero` failed; provide a proof in the module:
+  verify Map::next_or_zero by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of index => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/opaque_callee_index_errors.spec.lean:16:5: error: the specification clause `ensures result == key` is not established
+VerexE2ETests/SourceVerify/opaque_callee_index_errors.spec.lean:15:8: error: verex verification failed: the automatic verification of `Map::value_is_key` failed; provide a proof in the module:
+  verify Map::value_is_key by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

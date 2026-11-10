@@ -54,6 +54,13 @@ repeat = 3
 A Move problem with `dev = true` compiles its package in dev mode, with
 its `[dev-addresses]`, as the higher-order paper's examples need.
 
+`bench/rust` holds Rust counterparts of Move problems, named `rust_<name>`, so
+coverage and cost are tracked on the same algorithms in both languages:
+`math64`, `bit_vector`, `simple_map`, and `lower_bound`, whose Move counterpart
+is `bench/package/sources/lower_bound.move`, since `ordered_map` does not verify
+its search. Their false twins are `SourceVerify/bench_<name>_errors.rs`. A proof
+of a Rust problem stands in its `.spec.lean`.
+
 A problem may declare `expected_rejections`, an array of fully qualified
 verification target names. AMM declares its intentionally non-compliant fee
 constructor this way. The benchmark reports **expected rejection** only when

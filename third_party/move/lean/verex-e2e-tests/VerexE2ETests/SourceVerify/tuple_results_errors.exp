@@ -1,0 +1,40 @@
+VerexE2ETests/SourceVerify/tuple_results_errors.spec.lean:8:3: error: the specification clause `ensures result == (a, b)` is not established
+VerexE2ETests/SourceVerify/tuple_results_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `swapped` failed; provide a proof in the module:
+  verify swapped by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_results_errors.spec.lean:11:3: error: the specification clause `ensures spec.result[0] == spec.result[1]` is not established
+VerexE2ETests/SourceVerify/tuple_results_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `same` failed; provide a proof in the module:
+  verify same by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_results_errors.spec.lean:14:3: error: the specification clause `ensures result == t[1]` is not established
+VerexE2ETests/SourceVerify/tuple_results_errors.spec.lean:13:6: error: verex verification failed: the automatic verification of `first` failed; provide a proof in the module:
+  verify first by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_results_errors.spec.lean:17:3: error: the specification clause `ensures result == t[1]` is not established
+VerexE2ETests/SourceVerify/tuple_results_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `nested` failed; provide a proof in the module:
+  verify nested by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_results_errors.spec.lean:20:3: error: the specification clause `ensures t[0] == old(t[0])` is not established
+VerexE2ETests/SourceVerify/tuple_results_errors.spec.lean:19:6: error: verex verification failed: the automatic verification of `written` failed; provide a proof in the module:
+  verify written by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -177,9 +177,12 @@ statements and call/drop/assert/cleanup terminators; the structurizer
 classifies storage lifetime markers, place mentions, and user-type
 ascriptions as inert administration and erases them after validation, and
 under `panic=abort` lowers ordinary bounds, overflow, division, and remainder
-assertions to explicit panic branches. Destructive and provenance-sensitive
-statements, cleanup edges, and exceptional terminators are rejection
-boundaries.
+assertions to explicit panic branches. Before that, a region of blocks all of
+whose paths reach a call that does not return collapses to `abort`
+(`Import/PanicRegions.lean`). `unreachable` is not a panic path: it says a path
+cannot happen, and leaves the graph only together with such a call. Destructive and
+provenance-sensitive statements, cleanup edges, and exceptional terminators outside
+a region are rejection boundaries.
 
 ## Compilation units and dependencies
 
@@ -187,10 +190,15 @@ The checked object is a compilation unit, not an isolated module: calls,
 friends, abilities, specifications, and intrinsic bindings refer across
 module boundaries. A unit holds a version, one interned `Tables` snapshot,
 profile configurations, owned namespaces, dependency interfaces, and import
-evidence. A namespace is a language-neutral hierarchical declaration
-container of which a Move module, Rust crate or module, and generated Verex
-namespace are profile-specific views; the core does not bake Move
-address/module identity into every declaration.
+evidence. A namespace is a language-neutral declaration container of which
+a Move module, a Rust crate, and a generated Verex namespace are
+profile-specific views; the core does not bake Move address/module identity
+into every declaration. A namespace declares its scopes, naming scopes
+inside it: the modules of a Rust crate, which refer to each other in cycles
+while crates form a DAG, so a crate stays one namespace, and the types,
+traits, and trait impls its associated functions belong to (`Vec::push` is
+`push` in scope `vec::Vec` of `alloc`). Only a module contains scopes. A name
+carries the scope it is declared in, a path relative to its namespace.
 
 The `Tables` snapshot contains the identities referenced by owned namespaces
 and dependency interfaces, once per unit. Owned namespaces occupy the leading
@@ -280,8 +288,8 @@ interned type has no source range, so occurrences use a located `TypeUse`
 in signatures, fields, locals, casts, and generic arguments. A namespace is
 a finite, deterministic record of its declarations by kind (constants,
 structs, associated items, traits, implementations, functions, specification
-functions and variables, invariants, intrinsics, comments), its arenas, its
-imports, profile metadata, attributes, and pragmas. Trait and implementation
+functions and variables, invariants, intrinsics, comments), its scopes, its
+arenas, its imports, profile metadata, attributes, and pragmas. Trait and implementation
 declarations are ordinary core declaration tables referenced through checked
 IDs, not profile payloads. Declaration arrays retain source order.
 
@@ -289,7 +297,7 @@ IDs, not profile payloads. Declaration arrays retain source order.
 
 The core type language is the known Move/Rust union: unit, never, Boolean,
 character, fixed-width integers, tuples, vectors with an optional fixed
-length (Move `vector<T>` and Rust `Vec<T>` against Rust arrays), nominal
+length (Move `vector<T>` and Rust `Vec<T>` against Rust arrays), unsized slices, nominal
 types with generic arguments, function types with abilities, type
 parameters, references, and a profile extension. Function-value abilities,
 generic predicates (abilities, trait implementation, associated type and
@@ -297,6 +305,18 @@ constant equalities, lifetime outlives, const equality), structure
 abilities, trait identities, implementations, and associated-item bindings
 are structural data; profiles define language-specific admission rules
 rather than replacing them with tags.
+
+Rust `[T]` has a distinct unsized `Slice<T>` type. Indexing exposes its element
+type; whole-value replacement, moves, and vector resizing require sized storage
+and do not apply to a slice. Generic actuals obey the supported `Sized` boundary;
+a reference to a slice is sized, while the slice itself is not.
+
+A mutable slice loan retains the fixed extent of its backing storage. Its logical
+carrier contains one extent and two arrays indexed by it, for the current and
+final contents. Thus every possible final value already has the borrowed length.
+Redirecting a reference variable may select another extent; reborrowing its
+referent preserves the existing extent. The integration gates and the remaining
+mutable-subrange work are tracked in [the Rust verification plan](../plan/rust-verification.md).
 
 Pure tuple/vector operations, indexing, Boolean operations, comparisons, and
 integer arithmetic are core nodes. Fixed-width arithmetic is modular; the
@@ -312,9 +332,27 @@ freeze form a typed reference-operation family. A direct local read is
 non-consuming; validation infers the access of a value type without `Copy`:
 a selection or index of it with `Copy` copies its place, the operand of an
 observer (discriminant, variant test, length, index check) reads it, and
-otherwise the local is moved; a reference local keeps its read. Field and
-variant operations carry strong qualified references; enum variants may
-record an observable integer discriminant distinct from array position.
+otherwise the local is moved. A reference without `Copy` is moved too, except
+as the operand an observer or a reference operation takes at rest; a reference
+with `Copy` keeps its read. Field and variant operations carry strong qualified
+references; enum variants may record an observable integer discriminant
+distinct from array position.
+
+`readDiscriminant(place)` observes only an enum's tag. Unlike a value-level
+discriminant applied to a whole-value read, it requires initialized enum
+storage but does not require payload fields moved out earlier to be initialized.
+It consumes no payload and yields the declared integer discriminant. Validation
+checks the enum place, empty operand/type-argument lists, and result bounds;
+execution also rejects a tag outside the result's integer bounds. Whole-value
+and payload reads retain their ordinary initialization requirements. The source
+form is `core.readDiscriminant[resultType](place)`.
+
+Initialization also records a saved tag's provenance for direct owned enum
+locals. An exact integer match arm can then discard partial-move facts of
+other declared variants. It retains root and selected-payload facts. Whole
+writes or moves, including a terminal downcast move, invalidate saved tags;
+borrowing disables this refinement because later indirect writes are not
+tracked. Defaults, unknown tags, and indirect enum storage remain conservative.
 
 The specification language is core: contract clauses and the
 `forall`/`exists`/choice quantifiers are typed nodes; mathematical integers,
@@ -336,7 +374,7 @@ literals core constants. An elided Move lifetime produces a fresh core
 the same table. Lifetime constraints, inference, and profile-specific borrow
 checking are separate checked passes.
 
-Places are first-class (local, dereference, field, index, subslice,
+Places are first-class (local, dereference, field, index, subslice, unsize,
 downcast) because both lowerings need them and Rust moves and borrows cannot
 be value-only expressions. Operations distinguish move, copy, borrow kinds,
 read, write, assert, and drop. `GlobalKind` makes keyed storage first-class

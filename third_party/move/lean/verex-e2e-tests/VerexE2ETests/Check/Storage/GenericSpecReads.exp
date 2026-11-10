@@ -8,3 +8,247 @@ VerexE2ETests/Check/Storage/GenericSpecReads.lean:35:7: error: verex verificatio
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 `deposit` uses concrete verification: Given interpretation does not yet support storage interpretation
 `deposit_twice` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/Check/Storage/GenericSpecReads.lean:53:7: error: verification failed with a residual obligation:
+case some.left.continues.continues.continues.left.continues.continues.continues.right.right.right
+Θ✝ : VerexIR.Proofs.Denote.Skolems «0x42».generic_spec_reads.unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
+frame✝ :
+  VerexIR.Proofs.Denote.FrameOf «0x42».generic_spec_reads.unit
+    { namespaceId := { index := 0 }, functionId := { index := 3 } } [VerexIR.BinderKind.typeArg] typeInstantiation✝
+addr : VerexIR.Proofs.Denote.NTy.address.carrier
+amount : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory «0x42».generic_spec_reads.unit
+assumed permitted : True
+verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 740 (some addr, some amount, none, none, ()) initialState✝
+w✝ :
+  (VerexIR.Proofs.Denote.Skolems.resolve
+      (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))).carrier
+left✝ :
+  initialState✝
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address addr) =
+    some w✝
+old_value :
+  (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).carrier
+a✝⁴ :
+  0 ≤
+    (VerexIR.Proofs.Denote.Skolems.ofRuntime
+              (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+              w✝).val.fst.val +
+      amount.val
+a✝³ :
+  (VerexIR.Proofs.Denote.Skolems.ofRuntime
+              (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+              w✝).val.fst.val +
+      amount.val ≤
+    18446744073709551615
+invariantHolds✝⁵ invariantHolds✝⁴ : True
+named_eq :
+  old_value.val.fst.val =
+    (VerexIR.Proofs.Denote.Skolems.ofRuntime
+              (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+              w✝).val.fst.val +
+      amount.val
+invariantHolds✝³ : True
+verexAnchor :
+  VerexIR.Proofs.Denote.AnchorSaved 740 (some addr, some amount, none, none, ())
+    (initialState✝.set
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address addr)
+      (some
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+          old_value)))
+value : (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).carrier
+a✝² : 0 ≤ old_value.val.fst.val + amount.val
+a✝¹ : old_value.val.fst.val + amount.val ≤ 18446744073709551615
+invariantHolds✝² invariantHolds✝¹ : True
+a✝ : value.val.fst.val = old_value.val.fst.val + amount.val
+invariantHolds✝ : True
+⊢ ¬(initialState✝
+          {
+            type :=
+              VerexIR.Proofs.Denote.Skolems.resolve
+                (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+            arguments :=
+              VerexIR.Proofs.Denote.NRow.cons
+                (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                  (VerexIR.Proofs.Denote.NTy.param 0))
+                VerexIR.Proofs.Denote.NRow.nil }
+          (VerexIR.StorageKey.address addr) =
+        none ∨
+      18446744073709551615 <
+        ((Option.map
+                      (fun value =>
+                        VerexIR.Proofs.Denote.Skolems.ofRuntime
+                          (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰
+                            (VerexIR.Proofs.Denote.NTy.param 0))
+                          value)
+                      (initialState✝
+                        {
+                          type :=
+                            VerexIR.Proofs.Denote.Skolems.resolve
+                              (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰
+                                (VerexIR.Proofs.Denote.NTy.param 0)),
+                          arguments :=
+                            VerexIR.Proofs.Denote.NRow.cons
+                              (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                (VerexIR.Proofs.Denote.NTy.param 0))
+                              VerexIR.Proofs.Denote.NRow.nil }
+                        (VerexIR.StorageKey.address addr))).getD
+                  ((0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰
+                        (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant
+                    ⋯)).val.fst.val +
+          2 * amount.val)
+VerexE2ETests/Check/Storage/GenericSpecReads.lean:53:7: error: verification failed with a residual obligation:
+case some.left.continues.continues.continues.left.continues.continues.continues.right.left
+Θ✝ : VerexIR.Proofs.Denote.Skolems «0x42».generic_spec_reads.unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
+frame✝ :
+  VerexIR.Proofs.Denote.FrameOf «0x42».generic_spec_reads.unit
+    { namespaceId := { index := 0 }, functionId := { index := 3 } } [VerexIR.BinderKind.typeArg] typeInstantiation✝
+addr : VerexIR.Proofs.Denote.NTy.address.carrier
+amount : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory «0x42».generic_spec_reads.unit
+assumed permitted : True
+verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 740 (some addr, some amount, none, none, ()) initialState✝
+w✝ :
+  (VerexIR.Proofs.Denote.Skolems.resolve
+      (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))).carrier
+left✝ :
+  initialState✝
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address addr) =
+    some w✝
+old_value :
+  (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).carrier
+a✝⁴ :
+  0 ≤
+    (VerexIR.Proofs.Denote.Skolems.ofRuntime
+              (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+              w✝).val.fst.val +
+      amount.val
+a✝³ :
+  (VerexIR.Proofs.Denote.Skolems.ofRuntime
+              (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+              w✝).val.fst.val +
+      amount.val ≤
+    18446744073709551615
+invariantHolds✝⁵ invariantHolds✝⁴ : True
+named_eq :
+  old_value.val.fst.val =
+    (VerexIR.Proofs.Denote.Skolems.ofRuntime
+              (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+              w✝).val.fst.val +
+      amount.val
+invariantHolds✝³ : True
+verexAnchor :
+  VerexIR.Proofs.Denote.AnchorSaved 740 (some addr, some amount, none, none, ())
+    (initialState✝.set
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address addr)
+      (some
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+          old_value)))
+value : (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).carrier
+a✝² : 0 ≤ old_value.val.fst.val + amount.val
+a✝¹ : old_value.val.fst.val + amount.val ≤ 18446744073709551615
+invariantHolds✝² invariantHolds✝¹ : True
+a✝ : value.val.fst.val = old_value.val.fst.val + amount.val
+invariantHolds✝ : True
+key : VerexIR.StorageKey
+x✝ : ¬key = VerexIR.StorageKey.address addr
+⊢ (initialState✝.set
+          {
+            type :=
+              VerexIR.Proofs.Denote.Skolems.resolve
+                (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+            arguments :=
+              VerexIR.Proofs.Denote.NRow.cons
+                (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                  (VerexIR.Proofs.Denote.NTy.param 0))
+                VerexIR.Proofs.Denote.NRow.nil }
+          (VerexIR.StorageKey.address addr)
+          (some
+            (VerexIR.Proofs.Denote.Skolems.toRuntime
+              (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+              old_value))).set
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address addr)
+      (some
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)) value))
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      key =
+    initialState✝
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_reads.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      key
+VerexE2ETests/Check/Storage/GenericSpecReads.lean:54:4: error: the specification clause `aborts_if !exists<Coin<C> >(addr)` is not established
+VerexE2ETests/Check/Storage/GenericSpecReads.lean:55:4: error: the specification clause `aborts_if global<Coin<C> >(addr).value + 2 * amount > MAX_U64` is not established
+VerexE2ETests/Check/Storage/GenericSpecReads.lean:56:4: error: the specification clause `ensures global<Coin<C> >(addr).value == old(global<Coin<C> >(addr).value) + 2 * amount` is not established
+VerexE2ETests/Check/Storage/GenericSpecReads.lean:53:7: error: verex verification failed: the automatic verification of `deposit_twice` failed; provide a proof in the module:
+  verify deposit_twice by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

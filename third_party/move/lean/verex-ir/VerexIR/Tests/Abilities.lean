@@ -249,8 +249,51 @@ private def unconstrainedVectorCopyFixture : RawUnit :=
       ns with structs := ns.structs.set! 1 {
         declaration with generics := #[{ binder with abilities := #[] }] } }] }
 
-#guard validationHasDiagnosticAt rustSchema rustSemantics unconstrainedVectorCopyFixture
-  "VIR-SEMANTIC-ABILITY" ⟨8⟩
+-- A Rust declaration's `copy` is conditional on its type arguments, as
+-- `#[derive(Copy)]` states it, so an unbounded parameter is no obstacle.
+#guard (prepare? rustSchema rustSemantics unconstrainedVectorCopyFixture).isSome
+
+/-- `Blob<T> has copy` with a field of type `T`, copied at `Blob<bool>`. -/
+private def genericCopyFixture : RawUnit :=
+  let ns := copyableFixture.namespaces[0]!
+  let blobOfBool : Ty := .nominal ⟨1⟩ #[.typeArg (typeUse 1 5)]
+  { copyableFixture with
+    tables := { copyableFixture.tables with
+      types := (copyableFixture.tables.types.set! 2 blobOfBool).push (.typeParameter 0) }
+    namespaces := #[{
+      ns with
+      expressions := ns.expressions.set! 1 { ns.expressions[1]! with
+        kind := .operation (.call (.constructor blob)) #[.typeArg (typeUse 1 1)] #[⟨0⟩] }
+      structs := #[{ ns.structs[0]! with
+        generics := #[{ name := "T", kind := .typeArg, loc := ⟨5⟩ }]
+        fields := #[{ loc := ⟨5⟩, name := ⟨2⟩, type := typeUse 3 5 }] }] }] }
+
+-- A Rust declared ability is conditional: `Blob<bool>` is copied.
+#guard (prepare? rustSchema rustSemantics genericCopyFixture).isSome
+
+/-- The same declaration copied at `Blob<&mut bool>`, whose argument is not
+`Copy`. -/
+private def genericNonCopyFixture : RawUnit :=
+  let ns := genericCopyFixture.namespaces[0]!
+  let mutableBool : Ty := .reference {
+    profile := .rust, kind := .mutable, referent := ⟨1⟩, lifetime := ⟨0⟩ }
+  { genericCopyFixture with
+    tables := { genericCopyFixture.tables with
+      lifetimes := #[{ kind := .local, loc := ⟨9⟩ }]
+      types := genericCopyFixture.tables.types ++
+        #[mutableBool, .nominal ⟨1⟩ #[.typeArg (typeUse 4 9)]] }
+    namespaces := #[{
+      ns with
+      expressions := #[{ loc := ⟨9⟩, typeId := ⟨5⟩, kind := .operation (.copy ⟨0⟩) #[] #[] }]
+      patterns := #[]
+      functions := #[{ ns.functions[0]! with
+        signature := { parameters := #[{ name := "blob", typeUse := typeUse 5 9 }]
+                       results := #[typeUse 5 9] }
+        body := .structured ⟨0⟩
+        locals := #[{ id := ⟨0⟩, name := "blob", type := typeUse 5 9, loc := ⟨9⟩ }] }] }] }
+
+#guard preparationHasDiagnosticAt rustSchema rustSemantics genericNonCopyFixture
+  "VIR-SEMANTIC-ABILITY" ⟨9⟩
 
 private def unconstrainedRustDropFixture : RawUnit :=
   let ns := unconstrainedVectorCopyFixture.namespaces[0]!

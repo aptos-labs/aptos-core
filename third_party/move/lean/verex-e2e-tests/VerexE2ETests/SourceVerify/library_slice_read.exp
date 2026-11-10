@@ -1,0 +1,8 @@
+VerexE2ETests/SourceVerify/library_slice_read.spec.lean:19:3: error: the specification clause `ensures ∀ (k in 0 .. values.length), values[k] == old(values)[old(values).length - 1 - k]` is not established
+VerexE2ETests/SourceVerify/library_slice_read.spec.lean:17:6: error: verex verification failed: the automatic verification of `flip` failed; provide a proof in the module:
+  verify flip by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

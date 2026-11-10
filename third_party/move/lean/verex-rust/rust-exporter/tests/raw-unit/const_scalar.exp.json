@@ -1,0 +1,1715 @@
+{
+  "dependencies": [],
+  "evidence": [
+    {
+      "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
+      "trusted": true
+    }
+  ],
+  "namespaces": [
+    {
+      "associatedItems": [],
+      "attributes": [],
+      "comments": [],
+      "constants": [],
+      "doc": "",
+      "expressions": [
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "integer": {
+                  "value": 3
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 3
+          },
+          "typeId": {
+            "index": 3
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 0
+              },
+              "value": {
+                "index": 0
+              }
+            }
+          },
+          "loc": {
+            "index": 3
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 1
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 2
+          },
+          "typeId": {
+            "index": 3
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 2
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 8
+          },
+          "typeId": {
+            "index": 4
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "integer": {
+                  "value": 1024
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 8
+          },
+          "typeId": {
+            "index": 4
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [
+                {
+                  "index": 3
+                },
+                {
+                  "index": 4
+                }
+              ],
+              "instantiations": [],
+              "operation": {
+                "primitive": {
+                  "kind": "less"
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 8
+          },
+          "typeId": {
+            "index": 1
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 3
+              },
+              "value": {
+                "index": 5
+              }
+            }
+          },
+          "loc": {
+            "index": 8
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 4
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 7
+          },
+          "typeId": {
+            "index": 1
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "bool": {
+                  "value": true
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 12
+          },
+          "typeId": {
+            "index": 1
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 5
+              },
+              "value": {
+                "index": 8
+              }
+            }
+          },
+          "loc": {
+            "index": 12
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 6
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 11
+          },
+          "typeId": {
+            "index": 1
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "character": {
+                  "value": 120
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 16
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 7
+              },
+              "value": {
+                "index": 11
+              }
+            }
+          },
+          "loc": {
+            "index": 16
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 8
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 15
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "integer": {
+                  "value": 18446744073709551615
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 20
+          },
+          "typeId": {
+            "index": 3
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 9
+              },
+              "value": {
+                "index": 14
+              }
+            }
+          },
+          "loc": {
+            "index": 20
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 10
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 19
+          },
+          "typeId": {
+            "index": 3
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "integer": {
+                  "value": -3
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 24
+          },
+          "typeId": {
+            "index": 5
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 11
+              },
+              "value": {
+                "index": 17
+              }
+            }
+          },
+          "loc": {
+            "index": 24
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 12
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 23
+          },
+          "typeId": {
+            "index": 5
+          }
+        }
+      ],
+      "functions": [
+        {
+          "alignment": {
+            "index": 0
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 2
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 1
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 2
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 0
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 1
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 1
+                },
+                "typeId": {
+                  "index": 3
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 0
+          },
+          "origin": {
+            "index": 0
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 1
+                },
+                "typeId": {
+                  "index": 3
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 1
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 7
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 6
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 7
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 4
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 5
+              },
+              "mutable": false,
+              "name": "value",
+              "type": {
+                "loc": {
+                  "index": 5
+                },
+                "typeId": {
+                  "index": 4
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 6
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 6
+                },
+                "typeId": {
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 1
+          },
+          "origin": {
+            "index": 1
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "value",
+                "typeUse": {
+                  "loc": {
+                    "index": 5
+                  },
+                  "typeId": {
+                    "index": 4
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 6
+                },
+                "typeId": {
+                  "index": 1
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 2
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 11
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 9
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 10
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 9
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 10
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 10
+                },
+                "typeId": {
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 2
+          },
+          "origin": {
+            "index": 2
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 10
+                },
+                "typeId": {
+                  "index": 1
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 3
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 15
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 12
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 13
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 13
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 14
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 14
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 3
+          },
+          "origin": {
+            "index": 3
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 14
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 4
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 19
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 15
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 16
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 17
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 18
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 18
+                },
+                "typeId": {
+                  "index": 3
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 4
+          },
+          "origin": {
+            "index": 4
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 18
+                },
+                "typeId": {
+                  "index": 3
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 5
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 23
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 18
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 19
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 21
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 22
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 22
+                },
+                "typeId": {
+                  "index": 5
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 5
+          },
+          "origin": {
+            "index": 5
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 22
+                },
+                "typeId": {
+                  "index": 5
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "identity": {
+        "index": 0
+      },
+      "implementations": [],
+      "imports": [],
+      "intrinsics": [],
+      "invariants": [],
+      "lemmas": [],
+      "loc": {
+        "index": 0
+      },
+      "patterns": [],
+      "places": [
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        }
+      ],
+      "pragmas": [],
+      "profile": "rust",
+      "profileMetadata": [],
+      "scopes": [
+        {
+          "kind": "inherent",
+          "loc": {
+            "index": 25
+          },
+          "path": [
+            "Scale"
+          ]
+        }
+      ],
+      "specFunctions": [],
+      "specVars": [],
+      "structs": [],
+      "traits": []
+    }
+  ],
+  "profiles": [
+    {
+      "name": "rust",
+      "options": [
+        [
+          "panic",
+          "abort"
+        ],
+        [
+          "unsafe",
+          "reject"
+        ],
+        [
+          "target_pointer_width",
+          "64"
+        ]
+      ],
+      "profile": "rust",
+      "version": 5
+    }
+  ],
+  "tables": {
+    "alignments": [
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 0
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 1
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 2
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 3
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 4
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 5
+        },
+        "trust": "checked"
+      }
+    ],
+    "files": [
+      {
+        "contentHash": "",
+        "name": "tests/raw-unit/const_scalar.rs"
+      }
+    ],
+    "lifetimes": [],
+    "locations": [
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 487,
+          "file": {
+            "index": 0
+          },
+          "startByte": 465
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 487,
+          "file": {
+            "index": 0
+          },
+          "startByte": 484
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 516,
+          "file": {
+            "index": 0
+          },
+          "startByte": 516
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 510,
+          "file": {
+            "index": 0
+          },
+          "startByte": 498
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 217,
+          "file": {
+            "index": 0
+          },
+          "startByte": 177
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 201,
+          "file": {
+            "index": 0
+          },
+          "startByte": 196
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 217,
+          "file": {
+            "index": 0
+          },
+          "startByte": 213
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 239,
+          "file": {
+            "index": 0
+          },
+          "startByte": 239
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 237,
+          "file": {
+            "index": 0
+          },
+          "startByte": 224
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 346,
+          "file": {
+            "index": 0
+          },
+          "startByte": 325
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 346,
+          "file": {
+            "index": 0
+          },
+          "startByte": 342
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 359,
+          "file": {
+            "index": 0
+          },
+          "startByte": 359
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 357,
+          "file": {
+            "index": 0
+          },
+          "startByte": 353
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 384,
+          "file": {
+            "index": 0
+          },
+          "startByte": 361
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 384,
+          "file": {
+            "index": 0
+          },
+          "startByte": 380
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 399,
+          "file": {
+            "index": 0
+          },
+          "startByte": 399
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 397,
+          "file": {
+            "index": 0
+          },
+          "startByte": 391
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 264,
+          "file": {
+            "index": 0
+          },
+          "startByte": 241
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 264,
+          "file": {
+            "index": 0
+          },
+          "startByte": 261
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 281,
+          "file": {
+            "index": 0
+          },
+          "startByte": 281
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 279,
+          "file": {
+            "index": 0
+          },
+          "startByte": 271
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 306,
+          "file": {
+            "index": 0
+          },
+          "startByte": 283
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 306,
+          "file": {
+            "index": 0
+          },
+          "startByte": 304
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 323,
+          "file": {
+            "index": 0
+          },
+          "startByte": 323
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 321,
+          "file": {
+            "index": 0
+          },
+          "startByte": 313
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 417,
+          "file": {
+            "index": 0
+          },
+          "startByte": 401
+        },
+        "related": []
+      }
+    ],
+    "names": [
+      {
+        "name": "factor",
+        "namespaceId": {
+          "index": 0
+        },
+        "scope": [
+          "Scale"
+        ]
+      },
+      {
+        "name": "below_limit",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "flag",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "letter",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "maximum",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "negative",
+        "namespaceId": {
+          "index": 0
+        }
+      }
+    ],
+    "namespaces": [
+      {
+        "segments": [
+          "const_scalar"
+        ]
+      }
+    ],
+    "origins": [
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 0
+        },
+        "sourceIdentity": "const_scalar::Scale::factor"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 4
+        },
+        "sourceIdentity": "const_scalar::below_limit"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 9
+        },
+        "sourceIdentity": "const_scalar::flag"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 13
+        },
+        "sourceIdentity": "const_scalar::letter"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 17
+        },
+        "sourceIdentity": "const_scalar::maximum"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 21
+        },
+        "sourceIdentity": "const_scalar::negative"
+      }
+    ],
+    "types": [
+      "unit",
+      "bool",
+      "character",
+      {
+        "integer": {
+          "signed": false,
+          "width": {
+            "bits": {
+              "width": 64
+            }
+          }
+        }
+      },
+      {
+        "integer": {
+          "signed": false,
+          "width": "pointer"
+        }
+      },
+      {
+        "integer": {
+          "signed": true,
+          "width": {
+            "bits": {
+              "width": 8
+            }
+          }
+        }
+      }
+    ]
+  },
+  "version": {
+    "major": 1,
+    "minor": 9
+  }
+}

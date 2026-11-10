@@ -123,6 +123,7 @@ def normalize (unit : ValidatedUnit) : RuntimeValue → RuntimeValue
       .closure function mask typeInstantiation (normalizeList unit captures.toList).toArray
   | .borrow loan current => .borrow loan (normalize unit current)
   | .loanHole loan => .loanHole loan
+  | .retired => .retired
   | .ghost contents => .ghost (normalize unit contents)
   | .unit => .unit
   | .bool value => .bool value

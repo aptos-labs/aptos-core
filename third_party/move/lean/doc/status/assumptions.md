@@ -8,16 +8,28 @@ hypotheses the theorems take.
 - **`compileFunction_agrees`** (axiom). Every outcome of a compiled
   function's prophetic big-step meaning is an outcome of its denotation
   wherever the denotation is defined, over every family and instantiation
-  (`Spec.Refines`). The certifying steps of the denotation are undefined
+  (`Spec.Refines`), for `compileFunctionAt unit handle σ = .ok f`: without a
+  substitution `σ` the statement of `compileFunction` and `propheticMeaning`;
+  at type arguments holding a mutable reference, over the substituted rows,
+  with the frame's agreement at the family they induce (`propheticMeaningAt`).
+  The certifying steps of the denotation are undefined
   where a data invariant fails: a run that packs a value breaking its
   invariant, or that ends a mutable loan over one, keeps its runtime
   outcomes while the denotation is undefined at its start, so the
   refinement asserts nothing of that start. `Satisfies` excludes such a
   start, so the invariant is owed in the function that breaks it
   ([`data-invariants.md`](../designs/data-invariants.md), "Where a value
-  is made"). Establishing it: the induction of
+  is made"). The prophetic boundary uses one `LoanCorrespondence` across initial
+  arguments, exported settlements, and returned references. `BoundaryCorrespondence`
+  requires each original loan to settle independently, even when a nested holder is
+  redirected to another loan; each slice loan retains its own extent. These logical
+  `Settles` conditions have not yet been proved to follow from the runtime's
+  `settleLoans` operations. Connecting that boundary to `BigStep`, including escaped
+  nested reborrows, is part of this axiom's outstanding proof obligation. Establishing it: the induction of
   `denote_agrees` against `BigStep.EvalFunction`, one case per construct
   ([`denotation.md`](../designs/denotation.md), "The design").
+  Until then the Rust fixtures test it on concrete inputs
+  (`verex-rust/VerexRust/Tests/DifferentialCheck.lean`).
 - **`compileFunction_least_cycle`** (axiom; members of cycles of calls).
   The closed meanings of a cycle's members refine the least fixed point of
   their denotations, in the same sense. Establishing it: a continuity proof over the
@@ -89,8 +101,49 @@ hypotheses the theorems take.
 - **`native_f`** (hypothesis per native reached). Each native satisfies
   its contract; a caller of a verified function assumes that function's
   natives too.
+- **The Rust standard-library contracts** (`verex-rust/lib`; each a `native_f`
+  of the theorems reaching it). Trusted and listed; verifying them against the
+  generic MIR of their bodies needs the unsafe profile for most of `alloc`.
+  Capacity and allocation are outside the model: `Vec::push`, `insert`,
+  `extend_from_slice` and `vec!` have no failure of their own, and one that returns
+  had room (`old(self).length < MAX_U64`), and a string's UTF-8 bytes fit in a `usize`,
+  which `String::as_bytes`, `into_bytes`, `push` and `push_str` state of its length.
+  The paired byte-content and byte-length postconditions apply to runtime strings
+  with that representable length; they are not a realizable native contract for
+  every oversized logical `String`. The total logical `stringBytes` operation's
+  empty fallback does not remove this native-model assumption. For a `Vec`
+  of a zero-sized type this is a real assumption and not only a physical one:
+  its length can reach `usize::MAX`, where `push` panics "capacity overflow". The
+  pointer-width integers' contracts state 64 bits, as the rendering's profile does.
+  `Clone` is the identity at the integers, `bool` and `char`, as is `Default` zero or
+  `false`, the only shapes with a contract: a shape over a type parameter would trust
+  an impl the unit does not see. `abs` panics at the minimum, as the caller's overflow
+  checks do in the profile's `panic=abort` debug semantics, like its other arithmetic.
+- **The contract of a refused function** (a `native_f` of the theorems reaching it).
+  A function whose body the unit cannot state (`function.refused`) is an error of
+  its crate's verification, and its callers assume a contract the user gives it.
+- **An empty enum is an empty struct** (the export of `Infallible`). This is sound,
+  since it only adds a value, but a proof has no fact of an empty enum's
+  impossibility: code matching on a value of one is not known to be unreachable.
+- **The models of `core`'s iterators** (`@[model] struct`, `verex-rust/lib/core`).
+  A model states a private representation. `Rev`, `Enumerate`, `RangeInclusive` and
+  `StepBy` hold `core`'s own fields; `slice::Iter` holds `slice`, `pos` and `end` for
+  its pointers, the elements left being `slice[pos .. end]`. `next` follows the pinned
+  toolchain's source, which leaves `start` and `end` unspecified after exhaustion: it
+  wraps the bound and sets `exhausted` only when stepping overflows, and `StepBy`
+  over an unsigned `Range` turns `end` into a count, so a toolchain update re-checks
+  these. `Enumerate::next` panics when `count` overflows
+  (`rustc_inherit_overflow_checks`), which assumes overflow checks are on. A model
+  states no destructor, which is the library's word that `core` declares none on
+  these types.
 - **`NativesTyped`, `NativesShift`** (hypotheses of theorems assuming
   typing). Natives preserve typing and the loan shift.
+- **A native declared `-> !` does not return** (inside
+  `compileFunction_agrees`, as no hypothesis states it). Nothing follows a
+  call returning `!` (`Term.unreachable`, no outcome). A unit-defined callee
+  cannot return, as static typing leaves `!` uninhabited. Of a native, only
+  `NativesTyped` says so, which the axiom does not take, and
+  `NativesTyped` is not discharged.
 - **`RunsAgree`** (hypothesis of theorems assuming typing). Runs of the
   function meaning from starts with the same globals and table handles
   agree up to loan renaming: a run depends on its maps' abstract values
@@ -105,8 +158,37 @@ hypotheses the theorems take.
   Every outcome of a run is an outcome of the reading in which the runs
   pass each assumption only where its condition holds. A caller using the
   theorem takes the same hypothesis; one inlining the function takes none.
+- **`DroppedTypeArgumentsTrivial`** (public generic Rust `verified` theorems,
+  including recursive functions). The argument's destructor has no
+  observable effect and does not panic: the runtime and the denotation read the
+  drop as removing the value. A call in the unit instantiating such a parameter
+  at a type with a destructor has no denotation (`dropsDestructor`,
+  `Denote/Compile.lean`), so only a use of the theorem outside the unit relies
+  on this. The public theorem now requires that the instantiated types of
+  potentially dropped parameters have no destructor and hold no mutable loan.
+  Internal `typedVerified` and `typedSemanticsVerified` artifacts remain about
+  VIR's pure-drop semantics; they are not a claim about arbitrary Rust drop glue.
+  The exporter/type alignment remains trusted until M7. Discharged by M4 of
+  [`rust-verification.md`](../plan/rust-verification.md#m4--drop-and-panic),
+  where a drop runs the destructor.
+- **A diverging region is a panic** (no hypothesis states it; Rust functions).
+  The import collapses the blocks all of whose paths reach a call that does not
+  return into `abort` (`VerexIR/Import/PanicRegions.lean`): what a region computes
+  is unobservable under `panic=abort` and a stateless failure. A diverging callee
+  that does not panic (`exit`, a loop) and a call inside a region that does not
+  return become a panic path, and the callee's contract is not consulted, which
+  is sound and incomplete: the path did not return, and the panic is reported or
+  has to be permitted. An effect of such a callee that outlives the process is
+  not modeled.
 - **A callee's abstract contract view**, and the contract of a callee
   whose verification failed or did not run, are hypotheses of the caller's
   theorem; the callee's own failure is reported where it is verified.
 - **The decoder of native function values** (planned): assumed inside
   `compileFunction_agrees` until the agreement is proved.
+- **`-Zub-checks=no`** (Rust exporter). The exported MIR omits the alignment and null checks
+  rustc inserts at a dereference of a raw pointer and at a reference made from one, so
+  verification reads no panic of theirs. Under `unsafe=reject` the only such pointers a body
+  holds are rustc's elaboration of a `Box` dereference (`BoxFolds`), and a box's pointer is
+  aligned and non-null by the type's own invariant, so no check of them can fail. Revisit for
+  the unsafe profile, where a check does fail on a wrong pointer and its panic is behavior
+  ([`unsafe-pointers.md`](../designs/unsafe-pointers.md)).

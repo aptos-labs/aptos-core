@@ -1,0 +1,238 @@
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:8:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `id_write_false` failed; provide a proof in the module:
+  verify id_write_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:11:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `id_write_vacuous` failed; provide a proof in the module:
+  verify id_write_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:17:3: error: the specification clause `ensures a == old(a)` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `id_lender_false` failed; provide a proof in the module:
+  verify id_lender_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:26:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:25:6: error: verex verification failed: the automatic verification of `wrapper_field_false` failed; provide a proof in the module:
+  verify wrapper_field_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:29:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:28:6: error: verex verification failed: the automatic verification of `wrapper_field_vacuous` failed; provide a proof in the module:
+  verify wrapper_field_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:35:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:34:6: error: verex verification failed: the automatic verification of `wrapper_through_false` failed; provide a proof in the module:
+  verify wrapper_through_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:38:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:37:6: error: verex verification failed: the automatic verification of `wrapper_through_vacuous` failed; provide a proof in the module:
+  verify wrapper_through_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:44:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:43:6: error: verex verification failed: the automatic verification of `option_write_false` failed; provide a proof in the module:
+  verify option_write_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:47:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:46:6: error: verex verification failed: the automatic verification of `option_write_vacuous` failed; provide a proof in the module:
+  verify option_write_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:55:3: error: the specification clause `ensures result == v + w` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:53:6: error: verex verification failed: the automatic verification of `get_write_false` failed; provide a proof in the module:
+  verify get_write_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:59:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:57:6: error: verex verification failed: the automatic verification of `get_write_vacuous` failed; provide a proof in the module:
+  verify get_write_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:65:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:64:6: error: verex verification failed: the automatic verification of `twice_write_false` failed; provide a proof in the module:
+  verify twice_write_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:68:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:67:6: error: verex verification failed: the automatic verification of `twice_write_vacuous` failed; provide a proof in the module:
+  verify twice_write_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:74:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:73:6: error: verex verification failed: the automatic verification of `generic_at_reference_false` failed; provide a proof in the module:
+  verify generic_at_reference_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:77:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:76:6: error: verex verification failed: the automatic verification of `generic_at_reference_vacuous` failed; provide a proof in the module:
+  verify generic_at_reference_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.rs:249:5: error: no denotation for `consume_reference`: a call dropping a type parameter at a type holding a mutable reference is not carried by the denotation
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:86:3: error: the specification clause `ensures result == v + 1` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:85:6: error: verex verification failed: the automatic verification of `consume_value_false` failed; provide a proof in the module:
+  verify consume_value_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:89:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:88:6: error: verex verification failed: the automatic verification of `consume_value_vacuous` failed; provide a proof in the module:
+  verify consume_value_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:95:6: error: `opaque_reference` calls `opaque_id` at a reference type argument, and `opaque_id` is opaque: a generic contract does not transfer to a mutable reference, so it has no reading there
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:99:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:98:6: error: verex verification failed: the automatic verification of `opaque_value` failed; provide a proof in the module:
+  verify opaque_value by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:102:3: error: the specification clause `ensures result == v + 1` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:101:6: error: verex verification failed: the automatic verification of `opaque_value_false` failed; provide a proof in the module:
+  verify opaque_value_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:105:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:104:6: error: verex verification failed: the automatic verification of `opaque_value_vacuous` failed; provide a proof in the module:
+  verify opaque_value_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:107:6: error: `recursive_reference` calls `recursive_id` at a reference type argument, and `recursive_id` is on a cycle of calls: a generic contract does not transfer to a mutable reference, so it has no reading there
+VerexE2ETests/SourceVerify/generic_references_errors.rs:296:21: error: no denotation for `native_reference`: a call dropping a type parameter at a type holding a mutable reference is not carried by the denotation
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:117:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:116:6: error: verex verification failed: the automatic verification of `observed_reference_false` failed; provide a proof in the module:
+  verify observed_reference_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:120:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:119:6: error: verex verification failed: the automatic verification of `observed_reference_vacuous` failed; provide a proof in the module:
+  verify observed_reference_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:126:3: error: the specification clause `ensures result == v + 1` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:125:6: error: verex verification failed: the automatic verification of `observed_value_false` failed; provide a proof in the module:
+  verify observed_value_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:129:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:128:6: error: verex verification failed: the automatic verification of `observed_value_vacuous` failed; provide a proof in the module:
+  verify observed_value_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:135:3: error: the specification clause `ensures result == v + 1` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:134:6: error: verex verification failed: the automatic verification of `viewing_value_false` failed; provide a proof in the module:
+  verify viewing_value_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:138:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:137:6: error: verex verification failed: the automatic verification of `viewing_value_vacuous` failed; provide a proof in the module:
+  verify viewing_value_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:140:6: error: no denotation for the callee `outer` at a reference type argument: a move of a value holding a mutable reference out of an aggregate is not carried by the denotation
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:150:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:149:6: error: verex verification failed: the automatic verification of `holder_dropped_false` failed; provide a proof in the module:
+  verify holder_dropped_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:156:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:155:6: error: verex verification failed: the automatic verification of `holder_scope_end_false` failed; provide a proof in the module:
+  verify holder_scope_end_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:159:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:158:6: error: verex verification failed: the automatic verification of `holder_scope_end_vacuous` failed; provide a proof in the module:
+  verify holder_scope_end_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_references_errors.spec.lean:161:6: error: `push_view` calls `alloc::vec::Vec::len` at a reference type argument, and `alloc::vec::Vec::len` is native: a generic contract does not transfer to a mutable reference, so it has no reading there

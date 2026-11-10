@@ -61,14 +61,15 @@ partial def capturedUnsupported? : NTy → Option String
   | τ@(.param _) => if τ.paramFree then none else some "a type parameter"
   | .function parameters _ results =>
       if parameters.paramFree && results.paramFree then none else some "a type parameter"
+  | .nominal _ _ _ => some "a recursive type"
   | .tuple elements | .struct _ _ elements => rowUnsupported? elements
   | .enum _ _ _ rows _ => rowsUnsupported? rows
   | .ghost slot => capturedUnsupported? slot
-  | τ@(.vector _) | τ@(.table _ _) =>
+  | τ@(.vector _) | τ@(.slice _) | τ@(.table _ _) =>
       if !τ.paramFree then some "a type parameter"
       else if τ.closureFree then none
       else some "a function value inside a vector or a map"
-  | .ref _ => some "a reference"
+  | .ref _ | .sliceRef _ => some "a reference"
   | _ => none
 where
   rowUnsupported? : NRow → Option String
@@ -174,14 +175,14 @@ private def quoteHandleSyntax (source : VerexIR.StructHandle) : Term :=
 mutual
 /-- The patterns of a captured value and their encodings, as the
 encoder's arms take them apart. -/
-private partial def typeAlternatives (family : Name) (τ : NTy) (fresh : IO.Ref Nat) :
+private partial def typeAlternatives (unitIdent : Ident) (family : Name) (τ : NTy) (fresh : IO.Ref Nat) :
     GenM (Array Alternative) := do
   let freshVariable : GenM Ident := do
     let index ← fresh.modifyGet fun index => (index, index + 1)
     return mkIdent (Name.mkSimple s!"capture{index}")
   if τ.closureFree then
     let x ← freshVariable
-    return #[(x, .ok (← `(VerexIR.Proofs.Denote.NTy.encodeWith (C := $(rootIdent family))
+    return #[(x, .ok (← `(VerexIR.Proofs.Denote.NTy.encodeWith (unit := $unitIdent) (C := $(rootIdent family))
       (fun _ _ _ _ => default) $(← typeIdent family τ) $x)))]
   match τ with
   | .function _ _ _ =>
@@ -189,27 +190,27 @@ private partial def typeAlternatives (family : Name) (τ : NTy) (fresh : IO.Ref 
       return #[(x, .ok (← `(VerexIR.Proofs.Denote.ClosureValue.encode
         ($(mkIdent (family ++ `encode)) $x))))]
   | .tuple elements =>
-      (← rowAlternatives family elements fresh).mapM fun (pattern, encoded) => do
+      (← rowAlternatives unitIdent family elements fresh).mapM fun (pattern, encoded) => do
         return (pattern, ← mapEncoded encoded fun values =>
           `(VerexIR.RuntimeValue.tuple (List.toArray [$values,*])))
   | .struct source _ fields =>
-      (← rowAlternatives family fields fresh).mapM fun (pattern, encoded) => do
+      (← rowAlternatives unitIdent family fields fresh).mapM fun (pattern, encoded) => do
         return (pattern, ← mapEncoded encoded fun values =>
           `(VerexIR.RuntimeValue.nominal $(quoteHandleSyntax source) none
             (List.toArray [$values,*])))
-  | .enum source _ names rows _ => variantAlternatives family source names rows fresh
+  | .enum source _ names rows _ => variantAlternatives unitIdent family source names rows fresh
   | .ghost slot =>
-      (← typeAlternatives family slot fresh).mapM fun (pattern, encoded) => do
+      (← typeAlternatives unitIdent family slot fresh).mapM fun (pattern, encoded) => do
         return (pattern, ← mapEncoded encoded fun value => `(VerexIR.RuntimeValue.ghost $value))
   | _ => throwError "internal: a captured type is not carried natively"
 
-private partial def rowAlternatives (family : Name) (row : NRow) (fresh : IO.Ref Nat) :
+private partial def rowAlternatives (unitIdent : Ident) (family : Name) (row : NRow) (fresh : IO.Ref Nat) :
     GenM (Array (Term × Except Ident (Array Term))) := do
   match row with
   | .nil => return #[(← `(()), .ok #[])]
   | .cons τ rest =>
-      let heads ← typeAlternatives family τ fresh
-      let tails ← rowAlternatives family rest fresh
+      let heads ← typeAlternatives unitIdent family τ fresh
+      let tails ← rowAlternatives unitIdent family rest fresh
       let mut combined := #[]
       for (headPattern, head) in heads do
         for (tailPattern, tail) in tails do
@@ -220,15 +221,15 @@ private partial def rowAlternatives (family : Name) (row : NRow) (fresh : IO.Ref
             | _, .error absent => .error absent)
       return combined
 
-private partial def variantAlternatives (family : Name) (source : VerexIR.StructHandle)
+private partial def variantAlternatives (unitIdent : Ident) (family : Name) (source : VerexIR.StructHandle)
     (names : List String) (rows : NRows) (fresh : IO.Ref Nat) : GenM (Array Alternative) := do
   match names, rows with
   | name :: names, .cons fields rest =>
-      let here ← (← rowAlternatives family fields fresh).mapM fun (pattern, encoded) => do
+      let here ← (← rowAlternatives unitIdent family fields fresh).mapM fun (pattern, encoded) => do
         return (← `(Sum.inl $pattern), ← mapEncoded encoded fun values =>
           `(VerexIR.RuntimeValue.nominal $(quoteHandleSyntax source) (some $(quote name))
             (List.toArray [$values,*])))
-      let later ← (← variantAlternatives family source names rest fresh).mapM
+      let later ← (← variantAlternatives unitIdent family source names rest fresh).mapM
         fun (pattern, encoded) => do return (← `(Sum.inr $pattern), encoded)
       return here ++ later
   | _, _ =>
@@ -582,7 +583,7 @@ private def defineFunctionFamily (segments : Array String) (unit : ValidatedUnit
   for site in sites, index in [0:sites.size] do
     let ctor := mkIdent (family ++ Name.mkSimple s!"site{index}")
     let key := rootIdent (family ++ Name.mkSimple s!"key{index}")
-    let alternatives := (← rowAlternatives family site.captured fresh).map
+    let alternatives := (← rowAlternatives unitIdent family site.captured fresh).map
       fun (pattern, encoded) => (pattern, encoded.map fun values =>
         (Unhygienic.run `(VerexIR.Proofs.Denote.SiteKey.closure $key [$values,*])))
     siteArms := siteArms.push alternatives
@@ -634,14 +635,14 @@ private def defineFunctionFamily (segments : Array String) (unit : ValidatedUnit
     /-- The constructor of a site, by its index. -/
     noncomputable def $siteIdent:ident :
         (index : Fin ($sitesIdent).length) →
-        VerexIR.Proofs.Denote.HListWith $familyIdent (($sitesIdent).get index).captured →
+        VerexIR.Proofs.Denote.HListWith $unitIdent $familyIdent (($sitesIdent).get index).captured →
           $familyIdent (($sitesIdent).get index).parameters (($sitesIdent).get index).shared
             (($sitesIdent).get index).results :=
       fun index captures => match index, captures with $siteAlts:matchAlt*))
   elabCommand (← `(command|
     theorem $(rootIdent (family ++ `encode_site)):ident :
         ∀ (index : Fin ($sitesIdent).length)
-          (captures : VerexIR.Proofs.Denote.HListWith $familyIdent
+          (captures : VerexIR.Proofs.Denote.HListWith $unitIdent $familyIdent
             (($sitesIdent).get index).captured),
           $encodeIdent ($siteIdent index captures) =
             (($sitesIdent).get index).key.closure
@@ -726,7 +727,7 @@ private def defineSiteConstruction (unitIdent familyIdent : Ident) (family : Nam
       theorem $forgetIdent:ident
           [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
           (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row) :
-          @VerexIR.Proofs.Denote.NRow.encodeWith $familyIdent
+          @VerexIR.Proofs.Denote.NRow.encodeWith $unitIdent $familyIdent
               (fun _ _ _ value => $(rootIdent (family ++ `encode)) value) $row
               (@VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $row captures) =
             @VerexIR.Proofs.Denote.HList.encode $runtimeCarriers $row captures := by

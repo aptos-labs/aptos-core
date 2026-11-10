@@ -223,6 +223,7 @@ fn snapshot_inventory(roots: &BTreeSet<PathBuf>) -> Result<Inventory> {
                     ".olean",
                     ".olean.server",
                     ".olean.private",
+                    ".ir",
                     ".trace",
                     ".hash",
                 ]
@@ -322,7 +323,7 @@ fn snapshot_copy(package: &Path, into: &Path, mut env: Vec<(String, String)>) ->
                     let Ok(relative) = module.strip_prefix(&dir) else {
                         continue;
                     };
-                    for extension in ["olean", "olean.server", "olean.private"] {
+                    for extension in ["olean", "olean.server", "olean.private", "ir"] {
                         let source = module.with_extension(extension);
                         if source.is_file() {
                             let target = copy.join(relative).with_extension(extension);

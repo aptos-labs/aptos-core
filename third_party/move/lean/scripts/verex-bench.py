@@ -140,11 +140,18 @@ def group_of(problem):
         return tomllib.load(file)["package"]["name"]
 
 
+def head_object(path):
+    """The git object of a path at `HEAD`; a path not yet committed has none."""
+    found = subprocess.run(["git", "rev-parse", "--verify", "--quiet", f"HEAD:{path}"],
+                           cwd=REPO, capture_output=True, text=True)
+    return found.stdout.strip() if found.returncode == 0 else "uncommitted"
+
+
 def input_id(problem):
     """The git objects of a problem's inputs at `HEAD`, marked when the
     working tree changes them."""
     paths = input_paths(problem)
-    objects = [git("rev-parse", f"HEAD:{path}") for path in paths]
+    objects = [head_object(path) for path in paths]
     digest = hashlib.sha1("\n".join(objects).encode()).hexdigest()[:12]
     dirty = git("status", "--porcelain", "--", *paths)
     return digest + ("-dirty" if dirty else "")

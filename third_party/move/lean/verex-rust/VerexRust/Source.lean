@@ -272,6 +272,7 @@ private def constText : ConstValue → Except String String
       pure <| if fields.size == 1 then s!"({fields[0]!},)" else s!"({commaSep fields})"
   | .address _ => throw "Rust source does not support the Move address constant"
   | .profile value => throw s!"Rust source does not support profile constant `{value.tag}`"
+  | .opaque _ => throw "Rust source does not support an opaque constant"
 
 private structure Context where
   unit : ValidatedUnit
@@ -289,10 +290,18 @@ private def localName (context : Context) (id : LocalId) : Except String String 
   pure <| mark (.local context.ns.identity context.functionId id) localDecl.loc
     context.declaration.origin context.declaration.alignment (localIdentifier localDecl id)
 
+/-- A binder's name. Rust cannot declare the anonymous lifetime `'_`, so a binder
+of one is named by its position. -/
+private def binderSpelling (binder : GenericBinder) (index : Nat) : String :=
+  if binder.kind == .lifetime then
+    let name := if binder.name.startsWith "'" then binder.name else "'" ++ binder.name
+    if name == "'_" then s!"'l{index}" else name
+  else rustIdentifier binder.name
+
 private def binderName (binders : Array GenericBinder) (index : Nat) : Except String String := do
   let some binder := binders[index]?
     | throw s!"validated generic binder {index} is missing"
-  pure (rustIdentifier binder.name)
+  pure (binderSpelling binder index)
 
 private def lifetimeName (tables : Tables) (binders : Array GenericBinder)
     (id : LifetimeId) : Except String String := do
@@ -331,12 +340,11 @@ private def genericParameterText (tables : Tables) (binder : GenericBinder) :
         pure s!"const {rustIdentifier binder.name}: {← constGenericParameterTypeText tables type}"
     | .evidence => throw "Rust evidence binders require checked implementation syntax"
 
-private def functionGenericParameterText (tables : Tables) (binder : GenericBinder) :
-    Except String String := do
+private def functionGenericParameterText (tables : Tables) (binder : GenericBinder)
+    (index : Nat) : Except String String := do
   match binder.kind with
   | .typeArg => pure (rustIdentifier binder.name)
-  | .lifetime =>
-      pure <| if binder.name.startsWith "'" then binder.name else "'" ++ binder.name
+  | .lifetime => pure (binderSpelling binder index)
   | .const =>
       let some type := binder.type
         | throw "Rust const generic binder has no declared parameter type"
@@ -354,8 +362,11 @@ private def genericParametersText (tables : Tables) (namespaceId : NamespaceId) 
 private def functionGenericParametersText (tables : Tables) (namespaceId : NamespaceId)
     (functionId : FunctionId)
     (declaration : FunctionDecl FunctionBody) : Except String String := do
-  let parameters ← declaration.signature.generics.zipIdx.mapM fun (binder, index) => do
-    let rendered ← functionGenericParameterText tables binder
+  -- Rust declares lifetimes first, wherever their binders are.
+  let (lifetimes, others) := declaration.signature.generics.zipIdx.partition
+    (·.1.kind == .lifetime)
+  let parameters ← (lifetimes ++ others).mapM fun (binder, index) => do
+    let rendered ← functionGenericParameterText tables binder index
     pure <| mark (.functionBinder namespaceId functionId index) binder.loc declaration.origin
       declaration.alignment rendered
   pure <| if parameters.isEmpty then "" else s!"<{commaSep parameters}>"
@@ -420,7 +431,7 @@ mutual
     | .never => pure "!"
     | .bool => pure "bool"
     | .character => pure "char"
-    | .string => pure "str"
+    | .string => pure "String"
     | .integer (.bits width) signed =>
         if #[8, 16, 32, 64, 128].contains width then
           pure s!"{if signed then "i" else "u"}{width}"
@@ -429,10 +440,11 @@ mutual
     | .tuple elements =>
         let fields ← elements.mapM (typeTextFuel tables binders · (fuel - 1))
         pure <| if fields.size == 1 then s!"({fields[0]!},)" else s!"({commaSep fields})"
+    | .slice element => pure s!"[{← typeTextFuel tables binders element (fuel - 1)}]"
     | .vector element length =>
         let element ← typeTextFuel tables binders element (fuel - 1)
         match length with
-        | none => pure s!"[{element}]"
+        | none => pure s!"Vec<{element}>"
         | some (.integer length) =>
             if length < 0 then throw "validated fixed vector has a negative length"
             pure s!"[{element}; {length}]"
@@ -448,7 +460,10 @@ mutual
         pure s!"fn({commaSep arguments}) -> {result}"
     | .typeParameter index => binderName binders index
     | .reference reference =>
-        let referent ← typeTextFuel tables binders reference.referent (fuel - 1)
+        -- The string carrier denotes `str` behind a reference; Slice has its own type.
+        let referent ← match tables.types[reference.referent.index]? with
+          | some .string => pure "str"
+          | _ => typeTextFuel tables binders reference.referent (fuel - 1)
         let lifetime ← lifetimeName tables binders reference.lifetime
         let lifetime := if lifetime == "'_" then "" else lifetime ++ " "
         pure s!"&{lifetime}{if reference.kind == .mutable then "mut " else ""}{referent}"
@@ -539,13 +554,19 @@ private partial def placeType? (context : Context) (id : PlaceId)
   | fuel + 1, some (.index base index) => do
       let baseType ← placeType? context base fuel
       match context.unit.tables.types[baseType.index]? with
-      | some (.vector element _) => some element
+      | some (.vector element _) | some (.slice element) => some element
       | some (.tuple elements) => do
           let expression ← context.ns.expressions[index.index]?
           let .value (.integer value) _ := expression.kind | none
           if value < 0 then none else elements[value.toNat]?
       | _ => none
-  | fuel + 1, some (.subslice base ..) => placeType? context base fuel
+  | fuel + 1, some (.subslice base ..) | fuel + 1, some (.unsize base) => do
+      let baseType ← placeType? context base fuel
+      let element ← match context.unit.tables.types[baseType.index]? with
+        | some (.vector element _) | some (.slice element) => some element
+        | _ => none
+      let index ← context.unit.tables.types.findIdx? (· == .slice element)
+      some ⟨index⟩
   | fuel + 1, some (.downcast base _) => placeType? context base fuel
   | fuel + 1, some (.field base _ field) => do
       let baseType ← placeType? context base fuel
@@ -557,6 +578,13 @@ private partial def placeType? (context : Context) (id : PlaceId)
       let .nominal name _ ← context.unit.tables.types[baseType.index]? | none
       let declaration ← context.ns.structs.find? (·.name == name)
       (declaration.ghosts.find? (·.name == field)).map (·.type.typeId)
+
+private def discriminantReference? (context : Context) (place : PlaceId) :
+    Option QualifiedRef := do
+  let type ← placeType? context place
+  let .nominal name _ ← context.unit.tables.types[type.index]? | none
+  let qualified ← context.unit.tables.names[name.index]?
+  some { namespaceId := qualified.namespaceId, name }
 
 private def directLocalPlace? (ns : ValidatedNamespace) (id : PlaceId) : Option LocalId := do
   let .localVar localId ← ns.places[id.index]? | none
@@ -679,7 +707,7 @@ mutual
     | some place =>
         let value := match place with
           | .localVar _ => value
-          | .deref base | .field base .. | .ghostField base .. | .subslice base ..
+          | .deref base | .field base .. | .ghostField base .. | .subslice base .. | .unsize base
           | .downcast base _ =>
               markPlaceTree context base sourceLoc value (fuel - 1)
           | .index base index =>
@@ -774,6 +802,7 @@ mutual
         else
           pure s!"({baseText})[{start}..{stop}]"
     | .downcast _ _ => throw "enum-downcast places require pattern reconstruction"
+    | .unsize _ => throw "an unsize place has Rust source only as a borrow"
     pure <| mark (.place context.ns.identity id) sourceLoc context.declaration.origin
       context.declaration.alignment rendered
 
@@ -843,6 +872,19 @@ mutual
       indent (pattern ++ " => " ++ binder ++ ",\n_ => loop {},") ++ "\n})"
     pure <| some <| mark (.place context.ns.identity id) sourceLoc
       context.declaration.origin context.declaration.alignment rendered
+
+  /-- The coercion a borrow of an unsize place is: `(&mut P) as &mut [T]`. -/
+  private partial def unsizeBorrowText? (context : Context) (loops : List String)
+      (borrowPrefix : String) (id : PlaceId) (resultType : TypeId) (sourceLoc : LocId)
+      (fuel : Nat) : Except String (Option String) := do
+    if fuel == 0 then throw "cyclic validated place reached the Rust source backend"
+    let some (.unsize base) := context.ns.places[id.index]?
+      | return none
+    let baseText ← placeText context loops base sourceLoc (fuel - 1)
+    let target ← typeText context.unit.tables context.declaration.signature.generics resultType
+    pure <| some <| mark (.place context.ns.identity id) sourceLoc
+      context.declaration.origin context.declaration.alignment
+      s!"(({borrowPrefix}{baseText}) as {target})"
 
   /-- Recover a guarded slice-rest binding as one Rust `let ... else`.
   Printing the already-structured outer guard plus a nested pattern match makes
@@ -1034,12 +1076,17 @@ mutual
     | .index => match values.toList with
         | [value, index] => pure s!"({value})[{index}]"
         | _ => throw "validated index has wrong source arity"
-    | .shiftLeft => match values.toList with
-        | [value, amount] => pure s!"({value}).wrapping_shl(({amount}) as u32)"
-        | _ => throw "validated shift has wrong source arity"
-    | .shiftRight => match values.toList with
-        | [value, amount] => pure s!"({value}).wrapping_shr(({amount}) as u32)"
-        | _ => throw "validated shift has wrong source arity"
+    | .shiftLeft => binary "<<"
+    | .shiftRight => binary ">>"
+    -- Rust's operators panic where these do.
+    | .checkedAdd .panic => binary "+"
+    | .checkedSubtract .panic => binary "-"
+    | .checkedMultiply .panic => binary "*"
+    | .checkedDivide .panic => binary "/"
+    | .checkedModulo .panic => binary "%"
+    | .checkedShiftLeft .panic => binary "<<"
+    | .checkedShiftRight .panic => binary ">>"
+    | .checkedNegate .panic => unary "-"
     | .checkedAdd _ | .checkedSubtract _ | .checkedMultiply _ | .checkedModulo _ |
         .checkedDivide _ | .checkedShiftLeft _ | .checkedShiftRight _ | .checkedNegate _ |
         .checkedCast _ | .slice | .range | .implies | .equivalent |
@@ -1081,10 +1128,13 @@ mutual
     let discriminantValue ← match context.ns.expressions[discriminantValueId.index]? with
       | some value => pure value
       | none => return none
-    let .operation (.data (.discriminant reference)) _ discriminantArguments _ :=
-        discriminantValue.kind | return none
-    let [enumValueId] := discriminantArguments.toList | return none
-    let some enumPlace := loadedPlace? context.ns enumValueId | return none
+    let some (reference, enumPlace) := (do
+      match discriminantValue.kind with
+      | .operation (.readDiscriminant place) _ #[] _ =>
+          some (← discriminantReference? context place, place)
+      | .operation (.data (.discriminant reference)) _ #[argument] _ =>
+          some (reference, ← loadedPlace? context.ns argument)
+      | _ => none) | return none
     let some enumLocal := directLocalPlace? context.ns enumPlace | return none
     unless reference.namespaceId == context.ns.identity do return none
     let some declaration := context.ns.structs.find? (·.name == reference.name) | return none
@@ -1115,7 +1165,8 @@ mutual
     let .return_ returned := resultExpression.kind | return none
     let [returnedValue] := returned.toList | return none
     let some resultLocal := loadedLocal? context.ns returnedValue | return none
-    let enumValue ← exprText context loops enumValueId (fuel - 1)
+    let enumValue ← placeText context loops enumPlace discriminantValue.loc
+      (context.ns.places.size + 1)
     let renderedArms ← arms.mapIdxM fun armIndex arm => do
       let pattern ← match context.ns.patterns[arm.pattern.index]? with
         | some value => pure value
@@ -1248,6 +1299,10 @@ mutual
                 (context.ns.places.size + 1) with
             | some value => pure value
             | none =>
+              match ← unsizeBorrowText? context loops borrowPrefix place expression.typeId
+                  expression.loc (context.ns.places.size + 1) with
+              | some value => pure value
+              | none =>
                 let receiverPrefix :=
                   if kind == .mutable then "&mut (" else "&("
                 match ← downcastFieldText? context loops place expression.loc receiverPrefix false
@@ -1270,6 +1325,28 @@ mutual
         | .assert => match arguments.toList with
             | [condition] => pure s!"assert!({← exprText context loops condition (fuel - 1)})"
             | _ => throw "validated assertion has wrong source arity"
+        | .readDiscriminant place =>
+            unless arguments.isEmpty do throw "validated tag read has source arguments"
+            let some reference := discriminantReference? context place
+              | throw "validated tag-read place has no nominal type"
+            unless reference.namespaceId == context.ns.identity do
+              throw "external enum discriminants require emitted dependency modules"
+            let some declaration := context.ns.structs.find? (·.name == reference.name)
+              | throw "validated tag-read declaration is missing"
+            unless !declaration.variants.isEmpty do
+              throw "validated tag-read target is not an enum"
+            let owner ← nameAt context.unit.tables declaration.name
+            let value ← placeText context loops place expression.loc (context.ns.places.size + 1)
+            let arms ← declaration.variants.mapM fun variant => do
+              let variantName ← nameAt context.unit.tables variant.name
+              let pattern := if variant.fields.isEmpty then ""
+                else if fieldsArePositional context.unit.tables variant.fields then "(..)"
+                else " { .. }"
+              let some discriminant := variant.discriminant
+                | throw s!"validated enum variant `{variantName}` has no integer discriminant"
+              pure s!"{owner}::{variantName}{pattern} => {discriminant},"
+            -- A tag match binds no payload and does not borrow the aggregate.
+            pure <| "(match " ++ value ++ " {\n" ++ indent (lineSep arms) ++ "\n})"
         | .data (.discriminant reference) => match arguments.toList with
             | [argument] =>
                 unless reference.namespaceId == context.ns.identity do
@@ -1331,14 +1408,20 @@ mutual
                   pure <| if lines.isEmpty then "{}" else
                     "{\n" ++ indent (lineSep lines) ++ "\n}"
     | .letDecl pattern value body =>
-        let pattern ← patternText context loops pattern (fuel - 1)
+        let patternSource ← patternText context loops pattern (fuel - 1)
         let body ← exprText context loops body (fuel - 1)
         match value with
         | none => pure body
+        -- The element access that follows a bounds check implies it in Rust.
         | some value =>
-            let value ← exprText context loops value (fuel - 1)
-            let binding := s!"{pattern} = {value};"
-            pure <| "{\n" ++ indent binding ++ "\n" ++ indent body ++ "\n}"
+            if (context.ns.expressions[value.index]?).any fun checked =>
+                checked.kind matches .operation (.primitive (.checkVectorIndex .panic)) .. then
+              pure <| markExpressionTree context value
+                (markPatternTree context pattern body (fuel - 1)) (fuel - 1)
+            else
+              let value ← exprText context loops value (fuel - 1)
+              let binding := s!"{patternSource} = {value};"
+              pure <| "{\n" ++ indent binding ++ "\n" ++ indent body ++ "\n}"
     | .ifElse condition thenBranch elseBranch =>
         let condition ← exprText context loops condition (fuel - 1)
         let thenBranch ← exprText context loops thenBranch (fuel - 1)
@@ -1525,6 +1608,8 @@ def renderWithSourceMap (unit : ValidatedUnit) : Except String RenderedSource :=
     throw "standard Rust source backend requires a Rust-profile namespace"
   unless unit.dependencies.isEmpty && ns.imports.isEmpty do
     throw "standard Rust source backend does not yet reconstruct dependency imports"
+  unless ns.scopes.isEmpty do
+    throw "standard Rust source backend does not yet reconstruct scopes"
   unless ns.profileMetadata.isEmpty && ns.attributes.isEmpty && ns.pragmas.isEmpty do
     throw "standard Rust source backend does not yet reconstruct namespace semantic metadata"
   unless ns.constants.isEmpty && ns.traits.isEmpty &&

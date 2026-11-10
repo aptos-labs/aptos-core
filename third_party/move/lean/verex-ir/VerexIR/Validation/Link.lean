@@ -471,6 +471,11 @@ private def sameShape [Remap α] [BEq α] (leftTables rightTables : Tables) (lef
 private def nameOf (tables : Tables) (id : NameId) : String :=
   (tables.names[id.index]?.map (·.name)).getD ""
 
+/-- A declaration's name and the scope it is in, what identifies it in its
+namespace. -/
+private def scopedName (tables : Tables) (id : NameId) : Array String × String :=
+  ((tables.names[id.index]?.map (·.scope)).getD #[], nameOf tables id)
+
 /-- The boundary: every declaration of the interface a unit was validated
 against has the same shape in the namespace that replaces it. -/
 private def checkBoundary (interfaceTables actualTables : Tables) (path : Array String)
@@ -480,20 +485,23 @@ private def checkBoundary (interfaceTables actualTables : Tables) (path : Array 
       was checked against"
   for declared in interface.functions do
     let name := nameOf interfaceTables declared.name
-    let some linked := actual.functions.find? (nameOf actualTables ·.name == name)
+    let some linked := actual.functions.find? fun candidate =>
+        scopedName actualTables candidate.name == scopedName interfaceTables declared.name
       | throw s!"`{"::".intercalate path.toList}` does not declare the function `{name}`"
     unless sameShape interfaceTables actualTables declared.signature linked.signature do
       throw (located "function" name)
   for declared in interface.specFunctions do
     let name := nameOf interfaceTables declared.name
-    let some linked := actual.specFunctions.find? (nameOf actualTables ·.name == name)
+    let some linked := actual.specFunctions.find? fun candidate =>
+        scopedName actualTables candidate.name == scopedName interfaceTables declared.name
       | throw s!"`{"::".intercalate path.toList}` does not declare the specification function \
           `{name}`"
     unless sameShape interfaceTables actualTables declared.signature linked.signature do
       throw (located "specification function" name)
   for declared in interface.structs do
     let name := nameOf interfaceTables declared.name
-    let some linked := actual.structs.find? (nameOf actualTables ·.name == name)
+    let some linked := actual.structs.find? fun candidate =>
+        scopedName actualTables candidate.name == scopedName interfaceTables declared.name
       | throw s!"`{"::".intercalate path.toList}` does not declare the type `{name}`"
     unless sameShape interfaceTables actualTables (declared.generics, declared.fields, declared.variants)
           (linked.generics, linked.fields, linked.variants) &&
@@ -639,7 +647,8 @@ def link (base : ValidatedUnit) (objects : Array RelocatableNamespace) :
     namespaceId := dep.namespaceId, profile := dep.profile, exportedNames := dep.exportedNames
     structs := dep.structs
     functions := dep.functions.map (·.withBody .absent)
-    specFunctions := dep.specFunctions }
+    specFunctions := dep.specFunctions
+    scopes := dep.scopes }
   -- Every name a linked namespace uses must resolve in the unit, as it did
   -- in the unit that validated it.
   let nameId (namespaceIndex : Nat) (id : NameId) : NameId :=

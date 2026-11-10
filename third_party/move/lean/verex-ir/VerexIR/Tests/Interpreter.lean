@@ -224,6 +224,62 @@ private def hasInitializationError (root : Nat) (loc : Nat) : Bool :=
       | .error _ => false
   | .error _ => false
 
+/-! A flag (local 1) records whether `owned` (local 0) is still initialized and
+guards its drop, as Rust's drop elaboration emits. -/
+private def flagExpressions : Array Expr := #[
+  { loc := ⟨39⟩, typeId := ⟨1⟩, kind := .value (.bool true) },
+  { loc := ⟨39⟩, typeId := ⟨1⟩, kind := .value (.bool false) },
+  { loc := ⟨39⟩, typeId := ⟨0⟩, kind := .assign ⟨1⟩ ⟨39⟩ },
+  { loc := ⟨39⟩, typeId := ⟨0⟩, kind := .assign ⟨1⟩ ⟨40⟩ },
+  { loc := ⟨39⟩, typeId := ⟨1⟩, kind := .operation (.move ⟨0⟩) #[] #[] },
+  { loc := ⟨39⟩, typeId := ⟨0⟩, kind := .block #[⟨42⟩, ⟨43⟩] none },
+  { loc := ⟨39⟩, typeId := ⟨0⟩, kind := .ifElse ⟨39⟩ ⟨44⟩ none },
+  { loc := ⟨39⟩, typeId := ⟨1⟩, kind := .operation (.copy ⟨1⟩) #[] #[] },
+  { loc := ⟨47⟩, typeId := ⟨0⟩, kind := .operation (.drop ⟨0⟩) #[] #[] },
+  { loc := ⟨39⟩, typeId := ⟨0⟩, kind := .ifElse ⟨46⟩ ⟨47⟩ none },
+  -- owned := true; flag := true; if _ { flag := false; move owned };
+  -- if flag { drop owned }
+  { loc := ⟨39⟩, typeId := ⟨1⟩, kind := .block #[⟨55⟩, ⟨41⟩, ⟨45⟩, ⟨48⟩] (some ⟨39⟩) },
+  { loc := ⟨39⟩, typeId := ⟨0⟩, kind := .block #[⟨43⟩] none },
+  { loc := ⟨39⟩, typeId := ⟨0⟩, kind := .ifElse ⟨39⟩ ⟨50⟩ none },
+  -- owned := true; if _ { move owned }; flag := true; if flag { drop owned }
+  { loc := ⟨39⟩, typeId := ⟨1⟩, kind := .block #[⟨55⟩, ⟨51⟩, ⟨41⟩, ⟨48⟩] (some ⟨39⟩) },
+  { loc := ⟨39⟩, typeId := ⟨5⟩, kind := .operation (.borrow .mutable ⟨1⟩) #[] #[] },
+  -- the first, with the flag borrowed before the move
+  { loc := ⟨39⟩, typeId := ⟨1⟩, kind := .block #[⟨55⟩, ⟨41⟩, ⟨53⟩, ⟨45⟩, ⟨48⟩] (some ⟨39⟩) },
+  { loc := ⟨39⟩, typeId := ⟨0⟩, kind := .assign ⟨0⟩ ⟨39⟩ }
+]
+
+private def flagFixture (root : Nat) : RawUnit :=
+  let ns := fixture.namespaces[0]!
+  { fixture with
+    tables := { fixture.tables with
+      lifetimes := #[{ kind := .local, loc := ⟨39⟩ }]
+      types := fixture.tables.types.push (.reference {
+        profile := testProfile, kind := .mutable, referent := ⟨1⟩, lifetime := ⟨0⟩ }) }
+    namespaces := #[{ ns with
+      expressions := ns.expressions ++ ownershipExpressions ++ flagExpressions
+      places := #[.localVar ⟨0⟩, .localVar ⟨1⟩]
+      functions := ns.functions.set! 8 (function 9 40 1 root
+        #[localDecl 0 "owned" 1 40, localDecl 1 "flag" 1 40]) }] }
+
+#guard match validate #[schema] (flagFixture 49) with
+  | .ok unit => match prepareExecution #[semantics] unit with
+      | .ok executable => match Interpreter.run executable 32 (handle 8) #[] with
+          | .ok (_, { value := .returned #[.bool true], .. }) => true
+          | _ => false
+      | .error _ => false
+  | .error _ => false
+
+private def flagGuardRejected (root : Nat) : Bool :=
+  match validate #[schema] (flagFixture root) with
+  | .error diagnostics => diagnostics.any fun diagnostic =>
+      diagnostic.code == "VIR-SEMANTIC-INITIALIZATION" && diagnostic.primary == some ⟨47⟩
+  | .ok _ => false
+
+#guard flagGuardRejected 52
+#guard flagGuardRejected 54
+
 #guard match executable? with
   | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 9) #[] with
       | .error { value := .argumentArity 1 0, primary := { loc := ⟨41⟩, .. }, .. } => true

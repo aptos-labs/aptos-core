@@ -68,6 +68,7 @@ def ConstValue.fingerprint : ConstValue → List Nat
   | .vector elements => 7 :: ConstValue.fingerprintList elements.toList
   | .tuple elements => 8 :: ConstValue.fingerprintList elements.toList
   | .profile _ => [9]
+  | .opaque _ => [10]
 def ConstValue.fingerprintList : List ConstValue → List Nat
   | [] => [100]
   | value :: rest => 101 :: (ConstValue.fingerprint value ++ ConstValue.fingerprintList rest)
@@ -108,6 +109,7 @@ def Ty.fingerprintList : Ty → List Nat
   | .tuple elements => 9 :: elements.toList.map TypeId.index
   | .vector element length => 10 :: element.index ::
       (match length with | some value => value.fingerprint | none => [])
+  | .slice element => [23, element.index]
   | .range => [11]
   | .eventStore => [12]
   | .typeDomain type => [13, type.index]
@@ -310,7 +312,7 @@ def shallower (witnesses : IndexedArena Witness) (depth : Nat) (component : Type
 /-- The components an instantiation of a type recurses into. -/
 def components : Ty → Array TypeId
   | .tuple elements => elements
-  | .vector element _ => #[element]
+  | .vector element _ | .slice element => #[element]
   | .typeDomain nested => #[nested]
   | .resourceDomain _ arguments => arguments.getD #[]
   | .nominal _ arguments => arguments.filterMap fun argument => match argument with
@@ -331,6 +333,9 @@ def shapeOf (kinds : IndexedArena LifetimeKind) (instantiations : Array GenericA
   | .vector element length => do
       let element ← witnessed witnesses element
       some (.vector element length)
+  | .slice element => do
+      let element ← witnessed witnesses element
+      some (.slice element)
   | .typeDomain nested => do
       let nested ← witnessed witnesses nested
       some (.typeDomain nested)
@@ -358,7 +363,7 @@ def shapeOf (kinds : IndexedArena LifetimeKind) (instantiations : Array GenericA
 
 /-- Whether a type's instantiation searches the table for a shape. -/
 def searches : Ty → Bool
-  | .tuple _ | .vector .. | .typeDomain _ | .resourceDomain .. | .nominal .. | .function .. |
+  | .tuple _ | .vector .. | .slice _ | .typeDomain _ | .resourceDomain .. | .nominal .. | .function .. |
     .reference _ => true
   | _ => false
 
@@ -502,6 +507,8 @@ theorem tuple_not_nominal (elements : Array TypeId) :
     ∀ name arguments, Ty.tuple elements ≠ .nominal name arguments := by intros; simp
 theorem vector_not_nominal (element : TypeId) (length : Option ConstValue) :
     ∀ name arguments, Ty.vector element length ≠ .nominal name arguments := by intros; simp
+theorem slice_not_nominal (element : TypeId)  :
+    ∀ name arguments, Ty.slice element ≠ .nominal name arguments := by intros; simp
 theorem typeDomain_not_nominal (nested : TypeId) :
     ∀ name arguments, Ty.typeDomain nested ≠ .nominal name arguments := by intros; simp
 theorem resourceDomain_not_nominal (resource : NameId) (arguments' : Option (Array TypeId)) :
@@ -548,6 +555,12 @@ theorem shapeOf_vector (kinds : IndexedArena LifetimeKind) (instantiations : Arr
     (witnesses : IndexedArena Witness) (element : TypeId) (length : Option ConstValue) :
     shapeOf kinds instantiations witnesses (.vector element length) =
       (witnessed witnesses element).map fun element => .vector element length := by
+  simp only [shapeOf, Option.map_eq_bind, Option.bind_eq_bind]; rfl
+
+theorem shapeOf_slice (kinds : IndexedArena LifetimeKind) (instantiations : Array GenericArgument)
+    (witnesses : IndexedArena Witness) (element : TypeId)  :
+    shapeOf kinds instantiations witnesses (.slice element) =
+      (witnessed witnesses element).map fun element => .slice element := by
   simp only [shapeOf, Option.map_eq_bind, Option.bind_eq_bind]; rfl
 
 theorem shapeOf_typeDomain (kinds : IndexedArena LifetimeKind) (instantiations : Array GenericArgument)
@@ -651,6 +664,12 @@ theorem instantiate_eq_of_check {ns : ValidatedNamespace} {map : KeyMap}
           rw [agree all element (by simp [components]), shapeOf_vector] at *
           exact search_sound correct _ _ _ found (fun x c => c == Ty.vector x length)
             (fun x c => structural_search_eq _ _ (vector_not_nominal x length))
+        case slice element =>
+          simp only [searches, ↓reduceIte, Bool.and_eq_true] at check
+          obtain ⟨all, found⟩ := check
+          rw [agree all element (by simp [components]), shapeOf_slice] at *
+          exact search_sound correct _ _ _ found (fun x c => c == Ty.slice x)
+            (fun x c => structural_search_eq _ _ (slice_not_nominal x))
         case typeDomain nested =>
           simp only [searches, ↓reduceIte, Bool.and_eq_true] at check
           obtain ⟨all, found⟩ := check

@@ -1,0 +1,51 @@
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:5:3: error: the specification clause `ensures result == left + right` is not established
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `add_or_zero` failed; provide a proof in the module:
+  verify add_or_zero by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:8:3: error: the specification clause `ensures result == 7` is not established
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `or_default` failed; provide a proof in the module:
+  verify or_default by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:11:1: error: `no panic when aborts at call 1 of unwrap` is not established: the call `value.unwrap()` at VerexE2ETests/SourceVerify/library_option_errors.rs:17:5 may panic
+  from: VerexIR.Proofs.Denote.variantPlain.deepHolds ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) (Sum.inl ())
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:11:6: error: verex verification failed: the automatic verification of `must_none` failed; provide a proof in the module:
+  verify must_none by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of unwrap => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:14:1: error: `no panic when aborts at call 1 of unwrap` is not established: the call `value.unwrap()` at VerexE2ETests/SourceVerify/library_option_errors.rs:21:5 may panic
+  from: VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "None"
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:14:6: error: verex verification failed: the automatic verification of `must_unstated` failed; provide a proof in the module:
+  verify must_unstated by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of unwrap => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:18:3: error: the specification clause `ensures result` is not established
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:17:6: error: verex verification failed: the automatic verification of `present` failed; provide a proof in the module:
+  verify present by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:20:1: error: `no panic when aborts at call 1 of unwrap` is not established: the call `value.unwrap()` at VerexE2ETests/SourceVerify/library_option_errors.rs:30:5 may panic
+  from: (VerexIR.Proofs.Denote.NTy.int 8 false).deepHolds ({ val := 1, fits := ⋯ }, ()).fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ({ val := 1, fits := ⋯ }, ()).snd
+VerexE2ETests/SourceVerify/library_option_errors.spec.lean:20:6: error: verex verification failed: the automatic verification of `must_err` failed; provide a proof in the module:
+  verify must_err by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of unwrap => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

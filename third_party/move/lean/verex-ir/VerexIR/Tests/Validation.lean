@@ -104,6 +104,22 @@ private def constBinderUnit (kind : BinderKind := .const)
   | .ok unit => unit.indexes.namespaceCount == 1 && unit.indexes.functionCounts == #[1]
   | .error _ => false
 
+/-- An opaque constant, which the function reaches when `root` is its node. -/
+private def opaqueConstantUnit (root : ExprId) : RawUnit :=
+  let ns := validUnit.namespaces[0]!
+  { validUnit with namespaces := #[{ ns with
+      expressions := ns.expressions.push { loc := ⟨0⟩, typeId := ⟨0⟩, kind := .value (.opaque "&[u8; 7]") }
+      functions := #[{ ns.functions[0]! with body := .structured root }] }] }
+
+#guard match validate #[schema] (opaqueConstantUnit ⟨1⟩) with
+  | .error diagnostics =>
+      diagnostics.map (·.code) == #["VIR-OPAQUE-SURVIVOR"] &&
+        diagnostics.all fun diagnostic => (diagnostic.message.splitOn "&[u8; 7]").length == 2
+  | .ok _ => false
+
+-- The import leaves a collapsed region's nodes in the arena, unreached.
+#guard (validate #[schema] (opaqueConstantUnit ⟨0⟩)).isOk
+
 private def invalidCharacterUnit (value : Nat) : RawUnit :=
   { validUnit with
     tables := { tables with types := #[.character] }
@@ -1817,6 +1833,151 @@ private def rawMirTerminatorUnit : RawUnit :=
   | .error diagnostics => diagnostics.any (·.code == "VIR-CFG-MIR-TERMINATOR")
   | .ok _ => false
 
+/-! ### Diverging regions -/
+
+private def rawBlock (terminator : RawTerminator) (statements : Array RawStatement := #[]) :
+    RawBasicBlock :=
+  { loc := ⟨0⟩, statements, terminator }
+
+private def diverges : RawTerminator := .call ⟨0⟩ none .unreachable
+
+/-- The terminators after collapsing a graph with entry 0. -/
+private def collapsed (blocks : Array RawBasicBlock) : Array RawTerminator :=
+  (PanicRegions.collapse { entry := ⟨0⟩, blocks }).blocks.map (·.terminator)
+
+-- A diverging call is a region, and so is every block all of whose paths reach one.
+#guard collapsed #[rawBlock diverges] == #[.abort]
+#guard collapsed #[rawBlock (.goto ⟨1⟩), rawBlock diverges] == #[.abort, .abort]
+#guard collapsed #[rawBlock (.branch ⟨0⟩ ⟨1⟩ ⟨2⟩), rawBlock diverges, rawBlock diverges] ==
+  #[.abort, .abort, .abort]
+#guard collapsed #[rawBlock (.call ⟨0⟩ (some { place := ⟨0⟩, target := ⟨1⟩ }) .unreachable),
+    rawBlock (.drop ⟨0⟩ ⟨2⟩ .unreachable),
+    rawBlock (.assert ⟨0⟩ true .overflow ⟨3⟩ .unreachable), rawBlock diverges] ==
+  #[.abort, .abort, .abort, .abort]
+
+-- A collapsed block holds nothing.
+#guard (PanicRegions.collapse { entry := ⟨0⟩, blocks := #[
+    rawBlock (.goto ⟨1⟩) #[.execute ⟨0⟩], rawBlock diverges #[.deinit ⟨0⟩]] }).blocks.all
+  (·.statements.isEmpty)
+
+-- A path that returns keeps its block out of the region.
+#guard collapsed #[rawBlock (.branch ⟨0⟩ ⟨1⟩ ⟨2⟩), rawBlock diverges, rawBlock (.return_ #[])] ==
+  #[.branch ⟨0⟩ ⟨1⟩ ⟨2⟩, .abort, .return_ #[]]
+
+-- A block on a cycle is in no region: only what leaves the loop collapses.
+#guard collapsed #[rawBlock (.goto ⟨1⟩), rawBlock (.branch ⟨0⟩ ⟨0⟩ ⟨2⟩), rawBlock diverges] ==
+  #[.goto ⟨1⟩, .branch ⟨0⟩ ⟨0⟩ ⟨2⟩, .abort]
+#guard collapsed #[rawBlock (.goto ⟨0⟩)] == #[.goto ⟨0⟩]
+
+-- `unreachable` alone stays, in any position, and `abort` alone keeps its block.
+#guard collapsed #[rawBlock (.goto ⟨1⟩), rawBlock .unreachable] == #[.goto ⟨1⟩, .unreachable]
+#guard collapsed #[rawBlock (.goto ⟨1⟩), rawBlock .abort] == #[.goto ⟨1⟩, .abort]
+private def impossibleDefault : RawTerminator := .switch ⟨0⟩ #[(.integer 0, ⟨1⟩), (.integer 1, ⟨2⟩)] ⟨3⟩
+#guard collapsed #[rawBlock impossibleDefault, rawBlock (.return_ #[]), rawBlock (.return_ #[]),
+    rawBlock .unreachable] ==
+  #[impossibleDefault, .return_ #[], .return_ #[], .unreachable]
+
+-- A switch that can still return keeps its impossible default beside a region.
+#guard collapsed #[rawBlock impossibleDefault, rawBlock diverges, rawBlock (.return_ #[]),
+    rawBlock .unreachable] ==
+  #[impossibleDefault, .abort, .return_ #[], .unreachable]
+
+-- A switch every possible arm of which diverges goes with its impossible default.
+#guard collapsed #[rawBlock impossibleDefault, rawBlock diverges, rawBlock .abort,
+    rawBlock .unreachable] ==
+  #[.abort, .abort, .abort, .unreachable]
+
+-- Another unwind action is no terminator of `panic=abort`: it stays to be rejected.
+#guard collapsed #[rawBlock (.call ⟨0⟩ none .continue_)] == #[.call ⟨0⟩ none .continue_]
+#guard collapsed #[rawBlock (.call ⟨0⟩ none (.cleanup ⟨1⟩)), rawBlock .resume] ==
+  #[.call ⟨0⟩ none (.cleanup ⟨1⟩), .resume]
+#guard collapsed #[rawBlock (.drop ⟨0⟩ ⟨1⟩ .continue_), rawBlock diverges] ==
+  #[.drop ⟨0⟩ ⟨1⟩ .continue_, .abort]
+
+-- What a region holds no longer reaches the structurizer, which rejects it elsewhere.
+private def divergingRegionUnit (statements : Array RawStatement) : RawUnit :=
+  let ns := validUnit.namespaces[0]!
+  withUnitType { validUnit with namespaces := #[{ ns with
+    places := #[.localVar ⟨0⟩]
+    functions := #[{ ns.functions[0]! with
+      locals := #[{
+        id := ⟨0⟩, name := "held", type := { typeId := ⟨0⟩, loc := ⟨0⟩ },
+        mutable := true, loc := ⟨0⟩ }]
+      body := .cfg { entry := ⟨0⟩, blocks := #[
+        rawBlock (.branch ⟨0⟩ ⟨1⟩ ⟨3⟩),
+        rawBlock (.goto ⟨2⟩) statements,
+        rawBlock diverges,
+        rawBlock (.return_ #[⟨0⟩])] } }] }] }
+
+#guard match validate #[schema] (divergingRegionUnit #[.deinit ⟨0⟩]) with
+  | .ok unit =>
+      let ns := unit.namespaces[0]!
+      -- The two blocks of the region: the entry is the panic, the rest is pruned.
+      let witness := unit.structurizationWitnesses[0]!
+      witness.blocks.map (·.block.index) == #[0, 1, 3] &&
+        witness.edges.size == 2 &&
+        witness.regions.any (·.kind == .branch) &&
+        ns.expressions.any (·.kind == .throw_ .panic #[]) &&
+        (prepareExecution #[semantics] unit).isOk
+  | .error _ => false
+
+-- The same statement on a path that returns is still rejected.
+private def destructiveOutsideRegionUnit : RawUnit :=
+  let raw := divergingRegionUnit #[]
+  let ns := raw.namespaces[0]!
+  { raw with namespaces := #[{ ns with functions := #[{ ns.functions[0]! with
+      body := .cfg { entry := ⟨0⟩, blocks := #[
+        rawBlock (.branch ⟨0⟩ ⟨1⟩ ⟨2⟩),
+        rawBlock diverges,
+        rawBlock (.return_ #[⟨0⟩]) #[.deinit ⟨0⟩]] } }] }] }
+
+#guard match validate #[schema] destructiveOutsideRegionUnit with
+  | .error diagnostics => diagnostics.any (·.code == "VIR-CFG-MIR-STATEMENT")
+  | .ok _ => false
+
+-- A region in a nested branch keeps the code after the branches out of its arms.
+private def nestedRegionUnit : RawUnit :=
+  let raw := divergingRegionUnit #[]
+  let ns := raw.namespaces[0]!
+  { raw with namespaces := #[{ ns with functions := #[{ ns.functions[0]! with
+      body := .cfg { entry := ⟨0⟩, blocks := #[
+        rawBlock (.branch ⟨0⟩ ⟨1⟩ ⟨3⟩),
+        rawBlock (.branch ⟨0⟩ ⟨2⟩ ⟨3⟩),
+        rawBlock diverges,
+        rawBlock (.return_ #[⟨0⟩])] } }] }] }
+
+#guard match validate #[schema] nestedRegionUnit with
+  | .ok unit =>
+      let expressions := unit.namespaces[0]!.expressions
+      (expressions.filter (·.kind matches .return_ _)).size == 1 &&
+        (expressions.filter (·.kind == .throw_ .panic #[])).size == 1
+  | .error _ => false
+
+-- An impossible default stays out of the structured match: no third arm, no panic for it.
+private def regionBesideImpossibleDefaultUnit : RawUnit :=
+  let ns := validUnit.namespaces[0]!
+  withUnitType { validUnit with
+    tables := { validUnit.tables with types := #[.bool, .integer (.bits 32) false] }
+    namespaces := #[{ ns with
+      expressions := #[{ loc := ⟨0⟩, typeId := ⟨1⟩, kind := .value (.integer 1) }]
+      functions := #[{ ns.functions[0]! with
+        signature := { results := #[{ typeId := ⟨1⟩, loc := ⟨0⟩ }] }
+        body := .cfg { entry := ⟨0⟩, blocks := #[
+          rawBlock impossibleDefault,
+          rawBlock diverges,
+          rawBlock (.return_ #[⟨0⟩]),
+          rawBlock .unreachable] } }] }] }
+
+#guard match validate #[schema] regionBesideImpossibleDefaultUnit with
+  | .ok unit =>
+      let expressions := unit.namespaces[0]!.expressions
+      let panics := expressions.filter (·.kind == .throw_ .panic #[])
+      let twoArms := expressions.any fun expression => match expression.kind with
+        | .match_ _ arms => arms.size == 2
+        | _ => false
+      panics.size == 1 && twoArms
+  | .error _ => false
+
 private def rawCallContinuationUnit : RawUnit :=
   let ns := validUnit.namespaces[0]!
   { validUnit with
@@ -1872,6 +2033,41 @@ private def rejectsWitnessMutation (cfg : RawCfg) (expressions : Array Expr)
         rejectsWitnessMutation cfg ns.expressions
           { witness with regions := witness.regions.drop 1 }
   | .error _ => false
+
+private def viewCopyExpr (kind : ExprKind) : Expr := { loc := ⟨0⟩, typeId := ⟨0⟩, kind }
+
+/-- `_t = copy (*h).r`, marked a reference copy, through the shared `h`, then `use`. -/
+private def viewCopyGraph (use : Array ExprKind) :
+    Except Diagnostic (Array Place × Array Expr × RawCfg) :=
+  let reference (kind : ReferenceKind) : Ty :=
+    .reference { profile := testProfile, kind := kind, referent := ⟨0⟩, lifetime := ⟨0⟩ }
+  let places : Array Place := #[.localVar ⟨0⟩, .deref ⟨0⟩, .field ⟨1⟩ { namespaceId := ⟨0⟩, name := ⟨0⟩ } ⟨0⟩, .deref ⟨2⟩,
+    .localVar ⟨1⟩, .deref ⟨4⟩, .localVar ⟨2⟩]
+  let local' (index typeId : Nat) : LocalDecl :=
+    { id := ⟨index⟩, name := "l", type := { typeId := ⟨typeId⟩, loc := ⟨0⟩ }, loc := ⟨0⟩ }
+  let expressions := #[viewCopyExpr (.operation (.borrow rustReferenceCopy ⟨3⟩) #[] #[] none),
+    viewCopyExpr (.assign ⟨4⟩ ⟨0⟩)] ++ use.map viewCopyExpr
+  TwoPhase.mintBorrows places #[.unit, reference .shared, reference .mutable] expressions
+    #[local' 0 1, local' 1 2, local' 2 0]
+    { entry := ⟨0⟩, blocks := #[{
+        loc := ⟨0⟩
+        statements := #[.execute ⟨1⟩, .execute ⟨expressions.size - 1⟩]
+        terminator := .return_ #[] }] }
+
+-- A read through the copy reads the place the view holds; the copy is gone.
+#guard match viewCopyGraph #[.operation (.read ⟨5⟩) #[] #[] none] with
+  | .ok (_, expressions, graph) =>
+      graph.blocks[0]!.statements.size == 1 &&
+        expressions[2]!.kind == .operation (.read ⟨3⟩) #[] #[] none
+  | _ => false
+
+-- A write through it is not folded: the copy stays a mutable reborrow, of a place through
+-- the shared reference, which validation rejects.
+#guard match viewCopyGraph #[.operation (.read ⟨6⟩) #[] #[] none, .assign ⟨5⟩ ⟨2⟩] with
+  | .ok (_, expressions, graph) =>
+      graph.blocks[0]!.statements.size == 2 &&
+        expressions[0]!.kind == .operation (.borrow .mutable ⟨3⟩) #[] #[] none
+  | _ => false
 
 private def badProfileValueUnit : RawUnit :=
   { validUnit with namespaces := #[{

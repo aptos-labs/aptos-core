@@ -1,0 +1,3068 @@
+{
+  "dependencies": [],
+  "evidence": [
+    {
+      "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
+      "trusted": true
+    }
+  ],
+  "namespaces": [
+    {
+      "associatedItems": [],
+      "attributes": [],
+      "comments": [],
+      "constants": [],
+      "doc": "",
+      "expressions": [
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 0
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 4
+          },
+          "typeId": {
+            "index": 7
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 1
+              },
+              "value": {
+                "index": 0
+              }
+            }
+          },
+          "loc": {
+            "index": 4
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 2
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 3
+          },
+          "typeId": {
+            "index": 7
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "readDiscriminant": {
+                  "place": {
+                    "index": 3
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 12
+          },
+          "typeId": {
+            "index": 3
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 4
+              },
+              "value": {
+                "index": 3
+              }
+            }
+          },
+          "loc": {
+            "index": 12
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 5
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 11
+          },
+          "typeId": {
+            "index": 3
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 8
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 10
+          },
+          "typeId": {
+            "index": 1
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 9
+              },
+              "value": {
+                "index": 6
+              }
+            }
+          },
+          "loc": {
+            "index": 10
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 10
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 14
+          },
+          "typeId": {
+            "index": 1
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [
+                {
+                  "index": 8
+                }
+              ],
+              "instantiations": [],
+              "operation": {
+                "primitive": {
+                  "kind": "cast"
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 14
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 11
+              },
+              "value": {
+                "index": 9
+              }
+            }
+          },
+          "loc": {
+            "index": 14
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 14
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 9
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 15
+              },
+              "value": {
+                "index": 11
+              }
+            }
+          },
+          "loc": {
+            "index": 9
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 16
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 16
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 17
+              },
+              "value": {
+                "index": 13
+              }
+            }
+          },
+          "loc": {
+            "index": 16
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 18
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 17
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "readDiscriminant": {
+                  "place": {
+                    "index": 19
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 24
+          },
+          "typeId": {
+            "index": 3
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 20
+              },
+              "value": {
+                "index": 16
+              }
+            }
+          },
+          "loc": {
+            "index": 24
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 21
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 23
+          },
+          "typeId": {
+            "index": 3
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "integer": {
+                  "value": 0
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 25
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 22
+              },
+              "value": {
+                "index": 19
+              }
+            }
+          },
+          "loc": {
+            "index": 25
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 25
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 22
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 26
+              },
+              "value": {
+                "index": 21
+              }
+            }
+          },
+          "loc": {
+            "index": 22
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 27
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 27
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 28
+              },
+              "value": {
+                "index": 23
+              }
+            }
+          },
+          "loc": {
+            "index": 27
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 29
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 28
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 30
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 33
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [
+                {
+                  "index": 26
+                }
+              ],
+              "instantiations": [
+                {
+                  "typeArg": {
+                    "value": {
+                      "loc": {
+                        "index": 33
+                      },
+                      "typeId": {
+                        "index": 2
+                      }
+                    }
+                  }
+                }
+              ],
+              "operation": {
+                "call": {
+                  "kind": {
+                    "constructor": {
+                      "constructor": {
+                        "name": {
+                          "index": 5
+                        },
+                        "namespaceId": {
+                          "index": 2
+                        }
+                      },
+                      "variant": "Some"
+                    }
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 33
+          },
+          "typeId": {
+            "index": 9
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 31
+              },
+              "value": {
+                "index": 27
+              }
+            }
+          },
+          "loc": {
+            "index": 33
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 32
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 32
+          },
+          "typeId": {
+            "index": 9
+          }
+        }
+      ],
+      "functions": [
+        {
+          "alignment": {
+            "index": 0
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 3
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 1
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 2
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 0
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 1
+              },
+              "mutable": false,
+              "name": "values",
+              "type": {
+                "loc": {
+                  "index": 1
+                },
+                "typeId": {
+                  "index": 7
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 2
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 2
+                },
+                "typeId": {
+                  "index": 7
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 0
+          },
+          "origin": {
+            "index": 0
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "values",
+                "typeUse": {
+                  "loc": {
+                    "index": 1
+                  },
+                  "typeId": {
+                    "index": 7
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 2
+                },
+                "typeId": {
+                  "index": 7
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 1
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 11
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 4
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "switch": {
+                        "cases": [
+                          [
+                            {
+                              "integer": {
+                                "value": 0
+                              }
+                            },
+                            {
+                              "index": 3
+                            }
+                          ],
+                          [
+                            {
+                              "integer": {
+                                "value": 1
+                              }
+                            },
+                            {
+                              "index": 2
+                            }
+                          ]
+                        ],
+                        "defaultTarget": {
+                          "index": 1
+                        },
+                        "scrutinee": {
+                          "index": 5
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "loc": {
+                      "index": 12
+                    },
+                    "statements": [],
+                    "terminator": "unreachable"
+                  },
+                  {
+                    "loc": {
+                      "index": 13
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 7
+                          }
+                        }
+                      },
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 10
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "goto": {
+                        "target": {
+                          "index": 4
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "loc": {
+                      "index": 15
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 12
+                          }
+                        }
+                      },
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 14
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "goto": {
+                        "target": {
+                          "index": 4
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "loc": {
+                      "index": 17
+                    },
+                    "statements": [],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 15
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 5
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 6
+              },
+              "mutable": false,
+              "name": "value",
+              "type": {
+                "loc": {
+                  "index": 6
+                },
+                "typeId": {
+                  "index": 8
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 7
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 7
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 8
+              },
+              "mutable": true,
+              "name": "_2",
+              "type": {
+                "loc": {
+                  "index": 8
+                },
+                "typeId": {
+                  "index": 3
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 3
+              },
+              "loc": {
+                "index": 9
+              },
+              "mutable": true,
+              "name": "inner",
+              "type": {
+                "loc": {
+                  "index": 9
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 4
+              },
+              "loc": {
+                "index": 10
+              },
+              "mutable": true,
+              "name": "error",
+              "type": {
+                "loc": {
+                  "index": 10
+                },
+                "typeId": {
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 1
+          },
+          "origin": {
+            "index": 1
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "value",
+                "typeUse": {
+                  "loc": {
+                    "index": 6
+                  },
+                  "typeId": {
+                    "index": 8
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 7
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 2
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 23
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 17
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "switch": {
+                        "cases": [
+                          [
+                            {
+                              "integer": {
+                                "value": 0
+                              }
+                            },
+                            {
+                              "index": 2
+                            }
+                          ],
+                          [
+                            {
+                              "integer": {
+                                "value": 1
+                              }
+                            },
+                            {
+                              "index": 3
+                            }
+                          ]
+                        ],
+                        "defaultTarget": {
+                          "index": 1
+                        },
+                        "scrutinee": {
+                          "index": 18
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "loc": {
+                      "index": 24
+                    },
+                    "statements": [],
+                    "terminator": "unreachable"
+                  },
+                  {
+                    "loc": {
+                      "index": 25
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 20
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "goto": {
+                        "target": {
+                          "index": 4
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "loc": {
+                      "index": 26
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 22
+                          }
+                        }
+                      },
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 24
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "goto": {
+                        "target": {
+                          "index": 4
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "loc": {
+                      "index": 28
+                    },
+                    "statements": [],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 25
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 18
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 19
+              },
+              "mutable": false,
+              "name": "value",
+              "type": {
+                "loc": {
+                  "index": 19
+                },
+                "typeId": {
+                  "index": 9
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 20
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 20
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 21
+              },
+              "mutable": true,
+              "name": "_2",
+              "type": {
+                "loc": {
+                  "index": 21
+                },
+                "typeId": {
+                  "index": 3
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 3
+              },
+              "loc": {
+                "index": 22
+              },
+              "mutable": true,
+              "name": "inner",
+              "type": {
+                "loc": {
+                  "index": 22
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 2
+          },
+          "origin": {
+            "index": 2
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "value",
+                "typeUse": {
+                  "loc": {
+                    "index": 19
+                  },
+                  "typeId": {
+                    "index": 9
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 20
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 3
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 32
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 28
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 29
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 29
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 30
+              },
+              "mutable": false,
+              "name": "value",
+              "type": {
+                "loc": {
+                  "index": 30
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 31
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 31
+                },
+                "typeId": {
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 3
+          },
+          "origin": {
+            "index": 3
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "value",
+                "typeUse": {
+                  "loc": {
+                    "index": 30
+                  },
+                  "typeId": {
+                    "index": 2
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 31
+                },
+                "typeId": {
+                  "index": 9
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "identity": {
+        "index": 0
+      },
+      "implementations": [],
+      "imports": [],
+      "intrinsics": [],
+      "invariants": [],
+      "lemmas": [],
+      "loc": {
+        "index": 0
+      },
+      "patterns": [],
+      "places": [
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "downcast": {
+            "base": {
+              "index": 6
+            },
+            "variant": {
+              "index": 12
+            }
+          }
+        },
+        {
+          "field": {
+            "base": {
+              "index": 7
+            },
+            "owner": {
+              "name": {
+                "index": 9
+              },
+              "namespaceId": {
+                "index": 2
+              }
+            },
+            "field": {
+              "index": 13
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 4
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 4
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "downcast": {
+            "base": {
+              "index": 12
+            },
+            "variant": {
+              "index": 10
+            }
+          }
+        },
+        {
+          "field": {
+            "base": {
+              "index": 13
+            },
+            "owner": {
+              "name": {
+                "index": 9
+              },
+              "namespaceId": {
+                "index": 2
+              }
+            },
+            "field": {
+              "index": 11
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 3
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 3
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "downcast": {
+            "base": {
+              "index": 23
+            },
+            "variant": {
+              "index": 7
+            }
+          }
+        },
+        {
+          "field": {
+            "base": {
+              "index": 24
+            },
+            "owner": {
+              "name": {
+                "index": 5
+              },
+              "namespaceId": {
+                "index": 2
+              }
+            },
+            "field": {
+              "index": 8
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 3
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 3
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        }
+      ],
+      "pragmas": [],
+      "profile": "rust",
+      "profileMetadata": [],
+      "scopes": [],
+      "specFunctions": [],
+      "specVars": [],
+      "structs": [],
+      "traits": []
+    },
+    {
+      "associatedItems": [],
+      "attributes": [],
+      "comments": [],
+      "constants": [],
+      "doc": "",
+      "expressions": [],
+      "functions": [],
+      "identity": {
+        "index": 1
+      },
+      "implementations": [],
+      "imports": [],
+      "intrinsics": [],
+      "invariants": [],
+      "lemmas": [],
+      "loc": {
+        "index": 34
+      },
+      "patterns": [],
+      "places": [],
+      "pragmas": [
+        {
+          "assign": {
+            "loc": null,
+            "name": "verify",
+            "value": {
+              "constant": {
+                "value": {
+                  "bool": {
+                    "value": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "profile": "rust",
+      "profileMetadata": [],
+      "scopes": [
+        {
+          "kind": "module",
+          "loc": {
+            "index": 40
+          },
+          "path": [
+            "alloc"
+          ]
+        },
+        {
+          "kind": "module",
+          "loc": {
+            "index": 41
+          },
+          "path": [
+            "vec"
+          ]
+        }
+      ],
+      "specFunctions": [],
+      "specVars": [],
+      "structs": [
+        {
+          "abilities": [
+            "copy"
+          ],
+          "attributes": [],
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "fields": [],
+          "generics": [],
+          "ghosts": [],
+          "loc": {
+            "index": 36
+          },
+          "locals": [],
+          "name": {
+            "index": 4
+          },
+          "properties": [
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "struct.opaque"
+            }
+          ],
+          "variants": []
+        },
+        {
+          "abilities": [],
+          "attributes": [],
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "fields": [],
+          "generics": [
+            {
+              "abilities": [],
+              "kind": "typeArg",
+              "loc": {
+                "index": 39
+              },
+              "name": "T",
+              "predicates": [],
+              "type": null
+            },
+            {
+              "abilities": [],
+              "kind": "typeArg",
+              "loc": {
+                "index": 39
+              },
+              "name": "A",
+              "predicates": [],
+              "type": null
+            }
+          ],
+          "ghosts": [],
+          "loc": {
+            "index": 39
+          },
+          "locals": [],
+          "name": {
+            "index": 14
+          },
+          "properties": [
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "struct.destructor"
+            },
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "struct.opaque"
+            }
+          ],
+          "variants": []
+        }
+      ],
+      "traits": []
+    },
+    {
+      "associatedItems": [],
+      "attributes": [],
+      "comments": [],
+      "constants": [],
+      "doc": "",
+      "expressions": [],
+      "functions": [],
+      "identity": {
+        "index": 2
+      },
+      "implementations": [],
+      "imports": [],
+      "intrinsics": [],
+      "invariants": [],
+      "lemmas": [],
+      "loc": {
+        "index": 35
+      },
+      "patterns": [],
+      "places": [],
+      "pragmas": [
+        {
+          "assign": {
+            "loc": null,
+            "name": "verify",
+            "value": {
+              "constant": {
+                "value": {
+                  "bool": {
+                    "value": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "profile": "rust",
+      "profileMetadata": [],
+      "scopes": [
+        {
+          "kind": "module",
+          "loc": {
+            "index": 42
+          },
+          "path": [
+            "option"
+          ]
+        },
+        {
+          "kind": "module",
+          "loc": {
+            "index": 43
+          },
+          "path": [
+            "result"
+          ]
+        }
+      ],
+      "specFunctions": [],
+      "specVars": [],
+      "structs": [
+        {
+          "abilities": [
+            "copy"
+          ],
+          "attributes": [],
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "fields": [],
+          "generics": [
+            {
+              "abilities": [],
+              "kind": "typeArg",
+              "loc": {
+                "index": 37
+              },
+              "name": "T",
+              "predicates": [],
+              "type": null
+            }
+          ],
+          "ghosts": [],
+          "loc": {
+            "index": 37
+          },
+          "locals": [],
+          "name": {
+            "index": 5
+          },
+          "properties": [],
+          "variants": [
+            {
+              "discriminant": 0,
+              "fields": [],
+              "loc": {
+                "index": 37
+              },
+              "name": {
+                "index": 6
+              }
+            },
+            {
+              "discriminant": 1,
+              "fields": [
+                {
+                  "doc": "",
+                  "loc": {
+                    "index": 37
+                  },
+                  "name": {
+                    "index": 8
+                  },
+                  "type": {
+                    "loc": {
+                      "index": 37
+                    },
+                    "typeId": {
+                      "index": 4
+                    }
+                  }
+                }
+              ],
+              "loc": {
+                "index": 37
+              },
+              "name": {
+                "index": 7
+              }
+            }
+          ]
+        },
+        {
+          "abilities": [
+            "copy"
+          ],
+          "attributes": [],
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "fields": [],
+          "generics": [
+            {
+              "abilities": [],
+              "kind": "typeArg",
+              "loc": {
+                "index": 38
+              },
+              "name": "T",
+              "predicates": [],
+              "type": null
+            },
+            {
+              "abilities": [],
+              "kind": "typeArg",
+              "loc": {
+                "index": 38
+              },
+              "name": "E",
+              "predicates": [],
+              "type": null
+            }
+          ],
+          "ghosts": [],
+          "loc": {
+            "index": 38
+          },
+          "locals": [],
+          "name": {
+            "index": 9
+          },
+          "properties": [],
+          "variants": [
+            {
+              "discriminant": 0,
+              "fields": [
+                {
+                  "doc": "",
+                  "loc": {
+                    "index": 38
+                  },
+                  "name": {
+                    "index": 11
+                  },
+                  "type": {
+                    "loc": {
+                      "index": 38
+                    },
+                    "typeId": {
+                      "index": 4
+                    }
+                  }
+                }
+              ],
+              "loc": {
+                "index": 38
+              },
+              "name": {
+                "index": 10
+              }
+            },
+            {
+              "discriminant": 1,
+              "fields": [
+                {
+                  "doc": "",
+                  "loc": {
+                    "index": 38
+                  },
+                  "name": {
+                    "index": 13
+                  },
+                  "type": {
+                    "loc": {
+                      "index": 38
+                    },
+                    "typeId": {
+                      "index": 5
+                    }
+                  }
+                }
+              ],
+              "loc": {
+                "index": 38
+              },
+              "name": {
+                "index": 12
+              }
+            }
+          ]
+        }
+      ],
+      "traits": []
+    }
+  ],
+  "profiles": [
+    {
+      "name": "rust",
+      "options": [
+        [
+          "panic",
+          "abort"
+        ],
+        [
+          "unsafe",
+          "reject"
+        ],
+        [
+          "target_pointer_width",
+          "64"
+        ]
+      ],
+      "profile": "rust",
+      "version": 5
+    }
+  ],
+  "tables": {
+    "alignments": [
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 0
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 1
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 2
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 3
+        },
+        "trust": "checked"
+      }
+    ],
+    "files": [
+      {
+        "contentHash": "",
+        "name": "tests/raw-unit/dependency_types.rs"
+      }
+    ],
+    "lifetimes": [],
+    "locations": [
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 444,
+          "file": {
+            "index": 0
+          },
+          "startByte": 403
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 421,
+          "file": {
+            "index": 0
+          },
+          "startByte": 415
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 444,
+          "file": {
+            "index": 0
+          },
+          "startByte": 436
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 459,
+          "file": {
+            "index": 0
+          },
+          "startByte": 459
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 457,
+          "file": {
+            "index": 0
+          },
+          "startByte": 451
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 309,
+          "file": {
+            "index": 0
+          },
+          "startByte": 260
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 284,
+          "file": {
+            "index": 0
+          },
+          "startByte": 279
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 309,
+          "file": {
+            "index": 0
+          },
+          "startByte": 306
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 347,
+          "file": {
+            "index": 0
+          },
+          "startByte": 338
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 346,
+          "file": {
+            "index": 0
+          },
+          "startByte": 341
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 375,
+          "file": {
+            "index": 0
+          },
+          "startByte": 370
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 327,
+          "file": {
+            "index": 0
+          },
+          "startByte": 316
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 327,
+          "file": {
+            "index": 0
+          },
+          "startByte": 322
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 392,
+          "file": {
+            "index": 0
+          },
+          "startByte": 391
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 392,
+          "file": {
+            "index": 0
+          },
+          "startByte": 380
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 356,
+          "file": {
+            "index": 0
+          },
+          "startByte": 355
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 356,
+          "file": {
+            "index": 0
+          },
+          "startByte": 351
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 401,
+          "file": {
+            "index": 0
+          },
+          "startByte": 401
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 121,
+          "file": {
+            "index": 0
+          },
+          "startByte": 73
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 100,
+          "file": {
+            "index": 0
+          },
+          "startByte": 95
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 121,
+          "file": {
+            "index": 0
+          },
+          "startByte": 118
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 161,
+          "file": {
+            "index": 0
+          },
+          "startByte": 150
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 160,
+          "file": {
+            "index": 0
+          },
+          "startByte": 155
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 139,
+          "file": {
+            "index": 0
+          },
+          "startByte": 128
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 139,
+          "file": {
+            "index": 0
+          },
+          "startByte": 134
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 189,
+          "file": {
+            "index": 0
+          },
+          "startByte": 188
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 170,
+          "file": {
+            "index": 0
+          },
+          "startByte": 169
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 170,
+          "file": {
+            "index": 0
+          },
+          "startByte": 165
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 198,
+          "file": {
+            "index": 0
+          },
+          "startByte": 198
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 238,
+          "file": {
+            "index": 0
+          },
+          "startByte": 200
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 217,
+          "file": {
+            "index": 0
+          },
+          "startByte": 212
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 238,
+          "file": {
+            "index": 0
+          },
+          "startByte": 227
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 258,
+          "file": {
+            "index": 0
+          },
+          "startByte": 258
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 256,
+          "file": {
+            "index": 0
+          },
+          "startByte": 245
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `alloc`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `core`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `std::alloc::Global`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `std::option::Option`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `std::result::Result`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `std::vec::Vec`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `alloc::alloc`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `alloc::vec`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `core::option`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `core::result`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      }
+    ],
+    "names": [
+      {
+        "name": "keep",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "ok_or_error",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "unwrap_or_zero",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "wrap",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "Global",
+        "namespaceId": {
+          "index": 1
+        },
+        "scope": [
+          "alloc"
+        ]
+      },
+      {
+        "name": "Option",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "option"
+        ]
+      },
+      {
+        "name": "None",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "option"
+        ]
+      },
+      {
+        "name": "Some",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "option"
+        ]
+      },
+      {
+        "name": "0",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "option"
+        ]
+      },
+      {
+        "name": "Result",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "result"
+        ]
+      },
+      {
+        "name": "Ok",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "result"
+        ]
+      },
+      {
+        "name": "0",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "result"
+        ]
+      },
+      {
+        "name": "Err",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "result"
+        ]
+      },
+      {
+        "name": "0",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "result"
+        ]
+      },
+      {
+        "name": "Vec",
+        "namespaceId": {
+          "index": 1
+        },
+        "scope": [
+          "vec"
+        ]
+      }
+    ],
+    "namespaces": [
+      {
+        "segments": [
+          "dependency_types"
+        ]
+      },
+      {
+        "segments": [
+          "alloc"
+        ]
+      },
+      {
+        "segments": [
+          "core"
+        ]
+      }
+    ],
+    "origins": [
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 0
+        },
+        "sourceIdentity": "dependency_types::keep"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 5
+        },
+        "sourceIdentity": "dependency_types::ok_or_error"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 18
+        },
+        "sourceIdentity": "dependency_types::unwrap_or_zero"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 29
+        },
+        "sourceIdentity": "dependency_types::wrap"
+      }
+    ],
+    "types": [
+      "unit",
+      {
+        "integer": {
+          "signed": false,
+          "width": {
+            "bits": {
+              "width": 8
+            }
+          }
+        }
+      },
+      {
+        "integer": {
+          "signed": false,
+          "width": {
+            "bits": {
+              "width": 32
+            }
+          }
+        }
+      },
+      {
+        "integer": {
+          "signed": true,
+          "width": "pointer"
+        }
+      },
+      {
+        "typeParameter": {
+          "index": 0
+        }
+      },
+      {
+        "typeParameter": {
+          "index": 1
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [],
+          "name": {
+            "index": 4
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 2
+                  }
+                }
+              }
+            },
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 6
+                  }
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 14
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 2
+                  }
+                }
+              }
+            },
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 1
+                  }
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 9
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 2
+                  }
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 5
+          }
+        }
+      }
+    ]
+  },
+  "version": {
+    "major": 1,
+    "minor": 9
+  }
+}

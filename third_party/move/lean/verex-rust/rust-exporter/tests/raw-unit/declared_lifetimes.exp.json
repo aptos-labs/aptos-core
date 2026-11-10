@@ -1,0 +1,8023 @@
+{
+  "dependencies": [],
+  "evidence": [
+    {
+      "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
+      "trusted": true
+    },
+    {
+      "description": "calls of trait methods on concrete types resolve to their impls' methods as rustc's codegen resolves them",
+      "producer": "verex-rust-export via rustc Public Instance::resolve",
+      "trusted": true
+    }
+  ],
+  "namespaces": [
+    {
+      "associatedItems": [],
+      "attributes": [],
+      "comments": [
+        {
+          "isDoc": false,
+          "loc": {
+            "index": 105
+          },
+          "ownLine": true,
+          "text": "// Signatures keep their declared lifetimes, and their bodies stay inferred. An"
+        },
+        {
+          "isDoc": false,
+          "loc": {
+            "index": 106
+          },
+          "ownLine": true,
+          "text": "// elided lifetime is named only where it tells a result from a parameter."
+        },
+        {
+          "isDoc": false,
+          "loc": {
+            "index": 107
+          },
+          "ownLine": true,
+          "text": "// The bridge keeps early-bound lifetimes and their explicit outlives bound."
+        },
+        {
+          "isDoc": false,
+          "loc": {
+            "index": 108
+          },
+          "ownLine": true,
+          "text": "// Trait-bound early lifetimes remain distinct in the declared signature."
+        }
+      ],
+      "constants": [],
+      "doc": "",
+      "expressions": [
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 2
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 4
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 3
+              },
+              "value": {
+                "index": 0
+              }
+            }
+          },
+          "loc": {
+            "index": 4
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 4
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 3
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 7
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 10
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 8
+              },
+              "value": {
+                "index": 3
+              }
+            }
+          },
+          "loc": {
+            "index": 10
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 9
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 9
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 11
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 17
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 12
+              },
+              "value": {
+                "index": 6
+              }
+            }
+          },
+          "loc": {
+            "index": 17
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 13
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 16
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 14
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 23
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 15
+              },
+              "value": {
+                "index": 9
+              }
+            }
+          },
+          "loc": {
+            "index": 23
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 16
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 24
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 17
+              },
+              "value": {
+                "index": 11
+              }
+            }
+          },
+          "loc": {
+            "index": 24
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 19
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 28
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 21
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 28
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [
+                {
+                  "index": 13
+                },
+                {
+                  "index": 14
+                }
+              ],
+              "instantiations": [
+                {
+                  "lifetime": {
+                    "value": {
+                      "index": 0
+                    }
+                  }
+                },
+                {
+                  "lifetime": {
+                    "value": {
+                      "index": 0
+                    }
+                  }
+                }
+              ],
+              "operation": {
+                "call": {
+                  "kind": {
+                    "function": {
+                      "callee": {
+                        "name": {
+                          "index": 12
+                        },
+                        "namespaceId": {
+                          "index": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 28
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "integer": {
+                  "value": 2
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 29
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 23
+              },
+              "value": {
+                "index": 16
+              }
+            }
+          },
+          "loc": {
+            "index": 29
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "integer": {
+                  "value": 1
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 30
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 25
+              },
+              "value": {
+                "index": 18
+              }
+            }
+          },
+          "loc": {
+            "index": 30
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 26
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 25
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 27
+              },
+              "value": {
+                "index": 20
+              }
+            }
+          },
+          "loc": {
+            "index": 25
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 28
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 26
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 29
+              },
+              "value": {
+                "index": 22
+              }
+            }
+          },
+          "loc": {
+            "index": 26
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 30
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 27
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 31
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 27
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [
+                {
+                  "index": 24
+                },
+                {
+                  "index": 25
+                }
+              ],
+              "instantiations": [],
+              "operation": {
+                "primitive": {
+                  "kind": "overflowingAdd"
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 27
+          },
+          "typeId": {
+            "index": 15
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 32
+              },
+              "value": {
+                "index": 26
+              }
+            }
+          },
+          "loc": {
+            "index": 27
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "integer": {
+                  "value": 1
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 27
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 34
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 27
+          },
+          "typeId": {
+            "index": 1
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "integer": {
+                  "value": 0
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 27
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 36
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 27
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 37
+              },
+              "value": {
+                "index": 31
+              }
+            }
+          },
+          "loc": {
+            "index": 27
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 38
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 31
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 40
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 36
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 41
+              },
+              "value": {
+                "index": 34
+              }
+            }
+          },
+          "loc": {
+            "index": 36
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 42
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 35
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 44
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 41
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 45
+              },
+              "value": {
+                "index": 37
+              }
+            }
+          },
+          "loc": {
+            "index": 41
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 46
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 43
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 48
+              },
+              "value": {
+                "index": 39
+              }
+            }
+          },
+          "loc": {
+            "index": 43
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": "unit"
+            }
+          },
+          "loc": {
+            "index": 42
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 50
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 49
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 51
+              },
+              "value": {
+                "index": 42
+              }
+            }
+          },
+          "loc": {
+            "index": 49
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 52
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 48
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 54
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 55
+          },
+          "typeId": {
+            "index": 20
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 55
+              },
+              "value": {
+                "index": 45
+              }
+            }
+          },
+          "loc": {
+            "index": 55
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 56
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 54
+          },
+          "typeId": {
+            "index": 20
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 58
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 60
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [
+                {
+                  "index": 48
+                }
+              ],
+              "instantiations": [
+                {
+                  "lifetime": {
+                    "value": {
+                      "index": 0
+                    }
+                  }
+                }
+              ],
+              "operation": {
+                "call": {
+                  "kind": {
+                    "constructor": {
+                      "constructor": {
+                        "name": {
+                          "index": 15
+                        },
+                        "namespaceId": {
+                          "index": 0
+                        }
+                      },
+                      "variant": null
+                    }
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 60
+          },
+          "typeId": {
+            "index": 8
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 59
+              },
+              "value": {
+                "index": 49
+              }
+            }
+          },
+          "loc": {
+            "index": 60
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 60
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 59
+          },
+          "typeId": {
+            "index": 8
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "integer": {
+                  "value": 1
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 65
+          },
+          "typeId": {
+            "index": 2
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 62
+              },
+              "value": {
+                "index": 52
+              }
+            }
+          },
+          "loc": {
+            "index": 65
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": "unit"
+            }
+          },
+          "loc": {
+            "index": 64
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 64
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 70
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 65
+              },
+              "value": {
+                "index": 55
+              }
+            }
+          },
+          "loc": {
+            "index": 70
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 66
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 69
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 67
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 75
+          },
+          "typeId": {
+            "index": 18
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 68
+              },
+              "value": {
+                "index": 58
+              }
+            }
+          },
+          "loc": {
+            "index": 75
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 69
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 74
+          },
+          "typeId": {
+            "index": 18
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 71
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 81
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 72
+              },
+              "value": {
+                "index": 61
+              }
+            }
+          },
+          "loc": {
+            "index": 81
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 73
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 80
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 74
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 87
+          },
+          "typeId": {
+            "index": 18
+          }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 75
+              },
+              "value": {
+                "index": 64
+              }
+            }
+          },
+          "loc": {
+            "index": 87
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 76
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 86
+          },
+          "typeId": {
+            "index": 18
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "borrow": {
+                  "kind": "mutable",
+                  "place": {
+                    "index": 78
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 92
+          },
+          "typeId": {
+            "index": 21
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 79
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 92
+          },
+          "typeId": {
+            "index": 3
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [
+                {
+                  "index": 67
+                },
+                {
+                  "index": 68
+                }
+              ],
+              "instantiations": [
+                {
+                  "typeArg": {
+                    "value": {
+                      "loc": {
+                        "index": 92
+                      },
+                      "typeId": {
+                        "index": 2
+                      }
+                    }
+                  }
+                },
+                {
+                  "typeArg": {
+                    "value": {
+                      "loc": {
+                        "index": 92
+                      },
+                      "typeId": {
+                        "index": 3
+                      }
+                    }
+                  }
+                },
+                {
+                  "typeArg": {
+                    "value": {
+                      "loc": {
+                        "index": 92
+                      },
+                      "typeId": {
+                        "index": 10
+                      }
+                    }
+                  }
+                },
+                {
+                  "typeArg": {
+                    "value": {
+                      "loc": {
+                        "index": 92
+                      },
+                      "typeId": {
+                        "index": 2
+                      }
+                    }
+                  }
+                }
+              ],
+              "operation": {
+                "call": {
+                  "kind": {
+                    "function": {
+                      "callee": {
+                        "name": {
+                          "index": 21
+                        },
+                        "namespaceId": {
+                          "index": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 92
+          },
+          "typeId": {
+            "index": 16
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 81
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 93
+          },
+          "typeId": {
+            "index": 16
+          }
+        }
+      ],
+      "functions": [
+        {
+          "alignment": {
+            "index": 0
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 3
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 1
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 2
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 0
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 1
+              },
+              "mutable": false,
+              "name": "self",
+              "type": {
+                "loc": {
+                  "index": 1
+                },
+                "typeId": {
+                  "index": 13
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 2
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 2
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 0
+          },
+          "origin": {
+            "index": 0
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 0
+                },
+                "name": "'a",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "self",
+                "typeUse": {
+                  "loc": {
+                    "index": 1
+                  },
+                  "typeId": {
+                    "index": 13
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 2
+                },
+                "typeId": {
+                  "index": 23
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 1
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 9
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 4
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 5
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 5
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 6
+              },
+              "mutable": false,
+              "name": "self",
+              "type": {
+                "loc": {
+                  "index": 6
+                },
+                "typeId": {
+                  "index": 24
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 7
+              },
+              "mutable": false,
+              "name": "_other",
+              "type": {
+                "loc": {
+                  "index": 7
+                },
+                "typeId": {
+                  "index": 25
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 8
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 8
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 1
+          },
+          "origin": {
+            "index": 1
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 5
+                },
+                "name": "'l0",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 5
+                },
+                "name": "'l1",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "self",
+                "typeUse": {
+                  "loc": {
+                    "index": 6
+                  },
+                  "typeId": {
+                    "index": 24
+                  }
+                }
+              },
+              {
+                "mutable": false,
+                "name": "_other",
+                "typeUse": {
+                  "loc": {
+                    "index": 7
+                  },
+                  "typeId": {
+                    "index": 25
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 8
+                },
+                "typeId": {
+                  "index": 26
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 2
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 16
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 7
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 8
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 11
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 12
+              },
+              "mutable": false,
+              "name": "_value",
+              "type": {
+                "loc": {
+                  "index": 12
+                },
+                "typeId": {
+                  "index": 27
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 13
+              },
+              "mutable": false,
+              "name": "_x",
+              "type": {
+                "loc": {
+                  "index": 13
+                },
+                "typeId": {
+                  "index": 23
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 14
+              },
+              "mutable": false,
+              "name": "y",
+              "type": {
+                "loc": {
+                  "index": 14
+                },
+                "typeId": {
+                  "index": 28
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 3
+              },
+              "loc": {
+                "index": 15
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 15
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 2
+          },
+          "origin": {
+            "index": 2
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 11
+                },
+                "name": "'a",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 11
+                },
+                "name": "'b",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "typeArg",
+                "loc": {
+                  "index": 11
+                },
+                "name": "T",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 11
+                },
+                "name": "'l3",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "_value",
+                "typeUse": {
+                  "loc": {
+                    "index": 12
+                  },
+                  "typeId": {
+                    "index": 27
+                  }
+                }
+              },
+              {
+                "mutable": false,
+                "name": "_x",
+                "typeUse": {
+                  "loc": {
+                    "index": 13
+                  },
+                  "typeId": {
+                    "index": 23
+                  }
+                }
+              },
+              {
+                "mutable": false,
+                "name": "y",
+                "typeUse": {
+                  "loc": {
+                    "index": 14
+                  },
+                  "typeId": {
+                    "index": 28
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 15
+                },
+                "typeId": {
+                  "index": 28
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 3
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 28
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 10
+                          }
+                        }
+                      },
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 12
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "call": {
+                        "call": {
+                          "index": 15
+                        },
+                        "destination": {
+                          "place": {
+                            "index": 22
+                          },
+                          "target": {
+                            "index": 1
+                          }
+                        },
+                        "unwind": "unreachable"
+                      }
+                    }
+                  },
+                  {
+                    "loc": {
+                      "index": 27
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 17
+                          }
+                        }
+                      },
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 19
+                          }
+                        }
+                      },
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 21
+                          }
+                        }
+                      },
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 23
+                          }
+                        }
+                      },
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 27
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "assert": {
+                        "condition": {
+                          "index": 29
+                        },
+                        "expected": false,
+                        "kind": "overflow",
+                        "target": {
+                          "index": 2
+                        },
+                        "unwind": "unreachable"
+                      }
+                    }
+                  },
+                  {
+                    "loc": {
+                      "index": 31
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 32
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 33
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 18
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 19
+              },
+              "mutable": true,
+              "name": "a",
+              "type": {
+                "loc": {
+                  "index": 19
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 20
+              },
+              "mutable": true,
+              "name": "b",
+              "type": {
+                "loc": {
+                  "index": 20
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 21
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 21
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 3
+              },
+              "loc": {
+                "index": 22
+              },
+              "mutable": true,
+              "name": "r",
+              "type": {
+                "loc": {
+                  "index": 22
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 4
+              },
+              "loc": {
+                "index": 23
+              },
+              "mutable": true,
+              "name": "_4",
+              "type": {
+                "loc": {
+                  "index": 23
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 5
+              },
+              "loc": {
+                "index": 24
+              },
+              "mutable": true,
+              "name": "_5",
+              "type": {
+                "loc": {
+                  "index": 24
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 6
+              },
+              "loc": {
+                "index": 25
+              },
+              "mutable": true,
+              "name": "_6",
+              "type": {
+                "loc": {
+                  "index": 25
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 7
+              },
+              "loc": {
+                "index": 26
+              },
+              "mutable": true,
+              "name": "_7",
+              "type": {
+                "loc": {
+                  "index": 26
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 8
+              },
+              "loc": {
+                "index": 27
+              },
+              "mutable": true,
+              "name": "_8",
+              "type": {
+                "loc": {
+                  "index": 27
+                },
+                "typeId": {
+                  "index": 15
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 3
+          },
+          "origin": {
+            "index": 3
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [
+              {
+                "mutable": true,
+                "name": "a",
+                "typeUse": {
+                  "loc": {
+                    "index": 19
+                  },
+                  "typeId": {
+                    "index": 2
+                  }
+                }
+              },
+              {
+                "mutable": true,
+                "name": "b",
+                "typeUse": {
+                  "loc": {
+                    "index": 20
+                  },
+                  "typeId": {
+                    "index": 2
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 21
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 4
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 35
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 35
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 36
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 32
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 33
+              },
+              "mutable": false,
+              "name": "x",
+              "type": {
+                "loc": {
+                  "index": 33
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 34
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 34
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 4
+          },
+          "origin": {
+            "index": 4
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "x",
+                "typeUse": {
+                  "loc": {
+                    "index": 33
+                  },
+                  "typeId": {
+                    "index": 16
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 34
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 5
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 42
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 38
+                          }
+                        }
+                      },
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 40
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 41
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 37
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 38
+              },
+              "mutable": false,
+              "name": "x",
+              "type": {
+                "loc": {
+                  "index": 38
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 39
+              },
+              "mutable": false,
+              "name": "y",
+              "type": {
+                "loc": {
+                  "index": 39
+                },
+                "typeId": {
+                  "index": 18
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 40
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 40
+                },
+                "typeId": {
+                  "index": 0
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 3
+              },
+              "loc": {
+                "index": 41
+              },
+              "mutable": true,
+              "name": "_3",
+              "type": {
+                "loc": {
+                  "index": 41
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 5
+          },
+          "origin": {
+            "index": 5
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "x",
+                "typeUse": {
+                  "loc": {
+                    "index": 38
+                  },
+                  "typeId": {
+                    "index": 16
+                  }
+                }
+              },
+              {
+                "mutable": false,
+                "name": "y",
+                "typeUse": {
+                  "loc": {
+                    "index": 39
+                  },
+                  "typeId": {
+                    "index": 18
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 40
+                },
+                "typeId": {
+                  "index": 0
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 6
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 48
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 43
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 44
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 44
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 45
+              },
+              "mutable": false,
+              "name": "x",
+              "type": {
+                "loc": {
+                  "index": 45
+                },
+                "typeId": {
+                  "index": 29
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 46
+              },
+              "mutable": false,
+              "name": "_y",
+              "type": {
+                "loc": {
+                  "index": 46
+                },
+                "typeId": {
+                  "index": 30
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 47
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 47
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 6
+          },
+          "origin": {
+            "index": 6
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 44
+                },
+                "name": "'a",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 44
+                },
+                "name": "'l1",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "x",
+                "typeUse": {
+                  "loc": {
+                    "index": 45
+                  },
+                  "typeId": {
+                    "index": 29
+                  }
+                }
+              },
+              {
+                "mutable": false,
+                "name": "_y",
+                "typeUse": {
+                  "loc": {
+                    "index": 46
+                  },
+                  "typeId": {
+                    "index": 30
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 47
+                },
+                "typeId": {
+                  "index": 29
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 7
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 54
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 46
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 47
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 50
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 51
+              },
+              "mutable": false,
+              "name": "x",
+              "type": {
+                "loc": {
+                  "index": 51
+                },
+                "typeId": {
+                  "index": 31
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 52
+              },
+              "mutable": false,
+              "name": "_y",
+              "type": {
+                "loc": {
+                  "index": 52
+                },
+                "typeId": {
+                  "index": 32
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 53
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 53
+                },
+                "typeId": {
+                  "index": 20
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 7
+          },
+          "origin": {
+            "index": 7
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "typeArg",
+                "loc": {
+                  "index": 50
+                },
+                "name": "T",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 50
+                },
+                "name": "'a",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 50
+                },
+                "name": "'l2",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "x",
+                "typeUse": {
+                  "loc": {
+                    "index": 51
+                  },
+                  "typeId": {
+                    "index": 31
+                  }
+                }
+              },
+              {
+                "mutable": false,
+                "name": "_y",
+                "typeUse": {
+                  "loc": {
+                    "index": 52
+                  },
+                  "typeId": {
+                    "index": 32
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 53
+                },
+                "typeId": {
+                  "index": 31
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 8
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 59
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 50
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 51
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 56
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 57
+              },
+              "mutable": false,
+              "name": "x",
+              "type": {
+                "loc": {
+                  "index": 57
+                },
+                "typeId": {
+                  "index": 33
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 58
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 58
+                },
+                "typeId": {
+                  "index": 8
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 8
+          },
+          "origin": {
+            "index": 8
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 56
+                },
+                "name": "'a",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "x",
+                "typeUse": {
+                  "loc": {
+                    "index": 57
+                  },
+                  "typeId": {
+                    "index": 33
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 58
+                },
+                "typeId": {
+                  "index": 14
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 9
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 64
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 53
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 54
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 61
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 62
+              },
+              "mutable": false,
+              "name": "x",
+              "type": {
+                "loc": {
+                  "index": 62
+                },
+                "typeId": {
+                  "index": 34
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 63
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 63
+                },
+                "typeId": {
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 9
+          },
+          "origin": {
+            "index": 9
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 61
+                },
+                "name": "'a",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "x",
+                "typeUse": {
+                  "loc": {
+                    "index": 62
+                  },
+                  "typeId": {
+                    "index": 34
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 63
+                },
+                "typeId": {
+                  "index": 0
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 10
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 69
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 56
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 57
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 66
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 67
+              },
+              "mutable": false,
+              "name": "x",
+              "type": {
+                "loc": {
+                  "index": 67
+                },
+                "typeId": {
+                  "index": 35
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 68
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 68
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 10
+          },
+          "origin": {
+            "index": 10
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 66
+                },
+                "name": "'s",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 66
+                },
+                "name": "'l",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "x",
+                "typeUse": {
+                  "loc": {
+                    "index": 67
+                  },
+                  "typeId": {
+                    "index": 35
+                  }
+                }
+              }
+            ],
+            "predicates": [
+              {
+                "lifetimeOutlives": {
+                  "longer": {
+                    "index": 12
+                  },
+                  "shorter": {
+                    "index": 13
+                  }
+                }
+              }
+            ],
+            "results": [
+              {
+                "loc": {
+                  "index": 68
+                },
+                "typeId": {
+                  "index": 36
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 11
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 74
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 59
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 60
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 71
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 72
+              },
+              "mutable": false,
+              "name": "x",
+              "type": {
+                "loc": {
+                  "index": 72
+                },
+                "typeId": {
+                  "index": 37
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 73
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 73
+                },
+                "typeId": {
+                  "index": 18
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 11
+          },
+          "origin": {
+            "index": 11
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 71
+                },
+                "name": "'a",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "x",
+                "typeUse": {
+                  "loc": {
+                    "index": 72
+                  },
+                  "typeId": {
+                    "index": 37
+                  }
+                }
+              }
+            ],
+            "predicates": [
+              {
+                "lifetimeOutlives": {
+                  "longer": {
+                    "index": 1
+                  },
+                  "shorter": {
+                    "index": 14
+                  }
+                }
+              }
+            ],
+            "results": [
+              {
+                "loc": {
+                  "index": 73
+                },
+                "typeId": {
+                  "index": 38
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 12
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 80
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 62
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 63
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 76
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 77
+              },
+              "mutable": false,
+              "name": "x",
+              "type": {
+                "loc": {
+                  "index": 77
+                },
+                "typeId": {
+                  "index": 39
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 78
+              },
+              "mutable": false,
+              "name": "_y",
+              "type": {
+                "loc": {
+                  "index": 78
+                },
+                "typeId": {
+                  "index": 40
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 79
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 79
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 12
+          },
+          "origin": {
+            "index": 12
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 76
+                },
+                "name": "'a",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 76
+                },
+                "name": "'b",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "x",
+                "typeUse": {
+                  "loc": {
+                    "index": 77
+                  },
+                  "typeId": {
+                    "index": 39
+                  }
+                }
+              },
+              {
+                "mutable": false,
+                "name": "_y",
+                "typeUse": {
+                  "loc": {
+                    "index": 78
+                  },
+                  "typeId": {
+                    "index": 40
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 79
+                },
+                "typeId": {
+                  "index": 39
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 13
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 86
+                    },
+                    "statements": [
+                      {
+                        "execute": {
+                          "expression": {
+                            "index": 65
+                          }
+                        }
+                      }
+                    ],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 66
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 82
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 83
+              },
+              "mutable": false,
+              "name": "_x",
+              "type": {
+                "loc": {
+                  "index": 83
+                },
+                "typeId": {
+                  "index": 41
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 84
+              },
+              "mutable": false,
+              "name": "y",
+              "type": {
+                "loc": {
+                  "index": 84
+                },
+                "typeId": {
+                  "index": 38
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 85
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 85
+                },
+                "typeId": {
+                  "index": 18
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 13
+          },
+          "origin": {
+            "index": 13
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 82
+                },
+                "name": "'a",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "_x",
+                "typeUse": {
+                  "loc": {
+                    "index": 83
+                  },
+                  "typeId": {
+                    "index": 41
+                  }
+                }
+              },
+              {
+                "mutable": false,
+                "name": "y",
+                "typeUse": {
+                  "loc": {
+                    "index": 84
+                  },
+                  "typeId": {
+                    "index": 38
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 85
+                },
+                "typeId": {
+                  "index": 38
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alignment": {
+            "index": 14
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 92
+                    },
+                    "statements": [],
+                    "terminator": {
+                      "call": {
+                        "call": {
+                          "index": 69
+                        },
+                        "destination": {
+                          "place": {
+                            "index": 80
+                          },
+                          "target": {
+                            "index": 1
+                          }
+                        },
+                        "unwind": "unreachable"
+                      }
+                    }
+                  },
+                  {
+                    "loc": {
+                      "index": 93
+                    },
+                    "statements": [],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 70
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 88
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 89
+              },
+              "mutable": false,
+              "name": "v",
+              "type": {
+                "loc": {
+                  "index": 89
+                },
+                "typeId": {
+                  "index": 21
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 90
+              },
+              "mutable": false,
+              "name": "i",
+              "type": {
+                "loc": {
+                  "index": 90
+                },
+                "typeId": {
+                  "index": 3
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 91
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 91
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 14
+          },
+          "origin": {
+            "index": 14
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "v",
+                "typeUse": {
+                  "loc": {
+                    "index": 89
+                  },
+                  "typeId": {
+                    "index": 21
+                  }
+                }
+              },
+              {
+                "mutable": false,
+                "name": "i",
+                "typeUse": {
+                  "loc": {
+                    "index": 90
+                  },
+                  "typeId": {
+                    "index": 3
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 91
+                },
+                "typeId": {
+                  "index": 16
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "identity": {
+        "index": 0
+      },
+      "implementations": [],
+      "imports": [],
+      "intrinsics": [],
+      "invariants": [],
+      "lemmas": [],
+      "loc": {
+        "index": 0
+      },
+      "patterns": [],
+      "places": [
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "field": {
+            "base": {
+              "index": 0
+            },
+            "owner": {
+              "name": {
+                "index": 15
+              },
+              "namespaceId": {
+                "index": 0
+              }
+            },
+            "field": {
+              "index": 16
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 5
+            }
+          }
+        },
+        {
+          "field": {
+            "base": {
+              "index": 6
+            },
+            "owner": {
+              "name": {
+                "index": 17
+              },
+              "namespaceId": {
+                "index": 0
+              }
+            },
+            "field": {
+              "index": 18
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 10
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 3
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 3
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 4
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 5
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 4
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 18
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 5
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 20
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 3
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 3
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 24
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 6
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 7
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 6
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 7
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 8
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 8
+            }
+          }
+        },
+        {
+          "index": {
+            "base": {
+              "index": 33
+            },
+            "index": {
+              "index": 28
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 8
+            }
+          }
+        },
+        {
+          "index": {
+            "base": {
+              "index": 35
+            },
+            "index": {
+              "index": 30
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 39
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 43
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 3
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 3
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 47
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 49
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 53
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 57
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 61
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 63
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 70
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "deref": {
+            "base": {
+              "index": 77
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 2
+            }
+          }
+        }
+      ],
+      "pragmas": [],
+      "profile": "rust",
+      "profileMetadata": [],
+      "scopes": [
+        {
+          "kind": "inherent",
+          "loc": {
+            "index": 95
+          },
+          "path": [
+            "Holder"
+          ]
+        },
+        {
+          "kind": "inherent",
+          "loc": {
+            "index": 97
+          },
+          "path": [
+            "S"
+          ]
+        }
+      ],
+      "specFunctions": [],
+      "specVars": [],
+      "structs": [
+        {
+          "abilities": [],
+          "attributes": [],
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "fields": [
+            {
+              "doc": "",
+              "loc": {
+                "index": 96
+              },
+              "name": {
+                "index": 16
+              },
+              "type": {
+                "loc": {
+                  "index": 96
+                },
+                "typeId": {
+                  "index": 23
+                }
+              }
+            }
+          ],
+          "generics": [
+            {
+              "abilities": [],
+              "kind": "lifetime",
+              "loc": {
+                "index": 95
+              },
+              "name": "'a",
+              "predicates": [],
+              "type": null
+            }
+          ],
+          "ghosts": [],
+          "loc": {
+            "index": 95
+          },
+          "locals": [],
+          "name": {
+            "index": 15
+          },
+          "properties": [],
+          "variants": []
+        },
+        {
+          "abilities": [],
+          "attributes": [],
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "fields": [
+            {
+              "doc": "",
+              "loc": {
+                "index": 98
+              },
+              "name": {
+                "index": 18
+              },
+              "type": {
+                "loc": {
+                  "index": 98
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "generics": [],
+          "ghosts": [],
+          "loc": {
+            "index": 97
+          },
+          "locals": [],
+          "name": {
+            "index": 17
+          },
+          "properties": [],
+          "variants": []
+        }
+      ],
+      "traits": []
+    },
+    {
+      "associatedItems": [],
+      "attributes": [],
+      "comments": [],
+      "constants": [],
+      "doc": "",
+      "expressions": [],
+      "functions": [
+        {
+          "alignment": {
+            "index": 15
+          },
+          "attributes": [],
+          "body": "absent",
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 101
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 101
+              },
+              "mutable": false,
+              "name": "_1",
+              "type": {
+                "loc": {
+                  "index": 101
+                },
+                "typeId": {
+                  "index": 22
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 101
+              },
+              "mutable": false,
+              "name": "_2",
+              "type": {
+                "loc": {
+                  "index": 101
+                },
+                "typeId": {
+                  "index": 5
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 21
+          },
+          "origin": {
+            "index": 15
+          },
+          "pragmas": [
+            {
+              "assign": {
+                "loc": null,
+                "name": "verify",
+                "value": {
+                  "constant": {
+                    "value": {
+                      "bool": {
+                        "value": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "profile": "rust",
+          "profileData": [
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "function.dependency"
+            },
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "function.shapeOnly"
+            }
+          ],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "typeArg",
+                "loc": {
+                  "index": 101
+                },
+                "name": "T",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "typeArg",
+                "loc": {
+                  "index": 101
+                },
+                "name": "I",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "typeArg",
+                "loc": {
+                  "index": 101
+                },
+                "name": "A",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "typeArg",
+                "loc": {
+                  "index": 101
+                },
+                "name": "Output",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "_1",
+                "typeUse": {
+                  "loc": {
+                    "index": 101
+                  },
+                  "typeId": {
+                    "index": 22
+                  }
+                }
+              },
+              {
+                "mutable": false,
+                "name": "_2",
+                "typeUse": {
+                  "loc": {
+                    "index": 101
+                  },
+                  "typeId": {
+                    "index": 5
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 101
+                },
+                "typeId": {
+                  "index": 42
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "identity": {
+        "index": 1
+      },
+      "implementations": [],
+      "imports": [],
+      "intrinsics": [],
+      "invariants": [],
+      "lemmas": [],
+      "loc": {
+        "index": 94
+      },
+      "patterns": [],
+      "places": [],
+      "pragmas": [
+        {
+          "assign": {
+            "loc": null,
+            "name": "verify",
+            "value": {
+              "constant": {
+                "value": {
+                  "bool": {
+                    "value": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "profile": "rust",
+      "profileMetadata": [],
+      "scopes": [
+        {
+          "kind": "module",
+          "loc": {
+            "index": 102
+          },
+          "path": [
+            "alloc"
+          ]
+        },
+        {
+          "kind": "module",
+          "loc": {
+            "index": 103
+          },
+          "path": [
+            "vec"
+          ]
+        },
+        {
+          "kind": "implementation",
+          "loc": {
+            "index": 104
+          },
+          "path": [
+            "vec",
+            "<std::vec::Vec<T, A> as std::ops::IndexMut<I>>"
+          ]
+        }
+      ],
+      "specFunctions": [],
+      "specVars": [],
+      "structs": [
+        {
+          "abilities": [
+            "copy"
+          ],
+          "attributes": [],
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "fields": [],
+          "generics": [],
+          "ghosts": [],
+          "loc": {
+            "index": 99
+          },
+          "locals": [],
+          "name": {
+            "index": 19
+          },
+          "properties": [
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "struct.opaque"
+            }
+          ],
+          "variants": []
+        },
+        {
+          "abilities": [],
+          "attributes": [],
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "fields": [],
+          "generics": [
+            {
+              "abilities": [],
+              "kind": "typeArg",
+              "loc": {
+                "index": 100
+              },
+              "name": "T",
+              "predicates": [],
+              "type": null
+            },
+            {
+              "abilities": [],
+              "kind": "typeArg",
+              "loc": {
+                "index": 100
+              },
+              "name": "A",
+              "predicates": [],
+              "type": null
+            }
+          ],
+          "ghosts": [],
+          "loc": {
+            "index": 100
+          },
+          "locals": [],
+          "name": {
+            "index": 20
+          },
+          "properties": [
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "struct.destructor"
+            },
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "struct.opaque"
+            }
+          ],
+          "variants": []
+        }
+      ],
+      "traits": []
+    }
+  ],
+  "profiles": [
+    {
+      "name": "rust",
+      "options": [
+        [
+          "panic",
+          "abort"
+        ],
+        [
+          "unsafe",
+          "reject"
+        ],
+        [
+          "target_pointer_width",
+          "64"
+        ]
+      ],
+      "profile": "rust",
+      "version": 5
+    }
+  ],
+  "tables": {
+    "alignments": [
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 0
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 1
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 2
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 3
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 4
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 5
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 6
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 7
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 8
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 9
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 10
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 11
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 12
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 13
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 14
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public generic signature without its body",
+        "source": {
+          "index": 15
+        },
+        "trust": "checked"
+      }
+    ],
+    "files": [
+      {
+        "contentHash": "",
+        "name": "tests/raw-unit/declared_lifetimes.rs"
+      }
+    ],
+    "lifetimes": [
+      {
+        "kind": "inference",
+        "loc": {
+          "index": 0
+        },
+        "name": null
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 0
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'a"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 0
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'l0"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 1
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'l1"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 3
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'l3"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 1
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'b"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 0
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'a"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 1
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'l1"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 1
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'a"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 2
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'l2"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 0
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'a"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 0
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'a"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 1
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'l"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 0
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'s"
+      },
+      {
+        "kind": "static",
+        "loc": {
+          "index": 0
+        },
+        "name": "'static"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 0
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'a"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 1
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'b"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 0
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'a"
+      }
+    ],
+    "locations": [
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1537,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1505
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1521,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1517
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1537,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1526
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1560,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1560
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1554,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1548
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1447,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1398
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1420,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1411
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1428,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1422
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1447,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1439
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1475,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1475
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1469,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1458
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1339,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1237
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1286,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1280
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1294,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1292
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1310,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1309
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1339,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1328
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1349,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1349
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1347,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1346
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1608,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1564
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1583,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1578
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1595,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1590
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1608,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1605
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1620,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1619
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1633,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1627
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1641,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1635
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1672,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1671
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1676,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1675
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1676,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1671
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1642,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1623
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1653,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1648
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1665,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1659
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1678,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1678
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 535,
+          "file": {
+            "index": 0
+          },
+          "startByte": 493
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 512,
+          "file": {
+            "index": 0
+          },
+          "startByte": 511
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 535,
+          "file": {
+            "index": 0
+          },
+          "startByte": 527
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 545,
+          "file": {
+            "index": 0
+          },
+          "startByte": 545
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 543,
+          "file": {
+            "index": 0
+          },
+          "startByte": 542
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 474,
+          "file": {
+            "index": 0
+          },
+          "startByte": 434
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 454,
+          "file": {
+            "index": 0
+          },
+          "startByte": 453
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 467,
+          "file": {
+            "index": 0
+          },
+          "startByte": 466
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 474,
+          "file": {
+            "index": 0
+          },
+          "startByte": 474
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 488,
+          "file": {
+            "index": 0
+          },
+          "startByte": 486
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 491,
+          "file": {
+            "index": 0
+          },
+          "startByte": 491
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 488,
+          "file": {
+            "index": 0
+          },
+          "startByte": 481
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 620,
+          "file": {
+            "index": 0
+          },
+          "startByte": 547
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 577,
+          "file": {
+            "index": 0
+          },
+          "startByte": 576
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 594,
+          "file": {
+            "index": 0
+          },
+          "startByte": 592
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 620,
+          "file": {
+            "index": 0
+          },
+          "startByte": 609
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 630,
+          "file": {
+            "index": 0
+          },
+          "startByte": 630
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 628,
+          "file": {
+            "index": 0
+          },
+          "startByte": 627
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 912,
+          "file": {
+            "index": 0
+          },
+          "startByte": 854
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 877,
+          "file": {
+            "index": 0
+          },
+          "startByte": 876
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 892,
+          "file": {
+            "index": 0
+          },
+          "startByte": 890
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 912,
+          "file": {
+            "index": 0
+          },
+          "startByte": 903
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 922,
+          "file": {
+            "index": 0
+          },
+          "startByte": 922
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 920,
+          "file": {
+            "index": 0
+          },
+          "startByte": 919
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1053,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1006
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1025,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1024
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1053,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1043
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1077,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1077
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1075,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1060
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 416,
+          "file": {
+            "index": 0
+          },
+          "startByte": 379
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 402,
+          "file": {
+            "index": 0
+          },
+          "startByte": 401
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 416,
+          "file": {
+            "index": 0
+          },
+          "startByte": 416
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 432,
+          "file": {
+            "index": 0
+          },
+          "startByte": 432
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 429,
+          "file": {
+            "index": 0
+          },
+          "startByte": 423
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 767,
+          "file": {
+            "index": 0
+          },
+          "startByte": 709
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 738,
+          "file": {
+            "index": 0
+          },
+          "startByte": 737
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 767,
+          "file": {
+            "index": 0
+          },
+          "startByte": 756
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 777,
+          "file": {
+            "index": 0
+          },
+          "startByte": 777
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 775,
+          "file": {
+            "index": 0
+          },
+          "startByte": 774
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 842,
+          "file": {
+            "index": 0
+          },
+          "startByte": 779
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 816,
+          "file": {
+            "index": 0
+          },
+          "startByte": 815
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 842,
+          "file": {
+            "index": 0
+          },
+          "startByte": 830
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 852,
+          "file": {
+            "index": 0
+          },
+          "startByte": 852
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 850,
+          "file": {
+            "index": 0
+          },
+          "startByte": 849
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 346,
+          "file": {
+            "index": 0
+          },
+          "startByte": 280
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 300,
+          "file": {
+            "index": 0
+          },
+          "startByte": 299
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 317,
+          "file": {
+            "index": 0
+          },
+          "startByte": 315
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 346,
+          "file": {
+            "index": 0
+          },
+          "startByte": 335
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 377,
+          "file": {
+            "index": 0
+          },
+          "startByte": 377
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 375,
+          "file": {
+            "index": 0
+          },
+          "startByte": 374
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 994,
+          "file": {
+            "index": 0
+          },
+          "startByte": 924
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 951,
+          "file": {
+            "index": 0
+          },
+          "startByte": 949
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 963,
+          "file": {
+            "index": 0
+          },
+          "startByte": 962
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 994,
+          "file": {
+            "index": 0
+          },
+          "startByte": 982
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1004,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1004
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1002,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1001
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1736,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1680
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1698,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1697
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1716,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1715
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1736,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1728
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1752,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1749
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1754,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1754
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `alloc`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 250,
+          "file": {
+            "index": 0
+          },
+          "startByte": 229
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 275,
+          "file": {
+            "index": 0
+          },
+          "startByte": 257
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1363,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1351
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1380,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1370
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `std::alloc::Global`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `std::vec::Vec`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `<std::vec::Vec<T, A> as std::ops::IndexMut<I>>::index_mut`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `alloc::alloc`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `alloc::vec`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `alloc::vec::<std::vec::Vec<T, A> as std::ops::IndexMut<I>>`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 152,
+          "file": {
+            "index": 0
+          },
+          "startByte": 73
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 227,
+          "file": {
+            "index": 0
+          },
+          "startByte": 153
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 708,
+          "file": {
+            "index": 0
+          },
+          "startByte": 632
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1236,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1163
+        },
+        "related": []
+      }
+    ],
+    "names": [
+      {
+        "name": "take",
+        "namespaceId": {
+          "index": 0
+        },
+        "scope": [
+          "Holder"
+        ]
+      },
+      {
+        "name": "first",
+        "namespaceId": {
+          "index": 0
+        },
+        "scope": [
+          "S"
+        ]
+      },
+      {
+        "name": "bounded",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "caller",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "elided_one",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "elided_unit",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "elided_with_named",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "generic",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "holder",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "named_unit",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "outlives",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "outlives_static",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "sel",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "static_result",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "vec_index",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "Holder",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "r",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "S",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "v",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "Global",
+        "namespaceId": {
+          "index": 1
+        },
+        "scope": [
+          "alloc"
+        ]
+      },
+      {
+        "name": "Vec",
+        "namespaceId": {
+          "index": 1
+        },
+        "scope": [
+          "vec"
+        ]
+      },
+      {
+        "name": "index_mut",
+        "namespaceId": {
+          "index": 1
+        },
+        "scope": [
+          "vec",
+          "<std::vec::Vec<T, A> as std::ops::IndexMut<I>>"
+        ]
+      }
+    ],
+    "namespaces": [
+      {
+        "segments": [
+          "declared_lifetimes"
+        ]
+      },
+      {
+        "segments": [
+          "alloc"
+        ]
+      }
+    ],
+    "origins": [
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 0
+        },
+        "sourceIdentity": "declared_lifetimes::Holder::<'a>::take"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 5
+        },
+        "sourceIdentity": "declared_lifetimes::S::first"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 11
+        },
+        "sourceIdentity": "declared_lifetimes::bounded"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 18
+        },
+        "sourceIdentity": "declared_lifetimes::caller"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 32
+        },
+        "sourceIdentity": "declared_lifetimes::elided_one"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 37
+        },
+        "sourceIdentity": "declared_lifetimes::elided_unit"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 44
+        },
+        "sourceIdentity": "declared_lifetimes::elided_with_named"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 50
+        },
+        "sourceIdentity": "declared_lifetimes::generic"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 56
+        },
+        "sourceIdentity": "declared_lifetimes::holder"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 61
+        },
+        "sourceIdentity": "declared_lifetimes::named_unit"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 66
+        },
+        "sourceIdentity": "declared_lifetimes::outlives"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 71
+        },
+        "sourceIdentity": "declared_lifetimes::outlives_static"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 76
+        },
+        "sourceIdentity": "declared_lifetimes::sel"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 82
+        },
+        "sourceIdentity": "declared_lifetimes::static_result"
+      },
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 88
+        },
+        "sourceIdentity": "declared_lifetimes::vec_index"
+      },
+      {
+        "description": "Rustc Public FnDef::fn_sig",
+        "kind": "rustMir",
+        "location": {
+          "index": 101
+        },
+        "sourceIdentity": "<std::vec::Vec<T, A> as std::ops::IndexMut<I>>::index_mut"
+      }
+    ],
+    "types": [
+      "unit",
+      "bool",
+      {
+        "integer": {
+          "signed": false,
+          "width": {
+            "bits": {
+              "width": 32
+            }
+          }
+        }
+      },
+      {
+        "integer": {
+          "signed": false,
+          "width": "pointer"
+        }
+      },
+      {
+        "typeParameter": {
+          "index": 0
+        }
+      },
+      {
+        "typeParameter": {
+          "index": 1
+        }
+      },
+      {
+        "typeParameter": {
+          "index": 2
+        }
+      },
+      {
+        "typeParameter": {
+          "index": 3
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [
+            {
+              "lifetime": {
+                "value": {
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 15
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [],
+          "name": {
+            "index": 17
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [],
+          "name": {
+            "index": 19
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 2
+                  }
+                }
+              }
+            },
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 10
+                  }
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 20
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 4
+                  }
+                }
+              }
+            },
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 6
+                  }
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 20
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [
+            {
+              "lifetime": {
+                "value": {
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 15
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [
+            {
+              "lifetime": {
+                "value": {
+                  "index": 10
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 15
+          }
+        }
+      },
+      {
+        "tuple": {
+          "elements": [
+            {
+              "index": 2
+            },
+            {
+              "index": 1
+            }
+          ]
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 0
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 0
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 9
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 0
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 0
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 6
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 0
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 4
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 0
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 11
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 0
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 12
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 1
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 2
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 9
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 3
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 2
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 4
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 6
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 5
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 6
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 7
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 8
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 4
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 9
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 10
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 11
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 12
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 13
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 1
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 14
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 15
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 16
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 17
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 0
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 7
+            }
+          }
+        }
+      }
+    ]
+  },
+  "version": {
+    "major": 1,
+    "minor": 9
+  }
+}

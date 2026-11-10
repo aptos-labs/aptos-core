@@ -1,0 +1,70 @@
+VerexE2ETests/SourceVerify/bench_simple_map_errors.rs:34:5: info: `SimpleMap::find` uses concrete verification: Given interpretation does not yet support shape contract interpretation
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:11:5: error: the specification clause `ensures ∀ (i in 0 .. self.data.length), result is None ==> self.data[i].key != key` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:14:17: error: the loop invariant `∀ (i in 0 .. iter.start), self.data[i].key != key` is not preserved by an iteration
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:8:8: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (1000000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:8:8: error: verex verification failed: the automatic verification of `SimpleMap::find` exceeded its budget of 1000000 maxHeartbeats after deciding 22 leaves (stage interrupted); provide a proof in the module:
+  verify SimpleMap::find by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | invariant_2_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_simple_map_errors.rs:34:5: info: `SimpleMap::first` uses concrete verification: Given interpretation does not yet support shape contract interpretation
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:17:5: error: the specification clause `ensures result is Some ==> result.0 == 0` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:16:8: error: verex verification failed: the automatic verification of `SimpleMap::first` failed; provide a proof in the module:
+  verify SimpleMap::first by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:5:3: error: the specification clause `invariant ∀ (i in 0 .. data.length; j in 0 .. data.length), data[i].key == data[j].key ==> i == j` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:21:3: error: `no panic when aborts at abort 1` is not established: the panic `std::process::abort()` at VerexE2ETests/SourceVerify/bench_simple_map_errors.rs:36:13 may panic
+  from: ∀ (i : Int), 0 ≤ i → i < ↑argument_0.values.size → ∀ (j : Int), 0 ≤ j → j < ↑argument_0.values.size → (argument_0.values[i.toNat]?.getD (VerexIR.Proofs.Denote.NTy.plainInhabitantOf VerexIR.Proofs.Denote.Carriers.toPlain (bench_simple_map_errors.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)) ⋯)).fst.val = (argument_0.values[j.toNat]?.getD (VerexIR.Proofs.Denote.NTy.plainInhabitantOf VerexIR.Proofs.Denote.Carriers.toPlain (bench_simple_map_errors.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)) ⋯)).fst.val → i = j; ∀ (i : Int), 0 ≤ i → i < ↑argument_0.values.size → ∀ (j : Int), 0 ≤ j → j < ↑argument_0.values.size → (argument_0.values[i.toNat]?.getD (VerexIR.Proofs.Denote.NTy.plainInhabitantOf VerexIR.Proofs.Denote.Carriers.toPlain (bench_simple_map_errors.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)) ⋯)).fst.val = (argument_0.values[j.toNat]?.getD (VerexIR.Proofs.Denote.NTy.plainInhabitantOf VerexIR.Proofs.Denote.Carriers.toPlain (bench_simple_map_errors.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)) ⋯)).fst.val → i = j; ∀ (i : Int), 0 ≤ i → i < ↑argument_0.values.size → ∀ (j : Int), 0 ≤ j → j < ↑argument_0.values.size → (argument_0.values[i.toNat]?.getD (VerexIR.Proofs.Denote.NTy.plainInhabitantOf VerexIR.Proofs.Denote.Carriers.toPlain (bench_simple_map_errors.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)) ⋯)).fst.val = (argument_0.values[j.toNat]?.getD (VerexIR.Proofs.Denote.NTy.plainInhabitantOf VerexIR.Proofs.Denote.Carriers.toPlain (bench_simple_map_errors.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)) ⋯)).fst.val → i = j; (bench_simple_map_errors.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).vector.deepHolds ((argument_0, PUnit.unit), argument_0_final).fst.fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ((argument_0, PUnit.unit), argument_0_final).fst.snd; (VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) find_result.val = "Some" → ((Option.map VerexIR.Proofs.Denote.Var.here.selectPlain (VerexIR.Proofs.Denote.Which.here.there.project? find_result.val)).getD { val := 0, fits := ⋯ }).val < ↑argument_0.values.size) ∧ (VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) find_result.val = "Some" → ((VerexIR.Proofs.Denote.Var.here.selectCertified ((bench_simple_map_errors.unit.nominal.namespace.0.declaration✝¹⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds (argument_0, ()) ⋯)).values[((Option.map VerexIR.Proofs.Denote.Var.here.selectPlain (VerexIR.Proofs.Denote.Which.here.there.project? find_result.val)).getD { val := 0, fits := ⋯ }).val.toNat]?.getD ((bench_simple_map_errors.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant ⋯)).val.fst.val = argument_1.val); ∀ (i : Int), 0 ≤ i → i < ↑argument_0.values.size → VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) find_result.val = "None" → ¬((VerexIR.Proofs.Denote.Var.here.selectCertified ((bench_simple_map_errors.unit.nominal.namespace.0.declaration✝¹⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds (argument_0, ()) ⋯)).values[i.toNat]?.getD ((bench_simple_map_errors.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant ⋯)).val.fst.val = argument_1.val; VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 2 } } (((argument_0, PUnit.unit), argument_0_final), argument_1, argument_2, PUnit.unit) final✝; is_some_result = true ↔ VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) find_result.val = "Some"; final = final✝; is_some_result = true
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:22:5: error: the specification clause `ensures self.data.length == old(self).data.length + 1` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:21:8: error: verex verification failed: the automatic verification of `SimpleMap::add_checked` failed; provide a proof in the module:
+  verify SimpleMap::add_checked by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:5:3: error: the specification clause `invariant ∀ (i in 0 .. data.length; j in 0 .. data.length), data[i].key == data[j].key ==> i == j` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:25:5: error: the specification clause `ensures self.data.length == old(self).data.length + 1` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:24:8: error: verex verification failed: the automatic verification of `SimpleMap::add_unchecked` failed; provide a proof in the module:
+  verify SimpleMap::add_unchecked by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:5:3: error: the specification clause `invariant ∀ (i in 0 .. data.length; j in 0 .. data.length), data[i].key == data[j].key ==> i == j` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:28:5: error: the specification clause `panics_if ∀ (i in 0 .. old(self).data.length), old(self).data[i].key != key` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:29:5: error: the specification clause `ensures self.data.length == old(self).data.length` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:27:8: error: verex verification failed: the automatic verification of `SimpleMap::remove` failed; provide a proof in the module:
+  verify SimpleMap::remove by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | panics_if_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:31:8: error: the continuation after call 1 of `deref` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:33:5: error: the specification clause `ensures result == self.data[0].value` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:31:8: error: verex verification failed: the automatic verification of `SimpleMap::borrow` failed; provide a proof in the module:
+  verify SimpleMap::borrow by lean =>
+    verex_obligations
+    verex_on
+    | after_call_1_of_deref => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

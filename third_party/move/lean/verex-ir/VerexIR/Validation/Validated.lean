@@ -198,16 +198,34 @@ structure ReferenceParameterFact where
   lifetime : LifetimeId
   deriving Repr, BEq, Inhabited
 
+/-- One step of a path into a loaned or holding place. -/
+inductive LoanProjection where
+  | dereference
+  | field (name : NameId)
+  | index (literal : Option Nat)
+  | subslice (start stop : Nat) (fromEnd : Bool)
+  | downcast (variant : NameId)
+  deriving Repr, BEq, Inhabited
+
 /-- One recorded death point of a loan: its write-back must run before
-(`before := true`) or after the anchor expression evaluates. Function-result
-boundaries explicitly record every mutable loan not carried by the returned
-value. A loan may carry several records when its death is branch-dependent;
-ending a loan is conditional and idempotent, so the over-approximation
-is sound. Only a loan carried by a returned reference remains live for frame
-finalization to transfer across the call boundary. -/
+(`before := true`) or after the anchor expression evaluates, and what holds it
+there. Function-result boundaries explicitly record every mutable loan not
+carried by the returned value. A loan may carry several records when its death is
+branch-dependent; ending a loan is conditional and idempotent, so the
+over-approximation is sound. Only a loan carried by a returned reference remains
+live for frame finalization to transfer across the call boundary. -/
 structure LoanDeath where
   anchor : ExprId
   before : Bool := false
+  /-- The locals holding the loan where it dies. A place holding it elsewhere may
+  hold another reference here, whose prophecy this death says nothing about. -/
+  holders : Array LocalId := #[]
+  /-- Where an aggregate holder holds the loan: a local and the path from it to
+  the reference. Empty where a holder is itself a reference. -/
+  holderPaths : Array (LocalId × Array LoanProjection) := #[]
+  /-- The loan goes on through another holder: only these places die, and they resolve
+  what they hold. The run ends no loan here. -/
+  alone : Bool := false
   deriving Repr, BEq, Inhabited
 
 /-- Stable identity and lifetime of a loan site accepted by the borrow
@@ -218,7 +236,6 @@ semantics ends them (`loanDeathsAt`). -/
 structure CheckedLoanFact where
   expression : ExprId
   lifetime : LifetimeId
-  holders : Array LocalId := #[]
   deaths : Array LoanDeath := #[]
   deriving Repr, BEq, Inhabited
 
@@ -240,6 +257,13 @@ structure BorrowCertificate where
   parameters : Array ReferenceParameterFact
   loans : Array CheckedLoanFact
   lifetimeRelations : Array LifetimeRelationFact
+  /-- Reference carriers retired before a write replaces them. Unlike a local
+  loan death, these can name references lent by the caller, without a lexical
+  loan id in this function. The paths identify the old carriers after the
+  right-hand side has run. -/
+  carrierDeaths : Array LoanDeath := #[]
+  /-- Reference parameters checked not to escape, conditional on scoped dictionary requirements. -/
+  receiverNoEscape : Array Nat := #[]
   /-- The body's places that dereference a shared reference, ascending. A
   shared reference is the observed value itself, so the semantics reads
   such a place as its base. -/
@@ -351,6 +375,11 @@ def loanFacts (functionId : FunctionId) : Array CheckedLoanFact :=
   ((ns.borrowCertificates.toList.find? fun certificate =>
     certificate.functionId == functionId).map (·.loans)).getD #[]
 
+/-- Checked receiver slots of a body, conditional on its scoped dictionaries. -/
+def receiverNoEscape (functionId : FunctionId) : Array Nat :=
+  ((ns.borrowCertificates.toList.find? fun certificate =>
+    certificate.functionId == functionId).map (·.receiverNoEscape)).getD #[]
+
 /-- Where a location of the namespace is, in its own tables. -/
 def location? (loc : LocId) : Option Location := ns.localTables.locations[loc.index]?
 
@@ -405,6 +434,8 @@ structure ValidatedNamespaceInterface where
   functions : Array (FunctionDecl FunctionBody) := #[]
   /-- Checked specification-function signatures, likewise without bodies. -/
   specFunctions : Array SpecFunctionDecl := #[]
+  /-- Its checked scopes; see `RawNamespaceInterface.scopes`. -/
+  scopes : Array ScopeDecl := #[]
   deriving Repr, BEq, Inhabited
 
 /-- Checked copy of an upstream producer/check/assumption statement. This is
@@ -502,6 +533,19 @@ def sharedDereference (unit : ValidatedUnit) (namespaceId : NamespaceId) (place 
     Bool :=
   (unit.namespaces[namespaceId.index]?).any fun ns =>
     ns.borrowCertificates.any (·.sharedDereferences.contains place)
+
+/-- Whether a place goes through a dereference the certificate records as shared:
+what it reads of a mutable reference is what that refers to. -/
+def placeThroughShared (unit : ValidatedUnit) (ns : ValidatedNamespace) : Nat → PlaceId → Bool
+  | 0, _ => false
+  | fuel + 1, place =>
+      match ns.places[place.index]? with
+      | some (.deref base) =>
+          sharedDereference unit ns.unitIdentity place || placeThroughShared unit ns fuel base
+      | some (.field base _ _) | some (.ghostField base _ _) | some (.index base _)
+      | some (.subslice base ..) | some (.unsize base) | some (.downcast base _) =>
+          placeThroughShared unit ns fuel base
+      | some (.localVar _) | none => false
 
 namespace Internal
 

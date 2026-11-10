@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/question_mark_conversion.rs:13:13: error: `converted` calls `core::result::<std::result::Result<T, F> as std::ops::FromResidual<std::result::Result<std::convert::Infallible, E>>>::from_residual` at `{u32} {u32} {Wide}`, which matches no contract of it; its shapes are `{T} {E} {E}`

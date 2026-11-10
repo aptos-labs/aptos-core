@@ -1,0 +1,1132 @@
+{
+  "dependencies": [],
+  "evidence": [
+    {
+      "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
+      "trusted": true
+    },
+    {
+      "description": "calls of trait methods on concrete types resolve to their impls' methods as rustc's codegen resolves them",
+      "producer": "verex-rust-export via rustc Public Instance::resolve",
+      "trusted": true
+    }
+  ],
+  "namespaces": [
+    {
+      "associatedItems": [],
+      "attributes": [],
+      "comments": [
+        {
+          "isDoc": false,
+          "loc": {
+            "index": 12
+          },
+          "ownLine": true,
+          "text": "// Selection of the concrete Vec<T> impl uses the caller's T: Sized bound."
+        }
+      ],
+      "constants": [],
+      "doc": "",
+      "expressions": [
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 0
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 3
+          },
+          "typeId": {
+            "index": 10
+          }
+        },
+        {
+          "kind": {
+            "value": {
+              "sourceConstant": null,
+              "value": {
+                "integer": {
+                  "value": 0
+                }
+              }
+            }
+          },
+          "loc": {
+            "index": 3
+          },
+          "typeId": {
+            "index": 1
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [
+                {
+                  "index": 0
+                },
+                {
+                  "index": 1
+                }
+              ],
+              "instantiations": [
+                {
+                  "typeArg": {
+                    "value": {
+                      "loc": {
+                        "index": 3
+                      },
+                      "typeId": {
+                        "index": 2
+                      }
+                    }
+                  }
+                },
+                {
+                  "typeArg": {
+                    "value": {
+                      "loc": {
+                        "index": 3
+                      },
+                      "typeId": {
+                        "index": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "typeArg": {
+                    "value": {
+                      "loc": {
+                        "index": 3
+                      },
+                      "typeId": {
+                        "index": 6
+                      }
+                    }
+                  }
+                },
+                {
+                  "typeArg": {
+                    "value": {
+                      "loc": {
+                        "index": 3
+                      },
+                      "typeId": {
+                        "index": 9
+                      }
+                    }
+                  }
+                }
+              ],
+              "operation": {
+                "call": {
+                  "kind": {
+                    "function": {
+                      "callee": {
+                        "name": {
+                          "index": 3
+                        },
+                        "namespaceId": {
+                          "index": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 3
+          },
+          "typeId": {
+            "index": 9
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 2
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 4
+          },
+          "typeId": {
+            "index": 9
+          }
+        }
+      ],
+      "functions": [
+        {
+          "alignment": {
+            "index": 0
+          },
+          "attributes": [],
+          "body": {
+            "cfg": {
+              "graph": {
+                "blocks": [
+                  {
+                    "loc": {
+                      "index": 3
+                    },
+                    "statements": [],
+                    "terminator": {
+                      "call": {
+                        "call": {
+                          "index": 2
+                        },
+                        "destination": {
+                          "place": {
+                            "index": 1
+                          },
+                          "target": {
+                            "index": 1
+                          }
+                        },
+                        "unwind": "unreachable"
+                      }
+                    }
+                  },
+                  {
+                    "loc": {
+                      "index": 4
+                    },
+                    "statements": [],
+                    "terminator": {
+                      "return_": {
+                        "values": [
+                          {
+                            "index": 3
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "entry": {
+                  "index": 0
+                }
+              }
+            }
+          },
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 0
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 1
+              },
+              "mutable": false,
+              "name": "values",
+              "type": {
+                "loc": {
+                  "index": 1
+                },
+                "typeId": {
+                  "index": 10
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 2
+              },
+              "mutable": true,
+              "name": "_0",
+              "type": {
+                "loc": {
+                  "index": 2
+                },
+                "typeId": {
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 0
+          },
+          "origin": {
+            "index": 0
+          },
+          "pragmas": [],
+          "profile": "rust",
+          "profileData": [],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "typeArg",
+                "loc": {
+                  "index": 0
+                },
+                "name": "T",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "values",
+                "typeUse": {
+                  "loc": {
+                    "index": 1
+                  },
+                  "typeId": {
+                    "index": 10
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 2
+                },
+                "typeId": {
+                  "index": 9
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "identity": {
+        "index": 0
+      },
+      "implementations": [],
+      "imports": [],
+      "intrinsics": [],
+      "invariants": [],
+      "lemmas": [],
+      "loc": {
+        "index": 0
+      },
+      "patterns": [],
+      "places": [
+        {
+          "localVar": {
+            "localId": {
+              "index": 0
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 1
+            }
+          }
+        }
+      ],
+      "pragmas": [],
+      "profile": "rust",
+      "profileMetadata": [],
+      "scopes": [],
+      "specFunctions": [],
+      "specVars": [],
+      "structs": [],
+      "traits": []
+    },
+    {
+      "associatedItems": [],
+      "attributes": [],
+      "comments": [],
+      "constants": [],
+      "doc": "",
+      "expressions": [],
+      "functions": [
+        {
+          "alignment": {
+            "index": 1
+          },
+          "attributes": [],
+          "body": "absent",
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "loc": {
+            "index": 8
+          },
+          "locals": [
+            {
+              "id": {
+                "index": 0
+              },
+              "loc": {
+                "index": 8
+              },
+              "mutable": false,
+              "name": "_1",
+              "type": {
+                "loc": {
+                  "index": 8
+                },
+                "typeId": {
+                  "index": 11
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 1
+              },
+              "loc": {
+                "index": 8
+              },
+              "mutable": false,
+              "name": "_2",
+              "type": {
+                "loc": {
+                  "index": 8
+                },
+                "typeId": {
+                  "index": 3
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 3
+          },
+          "origin": {
+            "index": 1
+          },
+          "pragmas": [
+            {
+              "assign": {
+                "loc": null,
+                "name": "verify",
+                "value": {
+                  "constant": {
+                    "value": {
+                      "bool": {
+                        "value": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "profile": "rust",
+          "profileData": [
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "function.dependency"
+            },
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "function.shapeOnly"
+            }
+          ],
+          "signature": {
+            "generics": [
+              {
+                "abilities": [],
+                "kind": "typeArg",
+                "loc": {
+                  "index": 8
+                },
+                "name": "T",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "typeArg",
+                "loc": {
+                  "index": 8
+                },
+                "name": "I",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "typeArg",
+                "loc": {
+                  "index": 8
+                },
+                "name": "A",
+                "predicates": [],
+                "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "typeArg",
+                "loc": {
+                  "index": 8
+                },
+                "name": "BorrowedOutput",
+                "predicates": [],
+                "type": null
+              }
+            ],
+            "parameters": [
+              {
+                "mutable": false,
+                "name": "_1",
+                "typeUse": {
+                  "loc": {
+                    "index": 8
+                  },
+                  "typeId": {
+                    "index": 11
+                  }
+                }
+              },
+              {
+                "mutable": false,
+                "name": "_2",
+                "typeUse": {
+                  "loc": {
+                    "index": 8
+                  },
+                  "typeId": {
+                    "index": 3
+                  }
+                }
+              }
+            ],
+            "predicates": [],
+            "results": [
+              {
+                "loc": {
+                  "index": 8
+                },
+                "typeId": {
+                  "index": 5
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "identity": {
+        "index": 1
+      },
+      "implementations": [],
+      "imports": [],
+      "intrinsics": [],
+      "invariants": [],
+      "lemmas": [],
+      "loc": {
+        "index": 5
+      },
+      "patterns": [],
+      "places": [],
+      "pragmas": [
+        {
+          "assign": {
+            "loc": null,
+            "name": "verify",
+            "value": {
+              "constant": {
+                "value": {
+                  "bool": {
+                    "value": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "profile": "rust",
+      "profileMetadata": [],
+      "scopes": [
+        {
+          "kind": "module",
+          "loc": {
+            "index": 9
+          },
+          "path": [
+            "alloc"
+          ]
+        },
+        {
+          "kind": "module",
+          "loc": {
+            "index": 10
+          },
+          "path": [
+            "vec"
+          ]
+        },
+        {
+          "kind": "implementation",
+          "loc": {
+            "index": 11
+          },
+          "path": [
+            "vec",
+            "<std::vec::Vec<T, A> as std::ops::Index<I>>"
+          ]
+        }
+      ],
+      "specFunctions": [],
+      "specVars": [],
+      "structs": [
+        {
+          "abilities": [
+            "copy"
+          ],
+          "attributes": [],
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "fields": [],
+          "generics": [],
+          "ghosts": [],
+          "loc": {
+            "index": 6
+          },
+          "locals": [],
+          "name": {
+            "index": 1
+          },
+          "properties": [
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "struct.opaque"
+            }
+          ],
+          "variants": []
+        },
+        {
+          "abilities": [],
+          "attributes": [],
+          "contract": {
+            "conditions": [],
+            "hasFrame": false,
+            "loc": null,
+            "modifies": [],
+            "modifiesAll": false,
+            "parameterFrames": [],
+            "pragmas": [],
+            "reads": [],
+            "readsAll": false
+          },
+          "doc": "",
+          "fields": [],
+          "generics": [
+            {
+              "abilities": [],
+              "kind": "typeArg",
+              "loc": {
+                "index": 7
+              },
+              "name": "T",
+              "predicates": [],
+              "type": null
+            },
+            {
+              "abilities": [],
+              "kind": "typeArg",
+              "loc": {
+                "index": 7
+              },
+              "name": "A",
+              "predicates": [],
+              "type": null
+            }
+          ],
+          "ghosts": [],
+          "loc": {
+            "index": 7
+          },
+          "locals": [],
+          "name": {
+            "index": 2
+          },
+          "properties": [
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "struct.destructor"
+            },
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "struct.opaque"
+            }
+          ],
+          "variants": []
+        }
+      ],
+      "traits": []
+    }
+  ],
+  "profiles": [
+    {
+      "name": "rust",
+      "options": [
+        [
+          "panic",
+          "abort"
+        ],
+        [
+          "unsafe",
+          "reject"
+        ],
+        [
+          "target_pointer_width",
+          "64"
+        ]
+      ],
+      "profile": "rust",
+      "version": 5
+    }
+  ],
+  "tables": {
+    "alignments": [
+      {
+        "description": "Rustc Public optimized generic MIR",
+        "source": {
+          "index": 0
+        },
+        "trust": "checked"
+      },
+      {
+        "description": "Rustc Public generic signature without its body",
+        "source": {
+          "index": 1
+        },
+        "trust": "checked"
+      }
+    ],
+    "files": [
+      {
+        "contentHash": "",
+        "name": "tests/raw-unit/generic_index.rs"
+      }
+    ],
+    "lifetimes": [
+      {
+        "kind": "inference",
+        "loc": {
+          "index": 0
+        },
+        "name": null
+      }
+    ],
+    "locations": [
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 186,
+          "file": {
+            "index": 0
+          },
+          "startByte": 148
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 170,
+          "file": {
+            "index": 0
+          },
+          "startByte": 164
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 186,
+          "file": {
+            "index": 0
+          },
+          "startByte": 184
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 203,
+          "file": {
+            "index": 0
+          },
+          "startByte": 200
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 205,
+          "file": {
+            "index": 0
+          },
+          "startByte": 205
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `alloc`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `std::alloc::Global`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `std::vec::Vec`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `<std::vec::Vec<T, A> as std::ops::Index<I>>::index`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `alloc::alloc`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `alloc::vec`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": "rustc dependency `alloc::vec::<std::vec::Vec<T, A> as std::ops::Index<I>>`",
+        "parent": null,
+        "primary": null,
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 147,
+          "file": {
+            "index": 0
+          },
+          "startByte": 73
+        },
+        "related": []
+      }
+    ],
+    "names": [
+      {
+        "name": "first",
+        "namespaceId": {
+          "index": 0
+        }
+      },
+      {
+        "name": "Global",
+        "namespaceId": {
+          "index": 1
+        },
+        "scope": [
+          "alloc"
+        ]
+      },
+      {
+        "name": "Vec",
+        "namespaceId": {
+          "index": 1
+        },
+        "scope": [
+          "vec"
+        ]
+      },
+      {
+        "name": "index",
+        "namespaceId": {
+          "index": 1
+        },
+        "scope": [
+          "vec",
+          "<std::vec::Vec<T, A> as std::ops::Index<I>>"
+        ]
+      }
+    ],
+    "namespaces": [
+      {
+        "segments": [
+          "generic_index"
+        ]
+      },
+      {
+        "segments": [
+          "alloc"
+        ]
+      }
+    ],
+    "origins": [
+      {
+        "description": "Rustc Public CrateItem::body",
+        "kind": "rustMir",
+        "location": {
+          "index": 0
+        },
+        "sourceIdentity": "generic_index::first"
+      },
+      {
+        "description": "Rustc Public FnDef::fn_sig",
+        "kind": "rustMir",
+        "location": {
+          "index": 8
+        },
+        "sourceIdentity": "<std::vec::Vec<T, A> as std::ops::Index<I>>::index"
+      }
+    ],
+    "types": [
+      "unit",
+      {
+        "integer": {
+          "signed": false,
+          "width": "pointer"
+        }
+      },
+      {
+        "typeParameter": {
+          "index": 0
+        }
+      },
+      {
+        "typeParameter": {
+          "index": 1
+        }
+      },
+      {
+        "typeParameter": {
+          "index": 2
+        }
+      },
+      {
+        "typeParameter": {
+          "index": 3
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [],
+          "name": {
+            "index": 1
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 2
+                  }
+                }
+              }
+            },
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 6
+                  }
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 2
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 2
+                  }
+                }
+              }
+            },
+            {
+              "typeArg": {
+                "value": {
+                  "loc": {
+                    "index": 0
+                  },
+                  "typeId": {
+                    "index": 4
+                  }
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 2
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 0
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 0
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 7
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 0
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 8
+            }
+          }
+        }
+      }
+    ]
+  },
+  "version": {
+    "major": 1,
+    "minor": 9
+  }
+}

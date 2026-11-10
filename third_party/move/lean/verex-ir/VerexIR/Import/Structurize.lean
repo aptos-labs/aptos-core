@@ -1,6 +1,8 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexIR.Import.PanicRegions
+import VerexIR.Import.TwoPhase
 import VerexIR.Import.Raw
 import VerexIR.Validation.Diagnostic
 import VerexIR.Validation.Validated
@@ -11,9 +13,9 @@ import VerexIR.Validation.Validated
 Raw graph bodies are an import form, not a backend language.  This pass finds
 natural loops from dominance backedges and recursively builds the common VIR
 tree language.  Edges to active headers/continuation exits become
-`continue`/`break`; exits which immediately return or raise remain structured
-terminal branches inside the loop. Acyclic diamonds are joined at their
-nearest common reachable block.
+`continue`/`break`; exits from which every path returns or raises remain
+structured terminal branches inside the loop. Acyclic diamonds are joined at
+their nearest common reachable block.
 
 The implementation intentionally rejects graphs for which those regions are
 not unique.  It never leaves a `goto` in validated VIR and never falls back to
@@ -27,19 +29,7 @@ open VerexIR.Validation
 private def successors (graph : RawCfg) (block : Nat) : Array Nat :=
   match graph.blocks[block]? with
   | none => #[]
-  | some block => match block.terminator with
-      | .goto target => #[target.index]
-      | .branch _ thenTarget elseTarget => #[thenTarget.index, elseTarget.index]
-      | .switch _ cases defaultTarget => cases.map (·.2.index) |>.push defaultTarget.index
-      | .call _ destination unwind =>
-          destination.toArray.map (·.target.index) ++ match unwind with
-            | .cleanup target => #[target.index]
-            | _ => #[]
-      | .drop _ target unwind | .assert _ _ _ target unwind =>
-          #[target.index] ++ match unwind with
-            | .cleanup cleanup => #[cleanup.index]
-            | _ => #[]
-      | .return_ _ | .throw_ _ _ | .unreachable | .resume | .abort => #[]
+  | some block => block.terminator.successors.map (·.index)
 
 private def predecessors (graph : RawCfg) : Array (Array Nat) := Id.run do
   let mut result := Array.replicate graph.blocks.size #[]
@@ -109,6 +99,11 @@ private def directlyUnreachable (graph : RawCfg) (block : Nat) : Bool :=
   | some { terminator := .unreachable, .. } => true
   | _ => false
 
+/-- No execution continues after the block: it returns, raises, or is
+unreachable, as a switch's impossible default is. -/
+private def neverContinues (graph : RawCfg) (block : Nat) : Bool :=
+  directlyTerminates graph block || directlyUnreachable graph block
+
 /-- MIR administration which carries source/compiler lifetime information but
 has no executable effect in the initial safe profile. Destructive state and
 provenance statements remain explicit rejection boundaries. -/
@@ -122,6 +117,50 @@ own semantic-profile gates. -/
 private def panicAssertKind : RawAssertKind → Bool
   | .boundsCheck | .overflow | .divisionByZero | .remainderByZero => true
   | .misalignedPointerDereference | .profile _ => false
+
+private def distances (graph : RawCfg) (start : Nat) (blocked : Array Nat) : Array (Option Nat) := Id.run do
+  let mut result := Array.replicate graph.blocks.size none
+  if start >= graph.blocks.size then return result
+  result := result.set! start (some 0)
+  let mut work := #[start]
+  let mut cursor := 0
+  while cursor < work.size do
+    let current := work[cursor]!
+    cursor := cursor + 1
+    let distance := result[current]!.getD 0
+    for target in successors graph current do
+      if target < result.size && !blocked.contains target && result[target]!.isNone then
+        result := result.set! target (some (distance + 1))
+        work := work.push target
+  return result
+
+/-- The blocks reachable from `start` when every path from it ends in a
+return, a raise, or `stop`, without a cycle. With no `stop`, a loop exit to
+`start` leaves the function, not just the loop. -/
+private def regionUntil? (graph : RawCfg) (start : Nat) (stop : Option Nat) :
+    Option (Array Nat) := Id.run do
+  if stop == some start then return some #[]
+  -- Depth-first with the path on a stack: a successor on the path is a cycle.
+  let mut region : Array Nat := #[]
+  let mut stack : Array (Nat × Array Nat) := #[(start, successors graph start)]
+  let mut onPath : Array Nat := #[start]
+  while !stack.isEmpty do
+    let (node, pending) := stack.back!
+    if pending.isEmpty then
+      stack := stack.pop
+      onPath := onPath.pop
+      unless region.contains node do region := region.push node
+      if (successors graph node).isEmpty && !neverContinues graph node then return none
+    else if stop == some pending.back! then
+      stack := stack.set! (stack.size - 1) (node, pending.pop)
+    else
+      let next := pending.back!
+      stack := stack.set! (stack.size - 1) (node, pending.pop)
+      if onPath.contains next then return none
+      unless region.contains next do
+        stack := stack.push (next, successors graph next)
+        onPath := onPath.push next
+  return some region
 
 private def loopInfos (graph : RawCfg) : Except Diagnostic (Array LoopInfo) := do
   let dom := dominators graph
@@ -137,22 +176,69 @@ private def loopInfos (graph : RawCfg) : Except Diagnostic (Array LoopInfo) := d
               (header, nodes.foldl (fun all node =>
                 if all.contains node then all else all.push node) previous)
         | none => headers := headers.push (target, nodes)
-  let mut loops := #[]
-  for (header, nodes) in headers do
+  let mut loops : Array LoopInfo := #[]
+  -- Enclosing loops first: an exit to an enclosing loop's header or
+  -- continuation is that loop's `continue` or `break`, not a choice of this one.
+  for (header, nodes) in headers.insertionSort (fun outer inner => outer.2.size > inner.2.size) do
+    let transfers := loops.filter (fun outer => outer.header != header &&
+      outer.nodes.contains header) |>.flatMap fun outer => #[outer.header] ++ outer.exit.toArray
     let mut exits := #[]
     for node in nodes do
       for target in successors graph node do
         if !nodes.contains target && !exits.contains target then exits := exits.push target
-    -- A return/exceptional block is not a continuation choice: it can stay in
-    -- the loop tree as that branch's terminator. Only distinct nonterminal
-    -- targets require a post-loop dispatch, which this structured language
-    -- intentionally does not synthesize.
-    let continuationExits := exits.filter (!directlyTerminates graph ·)
-    if continuationExits.size > 1 then
+    -- An exit from which every path returns, raises, or is unreachable is not
+    -- a continuation choice: it stays in the loop tree as that branch's
+    -- terminator. Only distinct exits that continue require a post-loop
+    -- dispatch, which this structured language intentionally does not
+    -- synthesize.
+    let leaving := exits.filter (fun exit =>
+      !neverContinues graph exit && !transfers.contains exit) |>.map fun exit =>
+        (exit, regionUntil? graph exit none)
+    let continuing := leaving.filter (·.2.isNone) |>.map (·.1)
+    -- Exits that continue must meet: the nearest block outside the loop all
+    -- of them reach, each without a cycle on the way, follows the loop, and
+    -- each exit's own blocks before it stay inside the loop, ending in a
+    -- `break`.
+    let meeting : Option Nat := if continuing.size <= 1 then continuing[0]? else
+      let reached := continuing.map fun exit => distances graph exit nodes
+      let candidates := (Array.range graph.blocks.size).filterMap fun index =>
+        if nodes.contains index then none else
+        let steps := reached.map (·[index]!)
+        if steps.all (·.isSome) then
+          some (index, steps.foldl (fun total step => total + step.getD 0) 0)
+        else none
+      let ordered := candidates.insertionSort fun left right => left.2 < right.2
+      ordered.findSome? fun (candidate, _) =>
+        if continuing.all fun exit => (regionUntil? graph exit (some candidate)).isSome then
+          some candidate
+        else none
+    if continuing.size > 1 && meeting.isNone then
       let loc := graph.blocks[header]?.map (·.loc)
       throw <| .error "VIR-CFG-MULTI-EXIT"
-        s!"natural loop at block {header} has {continuationExits.size} distinct continuation exits" loc
-    loops := loops.push { header, nodes, exit := continuationExits[0]? }
+        s!"natural loop at block {header} has {continuing.size} distinct continuation exits" loc
+    -- When every exit leaves the function, one of them still follows the
+    -- loop rather than being repeated inside it: the exit most others lead
+    -- to, then the one with the larger region, then the first.
+    let reaching (exit : Nat) := (leaving.filter fun (other, region) =>
+      other != exit && (region.getD #[]).contains exit).size
+    let preferred : Option (Nat × Nat × Nat) :=
+      leaving.foldl (init := none) fun best (exit, region) =>
+        let size := (region.getD #[]).size
+        match best with
+        | some (_, bestReaching, bestSize) =>
+            if reaching exit > bestReaching ||
+                (reaching exit == bestReaching && size > bestSize) then
+              some (exit, reaching exit, size)
+            else best
+        | none => some (exit, reaching exit, size)
+    -- A heading leaving for code that only ends the function is a `while`
+    -- followed by that code, as the source writes it.
+    let heading := (successors graph header).find? fun target =>
+      !nodes.contains target && !transfers.contains target && !directlyUnreachable graph target
+    let exit := match meeting, preferred with
+      | some exit, _ | none, some (exit, _, _) => some exit
+      | none, none => heading
+    loops := loops.push { header, nodes, exit }
   return loops
 
 private structure ActiveLoop where
@@ -162,6 +248,8 @@ private structure ActiveLoop where
 private structure BuildContext where
   graph : RawCfg
   loops : Array LoopInfo
+  /-- The blocks every path from which fails or cannot happen. -/
+  diverging : Array Bool
   originalBlocks : Array BlockId
   resultTypeId : TypeId
   unitTypeId : Option TypeId
@@ -241,22 +329,6 @@ private def sequence (loc : LocId) (statements : Array ExprId) (tail : Option Ex
           pure typeId
     addTypedExpr loc typeId (.block statements tail)
 
-private def distances (graph : RawCfg) (start : Nat) (blocked : Array Nat) : Array (Option Nat) := Id.run do
-  let mut result := Array.replicate graph.blocks.size none
-  if start >= graph.blocks.size then return result
-  result := result.set! start (some 0)
-  let mut work := #[start]
-  let mut cursor := 0
-  while cursor < work.size do
-    let current := work[cursor]!
-    cursor := cursor + 1
-    let distance := result[current]!.getD 0
-    for target in successors graph current do
-      if target < result.size && !blocked.contains target && result[target]!.isNone then
-        result := result.set! target (some (distance + 1))
-        work := work.push target
-  return result
-
 /-- Remove blocks which cannot be reached from the graph entry and rewrite
 block IDs densely. Frontends commonly receive such blocks from ordinary
 compiler cleanup after a return or abort; they have no semantic contribution
@@ -302,7 +374,12 @@ private def nearestJoin (graph : RawCfg) (starts : Array Nat)
     (active : Array ActiveLoop) : Option Nat :=
   if starts.isEmpty then none else
   let blocked := active.flatMap fun loop => #[loop.header] ++ loop.exit.toArray
-  let allDistances := starts.map fun start => distances graph start blocked
+  -- An arm that is a `continue` or `break` leaves the region: nothing after
+  -- the loop is reached through it.
+  let allDistances := starts.map fun start =>
+    if blocked.contains start then
+      (Array.replicate graph.blocks.size none).set! start (some 0)
+    else distances graph start blocked
   let candidates : Array (Nat × Nat) := (Array.range graph.blocks.size).filterMap fun index =>
     let distances := allDistances.map (·[index]!)
     if distances.all (Option.isSome ·) then
@@ -314,6 +391,41 @@ private def nearestJoin (graph : RawCfg) (starts : Array Nat)
     | some previous@(_, previousDistance), candidate@(_, candidateDistance) =>
         if candidateDistance < previousDistance then some candidate else some previous
   best.map fun (index, _) => index
+
+/-- Where the arms of a branch meet. An arm that fails does not continue, so it
+has no say. Of the arms left, a single one meets nothing and runs on in the
+branch's place, and arms that do not meet end where the branch itself does. -/
+private def armsJoin (context : BuildContext) (arms : Array Nat) (stop : Option Nat)
+    (active : Array ActiveLoop) : Option Nat :=
+  let continuing := arms.filter fun arm => !(context.diverging[arm]?.getD false)
+  if continuing.size == arms.size then nearestJoin context.graph arms active
+  else
+    let join := if continuing.size == 1 then none
+      else nearestJoin context.graph continuing active
+    join <|> stop
+
+/-- Sequence statements, each bounds check binding what follows it, as the
+lowering of `v[i]` has it. -/
+private partial def sequenceChecks (loc : LocId) (statements : Array ExprId)
+    (tail : Option ExprId) : BuildM ExprId := do
+  let state ← get
+  let isCheck (id : ExprId) : Bool :=
+    match (state.expressions[id.index]?.map (·.kind) : Option ExprKind) with
+    | some (.operation (.primitive (.checkVectorIndex _)) ..) => true
+    | _ => false
+  match statements.findIdx? isCheck with
+  | none => sequence loc statements tail
+  | some position =>
+      let check := statements[position]!
+      let body ← sequenceChecks loc (statements.extract (position + 1)) tail
+      let state ← get
+      let some checkNode := state.expressions[check.index]?
+        | throw <| .at "VIR-ID-BOUNDS" s!"invalid bounds check {check.index}" loc
+      let some bodyNode := state.expressions[body.index]?
+        | throw <| .at "VIR-ID-BOUNDS" s!"invalid structured sequence tail {body.index}" loc
+      let pattern ← addPattern loc checkNode.typeId .wildcard
+      let binding ← addTypedExpr loc bodyNode.typeId (.letDecl pattern (some check) body)
+      sequence loc (statements.extract 0 position) (some binding)
 
 private def transfer? (target : Nat) (active : Array ActiveLoop) : Option (Nat × Bool) :=
   active.zipIdx.findSome? fun (loop, nest) =>
@@ -357,7 +469,7 @@ where
           if thenIndex == elseIndex then
             transferOrContinue block.loc thenIndex stop active fuel
           else
-            let join := nearestJoin context.graph #[thenIndex, elseIndex] active
+            let join := armsJoin context #[thenIndex, elseIndex] stop active
             let thenExpr ← emitBranch thenIndex join active fuel block.loc
             let elseExpr ← emitBranch elseIndex join active fuel block.loc
             let branch ← match join with
@@ -381,7 +493,7 @@ where
             let some scrutineeExpr := state.expressions[scrutinee.index]?
               | throw <| .at "VIR-ID-BOUNDS"
                   s!"invalid switch scrutinee expression {scrutinee.index}" block.loc
-            let join := nearestJoin context.graph targets active
+            let join := armsJoin context targets stop active
             let mut arms := #[]
             for (value, target) in cases do
               let pattern ← addPattern block.loc scrutineeExpr.typeId (.literal value)
@@ -442,7 +554,7 @@ where
     let statements := block.statements.filterMap fun
       | .execute expression => some expression
       | _ => none
-    let result ← sequence block.loc statements tail
+    let result ← sequenceChecks block.loc statements tail
     recordBlock current result
     pure result
 
@@ -486,7 +598,9 @@ private def graphWithWitness (expressions : Array Expr) (patterns : Array Patter
         block.loc
   let (cfg, originalBlocks) := pruneUnreachable cfg
   let loops ← loopInfos cfg
-  let context := { graph := cfg, loops, originalBlocks, resultTypeId, unitTypeId }
+  let context := {
+    graph := cfg, loops, diverging := PanicRegions.diverging cfg, originalBlocks,
+    resultTypeId, unitTypeId }
   let initial := { expressions, patterns }
   let (root, state) ← (emit cfg.entry.index none #[] (cfg.blocks.size * cfg.blocks.size * 4 + 1)).run context |>.run initial
   let blocks := originalBlocks.map fun block => {
@@ -596,18 +710,28 @@ def checkStructurizationWitness (cfg : RawCfg) (expressions : Array Expr)
 checked correspondence witness for each converted CFG function.  The result is
 the backend-stage namespace: every function body is `.structured` or
 `.absent`, so no raw graph survives this boundary. -/
-def structurizeNamespace (tables : Tables) (namespaceId : NamespaceId) (ns : RawNamespace) :
+def structurizeNamespace (tables : Tables) (pointerWidth : Option Nat)
+    (namespaceId : NamespaceId) (ns : RawNamespace) :
     Except (Array Diagnostic) (Namespace FunctionBody × Array StructurizationWitness) := do
   let mut expressions := ns.expressions
   let mut patterns := ns.patterns
+  let mut places := ns.places
   let mut functions : Array (FunctionDecl FunctionBody) := #[]
   let mut witnesses := #[]
   let unitTypeId := tables.types.findIdx? (fun type => type == .unit) |>.map (⟨·⟩)
   for (function, functionIndex) in ns.functions.zipIdx do
     match function.body with
-    | .cfg cfg =>
+    | .cfg rawCfg =>
         let typeId := function.signature.results[0]?.map (·.typeId) |>.getD ⟨0⟩
-        match graphWithWitness expressions patterns typeId unitTypeId cfg with
+        let (mintedPlaces, minted, rawCfg) ←
+          (TwoPhase.mintBorrows places tables.types expressions function.locals
+            (PanicRegions.collapse rawCfg)).mapError (#[·])
+        places := mintedPlaces
+        let (folded, locals, cfg) :=
+          FoldChecks.foldChecks places tables.types pointerWidth unitTypeId minted
+            function.locals rawCfg
+        let function := { function with locals }
+        match graphWithWitness folded patterns typeId unitTypeId cfg with
         | .ok result =>
             expressions := result.expressions
             patterns := result.patterns
@@ -639,6 +763,6 @@ def structurizeNamespace (tables : Tables) (namespaceId : NamespaceId) (ns : Raw
         | .error diagnostic => throw #[diagnostic]
     | .structured root => functions := functions.push (function.withBody (.structured root))
     | .absent => functions := functions.push (function.withBody .absent)
-  return (ns.withStage expressions patterns functions, witnesses)
+  return ({ ns.withStage expressions patterns functions with places }, witnesses)
 
 end VerexIR.Import.Structurize

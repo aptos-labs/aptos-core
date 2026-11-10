@@ -441,6 +441,15 @@ example:
 - Move global storage is organized by resource family and address; Rust state
   may include allocations and interior-mutable cells.
 - Move has abilities; Rust has ownership, destruction, traits, and lifetimes.
+  The Rust profile reads `Copy` as the `copy` ability and drops every value;
+  the property `struct.destructor` states which nominals run a destructor of
+  their own, or hide one (an opaque type); what a visible field reaches is read
+  from its type, a type the library models among them, and
+  until M4 a drop or a generic call that could run one has no denotation.
+  A struct with a `Copy` impl applying it to its own parameters declares
+  `copy`, which an instantiation has where its type arguments are `Copy`, as
+  `#[derive(Copy)]` states it; a generic parameter's abilities only constrain
+  instantiations.
 
 Two functions with the same body producer can therefore still live in
 different semantic profiles.  Conversely, Lean and MIR frontends can produce
@@ -531,6 +540,19 @@ the exporter makes no direct `rustc_middle` semantic queries.  If a needed
 fact is unavailable through Rustc Public, the response is an upstream request
 or a narrowly labelled temporary experiment adapter, not an untracked private
 query in the production mapper.
+
+Where the pinned `rustc_public` has no query for a fact the mapper needs, a
+confined bridge module (`rust-exporter/src/driver/polyfill.rs`, plus `main.rs`
+for `run_with_tcx!`) implements it and exposes `rustc_public` types only:
+declared predicates, caller-aware resolution, const parameter types, promoted
+constant evaluation, macro call sites, and the compiler identities of the `Fn`,
+`FnMut`, `FnOnce`, `Copy` and `Drop` items. No other module of the exporter
+imports `rustc_middle` or `rustc_public::rustc_internal`, and
+`RawUnit.evidence` records that the bridge was active. Each helper mirrors one
+upstream query and is deleted with a one-line call-site switch when the pinned
+toolchain carries it; the exception does not authorize moving compiler internals
+into the mapper. Its inventory and retirement are
+[`rustc-public-polyfill.md`](../plan/rustc-public-polyfill.md).
 
 ### Selected MIR phase
 
@@ -1030,6 +1052,9 @@ The [shared VIR model](vir-design.md#import-receipts-and-source-alignment)
 defines the distinction between a proof about validated VIR and a claim about
 its source.  Rust adds one temporary assumption: the pinned Rustc Public
 exporter preserves the selected MIR body when constructing `RawUnit`.
+The provenance of a function body therefore does not affect how it is specified
+or proved; it affects only how its meaning is justified and where diagnostics
+are reported.
 Successful rustc type and borrow checking is upstream admission evidence, not
 a proof of that translation.  Alignment ([`roadmap.md`](../plan/roadmap.md), "7. Rust frontend", M7) replaces the
 trusted-exporter assumption with checked translation/refinement results and
@@ -1078,52 +1103,10 @@ and high-level stepping tactics.  Proofs that unfold raw MIR blocks,
 structurization evidence, or compiler temporaries are allowed to be brittle
 across importer changes.
 
-## Milestones
+## The verification model and the open work
 
-The open work is staged as milestones M0 (exporter and import contract), M1
-(raw MIR ingestion and structured control), M1.5 (build integration and
-managed toolchain), M2 (semantics and contracts), M3 (ownership and ordinary
-references), M4 (drop and panic), M5 (unsafe import and checked raw
-pointers), M6 (library models, reference-bearing values and interior
-mutability), and M7
-(alignment); their open items are in [`roadmap.md`](../plan/roadmap.md), "7. Rust frontend".
-
-## Open design questions
-
-1. Which Rustc Public capability gaps, if any, block the exporter artifact, and
-   which should be upstreamed before any temporary adapter is considered?
-2. What stability expectations and promotion thresholds should the rolling
-   corpus enforce when optimized generic MIR changes between rustc revisions?
-3. Which library types receive primitive models in the first useful subset?
-4. How are stable loop identities maintained across harmless MIR changes?
-5. Which type-observing operations force specialized proof representatives
-   instead of the generic theorem?
-
-## Success criterion
-
-For a supported Rust function, the project should be able to:
-
-1. compile and borrow-check the Rust crate with a pinned configuration;
-2. decode its MIR and provenance to `RawUnit`, then validate it through the
-   single VIR pipeline;
-3. emit readable canonical Rust source from the resulting `ValidatedUnit`;
-4. recompile that source and recover an equivalent validated Rust-profile
-   body through the same MIR importer;
-5. preserve a generic body and its trait obligations rather than requiring a
-   separate proof for every concrete use;
-6. interpret the resulting VIR for a Rust fixture and obtain the same
-   observable result as the Rust execution.
-
-Verification extends this to:
-
-7. attach a normal Verex-style contract to the registered function;
-8. prove that contract with the common verification interface;
-9. transfer that theorem to concrete calls through validated evidence, without
-   replacing the generic VIR body;
-10. report failed obligations at their original Rust locations;
-11. state exactly which alignment theorem or trusted importer assumption makes
-   the result a claim about the Rust MIR body.
-
-When these steps hold, the provenance of a function body no longer affects
-how it is specified or proved.  It affects only how its meaning is justified
-and where diagnostics are reported.
+What the Rust path supports, how each feature is modelled, and where it refuses
+is [`rust-verification.md`](rust-verification.md). The milestones of this
+design, the deferred-work register and the open design questions are in
+[`rust-verification.md`](../plan/rust-verification.md) in the plan, with what is
+still open in each.

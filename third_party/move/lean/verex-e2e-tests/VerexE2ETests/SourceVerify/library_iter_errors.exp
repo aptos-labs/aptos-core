@@ -1,0 +1,71 @@
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:8:15: error: the loop invariant `iter.slice == values && iter.end == values.length && iter.pos < iter.end` is not established at entry
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:8:15: error: the loop invariant `iter.slice == values && iter.end == values.length && iter.pos < iter.end` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `sum_slice` failed; provide a proof in the module:
+  verify sum_slice by lean =>
+    verex_obligations
+    verex_on
+    | invariant_1_entry => verex_prepare; sorry
+    | invariant_1_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:13:3: error: the specification clause `ensures result < values.length * 4294967295` is not established
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:11:6: error: verex verification failed: the automatic verification of `sum_vec` failed; provide a proof in the module:
+  verify sum_vec by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:23:15: error: the loop invariant `total + 1 <= iter.pos * 4294967295` is not established at entry
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:18:6: error: verex verification failed: the automatic verification of `sum_borrowed` failed; provide a proof in the module:
+  verify sum_borrowed by lean =>
+    verex_obligations
+    verex_on
+    | invariant_2_entry => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:25:1: error: `no panic when aborts at op 1` is not established: the operation `total += *x as u64` at VerexE2ETests/SourceVerify/library_iter_errors.rs:31:9 may panic
+  from: into_iter_at_0_result.val.fst = values ∧ into_iter_at_0_result.val.snd.fst.val = 0 ∧ into_iter_at_0_result.val.snd.snd.fst.val = ↑values.values.size; iter_0_2.val = ↑values.values.size; iter_0_1.val ≤ iter_0_2.val; total.val ≤ iter_0_1.val * 4294967295; fst✝⁸.elim True fun reference => True; (VerexIR.Proofs.Denote.NTy.int 32 false).slice.deepHolds (values, iter_0_1, iter_0_2, PUnit.unit).fst; (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds (values, iter_0_1, iter_0_2, PUnit.unit).snd.fst; (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds (values, iter_0_1, iter_0_2, PUnit.unit).snd.snd.fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil (values, iter_0_1, iter_0_2, PUnit.unit).snd.snd.snd; VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) next_result.val = "Some" ↔ iter_0_1.val < iter_0_2.val; VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) next_result.val = "Some" → (Option.map VerexIR.Proofs.Denote.Var.here.selectPlain (VerexIR.Proofs.Denote.Which.here.there.project? next_result.val)).getD ((VerexIR.Proofs.Denote.NTy.int 32 false).inhabitant ⋯) = values.values[iter_0_1.val.toNat]?.getD (VerexIR.Proofs.Denote.NTy.plainInhabitantOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 32 false) ⋯); value_0.val.fst = values ∧ value_0.val.snd.snd.fst.val = iter_0_2.val; value_0.val.snd.fst.val = if iter_0_1.val < iter_0_2.val then iter_0_1.val + 1 else iter_0_1.val; VerexIR.IntegerValueFits (VerexIR.IntWidth.bits 64) true entry✝; attempt_1._verexJoinEntry_1_13 prepared✝ «native_core::slice::iter::<std::slice::Iter<'a, T> as std::iter::Iterator>::next» «native_alloc::vec::<&'a std::vec::Vec<T, A> as std::iter::IntoIterator>::into_iter.at_0» values assumed permitted into_iter_at_0_result final into_iter_ensures_1 recursive✝ loopHypothesis✝ fst✝⁸ fst✝⁷ fst✝⁶ total iter_0_1 iter_0_2 invariant_1_2 invariant_1_3 invariant_2 left✝⁶ left✝⁵ left✝⁴ left✝³ left✝² left✝¹ right✝ invariantHolds✝¹ value_0 next_result next_ensures_1 next_ensures_2 next_ensures_3 next_ensures_4 invariantHolds✝ entry✝ entry; (if 0 = entry✝ then some (some values, some total, some value_0, some (value_0.val, value_0), some next_result, fst✝⁶, ()) else none) = none; VerexIR.Proofs.Denote.Which.here.there.project? val✝¹.val = some (fst✝, PUnit.unit); (if 1 = entry✝ then some (some values, some total, some value_0, some (value_0.val, value_0), some next_result, fst✝⁶, ()) else none) = some (fst✝⁵, fst✝⁴, fst✝³, fst✝², some val✝¹, fst✝¹, PUnit.unit); fst✝⁴ = some val✝; ¬(0 ≤ val✝.val + fst✝.val % 18446744073709551616 ∧ val✝.val + fst✝.val % 18446744073709551616 ≤ 18446744073709551615)
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:25:6: error: verex verification failed: the automatic verification of `sum_vec_borrowed` failed; provide a proof in the module:
+  verify sum_vec_borrowed by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:32:3: error: the specification clause `ensures result == values.length + 1` is not established
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:31:6: error: verex verification failed: the automatic verification of `count` failed; provide a proof in the module:
+  verify count by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:41:15: error: the loop invariant `∀ (k in 0 .. iter.pos + 1), values[k] != target` is not established at entry
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:41:15: error: the loop invariant `∀ (k in 0 .. iter.pos + 1), values[k] != target` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:37:6: error: verex verification failed: the automatic verification of `contains_value` failed; provide a proof in the module:
+  verify contains_value by lean =>
+    verex_obligations
+    verex_on
+    | invariant_2_entry => verex_prepare; sorry
+    | invariant_2_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:44:3: error: the specification clause `ensures values.length > 0 ==> result == values[values.length - 1]` is not established
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:43:6: error: verex verification failed: the automatic verification of `first_or` failed; provide a proof in the module:
+  verify first_or by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:48:3: error: the specification clause `ensures values.length > 0 ==> result == values[0]` is not established
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:53:15: error: the loop invariant `iter.pos > 0 ==> last == values[iter.pos - 1]` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_errors.spec.lean:47:6: error: verex verification failed: the automatic verification of `last_or` failed; provide a proof in the module:
+  verify last_or by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

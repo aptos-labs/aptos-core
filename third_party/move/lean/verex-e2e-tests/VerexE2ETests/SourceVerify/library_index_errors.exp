@@ -1,0 +1,26 @@
+VerexE2ETests/SourceVerify/library_index_errors.spec.lean:4:1: error: `no panic when aborts at call 1 of index` is not established: the call `[position]` at VerexE2ETests/SourceVerify/library_index_errors.rs:5:11 may panic
+  from: ↑values.values.size ≤ position.val
+VerexE2ETests/SourceVerify/library_index_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `unguarded` failed; provide a proof in the module:
+  verify unguarded by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of index => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_index_errors.spec.lean:9:3: error: the specification clause `ensures result == 0` is not established
+VerexE2ETests/SourceVerify/library_index_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `wrong_element` failed; provide a proof in the module:
+  verify wrong_element by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_index_errors.spec.lean:12:3: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/SourceVerify/library_index_errors.spec.lean:11:6: error: verex verification failed: the automatic verification of `wrong_lookup` failed; provide a proof in the module:
+  verify wrong_lookup by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_index_errors.rs:20:12: error: `from_range` calls `alloc::vec::<std::vec::Vec<T, A> as std::ops::Index<I>>::index` at `{u32} {RangeFrom<usize>} {Global} {&Slice<u32>}`, which matches no contract of it; its shapes are `{T} {usize} {A} {&T}`

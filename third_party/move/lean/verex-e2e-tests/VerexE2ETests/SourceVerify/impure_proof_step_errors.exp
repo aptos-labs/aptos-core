@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/impure_proof_step_errors.spec.lean:9:12: error: VEREX-SPEC-IMPURE-CALL: cannot call impure function `advance` (mutates through a reference)

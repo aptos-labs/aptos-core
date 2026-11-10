@@ -1,0 +1,9 @@
+VerexE2ETests/SourceVerify/fnonce_forward.rs:32:1: info: `__fn_to_fnmut_forward_0` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_forward.rs:32:1: info: `__borrowed_to_fnonce_mutable_0` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_forward.rs:32:1: info: `__borrowed_to_fnonce_shared_0` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_forward.rs:32:1: info: `once` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_forward.rs:32:1: info: `shared` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_forward.rs:32:1: info: `mutable` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_forward.rs:32:1: info: `forward` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_forward.rs:32:1: info: `relay` uses concrete verification: Given interpretation does not yet support scoped method interpretation
+VerexE2ETests/SourceVerify/fnonce_forward.rs:32:1: info: `direct` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation

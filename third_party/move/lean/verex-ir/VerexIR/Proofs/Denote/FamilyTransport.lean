@@ -146,7 +146,8 @@ partial def spelledNTy (τ : Lean.Expr) (env : Option Environment := none) : Boo
   match τ.getAppFn.constName?, τ.getAppArgs with
   | some ``VerexIR.Proofs.Denote.NTy.unit, #[] | some ``VerexIR.Proofs.Denote.NTy.bool, #[]
   | some ``VerexIR.Proofs.Denote.NTy.address, #[] | some ``VerexIR.Proofs.Denote.NTy.signer, #[]
-  | some ``VerexIR.Proofs.Denote.NTy.string, #[] | some ``VerexIR.Proofs.Denote.NTy.bytes, #[] => true
+  | some ``VerexIR.Proofs.Denote.NTy.string, #[] | some ``VerexIR.Proofs.Denote.NTy.bytes, #[]
+  | some ``VerexIR.Proofs.Denote.NTy.char, #[] => true
   | some ``VerexIR.Proofs.Denote.NTy.int, #[_, _] | some ``VerexIR.Proofs.Denote.NTy.num, #[] => true
   | some ``VerexIR.Proofs.Denote.NTy.param, #[index] => index.nat?.isSome || index.rawNatLit?.isSome
   | some ``VerexIR.Proofs.Denote.NTy.tuple, #[row] => spelledNRow row env
@@ -155,11 +156,16 @@ partial def spelledNTy (τ : Lean.Expr) (env : Option Environment := none) : Boo
   | some ``VerexIR.Proofs.Denote.NTy.enum, #[_, arguments, _, rows, _] =>
       spelledNRow arguments env && spelledNRows rows env
   | some ``VerexIR.Proofs.Denote.NTy.vector, #[element] => spelledNTy element env
+  | some ``VerexIR.Proofs.Denote.NTy.slice, #[element] => spelledNTy element env
+  | some ``VerexIR.Proofs.Denote.NTy.sliceRef, #[element] => spelledNTy element env
+  | some ``VerexIR.Proofs.Denote.NTy.observed, #[referent] => spelledNTy referent env
+  | some ``VerexIR.Proofs.Denote.NTy.array, #[element, _] => spelledNTy element env
   | some ``VerexIR.Proofs.Denote.NTy.table, #[key, value] => spelledNTy key env && spelledNTy value env
   | some ``VerexIR.Proofs.Denote.NTy.ref, #[referent] => spelledNTy referent env
   | some ``VerexIR.Proofs.Denote.NTy.ghost, #[slot] => spelledNTy slot env
   | some ``VerexIR.Proofs.Denote.NTy.function, #[parameters, _, results] =>
       spelledNRow parameters env && spelledNRow results env
+  | some ``VerexIR.Proofs.Denote.NTy.nominal, #[_, arguments, _] => spelledNRow arguments env
   | _, _ => match nominalArguments? env τ with
     | some arguments => arguments.all fun argument => spelledNTy argument env
     | none => false
@@ -220,13 +226,18 @@ partial def substituteNTy (θ : Lean.Expr) (τ : Lean.Expr)
       pure (mkApp5 τ.getAppFn (← args[0]?) (← substituteNRow θ (← args[1]?) env) (← args[2]?)
         (← substituteNRows θ (← args[3]?) env) (← args[4]?))
   | some ``VerexIR.Proofs.Denote.NTy.vector | some ``VerexIR.Proofs.Denote.NTy.ref |
-      some ``VerexIR.Proofs.Denote.NTy.ghost =>
+      some ``VerexIR.Proofs.Denote.NTy.ghost | some ``VerexIR.Proofs.Denote.NTy.slice |
+      some ``VerexIR.Proofs.Denote.NTy.sliceRef | some ``VerexIR.Proofs.Denote.NTy.observed =>
       pure (mkApp τ.getAppFn (← substituteNTy θ (← args[0]?) env))
+  | some ``VerexIR.Proofs.Denote.NTy.array =>
+      pure (mkApp2 τ.getAppFn (← substituteNTy θ (← args[0]?) env) (← args[1]?))
   | some ``VerexIR.Proofs.Denote.NTy.table =>
       pure (mkApp2 τ.getAppFn (← substituteNTy θ (← args[0]?) env) (← substituteNTy θ (← args[1]?) env))
   | some ``VerexIR.Proofs.Denote.NTy.function =>
       pure (mkApp3 τ.getAppFn (← substituteNRow θ (← args[0]?) env) (← args[1]?)
         (← substituteNRow θ (← args[2]?) env))
+  | some ``VerexIR.Proofs.Denote.NTy.nominal =>
+      pure (mkApp3 τ.getAppFn (← args[0]?) (← substituteNRow θ (← args[1]?) env) (← args[2]?))
   | _ =>
       if let some arguments := nominalArguments? env τ then
         return mkAppN τ.getAppFn (← arguments.mapM fun argument => substituteNTy θ argument env)

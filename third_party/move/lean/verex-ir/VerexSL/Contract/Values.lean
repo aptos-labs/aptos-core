@@ -407,11 +407,20 @@ structure Context where
   /-- Lean binder each local denotes under `spec.old`: the entry value of a
   mutable reference, and the ordinary binder for everything else. -/
   oldLocals : Array (Option Lean.Expr) := #[]
+  /-- What each local holds as its references' prophecies, where a clause reads the
+  final value of a place: a loop invariant. -/
+  finalLocals : Array (Option Lean.Expr) := #[]
+  /-- The same under `spec.old`. -/
+  oldFinalLocals : Array (Option Lean.Expr) := #[]
   /-- Lean binder for each function result. -/
   results : Array Lean.Expr
   /-- The final value (prophecy) of each returned mutable reference, where
   the clause may read it with `final`. -/
   resultFinals : Array (Option Lean.Expr) := #[]
+  /-- Whether the result binders read their prophecies: set while translating
+  the operand of `final`, so a projection of the result reads the reference
+  the result carries at its final value. -/
+  resultsAreFinal : Bool := false
   /-- The components of a Move tuple result, each as its binder: what
   `spec.result[i]` reads. -/
   resultComponents : Array Lean.Expr := #[]
@@ -458,6 +467,9 @@ structure Context where
   instance, in the contract's frame: the values of a type parameter are
   native values of its argument's native type. -/
   typeArgumentTypes : Array (Option VerexIR.Proofs.Denote.NTy) := #[]
+  /-- Read a declaration at these arguments rather than substituting its native
+  reading: callable Unit results may erase a result slot. -/
+  readAtArguments : Bool := false
   /-- Inside the body of a recursive specification function's definition. -/
   definition : Option RecursiveDefinition := none
   /-- In a contract, what a known target's contract states at a frame and, for a
@@ -585,7 +597,12 @@ def Context.ntyOf? (context : Context) (typeId : TypeId) :
       let nty ← VerexIR.Proofs.Denote.ntyOf context.unit context.namespaceId typeId
       if context.typeArgumentTypes.isEmpty then some nty else
         let row ← context.typeArgumentTypes.toList.mapM id
-        some (nty.subst (VerexIR.Proofs.Denote.NRow.ofList row))
+        let env := VerexIR.Proofs.Denote.NRow.ofList row
+        if context.readAtArguments then
+          VerexIR.Proofs.Denote.ntyOfFuel (VerexIR.Proofs.Denote.unitTypes context.unit)
+            context.unit env (VerexIR.Proofs.Denote.typeFuel context.unit)
+            context.namespaceId typeId
+        else some (nty.subst env)
 
 def domainOf (ty : IrTy) : Domain :=
   match ty with
@@ -761,7 +778,9 @@ def Context.nativeType (context : Context) (typeId : TypeId) :
   let some nty := context.ntyOf? (specTypeId context.unit typeId)
     | throwError "a specification value of type {describeType ((context.valueTypeOf? typeId).getD .unit)} \
         has no native type"
-  pure nty
+  pure <| match nty with
+    | .slice element => .vector element
+    | _ => nty
 
 /-- The native type of an expression's value. -/
 def Context.exprType (context : Context) (id : ExprId) : MetaM VerexIR.Proofs.Denote.NTy := do
@@ -778,6 +797,18 @@ value under a live loan, and the row inside a declared value, inhabit
 (`NTy.plain`, `doc/designs/data-invariants.md`). -/
 def plainType (carriers τ : Lean.Expr) : Lean.Expr :=
   mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plain) carriers τ
+
+/-- The plain values of a quoted type at a family in the canonical spelling of
+the plain layer, the worker over the family's plain layer
+(`NTy.plainOf (Carriers.toPlain Θ) τ`). The wrapper (`plainType`) is the same
+type, but a congruence closure unfolds it down to the family's instance
+literal, so a term that names a plain type as an argument — an opaque
+specification function's result type and its inhabitant — is built at the
+worker, where its occurrences in a callee's fact and in a caller's clause
+stay one term. -/
+def plainWorkerType (carriers τ : Lean.Expr) : Lean.Expr :=
+  mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plainOf)
+    (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toPlain) carriers) τ
 
 /-- The Lean type of a binder of a specification type: an integer's `Int`, a
 Boolean's `Bool`, a textual scalar's `String`, any other's carrier. -/
@@ -938,8 +969,12 @@ partial def holdsDeclared : VerexIR.Proofs.Denote.NTy → Bool
   | .table key value => holdsDeclared key || holdsDeclared value
   | .ref referent => holdsDeclared referent
   | .ghost slot => holdsDeclared slot
+  | .slice element | .array element _ | .sliceRef element => holdsDeclared element
+  | .observed referent => holdsDeclared referent
+  -- A declaration that reaches itself is a declared type, whatever it holds.
+  | .nominal _ _ _ => true
   | .function _ _ _ => false
-  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char
   | .param _ => false
 
 /-- Whether a row of native types holds a declared type. -/
@@ -977,7 +1012,7 @@ is the layer of what it was read out of — a read through a live mutable
 reference is plain as far as it goes (`plainValueOf`) — so two values of
 one type can stand at the two layers, and a position taking both takes
 them at the plain one. -/
-private def plainJoin? (certified plain : Lean.Expr) : MetaM (Option Lean.Expr) := do
+def plainJoin? (certified plain : Lean.Expr) : MetaM (Option Lean.Expr) := do
   let certifiedType ← instantiateMVars (← inferType certified)
   unless certifiedType.isAppOfArity ``VerexIR.Proofs.Denote.NTy.carrier 2 do return none
   let carriers := certifiedType.getArg! 0
@@ -985,6 +1020,17 @@ private def plainJoin? (certified plain : Lean.Expr) : MetaM (Option Lean.Expr) 
   if ← certificateFree carriers τ then return none
   unless ← withNewMCtxDepth (isDefEq (← inferType plain) (plainType carriers τ)) do return none
   return some (← plainValueOf carriers τ certified)
+
+/-- An element at the layer of the vector a position takes it with: forgotten
+where the vector is plain and the element certified (`plainJoin?`). -/
+def elementAtLayerOf (carriers : Lean.Expr) (elementType : VerexIR.Proofs.Denote.NTy)
+    (vector element : Lean.Expr) : MetaM Lean.Expr := do
+  let τ ← quoteNTy elementType
+  if ← certificateFree carriers τ then return element
+  let plainVector := plainType carriers (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.vector) τ)
+  if ← withNewMCtxDepth (isDefEq (← inferType vector) plainVector) then
+    plainValueOf carriers τ element
+  else return element
 
 /-- A clause's conditional: `ite` on the decided test (`decisionOf`), its
 branches at one layer.  A conditional of a clause joins what each branch
@@ -1322,6 +1368,15 @@ def typedVariantField? (enum : VerexIR.Proofs.Denote.NTy) (choices : Array (Stri
   return some (fieldType,
     getD selectedType.appArg! (← plainInhabitant carriers fieldType))
 
+/-- The native type of a variant field, where the selection resolves. -/
+def selectedFieldType? (enum : VerexIR.Proofs.Denote.NTy) (choices : Array (String × Nat)) :
+    Option VerexIR.Proofs.Denote.NTy := do
+  let .enum _ _ names rows _ := enum | none
+  let (variant, index) ← choices[0]?
+  let ⟨σs, _⟩ ← VerexIR.Proofs.Denote.Which.ofName names rows variant
+  let ⟨field, _⟩ ← VerexIR.Proofs.Denote.Var.ofIndex σs index
+  return field
+
 /-- A variant field of a native enum value as the selection reads it: some
 value under its variant, none under another (`Choices.select?`). The field's
 native type and the selection; none where the selection does not resolve at
@@ -1457,6 +1512,9 @@ def opaqueValue (name : String) (typeArguments : List Lean.Expr) (result inhabit
   -- certified executable value and a value constructed by a specification.
   let arguments ← arguments.mapM fun value => do
     let type ← inferType value
+    -- A result is typed at its shape, which is its type's carrier.
+    let type ← if type.isAppOf ``VerexIR.Proofs.Denote.ResultShape.carrier then whnfR type
+      else pure type
     if type.isAppOfArity ``VerexIR.Proofs.Denote.NTy.carrier 2 then
       plainValueOf (type.getArg! 0) (type.getArg! 1) value
     else pure value
@@ -1469,6 +1527,9 @@ def opaqueValue (name : String) (typeArguments : List Lean.Expr) (result inhabit
     let type ← match (argumentTypes[index]?.bind id) with
       | some type => pure type
       | none => inferType value
+    -- One spelling of a plain type in the bundle (`plainWorkerType`).
+    let type := if type.isAppOfArity ``VerexIR.Proofs.Denote.NTy.plain 2 then
+        plainWorkerType (type.getArg! 0) (type.getArg! 1) else type
     bundle ← mkAppOptM ``Prod.mk #[type, ← inferType bundle, value, bundle]
   let model := specificationModel? profile name
   if let some .serialization := model then
@@ -2168,14 +2229,15 @@ hold ghost slots, and in a unit declaring ghosts (`ghosts`) so may a type
 parameter's instance. An owner without a handle compares by its contents,
 so its entries are read as values are. -/
 def holdsContents (ghosts : Bool) : VerexIR.Proofs.Denote.NTy → Bool
-  | .ghost _ | .function _ _ _ => true
+  | .ghost _ | .function _ _ _ | .nominal _ _ _ => true
   | .param _ => ghosts
   | .table key value => holdsContents ghosts key || holdsContents ghosts value
   | .tuple elements => rowHoldsContents ghosts elements
   | .struct _ _ elements => elements.ownsHandle || rowHoldsContents ghosts elements
   | .enum _ _ _ rows _ => rowsHoldContents ghosts rows
-  | .vector element | .ref element => holdsContents ghosts element
-  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes => false
+  | .vector element | .slice element | .array element _ | .sliceRef element | .ref element
+  | .observed element => holdsContents ghosts element
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char => false
 
 private def rowHoldsContents (ghosts : Bool) : VerexIR.Proofs.Denote.NRow → Bool
   | .nil => false
@@ -2186,6 +2248,14 @@ private def rowsHoldContents (ghosts : Bool) : VerexIR.Proofs.Denote.NRows → B
   | .cons fields rest => rowHoldsContents ghosts fields || rowsHoldContents ghosts rest
 end
 
+/-- The element type and the vector of a native vector or array. -/
+def nativeVector? (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) :
+    MetaM (Option (VerexIR.Proofs.Denote.NTy × Lean.Expr)) := do
+  match τ with
+  | .vector element | .slice element => return some (element, value)
+  | .array element _ => return some (element, ← mkAppM ``VerexIR.SpecArray.vector #[value])
+  | _ => return none
+
 /-- What a quantifier over the elements of a native vector binds: an element
 at its native type, its membership in the vector's values, and the
 pattern's local of the domain. -/
@@ -2193,7 +2263,7 @@ def nativeVectorBinder (carriers : Lean.Expr) (domain : Domain) (vectorType : Ve
     (vector : Lean.Expr) (binderName : Name) :
     MetaM (Name × Lean.Expr × Option (Lean.Expr → MetaM Lean.Expr) ×
       (Lean.Expr → MetaM Lean.Expr)) := do
-  let .vector element := vectorType
+  let some (element, vector) ← nativeVector? vectorType vector
     | throwError "internal: a quantifier over the elements of a value that is not a vector"
   let values ← mkAppM ``VerexIR.SpecVector.values #[vector]
   return (binderName, carrierType carriers (← quoteNTy element),
@@ -2216,6 +2286,23 @@ def locRange (ns : ValidatedNamespace) (loc : VerexIR.LocId) : ObligationRange :
       file := (ns.localTables.files[range.file.index]?.map (·.name)).getD ""
       startByte := range.startByte, endByte := range.endByte }
   | none => {}
+
+/-- The source range of a failing node, and whether a macro of another crate
+raised it, the range then being what it is reached after. -/
+def siteRange (ns : ValidatedNamespace) (loc : VerexIR.LocId) : ObligationRange × Bool :=
+  let fileName (file : VerexIR.FileId) :=
+    (ns.localTables.files[file.index]?.map (·.name)).getD ""
+  match ns.location? loc with
+  | some { primary := none, expansion, .. } =>
+      match expansion[0]? with
+      | some range =>
+          ({ file := fileName range.file, startByte := range.startByte, endByte := range.endByte },
+            true)
+      | none => ({}, false)
+  | some { primary := some range, .. } =>
+      ({ file := fileName range.file, startByte := range.startByte, endByte := range.endByte },
+        false)
+  | none => ({}, false)
 
 /-- The authored byte range of a condition of a namespace. -/
 def conditionRange (ns : ValidatedNamespace) (condition : VerexIR.Condition) :
@@ -2279,7 +2366,7 @@ def lemmaNames (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) : MetaM
   let some (_, declaration) := lemmaOf? unit reference
     | throwError m!"lemma `{qualified.name}` does not resolve"
   let base := Name.str (path.segments.foldl (fun name segment => Name.str name segment) .anonymous)
-    qualified.name
+    (SpecTypes.scopedSpelling qualified)
   let measures := (declaration.contract.conditions.filter (·.kind == .decreases)).size
   return {
     requires := Name.str base "lemmaRequires"
@@ -2434,9 +2521,10 @@ def specRecursive (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) : Bo
   specReaches unit reference reference
 
 /-- The spelling of a specification function, for a diagnostic. -/
-def specFunctionSpelling (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) :
+def specFunctionSpelling (ns : ValidatedNamespace) (reference : VerexIR.QualifiedRef) :
     String :=
-  ((unit.tables.names[reference.name.index]?).map (·.name)).getD (toString (repr reference))
+  ((ns.nameOf reference.name).map SpecTypes.scopedSpelling).getD
+    (toString (repr reference))
 
 /-- The Lean name of a recursive specification function's definition. -/
 def specDefinitionName (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) :
@@ -2446,7 +2534,7 @@ def specDefinitionName (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef)
   let some qualified := unit.tables.names[reference.name.index]?
     | throwError "a specification function has no name"
   let base := path.segments.foldl (fun name segment => Name.str name segment) .anonymous
-  return Name.str (Name.str base qualified.name) "spec"
+  return Name.str (Name.str base (SpecTypes.scopedSpelling qualified)) "spec"
 
 /-- The recursive specification functions defined together with one: those
 it reaches that reach it back, itself among them, in declaration order. -/
@@ -2491,6 +2579,9 @@ structure DefinitionShape where
   reads : SpecReads
   /-- The native types of the type arguments the definition is at. -/
   typeArgumentTypes : Array (Option VerexIR.Proofs.Denote.NTy) := #[]
+  /-- Read a declaration at these arguments rather than substituting its native
+  reading: callable Unit results may erase a result slot. -/
+  readAtArguments : Bool := false
   domains : Array Domain
   resultDomain : Domain
   localTypes : Array IrTy
@@ -2602,5 +2693,38 @@ def Context.bindComponent (context : Context) (element : VerexIR.PatternId)
       context.bindLocal localId elementType (← valueOf elementType)
   | _ => throwError "generated contracts require a variable or wildcard component \
       in a {pattern} binding pattern"
+
+
+/-- The local a specification's place expression reads from. -/
+partial def specRootLocal? (ns : ValidatedNamespace) (id : VerexIR.ExprId) : Option Nat :=
+  let rec placeRoot (place : VerexIR.PlaceId) : Option Nat :=
+    match ns.places[place.index]? with
+    | some (.localVar localId) => some localId.index
+    | some (.deref base) | some (.field base _ _) | some (.ghostField base _ _)
+    | some (.index base _) | some (.subslice base ..) | some (.unsize base)
+    | some (.downcast base _) => placeRoot base
+    | none => none
+  let kind : Option VerexIR.ExprKind := ns.expressions[id.index]?.map (·.kind)
+  match kind with
+  | some (.localVar localId) => some localId.index
+  | some (.operation (.read place) _ _ _) | some (.operation (.copy place) _ _ _) =>
+      placeRoot place
+  | some (.operation _ _ arguments _) =>
+      arguments[0]?.bind (specRootLocal? ns)
+  | _ => none
+
+/-- Whether an expression is the specification result or a projection of it,
+which `final` reads at the result's prophecy. -/
+partial def specRootsAtResult (ns : ValidatedNamespace) (id : VerexIR.ExprId) : Bool :=
+  let kind : Option VerexIR.ExprKind := ns.expressions[id.index]?.map (·.kind)
+  match kind with
+  | some (.operation (.specification (.result _)) _ _ _) => true
+  | some (.operation _ _ arguments _) => arguments[0]?.any (specRootsAtResult ns)
+  | _ => false
+
+/-- The current or final contents of a mutable slice's fixed-extent loan. -/
+def sliceReferenceContents (value : Lean.Expr) (final : Bool := false) : MetaM Lean.Expr := do
+  mkAppM (if final then ``VerexIR.SpecSliceRef.finalVector
+    else ``VerexIR.SpecSliceRef.currentVector) #[value]
 
 end VerexSL.Contract

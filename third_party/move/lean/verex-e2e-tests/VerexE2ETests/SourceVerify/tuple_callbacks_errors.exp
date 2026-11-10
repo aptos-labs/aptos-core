@@ -1,0 +1,36 @@
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.rs:4:1: info: `apply` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.rs:4:1: info: `forward` uses concrete verification: Given interpretation does not yet support behavioral contract interpretation
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.spec.lean:20:3: error: the specification clause `ensures spec.result[0] == value` is not established
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.spec.lean:19:6: error: verex verification failed: the automatic verification of `pair` failed; provide a proof in the module:
+  verify pair by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.rs:4:1: info: `apply_generic` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.spec.lean:36:3: error: the specification clause `ensures !spec.result[1]` is not established
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.spec.lean:34:6: error: verex verification failed: the automatic verification of `generic_pair` failed; provide a proof in the module:
+  verify generic_pair by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.spec.lean:43:3: error: the specification clause `ensures spec.result[0] != value` is not established
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.spec.lean:42:6: error: verex verification failed: the automatic verification of `singleton` failed; provide a proof in the module:
+  verify singleton by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.rs:4:1: info: `apply_nested` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.spec.lean:56:3: error: the specification clause `ensures spec.result[1] == (true, value)` is not established
+VerexE2ETests/SourceVerify/tuple_callbacks_errors.spec.lean:54:6: error: verex verification failed: the automatic verification of `nested_tuple` failed; provide a proof in the module:
+  verify nested_tuple by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

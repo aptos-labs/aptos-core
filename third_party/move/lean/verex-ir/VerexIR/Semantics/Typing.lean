@@ -73,6 +73,10 @@ mutual
         (length_matches : VectorLengthMatches length values.size)
         (elements_typed : ValuesHaveType unit tables values.toList elementType) :
         ValueHasType unit tables (.vector values) typeId
+    | slice {tables : Tables} (typeId elementType : TypeId) (values : Array RuntimeValue)
+        (type_eq : tables.types[typeId.index]? = some (.slice elementType))
+        (elements_typed : ValuesHaveType unit tables values.toList elementType) :
+        ValueHasType unit tables (.vector values) typeId
     /-- A nominal value is typed against its declaration: the spelling the
     type names, the variant it declares, and every field at the type the
     declaration gives it under this use's generic arguments.  Field types are
@@ -604,6 +608,7 @@ theorem constValue?_hasType {tables : Tables} {literal : ConstValue}
               cases ty <;> simp_all [isFirstSliceConst, isFirstSliceType]
               exact .bytes typeId bs ty_eq
           | profile p => simp [constValue?] at value_eq
+          | «opaque» _ => simp [constValue?] at value_eq
           | vector elements =>
               simp only [constValue?] at value_eq
               cases out_eq : Array.mapM (fun x => constValue? x.val) elements.attach with
