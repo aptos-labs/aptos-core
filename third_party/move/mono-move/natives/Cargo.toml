@@ -42,6 +42,7 @@ sha2_0_10_6 = { workspace = true }
 sha3 = { workspace = true }
 shared-dsa = { workspace = true }
 siphasher = { workspace = true }
+smallvec = { workspace = true }
 tiny-keccak = { workspace = true }
 
 [features]
