@@ -962,12 +962,24 @@ impl LiveState {
             .ledger_db
             .transaction_info_db()
             .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
-        let all_checkpoint_indices = txn_info_iter
+        let all_checkpoint_indices: Vec<_> = txn_info_iter
             .into_iter()
             .collect::<Result<Vec<_>>>()?
             .into_iter()
             .positions(|txn_info| txn_info.has_state_checkpoint_hash())
             .collect();
+
+        let last_version = num_transactions - 1;
+        let last_block_end = all_checkpoint_indices
+            .last()
+            .map(|idx| snapshot_next_version + *idx as Version)
+            .or(snapshot_next_version.checked_sub(1));
+        ensure!(
+            last_block_end == Some(last_version),
+            "DB ends at version {} in the middle of a block. Last block end version: {}.",
+            last_version,
+            last_block_end.map_or("none".to_string(), |v| v.to_string()),
+        );
 
         let state_update_refs = StateUpdateRefs::index_write_sets(
             snapshot_next_version,
