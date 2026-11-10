@@ -39,7 +39,7 @@ struct AggregatorOrSnapshotRef<'a, T> {
     _t: PhantomData<T>,
 }
 
-impl<'a, T> VMValue<'a> for AggregatorOrSnapshotRef<'a, T> {
+unsafe impl<'a, T> VMValue<'a> for AggregatorOrSnapshotRef<'a, T> {
     // A reference is a 16-byte fat pointer.
     const FRAME_SLOT_SIZE: usize = 16;
 
@@ -103,7 +103,7 @@ struct Aggregator<T> {
     max_value: T,
 }
 
-impl<'a, T: VMValue<'a>> VMValue<'a> for Aggregator<T> {
+unsafe impl<'a, T: VMValue<'a>> VMValue<'a> for Aggregator<T> {
     const FRAME_SLOT_SIZE: usize = 2 * <T as VMValue<'a>>::FRAME_SLOT_SIZE;
 
     /// # Safety
@@ -138,7 +138,7 @@ struct AggregatorSnapshot<T> {
     value: T,
 }
 
-impl<'a, T: VMValue<'a>> VMValue<'a> for AggregatorSnapshot<T> {
+unsafe impl<'a, T: VMValue<'a>> VMValue<'a> for AggregatorSnapshot<T> {
     const FRAME_SLOT_SIZE: usize = <T as VMValue<'a>>::FRAME_SLOT_SIZE;
 
     /// # Safety
@@ -170,7 +170,7 @@ struct DerivedStringSnapshot<'a> {
     padding: Vector<'a, u8>,
 }
 
-impl<'a> VMValue<'a> for DerivedStringSnapshot<'a> {
+unsafe impl<'a> VMValue<'a> for DerivedStringSnapshot<'a> {
     const FRAME_SLOT_SIZE: usize = 2 * <Vector<'a, u8> as VMValue<'a>>::FRAME_SLOT_SIZE;
 
     /// # Safety

@@ -63,7 +63,7 @@ struct TypeInfo<'a> {
     struct_name: Vector<'a, u8>,
 }
 
-impl<'a> VMValue<'a> for TypeInfo<'a> {
+unsafe impl<'a> VMValue<'a> for TypeInfo<'a> {
     const FRAME_SLOT_SIZE: usize = TYPE_INFO_STRUCT_NAME_OFFSET + 8;
 
     unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {

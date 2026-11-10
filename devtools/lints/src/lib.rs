@@ -20,6 +20,7 @@
 #![feature(rustc_private)]
 #![warn(unused_extern_crates)]
 
+extern crate rustc_data_structures;
 extern crate rustc_hir;
 extern crate rustc_lint;
 extern crate rustc_middle;
@@ -29,6 +30,7 @@ extern crate rustc_span;
 mod no_std_hash_map;
 mod raw_memory_access;
 mod scope;
+mod unsafe_cell_reborrow;
 
 use rustc_lint::LintStore;
 use rustc_session::Session;
@@ -44,6 +46,7 @@ pub fn register_lints(sess: &Session, lint_store: &mut LintStore) {
     lint_store.register_lints(&[
         no_std_hash_map::NO_STD_HASH_MAP,
         raw_memory_access::RAW_MEMORY_ACCESS,
+        unsafe_cell_reborrow::UNSAFE_CELL_REBORROW,
     ]);
     let hash_map_scope = config.no_std_hash_map.clone();
     lint_store.register_late_lint_pass(Box::new(move |_| {
@@ -53,6 +56,12 @@ pub fn register_lints(sess: &Session, lint_store: &mut LintStore) {
     lint_store.register_late_lint_pass(Box::new(move |_| {
         Box::new(raw_memory_access::RawMemoryAccess::new(raw_scope.clone()))
     }));
+    let cell_config = config.unsafe_cell_reborrow.clone();
+    lint_store.register_late_lint_pass(Box::new(move |_| {
+        Box::new(unsafe_cell_reborrow::UnsafeCellReborrow::new(
+            cell_config.clone(),
+        ))
+    }));
 }
 
 /// `ui/` holds UI tests in rustc's and clippy's sense (and under their
@@ -60,7 +69,19 @@ pub fn register_lints(sess: &Session, lint_store: &mut LintStore) {
 /// driver and the exact diagnostics it produces are diffed against
 /// `ui/<lint>.stderr`. They pin what a lint flags, what it leaves alone, and
 /// what it says.
+///
+/// The tests run with no crate scopes, so every lint applies to every test
+/// file; the one piece of config they need is the trait lists of
+/// `unsafe_cell_reborrow`, naming traits in `ui/unsafe_cell_reborrow.rs`.
 #[test]
 fn ui() {
-    dylint_testing::ui_test(env!("CARGO_PKG_NAME"), "ui");
+    dylint_testing::ui::Test::src_base(env!("CARGO_PKG_NAME"), "ui")
+        .dylint_toml(
+            r#"
+            [aptos_lints.unsafe_cell_reborrow]
+            inert_traits = ["unsafe_cell_reborrow::Inert"]
+            context_traits = ["unsafe_cell_reborrow::CtxTrait"]
+            "#,
+        )
+        .run();
 }

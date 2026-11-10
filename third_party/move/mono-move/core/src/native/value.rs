@@ -27,7 +27,16 @@ use std::marker::PhantomData;
 ///
 /// Native functions should, however, implement this trait for their own custom
 /// data types if they are using them as arguments or returns.
-pub trait VMValue<'a>: Sized {
+///
+/// # Safety
+///
+/// An implementation must not be able to reach a [`NativeContext`]: not hold
+/// one (or a type parameter bounded by it, or a `dyn` of it), and not call one.
+/// The context runs `write_to_frame` while it holds its own mutable
+/// components, so an impl that called back into it would alias them, and one
+/// that allocated would move the object being written. The
+/// `unsafe_cell_reborrow` lint checks every impl.
+pub unsafe trait VMValue<'a>: Sized {
     /// Byte size of the slot that holds this value. (Heap memory not included.)
     const FRAME_SLOT_SIZE: usize;
 
@@ -59,7 +68,7 @@ pub trait VMValue<'a>: Sized {
 /// [`MAX_ALIGN`](crate::MAX_ALIGN), via [`MemAddr::load`] / [`MemAddr::store`].
 macro_rules! impl_vm_value_for_integer {
     ($t:ty) => {
-        impl<'a> VMValue<'a> for $t {
+        unsafe impl<'a> VMValue<'a> for $t {
             const FRAME_SLOT_SIZE: usize = core::mem::size_of::<$t>();
 
             #[inline]
@@ -94,7 +103,7 @@ impl_vm_value_for_integer!(I256);
 
 /// The empty payload of a fieldless enum variant: zero-width, reads and writes
 /// nothing.
-impl<'a> VMValue<'a> for () {
+unsafe impl<'a> VMValue<'a> for () {
     const FRAME_SLOT_SIZE: usize = 0;
 
     #[inline]
@@ -104,7 +113,7 @@ impl<'a> VMValue<'a> for () {
     unsafe fn write_to_frame(self, _slot: MemAddr) {}
 }
 
-impl<'a> VMValue<'a> for bool {
+unsafe impl<'a> VMValue<'a> for bool {
     const FRAME_SLOT_SIZE: usize = 1;
 
     #[inline]
@@ -121,7 +130,7 @@ impl<'a> VMValue<'a> for bool {
     }
 }
 
-impl<'a> VMValue<'a> for AccountAddress {
+unsafe impl<'a> VMValue<'a> for AccountAddress {
     const FRAME_SLOT_SIZE: usize = AccountAddress::LENGTH;
 
     #[inline]
@@ -156,7 +165,7 @@ impl TableHandle {
 }
 
 /// A `TableHandle` has the same representation as the `address` it wraps.
-impl<'a> VMValue<'a> for TableHandle {
+unsafe impl<'a> VMValue<'a> for TableHandle {
     const FRAME_SLOT_SIZE: usize = <AccountAddress as VMValue<'a>>::FRAME_SLOT_SIZE;
 
     unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {
@@ -250,7 +259,7 @@ impl<'a, V> Ref<'a, Vector<'a, V>> {
     }
 }
 
-impl<'a, T> VMValue<'a> for Ref<'a, T> {
+unsafe impl<'a, T> VMValue<'a> for Ref<'a, T> {
     const FRAME_SLOT_SIZE: usize = 16;
 
     #[inline]
@@ -372,7 +381,7 @@ impl Vector<'_, u8> {
     }
 }
 
-impl<'a, V> VMValue<'a> for Vector<'a, V> {
+unsafe impl<'a, V> VMValue<'a> for Vector<'a, V> {
     const FRAME_SLOT_SIZE: usize = 8;
 
     #[inline]
@@ -423,7 +432,7 @@ impl<'a, T> Boxed<'a, T> {
 
 /// A boxed value's in-frame representation is the 8-byte pointer to its object,
 /// letting a native return one with `set_return`.
-impl<'a, T> VMValue<'a> for Boxed<'a, T> {
+unsafe impl<'a, T> VMValue<'a> for Boxed<'a, T> {
     const FRAME_SLOT_SIZE: usize = 8;
 
     #[inline]
