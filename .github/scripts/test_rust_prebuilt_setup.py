@@ -23,22 +23,26 @@ if os.environ.get('FAIL_TOOL') == name:
     raise SystemExit(1)
 channel = state['channel']
 if name == 'rustup':
-    if args == ['toolchain', 'list']:
-        print(channel + '-x86_64-unknown-linux-gnu' if state['installed'] else 'stable-x86_64-unknown-linux-gnu')
-    elif args[:2] == ['toolchain', 'install']:
-        if os.environ.get('FAIL_INSTALL'):
+    import tomllib
+    config = tomllib.loads((root / 'rust-toolchain.toml').read_text())['toolchain']
+    selection = str((root / config['path']).resolve()) if 'path' in config else config['channel']
+    if args == ['toolchain', 'install', '--no-update', '--no-self-update']:
+        if os.environ.get('FAIL_INSTALL') or os.environ.get('FAIL_COMPONENT'):
             raise SystemExit(1)
-        assert args[2:] == [channel], args
         state['installed'] = True
-    elif args[:2] == ['component', 'add']:
-        if os.environ.get('FAIL_COMPONENT'):
-            raise SystemExit(1)
-        assert args[2:4] == ['--toolchain', channel], args
-        state['components'] = sorted(set(state['components']) | set(args[4:]))
+        state['components'] = sorted(set(state['components']) | set(config.get('components', [])))
+        state['targets'] = config.get('targets', [])
+        state['profile'] = config.get('profile', 'default')
     elif args == ['show', 'active-toolchain']:
-        print(os.environ.get('ACTIVE_CHANNEL', channel) + '-x86_64-unknown-linux-gnu (directory override)')
-    elif args == ['run', channel, 'rustc', '--version']:
-        print('rustc ' + channel + ' (fixture)')
+        print(selection + ' (directory override)')
+    elif args[:2] == ['which', 'rustc']:
+        selected = args[3] if len(args) == 4 else os.environ.get('ACTIVE_CHANNEL', selection)
+        assert len(args) == 2 or args[2] == '--toolchain', args
+        compiler = root / 'toolchains' / selected / 'bin/rustc'
+        compiler.parent.mkdir(parents=True, exist_ok=True)
+        compiler.write_text('#!' + sys.executable + '\nimport json,os,pathlib\ns=json.loads((pathlib.Path(os.environ["FIXTURE_ROOT"])/"state.json").read_text())\nprint("rustc " + s.get("compiler_version",s["channel"]) + " (fixture)")\n')
+        compiler.chmod(0o755)
+        print(compiler)
     else:
         raise SystemExit('unexpected rustup invocation: ' + repr(args))
     state_path.write_text(json.dumps(state))
@@ -47,7 +51,7 @@ elif name == 'rustc':
     if args == ['-vV']:
         print('LLVM version: ' + str(state['rust_llvm']) + '.1.0')
     else:
-        print('rustc ' + os.environ.get('COMPILER_CHANNEL', channel) + ' (fixture)')
+        print('rustc ' + os.environ.get('COMPILER_CHANNEL', state.get('compiler_version', channel)) + ' (fixture)')
 elif name == 'clang':
     print('Ubuntu clang version ' + str(state['clang_llvm']) + '.1.0')
 elif name == 'ld.lld':
@@ -141,10 +145,11 @@ class PrebuiltSetupTests(unittest.TestCase):
         state = json.loads(path.read_text()) if path.exists() else {}
         path.write_text(json.dumps(dict(state, **changes)))
 
-    def run_step(self, index, **env):
-        script = self.steps[index]["run"].replace(
-            'test "$HOME" = /home/runner', f'test "$HOME" = "{self.home}"'
-        )
+    def run_phase(self, phase, **env):
+        name = "Select tool setup" if phase == "prepare" else "Verify active tools"
+        script = next(step for step in self.steps if step.get("name") == name)[
+            "run"
+        ].replace('test "$HOME" = /home/runner', f'test "$HOME" = "{self.home}"')
         return subprocess.run(
             ["bash", "-c", script],
             cwd=self.root,
@@ -166,23 +171,35 @@ class PrebuiltSetupTests(unittest.TestCase):
             self.assertEqual((self.root / name).read_text(), "")
 
     def test_matching_image_avoids_full_setup_and_verifies_before_cache(self):
-        result = self.run_step(0)
+        result = self.run_phase("prepare")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.root / "github-output").read_text(), "")
         self.assert_no_exports()
-        self.assertEqual(self.run_step(2).returncode, 0)
+        self.assertEqual(self.run_phase("verify").returncode, 0)
         self.assertEqual(self.calls()[-1], ["docker", ["info"]])
         self.assertIn(
             str(self.home / ".cargo/bin"), (self.root / "github-path").read_text()
         )
-        self.assertEqual(
-            self.steps[-1]["with"]["save-if"], "${{ inputs.save-cache == 'true' }}"
+        restored_cache = next(step for step in self.steps if step.get("id") == "cache")
+        setup_action = next(
+            step
+            for step in self.steps
+            if step.get("uses") == "./.github/actions/rust-setup"
         )
-        self.assertIn("Swatinem/rust-cache@", self.steps[-1]["uses"])
-        self.assertEqual(self.steps[1]["uses"], "./.github/actions/rust-setup")
-        self.assertEqual(self.steps[1]["with"]["SKIP_CACHE"], "true")
         self.assertEqual(
-            self.steps[1]["if"], "${{ steps.setup.outputs.system-setup == 'true' }}"
+            restored_cache["with"]["save-if"], "${{ inputs.save-cache == 'true' }}"
+        )
+        self.assertLess(
+            self.steps.index(restored_cache), self.steps.index(setup_action)
+        )
+        self.assertGreater(self.steps.index(restored_cache), 0)
+        self.assertEqual(setup_action["with"]["SKIP_CACHE"], "true")
+        self.assertEqual(
+            setup_action["if"], "${{ steps.setup.outputs.system-setup == 'true' }}"
+        )
+        self.assertEqual(
+            self.action["outputs"]["cache-hit"]["value"],
+            "${{ steps.cache.outputs.cache-hit }}",
         )
         self.assertEqual(
             self.steps[0]["env"]["RUNNER_ENVIRONMENT"], "${{ runner.environment }}"
@@ -235,45 +252,55 @@ class PrebuiltSetupTests(unittest.TestCase):
     def test_rust_drift_repairs_channel_and_components_without_system_setup(self):
         self.set_toolchain("1.99.2")
         self.set_state(channel="1.99.2", installed=False, components=[])
-        result = self.run_step(0)
+        result = self.run_phase("prepare")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(["rustup", ["toolchain", "install", "1.99.2"]], self.calls())
+        self.assertIn(
+            ["rustup", ["toolchain", "install", "--no-update", "--no-self-update"]],
+            self.calls(),
+        )
         self.assertEqual((self.root / "github-output").read_text(), "")
-        self.assertEqual(self.run_step(2).returncode, 0)
+        self.assertEqual(self.run_phase("verify").returncode, 0)
 
     def test_upstream_and_ubuntu_linker_version_formats_are_accepted(self):
         for prefix in ["", "Ubuntu "]:
             with self.subTest(prefix=prefix):
-                result = self.run_step(0, LLD_PREFIX=prefix)
+                result = self.run_phase("prepare", LLD_PREFIX=prefix)
                 self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_installed_channel_repairs_missing_components(self):
         self.set_state(components=["rustc"])
-        self.assertEqual(self.run_step(0).returncode, 0)
+        self.assertEqual(self.run_phase("prepare").returncode, 0)
         state = json.loads((self.root / "state.json").read_text())
         self.assertEqual(set(state["components"]), set(self.components))
-        self.assertFalse(
-            any(args[:2] == ["toolchain", "install"] for _, args in self.calls())
+        self.assertTrue(
+            all(
+                "--no-update" in args
+                for _, args in self.calls()
+                if args[:2] == ["toolchain", "install"]
+            )
         )
 
     def test_system_drift_selects_hosted_setup_then_requires_verified_tools(self):
         (self.root / "scripts/dev_setup.sh").write_text("changed setup\n")
         self.set_state(clang_llvm=22, lld_llvm=22)
-        result = self.run_step(0, RUNNER_ENVIRONMENT="github-hosted")
+        result = self.run_phase("prepare", RUNNER_ENVIRONMENT="github-hosted")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.calls(), [])
+        self.assertIn(
+            ["rustup", ["toolchain", "install", "--no-update", "--no-self-update"]],
+            self.calls(),
+        )
         self.assertEqual(
             (self.root / "github-output").read_text(), "system-setup=true\n"
         )
-        self.assertNotEqual(self.run_step(2).returncode, 0)
+        self.assertNotEqual(self.run_phase("verify").returncode, 0)
         self.assert_no_exports()
         self.set_state(clang_llvm=23, lld_llvm=23)
-        result = self.run_step(2)
+        result = self.run_phase("verify")
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_system_drift_requires_explicit_self_hosted_installation_capability(self):
         (self.root / "scripts/dev_setup.sh").write_text("changed setup\n")
-        result = self.run_step(0)
+        result = self.run_phase("prepare")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("compatible runner image", result.stderr)
         self.assertEqual(self.calls(), [])
@@ -284,10 +311,10 @@ class PrebuiltSetupTests(unittest.TestCase):
         for value in ["false", "", "yes", "1"]:
             with self.subTest(value=value):
                 self.assertNotEqual(
-                    self.run_step(0, ALLOW_SYSTEM_SETUP=value).returncode, 0
+                    self.run_phase("prepare", ALLOW_SYSTEM_SETUP=value).returncode, 0
                 )
                 self.assertEqual(self.calls(), [])
-        result = self.run_step(0, ALLOW_SYSTEM_SETUP="true")
+        result = self.run_phase("prepare", ALLOW_SYSTEM_SETUP="true")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             (self.root / "github-output").read_text(), "system-setup=true\n"
@@ -302,16 +329,20 @@ class PrebuiltSetupTests(unittest.TestCase):
 
     def test_self_hosted_opt_in_does_not_skip_compiler_verification(self):
         self.set_state(lld_llvm=22)
-        self.assertEqual(self.run_step(0, ALLOW_SYSTEM_SETUP="true").returncode, 0)
-        self.assertNotEqual(self.run_step(2, ALLOW_SYSTEM_SETUP="true").returncode, 0)
+        self.assertEqual(
+            self.run_phase("prepare", ALLOW_SYSTEM_SETUP="true").returncode, 0
+        )
+        self.assertNotEqual(
+            self.run_phase("verify", ALLOW_SYSTEM_SETUP="true").returncode, 0
+        )
         self.assert_no_exports()
 
     def test_llvm_drift_routes_only_hosted_and_checks_linker_independently(self):
         for key in ["clang_llvm", "lld_llvm"]:
             with self.subTest(key=key):
                 self.set_state(**dict({"clang_llvm": 23, "lld_llvm": 23}, **{key: 22}))
-                self.assertNotEqual(self.run_step(0).returncode, 0)
-                result = self.run_step(0, RUNNER_ENVIRONMENT="github-hosted")
+                self.assertNotEqual(self.run_phase("prepare").returncode, 0)
+                result = self.run_phase("prepare", RUNNER_ENVIRONMENT="github-hosted")
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn(
                     "system-setup=true", (self.root / "github-output").read_text()
@@ -321,10 +352,10 @@ class PrebuiltSetupTests(unittest.TestCase):
 
     def test_missing_manifest_is_cold_setup_only_on_hosted(self):
         self.manifest_path.unlink()
-        self.assertNotEqual(self.run_step(0).returncode, 0)
+        self.assertNotEqual(self.run_phase("prepare").returncode, 0)
         self.assertEqual(self.calls(), [])
         self.assertEqual(
-            self.run_step(0, RUNNER_ENVIRONMENT="github-hosted").returncode, 0
+            self.run_phase("prepare", RUNNER_ENVIRONMENT="github-hosted").returncode, 0
         )
         self.assertEqual(
             (self.root / "github-output").read_text(), "system-setup=true\n"
@@ -346,23 +377,23 @@ class PrebuiltSetupTests(unittest.TestCase):
         for manifest in cases:
             with self.subTest(manifest=manifest):
                 self.manifest_path.write_text(json.dumps(manifest))
-                result = self.run_step(0, RUNNER_ENVIRONMENT="github-hosted")
+                result = self.run_phase("prepare", RUNNER_ENVIRONMENT="github-hosted")
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(self.calls(), [])
                 self.assertEqual((self.root / "github-output").read_text(), "")
 
     def test_conflicting_override_and_incorrect_active_compiler_fail(self):
-        result = self.run_step(0, RUSTUP_TOOLCHAIN="stable")
+        result = self.run_phase("prepare", RUSTUP_TOOLCHAIN="stable")
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.calls(), [])
         for env in [{"ACTIVE_CHANNEL": "stable"}, {"COMPILER_CHANNEL": "1.97.0"}]:
             with self.subTest(env=env):
-                self.assertNotEqual(self.run_step(0, **env).returncode, 0)
+                self.assertNotEqual(self.run_phase("prepare", **env).returncode, 0)
                 self.assertEqual((self.root / "github-output").read_text(), "")
                 self.assert_no_exports()
         self.assertEqual(
-            self.run_step(
-                0, RUSTUP_TOOLCHAIN="1.99.1-x86_64-unknown-linux-gnu"
+            self.run_phase(
+                "prepare", RUSTUP_TOOLCHAIN="1.99.1-x86_64-unknown-linux-gnu"
             ).returncode,
             0,
         )
@@ -375,14 +406,37 @@ class PrebuiltSetupTests(unittest.TestCase):
         ]:
             with self.subTest(env=env):
                 self.set_state(installed=not bool(env.get("FAIL_INSTALL")))
-                self.assertNotEqual(self.run_step(2, **env).returncode, 0)
+                self.assertNotEqual(self.run_phase("verify", **env).returncode, 0)
                 self.assert_no_exports()
 
-    def test_unsupported_toolchain_fields_fail_before_install(self):
+    def test_native_rustup_profile_and_targets_are_reconciled(self):
         with (self.root / "rust-toolchain.toml").open("a") as stream:
-            stream.write('targets = ["x86_64-unknown-linux-gnu"]\n')
-        self.assertNotEqual(self.run_step(0).returncode, 0)
-        self.assertEqual(self.calls(), [])
+            stream.write(
+                'profile = "minimal"\ntargets = ["x86_64-unknown-linux-gnu"]\n'
+            )
+        result = self.run_phase("prepare")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        state = json.loads((self.root / "state.json").read_text())
+        self.assertEqual(state["profile"], "minimal")
+        self.assertEqual(state["targets"], ["x86_64-unknown-linux-gnu"])
+
+    def test_native_channel_aliases_do_not_have_to_equal_compiler_version(self):
+        for selection in ["stable", "1.99", "nightly-2026-11-01"]:
+            with self.subTest(selection=selection):
+                self.set_toolchain(selection)
+                self.set_state(channel=selection, compiler_version="1.99.1")
+                result = self.run_phase("prepare")
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_local_toolchain_path_does_not_attempt_distribution_install(self):
+        (self.root / "rust-toolchain.toml").write_text(
+            '[toolchain]\npath = "local toolchain"\n'
+        )
+        result = self.run_phase("prepare")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(
+            any(args[:2] == ["toolchain", "install"] for _, args in self.calls())
+        )
 
 
 if __name__ == "__main__":

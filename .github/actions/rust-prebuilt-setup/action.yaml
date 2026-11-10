@@ -10,6 +10,13 @@ inputs:
   allow-system-setup:
     description: Permit full setup on an isolated self-hosted job with installation privileges
     default: "false"
+outputs:
+  cache-hit:
+    description: Whether an exact Cargo cache entry was restored
+    value: ${{ steps.cache.outputs.cache-hit }}
+  system-setup:
+    description: Whether checkout dependency installation was required
+    value: ${{ steps.setup.outputs.system-setup == 'true' }}
 runs:
   using: composite
   steps:
@@ -24,6 +31,11 @@ runs:
         test "$HOME" = /home/runner
         export PATH="$HOME/bin:$HOME/.cargo/bin:$HOME/.dotnet/tools:$HOME/.local/bin:$PATH"
         python3 "$GITHUB_ACTION_PATH/setup.py" prepare
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+      id: cache
+      with:
+        key: ${{ inputs.cache-key }}
+        save-if: ${{ inputs.save-cache == 'true' }}
     - name: Install checkout dependencies when required
       if: ${{ steps.setup.outputs.system-setup == 'true' }}
       uses: ./.github/actions/rust-setup
@@ -57,7 +69,3 @@ runs:
         docker info >/dev/null
         printf '%s\n' "$HOME/bin" "$HOME/.cargo/bin" "$HOME/.dotnet/tools" "$HOME/.local/bin" >> "$GITHUB_PATH"
         printf 'DOTNET_ROOT=%s\n' "$HOME/.dotnet" >> "$GITHUB_ENV"
-    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
-      with:
-        key: ${{ inputs.cache-key }}
-        save-if: ${{ inputs.save-cache == 'true' }}

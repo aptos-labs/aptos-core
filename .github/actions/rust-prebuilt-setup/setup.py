@@ -22,31 +22,22 @@ def output(*args):
 def toolchain():
     config = tomllib.loads(Path("rust-toolchain.toml").read_text())
     tools = config.get("toolchain")
-    if (
-        set(config) != {"toolchain"}
-        or not isinstance(tools, dict)
-        or set(tools) != {"channel", "components"}
-    ):
-        fail("Expected only a pinned Rust channel and components")
-    channel, components = tools["channel"], tools["components"]
-    if not isinstance(channel, str) or not re.fullmatch(r"\d+\.\d+\.\d+", channel):
-        fail("Rust channel must pin a release version")
-    if (
-        not isinstance(components, list)
-        or not components
-        or any(
-            not isinstance(c, str) or not re.fullmatch(r"[a-z][a-z0-9-]*", c)
-            for c in components
-        )
-    ):
-        fail("Invalid Rust toolchain components")
-    if not matches_channel(os.environ.get("RUSTUP_TOOLCHAIN", channel), channel):
+    if not isinstance(tools, dict):
+        fail("Expected a Rustup toolchain table")
+    selection = tools.get("path", tools.get("channel"))
+    if not isinstance(selection, str) or not selection.strip():
+        fail("Expected a Rustup channel or toolchain path")
+    if "path" in tools:
+        selection = str(Path(selection).resolve())
+    if not matches_channel(os.environ.get("RUSTUP_TOOLCHAIN", selection), selection):
         fail("RUSTUP_TOOLCHAIN conflicts with rust-toolchain.toml")
-    return channel, components
+    return config, selection
 
 
 def matches_channel(name, channel):
-    return name == channel or name.startswith(channel + "-")
+    return name == channel or (
+        not Path(channel).is_absolute() and name.startswith(channel + "-")
+    )
 
 
 def stale_files():
@@ -84,25 +75,28 @@ def stale_files():
     }
 
 
-def reconcile_rust(channel, components):
-    installed = [
-        line.split()[0]
-        for line in output("rustup", "toolchain", "list").splitlines()
-        if line.strip()
-    ]
-    if not any(matches_channel(name, channel) for name in installed):
-        subprocess.run(["rustup", "toolchain", "install", channel], check=True)
-    subprocess.run(
-        ["rustup", "component", "add", "--toolchain", channel, *components], check=True
-    )
+def reconcile_rust(config):
+    environment = dict(os.environ)
+    environment.pop("RUSTUP_TOOLCHAIN", None)
+    # Rustup reads profile, components and targets from the checkout itself.
+    command = ["rustup", "toolchain", "install", "--no-update", "--no-self-update"]
+    if "path" in config["toolchain"]:
+        command = ["rustup", "show", "active-toolchain"]
+    subprocess.run(command, env=environment, check=True)
 
 
-def verify_rust(channel):
-    active = output("rustup", "show", "active-toolchain").split()[0]
-    expected = output("rustup", "run", channel, "rustc", "--version")
+def verify_rust(selection):
+    active = Path(output("rustup", "which", "rustc")).resolve()
+    if Path(selection).is_absolute():
+        selected = (Path(selection) / "bin" / "rustc").resolve()
+    else:
+        selected = Path(
+            output("rustup", "which", "rustc", "--toolchain", selection)
+        ).resolve()
+    expected = output(str(selected), "--version")
     if (
-        not matches_channel(active, channel)
-        or not expected.startswith(f"rustc {channel} ")
+        active != selected
+        or not expected.startswith("rustc ")
         or output("rustc", "--version") != expected
     ):
         fail("Active Rust compiler does not match rust-toolchain.toml")
@@ -117,12 +111,16 @@ def llvm_matches():
     return all(versions) and len({match[1] for match in versions}) == 1
 
 
+def system_setup_allowed():
+    return (
+        os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
+        or os.environ.get("ALLOW_SYSTEM_SETUP") == "true"
+    )
+
+
 def select_system_setup(reason):
     # Self-hosted installation is an explicit capability of the isolated job.
-    if (
-        os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"
-        and os.environ.get("ALLOW_SYSTEM_SETUP") != "true"
-    ):
+    if not system_setup_allowed():
         fail(f"{reason}; use a compatible runner image or select the AWS provider")
     print(f"::warning::{reason}; running normal Rust setup", flush=True)
     with Path(os.environ["GITHUB_OUTPUT"]).open("a") as stream:
@@ -131,27 +129,27 @@ def select_system_setup(reason):
 
 def main(mode):
     if mode == "prepare":
+        reason = None
         if MANIFEST.exists():
-            stale = stale_files()
-            channel, components = toolchain()
-            if "scripts/dev_setup.sh" in stale:
-                select_system_setup(
-                    "Prebuilt system-tool setup differs from the checkout"
-                )
-                return
-            reconcile_rust(channel, components)
-            verify_rust(channel)
-            if not llvm_matches():
-                select_system_setup(
-                    "Prebuilt LLVM tools do not match the active Rust compiler"
-                )
+            if "scripts/dev_setup.sh" in stale_files():
+                reason = "Prebuilt system-tool setup differs from the checkout"
         else:
-            toolchain()
-            select_system_setup("No prebuilt Rust image manifest")
+            reason = "No prebuilt Rust image manifest"
+        config, selection = toolchain()
+        if reason and not system_setup_allowed():
+            select_system_setup(reason)
+        reconcile_rust(config)
+        verify_rust(selection)
+        if reason:
+            select_system_setup(reason)
+        elif not llvm_matches():
+            select_system_setup(
+                "Prebuilt LLVM tools do not match the active Rust compiler"
+            )
     elif mode == "verify":
-        channel, components = toolchain()
-        reconcile_rust(channel, components)
-        verify_rust(channel)
+        config, selection = toolchain()
+        reconcile_rust(config)
+        verify_rust(selection)
         if not llvm_matches():
             fail(
                 "LLVM compiler/linker do not match the active Rust compiler after setup"
