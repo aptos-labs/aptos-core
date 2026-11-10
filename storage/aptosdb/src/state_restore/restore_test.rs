@@ -221,6 +221,20 @@ proptest! {
     }
 
     #[test]
+    fn test_restore_resumes_from_previous_key_hash(
+        (all, batch1_size) in arb_btree_map(2).prop_flat_map(|btree| {
+            let len = btree.len();
+            (Just(btree), 1..len)
+        })
+    ) {
+        // One key: the tree has persisted nothing yet, since a leaf is only
+        // written once the next key freezes it.
+        for batch1_size in [1, batch1_size] {
+            assert_resumes_from_previous_key_hash(&all, batch1_size);
+        }
+    }
+
+    #[test]
     fn test_overwrite(
         btree in arb_btree_map(1),
         target_version in 0u64..2000,
@@ -246,6 +260,57 @@ proptest! {
             assert_finish_rejects_unverified_replay(&btree, num_forged);
         }
     }
+}
+
+/// Restores the first `batch1_size` keys and drops the restore unfinished,
+/// then resumes as the restore controller does: skips every key up to
+/// `previous_key_hash()` and adds the rest.
+fn assert_resumes_from_previous_key_hash(
+    all: &BTreeMap<HashValue, (ValueBlob, ValueBlob)>,
+    batch1_size: usize,
+) {
+    let (db, version) = init_mock_store(&all.clone().into_values().collect());
+    let tree = JellyfishMerkleTree::new(&db);
+    let expected_root_hash = tree.get_root_hash(version).unwrap();
+    let restore_db = Arc::new(MockSnapshotStore::default());
+    let new_restore = || {
+        StateSnapshotRestore::new(
+            Arc::clone(&restore_db),
+            Arc::clone(&restore_db),
+            version,
+            expected_root_hash,
+            false, /* async_commit */
+            StateSnapshotRestoreMode::Default,
+        )
+        .unwrap()
+    };
+
+    let batch1: Vec<_> = all.iter().take(batch1_size).collect();
+    let proof = tree
+        .get_range_proof(*batch1.last().unwrap().0, version)
+        .unwrap();
+    new_restore()
+        .add_chunk(
+            batch1.into_iter().map(|(_, kv)| kv.clone()).collect(),
+            proof,
+        )
+        .unwrap();
+
+    let mut restore = new_restore();
+    let resume_point = restore.previous_key_hash().unwrap();
+    let rest: Vec<_> = all
+        .iter()
+        .filter(|(hash, _)| resume_point.is_none_or(|resume_point| **hash > resume_point))
+        .collect();
+    let proof = tree
+        .get_range_proof(*rest.last().unwrap().0, version)
+        .unwrap();
+    restore
+        .add_chunk(rest.into_iter().map(|(_, kv)| kv.clone()).collect(), proof)
+        .unwrap();
+    restore.finish().unwrap();
+
+    assert_success(&restore_db, expected_root_hash, all, version);
 }
 
 fn assert_success<V>(
