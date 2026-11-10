@@ -841,7 +841,8 @@ theorem Skolems.admits_carrier {unit : ValidatedUnit} [FunctionCarriers unit] [�
       ((Carriers.functions parameters shared results).closure function).encode = true := by
   have admitted : NTy.admits unit (Θ.resolve (.function parameters shared results))
       (@NTy.encode (Carriers.runtime unit) _ (Θ.toRuntime _ function)) = true :=
-    NTy.admits_encode unit _ _
+    NTy.admits_encode_function unit _ (NRow.substWith Θ.type parameters) shared
+      (NRow.substWith Θ.type results) (by rw [Θ.resolve_eq_type]; rfl) _
   rw [Θ.encode_toRuntime, NTy.encode_function, Θ.resolve_eq_type] at admitted
   simpa only [NTy.substWith, NRow.resolved_eq_substWith, Skolems.type] using admitted
 
@@ -990,7 +991,8 @@ theorem memoryTyped (unit : ValidatedUnit) [FunctionCarriers unit] (resources : 
         obtain ⟨ns, type, namespace_eq, resolves, typed, closed, plain, closures⟩ :=
           resources _ _ _ named
         obtain ⟨representation, normalized, typedRepresentation⟩ :=
-          representable _ _ _ typed closed plain closures (NTy.admits_encode unit _ value)
+          representable _ _ _ typed closed plain closures (NTy.admits_encode unit _ value
+            (resourceOf_supported (runtimeResourceOf_sound named).1).1)
         exact ⟨representation, encoded ▸ normalized, ns, type, namespace_eq, resolves,
           typedRepresentation⟩
     · cases found

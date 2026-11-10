@@ -2994,12 +2994,14 @@ structure SiteTyped (parameters : NRow) (shared : Sharing) (results : NRow)
 
 /-- A frame's values of a row encode as runtime values of the row's
 resolution, which admit it. -/
-theorem HList.admits_resolved (row : NRow) (values : HList row) :
+theorem HList.admits_resolved (row : NRow)
+    (supported : NRow.supported (NominalCarriers.supports unit) row.resolved = true)
+    (values : HList row) :
     NRow.admits unit row.resolved (HList.encode values) = true := by
   have encoded := HList.encode_toRuntime row values
   simp only [HList.encode] at encoded ⊢
   rw [← encoded]
-  exact NRow.admits_encode unit row.resolved (HList.toRuntime row values)
+  exact NRow.admits_encode unit row.resolved (HList.toRuntime row values) supported
 
 /-- A typed site's closure is one of the frame's function values. -/
 theorem SiteTyped.decodes {parameters : NRow} {shared : Sharing} {results : NRow}
@@ -3015,7 +3017,7 @@ theorem SiteTyped.decodes {parameters : NRow} {shared : Sharing} {results : NRow
   unfold NTy.admits
   rw [typed.rows]
   simp only [typed.faithful, typed.sharing, beq_self_eq_true, Bool.true_and]
-  exact HList.admits_resolved σs captures
+  exact HList.admits_resolved σs (NRow.supported_closureRowsIn?_captured unit typed.rows) captures
 
 /-- A closure of a target without type parameters, at its own rows
 (`closureRows?`), closed and faithful at the empty instantiation, is typed

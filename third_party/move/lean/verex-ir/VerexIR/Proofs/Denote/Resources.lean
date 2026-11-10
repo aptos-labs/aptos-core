@@ -59,6 +59,29 @@ def resourceOf (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId : Type
       some ⟨type, NRow.ofList arguments, .value⟩
   | _ => none
 
+/-- A resource's native type and type arguments come from the unit's tables,
+so an instance that covers those types supports them
+(`NominalCarriers.covers`). -/
+theorem resourceOf_supported [NominalCarriers unit] {namespaceId : NamespaceId} {typeId : TypeId}
+    {resource : ResourceType} (named : resourceOf unit namespaceId typeId = some resource) :
+    NTy.supported (NominalCarriers.supports unit) resource.type = true ∧
+      NRow.supported (NominalCarriers.supports unit) resource.arguments = true := by
+  simp only [resourceOf, Option.bind_eq_bind, Option.bind_eq_some_iff] at named
+  obtain ⟨ty, -, named⟩ := named
+  split at named
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff, guard, Option.some.injEq] at named
+    obtain ⟨ns, -, handle, -, declaration, -, guarded, -, type, typeRead, args, argsRead,
+      same⟩ := named
+    cases same
+    refine ⟨NTy.supported_ntyOf unit _ _ type typeRead, ?_⟩
+    simp only [NRow.supported_ofList]
+    refine mapM_supported (NominalCarriers.supports unit) _ ?_ _ args argsRead
+    intro argument σ got
+    split at got
+    · exact NTy.supported_ntyOf unit _ _ σ got
+    · exact absurd got (by simp)
+  · exact absurd named (by simp)
+
 /-- Ordinary global resources always use the bounded native value carrier. -/
 theorem resourceOf_kind {namespaceId : NamespaceId} {typeId : TypeId}
     {resource : ResourceType} (named : resourceOf unit namespaceId typeId = some resource) :

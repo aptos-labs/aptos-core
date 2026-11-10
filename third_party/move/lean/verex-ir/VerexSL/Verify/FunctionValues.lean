@@ -448,6 +448,12 @@ def ownTrivialName (segments : Array String) : Name :=
 def carriersNonemptyName (segments : Array String) : Name :=
   (unitName segments).getPrefix ++ `carriersNonempty
 
+/-- Name of a unit's nominal values: the instance that supports no
+declaration natively, which this stage gives every unit
+(`NominalCarriers.none`). -/
+def nominalCarriersName (segments : Array String) : Name :=
+  (unitName segments).getPrefix ++ `nominalCarriers
+
 /-- Declare a unit's inhabitants of certified carriers, where no declaration
 of it states a data invariant `own` carries: every declaration's is
 trivially true, so the inhabitants are the plain ones
@@ -474,7 +480,23 @@ private def ensureCarriersNonempty (segments : Array String) (unitIdent : Ident)
           (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent) :=
       @VerexIR.Proofs.Denote.CarriersNonempty.ofTrivial
         (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)
-        $(rootIdent (ownTrivialName segments)) (fun _ _ => trivial) (fun _ value => value)))
+        $(rootIdent (ownTrivialName segments)) (fun _ _ => trivial) (fun _ _ _ _ _ => trivial)
+        (fun _ value => value)))
+
+/-- Declare the unit's native nominal types.  No declaration of this unit has
+a generated native carrier yet, so the unit supports none
+(`NominalCarriers.none`).  Declared before the unit's function family, whose
+second interpretation reads the instance and whose function values carry it
+(`SiteFamily.functionCarriers`). -/
+private def ensureNominalCarriers (segments : Array String) (unitIdent : Ident) :
+    CommandElabM Unit := do
+  if (← getEnv).contains (nominalCarriersName segments) then return
+  let nominalsId ← `(Lean.Parser.Command.declId|
+    $(rootIdent (nominalCarriersName segments)):ident)
+  elabCommand (← `(command|
+    @[reducible] noncomputable instance $nominalsId:declId :
+        VerexIR.Proofs.Denote.NominalCarriers $unitIdent :=
+      VerexIR.Proofs.Denote.NominalCarriers.none $unitIdent))
 
 /-- Declare the data invariants of a unit's declarations and the instance
 that carries them, given its base function values: the base family's trivial
@@ -506,7 +528,8 @@ private def declareCarrierInstance (segments : Array String) (unit : ValidatedUn
     @[reducible] noncomputable def $nonemptyBaseId:declId :
         @VerexIR.Proofs.Denote.CarriersNonempty $baseCarriers :=
       @VerexIR.Proofs.Denote.CarriersNonempty.ofTrivial $baseCarriers
-        $(rootIdent (ownTrivialBaseName segments)) (fun _ _ => trivial) (fun _ value => value)))
+        $(rootIdent (ownTrivialBaseName segments)) (fun _ _ => trivial)
+        (fun _ _ _ _ _ => trivial) (fun _ value => value)))
   let own ← ensureDataOwn segments unit
   match own.predicate with
   | some _ =>
@@ -539,6 +562,7 @@ private def declareCarrierInstance (segments : Array String) (unit : ValidatedUn
 private def defineFunctionFamily (segments : Array String) (unit : ValidatedUnit)
     (unitIdent baseIdent familyIdent : Ident) (instanceId baseId : TSyntax ``Lean.Parser.Command.declId)
     (family : Name) (sites : Array SiteSpec) : GenM Unit := do
+  ensureNominalCarriers segments unitIdent
   -- The sites, as the family's index and the decoder read them.
   let mut specs := #[]
   for site in sites, index in [0:sites.size] do
@@ -727,7 +751,7 @@ private def defineSiteConstruction (unitIdent familyIdent : Ident) (family : Nam
       theorem $forgetIdent:ident
           [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
           (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row) :
-          @VerexIR.Proofs.Denote.NRow.encodeWith $unitIdent $familyIdent
+          @VerexIR.Proofs.Denote.NRow.encodeWith $unitIdent _ $familyIdent
               (fun _ _ _ value => $(rootIdent (family ++ `encode)) value) $row
               (@VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $row captures) =
             @VerexIR.Proofs.Denote.HList.encode $runtimeCarriers $row captures := by

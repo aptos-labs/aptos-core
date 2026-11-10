@@ -750,6 +750,40 @@ def NRows.refAbsent : NRows → Bool
 end
 
 mutual
+/-- Whether every declaration a type mentions, at any depth — in a nominal's
+type arguments, a struct's or a variant's rows, a function's rows — is one a
+unit's nominal carriers support (`NominalCarriers.supports`). -/
+def NTy.supported (supports : StructHandle → Bool → Bool) : NTy → Bool
+  | .tuple elements => NRow.supported supports elements
+  | .struct _ arguments fields =>
+      NRow.supported supports arguments && NRow.supported supports fields
+  | .enum _ arguments _ rows _ =>
+      NRow.supported supports arguments && NRows.supported supports rows
+  | .slice element => NTy.supported supports element
+  | .vector element => NTy.supported supports element
+  | .array element _ => NTy.supported supports element
+  | .table key value => NTy.supported supports key && NTy.supported supports value
+  | .ghost slot => NTy.supported supports slot
+  | .sliceRef element => NTy.supported supports element
+  | .ref referent => NTy.supported supports referent
+  | .observed referent => NTy.supported supports referent
+  | .function parameters _ results =>
+      NRow.supported supports parameters && NRow.supported supports results
+  | .nominal source arguments productive =>
+      supports source productive && NRow.supported supports arguments
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char
+  | .param _ => true
+
+def NRow.supported (supports : StructHandle → Bool → Bool) : NRow → Bool
+  | .nil => true
+  | .cons τ rest => NTy.supported supports τ && NRow.supported supports rest
+
+def NRows.supported (supports : StructHandle → Bool → Bool) : NRows → Bool
+  | .nil => true
+  | .cons fields rest => NRow.supported supports fields && NRows.supported supports rest
+end
+
+mutual
 /-- What a shared view of a type holds: each mutable reference as what it refers
 to. The identity on a type holding none. -/
 @[reducible] def NTy.erase : NTy → NTy
@@ -822,6 +856,200 @@ theorem slotShared_identity (types : TypeLookup) (env : NRow)
   split
   · simp only [NRow.argument, identity, NTy.isObserved, Bool.or_false]
   · simp only [Bool.or_false]
+
+/-- A mapped option is `some` exactly where the option is. -/
+theorem option_map_eq_some {α β : Type} {f : α → β} {x : Option α} {y : β} :
+    (f <$> x) = some y ↔ ∃ a, x = some a ∧ f a = y := by
+  cases x <;> simp
+
+section Supported
+variable (supports : StructHandle → Bool → Bool)
+
+@[simp] theorem NTy.supported_unmark : (τ : NTy) →
+    NTy.supported supports τ.unmark = NTy.supported supports τ
+  | .observed referent => NTy.supported_unmark referent
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char
+  | .tuple _ | .struct _ _ _ | .enum _ _ _ _ _ | .slice _ | .vector _ | .array _ _
+  | .table _ _ | .ghost _ | .ref _ | .sliceRef _ | .param _ | .function _ _ _
+  | .nominal _ _ _ => rfl
+
+mutual
+/-- A shared view of a type supports what the type does: it keeps every
+declaration and visits its arguments. -/
+@[simp] theorem NTy.supported_erase : (τ : NTy) →
+    NTy.supported supports τ.erase = NTy.supported supports τ
+  | .sliceRef element => NTy.supported_erase element
+  | .ref referent => NTy.supported_erase referent
+  | .tuple elements => NRow.supported_erase elements
+  | .struct _ arguments fields => by
+      simp only [NTy.erase, NTy.supported, NRow.supported_erase arguments,
+        NRow.supported_erase fields]
+  | .enum _ arguments _ rows _ => by
+      simp only [NTy.erase, NTy.supported, NRow.supported_erase arguments,
+        NRows.supported_erase rows]
+  | .slice element => NTy.supported_erase element
+  | .vector element => NTy.supported_erase element
+  | .array element _ => NTy.supported_erase element
+  | .table key value => by
+      simp only [NTy.erase, NTy.supported, NTy.supported_erase key, NTy.supported_erase value]
+  | .ghost slot => NTy.supported_erase slot
+  | .observed referent => NTy.supported_erase referent
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char
+  | .param _ | .function _ _ _ | .nominal _ _ _ => rfl
+
+@[simp] theorem NRow.supported_erase : (row : NRow) →
+    NRow.supported supports row.erase = NRow.supported supports row
+  | .nil => rfl
+  | .cons τ rest => by
+      simp only [NRow.erase, NRow.supported, NTy.supported_erase τ, NRow.supported_erase rest]
+
+@[simp] theorem NRows.supported_erase : (rows : NRows) →
+    NRows.supported supports rows.erase = NRows.supported supports rows
+  | .nil => rfl
+  | .cons fields rest => by
+      simp only [NRows.erase, NRows.supported, NRow.supported_erase fields,
+        NRows.supported_erase rest]
+end
+
+/-- A row built from a list supports what every type in the list does. -/
+theorem NRow.supported_ofList : (types : List NTy) →
+    NRow.supported supports (NRow.ofList types) = types.all (NTy.supported supports)
+  | [] => rfl
+  | τ :: rest => by
+      simp only [NRow.ofList, NRow.supported, List.all_cons, NRow.supported_ofList rest]
+
+/-- A row of rows built from a list supports what every row in it does. -/
+theorem NRows.supported_ofList : (rows : List NRow) →
+    NRows.supported supports (NRows.ofList rows) = rows.all (NRow.supported supports)
+  | [] => rfl
+  | row :: rest => by
+      simp only [NRows.ofList, NRows.supported, List.all_cons, NRows.supported_ofList rest]
+
+/-- A supported row's entry is supported, and so is a supported default. -/
+theorem NRow.supported_getD : (row : NRow) → NRow.supported supports row = true →
+    (index : Nat) → (default : NTy) → NTy.supported supports default = true →
+    NTy.supported supports (row.getD index default) = true
+  | .nil, _, _, _, held => held
+  | .cons τ _, supported, 0, _, _ => by
+      simp only [NRow.supported, Bool.and_eq_true] at supported
+      exact supported.1
+  | .cons _ rest, supported, index + 1, default, held => by
+      simp only [NRow.supported, Bool.and_eq_true] at supported
+      exact NRow.supported_getD rest supported.2 index default held
+
+mutual
+/-- Substituting supported types into a supported type supports. -/
+theorem NTy.supported_substWith (types : Nat → NTy)
+    (replace : ∀ index, NTy.supported supports (types index) = true) : (τ : NTy) →
+    NTy.supported supports τ = true → NTy.supported supports (τ.substWith types) = true
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
+  | .bytes, _ | .char, _ => rfl
+  | .param index, _ => by
+      simpa only [NTy.substWith, NTy.supported_unmark] using replace index
+  | .tuple elements, held => NRow.supported_substWith types replace elements held
+  | .slice element, held => NTy.supported_substWith types replace element held
+  | .vector element, held => NTy.supported_substWith types replace element held
+  | .array element _, held => NTy.supported_substWith types replace element held
+  | .ghost slot, held => NTy.supported_substWith types replace slot held
+  | .sliceRef element, held => NTy.supported_substWith types replace element held
+  | .ref referent, held => NTy.supported_substWith types replace referent held
+  | .observed referent, held => NTy.supported_substWith types replace referent held
+  | .table key value, held => by
+      simp only [NTy.substWith, NTy.supported, Bool.and_eq_true] at held ⊢
+      exact ⟨NTy.supported_substWith types replace key held.1,
+        NTy.supported_substWith types replace value held.2⟩
+  | .struct _ arguments fields, held => by
+      simp only [NTy.substWith, NTy.supported, Bool.and_eq_true] at held ⊢
+      exact ⟨NRow.supported_substWith types replace arguments held.1,
+        NRow.supported_substWith types replace fields held.2⟩
+  | .enum _ arguments _ rows _, held => by
+      simp only [NTy.substWith, NTy.supported, Bool.and_eq_true] at held ⊢
+      exact ⟨NRow.supported_substWith types replace arguments held.1,
+        NRows.supported_substWith types replace rows held.2⟩
+  | .function parameters _ results, held => by
+      simp only [NTy.substWith, NTy.supported, Bool.and_eq_true] at held ⊢
+      exact ⟨NRow.supported_substWith types replace parameters held.1,
+        NRow.supported_substWith types replace results held.2⟩
+  | .nominal _ arguments _, held => by
+      simp only [NTy.substWith, NTy.supported, Bool.and_eq_true] at held ⊢
+      exact ⟨held.1, NRow.supported_substWith types replace arguments held.2⟩
+
+theorem NRow.supported_substWith (types : Nat → NTy)
+    (replace : ∀ index, NTy.supported supports (types index) = true) : (row : NRow) →
+    NRow.supported supports row = true →
+    NRow.supported supports (NRow.substWith types row) = true
+  | .nil, _ => rfl
+  | .cons τ rest, held => by
+      simp only [NRow.substWith, NRow.supported, Bool.and_eq_true] at held ⊢
+      exact ⟨NTy.supported_substWith types replace τ held.1,
+        NRow.supported_substWith types replace rest held.2⟩
+
+theorem NRows.supported_substWith (types : Nat → NTy)
+    (replace : ∀ index, NTy.supported supports (types index) = true) : (rows : NRows) →
+    NRows.supported supports rows = true →
+    NRows.supported supports (NRows.substWith types rows) = true
+  | .nil, _ => rfl
+  | .cons fields rest, held => by
+      simp only [NRows.substWith, NRows.supported, Bool.and_eq_true] at held ⊢
+      exact ⟨NRow.supported_substWith types replace fields held.1,
+        NRows.supported_substWith types replace rest held.2⟩
+end
+
+/-- Extracting at a mask keeps every type supported. -/
+theorem supported_extract (mask : Nat) (captured : Bool) : (types : List NTy) →
+    types.all (NTy.supported supports) = true →
+    (ClosureMask.extract mask captured types).all (NTy.supported supports) = true
+  | [], _ => rfl
+  | τ :: rest, held => by
+      simp only [List.all_cons, Bool.and_eq_true] at held
+      simp only [ClosureMask.extract]
+      split
+      · simp only [List.all_cons, Bool.and_eq_true]
+        exact ⟨held.1, supported_extract (mask / 2) captured rest held.2⟩
+      · exact supported_extract (mask / 2) captured rest held.2
+
+/-- A list read type by type supports what each of its types does. -/
+theorem mapM_supported {α : Type} (f : α → Option NTy)
+    (sound : ∀ a σ, f a = some σ → NTy.supported supports σ = true) :
+    (as : List α) → (τs : List NTy) → as.mapM f = some τs →
+    τs.all (NTy.supported supports) = true
+  | [], τs, read => by
+      simp at read
+      cases read; rfl
+  | a :: as, τs, read => by
+      simp only [List.mapM_cons, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
+      obtain ⟨σ, found, read⟩ := read
+      obtain ⟨rest, restRead, same⟩ := read
+      simp only [pure, Option.some.injEq] at same
+      cases same
+      simp [sound a σ found, mapM_supported f sound as rest restRead]
+
+/-- A list of rows read row by row supports what each of its rows does. -/
+theorem mapM_supported_rows {α : Type} (f : α → Option NRow)
+    (sound : ∀ a r, f a = some r → NRow.supported supports r = true) :
+    (as : List α) → (rs : List NRow) → as.mapM f = some rs →
+    rs.all (NRow.supported supports) = true
+  | [], rs, read => by
+      simp at read
+      cases read; rfl
+  | a :: as, rs, read => by
+      simp only [List.mapM_cons, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
+      obtain ⟨r, found, read⟩ := read
+      obtain ⟨rest, restRead, same⟩ := read
+      simp only [pure, Option.some.injEq] at same
+      cases same
+      simp [sound a r found, mapM_supported_rows f sound as rest restRead]
+
+/-- Appending supported rows supports. -/
+theorem NRow.supported_append : (left : NRow) → (right : NRow) →
+    NRow.supported supports (left.append right) =
+      (NRow.supported supports left && NRow.supported supports right)
+  | .nil, _ => by simp [NRow.append, NRow.supported]
+  | .cons τ rest, right => by
+      simp only [NRow.append, NRow.supported, NRow.supported_append rest right,
+        Bool.and_assoc]
+
+end Supported
 
 mutual
 /-- The native type an VIR type denotes.  A shared reference denotes its
@@ -940,6 +1168,213 @@ def structNTyFuel (types : TypeLookup) (unit : ValidatedUnit) :
         if distinct : names.Nodup then some (.enum handle arguments names rows distinct)
         else none
 end
+
+section SupportedTables
+variable (supports : StructHandle → Bool → Bool)
+
+set_option maxHeartbeats 1000000 in
+mutual
+theorem supported_ntyOfFuel (types : TypeLookup) (unit : ValidatedUnit) :
+    (fuel : Nat) → (env : NRow) → NRow.supported supports env = true →
+    (namespaceId : NamespaceId) → (typeId : TypeId) → (τ : NTy) →
+    ntyOfFuel types unit env fuel namespaceId typeId = some τ →
+    NTy.supported supports τ = true
+  | 0, _, _, _, _, _, read => by rw [ntyOfFuel] at read; exact absurd read (by simp)
+  | fuel + 1, env, held, namespaceId, typeId, τ, read => by
+      have element : ∀ (id : TypeId) (σ : NTy),
+          ntyOfFuel types unit env fuel namespaceId id = some σ →
+          NTy.supported supports σ = true :=
+        fun id σ => supported_ntyOfFuel types unit fuel env held namespaceId id σ
+      rw [ntyOfFuel] at read
+      cases nsFound : unit.namespaces[namespaceId.index]? with
+      | none => rw [nsFound] at read; exact absurd read (by simp)
+      | some ns =>
+        rw [nsFound] at read
+        simp only [Option.bind_eq_bind, Option.bind_some] at read
+        cases tyFound : types namespaceId typeId with
+        | none => rw [tyFound] at read; exact absurd read (by simp)
+        | some ty =>
+          rw [tyFound] at read
+          simp only [Option.bind_eq_bind, Option.bind_some] at read
+          cases ty
+          case nominal name arguments =>
+            simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at read
+            obtain ⟨handle, -, read⟩ := read
+            split at read
+            · exact supported_structNTyFuel types unit fuel NRow.nil rfl _ _ read
+            · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at read
+              obtain ⟨θ, θRead, read⟩ := read
+              refine supported_structNTyFuel types unit fuel (NRow.ofList θ) ?_ _ _ read
+              simp only [NRow.supported_ofList]
+              refine mapM_supported supports _ ?_ _ θ θRead
+              intro argument σ found
+              cases argument <;>
+                first
+                  | (cases found; rfl)
+                  | (exact element _ σ found)
+                  | (simp only [reduceCtorEq] at found)
+          case function arguments result annotation =>
+            simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at read
+            obtain ⟨parameters, parametersRead, read⟩ := read
+            obtain ⟨entry, entryRead, read⟩ := read
+            split at read <;>
+              (try simp only [Bool.false_eq_true, reduceIte] at read) <;>
+              (try split at read) <;>
+              (try simp only [Bool.false_eq_true, reduceIte] at read) <;>
+              first
+                | (cases read
+                   simp only [NTy.supported, NRow.ofList, NRow.supported, NRow.supported_ofList,
+                     Bool.and_true]
+                   exact mapM_supported supports _ element _ parameters parametersRead)
+                | (simp only [option_map_eq_some, Option.bind_eq_bind,
+                     Option.bind_eq_some_iff] at read
+                   obtain ⟨results, ⟨inner, innerRead, listSame⟩, same⟩ := read
+                   cases listSame
+                   cases same
+                   simp only [NTy.supported, NRow.ofList, NRow.supported, NRow.supported_ofList,
+                     Bool.and_true, Bool.and_eq_true]
+                   exact ⟨mapM_supported supports _ element _ parameters parametersRead,
+                     element _ inner innerRead⟩)
+          all_goals repeat' first
+              | (simp only [reduceCtorEq] at read)
+              | (cases read; rfl)
+              | (split at read)
+              | (simp only [option_map_eq_some] at read
+                 obtain ⟨inner, innerRead, same⟩ := read
+                 cases same
+                 first
+                   | rfl
+                   | (simp only [NTy.supported, NTy.supported_erase]
+                      exact element _ inner innerRead)
+                   | (simp only [NTy.supported, Function.comp_apply, NRow.supported_ofList]
+                      exact mapM_supported supports _ element _ inner innerRead))
+              | (cases read
+                 simp only [NTy.supported, NTy.supported_unmark]
+                 exact NRow.supported_getD supports env held _ (NTy.param _) rfl)
+              | (simp only [reduceCtorEq] at *)
+termination_by fuel => fuel
+
+theorem supported_structNTyFuel (types : TypeLookup) (unit : ValidatedUnit) :
+    (fuel : Nat) → (env : NRow) → NRow.supported supports env = true →
+    (handle : StructHandle) → (τ : NTy) →
+    structNTyFuel types unit env fuel handle = some τ →
+    NTy.supported supports τ = true
+  | 0, _, _, _, _, read => by rw [structNTyFuel] at read; exact absurd read (by simp)
+  | fuel + 1, env, held, handle, τ, read => by
+      have element : ∀ (id : TypeId) (σ : NTy),
+          ntyOfFuel types unit env fuel handle.namespaceId id = some σ →
+          NTy.supported supports σ = true :=
+        fun id σ => supported_ntyOfFuel types unit fuel env held handle.namespaceId id σ
+      rw [structNTyFuel] at read
+      cases nsFound : unit.namespaces[handle.namespaceId.index]? with
+      | none => rw [nsFound] at read; exact absurd read (by simp)
+      | some targetNs =>
+        rw [nsFound] at read
+        simp only [Option.bind_eq_bind, Option.bind_some] at read
+        cases declFound : targetNs.structs[handle.structId]? with
+        | none => rw [declFound] at read; exact absurd read (by simp)
+        | some declaration =>
+          rw [declFound] at read
+          simp only [Option.bind_eq_bind, Option.bind_eq_some_iff, option_map_eq_some] at read
+          obtain ⟨decl, declSame, read⟩ := read
+          cases declSame
+          obtain ⟨ghosts, ⟨ghostTys, ghostsRead, ghostsSame⟩, read⟩ := read
+          cases ghostsSame
+          have arguments : NRow.supported supports (NRow.ofList
+              (List.map (fun index => env.getD index (NTy.param index))
+                (List.range declaration.generics.size))) = true := by
+            simp only [NRow.supported_ofList, List.all_eq_true]
+            intro σ mem
+            obtain ⟨index, -, rfl⟩ := List.mem_map.mp mem
+            simpa using NRow.supported_getD supports env held index (NTy.param index) rfl
+          have ghostRow : NRow.supported supports (NRow.ofList ghostTys) = true := by
+            simp only [NRow.supported_ofList]
+            refine mapM_supported supports _ ?_ _ ghostTys ghostsRead
+            intro ghost σ found
+            simp only [option_map_eq_some] at found
+            obtain ⟨inner, innerRead, same⟩ := found
+            cases same
+            simpa only [NTy.supported] using element _ inner innerRead
+          have withGhosts : ∀ fields, NRow.supported supports fields = true →
+              NRow.supported supports
+                (if declaration.ghosts.isEmpty = true then fields else fields ++ NRow.ofList ghostTys)
+                  = true := by
+            intro fields fieldsHeld
+            split
+            · exact fieldsHeld
+            · have joined : NRow.supported supports
+                  (NRow.append fields (NRow.ofList ghostTys)) = true := by
+                simp only [NRow.supported_append, fieldsHeld, ghostRow, Bool.and_self]
+              exact joined
+          cases layoutFound :
+              Validation.abstractLayout? unit handle.namespaceId handle.structId with
+          | some layout =>
+            rw [layoutFound] at read
+            cases read
+            have leading : NRow.supported supports
+                (if declaration.ghosts.isEmpty = true then layout.leadingRow
+                  else layout.leadingRow ++ NRow.ofList ghostTys) = true := by
+              refine withGhosts _ ?_
+              simp only [Validation.OwnerLayout.leadingRow, NRow.supported_ofList,
+                List.all_append, List.all_cons, List.all_nil, NTy.supported, Bool.and_true,
+                Bool.true_and]
+              repeat' split
+              all_goals first | rfl | decide
+            have entries : NRow.supported supports
+                (NRow.cons ((env.getD 0 (NTy.param 0)).table (env.getD 1 (NTy.param 1)))
+                  NRow.nil) = true := by
+              simp only [NRow.supported, NTy.supported, Bool.and_true, Bool.and_eq_true]
+              exact ⟨NRow.supported_getD supports env held 0 (NTy.param 0) rfl,
+                NRow.supported_getD supports env held 1 (NTy.param 1) rfl⟩
+            have joined : NRow.supported supports
+                (NRow.append
+                  (if declaration.ghosts.isEmpty = true then layout.leadingRow
+                    else layout.leadingRow ++ NRow.ofList ghostTys)
+                  (NRow.cons ((env.getD 0 (NTy.param 0)).table (env.getD 1 (NTy.param 1)))
+                    NRow.nil)) = true := by
+              simp only [NRow.supported_append, leading, entries, Bool.and_self]
+            simp only [NTy.supported, arguments, Bool.true_and]
+            exact joined
+          | none =>
+            rw [layoutFound] at read
+            dsimp only at read
+            by_cases variantsEmpty : declaration.variants.isEmpty = true
+            · rw [if_pos variantsEmpty] at read
+              simp only [option_map_eq_some, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
+              obtain ⟨fields, ⟨fieldTys, fieldsRead, fieldsSame⟩, same⟩ := read
+              cases fieldsSame
+              cases same
+              simp only [NTy.supported, arguments, Bool.true_and]
+              refine withGhosts _ ?_
+              simp only [NRow.supported_ofList]
+              exact mapM_supported supports _
+                (fun field σ found => element (targetNs.typeId field.type.typeId) σ found)
+                _ fieldTys fieldsRead
+            · rw [if_neg variantsEmpty] at read
+              try dsimp only at read
+              simp only [Option.bind_eq_bind, Option.bind_eq_some_iff, option_map_eq_some] at read
+              obtain ⟨names, -, read⟩ := read
+              obtain ⟨rows, ⟨rowList, rowsRead, rowsSame⟩, read⟩ := read
+              cases rowsSame
+              split at read
+              · cases read
+                simp only [NTy.supported, arguments, Bool.true_and, NRows.supported_ofList]
+                refine mapM_supported_rows supports _ ?_ _ rowList rowsRead
+                intro variant r found
+                simp only [option_map_eq_some] at found
+                obtain ⟨plain, ⟨fieldTys, fieldsRead, fieldsSame⟩, same⟩ := found
+                cases fieldsSame
+                cases same
+                refine withGhosts _ ?_
+                simp only [NRow.supported_ofList]
+                exact mapM_supported supports _
+                  (fun field σ got => element (targetNs.typeId field.type.typeId) σ got)
+                  _ fieldTys fieldsRead
+              · exact absurd read (by simp)
+termination_by fuel => fuel
+end
+
+end SupportedTables
 
 /-- The fuel that bounds the nesting of every type in a unit: two steps per
 type-table entry, since validated types are not recursive and a nominal
@@ -1851,59 +2286,259 @@ def erasures : TypedErasure carrier functions.codec.encode where
 
 end TypedFunctions
 
-/-- The values of a recursive nominal as a family holds them: each is a loan-free runtime
-value (`value`), and a runtime value is one where the family types it (`ofValue?`). -/
-structure TypedNominals (carrier : Type) where
-  value : carrier → RuntimeValue
-  ofValue? : RuntimeValue → Option carrier
-  ofValue?_value : ∀ held, ofValue? (value held) = some held
-  value_of_ofValue? : ∀ raw held, ofValue? raw = some held → value held = raw
-  plain : ∀ held, Plain (value held)
+/-- The decidable equality of a codec's natives: equality of their encodings,
+on which a codec is injective. -/
+def Codec.decEq (codec : Codec Native RuntimeValue) : DecidableEq Native := fun left right =>
+  decidable_of_iff (codec.encode left = codec.encode right)
+    ⟨fun same => codec.encode_injective same, fun same => same ▸ rfl⟩
 
-namespace TypedNominals
-variable {carrier : Type} (nominals : TypedNominals carrier)
-
-theorem value_injective {left right : carrier} (same : nominals.value left = nominals.value right) :
-    left = right := by
-  have read := nominals.ofValue?_value left
-  rw [same, nominals.ofValue?_value right] at read
-  exact (Option.some.inj read).symm
-
-def decEq : DecidableEq carrier := fun left right =>
-  decidable_of_iff (nominals.value left = nominals.value right)
-    ⟨nominals.value_injective, fun same => same ▸ rfl⟩
-
-def codec : Codec carrier RuntimeValue where
-  encode := nominals.value
-  decode? := nominals.ofValue?
-  decode_encode := nominals.ofValue?_value
-
-theorem tight : nominals.codec.Tight := nominals.value_of_ofValue?
-
-/-- The order of a nominal's values: their encodings'. -/
-def order (rank : ValueRanks) (left right : carrier) : Ordering :=
-  RuntimeValue.order rank (nominals.value left) (nominals.value right)
-
-def orders : TypedOrder carrier nominals.codec.encode where
-  order := nominals.order
+/-- The order of a codec's natives: the runtime order of their encodings. -/
+def Codec.orders (codec : Codec Native RuntimeValue) : TypedOrder Native codec.encode where
+  order := fun rank left right => RuntimeValue.order rank (codec.encode left) (codec.encode right)
   order_encode := fun _ _ _ => rfl
 
-def erasures : TypedErasure carrier nominals.codec.encode where
-  same := fun left right => decide ((nominals.value left).eraseGhosts = (nominals.value right).eraseGhosts)
+/-- The ghost-insensitive equality of a codec's natives: their encodings'. -/
+def Codec.erasures (codec : Codec Native RuntimeValue) : TypedErasure Native codec.encode where
+  same := fun left right =>
+    decide ((codec.encode left).eraseGhosts = (codec.encode right).eraseGhosts)
   same_eq := fun _ _ => rfl
 
 /-- The one value of a proposition that holds, encoded as `.unit`. -/
-@[reducible] def proof (held : Prop) [Decidable held] : TypedNominals (PLift held) where
-  value := fun _ => .unit
-  ofValue? := fun raw => match raw with
+@[reducible] def Codec.proof (held : Prop) [Decidable held] : Codec (PLift held) RuntimeValue where
+  encode := fun _ => .unit
+  decode? := fun raw => match raw with
     | .unit => if proved : held then some ⟨proved⟩ else none
     | _ => none
-  ofValue?_value := fun value => by simp only [dif_pos value.down]
-  value_of_ofValue? := fun raw value decoded => by
-    cases raw <;> first | rfl | (simp at decoded)
-  plain := fun _ => .unit
+  decode_encode := fun value => by simp only [dif_pos value.down]
 
-end TypedNominals
+/-- A tight codec is determined by its encoder: its decoder answers `some`
+exactly where the encoder produces the raw value. -/
+theorem Codec.eq_of_encode : ∀ {codec other : Codec Native RuntimeValue}, codec.Tight →
+    other.Tight → (∀ value, codec.encode value = other.encode value) → codec = other
+  | ⟨encode, decode?, sound⟩, ⟨encode', decode?', sound'⟩, tight, tightOther, same => by
+      have heads : encode = encode' := funext same
+      subst heads
+      have decoders : decode? = decode?' := by
+        funext raw
+        cases left : decode? raw with
+        | none =>
+            cases right : decode?' raw with
+            | none => rfl
+            | some value =>
+                have encoded : encode value = raw := tightOther raw value right
+                have decoded : decode? raw = some value := by rw [← encoded]; exact sound value
+                rw [left] at decoded
+                simp at decoded
+        | some value =>
+            have encoded : encode value = raw := tight raw value left
+            rw [← encoded, sound' value]
+      subst decoders
+      rfl
+
+/-- Two tight codecs of two equal native types that encode alike are the
+same codec. -/
+theorem Codec.heq_of_encode {Left Right : Type} (same : Left = Right)
+    {codec : Codec Left RuntimeValue} {other : Codec Right RuntimeValue}
+    (tight : codec.Tight) (tightOther : other.Tight)
+    (encodes : ∀ (left : Left) (right : Right), HEq left right →
+      codec.encode left = other.encode right) : HEq codec other := by
+  subst same
+  exact heq_of_eq (Codec.eq_of_encode tight tightOther fun value => encodes value value HEq.rfl)
+
+theorem Codec.proof_tight (held : Prop) [Decidable held] : (Codec.proof held).Tight := by
+  intro raw value decoded
+  cases raw <;> first | rfl | (simp at decoded)
+
+theorem Codec.proof_plain (held : Prop) [Decidable held] (value : PLift held) :
+    Plain ((Codec.proof held).encode value) := .unit
+
+/-- The codecs of a declaration's type arguments, one per plain argument type:
+the dictionary a nominal's codec reads (`PlainFamily.nominalCodec`). -/
+def SortCodecs : List Type → Type
+  | [] => Unit
+  | sort :: rest => Codec sort RuntimeValue × SortCodecs rest
+
+/-- Every argument's codec is tight. -/
+def SortCodecs.Tight : {sorts : List Type} → SortCodecs sorts → Prop
+  | [], _ => True
+  | _ :: _, codecs => codecs.1.Tight ∧ SortCodecs.Tight codecs.2
+
+/-- Every argument's encodings are loan-free. -/
+def SortCodecs.Plain : {sorts : List Type} → SortCodecs sorts → Prop
+  | [], _ => True
+  | _ :: _, codecs =>
+      (∀ value, SemanticOperations.Plain (codecs.1.encode value)) ∧ SortCodecs.Plain codecs.2
+
+/-- A value of each plain argument type: the dictionary a nominal's inhabitant
+reads (`NominalFunctor.nominalInhabitant`). -/
+def SortValues : List Type → Type
+  | [] => Unit
+  | sort :: rest => sort × SortValues rest
+
+/-- A predicate of each plain argument type: the invariants the arguments'
+values satisfy, which a nominal's own reads (`NominalFunctor.nominalHolds`). -/
+def SortHolds : List Type → Type
+  | [] => Unit
+  | sort :: rest => (sort → Prop) × SortHolds rest
+
+/-- Every argument's invariants hold of every value. -/
+def SortHolds.All : {sorts : List Type} → SortHolds sorts → Prop
+  | [], _ => True
+  | _ :: _, holds => (∀ value, holds.1 value) ∧ SortHolds.All holds.2
+
+/-- An encoder of each plain argument type, which a nominal's encoder reads
+(`NominalFunctor.nominalEncode`). -/
+def SortEncoders : List Type → Type
+  | [] => Unit
+  | sort :: rest => (sort → RuntimeValue) × SortEncoders rest
+
+/-- A decoder of each plain argument type, which a nominal's decoder reads
+(`NominalFunctor.nominalDecode?`). -/
+def SortDecoders : List Type → Type
+  | [] => Unit
+  | sort :: rest => (RuntimeValue → Option sort) × SortDecoders rest
+
+/-- The encoders of a dictionary of codecs. -/
+def SortCodecs.encoders : {sorts : List Type} → SortCodecs sorts → SortEncoders sorts
+  | [], _ => ()
+  | _ :: _, codecs => (codecs.1.encode, SortCodecs.encoders codecs.2)
+
+/-- The decoders of a dictionary of codecs. -/
+def SortCodecs.decoders : {sorts : List Type} → SortCodecs sorts → SortDecoders sorts
+  | [], _ => ()
+  | _ :: _, codecs => (codecs.1.decode?, SortCodecs.decoders codecs.2)
+
+/-- Every argument's decoder inverts its encoder. -/
+def SortDecoders.Inverts : {sorts : List Type} → SortEncoders sorts → SortDecoders sorts → Prop
+  | [], _, _ => True
+  | _ :: _, encoders, decoders =>
+      (∀ value, decoders.1 (encoders.1 value) = some value) ∧
+        SortDecoders.Inverts encoders.2 decoders.2
+
+/-- Every argument's decoder answers only where its encoder produced the raw
+value, as a tight codec does. -/
+def SortDecoders.Tight : {sorts : List Type} → SortEncoders sorts → SortDecoders sorts → Prop
+  | [], _, _ => True
+  | _ :: _, encoders, decoders =>
+      (∀ raw value, decoders.1 raw = some value → encoders.1 value = raw) ∧
+        SortDecoders.Tight encoders.2 decoders.2
+
+/-- Every argument's encodings are loan-free. -/
+def SortEncoders.Plain : {sorts : List Type} → SortEncoders sorts → Prop
+  | [], _ => True
+  | _ :: _, encoders =>
+      (∀ value, SemanticOperations.Plain (encoders.1 value)) ∧ SortEncoders.Plain encoders.2
+
+/-- Every argument's decoder inverts its encoder below a bound: what a value
+inside a nominal needs, its encoding being strictly inside the nominal's. -/
+def SortDecoders.InvertsBelow (bound : Nat) :
+    {sorts : List Type} → SortEncoders sorts → SortDecoders sorts → Prop
+  | [], _, _ => True
+  | _ :: _, encoders, decoders =>
+      (∀ value, sizeOf (encoders.1 value) < bound → decoders.1 (encoders.1 value) = some value) ∧
+        SortDecoders.InvertsBelow bound encoders.2 decoders.2
+
+/-- Two dictionaries of decoders, of any two argument lists, agree below a
+bound on whether they decode. -/
+def SortDecoders.SomeAgreeBelow (bound : Nat) :
+    {sorts sorts' : List Type} → SortDecoders sorts → SortDecoders sorts' → Prop
+  | [], [], _, _ => True
+  | _ :: _, _ :: _, decoders, others =>
+      (∀ raw, sizeOf raw < bound → (decoders.1 raw).isSome = (others.1 raw).isSome) ∧
+        SortDecoders.SomeAgreeBelow bound decoders.2 others.2
+  | _, _, _, _ => False
+
+/-- Two dictionaries of decoders agree below a bound. -/
+def SortDecoders.AgreeBelow (bound : Nat) :
+    {sorts : List Type} → SortDecoders sorts → SortDecoders sorts → Prop
+  | [], _, _ => True
+  | _ :: _, decoders, others =>
+      (∀ raw, sizeOf raw < bound → decoders.1 raw = others.1 raw) ∧
+        SortDecoders.AgreeBelow bound decoders.2 others.2
+
+/-- Every argument's decoder answers only where its encoder produced the raw
+value, below a bound. -/
+def SortDecoders.TightBelow (bound : Nat) :
+    {sorts : List Type} → SortEncoders sorts → SortDecoders sorts → Prop
+  | [], _, _ => True
+  | _ :: _, encoders, decoders =>
+      (∀ raw value, sizeOf raw < bound → decoders.1 raw = some value → encoders.1 value = raw) ∧
+        SortDecoders.TightBelow bound encoders.2 decoders.2
+
+/-- An unconditional inversion holds below every bound. -/
+theorem SortDecoders.invertsBelow (bound : Nat) : {sorts : List Type} →
+    (encoders : SortEncoders sorts) → (decoders : SortDecoders sorts) →
+    SortDecoders.Inverts encoders decoders →
+    SortDecoders.InvertsBelow bound encoders decoders
+  | [], _, _, _ => trivial
+  | _ :: _, encoders, decoders, inverts =>
+      ⟨fun value _ => inverts.1 value,
+        SortDecoders.invertsBelow bound encoders.2 decoders.2 inverts.2⟩
+
+/-- An unconditional tightness holds below every bound. -/
+theorem SortDecoders.tightBelow (bound : Nat) : {sorts : List Type} →
+    (encoders : SortEncoders sorts) → (decoders : SortDecoders sorts) →
+    SortDecoders.Tight encoders decoders → SortDecoders.TightBelow bound encoders decoders
+  | [], _, _, _ => trivial
+  | _ :: _, encoders, decoders, tight =>
+      ⟨fun raw value _ => tight.1 raw value,
+        SortDecoders.tightBelow bound encoders.2 decoders.2 tight.2⟩
+
+/-- A dictionary of codecs inverts. -/
+theorem SortCodecs.inverts : {sorts : List Type} → (codecs : SortCodecs sorts) →
+    SortDecoders.Inverts codecs.encoders codecs.decoders
+  | [], _ => trivial
+  | _ :: _, codecs => ⟨codecs.1.decode_encode, SortCodecs.inverts codecs.2⟩
+
+/-- A tight dictionary of codecs has tight decoders. -/
+theorem SortCodecs.tight_decoders : {sorts : List Type} → (codecs : SortCodecs sorts) →
+    codecs.Tight → SortDecoders.Tight codecs.encoders codecs.decoders
+  | [], _, _ => trivial
+  | _ :: _, codecs, tight => ⟨tight.1, SortCodecs.tight_decoders codecs.2 tight.2⟩
+
+/-- A loan-free dictionary of codecs has loan-free encoders. -/
+theorem SortCodecs.plain_encoders : {sorts : List Type} → (codecs : SortCodecs sorts) →
+    codecs.Plain → SortEncoders.Plain codecs.encoders
+  | [], _, _ => trivial
+  | _ :: _, codecs, plain => ⟨plain.1, SortCodecs.plain_encoders codecs.2 plain.2⟩
+
+/-- A decidable equality of each plain argument type, which a nominal's
+equality reads (`NominalFunctor.nominalDecEq`). -/
+def SortDecEqs : List Type → Type
+  | [] => Unit
+  | sort :: rest => DecidableEq sort × SortDecEqs rest
+
+/-- An order of each plain argument type, which a nominal's order reads
+(`NominalFunctor.nominalOrder`).  The rank is fixed outside, as
+`NTy.plainOrderOf` takes it. -/
+def SortOrderings : List Type → Type
+  | [] => Unit
+  | sort :: rest => (sort → sort → Ordering) × SortOrderings rest
+
+/-- Every argument's order is the runtime order of its encodings, as
+`TypedOrder` states of one. -/
+def SortOrderings.Agrees (rank : ValueRanks) :
+    {sorts : List Type} → SortEncoders sorts → SortOrderings sorts → Prop
+  | [], _, _ => True
+  | _ :: _, encoders, orderings =>
+      (∀ left right, RuntimeValue.order rank (encoders.1 left) (encoders.1 right) =
+          orderings.1 left right) ∧
+        SortOrderings.Agrees rank encoders.2 orderings.2
+
+/-- A ghost-insensitive equality of each plain argument type, which a
+nominal's equality reads (`NominalFunctor.nominalEqual`). -/
+def SortEquals : List Type → Type
+  | [] => Unit
+  | sort :: rest => (sort → sort → Bool) × SortEquals rest
+
+/-- Every argument's equality compares the erasures of its encodings, as
+`TypedErasure` states of one. -/
+def SortEquals.Agrees : {sorts : List Type} → SortEncoders sorts → SortEquals sorts → Prop
+  | [], _, _ => True
+  | _ :: _, encoders, equals =>
+      (∀ left right, equals.1 left right =
+          decide ((encoders.1 left).eraseGhosts = (encoders.1 right).eraseGhosts)) ∧
+        SortEquals.Agrees encoders.2 equals.2
 
 
 mutual
@@ -1985,6 +2620,107 @@ structure ParamPlain (Certified : Type) (certified : Codec Certified RuntimeValu
   of_certify : ∀ value held, of (certify value held) = value
   certify_of : ∀ value, certify (of value) (holds_of value) = value
 
+/-- A family's functor for the unit's declarations: a declaration's values at
+the plain types of its type arguments, with the operations and laws over them,
+whose readings of the arguments are dictionaries (`SortCodecs`, `SortValues`,
+`SortHolds`).  A family names the functor and does not spell its operations: it
+holds one field of this type, so that the family's constructor literal, which a
+reduction of any term over it exposes, carries one argument for the nominal
+layer rather than one per operation and law. -/
+structure NominalFunctor where
+  nominal : StructHandle → Bool → List Type → Type
+  nominalEncode : (source : StructHandle) → (productive : Bool) → (sorts : List Type) →
+    SortEncoders sorts → nominal source productive sorts → RuntimeValue
+  nominalDecode? : (source : StructHandle) → (productive : Bool) → (sorts : List Type) →
+    SortDecoders sorts → RuntimeValue → Option (nominal source productive sorts)
+  /-- Decoding inverts encoding where the arguments' does below the value's
+  own encoding, inside which an argument's is. -/
+  nominalDecode_encode : ∀ source productive sorts encoders decoders value,
+    SortDecoders.InvertsBelow
+        (sizeOf (nominalEncode source productive sorts encoders value)) encoders decoders →
+      nominalDecode? source productive sorts decoders
+          (nominalEncode source productive sorts encoders value) = some value
+  /-- Whether a raw value decodes reads an argument's decoder only below it,
+  so decoders that agree there on deciding decode equally often, whatever the
+  argument types. -/
+  nominalDecode?_isSome_congr : ∀ source productive sorts sorts'
+      (decoders : SortDecoders sorts) (others : SortDecoders sorts') raw,
+    SortDecoders.SomeAgreeBelow (sizeOf raw) decoders others →
+      (nominalDecode? source productive sorts decoders raw).isSome =
+        (nominalDecode? source productive sorts' others raw).isSome
+  /-- Decoding reads an argument's decoder only below the raw value it is
+  given, so decoders that agree there decode alike. -/
+  nominalDecode?_congr : ∀ source productive sorts decoders others raw,
+    SortDecoders.AgreeBelow (sizeOf raw) decoders others →
+      nominalDecode? source productive sorts decoders raw =
+        nominalDecode? source productive sorts others raw
+  /-- Decoding answers only where encoding produced the raw value, where the
+  arguments' decoders do below it. -/
+  nominalEncode_of_decode? : ∀ source productive sorts encoders decoders raw value,
+    SortDecoders.TightBelow (sizeOf raw) encoders decoders →
+      nominalDecode? source productive sorts decoders raw = some value →
+        nominalEncode source productive sorts encoders value = raw
+  nominalEncode_plain : ∀ source productive sorts (encoders : SortEncoders sorts),
+    SortEncoders.Plain encoders →
+    ∀ value, Plain (nominalEncode source productive sorts encoders value)
+  nominalInhabitant : (source : StructHandle) → (sorts : List Type) → SortValues sorts →
+    nominal source true sorts
+  /-- A nominal one of whose values is encoded as `.unit` has no other value,
+  which a map's default reads back (`NTy.readBack_unit`). -/
+  nominalEncode_unit : ∀ source productive sorts encoders
+      (value other : nominal source productive sorts),
+    nominalEncode source productive sorts encoders value = .unit → other = value
+  /-- The invariants of a nominal's value at the predicate family it is given:
+  its declaration's and its fields'.  An interpreter of the family it is
+  given, not a type of certificates fixed when the family was made. -/
+  nominalHolds : (own : (source : StructHandle) → (productive : Bool) → NRow →
+        (sorts : List Type) → nominal source productive sorts → Prop) →
+    (source : StructHandle) → (productive : Bool) → (arguments : NRow) → (sorts : List Type) →
+    SortHolds sorts → nominal source productive sorts → Prop
+  nominalHolds_own : ∀ own source productive arguments sorts holds value,
+    nominalHolds own source productive arguments sorts holds value →
+      own source productive arguments sorts value
+  /-- Against a predicate family that holds of everything, at argument
+  invariants that hold of everything, every value is certified. -/
+  nominalHolds_trivial : ∀ own source productive arguments sorts holds value,
+    (∀ source productive arguments sorts value, own source productive arguments sorts value) →
+    SortHolds.All holds →
+      nominalHolds own source productive arguments sorts holds value
+  /-- Certifying against a predicate family read at substituted rows is
+  certifying at the substituted row: a nested declaration's row is built from
+  the arguments elementwise, so substitution commutes with the interpreter. -/
+  nominalHolds_subst : ∀ own (θ : NRow) source productive arguments sorts holds value,
+    nominalHolds (fun source productive row sorts value =>
+          own source productive (NRow.subst θ row) sorts value)
+        source productive arguments sorts holds value =
+      nominalHolds own source productive (NRow.subst θ arguments) sorts holds value
+  /-- The equality of a nominal's values, on the native values. -/
+  nominalDecEq : ∀ source productive sorts, SortDecEqs sorts →
+    DecidableEq (nominal source productive sorts)
+  /-- The order of a nominal's values, on the native values. -/
+  nominalOrder : (rank : ValueRanks) → (source : StructHandle) → (productive : Bool) →
+    (sorts : List Type) → SortOrderings sorts → nominal source productive sorts →
+    nominal source productive sorts → Ordering
+  /-- The order agrees with the runtime order of the encodings, as
+  `NTy.plainOrder_codec` states of a struct. -/
+  nominalOrder_encode : ∀ rank source productive sorts (encoders : SortEncoders sorts) orderings,
+    SortOrderings.Agrees rank encoders orderings → ∀ left right,
+      RuntimeValue.order rank (nominalEncode source productive sorts encoders left)
+          (nominalEncode source productive sorts encoders right) =
+        nominalOrder rank source productive sorts orderings left right
+  /-- The ghost-insensitive equality of a nominal's values, at the flag that
+  says whether a handle-backed field compares (`NTy.plainEqual`). -/
+  nominalEqual : (handles : Bool) → (source : StructHandle) → (productive : Bool) →
+    (sorts : List Type) → SortEquals sorts → nominal source productive sorts →
+    nominal source productive sorts → Bool
+  /-- Without handles the equality compares the erasures of the encodings, as
+  `NTy.plainEqual_codec` states of a struct at that flag. -/
+  nominalEqual_encode : ∀ source productive sorts (encoders : SortEncoders sorts) equals,
+    SortEquals.Agrees encoders equals → ∀ left right,
+      nominalEqual false source productive sorts equals left right =
+        decide ((nominalEncode source productive sorts encoders left).eraseGhosts =
+          (nominalEncode source productive sorts encoders right).eraseGhosts)
+
 /-- What the lent layer of a family reads: a type parameter's lent values
 and a function type's values.  A declaration's data invariants are not part
 of it, so the lent carriers, codecs and operations of two families that
@@ -1996,13 +2732,9 @@ structure PlainFamily where
   functionCarrier : NRow → Sharing → NRow → Type
   functions : (parameters : NRow) → (shared : Sharing) → (results : NRow) →
     TypedFunctions (functionCarrier parameters shared results)
-  /-- The values of a recursive nominal, which carry no certificates of
-  their own: their typing certificate is the family's (`TypedNominals`). -/
-  nominalCarrier : StructHandle → NRow → Bool → Type
-  nominals : (source : StructHandle) → (arguments : NRow) → (productive : Bool) →
-    TypedNominals (nominalCarrier source arguments productive)
-  nominalInhabitant : ∀ source arguments, arguments.inhabitable = true →
-    nominalCarrier source arguments true
+  /-- The family's functor for the unit's declarations
+  (`NominalFunctor`): its operations are read through this field. -/
+  nominals : NominalFunctor
 
 /-- The carriers of a generic function's type parameters: per index an
 inhabited type, a tight codec whose encodings are loan-free, and decidable
@@ -2020,17 +2752,9 @@ class Carriers where
   functionCarrier : NRow → Sharing → NRow → Type
   functions : (parameters : NRow) → (shared : Sharing) → (results : NRow) →
     TypedFunctions (functionCarrier parameters shared results)
-  /-- The values of a recursive nominal at its type arguments and productivity flag, a value
-  wherever the flag says productive and the arguments are inhabitable (`NTy.inhabitable`). -/
-  nominalCarrier : StructHandle → NRow → Bool → Type
-  nominals : (source : StructHandle) → (arguments : NRow) → (productive : Bool) →
-    TypedNominals (nominalCarrier source arguments productive)
-  nominalInhabitant : (source : StructHandle) → (arguments : NRow) →
-    arguments.inhabitable = true → nominalCarrier source arguments true
-  /-- A nominal's value encoded as `.unit` is its inhabitant, which a map's default reads. -/
-  nominalInhabitant_unit : ∀ source arguments held (value : nominalCarrier source arguments true),
-    (nominals source arguments true).value value = .unit →
-      value = nominalInhabitant source arguments held
+  /-- The family's functor for the unit's declarations
+  (`NominalFunctor`): its operations are read through this field. -/
+  nominals : NominalFunctor
   /-- The typed values of a type parameter's values, as a specification
   holds them in a map: an integer argument's by their values, any other
   argument's as they are (`NTy.read`). -/
@@ -2065,15 +2789,54 @@ class Carriers where
   of its plain row by it (`NTy.carrier`,
   `doc/designs/data-invariants.md`). -/
   own : StructHandle → NRow → RuntimeValue → Prop := fun _ _ _ => True
+  /-- The data invariant a declaration states of its native values, at its
+  type arguments; `True` for a declaration without one. -/
+  nominalOwn : (source : StructHandle) → (productive : Bool) → (arguments : NRow) →
+    (sorts : List Type) → nominals.nominal source productive sorts → Prop := fun _ _ _ _ _ => True
 
 /-- The lent layer of a family (`PlainFamily`). -/
 @[reducible] def Carriers.toPlain [Θ : Carriers] : PlainFamily where
   lent := fun index => (Carriers.lent index).toParamLent
   functionCarrier := Carriers.functionCarrier
   functions := Carriers.functions
-  nominalCarrier := Carriers.nominalCarrier
   nominals := Carriers.nominals
-  nominalInhabitant := Carriers.nominalInhabitant
+
+/-- The codec of a nominal's values at a dictionary of the arguments' codecs:
+the functor's encoder and decoder, which invert where the arguments' do. -/
+def PlainFamily.nominalCodec (F : PlainFamily) (source : StructHandle) (productive : Bool)
+    (sorts : List Type) (codecs : SortCodecs sorts) :
+    Codec (F.nominals.nominal source productive sorts) RuntimeValue where
+  encode := F.nominals.nominalEncode source productive sorts codecs.encoders
+  decode? := F.nominals.nominalDecode? source productive sorts codecs.decoders
+  decode_encode := fun value =>
+    F.nominals.nominalDecode_encode source productive sorts codecs.encoders codecs.decoders value
+      (SortDecoders.invertsBelow _ codecs.encoders codecs.decoders codecs.inverts)
+
+/-- A nominal's codec is tight where the arguments' are. -/
+theorem Carriers.nominalCodec_tight [Carriers] (source : StructHandle) (productive : Bool)
+    (sorts : List Type) (codecs : SortCodecs sorts) (tight : codecs.Tight) :
+    (Carriers.toPlain.nominalCodec source productive sorts codecs).Tight :=
+  fun raw value decoded =>
+    Carriers.nominals.nominalEncode_of_decode? source productive sorts codecs.encoders codecs.decoders raw
+      value
+      (SortDecoders.tightBelow _ codecs.encoders codecs.decoders (codecs.tight_decoders tight))
+      decoded
+
+/-- A nominal's encodings are loan-free where the arguments' are. -/
+theorem Carriers.nominalCodec_plain [Carriers] (source : StructHandle) (productive : Bool)
+    (sorts : List Type) (codecs : SortCodecs sorts) (plain : codecs.Plain)
+    (value : Carriers.nominals.nominal source productive sorts) :
+    Plain ((Carriers.toPlain.nominalCodec source productive sorts codecs).encode value) :=
+  Carriers.nominals.nominalEncode_plain source productive sorts codecs.encoders
+    (codecs.plain_encoders plain) value
+
+/-- A nominal one of whose values encodes as `.unit` has no other value. -/
+theorem Carriers.nominalCodec_unit [Carriers] (source : StructHandle) (productive : Bool)
+    (sorts : List Type) (codecs : SortCodecs sorts)
+    (value other : Carriers.nominals.nominal source productive sorts)
+    (encoded : (Carriers.toPlain.nominalCodec source productive sorts codecs).encode value = .unit) :
+    other = value :=
+  Carriers.nominals.nominalEncode_unit source productive sorts codecs.encoders value other encoded
 
 instance [Θ : Carriers] (index : Nat) : Inhabited (Carriers.carrier index) := Θ.inhabited index
 
@@ -2098,6 +2861,37 @@ instance [Θ : Carriers] {index : Nat} {rank : ValueRanks} :
     rw [← TypedOrder.order_encode] at same
     exact (Carriers.codec index).encode_injective (RuntimeValue.eq_of_order same)
 
+/-- The one-point functor: every declaration has the single value at
+`productive = true` and none otherwise, encoded as `.unit`, and its invariant
+is its declaration's own.  The functor of a family that carries no declaration
+natively.  Not reducible: a family names it, and a reduction of the family
+stops at the name. -/
+def NominalFunctor.point : NominalFunctor where
+  nominal := fun _ productive _ => PLift (productive = true)
+  nominalEncode := fun _ _ _ _ _ => .unit
+  nominalDecode? := fun _ productive _ _ raw =>
+    match raw with
+    | .unit => if proved : productive = true then Option.some ⟨proved⟩ else Option.none
+    | _ => Option.none
+  nominalDecode_encode := fun _ _ _ _ _ value _ => by simp only [dif_pos value.down]
+  nominalDecode?_isSome_congr := fun _ _ _ _ _ _ _ _ => rfl
+  nominalDecode?_congr := fun _ _ _ _ _ _ _ => rfl
+  nominalEncode_of_decode? := fun _ productive _ _ _ raw value _ decoded => by
+    cases raw <;> first | rfl | (simp at decoded)
+  nominalEncode_plain := fun _ _ _ _ _ _ => .unit
+  nominalInhabitant := fun _ _ _ => ⟨rfl⟩
+  nominalEncode_unit := fun _ _ _ _ value other _ => by cases value; cases other; rfl
+  nominalHolds := fun own source productive arguments sorts _ value =>
+    own source productive arguments sorts value
+  nominalHolds_own := fun _ _ _ _ _ _ _ held => held
+  nominalHolds_trivial := fun _ _ _ _ _ _ value everything _ => everything _ _ _ _ value
+  nominalHolds_subst := fun _ _ _ _ _ _ _ _ => rfl
+  nominalDecEq := fun _ _ _ _ left right => isTrue (by cases left; cases right; rfl)
+  nominalOrder := fun _ _ _ _ _ _ _ => .eq
+  nominalOrder_encode := fun _ _ _ _ _ _ _ _ _ => RuntimeValue.order_unit _
+  nominalEqual := fun _ _ _ _ _ _ _ => true
+  nominalEqual_encode := fun _ _ _ _ _ _ _ _ => by simp
+
 /-- The family of literals, which never have a type parameter's or a
 function's type. -/
 @[reducible] def Carriers.ground : Carriers where
@@ -2110,11 +2904,7 @@ function's type. -/
   plain := fun _ _ => .unit
   functionCarrier := fun _ _ _ => Empty
   functions := fun _ _ _ => TypedFunctions.empty
-  nominalCarrier := fun _ arguments productive =>
-    PLift (productive = true ∧ arguments.inhabitable = true)
-  nominals := fun _ _ _ => TypedNominals.proof _
-  nominalInhabitant := fun _ _ held => ⟨rfl, held⟩
-  nominalInhabitant_unit := fun _ _ _ _ _ => rfl
+  nominals := NominalFunctor.point
   reads := fun _ => TypedReads.unit
   orders := fun _ => TypedOrder.unit
   erasures := fun _ => TypedErasure.unit
@@ -2143,6 +2933,81 @@ structure RuntimeFunction (unit : Validation.ValidatedUnit) (parameters : NRow)
     · cases decoded; rfl
     · cases decoded
 
+/-- Each of a declaration's type arguments is carried at an encoder whose
+encodings below a bound are ones the unit types at that argument's type. -/
+def SortEncoders.AdmitsBelow (unit : Validation.ValidatedUnit) (bound : Nat) :
+    (arguments : NRow) → {sorts : List Type} → SortEncoders sorts → Prop
+  | .nil, [], _ => True
+  | .cons τ rest, _ :: _, encoders =>
+      (∀ value, sizeOf (encoders.1 value) < bound →
+          NTy.admits unit τ (encoders.1 value) = true) ∧
+        SortEncoders.AdmitsBelow unit bound rest encoders.2
+  | _, _, _ => False
+
+/-- Each of a declaration's type arguments is carried at a codec whose
+encodings are ones the unit types at that argument's type. -/
+def SortCodecs.Admits (unit : Validation.ValidatedUnit) :
+    (arguments : NRow) → {sorts : List Type} → SortCodecs sorts → Prop
+  | .nil, [], _ => True
+  | .cons τ rest, _ :: _, codecs =>
+      (∀ value, NTy.admits unit τ (codecs.1.encode value) = true) ∧
+        SortCodecs.Admits unit rest codecs.2
+  | _, _, _ => False
+
+/-- An unconditional admission of a dictionary of codecs holds below every
+bound, of its encoders. -/
+theorem SortCodecs.admitsBelow (unit : Validation.ValidatedUnit) (bound : Nat) :
+    (arguments : NRow) → {sorts : List Type} → (codecs : SortCodecs sorts) →
+    SortCodecs.Admits unit arguments codecs →
+    SortEncoders.AdmitsBelow unit bound arguments codecs.encoders
+  | .nil, [], _, _ => trivial
+  | .cons _ rest, _ :: _, codecs, admits =>
+      ⟨fun value _ => admits.1 value, SortCodecs.admitsBelow unit bound rest codecs.2 admits.2⟩
+  | .nil, _ :: _, _, admits => admits.elim
+  | .cons _ _, [], _, admits => admits.elim
+
+/-- A unit's nominal values: a carrier per declaration at the plain types of
+its type arguments with its operations (`PlainFamily`), the declarations the
+instance carries natively, and the admission law of those.  One instance per
+unit, declared where the unit is registered: the runtime family reads it as
+it reads `FunctionCarriers`. -/
+class NominalCarriers (unit : Validation.ValidatedUnit) extends NominalFunctor where
+  /-- The data invariants of the unit's declarations, of a native value at its
+  type arguments (`Carriers.nominalOwn`); `True` for a declaration without
+  one. -/
+  nominalOwn : (source : StructHandle) → (productive : Bool) → (arguments : NRow) →
+    (sorts : List Type) → nominal source productive sorts → Prop := fun _ _ _ _ _ => True
+  /-- The declarations, at their productivity flag, whose values this instance
+  carries natively. -/
+  supports : StructHandle → Bool → Bool
+  /-- Every nominal in a type the unit's tables denote, at supported type
+  arguments, is one this instance supports. -/
+  covers : ∀ env fuel namespaceId typeId τ, NRow.supported supports env = true →
+    ntyOfFuel (unitTypes unit) unit env fuel namespaceId typeId = some τ →
+      NTy.supported supports τ = true
+  /-- A value's encoding is one the unit types at the nominal, where the
+  arguments' encodings are typed at the argument row. -/
+  admits : ∀ source productive arguments sorts (encoders : SortEncoders sorts) value,
+    supports source productive = true →
+    SortEncoders.AdmitsBelow unit
+        (sizeOf (nominalEncode source productive sorts encoders value)) arguments encoders →
+      NTy.admits unit (NTy.nominal source arguments productive)
+        (nominalEncode source productive sorts encoders value) = true
+
+/-- The instance of a unit that supports no declaration: the one point at
+`productive = true`, encoded as `.unit`, whose invariants are its
+declaration's of `.unit`.  A definition, not an instance: a unit's instance is
+declared with the unit.  Not reducible: a term names it, and a reduction of
+the unit's carriers stops at the name. -/
+def NominalCarriers.none (unit : Validation.ValidatedUnit) :
+    NominalCarriers unit where
+  toNominalFunctor := NominalFunctor.point
+  supports := fun _ _ => false
+  covers := fun env fuel namespaceId typeId τ held read =>
+    supported_ntyOfFuel (fun _ _ => false) (unitTypes unit) unit fuel env held namespaceId typeId
+      τ read
+  admits := fun _ _ _ _ _ _ supported _ => absurd supported (by simp)
+
 /-- A unit's function values: a carrier per function type and its interface
 (`TypedFunctions`). One instance per unit, declared where the unit is
 registered: the runtime family and storage hold these values. -/
@@ -2162,6 +3027,16 @@ class FunctionCarriers (unit : Validation.ValidatedUnit) where
   at the given type arguments (`Carriers.own`); `True` for a declaration
   without one. -/
   own : StructHandle → NRow → RuntimeValue → Prop := fun _ _ _ => True
+  /-- The unit's nominal values (`NominalCarriers`): the carriers of the
+  declarations this instance's unit carries natively. The two are declared
+  together, one pair per unit, so they are one parameter of every term that
+  reads the unit's carriers. -/
+  nominals : NominalCarriers unit := NominalCarriers.none unit
+
+/-- A unit's nominal values are the ones its function values carry, so a term
+that binds `FunctionCarriers unit` finds them without a second instance. -/
+instance FunctionCarriers.toNominals {unit : Validation.ValidatedUnit}
+    [functions : FunctionCarriers unit] : NominalCarriers unit := functions.nominals
 
 /-- The library's function values, the closures the unit types
 (`RuntimeFunction`): the instance of a unit without generated function
@@ -2174,17 +3049,11 @@ the unit. -/
   decodes := fun _ _ _ _ typed => by
     simp only [RuntimeFunction.functions, dif_pos typed, Option.isSome_some]
 
-/-- A value of a recursive nominal at the runtime family: a runtime value the unit types at
-the nominal. A type of its own, so that no verification condition unfolds it to its encoding. -/
-structure RuntimeNominal (unit : Validation.ValidatedUnit) (source : StructHandle)
-    (arguments : NRow) (productive : Bool) where
-  value : RuntimeValue
-  typed : NTy.admits unit (.nominal source arguments productive) value = true
 
 /-- What a recursive nominal admits holds no loan. -/
 theorem NTy.plain_of_admits_nominal {unit : Validation.ValidatedUnit} {source : StructHandle}
     {arguments : NRow} {productive : Bool} {value : RuntimeValue}
-    (admitted : NTy.admits unit (.nominal source arguments productive) value = true) :
+    (admitted : NTy.admits unit (NTy.nominal source arguments productive) value = true) :
     Plain value := by
   have point : productive = true ∧ value = witnessOrUnit unit source arguments →
       Plain value := fun held => held.2 ▸ witnessOrUnit_plain unit source arguments
@@ -2196,21 +3065,97 @@ theorem NTy.plain_of_admits_nominal {unit : Validation.ValidatedUnit} {source : 
        · exact (plain?_iff _).mp admitted.1.1
        · exact point admitted)
 
-/-- The runtime family's values of a recursive nominal: the values the unit types. -/
-@[reducible] def RuntimeNominal.nominals (unit : Validation.ValidatedUnit) (source : StructHandle)
-    (arguments : NRow) (productive : Bool) :
-    TypedNominals (RuntimeNominal unit source arguments productive) where
-  value := RuntimeNominal.value
-  ofValue? := fun raw =>
-    if typed : NTy.admits unit (.nominal source arguments productive) raw = true then
-      some ⟨raw, typed⟩
-    else none
-  ofValue?_value := fun value => by simp only [dif_pos value.typed]
-  value_of_ofValue? := fun raw value decoded => by
-    split at decoded
-    · cases decoded; rfl
-    · cases decoded
-  plain := fun value => NTy.plain_of_admits_nominal value.typed
+section SupportedClosures
+variable (unit : Validation.ValidatedUnit) [NominalCarriers unit]
+
+/-- A type the unit's tables denote at no type arguments is supported. -/
+theorem NTy.supported_ntyOf (namespaceId : NamespaceId) (typeId : TypeId) (τ : NTy)
+    (read : ntyOf unit namespaceId typeId = some τ) :
+    NTy.supported (NominalCarriers.supports unit) τ = true :=
+  NominalCarriers.covers .nil (typeFuel unit) namespaceId typeId τ rfl read
+
+/-- A closure target's parameter and result types are supported. -/
+theorem supported_closureSignature? (function : FunctionHandle) :
+    ∀ parameters results, closureSignature? unit function = some (parameters, results) →
+    parameters.all (NTy.supported (NominalCarriers.supports unit)) = true ∧
+      results.all (NTy.supported (NominalCarriers.supports unit)) = true := by
+  intro parameters results read
+  simp only [closureSignature?, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
+  obtain ⟨targetNs, -, declaration, -, parameterTys, parametersRead, resultTys, resultsRead,
+    read⟩ := read
+  simp only [guard, Option.bind_eq_bind, Option.bind_eq_some_iff, Option.some.injEq,
+    Prod.mk.injEq] at read
+  refine ⟨?_, ?_⟩
+  · have same : parameterTys = parameters := by
+      split at read <;> simp_all
+    exact same ▸ mapM_supported (NominalCarriers.supports unit) _
+      (fun parameter σ got => NTy.supported_ntyOf unit _ _ σ got) _ parameterTys parametersRead
+  · have same : resultTys = results := by
+      split at read <;> simp_all
+    exact same ▸ mapM_supported (NominalCarriers.supports unit) _
+      (fun result σ got => NTy.supported_ntyOf unit _ _ σ got) _ resultTys resultsRead
+
+
+/-- A closure's captured, supplied and result rows are supported. -/
+theorem supported_closureRows? (function : FunctionHandle) (mask : Nat) :
+    ∀ captured supplied results,
+    closureRows? unit function mask = some (captured, supplied, results) →
+    NRow.supported (NominalCarriers.supports unit) captured = true ∧
+      NRow.supported (NominalCarriers.supports unit) supplied = true ∧
+        NRow.supported (NominalCarriers.supports unit) results = true := by
+  intro captured supplied results read
+  simp only [closureRows?, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
+  obtain ⟨⟨parameterTys, resultTys⟩, signature, read⟩ := read
+  obtain ⟨parametersHeld, resultsHeld⟩ :=
+    supported_closureSignature? unit function parameterTys resultTys signature
+  simp only [guard, Option.bind_eq_bind, Option.bind_eq_some_iff, Option.some.injEq,
+    Prod.mk.injEq] at read
+  have shapes : captured = NRow.ofList (ClosureMask.extract mask true parameterTys) ∧
+      supplied = NRow.ofList (ClosureMask.extract mask false parameterTys) ∧
+        results = NRow.ofList resultTys := by
+    split at read <;> split at read <;> simp_all
+  obtain ⟨rfl, rfl, rfl⟩ := shapes
+  simp only [NRow.supported_ofList]
+  exact ⟨supported_extract (NominalCarriers.supports unit) mask true parameterTys parametersHeld,
+    supported_extract (NominalCarriers.supports unit) mask false parameterTys parametersHeld,
+    resultsHeld⟩
+
+/-- A closure target's type arguments, as its creation site instantiates them,
+are supported. -/
+theorem NTy.supported_closureArgument (function : FunctionHandle)
+    (typeInstantiation : Array (TypeId × TypeId)) (index : Nat) :
+    NTy.supported (NominalCarriers.supports unit)
+      (closureArgument unit function typeInstantiation index) = true := by
+  simp only [closureArgument]
+  cases nodeFound : paramNodeIn? unit function.namespaceId index with
+  | none => simp only [nodeFound]; rfl
+  | some node =>
+      simp only [nodeFound]
+      cases read : ntyOf unit function.namespaceId
+          (instantiatedTypeId typeInstantiation node) with
+      | none => simp only [read, Option.getD_none]; rfl
+      | some σ =>
+          simp only [read, Option.getD_some]
+          exact NTy.supported_ntyOf unit _ _ σ read
+
+/-- The captured row a typed site names is supported: its types come from the
+unit's own tables, at type arguments that do (`NominalCarriers.covers`). -/
+theorem NRow.supported_closureRowsIn?_captured {function : FunctionHandle} {mask : Nat}
+    {typeInstantiation : Array (TypeId × TypeId)} {captured supplied results : NRow}
+    (read : closureRowsIn? unit function mask typeInstantiation =
+      some (captured, supplied, results)) :
+    NRow.supported (NominalCarriers.supports unit) captured = true := by
+  simp only [closureRowsIn?, Option.map_eq_some_iff] at read
+  obtain ⟨⟨rawCaptured, rawSupplied, rawResults⟩, rows, same⟩ := read
+  obtain ⟨capturedHeld, -, -⟩ :=
+    supported_closureRows? unit function mask rawCaptured rawSupplied rawResults rows
+  simp only [Prod.mk.injEq] at same
+  obtain ⟨rfl, -, -⟩ := same
+  exact NRow.supported_substWith (NominalCarriers.supports unit) _
+    (fun index => NTy.supported_closureArgument unit function typeInstantiation index)
+    rawCaptured capturedHeld
+
+end SupportedClosures
 
 /-- A nominal flagged productive admits its witness. -/
 theorem NTy.admits_witnessOrUnit (unit : Validation.ValidatedUnit) (source : StructHandle)
@@ -2246,18 +3191,8 @@ loan-free runtime value, and the unit's function values. -/
   plain := fun _ value => value.property
   functionCarrier := FunctionCarriers.carrier unit
   functions := FunctionCarriers.functions
-  nominalCarrier := RuntimeNominal unit
-  nominals := RuntimeNominal.nominals unit
-  nominalInhabitant := fun source arguments _ =>
-    ⟨witnessOrUnit unit source arguments, NTy.admits_witnessOrUnit unit source arguments⟩
-  nominalInhabitant_unit := fun source arguments _ value encoded => by
-    obtain ⟨raw, typed⟩ := value
-    cases (show raw = .unit from encoded)
-    exact congrArg (fun held => RuntimeNominal.mk (unit := unit) (source := source)
-      (arguments := arguments) (productive := true) held.1 held.2)
-      (Subtype.ext (NTy.witnessOrUnit_of_admits_unit typed).symm :
-        (⟨.unit, typed⟩ : { value // NTy.admits unit (.nominal source arguments true) value = true }) =
-          ⟨witnessOrUnit unit source arguments, NTy.admits_witnessOrUnit unit source arguments⟩)
+  nominals := NominalCarriers.toNominalFunctor unit
+  nominalOwn := NominalCarriers.nominalOwn
   reads := fun _ => PlainValue.reads
   orders := fun _ => PlainValue.orders
   erasures := fun _ => PlainValue.erasures
@@ -2407,13 +3342,20 @@ stated over, and the current of a mutable reference
   | .ref referent => NTy.plainOf F referent × NTy.plainOf F referent
   | .param index => (F.lent index).carrier
   | .function parameters shared results => F.functionCarrier parameters shared results
-  | .nominal source arguments productive => F.nominalCarrier source arguments productive
+  | .nominal source arguments productive =>
+      F.nominals.nominal source productive (NRow.plainSortsOf F arguments)
   | .observed referent => NTy.plainOf F referent
 
 /-- A plain row of values, one per type. -/
 def HListPlainOf (F : PlainFamily) : NRow → Type
   | .nil => Unit
   | .cons τ rest => NTy.plainOf F τ × HListPlainOf F rest
+
+/-- The plain types of a declaration's type arguments, which its functor
+reads (`NominalFunctor.nominal`). -/
+@[reducible] def NRow.plainSortsOf (F : PlainFamily) : NRow → List Type
+  | .nil => []
+  | .cons τ rest => NTy.plainOf F τ :: NRow.plainSortsOf F rest
 
 /-- A plain value of one of the named variants: the nested sum of their
 plain rows.
@@ -2539,7 +3481,9 @@ def NTy.plainCodecOf (F : PlainFamily) : (τ : NTy) → Codec (NTy.plainOf F τ)
   | .ref referent => Codec.prophecyPair (NTy.plainCodecOf F referent)
   | .param index => (F.lent index).codec
   | .function parameters shared results => (F.functions parameters shared results).codec
-  | .nominal source arguments productive => (F.nominals source arguments productive).codec
+  | .nominal source arguments productive =>
+      F.nominalCodec source productive (NRow.plainSortsOf F arguments)
+        (NRow.sortCodecsOf F arguments)
   | .observed referent => NTy.plainCodecOf F referent
 termination_by structural τ => τ
 
@@ -2547,6 +3491,13 @@ termination_by structural τ => τ
 def rowCodecPlainOf (F : PlainFamily) : (row : NRow) → Codec (HListPlainOf F row) (List RuntimeValue)
   | .nil => Codec.tupleNil
   | .cons τ rest => Codec.tupleCons (NTy.plainCodecOf F τ) (rowCodecPlainOf F rest)
+termination_by structural row => row
+
+/-- The codecs of a declaration's type arguments, which its functor's codec
+reads (`PlainFamily.nominalCodec`). -/
+def NRow.sortCodecsOf (F : PlainFamily) : (row : NRow) → SortCodecs (NRow.plainSortsOf F row)
+  | .nil => ()
+  | .cons τ rest => (NTy.plainCodecOf F τ, NRow.sortCodecsOf F rest)
 termination_by structural row => row
 
 def rowCodecsPlainOf (F : PlainFamily) : (rows : NRows) → RowCodecsPlainOf F rows
@@ -2627,6 +3578,10 @@ example (base : Carriers) (τ : NTy) :
     @NTy.plainCodec { base with own := fun _ _ _ => True } τ =
       @NTy.plainCodec { base with own := fun _ _ _ => False } τ := rfl
 
+example (base : Carriers) (τ : NTy) :
+    @NTy.plainCodec { base with nominalOwn := fun _ _ _ _ _ => True } τ =
+      @NTy.plainCodec { base with nominalOwn := fun _ _ _ _ _ => False } τ := rfl
+
 mutual
 /-- The data invariants a plain value satisfies, at every depth: at a
 struct or a variant, its declaration's (`Carriers.own`) of its encoding,
@@ -2660,6 +3615,9 @@ def NTy.deepHolds : (τ : NTy) → τ.plain → Prop
         (∀ final ∈ value.finalVector.values, NTy.deepHolds element final)
   | .observed referent, value => NTy.deepHolds referent value
   | .param index, value => (Carriers.lent index).holds value
+  | .nominal source arguments productive, value =>
+      Carriers.nominals.nominalHolds Carriers.nominalOwn source productive arguments
+        (NRow.plainSortsOf Carriers.toPlain arguments) (NRow.sortHolds arguments) value
   | _, _ => True
 termination_by structural τ _ => τ
 
@@ -2667,6 +3625,13 @@ def HListPlain.deepHolds : (row : NRow) → HListPlain row → Prop
   | .nil, _ => True
   | .cons τ rest, values => NTy.deepHolds τ values.1 ∧ HListPlain.deepHolds rest values.2
 termination_by structural row _ => row
+
+/-- The invariants of a declaration's type arguments, which its functor's
+own reads (`NominalFunctor.nominalHolds`). -/
+def NRow.sortHolds : (row : NRow) → SortHolds (NRow.plainSortsOf Carriers.toPlain row)
+  | .nil => ()
+  | .cons τ rest => (NTy.deepHolds τ, NRow.sortHolds rest)
+termination_by structural row => row
 
 def variantPlain.deepHolds : (names : List String) → (rows : NRows) → variantPlain names rows → Prop
   -- A declaration with no variant left has no value: the case is vacuous,
@@ -2723,7 +3688,9 @@ to a congruence closure, which no equation of the leaf relates. -/
   | .ref referent => referent.plain × referent.carrier
   | .param index => Carriers.carrier index
   | .function parameters shared results => Carriers.functionCarrier parameters shared results
-  | .nominal source arguments productive => Carriers.nominalCarrier source arguments productive
+  | .nominal source arguments productive =>
+      { value : Carriers.nominals.nominal source productive (NRow.plainSortsOf Carriers.toPlain arguments) //
+        NTy.deepHolds (NTy.nominal source arguments productive) value }
   | .observed referent => referent.carrier
 termination_by structural τ => τ
 
@@ -2874,7 +3841,9 @@ def NTy.plainDecEqOf (F : PlainFamily) : (τ : NTy) → DecidableEq (NTy.plainOf
   | .ref referent => @instDecidableEqProd _ _ (NTy.plainDecEqOf F referent) (NTy.plainDecEqOf F referent)
   | .param index => (F.lent index).decEq
   | .function parameters shared results => (F.functions parameters shared results).decEq
-  | .nominal source arguments productive => (F.nominals source arguments productive).decEq
+  | .nominal source arguments productive =>
+      F.nominals.nominalDecEq source productive (NRow.plainSortsOf F arguments)
+        (NRow.sortDecEqsOf F arguments)
   | .observed referent => NTy.plainDecEqOf F referent
 
 def HListPlainOf.decEq (F : PlainFamily) : (row : NRow) → DecidableEq (HListPlainOf F row)
@@ -2888,6 +3857,12 @@ def variantPlainOf.decEq (F : PlainFamily) : (names : List String) → (rows : N
   | [], .cons _ _ => inferInstanceAs (DecidableEq Empty)
   | _ :: names, .cons fields rest =>
       @instDecidableEqSum _ _ (HListPlainOf.decEq F fields) (variantPlainOf.decEq F names rest)
+
+/-- The equalities of a declaration's type arguments, which its functor's
+equality reads (`NominalFunctor.nominalDecEq`). -/
+def NRow.sortDecEqsOf (F : PlainFamily) : (row : NRow) → SortDecEqs (NRow.plainSortsOf F row)
+  | .nil => ()
+  | .cons τ rest => (NTy.plainDecEqOf F τ, NRow.sortDecEqsOf F rest)
 end
 
 /-- Decidable equality of plain values at a family's lent layer. -/
@@ -2931,7 +3906,8 @@ def NTy.decEq : (τ : NTy) → DecidableEq τ.carrier
   | .ref referent => @instDecidableEqProd _ _ referent.plainDecEq referent.decEq
   | .param index => Carriers.decEq index
   | .function parameters shared results => (Carriers.functions parameters shared results).decEq
-  | .nominal source arguments productive => (Carriers.nominals source arguments productive).decEq
+  | .nominal source arguments productive =>
+      @Subtype.instDecidableEq _ _ (NTy.plainDecEq (NTy.nominal source arguments productive))
   | .observed referent => referent.decEq
 
 
@@ -3054,7 +4030,9 @@ noncomputable def NTy.codec : (τ : NTy) → Codec τ.carrier RuntimeValue
   | .ref referent => Codec.pair referent.plainCodec referent.codec
   | .param index => Carriers.codec index
   | .function parameters shared results => (Carriers.functions parameters shared results).codec
-  | .nominal source arguments productive => (Carriers.nominals source arguments productive).codec
+  | .nominal source arguments productive =>
+      Codec.certified (NTy.plainCodec (NTy.nominal source arguments productive))
+        (NTy.deepHolds (NTy.nominal source arguments productive))
   | .observed referent => referent.codec
 
 /-- The codec of a row of values. -/
@@ -3171,8 +4149,8 @@ end
       ((Carriers.functions parameters shared results).closure value).encode := rfl
 @[simp] theorem NTy.encode_nominal (source : StructHandle) (arguments : NRow) (productive : Bool)
     (value : (NTy.nominal source arguments productive).carrier) :
-    NTy.encode (.nominal source arguments productive) value =
-      (Carriers.nominals source arguments productive).value value := rfl
+    NTy.encode (NTy.nominal source arguments productive) value =
+      NTy.plainEncode (NTy.nominal source arguments productive) value.val := rfl
 
 /-- The storage key a native value keys memory by: an address or a signer by
 its address, a scalar by its value, as the runtime keys storage by the
@@ -3204,7 +4182,7 @@ noncomputable def NTy.storageKey : (τ : NTy) → τ.carrier → StorageKey
   | .function parameters shared results, value =>
       (NTy.encode (.function parameters shared results) value).storageKey
   | .nominal source arguments productive, value =>
-      (NTy.encode (.nominal source arguments productive) value).storageKey
+      (NTy.encode (NTy.nominal source arguments productive) value).storageKey
   | .observed referent, value => (NTy.encode (.observed referent) value).storageKey
 
 /-- A native value keys storage as its encoding does. -/
@@ -3385,7 +4363,7 @@ def NTy.forget : (τ : NTy) → τ.carrier → τ.plain
   | .observed referent, value => NTy.forget referent value
   | .param index, value => (Carriers.lent index).of value
   | .function _ _ _, value => value
-  | .nominal _ _ _, value => value
+  | .nominal _ _ _, value => value.val
 termination_by structural τ _ => τ
 
 /-- A row of certified values as a row of lent ones. -/
@@ -3574,7 +4552,8 @@ def NTy.plainOrderOf (F : PlainFamily) (rank : ValueRanks) : (τ : NTy) →
   | .function parameters shared results, left, right =>
       (F.functions parameters shared results).order rank left right
   | .nominal source arguments productive, left, right =>
-      (F.nominals source arguments productive).order rank left right
+      F.nominals.nominalOrder rank source productive (NRow.plainSortsOf F arguments)
+        (NRow.sortOrderingsOf F rank arguments) left right
 
 /-- The lexicographic order of two rows of one row type. -/
 def HListPlainOf.order (F : PlainFamily) (rank : ValueRanks) : (row : NRow) →
@@ -3606,6 +4585,13 @@ def variantPlainOf.order (F : PlainFamily) (rank : ValueRanks) (source : StructH
             (variantPlainOf.order F rank source names rest leftLater)
             right)
         left
+
+/-- The orders of a declaration's type arguments, which its functor's order
+reads (`NominalFunctor.nominalOrder`). -/
+def NRow.sortOrderingsOf (F : PlainFamily) (rank : ValueRanks) :
+    (row : NRow) → SortOrderings (NRow.plainSortsOf F row)
+  | .nil => ()
+  | .cons τ rest => (NTy.plainOrderOf F rank τ, NRow.sortOrderingsOf F rank rest)
 end
 
 /-- The structural order of two plain values at a family's lent layer. -/
@@ -3753,7 +4739,11 @@ theorem NTy.plainOrder_codec (rank : ValueRanks) : (τ : NTy) → (left right : 
   | .function parameters shared results, left, right =>
       (Carriers.functions parameters shared results).orders.order_encode rank left right
   | .nominal source arguments productive, left, right =>
-      (Carriers.nominals source arguments productive).orders.order_encode rank left right
+      Carriers.nominals.nominalOrder_encode rank source productive
+        (NRow.plainSortsOf Carriers.toPlain arguments)
+        (NRow.sortCodecsOf Carriers.toPlain arguments).encoders
+        (NRow.sortOrderingsOf Carriers.toPlain rank arguments)
+        (NRow.sortOrderings_agree rank arguments) left right
 
 /-- Rows order as the lists of their encodings do. -/
 theorem HListPlain.order_codec (rank : ValueRanks) : (row : NRow) → (left right : HListPlain row) →
@@ -3792,6 +4782,13 @@ theorem variantPlain.order_codec (rank : ValueRanks) (source : StructHandle) :
   | _ :: names, .cons _ rest, distinct, .inr left, .inr right => by
       simp only [variantEncodePlain, variantEncodePlainOf, Sum.elim_inl, Sum.elim_inr, rowCodecsPlain, rowCodecsPlainOf, variantPlain.order, variantPlainOf.order]
       exact variantPlain.order_codec rank source names rest (List.nodup_cons.mp distinct).2 left right
+
+/-- Every argument's order is the runtime order of its encodings. -/
+theorem NRow.sortOrderings_agree (rank : ValueRanks) : (row : NRow) →
+    SortOrderings.Agrees rank (NRow.sortCodecsOf Carriers.toPlain row).encoders
+      (NRow.sortOrderingsOf Carriers.toPlain rank row)
+  | .nil => trivial
+  | .cons τ rest => ⟨NTy.plainOrder_codec rank τ, NRow.sortOrderings_agree rank rest⟩
 end
 
 /-- Native values order as their encodings do. -/
@@ -4026,7 +5023,7 @@ step of the row. -/
   | .bytes, _ => trivial
   | .char, _ => trivial
   | .function _ _ _, _ => trivial
-  | .nominal _ _ _, _ => trivial
+  | .nominal _ _ _, value => value.property
   | .param index, value => (Carriers.lent index).holds_of value
   | .ref referent, value => NTy.deepHolds_forget referent value.2
   | .observed referent, value => NTy.deepHolds_forget referent value
@@ -4095,7 +5092,7 @@ def NTy.ofDeepHolds : (τ : NTy) → (value : τ.plain) → NTy.deepHolds τ val
   | .bytes, value, _ => value
   | .char, value, _ => value
   | .function _ _ _, value, _ => value
-  | .nominal _ _ _, value, _ => value
+  | .nominal _ _ _, value, holds => ⟨value, holds⟩
   | .tuple elements, values, holds => HListPlain.ofDeepHolds elements values holds
   | .struct _ _ _, row, holds => ⟨row, holds⟩
   | .enum _ _ _ _ _, value, holds => ⟨value, holds⟩
@@ -4763,7 +5760,8 @@ def NTy.plainEqualOf (F : PlainFamily) (handles : Bool) : (τ : NTy) →
   | .function parameters shared results, left, right =>
       (F.functions parameters shared results).erasures.same left right
   | .nominal source arguments productive, left, right =>
-      (F.nominals source arguments productive).erasures.same left right
+      F.nominals.nominalEqual handles source productive (NRow.plainSortsOf F arguments)
+        (NRow.sortEqualsOf F handles arguments) left right
 
 /-- Rows compare component by component. -/
 def HListPlainOf.equal (F : PlainFamily) (handles : Bool) : (row : NRow) →
@@ -4793,6 +5791,13 @@ def variantPlainOf.equal (F : PlainFamily) (handles : Bool) : (names : List Stri
           Sum.elim (fun _ => false)
             (variantPlainOf.equal F handles names rest leftLater) right)
         left
+
+/-- The equalities of a declaration's type arguments at a handle flag, which
+its functor's equality reads (`NominalFunctor.nominalEqual`). -/
+def NRow.sortEqualsOf (F : PlainFamily) (handles : Bool) :
+    (row : NRow) → SortEquals (NRow.plainSortsOf F row)
+  | .nil => ()
+  | .cons τ rest => (NTy.plainEqualOf F handles τ, NRow.sortEqualsOf F handles rest)
 end
 
 /-- Plain equality without ghost slots at a family's lent layer. -/
@@ -4850,7 +5855,7 @@ def NTy.equal (handles : Bool) : (τ : NTy) → τ.carrier → τ.carrier → Bo
   | .function parameters shared results, left, right =>
       (Carriers.functions parameters shared results).erasures.same left right
   | .nominal source arguments productive, left, right =>
-      (Carriers.nominals source arguments productive).erasures.same left right
+      NTy.plainEqual handles (NTy.nominal source arguments productive) left.val right.val
   | .observed referent, left, right => NTy.equal handles referent left right
 
 /-- Rows compare component by component. -/
@@ -4964,9 +5969,10 @@ theorem NTy.equal_table (key value : NTy)
         (Carriers.functions parameters shared results).erased right) := rfl
 @[simp, vir_denote_norm] theorem NTy.equal_nominal (source : StructHandle) (arguments : NRow)
     (productive : Bool) (left right : (NTy.nominal source arguments productive).carrier) :
-    NTy.equal handles (.nominal source arguments productive) left right =
-      decide (((Carriers.nominals source arguments productive).value left).eraseGhosts =
-        ((Carriers.nominals source arguments productive).value right).eraseGhosts) := rfl
+    NTy.equal handles (NTy.nominal source arguments productive) left right =
+      Carriers.nominals.nominalEqual handles source productive
+        (NRow.plainSortsOf Carriers.toPlain arguments)
+        (NRow.sortEqualsOf Carriers.toPlain handles arguments) left.val right.val := rfl
 /-- A type parameter's equality stays folded, at one flag: its values hold
 no handle. -/
 @[simp, vir_denote_norm] theorem NTy.equal_param_handles (index : Nat)
@@ -5145,7 +6151,11 @@ theorem NTy.plainEqual_codec : (τ : NTy) → (left right : τ.plain) →
   | .function parameters shared results, left, right =>
       (Carriers.functions parameters shared results).erasures.same_eq left right
   | .nominal source arguments productive, left, right =>
-      (Carriers.nominals source arguments productive).erasures.same_eq left right
+      Carriers.nominals.nominalEqual_encode source productive
+        (NRow.plainSortsOf Carriers.toPlain arguments)
+        (NRow.sortCodecsOf Carriers.toPlain arguments).encoders
+        (NRow.sortEqualsOf Carriers.toPlain false arguments)
+        (NRow.sortEquals_agrees arguments) left right
 
 /-- Rows compare without ghosts as the lists of their encodings do. -/
 theorem HListPlain.equal_codec : (row : NRow) → (left right : HListPlain row) →
@@ -5182,6 +6192,13 @@ theorem variantPlain.equal_codec (source : StructHandle) :
   | _ :: names, .cons _ rest, distinct, .inr left, .inr right => by
       simp only [variantPlain.equal, variantPlainOf.equal, variantEncodePlain, variantEncodePlainOf, Sum.elim_inl, Sum.elim_inr, rowCodecsPlain, rowCodecsPlainOf]
       exact variantPlain.equal_codec source names rest (List.nodup_cons.mp distinct).2 left right
+
+/-- Every argument's equality compares the erasures of its encodings. -/
+theorem NRow.sortEquals_agrees : (row : NRow) →
+    SortEquals.Agrees (NRow.sortCodecsOf Carriers.toPlain row).encoders
+      (NRow.sortEqualsOf Carriers.toPlain false row)
+  | .nil => trivial
+  | .cons τ rest => ⟨NTy.plainEqual_codec τ, NRow.sortEquals_agrees rest⟩
 end
 
 mutual
@@ -5240,7 +6257,7 @@ theorem NTy.equal_codec : (τ : NTy) → (left right : τ.carrier) →
   | .function parameters shared results, left, right =>
       (Carriers.functions parameters shared results).erasures.same_eq left right
   | .nominal source arguments productive, left, right =>
-      (Carriers.nominals source arguments productive).erasures.same_eq left right
+      NTy.plainEqual_codec (NTy.nominal source arguments productive) left.val right.val
 
 /-- Rows compare without ghosts as the lists of their encodings do. -/
 theorem HList.equal_codec : (row : NRow) → (left right : HList row) →
@@ -5357,7 +6374,7 @@ omit [Carriers] in
 omit [Carriers] in
 @[simp, vir_denote_norm] theorem NRow.ownsHandle_nominal (source : StructHandle) (arguments : NRow)
     (productive : Bool) (rest : NRow) :
-    NRow.ownsHandle (.cons (.nominal source arguments productive) rest) = false := rfl
+    NRow.ownsHandle (.cons (NTy.nominal source arguments productive) rest) = false := rfl
 
 omit [Carriers] in
 @[simp, vir_denote_norm] theorem NRow.ownsHandle_nil : NRow.ownsHandle .nil = false := rfl
@@ -5391,7 +6408,7 @@ omit [Carriers] in
 /-- A recursive nominal's identity is its runtime value with ghost contents dropped. -/
 @[simp] theorem NTy.identityRuntime_nominal (source : StructHandle) (arguments : NRow)
     (productive : Bool) (value : RuntimeValue) :
-    NTy.identityRuntime (.nominal source arguments productive) value = value.eraseGhosts := by
+    NTy.identityRuntime (NTy.nominal source arguments productive) value = value.eraseGhosts := by
   cases value <;> rw [NTy.identityRuntime]
 
 omit [Carriers] in
@@ -5518,7 +6535,8 @@ def NTy.plainEqbOf (F : PlainFamily) : (τ : NTy) → NTy.plainOf F τ → NTy.p
   | .function parameters shared results, left, right =>
       (F.functions parameters shared results).erasures.same left right
   | .nominal source arguments productive, left, right =>
-      (F.nominals source arguments productive).erasures.same left right
+      @decide (left = right) (F.nominals.nominalDecEq source productive (NRow.plainSortsOf F arguments)
+        (NRow.sortDecEqsOf F arguments) left right)
 termination_by structural τ _ _ => τ
 
 /-- Structural equality of rows, component by component. -/
@@ -5602,7 +6620,7 @@ def NTy.eqb : (τ : NTy) → τ.carrier → τ.carrier → Bool
       (Carriers.functions parameters shared results).erasures.same left right
   | .observed referent, left, right => NTy.eqb referent left right
   | .nominal source arguments productive, left, right =>
-      (Carriers.nominals source arguments productive).erasures.same left right
+      NTy.plainEqb (NTy.nominal source arguments productive) left.val right.val
 
 /-- Structural equality of rows, component by component. -/
 def rowEqb : (row : NRow) → HList row → HList row → Bool
@@ -5743,9 +6761,10 @@ theorem NTy.beq_encode (τ : NTy) (scalar : τ.isScalar = true) (left right : τ
 
 @[simp] theorem NTy.eqb_nominal (source : StructHandle) (arguments : NRow) (productive : Bool)
     (left right : (NTy.nominal source arguments productive).carrier) :
-    NTy.eqb (.nominal source arguments productive) left right =
-      decide (((Carriers.nominals source arguments productive).value left).eraseGhosts =
-        ((Carriers.nominals source arguments productive).value right).eraseGhosts) := rfl
+    NTy.eqb (NTy.nominal source arguments productive) left right =
+      @decide (left.val = right.val) (Carriers.nominals.nominalDecEq source productive
+        (NRow.plainSortsOf Carriers.toPlain arguments)
+        (NRow.sortDecEqsOf Carriers.toPlain arguments) left.val right.val) := rfl
 /-! ## Environments
 
 A function's locals are one heterogeneous row indexed by their declared
@@ -8320,7 +9339,9 @@ theorem NTy.plainCodec_tight [Carriers] : (τ : NTy) → τ.plainCodec.Tight
   | .slice element => boundedVector_tight (NTy.plainCodec_tight element)
   | .array element _ => array_tight (NTy.plainCodec_tight element)
   | .sliceRef element => sliceRef_tight (NTy.plainCodec_tight element)
-  | .nominal source arguments productive => (Carriers.nominals source arguments productive).tight
+  | .nominal source arguments productive =>
+      Carriers.nominalCodec_tight source productive (NRow.plainSortsOf Carriers.toPlain arguments)
+        (NRow.sortCodecsOf Carriers.toPlain arguments) (NRow.sortCodecs_tight arguments)
   | .observed referent => NTy.plainCodec_tight referent
 
 theorem rowCodecPlain_tight [Carriers] : (row : NRow) → (rowCodecPlain row).Tight
@@ -8330,6 +9351,12 @@ theorem rowCodecPlain_tight [Carriers] : (row : NRow) → (rowCodecPlain row).Ti
 theorem rowCodecsPlain_tight [Carriers] : (rows : NRows) → RowCodecsPlainTight rows (rowCodecsPlain rows)
   | .nil => trivial
   | .cons fields rest => ⟨rowCodecPlain_tight fields, rowCodecsPlain_tight rest⟩
+
+/-- Every codec of a declaration's type arguments is tight. -/
+theorem NRow.sortCodecs_tight [Carriers] : (row : NRow) →
+    SortCodecs.Tight (NRow.sortCodecsOf Carriers.toPlain row)
+  | .nil => trivial
+  | .cons τ rest => ⟨NTy.plainCodec_tight τ, NRow.sortCodecs_tight rest⟩
 end
 
 mutual
@@ -8360,7 +9387,8 @@ theorem NTy.codec_tight [Carriers] : (τ : NTy) → τ.codec.Tight
 
   | .param index => Carriers.tight index
   | .function parameters shared results => (Carriers.functions parameters shared results).tight
-  | .nominal source arguments productive => (Carriers.nominals source arguments productive).tight
+  | .nominal source arguments productive =>
+      certified_tight (NTy.plainCodec_tight (NTy.nominal source arguments productive))
 
 theorem rowCodec_tight [Carriers] : (row : NRow) → (rowCodec row).Tight
   | .nil => tupleNil_tight
@@ -9040,7 +10068,8 @@ theorem NTy.plainEncode_plain : (τ : NTy) → (value : τ.plain) → Plain (τ.
   | .function parameters shared results, value =>
       (Carriers.functions parameters shared results).plain value
   | .nominal source arguments productive, value =>
-      (Carriers.nominals source arguments productive).plain value
+      Carriers.nominalCodec_plain source productive (NRow.plainSortsOf Carriers.toPlain arguments)
+        (NRow.sortCodecsOf Carriers.toPlain arguments) (NRow.sortCodecs_plain arguments) value
 
 theorem rowCodecPlain_plain : (row : NRow) → (values : HListPlain row) →
     ∀ encoded ∈ (rowCodecPlain row).encode values, Plain encoded
@@ -9058,6 +10087,12 @@ theorem variantEncodePlain_plain (source : StructHandle) : (names : List String)
   | name :: names, .cons fields rest, .inl values => .nominal source (some name) _ fun field member =>
       rowCodecPlain_plain fields values field (by simpa using member)
   | _ :: names, .cons _ rest, .inr value => variantEncodePlain_plain source names rest value
+
+/-- Every codec of a declaration's type arguments encodes loan-free. -/
+theorem NRow.sortCodecs_plain : (row : NRow) →
+    SortCodecs.Plain (NRow.sortCodecsOf Carriers.toPlain row)
+  | .nil => trivial
+  | .cons τ rest => ⟨NTy.plainEncode_plain τ, NRow.sortCodecs_plain rest⟩
 end
 
 mutual
@@ -9113,7 +10148,7 @@ theorem NTy.encode_plain : (τ : NTy) → (value : τ.carrier) → Plain (τ.cod
   | .function parameters shared results, value =>
       (Carriers.functions parameters shared results).plain value
   | .nominal source arguments productive, value =>
-      (Carriers.nominals source arguments productive).plain value
+      NTy.plainEncode_plain (NTy.nominal source arguments productive) value.val
 
 theorem rowCodec_plain : (row : NRow) → (values : HList row) →
     ∀ encoded ∈ (rowCodec row).encode values, Plain encoded
@@ -9159,29 +10194,37 @@ theorem NTy.admitsEach_of_forall {τ : NTy} : (values : List RuntimeValue) →
       exact NTy.admitsEach_of_forall values fun other member =>
         admitted other (List.mem_cons_of_mem _ member)
 
+private theorem and_left {left right : Bool} (both : (left && right) = true) : left = true := by
+  simp only [Bool.and_eq_true] at both; exact both.1
+
+private theorem and_right {left right : Bool} (both : (left && right) = true) : right = true := by
+  simp only [Bool.and_eq_true] at both; exact both.2
+
 mutual
 /-- The runtime family's encoding of a value admits its type. -/
 theorem NTy.plainAdmits_encode : (τ : NTy) → (value : @NTy.plain (Carriers.runtime unit) τ) →
+    τ.supported (NominalCarriers.supports unit) = true →
     NTy.admits unit τ ((@NTy.plainCodec (Carriers.runtime unit) τ).encode value) = true
-  | .unit, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.unit, NTy.admits]
-  | .bool, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.bool, NTy.admits]
-  | .int width signed, value => by
+  | .unit, _, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.unit, NTy.admits]
+  | .bool, _, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.bool, NTy.admits]
+  | .int width signed, value, _ => by
       simp [NTy.plainCodec, NTy.plainCodecOf, Codec.specInt, NTy.admits, decodeInt?_val]
-  | .num, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.specInt, NTy.admits]
-  | .address, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.address, NTy.admits]
-  | .signer, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.signer, NTy.admits]
-  | .string, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.string, NTy.admits]
-  | .bytes, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.bytes, NTy.admits]
-  | .char, value => by
+  | .num, _, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.specInt, NTy.admits]
+  | .address, _, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.address, NTy.admits]
+  | .signer, _, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.signer, NTy.admits]
+  | .string, _, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.string, NTy.admits]
+  | .bytes, _, _ => by simp [NTy.plainCodec, NTy.plainCodecOf, Codec.bytes, NTy.admits]
+  | .char, value, _ => by
       simpa [NTy.plainCodec, NTy.plainCodecOf, Codec.character, NTy.admits] using value.valid
-  | .tuple elements, values => by
+  | .tuple elements, values, supported => by
       simp only [NTy.plainCodec, NTy.plainCodecOf, Codec.tuple, NTy.admits]
-      exact NRow.plainAdmits_encode elements values
-  | .struct source arguments fields, values => by
+      exact NRow.plainAdmits_encode elements values supported
+  | .struct source arguments fields, values, supported => by
       simp only [NTy.plainCodec, NTy.plainCodecOf, Codec.nominalRow, NTy.admits, beq_self_eq_true, Bool.true_and]
-      exact NRow.plainAdmits_encode fields values
-  | .enum source arguments names rows distinct, value => by
+      exact NRow.plainAdmits_encode fields values (and_right supported)
+  | .enum source arguments names rows distinct, value, supported => by
       have admitted := variantEncodePlain_admits source names rows distinct value
+        (and_right supported)
       simp only [variantEncodePlain] at admitted
       simp only [NTy.plainCodec, NTy.plainCodecOf, variantCodecPlain, variantCodecPlainOf]
       split at admitted
@@ -9190,23 +10233,23 @@ theorem NTy.plainAdmits_encode : (τ : NTy) → (value : @NTy.plain (Carriers.ru
           obtain ⟨rfl, -, row, selected, rowAdmitted⟩ := admitted
           simp only [NTy.admits, beq_self_eq_true, selected, rowAdmitted, Bool.true_and]
       · exact admitted.elim
-  | .vector element, value => by
+  | .vector element, value, supported => by
       simp only [NTy.plainCodec, NTy.plainCodecOf, Codec.boundedVector, NTy.admits, Array.toList_map]
       exact NTy.admitsEach_of_forall unit _ fun encoded member => by
         obtain ⟨item, _, rfl⟩ := List.mem_map.mp member
-        exact NTy.plainAdmits_encode element item
-  | .slice element, value => by
+        exact NTy.plainAdmits_encode element item supported
+  | .slice element, value, supported => by
       simp only [NTy.plainCodec, NTy.plainCodecOf, Codec.boundedVector, NTy.admits, Array.toList_map]
       exact NTy.admitsEach_of_forall unit _ fun encoded member => by
         obtain ⟨item, _, rfl⟩ := List.mem_map.mp member
-        exact NTy.plainAdmits_encode element item
-  | .array element _, value => by
+        exact NTy.plainAdmits_encode element item supported
+  | .array element _, value, supported => by
       simp only [NTy.plainCodec, NTy.plainCodecOf, Codec.array, Codec.boundedVector, NTy.admits,
         Array.toList_map, Array.size_map, value.size_eq, beq_self_eq_true, Bool.true_and]
       exact NTy.admitsEach_of_forall unit _ fun encoded member => by
         obtain ⟨item, _, rfl⟩ := List.mem_map.mp member
-        exact NTy.plainAdmits_encode element item
-  | .table key value, entries => by
+        exact NTy.plainAdmits_encode element item supported
+  | .table key value, entries, supported => by
       show NTy.admits unit (.table key value)
         (@NTy.plainEncode (Carriers.runtime unit) (.table key value) entries) = true
       rw [@NTy.plainEncode_table (Carriers.runtime unit)]
@@ -9215,47 +10258,68 @@ theorem NTy.plainAdmits_encode : (τ : NTy) → (value : @NTy.plain (Carriers.ru
       | nil => simp [NTy.admitsEntries]
       | cons entry rest ih =>
           simp only [List.map_cons, NTy.admitsEntries, NTy.admitsEntry, ih, Bool.and_true, Bool.and_eq_true, List.toList_toArray]
-          exact ⟨NTy.plainAdmits_encode key entry.1, NTy.plainAdmits_encode value entry.2⟩
-  | .sliceRef element, value => by
+          exact ⟨NTy.plainAdmits_encode key entry.1 (and_left supported),
+            NTy.plainAdmits_encode value entry.2 (and_right supported)⟩
+  | .sliceRef element, value, supported => by
       simp only [NTy.plainCodec, NTy.plainCodecOf, Codec.sliceRef, Codec.boundedVector, NTy.admits,
         List.toList_toArray, NTy.admitsPair, Array.size_map, value.currentVector_size,
         value.finalVector_size, beq_self_eq_true, Bool.true_and, Bool.and_eq_true, Array.toList_map]
       constructor <;> exact NTy.admitsEach_of_forall unit _ fun encoded member => by
         obtain ⟨item, _, rfl⟩ := List.mem_map.mp member
-        exact NTy.plainAdmits_encode element item
-  | .ref referent, value => by
-      simp only [NTy.plainCodec, NTy.plainCodecOf, Codec.prophecyPair, NTy.admits, NTy.admitsPair, NTy.plainAdmits_encode referent value.1, NTy.plainAdmits_encode referent value.2, Bool.and_self]
-  | .ghost slot, value => by
+        exact NTy.plainAdmits_encode element item supported
+  | .ref referent, value, supported => by
+      simp only [NTy.plainCodec, NTy.plainCodecOf, Codec.prophecyPair, NTy.admits, NTy.admitsPair, NTy.plainAdmits_encode referent value.1 supported, NTy.plainAdmits_encode referent value.2 supported, Bool.and_self]
+  | .ghost slot, value, _ => by
       simp only [NTy.plainCodec, NTy.plainCodecOf, Codec.ghost, NTy.admits]
       exact (SemanticOperations.plain?_iff _).mpr (@NTy.plainEncode_plain (Carriers.runtime unit) slot value)
-  | .observed _, _ => by simp only [NTy.admits]
-  | .param _, _ => by simp [NTy.admits]
-  | .function _ _ _, value => FunctionCarriers.admits _ _ _ value
-  | .nominal _ _ _, value => value.typed
+  | .observed _, _, _ => by simp only [NTy.admits]
+  | .param _, _, _ => by simp [NTy.admits]
+  | .function _ _ _, value, _ => FunctionCarriers.admits _ _ _ value
+  | .nominal source arguments productive, value, supported =>
+      NominalCarriers.admits source productive arguments
+        (NRow.plainSortsOf (Carriers.runtime unit).toPlain arguments)
+        (NRow.sortCodecsOf (Carriers.runtime unit).toPlain arguments).encoders value
+        (and_left supported)
+        (SortCodecs.admitsBelow unit _ arguments
+          (NRow.sortCodecsOf (Carriers.runtime unit).toPlain arguments)
+          (NRow.sortCodecs_admits arguments (and_right supported)))
 
 /-- The runtime family's encoding of a row admits it. -/
 theorem NRow.plainAdmits_encode : (row : NRow) → (values : @HListPlain (Carriers.runtime unit) row) →
+    NRow.supported (NominalCarriers.supports unit) row = true →
     NRow.admits unit row ((@rowCodecPlain (Carriers.runtime unit) row).encode values) = true
-  | .nil, _ => by simp [rowCodecPlain, rowCodecPlainOf, Codec.tupleNil, NRow.admits]
-  | .cons τ rest, values => by
-      simp only [rowCodecPlain, rowCodecPlainOf, Codec.tupleCons, NRow.admits, NTy.plainAdmits_encode τ values.1, NRow.plainAdmits_encode rest values.2, Bool.and_self]
+  | .nil, _, _ => by simp [rowCodecPlain, rowCodecPlainOf, Codec.tupleNil, NRow.admits]
+  | .cons τ rest, values, supported => by
+      simp only [rowCodecPlain, rowCodecPlainOf, Codec.tupleCons, NRow.admits, NTy.plainAdmits_encode τ values.1 (and_left supported), NRow.plainAdmits_encode rest values.2 (and_right supported), Bool.and_self]
+
+/-- Every argument's codec of a declaration's type arguments encodes values
+the unit types at that argument's type. -/
+theorem NRow.sortCodecs_admits : (row : NRow) →
+    NRow.supported (NominalCarriers.supports unit) row = true →
+    SortCodecs.Admits unit row (NRow.sortCodecsOf (Carriers.runtime unit).toPlain row)
+  | .nil, _ => trivial
+  | .cons τ rest, supported =>
+      ⟨fun value => NTy.plainAdmits_encode τ value (and_left supported),
+        NRow.sortCodecs_admits rest (and_right supported)⟩
 
 /-- The runtime family's encoding of an enum value is a variant the enum's
 names select, whose fields admit its row. -/
 theorem variantEncodePlain_admits (source : StructHandle) : (names : List String) → (rows : NRows) →
     names.Nodup → (value : @variantPlain (Carriers.runtime unit) names rows) →
+    NRows.supported (NominalCarriers.supports unit) rows = true →
     match (@variantEncodePlain (Carriers.runtime unit) source names rows
         (@rowCodecsPlain (Carriers.runtime unit) rows) value : RuntimeValue) with
     | RuntimeValue.nominal actual (some name) fields => actual = source ∧ name ∈ names ∧
         ∃ row, NRows.variant? names rows name = some row ∧ NRow.admits unit row fields.toList = true
     | _ => False
-  | _, .nil, _, value => nomatch value
-  | [], .cons _ _, _, value => nomatch value
-  | name :: names, .cons fields rest, _, .inl values => by
+  | _, .nil, _, value, _ => nomatch value
+  | [], .cons _ _, _, value, _ => nomatch value
+  | name :: names, .cons fields rest, _, .inl values, supported => by
       simp only [variantEncodePlain, variantEncodePlainOf, Sum.elim_inl, Sum.elim_inr, Codec.nominalRow, List.mem_cons, true_or, NRows.variant?, beq_self_eq_true, if_true, Option.some.injEq, exists_eq_left', true_and]
-      exact NRow.plainAdmits_encode fields values
-  | first :: names, .cons fields rest, distinct, .inr later => by
-      have admitted := variantEncodePlain_admits source names rest (List.nodup_cons.mp distinct).2 later
+      exact NRow.plainAdmits_encode fields values (and_left supported)
+  | first :: names, .cons fields rest, distinct, .inr later, supported => by
+      have admitted := variantEncodePlain_admits source names rest (List.nodup_cons.mp distinct).2
+        later (and_right supported)
       simp only [variantEncodePlain, rowCodecsPlain] at admitted
       simp only [variantEncodePlain, variantEncodePlainOf, Sum.elim_inl, Sum.elim_inr, rowCodecsPlain, rowCodecsPlainOf]
       split at admitted
@@ -9273,42 +10337,44 @@ end
 mutual
 /-- The runtime family's encoding of a value admits its type. -/
 theorem NTy.admits_encode : (τ : NTy) → (value : @NTy.carrier (Carriers.runtime unit) τ) →
+    τ.supported (NominalCarriers.supports unit) = true →
     NTy.admits unit τ ((@NTy.codec (Carriers.runtime unit) τ).encode value) = true
-  | .unit, _ => by simp [NTy.codec, Codec.unit, NTy.admits]
-  | .bool, _ => by simp [NTy.codec, Codec.bool, NTy.admits]
-  | .int width signed, value => by
+  | .unit, _, _ => by simp [NTy.codec, Codec.unit, NTy.admits]
+  | .bool, _, _ => by simp [NTy.codec, Codec.bool, NTy.admits]
+  | .int width signed, value, _ => by
       simp [NTy.codec, Codec.specInt, NTy.admits, decodeInt?_val]
-  | .num, _ => by simp [NTy.codec, Codec.specInt, NTy.admits]
-  | .address, _ => by simp [NTy.codec, Codec.address, NTy.admits]
-  | .signer, _ => by simp [NTy.codec, Codec.signer, NTy.admits]
-  | .string, _ => by simp [NTy.codec, Codec.string, NTy.admits]
-  | .bytes, _ => by simp [NTy.codec, Codec.bytes, NTy.admits]
-  | .char, value => by simpa [NTy.codec, Codec.character, NTy.admits] using value.valid
-  | .tuple elements, values => by
+  | .num, _, _ => by simp [NTy.codec, Codec.specInt, NTy.admits]
+  | .address, _, _ => by simp [NTy.codec, Codec.address, NTy.admits]
+  | .signer, _, _ => by simp [NTy.codec, Codec.signer, NTy.admits]
+  | .string, _, _ => by simp [NTy.codec, Codec.string, NTy.admits]
+  | .bytes, _, _ => by simp [NTy.codec, Codec.bytes, NTy.admits]
+  | .char, value, _ => by simpa [NTy.codec, Codec.character, NTy.admits] using value.valid
+  | .tuple elements, values, supported => by
       simp only [NTy.codec, Codec.tuple, NTy.admits]
-      exact NRow.admits_encode elements values
-  | .struct source arguments fields, values =>
-      NTy.plainAdmits_encode (unit := unit) (.struct source arguments fields) values.val
-  | .enum source arguments names rows distinct, value =>
+      exact NRow.admits_encode elements values supported
+  | .struct source arguments fields, values, supported =>
+      NTy.plainAdmits_encode (unit := unit) (.struct source arguments fields) values.val supported
+  | .enum source arguments names rows distinct, value, supported =>
       NTy.plainAdmits_encode (unit := unit) (.enum source arguments names rows distinct) value.val
-  | .slice element, value => by
+        supported
+  | .slice element, value, supported => by
       simp only [NTy.codec, Codec.boundedVector, NTy.admits, Array.toList_map]
       exact NTy.admitsEach_of_forall unit _ fun encoded member => by
         obtain ⟨item, _, rfl⟩ := List.mem_map.mp member
-        exact NTy.admits_encode element item
+        exact NTy.admits_encode element item supported
 
-  | .vector element, value => by
+  | .vector element, value, supported => by
       simp only [NTy.codec, Codec.boundedVector, NTy.admits, Array.toList_map]
       exact NTy.admitsEach_of_forall unit _ fun encoded member => by
         obtain ⟨item, _, rfl⟩ := List.mem_map.mp member
-        exact NTy.admits_encode element item
-  | .array element _, value => by
+        exact NTy.admits_encode element item supported
+  | .array element _, value, supported => by
       simp only [NTy.codec, Codec.array, Codec.boundedVector, NTy.admits, Array.toList_map,
         Array.size_map, value.size_eq, beq_self_eq_true, Bool.true_and]
       exact NTy.admitsEach_of_forall unit _ fun encoded member => by
         obtain ⟨item, _, rfl⟩ := List.mem_map.mp member
-        exact NTy.admits_encode element item
-  | .table key value, entries => by
+        exact NTy.admits_encode element item supported
+  | .table key value, entries, supported => by
       show NTy.admits unit (.table key value)
         (@NTy.encode (Carriers.runtime unit) (.table key value) entries) = true
       rw [@NTy.encode_table (Carriers.runtime unit)]
@@ -9317,47 +10383,53 @@ theorem NTy.admits_encode : (τ : NTy) → (value : @NTy.carrier (Carriers.runti
       | nil => simp [NTy.admitsEntries]
       | cons entry rest ih =>
           simp only [List.map_cons, NTy.admitsEntries, NTy.admitsEntry, ih, Bool.and_true, Bool.and_eq_true, List.toList_toArray]
-          exact ⟨NTy.admits_encode key entry.1, NTy.admits_encode value entry.2⟩
-  | .sliceRef element, value => by
+          exact ⟨NTy.admits_encode key entry.1 (and_left supported),
+            NTy.admits_encode value entry.2 (and_right supported)⟩
+  | .sliceRef element, value, supported => by
       simp only [NTy.codec, Codec.sliceRef, Codec.boundedVector, NTy.admits,
         List.toList_toArray, NTy.admitsPair, NTy.admits, Array.size_map, value.currentVector_size, value.finalVector_size,
         beq_self_eq_true, Bool.true_and, Bool.and_eq_true, Array.toList_map]
       constructor <;> exact NTy.admitsEach_of_forall unit _ fun encoded member => by
         obtain ⟨item, _, rfl⟩ := List.mem_map.mp member
-        exact NTy.admits_encode element item
-  | .ref referent, value => by
-      simp only [NTy.codec, Codec.pair, NTy.admits, NTy.admitsPair, NTy.plainAdmits_encode (unit := unit) referent value.1, NTy.admits_encode referent value.2, Bool.and_self]
-  | .ghost slot, value => by
+        exact NTy.admits_encode element item supported
+  | .ref referent, value, supported => by
+      simp only [NTy.codec, Codec.pair, NTy.admits, NTy.admitsPair, NTy.plainAdmits_encode (unit := unit) referent value.1 supported, NTy.admits_encode referent value.2 supported, Bool.and_self]
+  | .ghost slot, value, _ => by
       simp only [NTy.codec, Codec.ghost, NTy.admits]
       exact (SemanticOperations.plain?_iff _).mpr (@NTy.encode_plain (Carriers.runtime unit) slot value)
-  | .observed _, _ => by simp only [NTy.admits]
-  | .param _, _ => by simp [NTy.admits]
-  | .function _ _ _, value => FunctionCarriers.admits _ _ _ value
-  | .nominal _ _ _, value => value.typed
+  | .observed _, _, _ => by simp only [NTy.admits]
+  | .param _, _, _ => by simp [NTy.admits]
+  | .function _ _ _, value, _ => FunctionCarriers.admits _ _ _ value
+  | .nominal source arguments productive, value, supported =>
+      NTy.plainAdmits_encode (unit := unit) (NTy.nominal source arguments productive) value.val
+        supported
 
 /-- The runtime family's encoding of a row admits it. -/
 theorem NRow.admits_encode : (row : NRow) → (values : @HList (Carriers.runtime unit) row) →
+    NRow.supported (NominalCarriers.supports unit) row = true →
     NRow.admits unit row ((@rowCodec (Carriers.runtime unit) row).encode values) = true
-  | .nil, _ => by simp [rowCodec, Codec.tupleNil, NRow.admits]
-  | .cons τ rest, values => by
-      simp only [rowCodec, Codec.tupleCons, NRow.admits, NTy.admits_encode τ values.1, NRow.admits_encode rest values.2, Bool.and_self]
+  | .nil, _, _ => by simp [rowCodec, Codec.tupleNil, NRow.admits]
+  | .cons τ rest, values, supported => by
+      simp only [rowCodec, Codec.tupleCons, NRow.admits, NTy.admits_encode τ values.1 (and_left supported), NRow.admits_encode rest values.2 (and_right supported), Bool.and_self]
 
 /-- The runtime family's encoding of an enum value is a variant the enum's
 names select, whose fields admit its row. -/
 theorem variantEncode_admits (source : StructHandle) : (names : List String) → (rows : NRows) →
     names.Nodup → (value : @variantCarrier (Carriers.runtime unit) names rows) →
+    NRows.supported (NominalCarriers.supports unit) rows = true →
     match (@variantEncode (Carriers.runtime unit) source names rows
         (@rowCodecs (Carriers.runtime unit) rows) value : RuntimeValue) with
     | RuntimeValue.nominal actual (some name) fields => actual = source ∧ name ∈ names ∧
         ∃ row, NRows.variant? names rows name = some row ∧ NRow.admits unit row fields.toList = true
     | _ => False
-  | _, .nil, _, value => nomatch value
-  | [], .cons _ _, _, value => nomatch value
-  | name :: names, .cons fields rest, _, .inl values => by
+  | _, .nil, _, value, _ => nomatch value
+  | [], .cons _ _, _, value, _ => nomatch value
+  | name :: names, .cons fields rest, _, .inl values, supported => by
       simp only [variantEncode, Sum.elim_inl, Sum.elim_inr, Codec.nominalRow, List.mem_cons, true_or, NRows.variant?, beq_self_eq_true, if_true, Option.some.injEq, exists_eq_left', true_and]
-      exact NRow.admits_encode fields values
-  | first :: names, .cons fields rest, distinct, .inr later => by
+      exact NRow.admits_encode fields values (and_left supported)
+  | first :: names, .cons fields rest, distinct, .inr later, supported => by
       have admitted := variantEncode_admits source names rest (List.nodup_cons.mp distinct).2 later
+        (and_right supported)
       simp only [variantEncode, Sum.elim_inl, Sum.elim_inr, rowCodecs]
       split at admitted
       · next actual name values encoded =>
@@ -9370,6 +10442,17 @@ theorem variantEncode_admits (source : StructHandle) : (names : List String) →
           exact ⟨row, selected, rowAdmitted⟩
       · exact admitted.elim
 end
+
+/-- A function type's admission needs no supportedness: its values are the
+closures the unit types (`FunctionCarriers.admits`).  Stated at any type the
+caller shows to be a function type, so that a frame's resolution of one uses
+it (`Skolems.admits_carrier`). -/
+theorem NTy.admits_encode_function (τ : NTy) (parameters : NRow) (shared : Sharing)
+    (results : NRow) (shape : τ = .function parameters shared results)
+    (value : @NTy.carrier (Carriers.runtime unit) τ) :
+    NTy.admits unit τ ((@NTy.codec (Carriers.runtime unit) τ).encode value) = true := by
+  subst shape
+  exact FunctionCarriers.admits _ _ _ value
 
 end Admits
 
@@ -9788,7 +10871,8 @@ def NTy.plainInhabitantOf (F : PlainFamily) : (τ : NTy) → τ.inhabitable = tr
   | .param _, _ => default
   | .function _ _ _, inhabitable => absurd inhabitable (by simp [NTy.inhabitable])
   | .nominal source arguments true, inhabitable =>
-      F.nominalInhabitant source arguments (by simpa [NTy.inhabitable] using inhabitable)
+      F.nominals.nominalInhabitant source (NRow.plainSortsOf F arguments)
+        (NRow.sortValuesOf F arguments (by simpa [NTy.inhabitable] using inhabitable))
   | .nominal _ _ false, inhabitable => absurd inhabitable (by simp [NTy.inhabitable])
   | .observed referent, inhabitable => NTy.plainInhabitantOf F referent inhabitable
 termination_by structural τ _ => τ
@@ -9808,6 +10892,16 @@ def variantPlainOf.inhabitant (F : PlainFamily) : (names : List String) → (row
   | [], _, inhabitable => absurd inhabitable (by simp [NRows.firstInhabitable])
   | _ :: _, .nil, inhabitable => absurd inhabitable (by simp [NRows.firstInhabitable])
 termination_by structural names rows _ => rows
+
+/-- A value of each of a declaration's type arguments, which its functor's
+inhabitant reads (`NominalFunctor.nominalInhabitant`). -/
+def NRow.sortValuesOf (F : PlainFamily) : (row : NRow) → row.inhabitable = true →
+    SortValues (NRow.plainSortsOf F row)
+  | .nil, _ => ()
+  | .cons τ rest, inhabitable =>
+      (NTy.plainInhabitantOf F τ (by simp_all [NRow.inhabitable]),
+        NRow.sortValuesOf F rest (by simp_all [NRow.inhabitable]))
+termination_by structural row _ => row
 end
 
 /-- A plain value of a type that has values, at a family's lent layer. -/
@@ -9828,23 +10922,25 @@ mutual
 declaration's and every type parameter's is trivially true. -/
 theorem NTy.deepHolds_of_trivial
     (own : ∀ source arguments value, Carriers.own source arguments value)
-    (params : ∀ index value, (Carriers.lent index).holds value) :
+    (params : ∀ index value, (Carriers.lent index).holds value)
+    (nominals : ∀ source productive arguments sorts value,
+      Carriers.nominalOwn source productive arguments sorts value) :
     (τ : NTy) → (value : τ.plain) → NTy.deepHolds τ value
-  | .tuple elements, values => HListPlain.deepHolds_of_trivial own params elements values
-  | .struct _ _ fields, row => ⟨own _ _ _, HListPlain.deepHolds_of_trivial own params fields row⟩
+  | .tuple elements, values => HListPlain.deepHolds_of_trivial own params nominals elements values
+  | .struct _ _ fields, row => ⟨own _ _ _, HListPlain.deepHolds_of_trivial own params nominals fields row⟩
   | .enum _ _ names rows _, value =>
-      ⟨own _ _ _, variantPlain.deepHolds_of_trivial own params names rows value⟩
-  | .vector element, vector => fun value _ => NTy.deepHolds_of_trivial own params element value
-  | .slice element, vector => fun value _ => NTy.deepHolds_of_trivial own params element value
-  | .array element _, array => fun value _ => NTy.deepHolds_of_trivial own params element value
+      ⟨own _ _ _, variantPlain.deepHolds_of_trivial own params nominals names rows value⟩
+  | .vector element, vector => fun value _ => NTy.deepHolds_of_trivial own params nominals element value
+  | .slice element, vector => fun value _ => NTy.deepHolds_of_trivial own params nominals element value
+  | .array element _, array => fun value _ => NTy.deepHolds_of_trivial own params nominals element value
   | .table key value, entries => fun entry _ =>
-      ⟨NTy.deepHolds_of_trivial own params key entry.1, NTy.deepHolds_of_trivial own params value entry.2⟩
-  | .ghost slot, value => NTy.deepHolds_of_trivial own params slot value
-  | .ref referent, value => NTy.deepHolds_of_trivial own params referent value.2
+      ⟨NTy.deepHolds_of_trivial own params nominals key entry.1, NTy.deepHolds_of_trivial own params nominals value entry.2⟩
+  | .ghost slot, value => NTy.deepHolds_of_trivial own params nominals slot value
+  | .ref referent, value => NTy.deepHolds_of_trivial own params nominals referent value.2
   | .sliceRef element, value =>
-      ⟨fun current _ => NTy.deepHolds_of_trivial own params element current,
-        fun final _ => NTy.deepHolds_of_trivial own params element final⟩
-  | .observed referent, value => NTy.deepHolds_of_trivial own params referent value
+      ⟨fun current _ => NTy.deepHolds_of_trivial own params nominals element current,
+        fun final _ => NTy.deepHolds_of_trivial own params nominals element final⟩
+  | .observed referent, value => NTy.deepHolds_of_trivial own params nominals referent value
   | .unit, _ => trivial
   | .bool, _ => trivial
   | .int _ _, _ => trivial
@@ -9856,25 +10952,44 @@ theorem NTy.deepHolds_of_trivial
   | .char, _ => trivial
   | .param index, value => params index value
   | .function _ _ _, _ => trivial
-  | .nominal _ _ _, _ => trivial
+  | .nominal source arguments productive, value =>
+      Carriers.nominals.nominalHolds_trivial Carriers.nominalOwn source productive arguments
+        (NRow.plainSortsOf Carriers.toPlain arguments) (NRow.sortHolds arguments) value nominals
+        (NRow.sortHolds_all own params nominals arguments)
 
 theorem HListPlain.deepHolds_of_trivial
     (own : ∀ source arguments value, Carriers.own source arguments value)
-    (params : ∀ index value, (Carriers.lent index).holds value) :
+    (params : ∀ index value, (Carriers.lent index).holds value)
+    (nominals : ∀ source productive arguments sorts value,
+      Carriers.nominalOwn source productive arguments sorts value) :
     (row : NRow) → (values : HListPlain row) → HListPlain.deepHolds row values
   | .nil, _ => trivial
   | .cons τ rest, values =>
-      ⟨NTy.deepHolds_of_trivial own params τ values.1, HListPlain.deepHolds_of_trivial own params rest values.2⟩
+      ⟨NTy.deepHolds_of_trivial own params nominals τ values.1, HListPlain.deepHolds_of_trivial own params nominals rest values.2⟩
 
 theorem variantPlain.deepHolds_of_trivial
     (own : ∀ source arguments value, Carriers.own source arguments value)
-    (params : ∀ index value, (Carriers.lent index).holds value) :
+    (params : ∀ index value, (Carriers.lent index).holds value)
+    (nominals : ∀ source productive arguments sorts value,
+      Carriers.nominalOwn source productive arguments sorts value) :
     (names : List String) → (rows : NRows) → (value : variantPlain names rows) →
     variantPlain.deepHolds names rows value
   | _, .nil, value => nomatch value
   | [], .cons _ _, value => nomatch value
-  | _ :: _, .cons fields _, .inl row => HListPlain.deepHolds_of_trivial own params fields row
-  | _ :: names, .cons _ rest, .inr later => variantPlain.deepHolds_of_trivial own params names rest later
+  | _ :: _, .cons fields _, .inl row => HListPlain.deepHolds_of_trivial own params nominals fields row
+  | _ :: names, .cons _ rest, .inr later => variantPlain.deepHolds_of_trivial own params nominals names rest later
+
+/-- At a trivial family every argument's invariants hold of every value. -/
+theorem NRow.sortHolds_all
+    (own : ∀ source arguments value, Carriers.own source arguments value)
+    (params : ∀ index value, (Carriers.lent index).holds value)
+    (nominals : ∀ source productive arguments sorts value,
+      Carriers.nominalOwn source productive arguments sorts value) :
+    (row : NRow) → SortHolds.All (NRow.sortHolds row)
+  | .nil => trivial
+  | .cons τ rest =>
+      ⟨NTy.deepHolds_of_trivial own params nominals τ,
+        NRow.sortHolds_all own params nominals rest⟩
 end
 
 mutual
@@ -9885,6 +11000,8 @@ certificates of their own that map is the identity
 (`doc/designs/data-invariants.md`). -/
 def NTy.certifyTrivial (own : ∀ source arguments value, Carriers.own source arguments value)
     (params : ∀ index value, (Carriers.lent index).holds value)
+    (nominals : ∀ source productive arguments sorts value,
+      Carriers.nominalOwn source productive arguments sorts value)
     (certifyParam : ∀ index, (Carriers.lent index).carrier → Carriers.carrier index) :
     (τ : NTy) → τ.plain → τ.carrier
   | .unit, value => value
@@ -9896,43 +11013,47 @@ def NTy.certifyTrivial (own : ∀ source arguments value, Carriers.own source ar
   | .string, value => value
   | .bytes, value => value
   | .char, value => value
-  | .tuple elements, values => HListPlain.certifyTrivial own params certifyParam elements values
+  | .tuple elements, values => HListPlain.certifyTrivial own params nominals certifyParam elements values
   | .struct source arguments fields, row =>
-      ⟨row, NTy.deepHolds_of_trivial own params (.struct source arguments fields) row⟩
+      ⟨row, NTy.deepHolds_of_trivial own params nominals (.struct source arguments fields) row⟩
   | .enum source arguments names rows distinct, value =>
-      ⟨value, NTy.deepHolds_of_trivial own params (.enum source arguments names rows distinct) value⟩
+      ⟨value, NTy.deepHolds_of_trivial own params nominals (.enum source arguments names rows distinct) value⟩
   | .vector element, vector =>
-      ⟨vector.values.map (NTy.certifyTrivial own params certifyParam element),
+      ⟨vector.values.map (NTy.certifyTrivial own params nominals certifyParam element),
         by simpa using vector.bounded⟩
   | .slice element, vector =>
-      ⟨vector.values.map (NTy.certifyTrivial own params certifyParam element),
+      ⟨vector.values.map (NTy.certifyTrivial own params nominals certifyParam element),
         by simpa using vector.bounded⟩
   | .array element _, array =>
-      ⟨⟨array.vector.values.map (NTy.certifyTrivial own params certifyParam element),
+      ⟨⟨array.vector.values.map (NTy.certifyTrivial own params nominals certifyParam element),
           by simpa using array.vector.bounded⟩,
         by simpa using array.size_eq⟩
   | .table key value, entries =>
       ⟨entries.entries.map fun entry =>
-          (NTy.certifyTrivial own params certifyParam key entry.1,
-            NTy.certifyTrivial own params certifyParam value entry.2),
+          (NTy.certifyTrivial own params nominals certifyParam key entry.1,
+            NTy.certifyTrivial own params nominals certifyParam value entry.2),
         by simpa using entries.bounded⟩
-  | .ghost slot, value => NTy.certifyTrivial own params certifyParam slot value
+  | .ghost slot, value => NTy.certifyTrivial own params nominals certifyParam slot value
   | .ref referent, reference =>
-      (reference.1, NTy.certifyTrivial own params certifyParam referent reference.2)
-  | .sliceRef element, value => value.map (NTy.certifyTrivial own params certifyParam element)
-  | .observed referent, value => NTy.certifyTrivial own params certifyParam referent value
+      (reference.1, NTy.certifyTrivial own params nominals certifyParam referent reference.2)
+  | .sliceRef element, value => value.map (NTy.certifyTrivial own params nominals certifyParam element)
+  | .observed referent, value => NTy.certifyTrivial own params nominals certifyParam referent value
   | .param index, value => certifyParam index value
   | .function _ _ _, value => value
-  | .nominal _ _ _, value => value
+  | .nominal source arguments productive, value =>
+      ⟨value, NTy.deepHolds_of_trivial own params nominals
+        (NTy.nominal source arguments productive) value⟩
 
 def HListPlain.certifyTrivial (own : ∀ source arguments value, Carriers.own source arguments value)
     (params : ∀ index value, (Carriers.lent index).holds value)
+    (nominals : ∀ source productive arguments sorts value,
+      Carriers.nominalOwn source productive arguments sorts value)
     (certifyParam : ∀ index, (Carriers.lent index).carrier → Carriers.carrier index) :
     (row : NRow) → HListPlain row → HList row
   | .nil, _ => ()
   | .cons τ rest, values =>
-      (NTy.certifyTrivial own params certifyParam τ values.1,
-        HListPlain.certifyTrivial own params certifyParam rest values.2)
+      (NTy.certifyTrivial own params nominals certifyParam τ values.1,
+        HListPlain.certifyTrivial own params nominals certifyParam rest values.2)
 end
 
 /-! ### The trivial certification, constructor by constructor
@@ -9945,78 +11066,80 @@ row is the field of the row (`doc/designs/data-invariants.md`). -/
 section CertifyTrivial
 variable (own : ∀ source arguments value, Carriers.own source arguments value)
   (params : ∀ index value, (Carriers.lent index).holds value)
+  (nominals : ∀ source productive arguments sorts value,
+    Carriers.nominalOwn source productive arguments sorts value)
   (certifyParam : ∀ index, (Carriers.lent index).carrier → Carriers.carrier index)
 
 @[vir_denote_norm] theorem NTy.certifyTrivial_unit (value : (NTy.unit).plain) :
-    NTy.certifyTrivial own params certifyParam .unit value = value := rfl
+    NTy.certifyTrivial own params nominals certifyParam .unit value = value := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_bool (value : (NTy.bool).plain) :
-    NTy.certifyTrivial own params certifyParam .bool value = value := rfl
+    NTy.certifyTrivial own params nominals certifyParam .bool value = value := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_int (width : Nat) (signed : Bool)
     (value : (NTy.int width signed).plain) :
-    NTy.certifyTrivial own params certifyParam (.int width signed) value = value := rfl
+    NTy.certifyTrivial own params nominals certifyParam (.int width signed) value = value := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_num (value : (NTy.num).plain) :
-    NTy.certifyTrivial own params certifyParam .num value = value := rfl
+    NTy.certifyTrivial own params nominals certifyParam .num value = value := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_address (value : (NTy.address).plain) :
-    NTy.certifyTrivial own params certifyParam .address value = value := rfl
+    NTy.certifyTrivial own params nominals certifyParam .address value = value := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_signer (value : (NTy.signer).plain) :
-    NTy.certifyTrivial own params certifyParam .signer value = value := rfl
+    NTy.certifyTrivial own params nominals certifyParam .signer value = value := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_string (value : (NTy.string).plain) :
-    NTy.certifyTrivial own params certifyParam .string value = value := rfl
+    NTy.certifyTrivial own params nominals certifyParam .string value = value := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_bytes (value : (NTy.bytes).plain) :
-    NTy.certifyTrivial own params certifyParam .bytes value = value := rfl
+    NTy.certifyTrivial own params nominals certifyParam .bytes value = value := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_function (parameters : NRow) (shared : Sharing)
     (results : NRow) (value : (NTy.function parameters shared results).plain) :
-    NTy.certifyTrivial own params certifyParam (.function parameters shared results) value =
+    NTy.certifyTrivial own params nominals certifyParam (.function parameters shared results) value =
       value := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_tuple (elements : NRow)
     (values : (NTy.tuple elements).plain) :
-    NTy.certifyTrivial own params certifyParam (.tuple elements) values =
-      HListPlain.certifyTrivial own params certifyParam elements values := rfl
+    NTy.certifyTrivial own params nominals certifyParam (.tuple elements) values =
+      HListPlain.certifyTrivial own params nominals certifyParam elements values := rfl
 
 /-- A trivially certified struct value is its row: the certificate is the
 trivial one, which no reader inspects. -/
 @[vir_denote_norm] theorem NTy.certifyTrivial_struct_val (source : StructHandle)
     (arguments fields : NRow) (row : HListPlain fields) :
-    (NTy.certifyTrivial own params certifyParam (.struct source arguments fields) row).val =
+    (NTy.certifyTrivial own params nominals certifyParam (.struct source arguments fields) row).val =
       row := rfl
 
 /-- A trivially certified variant value is its payload. -/
 @[vir_denote_norm] theorem NTy.certifyTrivial_enum_val (source : StructHandle)
     (arguments : NRow) (names : List String) (rows : NRows) (distinct : names.Nodup)
     (value : variantPlain names rows) :
-    (NTy.certifyTrivial own params certifyParam
+    (NTy.certifyTrivial own params nominals certifyParam
         (.enum source arguments names rows distinct) value).val = value := rfl
 
 @[vir_denote_norm] theorem NTy.certifyTrivial_vector_values (element : NTy)
     (vector : (NTy.vector element).plain) :
-    (NTy.certifyTrivial own params certifyParam (.vector element) vector).values =
-      vector.values.map (NTy.certifyTrivial own params certifyParam element) := rfl
+    (NTy.certifyTrivial own params nominals certifyParam (.vector element) vector).values =
+      vector.values.map (NTy.certifyTrivial own params nominals certifyParam element) := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_table_entries (key value : NTy)
     (entries : (NTy.table key value).plain) :
-    (NTy.certifyTrivial own params certifyParam (.table key value) entries).entries =
+    (NTy.certifyTrivial own params nominals certifyParam (.table key value) entries).entries =
       entries.entries.map (fun entry =>
-        (NTy.certifyTrivial own params certifyParam key entry.1,
-          NTy.certifyTrivial own params certifyParam value entry.2)) := rfl
+        (NTy.certifyTrivial own params nominals certifyParam key entry.1,
+          NTy.certifyTrivial own params nominals certifyParam value entry.2)) := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_ghost (slot : NTy)
     (value : (NTy.ghost slot).plain) :
-    NTy.certifyTrivial own params certifyParam (.ghost slot) value =
-      NTy.certifyTrivial own params certifyParam slot value := rfl
+    NTy.certifyTrivial own params nominals certifyParam (.ghost slot) value =
+      NTy.certifyTrivial own params nominals certifyParam slot value := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_ref (referent : NTy)
     (reference : (NTy.ref referent).plain) :
-    NTy.certifyTrivial own params certifyParam (.ref referent) reference =
-      (reference.1, NTy.certifyTrivial own params certifyParam referent reference.2) := rfl
+    NTy.certifyTrivial own params nominals certifyParam (.ref referent) reference =
+      (reference.1, NTy.certifyTrivial own params nominals certifyParam referent reference.2) := rfl
 @[vir_denote_norm] theorem NTy.certifyTrivial_param (index : Nat)
     (value : (NTy.param index).plain) :
-    NTy.certifyTrivial own params certifyParam (.param index) value =
+    NTy.certifyTrivial own params nominals certifyParam (.param index) value =
       certifyParam index value := rfl
 
 @[vir_denote_norm] theorem HListPlain.certifyTrivial_nil (values : HListPlain .nil) :
-    HListPlain.certifyTrivial own params certifyParam .nil values = () := rfl
+    HListPlain.certifyTrivial own params nominals certifyParam .nil values = () := rfl
 @[vir_denote_norm] theorem HListPlain.certifyTrivial_cons (τ : NTy) (rest : NRow)
     (values : HListPlain (.cons τ rest)) :
-    HListPlain.certifyTrivial own params certifyParam (.cons τ rest) values =
-      (NTy.certifyTrivial own params certifyParam τ values.1,
-        HListPlain.certifyTrivial own params certifyParam rest values.2) := rfl
+    HListPlain.certifyTrivial own params nominals certifyParam (.cons τ rest) values =
+      (NTy.certifyTrivial own params nominals certifyParam τ values.1,
+        HListPlain.certifyTrivial own params nominals certifyParam rest values.2) := rfl
 
 end CertifyTrivial
 
@@ -10030,27 +11153,18 @@ declaration's invariant is trivially true they are the plain inhabitants
 (`CarriersNonempty.ofTrivial`). -/
 class CarriersNonempty (Θ : Carriers) where
   inhabitant : (τ : NTy) → τ.inhabitable = true → @NTy.carrier Θ τ
-  -- MERGE-REVIEW: the parent made inhabitants abstract while a nominal's
-  -- inhabitant is the family's, which `NTy.readBack_unit_nominal` reads;
-  -- a nominal's values carry no certificate of their own, so there is
-  -- nothing here to choose (`Carriers.nominalInhabitant`).
-  /-- A nominal's inhabitant is its family's. -/
-  inhabitant_nominal : ∀ (source : StructHandle) (arguments : NRow)
-    (inhabitable : (NTy.nominal source arguments true).inhabitable = true)
-    (held : arguments.inhabitable = true),
-    inhabitant (.nominal source arguments true) inhabitable =
-      @Carriers.nominalInhabitant Θ source arguments held
 
 /-- The inhabitants where no declaration and no type parameter states a
 data invariant. -/
 def CarriersNonempty.ofTrivial
     (own : ∀ source arguments value, Carriers.own source arguments value)
     (params : ∀ index value, (Carriers.lent index).holds value)
+    (nominals : ∀ source productive arguments sorts value,
+      Carriers.nominalOwn source productive arguments sorts value)
     (certifyParam : ∀ index, (Carriers.lent index).carrier → Carriers.carrier index) :
     CarriersNonempty Θ where
   inhabitant := fun τ inhabitable =>
-    NTy.certifyTrivial own params certifyParam τ (NTy.plainInhabitant τ inhabitable)
-  inhabitant_nominal := fun _ _ _ _ => rfl
+    NTy.certifyTrivial own params nominals certifyParam τ (NTy.plainInhabitant τ inhabitable)
 
 /-- A value of a type that has values. -/
 def NTy.inhabitant [CarriersNonempty Θ] (τ : NTy) (inhabitable : τ.inhabitable = true) :
@@ -10077,11 +11191,15 @@ def DataInvariantsSatisfiable (unit : Validation.ValidatedUnit)
   (∀ (source : StructHandle) (arguments fields : NRow),
       (NTy.struct source arguments fields).inhabitable = true →
       Nonempty (@NTy.carrier (Carriers.runtime unit) (.struct source arguments fields))) ∧
-    ∀ (source : StructHandle) (arguments : NRow) (names : List String) (rows : NRows)
-      (distinct : names.Nodup),
-      (NTy.enum source arguments names rows distinct).inhabitable = true →
-      Nonempty (@NTy.carrier (Carriers.runtime unit)
-        (.enum source arguments names rows distinct))
+    (∀ (source : StructHandle) (arguments : NRow) (names : List String) (rows : NRows)
+        (distinct : names.Nodup),
+        (NTy.enum source arguments names rows distinct).inhabitable = true →
+        Nonempty (@NTy.carrier (Carriers.runtime unit)
+          (.enum source arguments names rows distinct))) ∧
+      ∀ (source : StructHandle) (arguments : NRow) (productive : Bool),
+        (NTy.nominal source arguments productive).inhabitable = true →
+        Nonempty (@NTy.carrier (Carriers.runtime unit)
+          (NTy.nominal source arguments productive))
 
 mutual
 /-- A value of a type that has values, at the public family, from the
@@ -10105,7 +11223,7 @@ noncomputable def NTy.inhabitantSatisfiable (satisfiable : DataInvariantsSatisfi
   | .struct source arguments fields, inhabitable =>
       Classical.choice (satisfiable.1 source arguments fields inhabitable)
   | .enum source arguments names rows distinct, inhabitable =>
-      Classical.choice (satisfiable.2 source arguments names rows distinct inhabitable)
+      Classical.choice (satisfiable.2.1 source arguments names rows distinct inhabitable)
   | .vector _, _ => default
   | .slice _, _ => default
   | .array element length, inhabitable =>
@@ -10126,10 +11244,8 @@ noncomputable def NTy.inhabitantSatisfiable (satisfiable : DataInvariantsSatisfi
   | .observed referent, inhabitable => NTy.inhabitantSatisfiable satisfiable referent inhabitable
   | .param _, _ => default
   | .function _ _ _, inhabitable => absurd inhabitable (by simp [NTy.inhabitable])
-  | .nominal source arguments true, inhabitable =>
-      @Carriers.nominalInhabitant (Carriers.runtime unit) source arguments
-        (by simpa [NTy.inhabitable] using inhabitable)
-  | .nominal _ _ false, inhabitable => absurd inhabitable (by simp [NTy.inhabitable])
+  | .nominal source arguments productive, inhabitable =>
+      Classical.choice (satisfiable.2.2 source arguments productive inhabitable)
 termination_by structural τ _ => τ
 
 /-- A row of values at the public family, from the same hypothesis. -/
@@ -10148,22 +11264,25 @@ of its data invariants: the content of the ledger hypothesis
 noncomputable def CarriersNonempty.ofSatisfiable (satisfiable : DataInvariantsSatisfiable unit) :
     @CarriersNonempty (Carriers.runtime unit) where
   inhabitant := NTy.inhabitantSatisfiable satisfiable
-  inhabitant_nominal := fun _ _ _ _ => rfl
 
 /-- A unit whose declarations state no data invariant satisfies the
 hypothesis: every plain value is certified there
 (`CarriersNonempty.ofTrivial`), so a generated artifact discharges it rather
 than carrying it. -/
 theorem DataInvariantsSatisfiable.of_trivial
-    (own : ∀ source arguments value, FunctionCarriers.own unit source arguments value) :
+    (own : ∀ source arguments value, FunctionCarriers.own unit source arguments value)
+    (nominals : ∀ source productive arguments sorts value,
+      @Carriers.nominalOwn (Carriers.runtime unit) source productive arguments sorts value) :
     DataInvariantsSatisfiable unit :=
   have inhabitants : @CarriersNonempty (Carriers.runtime unit) :=
-    @CarriersNonempty.ofTrivial (Carriers.runtime unit) own (fun _ _ => trivial)
+    @CarriersNonempty.ofTrivial (Carriers.runtime unit) own (fun _ _ => trivial) nominals
       (fun _ value => value)
   ⟨fun source arguments fields inhabitable =>
       ⟨inhabitants.inhabitant (.struct source arguments fields) inhabitable⟩,
     fun source arguments names rows distinct inhabitable =>
-      ⟨inhabitants.inhabitant (.enum source arguments names rows distinct) inhabitable⟩⟩
+      ⟨inhabitants.inhabitant (.enum source arguments names rows distinct) inhabitable⟩,
+    fun source arguments productive inhabitable =>
+      ⟨inhabitants.inhabitant (NTy.nominal source arguments productive) inhabitable⟩⟩
 
 end Satisfiable
 
@@ -10366,18 +11485,18 @@ theorem NTy.readBack_readWrite : (τ : NTy) → (inhabitable : τ.inhabitable = 
 /-- `.unit` reads back as a nominal's inhabitant: it is what `.unit` decodes to, if anything. -/
 theorem NTy.readBack_unit_nominal {source : StructHandle} {arguments : NRow}
     (inhabitable : (NTy.nominal source arguments true).inhabitable = true) :
-    ((Carriers.nominals source arguments true).ofValue? .unit).getD
-        (NTy.inhabitantOf (.nominal source arguments true) inhabitable) =
+    (((NTy.nominal source arguments true).codec.decode? .unit).getD
+        (NTy.inhabitantOf (.nominal source arguments true) inhabitable)) =
       NTy.inhabitantOf (.nominal source arguments true) inhabitable := by
-  have held : arguments.inhabitable = true := by simpa [NTy.inhabitable] using inhabitable
-  cases decoded : (Carriers.nominals source arguments true).ofValue? .unit with
+  cases decoded : (NTy.nominal source arguments true).codec.decode? .unit with
   | none => rfl
   | some value =>
-      have same := Carriers.nominalInhabitant_unit source arguments held value
-        ((Carriers.nominals source arguments true).value_of_ofValue? _ _ decoded)
-      simp only [Option.getD_some, same]
-      rw [NTy.inhabitantOf]
-      exact (CarriersNonempty.inhabitant_nominal source arguments inhabitable held).symm
+      have encoded := NTy.codec_tight (.nominal source arguments true) _ _ decoded
+      simp only [Option.getD_some]
+      exact (Subtype.ext (Carriers.nominalCodec_unit source true
+        (NRow.plainSortsOf Carriers.toPlain arguments)
+        (NRow.sortCodecsOf Carriers.toPlain arguments) value.val
+        (NTy.inhabitantOf (.nominal source arguments true) inhabitable).val encoded)).symm
 
 theorem NTy.readBack_unit : (τ : NTy) → (inhabitable : τ.inhabitable = true) →
     NTy.readBack τ inhabitable .unit = (NTy.readInhabited τ inhabitable).default
@@ -10548,7 +11667,7 @@ them, any other type's by the structural order (`NTy.keyOrder`). -/
   | .sliceRef referent => NTy.keyOrder rank (.sliceRef referent)
   | .ref referent => NTy.keyOrder rank (.ref referent)
   | .function parameters shared results => NTy.keyOrder rank (.function parameters shared results)
-  | .nominal source arguments productive => NTy.keyOrder rank (.nominal source arguments productive)
+  | .nominal source arguments productive => NTy.keyOrder rank (NTy.nominal source arguments productive)
 
 /-- The typed reads of a type, bundled: what a family instantiated at the
 type reads a parameter by. -/
@@ -10626,15 +11745,9 @@ carried as the `i`-th argument at the caller's family. -/
     @Carriers.functionCarrier outer (NRow.subst θ.1 parameters) shared (NRow.subst θ.1 results)
   functions := fun parameters shared results =>
     @Carriers.functions outer (NRow.subst θ.1 parameters) shared (NRow.subst θ.1 results)
-  nominalCarrier := fun source arguments productive =>
-    @Carriers.nominalCarrier outer source (NRow.subst θ.1 arguments) productive
-  nominals := fun source arguments productive =>
-    @Carriers.nominals outer source (NRow.subst θ.1 arguments) productive
-  nominalInhabitant := fun source arguments held =>
-    @Carriers.nominalInhabitant outer source (NRow.subst θ.1 arguments)
-      (NRow.inhabitable_subst θ.1 θ.inhabitable arguments held)
-  nominalInhabitant_unit := fun source arguments _ =>
-    @Carriers.nominalInhabitant_unit outer source (NRow.subst θ.1 arguments) _
+  nominals := @Carriers.nominals outer
+  nominalOwn := fun source productive arguments sorts value =>
+    @Carriers.nominalOwn outer source productive (NRow.subst θ.1 arguments) sorts value
   reads := fun index => @NTy.reads outer inferInstance ((NTy.param index).subst θ.1)
     ((NTy.inhabitable_unmark _).trans
         (NRow.getD_inhabitable θ.1 θ.inhabitable index (.param index) rfl))
@@ -10699,6 +11812,74 @@ A type parameter's lent values are the argument's lent values at the
 caller's family (`Carriers.lent`), so the plain family transports as the
 certified one does and a parameter's own value is itself. -/
 
+private theorem prod_type_congr {A A' B B' : Type} (first : A = A') (second : B = B') :
+    (A × B) = (A' × B') := by
+  subst first; subst second; rfl
+
+private theorem sum_type_congr {A A' B B' : Type} (first : A = A') (second : B = B') :
+    (A ⊕ B) = (A' ⊕ B') := by
+  subst first; subst second; rfl
+
+private theorem cons_type_congr {T T' : Type} {rest rest' : List Type}
+    (head : T = T') (tail : rest = rest') : T :: rest = T' :: rest' := by
+  subst head; subst tail; rfl
+
+section PlainInstantiate
+variable (θ : TypeArgs)
+
+mutual
+/-- The lent carrier at the induced family is the lent carrier at the
+substituted type: a type parameter's lent values are the argument's
+(`Carriers.lent`). -/
+theorem NTy.plain_instantiate : (τ : NTy) →
+    @NTy.plain (Carriers.instantiate θ Θ) τ = @NTy.plain Θ (τ.subst θ.1)
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char | .param _
+  | .function _ _ _ => rfl
+  | .nominal source arguments productive =>
+      congrArg (Carriers.nominals.nominal source productive)
+        (NRow.plainSortsOf_instantiate arguments)
+  | .tuple elements => HListPlain.plain_instantiate elements
+  | .struct _ _ fields => HListPlain.plain_instantiate fields
+  | .enum _ _ names rows _ => variantPlain.plain_instantiate names rows
+  | .slice element => congrArg SpecVector (NTy.plain_instantiate element)
+  | .vector element => congrArg SpecVector (NTy.plain_instantiate element)
+  | .array element length =>
+      congrArg (fun T => SpecArray T length) (NTy.plain_instantiate element)
+  | .table key value =>
+      congrArg SpecEntries
+        (prod_type_congr (NTy.plain_instantiate key) (NTy.plain_instantiate value))
+  | .ghost slot => NTy.plain_instantiate slot
+  | .sliceRef element => congrArg SpecSliceRef (NTy.plain_instantiate element)
+  | .observed referent => NTy.plain_instantiate referent
+  | .ref referent =>
+      prod_type_congr (NTy.plain_instantiate referent) (NTy.plain_instantiate referent)
+theorem HListPlain.plain_instantiate : (row : NRow) →
+    @HListPlain (Carriers.instantiate θ Θ) row = @HListPlain Θ (NRow.subst θ.1 row)
+  | .nil => rfl
+  | .cons τ rest =>
+      prod_type_congr (NTy.plain_instantiate τ) (HListPlain.plain_instantiate rest)
+theorem variantPlain.plain_instantiate : (names : List String) → (rows : NRows) →
+    @variantPlain (Carriers.instantiate θ Θ) names rows =
+      @variantPlain Θ names (NRows.subst θ.1 rows)
+  | _, .nil => rfl
+  | [], .cons _ _ => rfl
+  | _ :: names, .cons fields rest =>
+      sum_type_congr (HListPlain.plain_instantiate fields)
+        (variantPlain.plain_instantiate names rest)
+
+/-- The plain types of a declaration's type arguments at the induced family
+are theirs at the substituted row: substitution reaches a nominal through
+its argument types (`NTy.plainOf`). -/
+theorem NRow.plainSortsOf_instantiate : (row : NRow) →
+    NRow.plainSortsOf (Carriers.instantiate θ Θ).toPlain row =
+      NRow.plainSortsOf Carriers.toPlain (NRow.subst θ.1 row)
+  | .nil => rfl
+  | .cons τ rest =>
+      cons_type_congr (NTy.plain_instantiate τ) (NRow.plainSortsOf_instantiate rest)
+end
+
+end PlainInstantiate
+
 mutual
 /-- A caller's lent value in the callee's view: the same runtime value,
 carried at the family the call's type arguments induce. -/
@@ -10734,7 +11915,9 @@ def NTy.plainToSkolem (θ : TypeArgs) : (τ : NTy) → (τ.subst θ.1).plain →
   | .observed referent, value => NTy.plainToSkolem θ referent value
   | .param _, value => value
   | .function _ _ _, value => value
-  | .nominal _ _ _, value => value
+  | .nominal source arguments productive, value =>
+      cast (congrArg (Carriers.nominals.nominal source productive)
+        (NRow.plainSortsOf_instantiate θ arguments)).symm value
 
 /-- A caller's row of lent values in the callee's view. -/
 def HListPlain.toSkolem (θ : TypeArgs) : (row : NRow) → HListPlain (NRow.subst θ.1 row) →
@@ -10787,7 +11970,9 @@ def NTy.plainOfSkolem (θ : TypeArgs) : (τ : NTy) →
   | .observed referent, value => NTy.plainOfSkolem θ referent value
   | .param _, value => value
   | .function _ _ _, value => value
-  | .nominal _ _ _, value => value
+  | .nominal source arguments productive, value =>
+      cast (congrArg (Carriers.nominals.nominal source productive)
+        (NRow.plainSortsOf_instantiate θ arguments)) value
 
 /-- A callee's row of lent values in the caller's view. -/
 def HListPlain.ofSkolem (θ : TypeArgs) : (row : NRow) →
@@ -10811,7 +11996,8 @@ mutual
 theorem NTy.plainOfSkolem_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.subst θ.1).plain) →
     NTy.plainOfSkolem θ τ (NTy.plainToSkolem θ τ value) = value
   | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
-  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ | .nominal _ _ _, _ => rfl
+  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ => rfl
+  | .nominal _ _ _, _ => eq_of_heq ((cast_heq _ _).trans (cast_heq _ _))
   | .tuple elements, values => HListPlain.ofSkolem_toSkolem θ elements values
   | .struct _ _ fields, values => HListPlain.ofSkolem_toSkolem θ fields values
   | .enum _ _ names rows _, value => variantPlain.ofSkolem_toSkolem θ names rows value
@@ -10879,7 +12065,8 @@ theorem NTy.plainToSkolem_ofSkolem (θ : TypeArgs) : (τ : NTy) →
     (value : @NTy.plain (Carriers.instantiate θ Θ) τ) →
     NTy.plainToSkolem θ τ (NTy.plainOfSkolem θ τ value) = value
   | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
-  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ | .nominal _ _ _, _ => rfl
+  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ => rfl
+  | .nominal _ _ _, _ => eq_of_heq ((cast_heq _ _).trans (cast_heq _ _))
   | .tuple elements, values => HListPlain.toSkolem_ofSkolem θ elements values
   | .struct _ _ fields, values => HListPlain.toSkolem_ofSkolem θ fields values
   | .enum _ _ names rows _, value => variantPlain.toSkolem_ofSkolem θ names rows value
@@ -10941,6 +12128,156 @@ theorem variantPlain.toSkolem_ofSkolem (θ : TypeArgs) : (names : List String) �
       simp only [variantPlain.toSkolem, variantPlain.ofSkolem, variantPlain.toSkolem_ofSkolem θ names rest]
 end
 
+/-- Two predicates of two equal types that agree on equal values are the
+same predicate. -/
+private theorem fun_heq {A B : Type} {P : A → Prop} {Q : B → Prop} (same : A = B)
+    (agree : ∀ (a : A) (b : B), HEq a b → (P a ↔ Q b)) : HEq P Q := by
+  subst same
+  exact heq_of_eq (funext fun a => propext (agree a a HEq.rfl))
+
+/-- A nominal's invariants do not see the cast that moves its value between
+two argument lists that are equal. -/
+private theorem nominal_holds_cast {F : PlainFamily}
+    {own : (source : StructHandle) → (productive : Bool) → NRow → (sorts : List Type) →
+      F.nominals.nominal source productive sorts → Prop}
+    {source : StructHandle} {productive : Bool} {arguments : NRow}
+    {sorts sorts' : List Type} (same : sorts = sorts')
+    {holds : SortHolds sorts} {holds' : SortHolds sorts'} (sameHolds : HEq holds holds')
+    (value : F.nominals.nominal source productive sorts') :
+    F.nominals.nominalHolds own source productive arguments sorts holds
+        (cast (congrArg (F.nominals.nominal source productive) same).symm value) =
+      F.nominals.nominalHolds own source productive arguments sorts' holds' value := by
+  subst same
+  cases eq_of_heq sameHolds
+  rfl
+
+/-- A nominal's encoding does not see the cast that moves its value between
+two argument lists that are equal. -/
+private theorem nominal_encode_cast {F : PlainFamily} {source : StructHandle} {productive : Bool}
+    {sorts sorts' : List Type} (same : sorts = sorts')
+    {codecs : SortCodecs sorts} {codecs' : SortCodecs sorts'} (sameCodecs : HEq codecs codecs')
+    (value : F.nominals.nominal source productive sorts') :
+    (F.nominalCodec source productive sorts codecs).encode
+        (cast (congrArg (F.nominals.nominal source productive) same).symm value) =
+      (F.nominalCodec source productive sorts' codecs').encode value := by
+  subst same
+  cases eq_of_heq sameCodecs
+  rfl
+
+private theorem prod_mk_heq {A A' B B' : Type} (ha : A = A') (hb : B = B') (a : A) (b : B)
+    (p : A' × B') (first : HEq a p.1) (second : HEq b p.2) : HEq (a, b) p := by
+  subst ha; subst hb
+  obtain ⟨x, y⟩ := p
+  rw [eq_of_heq first, eq_of_heq second]
+
+private theorem sum_inl_heq {A A' B B' : Type} (ha : A = A') (hb : B = B') (a : A) (a' : A')
+    (same : HEq a a') : HEq (Sum.inl a : A ⊕ B) (Sum.inl a' : A' ⊕ B') := by
+  subst ha; subst hb
+  rw [eq_of_heq same]
+
+private theorem sum_inr_heq {A A' B B' : Type} (ha : A = A') (hb : B = B') (b : B) (b' : B')
+    (same : HEq b b') : HEq (Sum.inr b : A ⊕ B) (Sum.inr b' : A' ⊕ B') := by
+  subst ha; subst hb
+  rw [eq_of_heq same]
+
+private theorem specArray_map_heq {A B : Type} {length : Nat} (h : A = B) (f : A → B)
+    (array : SpecArray A length) (bounded : (array.vector.values.map f).size < 2 ^ 64)
+    (sized : (⟨array.vector.values.map f, bounded⟩ : SpecVector B).values.size = length)
+    (same : ∀ x, HEq (f x) x) :
+    HEq (⟨⟨array.vector.values.map f, bounded⟩, sized⟩ : SpecArray B length) array := by
+  subst h
+  have identity : f = id := funext fun x => eq_of_heq (same x)
+  obtain ⟨⟨values, _⟩, _⟩ := array
+  simp only [identity, Array.map_id]
+  exact HEq.rfl
+
+private theorem specVector_map_heq {A B : Type} (h : A = B) (f : A → B) (vector : SpecVector A)
+    (bounded : (vector.values.map f).size < 2 ^ 64) (same : ∀ x, HEq (f x) x) :
+    HEq (⟨vector.values.map f, bounded⟩ : SpecVector B) vector := by
+  subst h
+  have identity : f = id := funext fun x => eq_of_heq (same x)
+  obtain ⟨values, _⟩ := vector
+  simp only [identity, Array.map_id]
+  exact HEq.rfl
+
+private theorem specEntries_map_heq {K K' V V' : Type} (hk : K = K') (hv : V = V')
+    (fk : K → K') (fv : V → V') (table : SpecEntries (K × V))
+    (bounded : (table.entries.map fun entry => (fk entry.1, fv entry.2)).length < 2 ^ 64)
+    (sameKeys : ∀ k, HEq (fk k) k) (sameValues : ∀ v, HEq (fv v) v) :
+    HEq (⟨table.entries.map fun entry => (fk entry.1, fv entry.2), bounded⟩ : SpecEntries (K' × V'))
+      table := by
+  subst hk; subst hv
+  have identity : (fun entry : K × V => (fk entry.1, fv entry.2)) = id :=
+    funext fun entry => by simp only [eq_of_heq (sameKeys entry.1), eq_of_heq (sameValues entry.2), id]
+  obtain ⟨entries, _⟩ := table
+  simp only [identity, List.map_id]
+  exact HEq.rfl
+
+private theorem specSliceRef_map_heq {A B : Type} (h : A = B) (f : A → B)
+    (value : SpecSliceRef A) (same : ∀ x, HEq (f x) x) : HEq (value.map f) value := by
+  subst h
+  have identity : f = id := funext fun x => eq_of_heq (same x)
+  rw [identity]
+  exact heq_of_eq (SpecSliceRef.map_id value)
+
+
+
+section PlainToSkolemHeq
+variable (θ : TypeArgs)
+
+mutual
+/-- A caller's lent value in the callee's view is the value. -/
+theorem NTy.plainToSkolem_heq : (τ : NTy) → (value : (τ.subst θ.1).plain) →
+    HEq (NTy.plainToSkolem θ τ value) value
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
+  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ => HEq.rfl
+  | .nominal _ _ _, _ => cast_heq _ _
+  | .tuple elements, values => HListPlain.toSkolem_heq elements values
+  | .struct _ _ fields, values => HListPlain.toSkolem_heq fields values
+  | .enum _ _ names rows _, value => variantPlain.toSkolem_heq names rows value
+  | .slice element, vector =>
+      specVector_map_heq (NTy.plain_instantiate θ element).symm _ vector _
+        (NTy.plainToSkolem_heq element)
+  | .vector element, vector =>
+      specVector_map_heq (NTy.plain_instantiate θ element).symm _ vector _
+        (NTy.plainToSkolem_heq element)
+  | .array element _, array =>
+      specArray_map_heq (NTy.plain_instantiate θ element).symm _ array _ _
+        (NTy.plainToSkolem_heq element)
+  | .table key value, table =>
+      specEntries_map_heq (NTy.plain_instantiate θ key).symm
+        (NTy.plain_instantiate θ value).symm _ _ table _
+        (NTy.plainToSkolem_heq key) (NTy.plainToSkolem_heq value)
+  | .ghost slot, value => NTy.plainToSkolem_heq slot value
+  | .observed referent, value => NTy.plainToSkolem_heq referent value
+  | .sliceRef element, value =>
+      specSliceRef_map_heq (NTy.plain_instantiate θ element).symm _ value
+        (NTy.plainToSkolem_heq element)
+  | .ref referent, value =>
+      prod_mk_heq (NTy.plain_instantiate θ referent) (NTy.plain_instantiate θ referent) _ _ value
+        (NTy.plainToSkolem_heq referent value.1) (NTy.plainToSkolem_heq referent value.2)
+theorem HListPlain.toSkolem_heq : (row : NRow) → (values : HListPlain (NRow.subst θ.1 row)) →
+    HEq (HListPlain.toSkolem θ row values) values
+  | .nil, values => by cases values; exact HEq.rfl
+  | .cons τ rest, values =>
+      prod_mk_heq (NTy.plain_instantiate θ τ) (HListPlain.plain_instantiate θ rest) _ _
+        values (NTy.plainToSkolem_heq τ values.1) (HListPlain.toSkolem_heq rest values.2)
+theorem variantPlain.toSkolem_heq : (names : List String) → (rows : NRows) →
+    (value : variantPlain names (NRows.subst θ.1 rows)) →
+    HEq (variantPlain.toSkolem θ names rows value) value
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | _ :: names, .cons fields rest, .inl values =>
+      sum_inl_heq (HListPlain.plain_instantiate θ fields)
+        (variantPlain.plain_instantiate θ names rest) _ _ (HListPlain.toSkolem_heq fields values)
+  | _ :: names, .cons fields rest, .inr value =>
+      sum_inr_heq (HListPlain.plain_instantiate θ fields)
+        (variantPlain.plain_instantiate θ names rest) _ _
+        (variantPlain.toSkolem_heq names rest value)
+end
+
+end PlainToSkolemHeq
+
 mutual
 /-- Transport of a lent value to the callee's view keeps its encoding. -/
 theorem NTy.plainEncode_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.subst θ.1).plain) →
@@ -10957,7 +12294,9 @@ theorem NTy.plainEncode_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.s
   | .char, _ => rfl
   | .param _, _ => rfl
   | .function _ _ _, _ => rfl
-  | .nominal _ _ _, _ => rfl
+  | .nominal source arguments productive, value =>
+      nominal_encode_cast (NRow.plainSortsOf_instantiate θ arguments)
+        (NRow.sortCodecsOf_instantiate θ arguments) value
   | .observed referent, value => NTy.plainEncode_toSkolem θ referent value
   | .tuple elements, values => by
       show @NTy.plainEncode (Carriers.instantiate θ Θ) (.tuple elements)
@@ -11079,6 +12418,24 @@ theorem variantPlain.encode_toSkolem (θ : TypeArgs) (source : StructHandle) :
           (.cons (NRow.subst θ.1 fields) (rest.subst θ.1)) distinct) (.inr value)
       rw [@NTy.plainEncode_enum_inr (Carriers.instantiate θ Θ), NTy.plainEncode_enum_inr]
       exact variantPlain.encode_toSkolem θ source names rest _ value
+/-- The codecs of a declaration's type arguments at the induced family are
+theirs at the substituted row: a tight codec is determined by its encoder,
+and the encodings agree (`NTy.plainEncode_toSkolem`). -/
+theorem NRow.sortCodecsOf_instantiate (θ : TypeArgs) : (row : NRow) →
+    HEq (NRow.sortCodecsOf (Carriers.instantiate θ Θ).toPlain row)
+      (NRow.sortCodecsOf Carriers.toPlain (NRow.subst θ.1 row))
+  | .nil => HEq.rfl
+  | .cons τ rest =>
+      prod_mk_heq (congrArg (fun T => Codec T RuntimeValue) (NTy.plain_instantiate θ τ))
+        (congrArg SortCodecs (NRow.plainSortsOf_instantiate θ rest)) _ _ _
+        (Codec.heq_of_encode (NTy.plain_instantiate θ τ)
+          (@NTy.plainCodec_tight (Carriers.instantiate θ Θ) τ)
+          (NTy.plainCodec_tight (τ.subst θ.1))
+          (fun left right carried => by
+            rw [eq_of_heq (carried.trans (NTy.plainToSkolem_heq θ τ right).symm)]
+            exact NTy.plainEncode_toSkolem θ τ right))
+        (NRow.sortCodecsOf_instantiate θ rest)
+
 end
 
 /-- Transport of a lent value to the caller's view keeps its encoding
@@ -11122,7 +12479,10 @@ theorem NTy.deepHolds_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.sub
   | .char, _ => Iff.rfl
   | .param _, _ => Iff.rfl
   | .function _ _ _, _ => Iff.rfl
-  | .nominal _ _ _, _ => Iff.rfl
+  | .nominal source arguments productive, value =>
+      Iff.of_eq ((nominal_holds_cast (NRow.plainSortsOf_instantiate θ arguments)
+          (NRow.sortHolds_instantiate θ arguments) value).trans
+        (Carriers.nominals.nominalHolds_subst _ θ.1 source productive arguments _ _ value))
   | .tuple elements, values => HListPlain.deepHolds_toSkolem θ elements values
   | .ghost slot, value => NTy.deepHolds_toSkolem θ slot value
   | .ref referent, value => NTy.deepHolds_toSkolem θ referent value.2
@@ -11215,6 +12575,20 @@ theorem variantPlain.deepHolds_toSkolem (θ : TypeArgs) : (names : List String) 
   | [], .cons _ _, value => nomatch value
   | _ :: _, .cons fields _, .inl values => HListPlain.deepHolds_toSkolem θ fields values
   | _ :: names, .cons _ rest, .inr value => variantPlain.deepHolds_toSkolem θ names rest value
+
+/-- The invariants of a declaration's type arguments at the induced family
+are theirs at the substituted row. -/
+theorem NRow.sortHolds_instantiate (θ : TypeArgs) : (row : NRow) →
+    HEq (@NRow.sortHolds (Carriers.instantiate θ Θ) row)
+      (@NRow.sortHolds Θ (NRow.subst θ.1 row))
+  | .nil => HEq.rfl
+  | .cons τ rest =>
+      prod_mk_heq (congrArg (fun T => T → Prop) (NTy.plain_instantiate θ τ))
+        (congrArg SortHolds (NRow.plainSortsOf_instantiate θ rest)) _ _ _
+        (fun_heq (NTy.plain_instantiate θ τ) (fun left right carried => by
+          rw [eq_of_heq (carried.trans (NTy.plainToSkolem_heq θ τ right).symm)]
+          exact NTy.deepHolds_toSkolem θ τ right))
+        (NRow.sortHolds_instantiate θ rest)
 end
 
 /-- A transported lent value satisfies the data invariants in the callee's
@@ -11268,7 +12642,11 @@ def NTy.toSkolem (θ : TypeArgs) : (τ : NTy) → (τ.subst θ.1).carrier →
       (NTy.plainToSkolem θ referent value.1, NTy.toSkolem θ referent value.2)
 
   | .param _, value => value
-  | .function _ _ _, value | .nominal _ _ _, value => value
+  | .function _ _ _, value => value
+  | .nominal source arguments productive, value =>
+      ⟨NTy.plainToSkolem θ (NTy.nominal source arguments productive) value.val,
+        (NTy.deepHolds_toSkolem θ (NTy.nominal source arguments productive) value.val).mpr
+          value.property⟩
 
 def HList.toSkolem (θ : TypeArgs) : (row : NRow) → HList (NRow.subst θ.1 row) →
     @HList (Carriers.instantiate θ Θ) row
@@ -11323,7 +12701,11 @@ def NTy.ofSkolem (θ : TypeArgs) : (τ : NTy) → @NTy.carrier (Carriers.instant
       (NTy.plainOfSkolem θ referent value.1, NTy.ofSkolem θ referent value.2)
 
   | .param _, value => value
-  | .function _ _ _, value | .nominal _ _ _, value => value
+  | .function _ _ _, value => value
+  | .nominal source arguments productive, value =>
+      ⟨NTy.plainOfSkolem θ (NTy.nominal source arguments productive) value.val,
+        (NTy.deepHolds_ofSkolem θ (NTy.nominal source arguments productive) value.val).mpr
+          value.property⟩
 
 def HList.ofSkolem (θ : TypeArgs) : (row : NRow) → @HList (Carriers.instantiate θ Θ) row →
     HList (NRow.subst θ.1 row)
@@ -11345,9 +12727,6 @@ instance CarriersNonempty.instantiate (θ : TypeArgs) (outer : Carriers)
   inhabitant := fun τ inhabitable =>
     @NTy.toSkolem outer inner θ τ
       (@NTy.inhabitant outer inner (τ.subst θ.1) (NTy.inhabitable_subst θ.1 θ.inhabitable τ inhabitable))
-  inhabitant_nominal := fun source arguments _ held =>
-    inner.inhabitant_nominal source (NRow.subst θ.1 arguments) _
-      (NRow.inhabitable_subst θ.1 θ.inhabitable arguments held)
 
 /-- A callee's result in the caller's view. -/
 def ResultShape.ofSkolem (θ : TypeArgs) : (shape : ResultShape) →
@@ -11589,7 +12968,8 @@ theorem NTy.encode_ofSkolem (θ : TypeArgs) : (τ : NTy) →
       simp only [NTy.ofSkolem]
       rw [NTy.encode_ofSkolem θ slot value]
   | .observed referent, value => NTy.encode_ofSkolem θ referent value
-  | .nominal _ _ _, _ => rfl
+  | .nominal source arguments productive, value =>
+      NTy.plainEncode_ofSkolem θ (NTy.nominal source arguments productive) value.val
 
 
 theorem HList.encode_ofSkolem (θ : TypeArgs) : (row : NRow) →
@@ -11701,7 +13081,8 @@ theorem NTy.encode_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.subst 
       simp only [NTy.toSkolem]
       rw [NTy.encode_toSkolem θ slot value]
   | .observed referent, value => NTy.encode_toSkolem θ referent value
-  | .nominal _ _ _, _ => rfl
+  | .nominal source arguments productive, value =>
+      NTy.plainEncode_toSkolem θ (NTy.nominal source arguments productive) value.val
 
 
 theorem HList.encode_toSkolem (θ : TypeArgs) : (row : NRow) →
@@ -11823,71 +13204,6 @@ unfold to the same type, so a transport of a value is the value
 section TransportIdentity
 variable (θ : TypeArgs)
 
-private theorem prod_type_congr {A A' B B' : Type} (first : A = A') (second : B = B') :
-    (A × B) = (A' × B') := by
-  subst first; subst second; rfl
-
-private theorem sum_type_congr {A A' B B' : Type} (first : A = A') (second : B = B') :
-    (A ⊕ B) = (A' ⊕ B') := by
-  subst first; subst second; rfl
-
-private theorem prod_mk_heq {A A' B B' : Type} (ha : A = A') (hb : B = B') (a : A) (b : B)
-    (p : A' × B') (first : HEq a p.1) (second : HEq b p.2) : HEq (a, b) p := by
-  subst ha; subst hb
-  obtain ⟨x, y⟩ := p
-  rw [eq_of_heq first, eq_of_heq second]
-
-private theorem sum_inl_heq {A A' B B' : Type} (ha : A = A') (hb : B = B') (a : A) (a' : A')
-    (same : HEq a a') : HEq (Sum.inl a : A ⊕ B) (Sum.inl a' : A' ⊕ B') := by
-  subst ha; subst hb
-  rw [eq_of_heq same]
-
-private theorem sum_inr_heq {A A' B B' : Type} (ha : A = A') (hb : B = B') (b : B) (b' : B')
-    (same : HEq b b') : HEq (Sum.inr b : A ⊕ B) (Sum.inr b' : A' ⊕ B') := by
-  subst ha; subst hb
-  rw [eq_of_heq same]
-
-private theorem specArray_map_heq {A B : Type} {length : Nat} (h : A = B) (f : A → B)
-    (array : SpecArray A length) (bounded : (array.vector.values.map f).size < 2 ^ 64)
-    (sized : (⟨array.vector.values.map f, bounded⟩ : SpecVector B).values.size = length)
-    (same : ∀ x, HEq (f x) x) :
-    HEq (⟨⟨array.vector.values.map f, bounded⟩, sized⟩ : SpecArray B length) array := by
-  subst h
-  have identity : f = id := funext fun x => eq_of_heq (same x)
-  obtain ⟨⟨values, _⟩, _⟩ := array
-  simp only [identity, Array.map_id]
-  exact HEq.rfl
-
-private theorem specVector_map_heq {A B : Type} (h : A = B) (f : A → B) (vector : SpecVector A)
-    (bounded : (vector.values.map f).size < 2 ^ 64) (same : ∀ x, HEq (f x) x) :
-    HEq (⟨vector.values.map f, bounded⟩ : SpecVector B) vector := by
-  subst h
-  have identity : f = id := funext fun x => eq_of_heq (same x)
-  obtain ⟨values, _⟩ := vector
-  simp only [identity, Array.map_id]
-  exact HEq.rfl
-
-private theorem specEntries_map_heq {K K' V V' : Type} (hk : K = K') (hv : V = V')
-    (fk : K → K') (fv : V → V') (table : SpecEntries (K × V))
-    (bounded : (table.entries.map fun entry => (fk entry.1, fv entry.2)).length < 2 ^ 64)
-    (sameKeys : ∀ k, HEq (fk k) k) (sameValues : ∀ v, HEq (fv v) v) :
-    HEq (⟨table.entries.map fun entry => (fk entry.1, fv entry.2), bounded⟩ : SpecEntries (K' × V'))
-      table := by
-  subst hk; subst hv
-  have identity : (fun entry : K × V => (fk entry.1, fv entry.2)) = id :=
-    funext fun entry => by simp only [eq_of_heq (sameKeys entry.1), eq_of_heq (sameValues entry.2), id]
-  obtain ⟨entries, _⟩ := table
-  simp only [identity, List.map_id]
-  exact HEq.rfl
-
-private theorem specSliceRef_map_heq {A B : Type} (h : A = B) (f : A → B)
-    (value : SpecSliceRef A) (same : ∀ x, HEq (f x) x) : HEq (value.map f) value := by
-  subst h
-  have identity : f = id := funext fun x => eq_of_heq (same x)
-  rw [identity]
-  exact heq_of_eq (SpecSliceRef.map_id value)
-
-
 /-- Two certified carriers are the same type where their plain carriers are
 and their certificates agree, the agreement read through a map that carries
 a value to itself. -/
@@ -11916,50 +13232,14 @@ private theorem subtype_heq {A B : Type} (same : A = B) (f : A → B)
   subst predicates
   exact heq_of_eq (Subtype.ext (eq_of_heq values))
 
-mutual
-/-- The lent carrier at the induced family is the lent carrier at the
-substituted type: a type parameter's lent values are the argument's
-(`Carriers.lent`). -/
-theorem NTy.plain_instantiate : (τ : NTy) →
-    @NTy.plain (Carriers.instantiate θ Θ) τ = @NTy.plain Θ (τ.subst θ.1)
-  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char | .param _
-  | .function _ _ _ | .nominal _ _ _ => rfl
-  | .tuple elements => HListPlain.plain_instantiate elements
-  | .struct _ _ fields => HListPlain.plain_instantiate fields
-  | .enum _ _ names rows _ => variantPlain.plain_instantiate names rows
-  | .slice element => congrArg SpecVector (NTy.plain_instantiate element)
-  | .vector element => congrArg SpecVector (NTy.plain_instantiate element)
-  | .array element length =>
-      congrArg (fun T => SpecArray T length) (NTy.plain_instantiate element)
-  | .table key value =>
-      congrArg SpecEntries
-        (prod_type_congr (NTy.plain_instantiate key) (NTy.plain_instantiate value))
-  | .ghost slot => NTy.plain_instantiate slot
-  | .sliceRef element => congrArg SpecSliceRef (NTy.plain_instantiate element)
-  | .observed referent => NTy.plain_instantiate referent
-  | .ref referent =>
-      prod_type_congr (NTy.plain_instantiate referent) (NTy.plain_instantiate referent)
-theorem HListPlain.plain_instantiate : (row : NRow) →
-    @HListPlain (Carriers.instantiate θ Θ) row = @HListPlain Θ (NRow.subst θ.1 row)
-  | .nil => rfl
-  | .cons τ rest =>
-      prod_type_congr (NTy.plain_instantiate τ) (HListPlain.plain_instantiate rest)
-theorem variantPlain.plain_instantiate : (names : List String) → (rows : NRows) →
-    @variantPlain (Carriers.instantiate θ Θ) names rows =
-      @variantPlain Θ names (NRows.subst θ.1 rows)
-  | _, .nil => rfl
-  | [], .cons _ _ => rfl
-  | _ :: names, .cons fields rest =>
-      sum_type_congr (HListPlain.plain_instantiate fields)
-        (variantPlain.plain_instantiate names rest)
-end
 
 mutual
 /-- A callee's lent value in the caller's view is the value. -/
 theorem NTy.plainOfSkolem_heq : (τ : NTy) → (value : @NTy.plain (Carriers.instantiate θ Θ) τ) →
     HEq (NTy.plainOfSkolem θ τ value) value
   | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
-  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ | .nominal _ _ _, _ => HEq.rfl
+  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ => HEq.rfl
+  | .nominal _ _ _, _ => cast_heq _ _
   | .tuple elements, values => HListPlain.ofSkolem_heq elements values
   | .struct _ _ fields, values => HListPlain.ofSkolem_heq fields values
   | .enum _ _ names rows _, value => variantPlain.ofSkolem_heq names rows value
@@ -12006,55 +13286,6 @@ theorem variantPlain.ofSkolem_heq : (names : List String) → (rows : NRows) →
         (variantPlain.ofSkolem_heq names rest value)
 end
 
-mutual
-/-- A caller's lent value in the callee's view is the value. -/
-theorem NTy.plainToSkolem_heq : (τ : NTy) → (value : (τ.subst θ.1).plain) →
-    HEq (NTy.plainToSkolem θ τ value) value
-  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
-  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ | .nominal _ _ _, _ => HEq.rfl
-  | .tuple elements, values => HListPlain.toSkolem_heq elements values
-  | .struct _ _ fields, values => HListPlain.toSkolem_heq fields values
-  | .enum _ _ names rows _, value => variantPlain.toSkolem_heq names rows value
-  | .slice element, vector =>
-      specVector_map_heq (NTy.plain_instantiate θ element).symm _ vector _
-        (NTy.plainToSkolem_heq element)
-  | .vector element, vector =>
-      specVector_map_heq (NTy.plain_instantiate θ element).symm _ vector _
-        (NTy.plainToSkolem_heq element)
-  | .array element _, array =>
-      specArray_map_heq (NTy.plain_instantiate θ element).symm _ array _ _
-        (NTy.plainToSkolem_heq element)
-  | .table key value, table =>
-      specEntries_map_heq (NTy.plain_instantiate θ key).symm
-        (NTy.plain_instantiate θ value).symm _ _ table _
-        (NTy.plainToSkolem_heq key) (NTy.plainToSkolem_heq value)
-  | .ghost slot, value => NTy.plainToSkolem_heq slot value
-  | .observed referent, value => NTy.plainToSkolem_heq referent value
-  | .sliceRef element, value =>
-      specSliceRef_map_heq (NTy.plain_instantiate θ element).symm _ value
-        (NTy.plainToSkolem_heq element)
-  | .ref referent, value =>
-      prod_mk_heq (NTy.plain_instantiate θ referent) (NTy.plain_instantiate θ referent) _ _ value
-        (NTy.plainToSkolem_heq referent value.1) (NTy.plainToSkolem_heq referent value.2)
-theorem HListPlain.toSkolem_heq : (row : NRow) → (values : HListPlain (NRow.subst θ.1 row)) →
-    HEq (HListPlain.toSkolem θ row values) values
-  | .nil, values => by cases values; exact HEq.rfl
-  | .cons τ rest, values =>
-      prod_mk_heq (NTy.plain_instantiate θ τ) (HListPlain.plain_instantiate θ rest) _ _
-        values (NTy.plainToSkolem_heq τ values.1) (HListPlain.toSkolem_heq rest values.2)
-theorem variantPlain.toSkolem_heq : (names : List String) → (rows : NRows) →
-    (value : variantPlain names (NRows.subst θ.1 rows)) →
-    HEq (variantPlain.toSkolem θ names rows value) value
-  | _, .nil, value => nomatch value
-  | [], .cons _ _, value => nomatch value
-  | _ :: names, .cons fields rest, .inl values =>
-      sum_inl_heq (HListPlain.plain_instantiate θ fields)
-        (variantPlain.plain_instantiate θ names rest) _ _ (HListPlain.toSkolem_heq fields values)
-  | _ :: names, .cons fields rest, .inr value =>
-      sum_inr_heq (HListPlain.plain_instantiate θ fields)
-        (variantPlain.plain_instantiate θ names rest) _ _
-        (variantPlain.toSkolem_heq names rest value)
-end
 
 mutual
 /-- The carrier at the induced family is the carrier at the substituted
@@ -12063,7 +13294,13 @@ certificates (`NTy.deepHolds_ofSkolem`). -/
 theorem NTy.carrier_instantiate : (τ : NTy) →
     @NTy.carrier (Carriers.instantiate θ Θ) τ = @NTy.carrier Θ (τ.subst θ.1)
   | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char | .param _
-  | .function _ _ _ | .nominal _ _ _ => rfl
+  | .function _ _ _ => rfl
+  | .nominal source arguments productive =>
+      subtype_congr (NTy.plain_instantiate θ (NTy.nominal source arguments productive))
+        (NTy.plainOfSkolem θ (NTy.nominal source arguments productive))
+        (NTy.plainOfSkolem_heq θ (NTy.nominal source arguments productive))
+        (fun row =>
+          (NTy.deepHolds_ofSkolem θ (NTy.nominal source arguments productive) row).symm)
   | .tuple elements => HList.carrier_instantiate elements
   | .struct source arguments fields =>
       subtype_congr (HListPlain.plain_instantiate θ fields) (HListPlain.ofSkolem θ fields)
@@ -12115,7 +13352,15 @@ mutual
 theorem NTy.ofSkolem_heq : (τ : NTy) → (value : @NTy.carrier (Carriers.instantiate θ Θ) τ) →
     HEq (NTy.ofSkolem θ τ value) value
   | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
-  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ | .nominal _ _ _, _ => HEq.rfl
+  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ => HEq.rfl
+  | .nominal source arguments productive, value =>
+      (subtype_heq (NTy.plain_instantiate θ (NTy.nominal source arguments productive))
+        (NTy.plainOfSkolem θ (NTy.nominal source arguments productive))
+        (NTy.plainOfSkolem_heq θ (NTy.nominal source arguments productive))
+        (fun row =>
+          (NTy.deepHolds_ofSkolem θ (NTy.nominal source arguments productive) row).symm)
+        value (NTy.ofSkolem θ (NTy.nominal source arguments productive) value)
+        (NTy.plainOfSkolem_heq θ (NTy.nominal source arguments productive) value.val).symm).symm
   | .tuple elements, values => HList.ofSkolem_heq elements values
   | .struct source arguments fields, value =>
       (subtype_heq (HListPlain.plain_instantiate θ fields) (HListPlain.ofSkolem θ fields)
@@ -12176,7 +13421,14 @@ mutual
 theorem NTy.toSkolem_heq : (τ : NTy) → (value : (τ.subst θ.1).carrier) →
     HEq (NTy.toSkolem θ τ value) value
   | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
-  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ | .nominal _ _ _, _ => HEq.rfl
+  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ => HEq.rfl
+  | .nominal source arguments productive, value =>
+      subtype_heq (NTy.plain_instantiate θ (NTy.nominal source arguments productive))
+        (NTy.plainOfSkolem θ (NTy.nominal source arguments productive))
+        (NTy.plainOfSkolem_heq θ (NTy.nominal source arguments productive))
+        (fun row => (NTy.deepHolds_ofSkolem θ (NTy.nominal source arguments productive) row).symm)
+        (NTy.toSkolem θ (NTy.nominal source arguments productive) value) value
+        (NTy.plainToSkolem_heq θ (NTy.nominal source arguments productive) value.val)
   | .tuple elements, values => HList.toSkolem_heq elements values
   | .struct source arguments fields, value =>
       subtype_heq (HListPlain.plain_instantiate θ fields) (HListPlain.ofSkolem θ fields)
@@ -12256,7 +13508,10 @@ mutual
 theorem NTy.ofSkolem_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.subst θ.1).carrier) →
     NTy.ofSkolem θ τ (NTy.toSkolem θ τ value) = value
   | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ | .char, _
-  | .param _, _ | .function _ _ _, _ | .nominal _ _ _, _ => rfl
+  | .param _, _ | .function _ _ _, _ => rfl
+  | .nominal source arguments productive, value =>
+      Subtype.ext
+        (NTy.plainOfSkolem_toSkolem θ (NTy.nominal source arguments productive) value.val)
   | .tuple elements, values => HList.ofSkolem_toSkolem θ elements values
   | .struct _ _ fields, values => Subtype.ext (HListPlain.ofSkolem_toSkolem θ fields values.val)
   | .enum _ _ names rows _, value =>
@@ -12326,7 +13581,10 @@ theorem NTy.toSkolem_ofSkolem (θ : TypeArgs) : (τ : NTy) →
     (value : @NTy.carrier (Carriers.instantiate θ Θ) τ) →
     NTy.toSkolem θ τ (NTy.ofSkolem θ τ value) = value
   | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ | .char, _
-  | .param _, _ | .function _ _ _, _ | .nominal _ _ _, _ => rfl
+  | .param _, _ | .function _ _ _, _ => rfl
+  | .nominal source arguments productive, value =>
+      Subtype.ext
+        (NTy.plainToSkolem_ofSkolem θ (NTy.nominal source arguments productive) value.val)
   | .tuple elements, values => HList.toSkolem_ofSkolem θ elements values
   | .struct _ _ fields, values => Subtype.ext (HListPlain.toSkolem_ofSkolem θ fields values.val)
   | .enum _ _ names rows _, value =>
@@ -12721,21 +13979,11 @@ parameter as an inhabitable type.  Only the runtime family's inhabitants
 are assumed (`Skolems.runtimeNonempty`); every frame's follow. -/
 noncomputable instance Skolems.carriersNonempty (Θ : Skolems unit) :
     CarriersNonempty Θ.toCarriers where
-  -- MERGE-REVIEW: a nominal's inhabitant is the frame's own
-  -- (`Carriers.nominalInhabitant`), which `NTy.readBack_unit_nominal`
-  -- reads; nothing relates a carry-back from the runtime family to it, and
-  -- a nominal's values carry no certificate, so there is nothing to carry.
   inhabitant := fun τ inhabitable =>
-    match τ, inhabitable with
-    | .nominal source arguments true, held =>
-        @Carriers.nominalInhabitant Θ.toCarriers source arguments
-          (by simpa [NTy.inhabitable] using held)
-    | τ, inhabitable =>
-        Θ.ofRuntime τ (@NTy.inhabitant (Carriers.runtime unit) Θ.runtimeNonempty (Θ.resolve τ)
-          (by
-            rw [Θ.resolve_eq τ]
-            exact NTy.inhabitable_substWith _ Θ.argument_inhabitable τ inhabitable))
-  inhabitant_nominal := fun _ _ _ _ => rfl
+    Θ.ofRuntime τ (@NTy.inhabitant (Carriers.runtime unit) Θ.runtimeNonempty (Θ.resolve τ)
+      (by
+        rw [Θ.resolve_eq τ]
+        exact NTy.inhabitable_substWith _ Θ.argument_inhabitable τ inhabitable))
 
 /-- The inhabitants of the runtime family, as a frame carries them. -/
 instance (priority := low) Skolems.runtimeCarriersNonempty [Θ : Skolems unit] :

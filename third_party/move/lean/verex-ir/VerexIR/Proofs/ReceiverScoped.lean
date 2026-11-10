@@ -111,7 +111,9 @@ theorem receiverScopedShape_of_function {unit : ValidatedUnit} [FunctionCarriers
     (function : (NTy.function parameters shared results).carrier) :
     let closure := (Carriers.functions parameters shared results).closure function
     receiverScopedShape unit closure.function closure.mask closure.typeInstantiation closure.captures = true := by
-  have admitted := NTy.admits_encode unit (Θ.resolve (.function parameters shared results))
+  have admitted := NTy.admits_encode_function unit
+    (Θ.resolve (.function parameters shared results)) (NRow.substWith Θ.type parameters) shared
+    (NRow.substWith Θ.type results) (by rw [Θ.resolve_eq_type]; rfl)
     (Θ.toRuntime (.function parameters shared results) function)
   change NTy.admits unit (Θ.resolve (.function parameters shared results))
     (@NTy.encode (Carriers.runtime unit) _

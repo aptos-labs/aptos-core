@@ -40,7 +40,8 @@ open VerexIR.SemanticOperations
 
 section Carriers
 
-variable (unit : Validation.ValidatedUnit) (C : NRow → Sharing → NRow → Type)
+variable (unit : Validation.ValidatedUnit) [NominalCarriers unit]
+  (C : NRow → Sharing → NRow → Type)
 
 mutual
 /-- The carrier of a native type at the base frame, its function types
@@ -67,12 +68,19 @@ carried by `C`. -/
   | .ref referent => NTy.carrierWith referent × NTy.carrierWith referent
   | .param _ => PlainValue
   | .function parameters shared results => C parameters shared results
-  | .nominal source arguments productive => RuntimeNominal unit source arguments productive
+  | .nominal source arguments productive =>
+      (NominalCarriers.toNominalFunctor unit).nominal source productive (NRow.sortsWith arguments)
 
 /-- A row of values, as `HList` at the base frame. -/
 def HListWith : NRow → Type
   | .nil => Unit
   | .cons τ rest => NTy.carrierWith τ × HListWith rest
+
+/-- The carriers of a declaration's type arguments at this interpretation,
+which its functor reads (`NominalFunctor.nominal`). -/
+@[reducible] def NRow.sortsWith : NRow → List Type
+  | .nil => []
+  | .cons τ rest => NTy.carrierWith τ :: NRow.sortsWith rest
 
 /-- A variant value, as `variantCarrier` at the base frame. -/
 def variantCarrierWith : List String → NRows → Type
@@ -85,7 +93,8 @@ end Carriers
 
 section Codecs
 
-variable {unit : Validation.ValidatedUnit} {C : NRow → Sharing → NRow → Type}
+variable {unit : Validation.ValidatedUnit} [NominalCarriers unit]
+  {C : NRow → Sharing → NRow → Type}
 
 section Encode
 
@@ -121,12 +130,20 @@ def NTy.encodeWith : (τ : NTy) → τ.carrierWith unit C → RuntimeValue
   | .ref referent, value => .tuple #[NTy.encodeWith referent value.1, NTy.encodeWith referent value.2]
   | .param _, value => value.val
   | .function parameters shared results, value => (encode parameters shared results value).encode
-  | .nominal _ _ _, value => value.value
+  | .nominal source arguments productive, value =>
+      (NominalCarriers.toNominalFunctor unit).nominalEncode
+        source productive (NRow.sortsWith unit C arguments)
+        (NRow.encodersWith arguments) value
 
 /-- The runtime values of a row's values. -/
 def NRow.encodeWith : (row : NRow) → HListWith unit C row → List RuntimeValue
   | .nil, _ => []
   | .cons τ rest, values => NTy.encodeWith τ values.1 :: NRow.encodeWith rest values.2
+
+/-- The encoders of a declaration's type arguments at this interpretation. -/
+def NRow.encodersWith : (row : NRow) → SortEncoders (NRow.sortsWith unit C row)
+  | .nil => ()
+  | .cons τ rest => (NTy.encodeWith τ, NRow.encodersWith rest)
 
 /-- The runtime value of a variant value under its declaration's handle. -/
 def NRows.encodeWith (source : StructHandle) :
@@ -216,10 +233,17 @@ def NTy.decodeWith : (τ : NTy) → RuntimeValue → Option (τ.carrierWith unit
   | .function parameters shared results, raw =>
       (ClosureValue.decode? raw).bind (decode parameters shared results)
   | .nominal source arguments productive, raw =>
-      (RuntimeNominal.nominals unit source arguments productive).ofValue? raw
+      (NominalCarriers.toNominalFunctor unit).nominalDecode?
+        source productive (NRow.sortsWith unit C arguments)
+        (NRow.decodersWith arguments) raw
   | _, _ => none
 
 /-- The values of a row runtime values encode, in order. -/
+def NRow.decodersWith : (row : NRow) → SortDecoders (NRow.sortsWith unit C row)
+  | .nil => ()
+  | .cons τ rest => (NTy.decodeWith τ, NRow.decodersWith rest)
+
+/-- A row's values decoded value by value. -/
 def NRow.decodeWith : (row : NRow) → List RuntimeValue → Option (HListWith unit C row)
   | .nil, [] => some ()
   | .cons τ rest, raw :: raws =>
@@ -463,7 +487,8 @@ end Lists
 
 section Laws
 
-variable {unit : Validation.ValidatedUnit} {C : NRow → Sharing → NRow → Type}
+variable {unit : Validation.ValidatedUnit} [NominalCarriers unit]
+  {C : NRow → Sharing → NRow → Type}
 
 section Encode
 
@@ -520,7 +545,16 @@ theorem NTy.plain_encodeWith : (τ : NTy) → (value : τ.carrierWith unit C) �
   | .param _, value => value.property
   | .function parameters shared results, value =>
       .closure _ _ _ _ (encode parameters shared results value).plain
-  | .nominal _ _ _, value => NTy.plain_of_admits_nominal value.typed
+  | .nominal source arguments productive, value =>
+      (NominalCarriers.toNominalFunctor unit).nominalEncode_plain
+        source productive (NRow.sortsWith unit C arguments)
+        (NRow.encodersWith encode arguments) (NRow.plain_encodersWith arguments) value
+
+/-- Every argument's encoder of this interpretation encodes loan-free. -/
+theorem NRow.plain_encodersWith : (row : NRow) →
+    SortEncoders.Plain (NRow.encodersWith (unit := unit) (C := C) encode row)
+  | .nil => trivial
+  | .cons τ rest => ⟨NTy.plain_encodeWith τ, NRow.plain_encodersWith rest⟩
 
 theorem NRow.plain_encodeWith : (row : NRow) → (values : HListWith unit C row) →
     ∀ raw ∈ NRow.encodeWith encode row values, Plain raw
@@ -651,8 +685,22 @@ theorem NTy.decodeWith_encodeWith : (τ : NTy) → (value : τ.carrierWith unit 
       rw [show ClosureValue.decode? (encode parameters shared results value).encode =
           some (encode parameters shared results value) from Codec.closure.decode_encode _]
       exact round parameters shared results value small
-  | .nominal source arguments productive, value, _ =>
-      (RuntimeNominal.nominals unit source arguments productive).ofValue?_value value
+  | .nominal source arguments productive, value, small =>
+      (NominalCarriers.toNominalFunctor unit).nominalDecode_encode
+        source productive (NRow.sortsWith unit C arguments)
+        (NRow.encodersWith encode arguments) (NRow.decodersWith unit decode arguments) value
+        (NRow.invertsBelowWith arguments _ small)
+
+/-- Every argument's decoder of this interpretation inverts its encoder below
+a bound inside the one this law carries. -/
+theorem NRow.invertsBelowWith : (row : NRow) → (limit : Nat) → limit < bound →
+    SortDecoders.InvertsBelow limit (NRow.encodersWith encode row)
+      (NRow.decodersWith unit decode row)
+  | .nil, _, _ => trivial
+  | .cons τ rest, limit, small =>
+      ⟨fun value inside =>
+          NTy.decodeWith_encodeWith τ value (Nat.lt_trans inside small),
+        NRow.invertsBelowWith rest limit small⟩
 
 theorem NRow.decodeWith_encodeWith : (row : NRow) → (values : HListWith unit C row) →
     (∀ raw ∈ NRow.encodeWith encode row values, sizeOf raw < bound) →
@@ -872,8 +920,21 @@ theorem NTy.encodeWith_of_decodeWith : (τ : NTy) → (raw : RuntimeValue) → s
       rw [tight parameters shared results closure value
         (by rw [show closure.encode = raw from encoded]; exact small) typed]
       exact encoded
-  | .nominal source arguments productive, raw, _, value, decoded =>
-      (RuntimeNominal.nominals unit source arguments productive).value_of_ofValue? raw value decoded
+  | .nominal source arguments productive, raw, small, value, decoded =>
+      (NominalCarriers.toNominalFunctor unit).nominalEncode_of_decode?
+        source productive (NRow.sortsWith unit C arguments)
+        (NRow.encodersWith encode arguments) (NRow.decodersWith unit decode arguments) raw value
+        (NRow.tightBelowWith arguments _ small) decoded
+
+/-- Every argument's decoder of this interpretation answers only where its
+encoder produced the raw value, below a bound inside this law's. -/
+theorem NRow.tightBelowWith : (row : NRow) → (limit : Nat) → limit < bound →
+    SortDecoders.TightBelow limit (NRow.encodersWith encode row) (NRow.decodersWith unit decode row)
+  | .nil, _, _ => trivial
+  | .cons τ rest, limit, small =>
+      ⟨fun raw value inside decoded =>
+          NTy.encodeWith_of_decodeWith τ raw (Nat.lt_trans inside small) value decoded,
+        NRow.tightBelowWith rest limit small⟩
 
 theorem NRow.encodeWith_of_decodeWith : (row : NRow) → (raws : List RuntimeValue) →
     (∀ raw ∈ raws, sizeOf raw < bound) → (values : HListWith unit C row) →
@@ -934,51 +995,59 @@ variable (unit)
       NTy.admits unit (.function parameters shared results)
         (encode parameters shared results value).encode = true)
 
+private theorem and_left {left right : Bool} (both : (left && right) = true) : left = true := by
+  simp only [Bool.and_eq_true] at both; exact both.1
+
+private theorem and_right {left right : Bool} (both : (left && right) = true) : right = true := by
+  simp only [Bool.and_eq_true] at both; exact both.2
+
 include admitted in
 mutual
 /-- An encoding admits its type, where the function arm's below the bound
 admit theirs. -/
 theorem NTy.admits_encodeWith : (τ : NTy) → (value : τ.carrierWith unit C) →
     sizeOf (NTy.encodeWith encode τ value) < bound →
+    τ.supported (NominalCarriers.supports unit) = true →
       NTy.admits unit τ (NTy.encodeWith encode τ value) = true
-  | .unit, _, _ => by simp [NTy.encodeWith, NTy.admits]
-  | .bool, _, _ => by simp [NTy.encodeWith, NTy.admits]
-  | .int width signed, value, _ => by simp [NTy.encodeWith, NTy.admits, decodeInt?_val]
-  | .num, _, _ => by simp [NTy.encodeWith, NTy.admits]
-  | .address, _, _ => by simp [NTy.encodeWith, NTy.admits]
-  | .signer, _, _ => by simp [NTy.encodeWith, NTy.admits]
-  | .string, _, _ => by simp [NTy.encodeWith, NTy.admits]
-  | .bytes, _, _ => by simp [NTy.encodeWith, NTy.admits]
-  | .char, value, _ => by simpa [NTy.encodeWith, NTy.admits] using value.valid
-  | .tuple elements, values, small => by
+  | .unit, _, _, _ => by simp [NTy.encodeWith, NTy.admits]
+  | .bool, _, _, _ => by simp [NTy.encodeWith, NTy.admits]
+  | .int width signed, value, _, _ => by simp [NTy.encodeWith, NTy.admits, decodeInt?_val]
+  | .num, _, _, _ => by simp [NTy.encodeWith, NTy.admits]
+  | .address, _, _, _ => by simp [NTy.encodeWith, NTy.admits]
+  | .signer, _, _, _ => by simp [NTy.encodeWith, NTy.admits]
+  | .string, _, _, _ => by simp [NTy.encodeWith, NTy.admits]
+  | .bytes, _, _, _ => by simp [NTy.encodeWith, NTy.admits]
+  | .char, value, _, _ => by simpa [NTy.encodeWith, NTy.admits] using value.valid
+  | .tuple elements, values, small, supported => by
       simp only [NTy.encodeWith, NTy.admits]
-      exact NRow.admits_encodeWith elements values fun raw member =>
-        Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple (List.mem_toArray.mpr member)) small
-  | .struct source _ fields, values, small => by
+      exact NRow.admits_encodeWith elements values (fun raw member =>
+        Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple (List.mem_toArray.mpr member)) small) supported
+  | .struct source _ fields, values, small, supported => by
       simp only [NTy.encodeWith, NTy.admits, beq_self_eq_true, Bool.true_and]
-      exact NRow.admits_encodeWith fields values fun raw member =>
-        Nat.lt_trans (RuntimeValue.sizeOf_lt_nominal (List.mem_toArray.mpr member)) small
-  | .enum source _ names rows distinct, value, small => by
+      exact NRow.admits_encodeWith fields values (fun raw member =>
+        Nat.lt_trans (RuntimeValue.sizeOf_lt_nominal (List.mem_toArray.mpr member)) small)
+        (and_right supported)
+  | .enum source _ names rows distinct, value, small, supported => by
       obtain ⟨name, raws, encoded, row, selected, rowAdmitted⟩ :=
-        NRows.admits_encodeWith source names rows distinct value small
+        NRows.admits_encodeWith source names rows distinct value small (and_right supported)
       simp only [NTy.encodeWith]
       rw [encoded]
       simp only [NTy.admits, beq_self_eq_true, selected, rowAdmitted, Bool.true_and]
-  | .slice element, values, small
-  | .vector element, values, small => by
+  | .slice element, values, small, supported
+  | .vector element, values, small, supported => by
       simp only [NTy.encodeWith, NTy.admits, Array.toList_map]
       exact @NTy.admitsEach_of_forall unit (FunctionCarriers.runtime unit) _ _ fun raw member => by
         obtain ⟨item, itemMember, rfl⟩ := List.mem_map.mp member
         exact NTy.admits_encodeWith element item (Nat.lt_trans (RuntimeValue.sizeOf_lt_vector
-          (Array.mem_map_of_mem (Array.mem_toList_iff.mp itemMember))) small)
-  | .array element _, values, small => by
+          (Array.mem_map_of_mem (Array.mem_toList_iff.mp itemMember))) small) supported
+  | .array element _, values, small, supported => by
       simp only [NTy.encodeWith, NTy.admits, Array.toList_map, Array.size_map, values.size_eq,
         beq_self_eq_true, Bool.true_and]
       exact @NTy.admitsEach_of_forall unit (FunctionCarriers.runtime unit) _ _ fun raw member => by
         obtain ⟨item, itemMember, rfl⟩ := List.mem_map.mp member
         exact NTy.admits_encodeWith element item (Nat.lt_trans (RuntimeValue.sizeOf_lt_vector
-          (Array.mem_map_of_mem (Array.mem_toList_iff.mp itemMember))) small)
-  | .table key value, entries, small => by
+          (Array.mem_map_of_mem (Array.mem_toList_iff.mp itemMember))) small) supported
+  | .table key value, entries, small, supported => by
       simp only [NTy.encodeWith] at small ⊢
       simp only [NTy.admits]
       have each : ∀ entry ∈ entries.entries,
@@ -989,9 +1058,9 @@ theorem NTy.admits_encodeWith : (τ : NTy) → (value : τ.carrierWith unit C) �
           (List.mem_map_of_mem (f := fun entry : _ × _ => RuntimeValue.tuple
             #[NTy.encodeWith encode key entry.1, NTy.encodeWith encode value entry.2]) member))) small
         exact ⟨NTy.admits_encodeWith key entry.1
-            (Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple (by simp)) outer),
+            (Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple (by simp)) outer) (and_left supported),
           NTy.admits_encodeWith value entry.2
-            (Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple (by simp)) outer)⟩
+            (Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple (by simp)) outer) (and_right supported)⟩
       clear small
       revert each
       generalize entries.entries = list
@@ -1003,11 +1072,11 @@ theorem NTy.admits_encodeWith : (τ : NTy) → (value : τ.carrierWith unit C) �
             (each entry List.mem_cons_self).1, (each entry List.mem_cons_self).2, Bool.and_self,
             Bool.true_and]
           exact ih fun other member => each other (List.mem_cons_of_mem _ member)
-  | .ghost slot, value, _ => by
+  | .ghost slot, value, _, _ => by
       simp only [NTy.encodeWith, NTy.admits]
       exact (SemanticOperations.plain?_iff _).mpr (NTy.plain_encodeWith encode slot value)
-  | .observed _, _, _ => by simp only [NTy.admits]
-  | .sliceRef element, value, small => by
+  | .observed _, _, _, _ => by simp only [NTy.admits]
+  | .sliceRef element, value, small, supported => by
       have each (vector : SpecVector (element.carrierWith unit C))
           (member : RuntimeValue.vector (vector.values.map (NTy.encodeWith encode element)) ∈
             #[RuntimeValue.vector (value.currentVector.values.map (NTy.encodeWith encode element)),
@@ -1018,50 +1087,67 @@ theorem NTy.admits_encodeWith : (τ : NTy) → (value : τ.carrierWith unit C) �
         obtain ⟨item, itemMember, rfl⟩ := Array.mem_map.mp (Array.mem_toList_iff.mp inside)
         exact NTy.admits_encodeWith element item (Nat.lt_trans
           (RuntimeValue.sizeOf_lt_vector (Array.mem_map_of_mem itemMember))
-          (Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple member) small))
+          (Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple member) small)) supported
       simp only [NTy.encodeWith, NTy.admits, NTy.admitsPair, Array.size_map,
         value.currentVector_size, value.finalVector_size, beq_self_eq_true, Bool.true_and]
       rw [each value.currentVector (by simp), each value.finalVector (by simp)]
       rfl
-  | .ref referent, value, small => by
+  | .ref referent, value, small, supported => by
       simp only [NTy.encodeWith, NTy.admits, NTy.admitsPair]
       rw [NTy.admits_encodeWith referent value.1
-          (Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple (by simp)) small),
+          (Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple (by simp)) small) supported,
         NTy.admits_encodeWith referent value.2
-          (Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple (by simp)) small)]
+          (Nat.lt_trans (RuntimeValue.sizeOf_lt_tuple (by simp)) small) supported]
       rfl
-  | .param _, _, _ => by simp [NTy.admits]
-  | .function parameters shared results, value, small => admitted parameters shared results value small
-  | .nominal _ _ _, value, _ => value.typed
+  | .param _, _, _, _ => by simp [NTy.admits]
+  | .function parameters shared results, value, small, _ => admitted parameters shared results value small
+  | .nominal source arguments productive, value, small, supported =>
+      NominalCarriers.admits source productive arguments (NRow.sortsWith unit C arguments)
+        (NRow.encodersWith encode arguments) value (and_left supported)
+        (NRow.admitsBelowWith _ arguments small (and_right supported))
+
+/-- Every argument's encoder of this interpretation encodes, below a bound
+inside this law's, values the unit types at that argument's type. -/
+theorem NRow.admitsBelowWith (limit : Nat) : (row : NRow) → limit < bound →
+    NRow.supported (NominalCarriers.supports unit) row = true →
+    SortEncoders.AdmitsBelow unit limit row (NRow.encodersWith (unit := unit) encode row)
+  | .nil, _, _ => trivial
+  | .cons τ rest, small, supported =>
+      ⟨fun value inside => NTy.admits_encodeWith τ value (Nat.lt_trans inside small)
+          (and_left supported),
+        NRow.admitsBelowWith limit rest small (and_right supported)⟩
 
 theorem NRow.admits_encodeWith : (row : NRow) → (values : HListWith unit C row) →
     (∀ raw ∈ NRow.encodeWith encode row values, sizeOf raw < bound) →
+    NRow.supported (NominalCarriers.supports unit) row = true →
       NRow.admits unit row (NRow.encodeWith encode row values) = true
-  | .nil, _, _ => by simp [NRow.encodeWith, NRow.admits]
-  | .cons τ rest, values, small => by
+  | .nil, _, _, _ => by simp [NRow.encodeWith, NRow.admits]
+  | .cons τ rest, values, small, supported => by
       simp only [NRow.encodeWith, NRow.admits]
-      rw [NTy.admits_encodeWith τ values.1 (small _ List.mem_cons_self),
-        NRow.admits_encodeWith rest values.2 fun raw member =>
-          small raw (List.mem_cons_of_mem _ member)]
+      rw [NTy.admits_encodeWith τ values.1 (small _ List.mem_cons_self) (and_left supported),
+        NRow.admits_encodeWith rest values.2 (fun raw member =>
+          small raw (List.mem_cons_of_mem _ member)) (and_right supported)]
       rfl
 
 theorem NRows.admits_encodeWith (source : StructHandle) : (names : List String) →
     (rows : NRows) → names.Nodup → (value : variantCarrierWith unit C names rows) →
     sizeOf (NRows.encodeWith encode source names rows value) < bound →
+    NRows.supported (NominalCarriers.supports unit) rows = true →
       ∃ name raws, NRows.encodeWith encode source names rows value =
           .nominal source (some name) raws ∧
         ∃ row, NRows.variant? names rows name = some row ∧
           NRow.admits unit row raws.toList = true
-  | _, .nil, _, value, _ => nomatch value
-  | [], .cons _ _, _, value, _ => nomatch value
-  | name :: names, .cons fields rest, _, .inl values, small => by
+  | _, .nil, _, value, _, _ => nomatch value
+  | [], .cons _ _, _, value, _, _ => nomatch value
+  | name :: names, .cons fields rest, _, .inl values, small, supported => by
       refine ⟨name, _, rfl, fields, by simp [NRows.variant?], ?_⟩
       rw [List.toList_toArray]
-      exact NRow.admits_encodeWith fields values fun raw member =>
-        Nat.lt_trans (RuntimeValue.sizeOf_lt_nominal (List.mem_toArray.mpr member)) small
-  | first :: names, .cons fields rest, distinct, .inr value, small => by
+      exact NRow.admits_encodeWith fields values (fun raw member =>
+        Nat.lt_trans (RuntimeValue.sizeOf_lt_nominal (List.mem_toArray.mpr member)) small)
+        (and_left supported)
+  | first :: names, .cons fields rest, distinct, .inr value, small, supported => by
       obtain ⟨name, raws, encoded, row, selected, rowAdmitted⟩ := NRows.admits_encodeWith source
-        names rest (List.nodup_cons.mp distinct).2 value small
+        names rest (List.nodup_cons.mp distinct).2 value small (and_right supported)
       have member : name ∈ names := NRows.mem_of_variant? names rest selected
       have different : (first == name) = false := by
         simp only [beq_eq_false_iff_ne]
@@ -1183,7 +1269,21 @@ theorem NTy.decodeWith_congr : (τ : NTy) → (raw : RuntimeValue) → sizeOf ra
           have encoded := Codec.closure_tight raw closure read
           exact agree parameters shared results closure
             (by rw [show closure.encode = raw from encoded]; exact small)
-  | .nominal _ _ _, _, _ => rfl
+  | .nominal source arguments productive, raw, small =>
+      (NominalCarriers.toNominalFunctor unit).nominalDecode?_congr
+        source productive (NRow.sortsWith unit C arguments)
+        (NRow.decodersWith unit decode arguments) (NRow.decodersWith unit decode' arguments) raw
+        (NRow.agreeBelowWith arguments _ small)
+
+/-- Two decoders of this interpretation that agree below a bound give
+argument dictionaries that agree there. -/
+theorem NRow.agreeBelowWith : (row : NRow) → (limit : Nat) → limit < bound →
+    SortDecoders.AgreeBelow limit (NRow.decodersWith unit decode row)
+      (NRow.decodersWith unit decode' row)
+  | .nil, _, _ => trivial
+  | .cons τ rest, limit, small =>
+      ⟨fun raw inside => NTy.decodeWith_congr τ raw (Nat.lt_trans inside small),
+        NRow.agreeBelowWith rest limit small⟩
 
 theorem NRow.decodeWith_congr : (row : NRow) → (raws : List RuntimeValue) →
     (∀ raw ∈ raws, sizeOf raw < bound) →
@@ -1328,7 +1428,21 @@ theorem NTy.isSome_decodeWith : (τ : NTy) → (raw : RuntimeValue) → sizeOf r
           have encoded := Codec.closure_tight raw closure read
           exact agree parameters shared results closure
             (by rw [show closure.encode = raw from encoded]; exact small)
-  | .nominal _ _ _, _, _ => rfl
+  | .nominal source arguments productive, raw, small =>
+      (NominalCarriers.toNominalFunctor unit).nominalDecode?_isSome_congr source productive
+        (NRow.sortsWith unit C arguments) (NRow.sortsWith unit C' arguments)
+        (NRow.decodersWith unit decode arguments) (NRow.decodersWith unit decode' arguments) raw
+        (NRow.someAgreeBelowWith arguments _ small)
+
+/-- Two decoders of this interpretation that decide alike below a bound give
+argument dictionaries that decide alike there. -/
+theorem NRow.someAgreeBelowWith : (row : NRow) → (limit : Nat) → limit < bound →
+    SortDecoders.SomeAgreeBelow limit (NRow.decodersWith unit decode row)
+      (NRow.decodersWith unit decode' row)
+  | .nil, _, _ => trivial
+  | .cons τ rest, limit, small =>
+      ⟨fun raw inside => NTy.isSome_decodeWith τ raw (Nat.lt_trans inside small),
+        NRow.someAgreeBelowWith rest limit small⟩
 
 theorem NRow.isSome_decodeWith : (row : NRow) → (raws : List RuntimeValue) →
     (∀ raw ∈ raws, sizeOf raw < bound) →
@@ -1658,13 +1772,14 @@ def closureTyping (unit : Validation.ValidatedUnit) (parameters : NRow) (shared 
 
 /-- Whether a closure's runtime captures decode at a row, the closures among
 them typed by the unit. -/
-def NRow.decodable (unit : Validation.ValidatedUnit) (row : NRow) (captures : List RuntimeValue) :
+def NRow.decodable (unit : Validation.ValidatedUnit) [NominalCarriers unit] (row : NRow) (captures : List RuntimeValue) :
     Bool :=
   (NRow.decodeWith unit (closureTyping unit) row captures).isSome
 
 /-- Whether a closure is a site's encoding at a function type: at a site's
 key, of the site's function type, its captures decoding at the site's row. -/
-def isSiteWith (unit : Validation.ValidatedUnit) (sites : List SiteSpec) (parameters : NRow)
+def isSiteWith (unit : Validation.ValidatedUnit) [NominalCarriers unit] (sites : List SiteSpec)
+    (parameters : NRow)
     (shared : Sharing) (results : NRow) (closure : ClosureValue) : Bool :=
   match siteIndex? sites closure with
   | some index =>
@@ -1703,7 +1818,7 @@ theorem ForeignClosure.ext {unit : Validation.ValidatedUnit}
 /-- A link set's function values: a family with a constructor per closure
 site and `foreign`, its encoder, and the facts the unit's evaluation
 decides of its sites. The generated block provides one. -/
-structure SiteFamily (unit : Validation.ValidatedUnit) where
+structure SiteFamily (unit : Validation.ValidatedUnit) [NominalCarriers unit] where
   F : NRow → Sharing → NRow → Type
   sites : List SiteSpec
   site : (index : Fin sites.length) → HListWith unit F (sites.get index).captured →
@@ -1728,7 +1843,7 @@ structure SiteFamily (unit : Validation.ValidatedUnit) where
 
 namespace SiteFamily
 
-variable {unit : Validation.ValidatedUnit} (Φ : SiteFamily unit)
+variable {unit : Validation.ValidatedUnit} [NominalCarriers unit] (Φ : SiteFamily unit)
 
 /-- The value a runtime closure is: a site's constructor where it is that
 site's encoding, `foreign` where the unit types it otherwise. Recursion is
@@ -1821,7 +1936,10 @@ theorem admits_encode : (bound : Nat) → ∀ parameters shared results
               captures).toArray))
           (fun parameters' shared' results' inner smaller =>
             admits_encode bound _ _ _ inner (by simp only [ClosureValue.encode] at small; omega))
-          _ captures fun raw member => RuntimeValue.sizeOf_lt_closure (List.mem_toArray.mpr member)
+          _ captures
+          (fun raw member => RuntimeValue.sizeOf_lt_closure (List.mem_toArray.mpr member))
+          (NRow.supported_closureRowsIn?_captured unit (by
+            simpa only [beq_iff_eq] using rows))
       · rw [Φ.encode_foreign]
         exact key.admitted
 
@@ -1962,6 +2080,10 @@ members. -/
   decodes := fun parameters shared results closure admitted =>
     Φ.decodes _ parameters shared results closure (Nat.lt_succ_self _) admitted
   own := own
+  -- The family's nominal values are the unit's, which this interpretation
+  -- already reads (`NTy.carrierWith`): the unit's function values carry the
+  -- very instance its second interpretation was built at.
+  nominals := ‹NominalCarriers unit›
 
 /-- A site's closure: its key, capturing its captures' encodings. -/
 theorem encode_site_eq (index : Fin Φ.sites.length)

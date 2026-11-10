@@ -9,7 +9,7 @@ namespace VerexIR.Proofs.Denote
 clauses. It is never the family in which a function is verified: that family
 installs the resulting declarations with `withDeclarations`. -/
 @[reducible] def GivenFrame.clauseScaffold (frame : GivenFrame) : Carriers :=
-  { frame.toCarriers with own := fun _ _ _ => True }
+  { frame.toCarriers with own := fun _ _ _ => True, nominalOwn := fun _ _ _ _ _ => True }
 
 /-- Clause translation may choose values without assuming the declarations
 it is defining. Given parameter certification is the identity; no parameter invariant
@@ -17,7 +17,7 @@ or actual nominal invariant is introduced into this scaffold. -/
 @[reducible] def GivenFrame.clauseScaffoldNonempty (frame : GivenFrame) :
     CarriersNonempty frame.clauseScaffold :=
   @CarriersNonempty.ofTrivial frame.clauseScaffold
-    (fun _ _ _ => trivial) (fun _ _ => trivial)
+    (fun _ _ _ => trivial) (fun _ _ => trivial) (fun _ _ _ _ _ => trivial)
     (fun _ value => value)
 
 theorem GivenFrame.clauseScaffold_toPlain (frame : GivenFrame) :
