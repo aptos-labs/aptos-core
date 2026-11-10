@@ -2057,8 +2057,7 @@ where
         let runtime_environment = environment.runtime_environment();
         let start_counter = gen_id_start_value(true);
         let counter = RefCell::new(start_counter);
-        let unsync_map =
-            UnsyncMap::new().with_mono_move_arena(environment.features().is_mono_move_enabled());
+        let unsync_map = UnsyncMap::new();
 
         let mut ret = Vec::with_capacity(num_txns + 1);
 
