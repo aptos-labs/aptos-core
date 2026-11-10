@@ -15,7 +15,9 @@ use anyhow::{anyhow, Result};
 use aptos_framework::natives::code::PackageRegistry;
 use aptos_types::state_store::{state_key::StateKey, StateView};
 use bytes::Bytes;
-use mono_move_aptos_transaction_executor::{decode_group_members, AptosDataProvider, GroupMembers};
+use mono_move_aptos_transaction_executor::{
+    check_group_key, decode_group_members, AptosDataProvider, GroupMembers,
+};
 use mono_move_core::{
     nominal_tag,
     storage::{
@@ -286,6 +288,7 @@ impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {
         &self,
         group_key: &InMemoryStorageKey,
     ) -> Result<Option<GroupMembers>, ResourceProviderError> {
+        check_group_key(group_key)?;
         if let Some(members) = self.inner.borrow().groups.get(group_key) {
             return Ok(members.clone());
         }
