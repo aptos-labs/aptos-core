@@ -8,7 +8,8 @@
 # `inputs` lists further paths whose change changes the problem; `dev`
 # compiles a Move package in dev mode (its `[dev-addresses]`); `repeat`
 # runs a small problem several times and keeps the median; `timeout` is in
-# seconds (20 minutes by default).
+# seconds for the complete problem including repeats (300 seconds by default).
+# The runner's --timeout overrides this value; --jobs controls independent problems.
 
 # ## Move standard library
 

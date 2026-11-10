@@ -1,0 +1,78 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/abort_in_fun.move:1:1: info: `call_abort_generic_struct` uses concrete verification: Given interpretation does not yet support calls to callees without a contract
+tests/sources/functional/abort_in_fun.move:72:5: error: verification failed with a residual obligation:
+case continues.continues.right.right
+Θ✝ : VerexIR.Proofs.Denote.Skolems unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
+frame✝ :
+  VerexIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 6 } } 1
+    typeInstantiation✝
+x y : (VerexIR.Proofs.Denote.NTy.param 0).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted invariantHolds✝¹ left✝⁴ : True
+left✝³ : (VerexIR.Proofs.Denote.NTy.param 0).deepHolds ((VerexIR.Proofs.Denote.Carriers.lent 0).of x)
+right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+invariantHolds✝ left✝¹ : True
+left✝ : (VerexIR.Proofs.Denote.NTy.param 0).deepHolds ((VerexIR.Proofs.Denote.Carriers.lent 0).of y)
+right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+pathDecision✝ :
+  (0x42.TestAbortInFunction.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).eqb
+      ((0x42.TestAbortInFunction.unit.nominal.namespace.0.declaration✝⁻⁰
+            (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds
+        ((VerexIR.Proofs.Denote.Carriers.lent 0).of x, ()) ⋯)
+      ((0x42.TestAbortInFunction.unit.nominal.namespace.0.declaration✝⁻⁰
+            (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds
+        ((VerexIR.Proofs.Denote.Carriers.lent 0).of y, ()) ⋯) =
+    false
+⊢ ¬x = y
+tests/sources/functional/abort_in_fun.move:73:9: error: the specification clause `aborts_if x == y` is not established
+tests/sources/functional/abort_in_fun.move:72:5: error: verex verification failed: the automatic verification of `call_abort_generic_struct` failed; provide a proof in `tests/sources/functional/abort_in_fun.proof.lean`:
+  verify call_abort_generic_struct by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/abort_in_fun.move:100:5: error: verification failed with a residual obligation:
+case continues.continues.continues.continues.left.right.right.right
+x y : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+test_assert1 : VerexIR.Proofs.Denote.NTy.bool.carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted invariantHolds✝³ left✝¹³ : True
+left✝¹² : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds x
+right✝⁵ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+invariantHolds✝² left✝¹⁰ : True
+right✝⁴ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+left✝⁸ : True
+left✝⁷ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds x
+right✝³ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+invariantHolds✝¹ left✝⁶ : True
+left✝⁵ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds y
+right✝² : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+invariantHolds✝ left✝³ : True
+right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+left✝¹ : True
+left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds y
+right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+test_assert1_eq : test_assert1 = true
+pathDecision✝ :
+  (0x42.TestAbortInFunction.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).eqb
+      ((0x42.TestAbortInFunction.unit.nominal.namespace.0.declaration✝⁻⁰
+            0x42.TestAbortInFunction.unit.nominal.namespace.0.declaration✝¹⁻⁰).ofDeepHolds
+        ((x, ()), ()) ⋯)
+      ((0x42.TestAbortInFunction.unit.nominal.namespace.0.declaration✝⁻⁰
+            0x42.TestAbortInFunction.unit.nominal.namespace.0.declaration✝¹⁻⁰).ofDeepHolds
+        ((y, ()), ()) ⋯) =
+    false
+⊢ ¬(x.val = y.val ∨ test_assert1 = false)
+tests/sources/functional/abort_in_fun.move:101:9: error: the specification clause `aborts_if x == y` is not established
+tests/sources/functional/abort_in_fun.move:102:9: error: the specification clause `aborts_if !test_assert1` is not established
+tests/sources/functional/abort_in_fun.move:100:5: error: verex verification failed: the automatic verification of `call_abort_generic_struct_concrete` failed; provide a proof in `tests/sources/functional/abort_in_fun.proof.lean`:
+  verify call_abort_generic_struct_concrete by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

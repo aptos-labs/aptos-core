@@ -1,0 +1,83 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/regression/mut_ref_returned_data_invariant.move:14:9
+   │
+14 │         invariant v == 0;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:20: break_and_keep
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:21: break_and_keep
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:20: break_and_keep
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:14
+
+error: data invariant does not hold
+   ┌─ tests/sources/regression/mut_ref_returned_data_invariant.move:14:9
+   │
+14 │         invariant v == 0;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:26: break_and_return
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:27: break_and_return
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:26: break_and_return
+   =         result = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:14
+
+error: data invariant does not hold
+   ┌─ tests/sources/regression/mut_ref_returned_data_invariant.move:14:9
+   │
+14 │         invariant v == 0;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:83: early_return_broken
+   =         b = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:84: early_return_broken
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:85: early_return_broken
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:86: early_return_broken
+   =         result = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:14
+
+error: data invariant does not hold
+   ┌─ tests/sources/regression/mut_ref_returned_data_invariant.move:14:9
+   │
+14 │         invariant v == 0;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:114: loop_return_broken
+   =         n = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:116: loop_return_broken
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:117: loop_return_broken
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:118: loop_return_broken
+   =         result = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:14
+
+error: data invariant does not hold
+   ┌─ tests/sources/regression/mut_ref_returned_data_invariant.move:14:9
+   │
+14 │         invariant v == 0;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:101: nested_return_broken
+   =         b = <redacted>
+   =         c = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:102: nested_return_broken
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:103: nested_return_broken
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:104: nested_return_broken
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:105: nested_return_broken
+   =         result = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/regression/mut_ref_returned_data_invariant.move:14
+

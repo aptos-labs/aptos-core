@@ -1,9 +1,9 @@
 # Higher-order functions
 
-Open work: [`roadmap.md`](../plan/roadmap.md). The replacement of the
-closure carrier's runtime captures and of the requires table by native data
-is planned in
-[`native-function-values.md`](../plan/native-function-values.md).
+Open work: [`roadmap.md`](../plan/roadmap.md). A function value is native
+data: the carrier of a function type is a family generated per link set, a
+constructor per closure site holding its captures natively ("Function values
+as native data" below).
 
 Move function values (language 2.2) are closures: a function, a mask saying
 which of its parameters are bound, and the bound values. Their
@@ -112,10 +112,12 @@ with its captures composed into the lent arguments by its mask
 (`closureRun`).
 
 A known closure invokes as a call of its target (`Denote/Closures.lean`):
-`closureRun_closureOf` equates the run with the target's
-`propheticMeaning` on the woven arguments; for a generic target,
-`propheticMeaning_subst` carries the meaning to the family the type
-arguments induce, the form a direct call with type arguments has. At the
+`closureRun_closureOf` equates the run with the target's prophetic run on
+the woven arguments; for a generic target, `propheticRun_subst` carries the
+run to the family the type arguments induce and
+`propheticMeaning_of_coherent` reads it there as the meaning
+(`closureMeaning_closureOfGeneric`), the form a direct call with type
+arguments has. At the
 base frame a closure site of a target without type arguments is a
 constructor of the link set's generated family: construction is the
 constructor and invoking the constructor is the target's call
@@ -127,6 +129,22 @@ constructor, by the proof that its closure is its target's at its captures
 and closure targets join a function's callees. Since
 `invoke`'s denotation is defined from the big-step meaning, its case of
 the agreement is by definition.
+
+`aborts_of` and `ensures_of` of a known target with type arguments are read
+directly: `aborts_of<f<τ̄>>(x)` means the call `f<τ̄>(x)` a body denotes aborts
+(`CallAborts`, `CallEnsures`), the target's meaning at the family its type arguments
+induce and the instantiation its frame computes from the enclosing function's. No
+function value is constructed, so no `ClosureFrame` is owed, at a closed type argument
+or at a type parameter of the verified function, as a body's call owes none.
+`closureMeaning_closureOfGeneric` relates the two: under coherence the literal's
+invocation is this call. The solver reads it as the call: where a goal owes it, the
+body's call of the target assumes its run and abort (`wp_call_runs`) and, where runs
+agree, the absence of its abort (`wp_call_runs_agree`), at the clause's spelling of the
+type arguments (`frameInstantiation_congr`); as a hypothesis it becomes the call's
+weakest precondition, which the call rule reads. Not served, with the error of a function
+value with type arguments: such a literal as a value (`f == upsert<T>`), one capturing
+values, and a `result_of`, `state_of` or `requires_of` of it. In a unit verified through
+its model the reading is the target's interface contract ([`ghost-fields.md`](ghost-fields.md)).
 
 ## Relation to the Prover's encoding
 
@@ -242,7 +260,8 @@ does not state them. `result_of` of a literal closure whose abort is
 undecided is decided case by case on the abort. A parameter of a shared
 reference type is the value it observes (`observedType`). A closure that
 captures values behaves as the function value naming its target at the
-woven arguments (`abortsOf_closureOf_captured`, `verex_woven_behaviors`).
+woven arguments (`abortsOf_closureOf_woven`, `ensuresOf_closureOf_woven`,
+read by the normalizer's `wovenBehavior` simprocs).
 
 **Mutable-reference arguments** follow the prophetic model, in the Prover's
 argument layout (`spec_translator.rs`, `bytecode_translator.rs`): a
@@ -297,8 +316,10 @@ is read in the caller's view (`FramedAt.of_instantiate`).
 Default frames of directly function-typed Move fields are implicit data
 invariants (`KeepsMemoryAtOf` on the field's value), checked or carried by
 construction, mutation, parameters, results and stored resources; an
-invocation of a closure read from storage recovers its frame from
-`MemoryInvariants.read`. Explicit struct-field write frames use
+invocation of a closure read from storage recovers its frame from the data
+invariants of the memory it reads (`DataInvariants.read`;
+[`data-invariants.md`](data-invariants.md)). Explicit struct-field write
+frames use
 `FramedAtOf`: the formals bind invocation arguments, resource types are
 instantiated in the enclosing nominal's scope, addresses are evaluated in
 the invocation's pre-state, and a wildcard frame imposes no restriction.
@@ -507,8 +528,13 @@ one. Three pieces relate them.
   (`TypedAs.subst`). A unit's readings agree when every closed type
   identifier the compiler reads natively (`ntyOf`) is `TypedAs` its
   semantic type, and every function's signature is, over its generic
-  environment; decided once per unit by evaluation. A unit whose readings
-  do not agree is reported as not memory-typed.
+  environment; decided once per unit by evaluation over indexed tables
+  (`TypingView`, `doc/designs/performance.md`): a unit whose namespaces hold
+  its tables checks them once, and the result gives the array-reading check
+  (`typesAgreeCheck`), so the fact states what it did. A function that is not
+  a closure target (`closureSignature?` is `none`) agrees vacuously, as no
+  function value holds it. A unit whose readings do not agree is reported as
+  not memory-typed.
 - *Faithful closures.* `HasType.closure` types a closure only under an
   instantiation faithful to its arguments (`FrameInstantiation`), which
   the native typing also checks in its decidable form; a closure the
@@ -532,6 +558,188 @@ frame's transport, where the readings agree), and its arguments' semantic types 
 resolves to scalars (`ScalarAt`); a generic function whose function-typed
 parameter's rows mention its type parameters assumes that its frame
 resolves them to scalars, which a call discharges at its type arguments.
+
+## Function values as native data
+
+The carrier of a function type holds no runtime values: it is a family
+generated per link set, with a constructor per closure site holding the
+site's captures as native values, and one constructor for every other
+closure the unit types at that type. Verification over it is verification
+over native data ([`native-verification.md`](native-verification.md)), and
+typing holds by construction. The model follows the Move Prover's
+representation of function values (`higher-order-paper-26`, "Representing
+Function Values") and its monomorphization.
+
+**Closures are data.** A closure is its target and its captured arguments as
+native values; invocation dispatches on the target with the captures woven
+into the arguments. A closure site is a target at an instantiation, the mask
+of its captured parameters, the captured row and the function type it is a
+value of (`ClosureSite`, `VerexSL/Verify/Contracts.lean`); `closureSites`
+walks the link set — the unit and the dependencies its theorems relocate —
+and groups the sites by function type, mutually where a captured row holds a
+type of the group (`ClosureSiteGroup`). A capture whose type cannot be
+carried natively is rejected at generation (`capturedUnsupported?`,
+`VerexSL/Verify/FunctionValues.lean`): a type parameter left open, a
+reference, or a function value inside a vector or a map, which the kernel
+admits no nested occurrence of the family for.
+
+**A unit's function values.** `FunctionCarriers unit` (`Denote/Types.lean`)
+is the class of a unit's function values: a carrier per function type, its
+`TypedFunctions` interface, and two laws — every value's closure is one the
+unit types at its function type, and every closure the unit types at a
+function type decodes. There is exactly one instance per unit constant,
+declared where the unit is registered, before any theorem, so
+`Carriers.runtime unit`, `Skolems unit`, `Memory unit` and `Comp unit` keep
+their spellings under it: storage holds the unit's function values, the base
+frame's transports stay identities, and `Carriers.instantiate` forwards
+function carriers to the outer family at the substituted rows. A field of
+the frame would admit two frames of one unit at different function values,
+where memory needs one. `FunctionCarriers.runtime` (`RuntimeFunction`) is a
+definition, not an instance: it is the instance of a unit without a
+generated block, and of the library's own tests. The agreement holds for
+every unit and instance.
+
+**The generated family.** `ensureFunctionCarriers`
+(`VerexSL/Verify/FunctionValues.lean`) generates, once per link set before
+the unit's first target theorem, one indexed family
+`FV : NRow → Sharing → NRow → Type` (`functionValuesName`): a constructor
+per closure site at its closed rows, holding the site's captures, a site
+inside a generic function once per instantiation the link set uses, and
+`foreign (key : ForeignClosure …)` at every index. A capture's carrier is
+spelled concretely, since the family's own `NTy.carrier` is no strictly
+positive occurrence, and checked once by `rfl` against the base frame's
+carrier. The generator supplies the inductive, the structural encoder and
+the site table (`siteSpecs`, `SiteSpec`); the library's `SiteFamily`
+interface (`Denote/FunctionValues.lean`) derives from them the decoder — by
+closure size, over the codec parameterized by its function arm
+(`NTy.decodeWith`) — the four laws and the instance. A closure whose
+captures do not decode at its site's row is `foreign`, so every admitted
+closure decodes.
+
+**Values from parameters and storage** are variables of the family. A value
+of a closure site is that site's constructor at unknown captures. Every
+other closure the unit types at the function type is `foreign`, whose key is
+the one sealed piece: `ForeignClosure` carries the closure, the proof that
+the unit admits it at the type, and the proof that no site encodes it
+(`isSiteWith`, `siteIndex?`), and equal keys are equal closures
+(`ForeignClosure.ext`). Its behaviour is a hypothesis — the declared
+behavioral predicates — as the Prover's parameter and field variants are.
+
+**Construction.** A function value is created by a frame operation,
+`Skolems.construct` (`Denote/Term.lean`), typed by its site (`SiteTyped`:
+the target's rows and sharing at the instantiation are the frame's
+resolution of the function type's rows, and the instantiation is faithful),
+which a closure node carries. It is irreducible: a leaf reads it by its
+closure (`Skolems.closure_construct`) and, at the base frame, by the
+generated constructors (`SiteFamily.construct_eq`). A literal function value
+a specification writes is typed by the unit's check
+(`SiteTyped.ofCheck`, `closureTypingCheck`), whose proof the clause binds,
+and such a literal is itself a closure site of the link set. There is no
+`Carriers` field for construction, so the ground family keeps no function
+values. `Term.closureGeneric` builds a value of a target with type arguments
+(`functionOfGeneric`), at the induced instantiation.
+
+**Site equations.** For each site without type arguments the generator
+proves and registers (`SiteEquations`, `defineSiteEquations`) its
+constructor's closure, the unit's typing check, its invocation as its
+target's call at the woven arguments, and the typing of the value naming its
+target. The normalizer rewrites construction and invocation at the base
+frame by them (the `constructSite` and `invokeSite` simprocs,
+`Solve/Base.lean`), and the solver's dispatch rules read a construction and
+a site's constructor alike (`LiteralValue`), so a known function value uses
+its target's theorem as a direct call does. At an abstract frame nothing
+reduces. The invocation equations of sites *with* type arguments are open:
+they keep `functionOfGeneric` and its invocation rule
+([`../plan/roadmap.md`](../plan/roadmap.md)).
+
+**Equality and order.** Of known function values — a construction or a
+site's constructor — the normalizer reads equality and order off the
+generated structure (`knownFunctionsEqual`, `knownFunctionsOrder`): at one
+key, the captures' equality without ghost slots and the captures' order; at
+different keys, unequal, and ordered by the keys (`closureKeyOrder`: handle
+rank, handle, instantiation, mask). A value the leaf does not know keeps the
+interface's opaque key and order. A value is storable where its captured
+rows are reference-free, and a stored function value is encoded and decoded
+by the generated codec.
+
+**The requires meaning**, whose predicate "Behavioral predicates" above
+states. `RequiresMeaning unit` (`Proofs/Behavior.lean`) is
+a predicate over a function carrier's value, a native arguments row and
+memory — no runtime values, and no table over encoded arguments. A unit's
+meaning is generated per link set (`functionRequiresName`,
+`buildDeclaredRequires`), one `vir_denote_norm` equation per constructor:
+`RequiresOf` of a site's constructor is its target's declared `requires` at
+the woven arguments, and of `foreign` it is `requiresForeign`, which is
+`opaque` — defining it as `True` would make every value the link set does
+not enumerate invocable at every argument. `RequiresOf` reads the meaning at
+the base frame, where the frame carries the value and the arguments, and
+`RequiresOfEntries` is the form a clause states: the precondition holds at
+every arguments row with the given entry values, since a clause names no
+prophecy of a mutable reference it passes. Off the base frame, `requires_of`
+of a construction is read at the base frame (`requiresOf_construct`); at
+rows without type parameters the arguments reach the target's precondition
+(`toRuntimeFree`).
+
+Calling a function value asserts no `requires_of`, as in the Move Prover,
+which checks none at a call of a function value: caller obligations are
+stated in the specification. A model unit's invocation of a value is defined
+where its site's target's precondition holds (`verexInvokeDefined`), and an
+executable unit's by typing; a link set none of whose sites' targets
+declares a precondition proves every invocation defined (the generated
+`…_everywhere` theorem, `everywhereName`). An executable unit keeps
+`closureMeaning` with `foreign` opaque there; a model unit keeps
+`verexInvoke` with its definedness and coherence binders, its routing
+restated per closure site at the base frame.
+
+**Typing by construction.** Every value of the carrier is a site's
+constructor or an admitted foreign closure, so no leaf discharges a typing
+predicate of a function value: there is no typing side condition on a
+closure rule, no literal-typing rule and no leaf-time evaluation of a
+literal's typing check. The
+rule for an invocation of a function value a proof does not see takes the
+closure's typing from the carrier (`FunctionCarriers.admits`, through the
+frame's transport, where the readings agree), and a function value at a
+skolem frame invokes by it.
+
+**Where the runtime form remains.** The generated encoder and decoder,
+`ForeignClosure`'s payload, `closureMeaning`, `propheticRun`,
+`Failure.encode`, the codecs and the agreement. The native-only check flags
+the runtime closure vocabulary anywhere else (`ClosureValue`,
+`RuntimeFunction`, `closureOf`, `closureRun`, and the interface's `closure`
+and `ofClosure?`; [`native-verification.md`](native-verification.md)).
+
+A failure is a `ThrowKind` with an array of integers (`Failure`), related to the runtime
+failure by the injective `Failure.encode`; the public theorem assumes
+`FailuresIntegral` ([`../status/assumptions.md`](../status/assumptions.md)).
+
+Open, in [`../plan/roadmap.md`](../plan/roadmap.md): the invocation
+equations of closure sites with type arguments, which keep
+`functionOfGeneric` and its invocation rule; captures holding a function
+value under a vector or a map, which `capturedUnsupported?` rejects because
+a vector or map carrier whose certificate is a proof over its elements
+cannot nest the family — the decided remedy is to drop that certificate and
+make the bound a leaf fact, as an integer's range is; and the sharing marks
+of `NTy.function`, which are Move's calling convention inside the type and
+should be derived data of the target.
+
+## Function values of tuple-returning functions
+
+A function type states its results as a row (`|&T|(K, &V)` has the results `K`
+and `&V`, each with a sharing mark), a function declares one tuple-typed result,
+and a `ResultShape` is none or one type, so a target's one-element row of a tuple
+never equals the row of the type. Such a function is therefore not carried as a
+closure target; a function value of one is refused at its construction: "a
+function value of `f` is not supported: `f` returns a tuple" (`closureTargetRefusal`),
+naming a reference it holds. Calling it directly is unaffected. Move allows these
+values, so this is a gap of Verex, not a rule of the language.
+
+A target stating a shared reference below the top level of a parameter or result
+is, besides, not a closure target at all (`closureSignature?` is `none`): the
+native type erases the reference, so no sharing mark records it, and `TypedAs`
+could not read it without losing `TypedAs.unique`.
+
+Open: results as rows, where `ResultShape` gains a row case, a function's
+tuple result reads as its elements with their marks, and the refusal goes.
 
 ## Non-goals
 

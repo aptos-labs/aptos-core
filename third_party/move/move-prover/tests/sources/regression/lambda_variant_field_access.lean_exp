@@ -15,3 +15,11 @@ tests/sources/regression/lambda_variant_field_access.move:79:5: error: verex ver
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/lambda_variant_field_access.move:91:9: error: the specification clause `ensures f.x == 5` is not established
+tests/sources/regression/lambda_variant_field_access.move:89:5: error: verex verification failed: the automatic verification of `write_shared` failed; provide a proof in the module:
+  verify write_shared by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

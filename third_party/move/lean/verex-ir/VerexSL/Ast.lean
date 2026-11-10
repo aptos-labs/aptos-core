@@ -532,6 +532,8 @@ inductive SourceAttributeValue where
   | number (value : Nat)
   | string (value : String)
   | name (value : String)
+  /-- A name in another namespace, as written. -/
+  | qualifiedName (value : String)
   deriving Repr, BEq, Inhabited
 
 /-- Structured declaration metadata. Intrinsic owner/role annotations use

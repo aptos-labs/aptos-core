@@ -10,27 +10,14 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value) (fun result final => False)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+      (fun result final => False)
       (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True) state
 verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  fun flow state =>
-    match flow with
-    | VerexIR.Proofs.Denote.Flow.value value env =>
-      VerexIR.Proofs.wp
-        (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
-          (VerexIR.Proofs.Denote.Term.lit ()) env)
-        verexContinuation✝²
-        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True)
-        state
-    | VerexIR.Proofs.Denote.Flow.return_ result env =>
-      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.return_ result env) state
-    | VerexIR.Proofs.Denote.Flow.break_ nest env =>
-      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.break_ nest env) state
-    | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
-      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
+  attempt_1._verexContinuation_1_3
 verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
     VerexIR.Proofs.Denote.NTy.unit.carrier →
@@ -39,7 +26,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
 recursive✝ :
   VerexIR.Proofs.Denote.HEnv
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) →
-    VerexIR.Proofs.Denote.Comp unit
+    VerexIR.Proofs.Spec (VerexIR.Proofs.Denote.Memory unit) VerexIR.Proofs.Failure
       (VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
         (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) Unit)
 state✝ : VerexIR.Proofs.Denote.Memory unit
@@ -64,7 +51,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
   fun value state =>
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.Flow.iterate recursive✝ value) verexContinuation✝
       (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True) state
-a✝ : 10 < i.val
+pathDecision✝ : 10 < i.val
 ⊢ False
 tests/sources/functional/loops.move:57:5: error: verex verification failed: the automatic verification of `iter10_no_abort_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
   verify iter10_no_abort_incorrect by lean =>

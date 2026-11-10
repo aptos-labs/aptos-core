@@ -14,16 +14,14 @@ verify assert_no_duplicate by lean =>
   | aborts_if_1 =>
     verex_prepare only
     all_goals try verex_decide
-    all_goals refine ⟨i.val, by omega, by omega, j.val, by omega, by omega, by omega, by omega, by omega, ?_⟩
-    all_goals simp_all only [Option.getD_some]
-  | leaf =>
-    verex_prepare only
     all_goals try omega
-    all_goals
-      rintro ⟨x, xlo, xhi, y, ylo, yhi, hx, hy, ne, same⟩
-      by_cases before : x < y
-      · exact invariant_6 x xlo xhi y ylo yhi (by omega) before hy same
-      · exact invariant_6 y ylo yhi x xlo xhi (by omega) (by omega) hx same.symm
+    all_goals first
+      | (rintro ⟨x, xlo, xhi, y, ylo, yhi, hx, hy, ne, same⟩
+         by_cases before : x < y
+         · exact invariant_6 x xlo xhi y ylo yhi (by omega) before hy same
+         · exact invariant_6 y ylo yhi x xlo xhi (by omega) (by omega) hx same.symm)
+      | (refine ⟨i.val, by omega, by omega, j.val, by omega, by omega, by omega, by omega, by omega, ?_⟩
+         simp_all only [Option.getD_some])
   | invariant_6_step =>
     verex_prepare only
     by_cases before : x < i.val

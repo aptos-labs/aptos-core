@@ -7,15 +7,15 @@ import VerexIR.Proofs.Denote.Term
 
 namespace VerexIR.Proofs.Denote
 
-variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
+variable {State : Type}
 
 /-- The weakest precondition through a verified callee whose contract
 excuses its postcondition exactly where it must fail, as every generated
 contract's does: a successful run refutes the condition, so the
 postcondition holds outright. -/
-theorem wp_call_strict {Args Result : Type} {function : Args → Comp unit Result}
-    {contract : Contract (Memory unit) Failure Args Result} {args : Args}
-    {ensures : Result → Memory unit → Prop} {aborts : Failure → Prop} {initial : Memory unit}
+theorem wp_call_strict {Args Result : Type} {function : Args → Spec State Failure Result}
+    {contract : Contract (State) Failure Args Result} {args : Args}
+    {ensures : Result → State → Prop} {aborts : Failure → Prop} {initial : State}
     (verified : Satisfies function contract)
     (strict : contract.mayAbort = contract.mustAbort)
     (assumed : contract.assumes args initial)
@@ -33,10 +33,10 @@ theorem wp_call_strict {Args Result : Type} {function : Args → Comp unit Resul
 /-- The weakest precondition through a verified callee whose contract's
 conditions at the call are given by equations: a contract normalized once
 per callee and instance, its normal forms instantiated at each call. -/
-theorem wp_call_normal {Args Result : Type} {function : Args → Comp unit Result}
-    {contract : Contract (Memory unit) Failure Args Result} {args : Args}
-    {ensures : Result → Memory unit → Prop} {aborts : Failure → Prop} {initial : Memory unit}
-    {assumes requires mustAbort : Prop} {established framed : Result → Memory unit → Prop}
+theorem wp_call_normal {Args Result : Type} {function : Args → Spec State Failure Result}
+    {contract : Contract (State) Failure Args Result} {args : Args}
+    {ensures : Result → State → Prop} {aborts : Failure → Prop} {initial : State}
+    {assumes requires mustAbort : Prop} {established framed : Result → State → Prop}
     {failed : Failure → Prop}
     (verified : Satisfies function contract)
     (strict : contract.mayAbort = contract.mustAbort)
@@ -59,10 +59,10 @@ theorem wp_call_normal {Args Result : Type} {function : Args → Comp unit Resul
 
 /-- `wp_call` with the contract's conditions at the call given by equations:
 the postcondition still excused where the contract permits a failure. -/
-theorem wp_call_equations {Args Result : Type} {function : Args → Comp unit Result}
-    {contract : Contract (Memory unit) Failure Args Result} {args : Args}
-    {ensures : Result → Memory unit → Prop} {aborts : Failure → Prop} {initial : Memory unit}
-    {assumes requires mayAbort mustAbort : Prop} {established framed : Result → Memory unit → Prop}
+theorem wp_call_equations {Args Result : Type} {function : Args → Spec State Failure Result}
+    {contract : Contract (State) Failure Args Result} {args : Args}
+    {ensures : Result → State → Prop} {aborts : Failure → Prop} {initial : State}
+    {assumes requires mayAbort mustAbort : Prop} {established framed : Result → State → Prop}
     {failed : Failure → Prop}
     (verified : Satisfies function contract)
     (assumes_eq : contract.assumes args initial = assumes)

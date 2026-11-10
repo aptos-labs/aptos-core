@@ -39,9 +39,9 @@ example : True := by
       expectMissing (← cache.get) proposition
   trivial
 
--- Dependency compatibility alone does not pay for a derivation. A common
--- request is reusable by its participating owners and their proof cases;
--- another clause, or a mixed group containing it, must do its own work.
+-- Automatic owners reuse each other's results, as the default walk's leaves
+-- share one cache: a sibling clause need not repeat a derivation another
+-- clause paid for. The unowned scope stays separate in both directions.
 example : True := by
   run_tac
     let statement := mkConst ``True
@@ -55,28 +55,26 @@ example : True := by
     discard <| run #[0, 1]
     discard <| run #[1]
     discard <| run #[0, 0]
-    unless (← attempts.get) == 1 do throwError "participating owners repeated common work"
     discard <| run #[2]
-    unless (← attempts.get) == 2 do throwError "a late owner inherited uncharged work"
     discard <| run #[1, 2]
-    unless (← attempts.get) == 3 do throwError "a mixed group inherited an unpaid request"
+    unless (← attempts.get) == 1 do throwError "a sibling owner repeated paid work"
     discard <| run #[]
-    unless (← attempts.get) == 4 do throwError "an unowned request inherited charged work"
+    unless (← attempts.get) == 2 do throwError "an unowned request inherited charged work"
     discard <| run #[3]
-    unless (← attempts.get) == 5 do throwError "an owner inherited uncharged work"
+    unless (← attempts.get) == 2 do throwError "an owner repeated paid work"
   trivial
 
--- Failed searches have the same debit boundary as successful requests.
+-- Failed searches have the same scope boundary as successful requests.
 example : True := by
   run_tac
     let statement := mkConst ``False
     let cache ← remember {} statement none (owners := #[0])
-    match ← lookup cache statement (owners := #[1]) with
+    match ← lookup cache statement with
     | .missing => pure ()
-    | _ => throwError "a late owner inherited an unpaid failed search"
-    match ← lookup cache statement (owners := #[0]) with
+    | _ => throwError "an unowned request inherited an owned failed search"
+    match ← lookup cache statement (owners := #[1]) with
     | .found none => pure ()
-    | _ => throwError "an owner repeated its unchanged failed search"
+    | _ => throwError "a sibling owner repeated an unchanged failed search"
   trivial
 
 -- No-progress is specific to the whole context revision. A new assumption

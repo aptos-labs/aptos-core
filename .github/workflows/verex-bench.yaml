@@ -1,4 +1,4 @@
-# The Verex verification benchmark (third_party/move/lean/designs/verification-benchmarks.md):
+# The Verex verification benchmark (third_party/move/lean/doc/designs/benchmark.md):
 # measures the standard problems of third_party/move/lean/bench/problems.toml,
 # keeps the results as an artifact, and reports them against the recent runs.
 name: Verex verification benchmark

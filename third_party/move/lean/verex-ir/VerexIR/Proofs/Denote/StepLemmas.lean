@@ -7,7 +7,7 @@ import VerexIR.Proofs.Denote.VectorOperations
 /-!
 # The built-in lemmas of the proof language
 
-The theorems the built-in lemmas of `apply` are (`doc/plan/proof-language.md`,
+The theorems the built-in lemmas of `apply` are (`doc/designs/proof-language.md`,
 "Lemmas"): the arithmetic lemmas over the specification's `*`, `/`, `%`, `<<`
 and `>>`, which elaborate to `Int.tdiv`, `Int.tmod`, `Int.shiftLeft` and
 `Int.shiftRight`; the vector lemmas over the vector operations as the
@@ -64,6 +64,11 @@ theorem div_add_mul (x b c : Int) (_ : 0 ≤ x) (_ : 0 ≤ b) (_ : 0 < c) :
 theorem mod_small (x c : Int) (_ : 0 ≤ x) (_ : x < c) : x.tmod c = x := by
   rw [Int.tmod_eq_emod_of_nonneg ‹_›]
   exact Int.emod_eq_of_lt ‹_› ‹_›
+
+theorem div_mod (x c : Int) (_ : 0 ≤ x) (_ : 0 < c) :
+    x.tdiv c * c + x.tmod c = x ∧ 0 ≤ x.tmod c ∧ x.tmod c < c := by
+  rw [Int.tdiv_eq_ediv_of_nonneg ‹_›, Int.tmod_eq_emod_of_nonneg ‹_›]
+  exact ⟨Int.ediv_mul_add_emod x c, Int.emod_nonneg x (Int.ne_of_gt ‹_›), Int.emod_lt_of_pos x ‹_›⟩
 
 theorem shl_mul (x k : Int) : x.shiftLeft k.toNat = x * 2 ^ k.toNat :=
   Int.shiftLeft_eq x k.toNat
@@ -349,19 +354,29 @@ theorem vector_contains_index (v : SpecVector α) (fallback : α) (i : Int) (_ :
 
 /-- A distinct vector without the element at a position holds that element
 no more. -/
-theorem vector_contains_remove {β : Sort _} (read : α → β) (v : SpecVector α) (fallback : α)
+theorem vector_contains_remove {β : Sort _} (read : α → β) (injective : ∀ a b, read a = read b → a = b) (v : SpecVector α) (fallback : α)
     (i : Int) (e : α) (_ : 0 ≤ i) (_ : i < v.values.size)
     (distinct : ∀ a : Int, 0 ≤ a → a < v.values.size → ∀ b : Int, 0 ≤ b → b < v.values.size →
       read (v.values[a.toNat]?.getD fallback) = read (v.values[b.toNat]?.getD fallback) → a = b)
     (held : read (v.values[i.toNat]?.getD fallback) = read e) :
-    ¬e ∈ v.values.eraseIdxIfInBounds i.toNat := by
-  have within : i.toNat < v.values.size := by omega
-  rw [eraseIdxIfInBounds_of_lt _ _ within, Array.mem_eraseIdx_iff_getElem]
-  rintro ⟨j, hj, other, found⟩
-  have same := distinct j (by omega) (by omega) i ‹_› ‹_› (by
-    simp only [Int.toNat_natCast, Array.getElem?_eq_getElem hj, Option.getD_some, found]
-    exact held.symm)
-  omega
+    (¬e ∈ v.values.eraseIdxIfInBounds i.toNat) ∧
+      (∀ k : Int, 0 ≤ k → k < (v.values.eraseIdxIfInBounds i.toNat).size →
+        read ((v.values.eraseIdxIfInBounds i.toNat)[k.toNat]?.getD fallback) ≠ read e) := by
+  have missing : ¬e ∈ v.values.eraseIdxIfInBounds i.toNat := by
+    have within : i.toNat < v.values.size := by omega
+    rw [eraseIdxIfInBounds_of_lt _ _ within, Array.mem_eraseIdx_iff_getElem]
+    rintro ⟨j, hj, other, found⟩
+    have same := distinct j (by omega) (by omega) i ‹_› ‹_› (by
+      simp only [Int.toNat_natCast, Array.getElem?_eq_getElem hj, Option.getD_some, found]
+      exact held.symm)
+    omega
+  refine ⟨missing, ?_⟩
+  intro k low high same
+  have bound : k.toNat < (v.values.eraseIdxIfInBounds i.toNat).size := by omega
+  have equal := injective _ _ same
+  apply missing
+  rw [← equal, Array.getElem?_eq_getElem bound, Option.getD_some]
+  exact Array.getElem_mem bound
 
 /-- Vectors whose elements read alike, by a read that tells elements apart,
 are equal. -/

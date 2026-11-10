@@ -624,7 +624,7 @@ two-field entry values. An entries layout has that field alone, its entries
 values of the entry declaration. A table layout holds the handle of the
 table first, then its cached length if the owner caches one, then the
 hidden contents field of entry tuples (`doc/designs/intrinsic-maps.md`,
-"Views"). -/
+"Layouts"). -/
 structure Layout where
   owner : StructHandle
   variant : Option String

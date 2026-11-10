@@ -64,3 +64,49 @@ elab "vir_denote_equations " ids:ident* : command => do
       | throwErrorAt id m!"`{name}` has no equations"
     let eqnIds := eqns.map fun eqn => mkIdent eqn
     elabCommand (← `(attribute [vir_denote ↓] $eqnIds*))
+
+/-!
+## The recursive specification functions the verifier has defined
+
+A definition and the theorem that unfolds it once are emitted together,
+and the leaf reads the theorem and the measure the recursion descends on
+from here rather than from the definition's name.
+-/
+
+namespace VerexIR.Proofs.Denote
+
+open Lean
+
+/-- A recursive specification function's definition, as the leaf reads it:
+the theorem that unfolds the definition once at its arguments, and the
+measure the recursion descends on.  Both are stated at the definition's
+leading parameters — what its body reads besides its arguments — followed
+by the bundled arguments, so an application's own arguments instantiate
+them. -/
+structure SpecDefinition where
+  /-- The unfolding theorem, at the parameters and the bundle. -/
+  unfold : Name
+  /-- The measure, a function of the parameters and the bundle into `Nat`.
+  An application whose measure is a literal unfolds at most that often,
+  since every recursive call is at a smaller measure. -/
+  measure : Expr
+  deriving Inhabited
+
+/-- The recursive specification functions defined so far, by the constant
+each defines: written where the definition and its unfolding theorem are
+emitted, read where a leaf evaluates an application.  An extension, so
+that nothing reads a definition out of the spelling of its name. -/
+initialize specDefinitions :
+    SimplePersistentEnvExtension (Name × SpecDefinition) (NameMap SpecDefinition) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := fun map (name, definition) => map.insert name definition
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries (fun map (name, definition) => map.insert name definition) {}
+        entries }
+
+/-- The definition a constant is of, where it is a recursive specification
+function's. -/
+def specDefinition? (env : Environment) (name : Name) : Option SpecDefinition :=
+  (specDefinitions.getState env).find? name
+
+end VerexIR.Proofs.Denote

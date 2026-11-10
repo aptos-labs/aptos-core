@@ -103,3 +103,16 @@ info: '«0x42».closure_sites.FunctionValue.construct3' depends on axioms: [prop
 #print axioms «0x42».closure_sites.FunctionValue.construct3
 
 end VerexSL.Tests.ClosureSites
+
+-- Closure identity includes the capture mask even when the target is shared.
+verex module 0x42::closure_masks where
+  fun add(x : u64, y : u64) -> u64 := x + y
+  spec add where
+    aborts_if x + y > MAX_U64
+    ensures result == x + y
+  fun same_target_different_masks(x : u64) -> Bool :=
+    function[Fn(u64) -> u64 has Copy, Drop](add, x, _) ==
+      function[Fn(u64) -> u64 has Copy, Drop](add, _, x)
+  spec same_target_different_masks where
+    aborts_if false
+    ensures !result

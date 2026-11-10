@@ -94,7 +94,7 @@ from the starts at one memory differ only in their loans, which the
 behavioral predicates rely on.
 
 **Tables.** A table owner's type has a hidden last field holding its
-entries ([`intrinsic-maps.md`](intrinsic-maps.md), "Owned Table values"),
+entries ([`intrinsic-maps.md`](intrinsic-maps.md), "Tables in the runtime semantics"),
 so a memory holds tables as values, as the runtime does. An escaping
 reference leaves a heap hole; at a successful call boundary
 `StorageEncodesReturned` resolves those holes with the returned row, so
@@ -109,27 +109,31 @@ unconditional even when abort conditions excuse `ensures`.
   other than its listed ones reads the same, and that every other
   resource type reads the same (a loose frame leaves those open); a
   caller frames with it by the memory's update lemmas.
-- **Data invariants of values**, as the Prover checks them: owed where a
-  value is constructed (`Term.constructed`) and where a mutation of a
-  local whose type carries one ends, at the death of a loan of the local
-  and after a write into it (`Term.mutationEnd`); assumed of parameters
-  at entry and owed of results and of the referents of mutable parameters
-  at exit. A function constructing or mutating such a value is verified
-  even without a specification.
-- **Data invariants of stored resources**, as the Prover treats them:
-  assumed at entry for the memory a function reaches, owed at every
-  write. One predicate per unit (`storedInvariant`) gives each `key`
-  declaration's invariant; `MemoryInvariants storedInvariant memory`
-  states it of every stored value. A function reaching a declaration that
-  has one requires it at entry and ensures it at exit; any other function
-  reaching memory ensures that it keeps it. A write keeps it by its lemma
-  (`MemoryInvariants.set`) where the value written satisfies its own, and a
-  read adds the value's invariant to what a proof knows. The invariant of
-  a stored value is stated at its resource's own type arguments
-  (`StoredCase`), one statement per row of type values, as the Prover
-  indexes memory by type; a writer or reader at a generic frame moves its
-  view of the value there (`Skolems.reframe`), which keeps its encoding,
-  so the invariant holds at every frame by construction.
+- **Data invariants of values** are part of the type, not a property of
+  memory: `Memory unit` is a function into certified carriers, so a typed
+  memory is one whose stored values satisfy their invariants, and a read of
+  one owes nothing and assumes nothing. The obligation falls where a value
+  is made, where a mutation of one ends, where a mutable loan over one
+  dies, where a reference to one is handed to a call and where one is
+  returned ([`data-invariants.md`](data-invariants.md)). A function
+  constructing or mutating such a value is verified even without a
+  specification.
+- **Data invariants of stored resources** are stated over memory by a second
+  layer, for the declarations whose invariant a carrier cannot state — one
+  reading the executable unit, a precondition or memory — and for no others:
+  one predicate per unit (`storedInvariant`) gives each such `key`
+  declaration's invariant and `DataInvariants storedInvariant memory` states
+  it of every stored value, assumed at entry for the memory a function
+  reaches and owed at every write, kept across a write by
+  `DataInvariants.set` where the value written satisfies its own. The
+  invariant of a stored value is stated at
+  its resource's own type arguments (`StoredCase`), one statement per row
+  of type values, as the Prover indexes memory by type; a writer or reader
+  at a generic frame moves its view of the value there (`Skolems.reframe`),
+  which keeps its encoding, so the invariant holds at every frame by
+  construction. Removing this layer, once no declaration needs it, is an open
+  problem
+  ([`../plan/data-and-global-invariants.md`](../plan/data-and-global-invariants.md)).
 - **Module invariants**, as the Prover evaluates them: those of every
   namespace of the unit that read memory a function reaches (through its
   body, contract, specification functions, and callees, at any depth) are
@@ -164,8 +168,8 @@ unconditional even when abort conditions excuse `ensures`.
 ## Agreement
 
 `compileFunction_agrees` is `Spec.Refines (propheticMeaning …) (f.denote
-…)`: every outcome of the prophetic meaning is one of the denotation, the
-only direction used (contract transport, inlining), weaker than an
+…)`: every outcome of the prophetic meaning is one of the denotation
+wherever the denotation is defined, the only direction used (contract transport, inlining), weaker than an
 equivalence, and true at every frame, since at an incoherent one the
 prophetic meaning has no outcome. What the axioms assume about types is
 the compiler's: a coherent caller's calls have coherent frames.

@@ -582,6 +582,13 @@ private structure SourceBinding where
   value : Option Expr
   /-- A quantifier binder, which ranges over its domain. -/
   quantifier : Bool := false
+  /-- Written in a specification expression, which reads specification
+  functions and logical values. -/
+  specification : Bool := false
+
+private def inSpecification (entry : SourceBinding × Array SourceBinding) :
+    SourceBinding × Array SourceBinding :=
+  ({ entry.1 with specification := true }, entry.2)
 
 private def forLowerName (span : Span) : String :=
   s!"$for_lb_{span.startByte}"
@@ -717,12 +724,13 @@ mutual
         collected ++ (result.map (scopedBindings scope)).getD #[]
     | .specBlock conditions _ _ =>
         (conditions.foldl (init := (#[], scope)) fun (collected, scope) (kind, value) =>
-          let nested := scopedBindings scope value
+          let nested := (scopedBindings scope value).map inSpecification
           match kind with
           | .let_ name =>
               let binding : SourceBinding := {
                 span := value.span, mutable := false
-                pattern := .variable name value.span, type := none, value }
+                pattern := .variable name value.span, type := none, value
+                specification := true }
               (collected ++ nested ++ #[(binding, scope)], scope.push binding)
           | _ => (collected ++ nested, scope)).1
     | .forRange iterator lower upper body span =>
@@ -761,8 +769,9 @@ mutual
             let binding : SourceBinding := {
               span := pattern.span, mutable := false, pattern, type := none
               value := some domain, quantifier := true }
-            (collected ++ scopedBindings scope domain ++ #[(binding, scope)], scope.push binding)
-        collected ++ scopedBindings inner body
+            (collected ++ (scopedBindings scope domain).map inSpecification ++
+              #[(binding, scope)], scope.push binding)
+        collected ++ (scopedBindings inner body).map inSpecification
     | source => (childExpressions source).flatMap (scopedBindings scope)
 
   /-- Does control leave this expression through a `return` written somewhere
@@ -1337,6 +1346,16 @@ private def resolveLocalConstructor (segments : Array String) :
       (sourceNominal? state.sourceNamespace segments.back!).isSome then
     let (reference, declaration) ← resolveLocalNominal segments
     return (reference, declaration, none)
+  -- A nominal of another module, which a specification may construct, named
+  -- by a `use` or by its path.
+  let expanded := (expandedUsePath? state.sourceNamespace segments).getD segments
+  if expanded.size ≥ 2 && (state.source.namespaces.find? (·.path == expanded.pop)).any
+      (fun ns => (sourceNominal? ns expanded.back!).isSome) then
+    let (reference, declaration) ← resolveLocalNominal segments
+    return (reference, declaration, none)
+  if segments.size == 1 && (expandedUsePath? state.sourceNamespace segments).isSome then
+    let (reference, declaration) ← resolveLocalNominal segments
+    return (reference, declaration, none)
   if segments.size < 2 then
     failAt "VEREX-CONSTRUCTOR-NAME" s!"unknown constructor `{segments.back!}`"
   let variant := segments.back!
@@ -1566,6 +1585,16 @@ private def resolveNominalField (baseType : TypeId) (field : String) (span : Spa
         set { current with tables }
         pure name
   return ({ namespaceId := ownerName.namespaceId, name := owner }, fieldName, typeId, declaration)
+
+/-- Whether a field path from a nominal type passes through an enum. -/
+private def projectionCrossesEnum (base : TypeId) (fields : Array String) (span : Span) :
+    LowerM Bool := do
+  let mut referent := base
+  for field in fields do
+    let (_, _, fieldType, declaration) ← resolveNominalField referent field span
+    unless declaration.variants.isEmpty do return true
+    referent := fieldType
+  return false
 
 private def nominalPatternDeclaration (typeId : TypeId) (span : Span) :
     LowerM (SourceNominal × Array GenericArgument) := do
@@ -2131,15 +2160,15 @@ private def addArbitrarySpecValue (context : ExprContext) (typeId : TypeId)
 
 /-- The name a state label is in VIR: interned in the unit's names, under the
 namespace of the specification. -/
-private def labelName (name : String) : LowerM Nat := do
+private def labelName (name : String) : LowerM NameId := do
   let state ← get
   let (tables, id) := internName state.tables state.namespaceId name
   set { state with tables }
-  return id.index
+  return id
 
 /-- The state a one-state read under the enclosing labels reads: the
 post-state's label, else the pre-state's. -/
-private def stateLabel (context : ExprContext) : Option Nat :=
+private def stateLabel (context : ExprContext) : Option NameId :=
   context.stateRange.post <|> context.stateRange.pre
 
 private def runtimeIndexType : LowerM TypeId := do
@@ -2255,7 +2284,7 @@ private partial def lowerExpressionPlaceWith
         else .field base owner fieldName
       return (← pushPlace place, typeId, bindings, do
         pushExpression loc typeId (.operation (.data
-          (if ghost then .selectGhost owner field else .select owner field)) #[] #[← observe]))
+          (fieldSelection declaration owner field)) #[] #[← observe]))
   | .index base indexSource _ =>
       let (base, baseType, bindings, observe) ← lowerExpressionPlaceWith
         lowerIndex context base checkBounds captureLiteralIndexes
@@ -2538,6 +2567,16 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
               ConstValue.integer (Int.ofNat byte.toNat)
             let id ← pushExpression loc expectedType (.value (.vector elements))
             return (id, expectedType)
+      -- Without a context asking for `Bytes`, a Move byte string is a vector:
+      -- the source language has no other type for one.
+      let expectsBytes ← match expected with
+        | some expected => pure ((← typeNode? expected) == some .bytes)
+        | none => pure false
+      if (← get).sourceNamespace.profile == .move && !expectsBytes then
+        let vectorType ← internType (.vector (← internType (.integer (.bits 8) false)) none)
+        if let some expected := expected then ensureType expected vectorType span
+        let elements := value.map fun byte => ConstValue.integer (Int.ofNat byte.toNat)
+        return (← pushExpression loc vectorType (.value (.vector elements)), vectorType)
       let typeId ← internType .bytes
       if let some expected := expected then ensureType expected typeId span
       return (← pushExpression loc typeId (.value (.bytes value)), typeId)
@@ -2665,10 +2704,27 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       let id ← pushExpression loc placeType <| .operation operation #[] #[]
       return (← bindPlaceIndices loc placeType bindings id, placeType)
   | .borrowPlace mutable place _ =>
+      -- A signer's address is a value, which no field place names.
+      if let .field (.local name localSpan) "address" fieldSpan := place then
+        if let some (_, baseType) := lookupLocal? context name then
+          let baseIsSigner ← match ← typeNode? baseType with
+            | some .signer => pure true
+            | some (.reference reference) =>
+                pure ((← typeNode? reference.referent) == some .signer)
+            | _ => pure false
+          if !mutable && baseIsSigner then
+            let address : Expr := .field (.local name localSpan) "address" fieldSpan
+            return ← lowerExpr context expected
+              (if context.specification then address else .borrowValue false address span)
       if context.specification then
         let value ← lowerSpecificationPlaceValue context place
         if let some expected := expected then ensureType expected value.2 span
         return value
+      -- A constant is a value, not a place: its borrow is a value borrow.
+      if let .local name localSpan := place then
+        if !mutable && (lookupLocal? context name).isNone &&
+            (sourceConstant? (← get).sourceNamespace name).isSome then
+          return ← lowerExpr context expected (.borrowValue false (.local name localSpan) span)
       let (place, placeType) ← lowerPlace context place
       let resultType ← match expected with
         | some resultType => pure resultType
@@ -2791,8 +2847,9 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
               failAt "VEREX-STATE-LABEL" "a binder over the state domain is one label" (some domain.span)
           | _, _ => pure none
         let loweredPattern ← lowerBindingPattern active pattern patternType
-        let boundLocals ← bindingPatternLocals active pattern
-        active := withBoundLocals active boundLocals
+        -- A state label binds no value: the name still reads an enclosing one.
+        if label.isNone then
+          active := withBoundLocals active (← bindingPatternLocals active pattern)
         loweredBinders := loweredBinders.push {
           pattern := loweredPattern, domain := domainValue.1, label }
       let boolType ← internType .bool
@@ -4172,11 +4229,12 @@ private partial def lowerBorrowValueExpr (context : ExprContext) (expected : Opt
         let mut referenceType ← inferredReferenceType expectedKind referent loc
         let borrowed ← pushExpression loc referenceType <| .operation
           (.global (.borrow borrowKind)) #[.typeArg resource] #[key.1]
-        if mutable && !fields.isEmpty then
-          -- A field-focused mutable storage borrow reborrows the
-          -- projected place through a synthesized holder local: place
-          -- resolution is the runtime meaning of a projection, and a
-          -- value-level selection of a mutable reference has none.
+        if !fields.isEmpty && (mutable || (← projectionCrossesEnum referent fields span)) then
+          -- A field-focused storage borrow reborrows the projected place
+          -- through a synthesized holder local: place resolution is the
+          -- runtime meaning of a projection, and a value-level selection of a
+          -- mutable reference, or of an enum's field through a reference, has
+          -- none.
           let holder ← pushTemporaryLocal referenceType loc
           let pattern ← pushPattern
             { loc, typeId := referenceType, kind := .variable holder }
@@ -4188,7 +4246,7 @@ private partial def lowerBorrowValueExpr (context : ExprContext) (expected : Opt
             place ← pushPlace (.field place owner fieldName)
           referenceType ← inferredReferenceType expectedKind referent loc
           let focused ← pushExpression loc referenceType <| .operation
-            (.borrow .mutable place) #[] #[]
+            (.borrow borrowKind place) #[] #[]
           let id ← pushExpression loc referenceType <|
             .letDecl pattern (some borrowed) focused
           if let some expected := expected then ensureType expected referenceType span
@@ -4202,7 +4260,19 @@ private partial def lowerBorrowValueExpr (context : ExprContext) (expected : Opt
             (.data (.select owner field)) #[] #[selected]
         if let some expected := expected then ensureType expected referenceType span
         return (selected, referenceType)
-  if let some placeSource := localStoragePlace? context value then
+  -- A signer's address is a value, not a field to borrow in place.
+  let signerAddress ← match value with
+    | .field base "address" _ => match expressionPlace? base with
+        | some place => do
+            let (_, baseType) ← lowerPlace context place
+            match ← typeNode? baseType with
+            | some .signer => pure true
+            | some (.reference reference) =>
+                pure ((← typeNode? reference.referent) == some .signer)
+            | _ => pure false
+        | none => pure false
+    | _ => pure false
+  if let some placeSource := if signerAddress then none else localStoragePlace? context value then
     let indexType ← runtimeIndexType
     let (place, placeType, bindings, _) ← lowerExpressionPlaceWith
       (lowerExpr context (some indexType)) context placeSource
@@ -5771,6 +5841,11 @@ private partial def lowerArgument (context : ExprContext) (parameterType : TypeI
 
 end
 
+/-- Whether a quantifier binder of this type binds a value name, which a state
+label does not (`doc/designs/state-labels.md`). -/
+private def bindsValue (patternType : TypeId) : LowerM Bool :=
+  return (← typeNode? patternType) != some .stateDomain
+
 private def sourceQuantifierPatternType (context : ExprContext) (domain : Expr) :
     LowerM TypeId := do
   -- Domains routinely contain field selection and specification calls (for
@@ -5819,6 +5894,22 @@ private def clauseKind? : ContractClause → Option ConditionKind
   | .invariant .. => some .structInvariant
   | .modifies .. | .modifiesAll .. | .reads .. | .readsAll .. | .modifiesOf .. |
       .modifiesOfAll .. | .ghost .. => none
+
+/-- The name a contract clause binds. -/
+private def contractBindingName? : ContractClause → Option String
+  | .letPre name .. | .letPost name .. => some name
+  | _ => none
+
+/-- The type of an expression, discarding what lowering it leaves. -/
+private def probedType (context : ExprContext) (source : Expr) : LowerM TypeId := do
+  let before ← get
+  let inferred ← lowerExpr context none source
+  let after ← get
+  set { after with
+    output := before.output
+    temporaryLocalBase := before.temporaryLocalBase
+    temporaryLocals := before.temporaryLocals }
+  return inferred.2
 
 private def clauseExpression? : ContractClause → Option Expr
   | .letPre _ expression .. | .letPost _ expression .. |
@@ -5891,6 +5982,7 @@ private partial def lowerSourceAttribute : SourceAttribute → LowerM Attribute
         | .number value => AttributeValue.constant (.integer value)
         | .string value => AttributeValue.constant (.string value)
         | .name value => AttributeValue.name none value
+        | .qualifiedName value => AttributeValue.qualifiedName value
       return .assign name value (some (← addLoc span))
 
 private def sourceAttributes (attributes : Array SourceAttribute) : LowerM (Array Attribute) := do
@@ -5973,10 +6065,7 @@ private def lowerContract (context : ExprContext) (clauses : Array ContractClaus
     conditions := conditions.push {
       loc, kind := (clauseKind? clause).get!, properties,
       expression := expression.1, auxiliary }
-    let bindingName? := match clause with
-      | .letPre name .. | .letPost name .. => some name
-      | _ => none
-    if let some name := bindingName? then
+    if let some name := contractBindingName? clause then
       if (lookupLocal? context name).isSome then
         failAt "VEREX-CONTRACT-BINDING-DUPLICATE"
           s!"contract binding `{name}` shadows an existing local" (some clause.span)
@@ -6068,24 +6157,33 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
       let some domain := binding.value
         | failAt "VEREX-QUANTIFIER-DOMAIN" "a quantifier has no domain" (some binding.span)
       let patternType ← sourceQuantifierPatternType predeclareContext domain
+      let bindsName ← bindsValue patternType
       let patternDeclarations ← predeclareBindingPattern typeContext false
         binding.pattern patternType locals.size
       for (localInfo, localDecl) in patternDeclarations do
         locals := locals.push localDecl
         declarations := declarations.push localInfo
         logicalLocals := logicalLocals.push localInfo.id
-        predeclared := predeclared.push
-          (binding.span, localInfo.name, localInfo.id, localInfo.typeId)
+        if bindsName then
+          predeclared := predeclared.push
+            (binding.span, localInfo.name, localInfo.id, localInfo.typeId)
       continue
     let typeId ← match binding.type with
       | some type => pure (← lowerTypeUse typeContext type).typeId
       | none => do
           let before ← get
+          let visible ← if binding.specification then
+              inferenceLocals.mapM fun (name, id, typeId) => do
+                let projected ← if logicalLocals.contains id then pure typeId
+                  else projectSpecTypeId typeId
+                pure (name, id, projected)
+            else pure inferenceLocals
           let inferenceContext : ExprContext := {
             types := typeContext
-            locals := inferenceLocals
+            locals := visible
             declarations
-            returnType := predeclareReturnType }
+            returnType := predeclareReturnType
+            specification := binding.specification }
           let some value := binding.value
             | failAt "VEREX-DECLARATION-TYPE"
                 "a declaration without initializer needs a type" (some binding.span)
@@ -6122,64 +6220,79 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
   let clauses := declaration.contract.filterMap clauseExpression?
   -- A clause's match arms bind in the projected domain, below.
   let clauseArmSpans := (clauses.flatMap sourceMatchBindings).map (·.pattern.span)
-  for (binding, scope) in clauses.flatMap (scopedBindings #[]) do
-    if declarations.any (·.span == binding.pattern.span) then continue
-    if clauseArmSpans.contains binding.pattern.span then continue
-    let visible := scope.reverse.flatMap (fun entry =>
-      clausePredeclared.filterMap fun (span, name, id, typeId) =>
-        if span == entry.span then some (name, id, typeId) else none) ++ clauseScope
-    -- A quantifier binder at its place, so that the bindings in its body
-    -- see it.
-    if binding.quantifier then
-      let some domain := binding.value | continue
-      let predeclareContext : ExprContext := {
+  -- A clause also sees the contract's bindings before it.
+  let mut clauseLets : Array (String × LocalId × TypeId) := #[]
+  for clause in declaration.contract do
+    let some expression := clauseExpression? clause | continue
+    for (binding, scope) in scopedBindings #[] expression do
+      if declarations.any (·.span == binding.pattern.span) then continue
+      if clauseArmSpans.contains binding.pattern.span then continue
+      let visible := scope.reverse.flatMap (fun entry =>
+        clausePredeclared.filterMap fun (span, name, id, typeId) =>
+          if span == entry.span then some (name, id, typeId) else none) ++ clauseScope ++ clauseLets
+      -- A quantifier binder at its place, so that the bindings in its body
+      -- see it.
+      if binding.quantifier then
+        let some domain := binding.value | continue
+        let predeclareContext : ExprContext := {
+          types := typeContext
+          locals := visible ++ quantifierLocals
+          declarations
+          returnType := predeclareReturnType
+          resultType := some predeclareResultType
+          specification := true }
+        let patternType ← sourceQuantifierPatternType predeclareContext domain
+        let bindsName ← bindsValue patternType
+        let patternDeclarations ← predeclareBindingPattern typeContext false
+          binding.pattern patternType locals.size
+        for (localInfo, localDecl) in patternDeclarations do
+          locals := locals.push localDecl
+          declarations := declarations.push localInfo
+          logicalLocals := logicalLocals.push localInfo.id
+          if bindsName then
+            clausePredeclared := clausePredeclared.push
+              (binding.pattern.span, localInfo.name, localInfo.id, localInfo.typeId)
+        continue
+      let typeId ← match binding.type with
+        | some type => projectSpecTypeId (← lowerTypeUse typeContext type).typeId
+        | none => do
+            let before ← get
+            let inferenceContext : ExprContext := {
+              types := typeContext
+              locals := visible
+              declarations
+              returnType := predeclareReturnType
+              resultType := some predeclareResultType
+              specification := true }
+            let some value := binding.value
+              | failAt "VEREX-DECLARATION-TYPE"
+                  "a declaration without initializer needs a type" (some binding.span)
+            let inferred ← lowerExpr inferenceContext none value
+            let after ← get
+            set { after with
+              output := before.output
+              temporaryLocalBase := before.temporaryLocalBase
+              temporaryLocals := before.temporaryLocals }
+            pure inferred.2
+      let patternDeclarations ← predeclareBindingPattern typeContext false
+        binding.pattern typeId locals.size
+      for (localInfo, localDecl) in patternDeclarations do
+        locals := locals.push localDecl
+        declarations := declarations.push localInfo
+        logicalLocals := logicalLocals.push localInfo.id
+        clausePredeclared := clausePredeclared.push
+          (binding.span, localInfo.name, localInfo.id, localInfo.typeId)
+    if let some name := contractBindingName? clause then
+      let bindingContext : ExprContext := {
         types := typeContext
-        locals := visible ++ quantifierLocals
+        locals := clauseScope ++ clauseLets
         declarations
         returnType := predeclareReturnType
         resultType := some predeclareResultType
         specification := true }
-      let patternType ← sourceQuantifierPatternType predeclareContext domain
-      let patternDeclarations ← predeclareBindingPattern typeContext false
-        binding.pattern patternType locals.size
-      for (localInfo, localDecl) in patternDeclarations do
-        locals := locals.push localDecl
-        localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
-        declarations := declarations.push localInfo
-        logicalLocals := logicalLocals.push localInfo.id
-        clausePredeclared := clausePredeclared.push
-          (binding.pattern.span, localInfo.name, localInfo.id, localInfo.typeId)
-      continue
-    let typeId ← match binding.type with
-      | some type => projectSpecTypeId (← lowerTypeUse typeContext type).typeId
-      | none => do
-          let before ← get
-          let inferenceContext : ExprContext := {
-            types := typeContext
-            locals := visible
-            declarations
-            returnType := predeclareReturnType
-            resultType := some predeclareResultType
-            specification := true }
-          let some value := binding.value
-            | failAt "VEREX-DECLARATION-TYPE"
-                "a declaration without initializer needs a type" (some binding.span)
-          let inferred ← lowerExpr inferenceContext none value
-          let after ← get
-          set { after with
-            output := before.output
-            temporaryLocalBase := before.temporaryLocalBase
-            temporaryLocals := before.temporaryLocals }
-          pure inferred.2
-    let patternDeclarations ← predeclareBindingPattern typeContext false
-      binding.pattern typeId locals.size
-    for (localInfo, localDecl) in patternDeclarations do
-      locals := locals.push localDecl
-      declarations := declarations.push localInfo
-      logicalLocals := logicalLocals.push localInfo.id
-      clausePredeclared := clausePredeclared.push
-        (binding.span, localInfo.name, localInfo.id, localInfo.typeId)
-  quantifierLocals := clausePredeclared.reverse.map (fun (_, name, id, typeId) =>
+      let bound ← probedType bindingContext expression
+      clauseLets := clauseLets.push (name, ⟨locals.size⟩, bound)
+  quantifierLocals := clauseLets ++ clausePredeclared.reverse.map (fun (_, name, id, typeId) =>
     (name, id, typeId)) ++ quantifierLocals
   let quantifierRoots := declaration.body.toArray ++ clauses
   for binding in quantifierRoots.flatMap sourceQuantifierBindings do
@@ -6192,13 +6305,13 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
       resultType := some predeclareResultType
       specification := true }
     let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+    let bindsName ← bindsValue patternType
     let patternDeclarations ← predeclareBindingPattern typeContext false
       binding.pattern patternType locals.size
     for (localInfo, localDecl) in patternDeclarations do
       locals := locals.push localDecl
-      localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
-      quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++
-        quantifierLocals
+      if bindsName then
+        quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++ quantifierLocals
       declarations := declarations.push localInfo
       logicalLocals := logicalLocals.push localInfo.id
   -- Specification clauses may also match: their arm patterns bind locals in
@@ -6400,13 +6513,13 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
       returnType := predeclareReturnType
       specification := true }
     let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+    let bindsName ← bindsValue patternType
     let patternDeclarations ← predeclareBindingPattern typeContext false
       binding.pattern patternType locals.size
     for (localInfo, localDecl) in patternDeclarations do
       locals := locals.push localDecl
-      localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
-      quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++
-        quantifierLocals
+      if bindsName then
+        quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++ quantifierLocals
       declarations := declarations.push localInfo
   for binding in declaration.body.toArray.flatMap sourceMatchBindings do
     let predeclareContext : ExprContext := {
@@ -6436,8 +6549,12 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
   -- Without a declared result type, the body's type is the result.
   let (body, result) ← match declaration.body, declared with
     | some source, some result => do
-        let lowered ← lowerExpr context (some result.typeId) source
-        ensureType result.typeId lowered.2 source.span
+        -- A tuple's integers are logical, as its calls read them.
+        let bodyType ← match ← typeNode? result.typeId with
+          | some (.tuple _) => projectSpecTypeId result.typeId
+          | _ => pure result.typeId
+        let lowered ← lowerExpr context (some bodyType) source
+        ensureType bodyType lowered.2 source.span
         pure (some lowered.1, result)
     | some source, none => do
         let lowered ← lowerExpr context none source
@@ -6501,21 +6618,35 @@ private def lowerLemma (declaration : LemmaDecl) : LowerM Unit := do
   let unitType ← internType .unit
   let mut declarations := #[]
   let mut quantifierLocals := localTypes
-  for binding in roots.flatMap sourceQuantifierBindings do
-    let predeclareContext : ExprContext := {
-      types := typeContext
-      locals := quantifierLocals
-      declarations
-      returnType := unitType
-      specification := true }
-    let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
-    let patternDeclarations ← predeclareBindingPattern typeContext false
-      binding.pattern patternType locals.size
-    for (localInfo, localDecl) in patternDeclarations do
-      locals := locals.push localDecl
-      quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++
-        quantifierLocals
-      declarations := declarations.push localInfo
+  let clauseRoots := declaration.contract.filterMap fun clause =>
+    (clauseExpression? clause).map (·, contractBindingName? clause)
+  let otherRoots := (declaration.decreases ++ declaration.proof.map (·.2)).map (·, none)
+  for (root, bound?) in clauseRoots ++ otherRoots do
+    for binding in sourceQuantifierBindings root do
+      let predeclareContext : ExprContext := {
+        types := typeContext
+        locals := quantifierLocals
+        declarations
+        returnType := unitType
+        specification := true }
+      let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+      let bindsName ← bindsValue patternType
+      let patternDeclarations ← predeclareBindingPattern typeContext false
+        binding.pattern patternType locals.size
+      for (localInfo, localDecl) in patternDeclarations do
+        locals := locals.push localDecl
+        if bindsName then
+          quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++ quantifierLocals
+        declarations := declarations.push localInfo
+    if let some name := bound? then
+      let bindingContext : ExprContext := {
+        types := typeContext
+        locals := quantifierLocals
+        declarations
+        returnType := unitType
+        specification := true }
+      let bound ← probedType bindingContext root
+      quantifierLocals := #[(name, ⟨locals.size⟩, bound)] ++ quantifierLocals
   for binding in roots.flatMap sourceMatchBindings do
     let predeclareContext : ExprContext := {
       types := typeContext
@@ -6673,11 +6804,12 @@ private def lowerStruct (declaration : StructDecl) : LowerM Unit := do
       returnType := boolType
       specification := true }
     let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+    let bindsName ← bindsValue patternType
     let patternDeclarations ← predeclareBindingPattern context false
       binding.pattern patternType locals.size
     for (localInfo, localDecl) in patternDeclarations do
       locals := locals.push localDecl
-      localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
+      if bindsName then localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
       declarations := declarations.push localInfo
   for binding in declaration.contract.filterMap clauseExpression? |>.flatMap
       sourceMatchBindings do
@@ -6766,11 +6898,12 @@ private def lowerEnum (declaration : EnumDecl) : LowerM Unit := do
       returnType := boolType
       specification := true }
     let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+    let bindsName ← bindsValue patternType
     let patternDeclarations ← predeclareBindingPattern context false
       binding.pattern patternType locals.size
     for (localInfo, localDecl) in patternDeclarations do
       locals := locals.push localDecl
-      localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
+      if bindsName then localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
       declarations := declarations.push localInfo
   for binding in declaration.contract.filterMap clauseExpression? |>.flatMap
       sourceMatchBindings do
@@ -6827,11 +6960,12 @@ private def lowerNamespaceInvariants
         returnType := boolType
         specification := true }
       let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+      let bindsName ← bindsValue patternType
       let patternDeclarations ← predeclareBindingPattern typeContext false
         binding.pattern patternType locals.size
       for (localInfo, localDecl) in patternDeclarations do
         locals := locals.push localDecl
-        localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
+        if bindsName then localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
         scopedDeclarations := scopedDeclarations.push localInfo
     let context : ExprContext := {
       types := typeContext

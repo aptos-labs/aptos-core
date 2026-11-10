@@ -1,0 +1,1 @@
+tests/sources/regression/spec_fun_same_mem_param.move:18:1: info: `is_xdx` uses concrete verification: Given interpretation does not yet support storage interpretation

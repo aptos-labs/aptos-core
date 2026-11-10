@@ -48,7 +48,8 @@ A label is one of:
   (`state_domain_quant.move`): "universally quantifying over all possible
   memory states", not over program points. A quantified variable of type
   `StateDomain` is not a local; it is resolved only in `|~` positions, and
-  one that is not used as a label is rejected.
+  one that is not used as a label is rejected. Its name hides no value: a
+  value of that name in its scope still reads the enclosing one.
 
 A one-state predicate at `S` (`S |~ aborts_of<f>(x)`) reads the globals of
 `S` as the start of the invocation. `S |~ f(x)` of a two-state
@@ -71,7 +72,7 @@ spelled by its source name too.
 **VIR.** `MemoryRange` and the labeled operations (`behavior`,
 `functionCall`, `lemma`, `publish`, `remove`, `update`, `global` and
 `exists` with an optional label). A `QuantifierBinder` over the
-`stateDomain` domain carries the label it binds (`label : Option Nat`,
+`stateDomain` domain carries the label it binds (`label : Option NameId`,
 present exactly for a state-domain binder). Validation (`Capability`)
 checks that every label a function's specification reads is bound by a
 state-domain binder or defined by a two-state operation of the same
@@ -127,10 +128,10 @@ S T …`, specification functions over `old`). A label is a `Memory unit`:
 - an invocation label is `Proofs.StateOf`, the post-state chosen from the
   same successful invocation as `ResultOf`; the projection defaults to the
   pre-state when no successful run exists and adds no success assumption.
-  `stateOf_eq_of_ensuresOf` proves that a successful execution determines
-  this state (runtime determinism up to loan renaming, injective slot
-  encodings, agreement on unnamed resources), and the call rules carry the
-  state equation into callers.
+  `stateOf_eq_of_ok` (`Proofs/Invocation.lean`) proves that a successful
+  execution determines this state, from the unit's runs agreeing up to loan
+  renaming (`RunsAgree`), and the call rules carry the state equation into
+  callers.
 
 A range `{pre, post}` then selects the states each operation reads; the
 default states are the contract's. A binder over the state domain also
@@ -139,7 +140,7 @@ binds one copy of every `&mut` parameter, as the Prover keeps per label
 old or current state and locals. The contract carries defined labels into
 an opaque caller: no program point of the callee is needed when its
 contract replaces the call. Specification types see through references
-(`seeThroughReferences`): a specification function over a `&mut Counter`
+(`specTypeId`, `VerexSL/Contract/Values.lean`): a specification function over a `&mut Counter`
 reads `c.value` as an integer, labeled or not.
 
 ## Verification

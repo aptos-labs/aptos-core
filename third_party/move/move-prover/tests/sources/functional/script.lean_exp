@@ -1,0 +1,1 @@
+tests/sources/functional/script.move:2:1: info: `main` uses concrete verification: Given interpretation does not yet support storage interpretation

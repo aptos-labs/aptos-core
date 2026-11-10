@@ -41,7 +41,7 @@ whole and not verified, as from the Move CLI (below), so calls into them
 inline. For a package directory, `--filter <part>` verifies the modules
 whose source file name contains the part, and `--modules <a::m>,…` verifies
 the named modules with only what verifying them reads exported
-([`verification-benchmarks.md`](../status/verification-benchmarks.md),
+([`benchmark.md`](benchmark.md),
 "Module selection"). A filter or module name that selects nothing is an
 error. `--dev` compiles a package directory in dev mode, with its
 `[dev-addresses]` and `[dev-dependencies]`. `VEREX_OPTIONS=name=value,…`
@@ -183,8 +183,24 @@ function of the type arguments and arguments: `hash::sha2_256` and
 `hash::sha3_256` with a 32-byte result, `bcs::to_bytes` as the
 specification function `bcs::serialize`, `type_info::type_name` and
 `type_info::type_of` as functions of the type, the latter aborting unless
-`type_info::spec_is_struct` holds. The prelude's injectivity and length
-axioms are not mirrored.
+`type_info::spec_is_struct` holds. At a type mentioning no parameter these
+three take the values the translator computes (the canonical name; the
+address, module, and name with type arguments;
+whether it is a struct or enum), `VerexIR.Proofs.Denote.reflectedTypeInfo`
+and its siblings. The prelude's injectivity and length axioms are not
+mirrored. `aggregator_v2`'s `create_aggregator`, `create_unbounded_aggregator`,
+`try_add`, `try_sub`, `is_at_least_impl` and `read` are the prelude's
+procedures by the element type (`NativeModel.aggregator`): at `u64` and `u128`
+exact arithmetic over the fields `value` and `max_value`; they abort unless
+the element's `type_name` is one of those two, so at another concrete type
+always; at a type parameter that does not abort, the result and the referent
+are unconstrained. `spec_get_value` and `spec_get_max_value` read the fields
+(`SpecificationModel.field`), as `aggregator::spec_get_handle`, `spec_get_key`
+and `spec_get_limit` do. The wrappers with bodies (`add`, `sub`,
+`is_at_least`, `max_value`, `*_with_value`) are read by their Move bodies,
+which at a type parameter differs from the prelude's `add` and `sub`: the
+body's assertion can abort on the unconstrained result, the prelude's cannot,
+and at `u64` the body is what runs.
 
 A Move specification function is partial: it is defined where its
 parameters declared with fixed-width integer types hold values of those
@@ -196,8 +212,9 @@ reads `x` as an `Int`, and the verifier derives the domain from the type.
 A recursive specification function unfolds where its measure descends, and
 a leaf holds it unfolded once at each application whose guard the context
 decides. The measure is the `decreases` clause or an integer parameter
-every recursive call provably decreases on its path; failing that, one the
-calls decrease on for non-negative parameters, and each call the path
+every recursive call provably decreases on its path, the conditions of the
+`if`s and the left operands of the `&&`, `||` and `==>` above it; failing
+that, one the calls decrease on for non-negative parameters, and each call the path
 conditions do not prove descending is guarded by its descent, taking an
 arbitrary value where the measure does not descend: the definable reading
 of the Prover's unguarded axiom. Parameters of bounded integer type also
@@ -231,11 +248,26 @@ A specification is established in one of three ways, tried in this order:
    does: theorems, then lemmas, then the targets, callees first, the
    functions no item names automatically. A proof file sees its module and
    the modules rendered before it, not another proof file's theorems.
-   Theorems and tactics see `VerexIR` opened. A proof file accompanies a
+   Theorems and tactics see `VerexIR` opened. The typed twins of the
+   module's structs and enums (`SpecTypes`), a Lean structure or inductive
+   per declaration with its `erase`/`decode?` codec, are display artifacts
+   built on demand: verification never reads them, so they are generated
+   only where asked for, by `#verex_unit`, or by a theorem or authored proof
+   that names one. A proof file accompanies a
    source file that declares one module. A Rust file's `.spec.lean`,
    spliced into its namespace, carries its `verify` items too.
 3. **By raising the budget.** `pragma heartbeats = N` on the spec block,
    for a function the solver proves given more time.
+
+Structured proofs use `verify f by` with `on … { … }` blocks. A block can
+end with nested `on` blocks: its initial steps run over the shared path,
+then the children receive their clauses and clause-local binders. Nested
+children run in source order, including overlapping selections; their keys
+must be within the parent's selection. Unselected clauses use `decide`.
+Path selectors belong on the parent. The language's design and lowering are
+in [`proof-language.md`](proof-language.md); the
+[user chapter](../user/proof-language.md) has the examples and the scope
+rules.
 
 `pragma verify = manual` on the spec block states that the function is
 established by a proof file: it is not attempted automatically, and a
@@ -251,11 +283,15 @@ do and where:
 
 ```text
 foo.move:12:5: error: verex verification failed: the automatic verification
-of `f` exceeded its budget of 1000000 maxHeartbeats; provide a proof:
+of `f` exceeded its budget of 1000000 maxHeartbeats after deciding 3 leaves
+at call 2 of `helper` (stage inline); provide a proof:
 `verify f by …` in `sources/foo.proof.lean` (`verify f by lean => verex_obligations`
 lists its obligations), or raise the budget with `pragma heartbeats = N`,
 in thousands of maxHeartbeats
 ```
+
+The position (leaves, call, stage) is omitted when the walker stopped before
+its first step.
 
 An obligation the solver cannot decide reports its clause and the same
 hint without the budget alternative. The file the hint names is the
@@ -343,9 +379,10 @@ The automatic verification is `verex_obligations` followed by
 
 A leaf of the automatic verification has its own budget, `pragma
 leaf_heartbeats = N` on the spec block or `verex.leafHeartbeats`, in
-thousands of heartbeats, twenty million by default; one cap covers the
-complete attempt (call observations, deciders, preparation, fallback),
-past which the leaf is reported for the proof file
+thousands of heartbeats, twenty million by default, for each attempt, the
+first and each case of its prepared split: the attempt's call observations,
+deciders and fallback, not its preparation, which the target's budget
+bounds. Past it the leaf is reported for the proof file
 ([`proof-strategy.md`](proof-strategy.md), P3). An authored proof hands
 every obligation to its script without the automatic leaf solver; the leaf
 cap applies there only under an explicit `verex_solve`, while the function
@@ -383,7 +420,7 @@ skipped so that their errors show. The language server interprets Verex's
 metaprograms, which the command line runs compiled: `ordered_map.proof.lean`
 loads in about 21 s, all of it interpretation. Two improvements are open:
 
-- **Compiled metaprograms in the server**: `precompileModules` for
+- **Compiled metaprograms in the server**: Lake's `precompileModules` for
   `verex-ir`, so that the server loads native code; costs a shared library
   per module at build time. Expected to bring a load to a few seconds.
 - **Asynchronous lowering**: elaborating each `verify` item's steps as its

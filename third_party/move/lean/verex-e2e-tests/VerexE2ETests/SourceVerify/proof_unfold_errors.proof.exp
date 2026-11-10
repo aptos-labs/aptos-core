@@ -1,0 +1,7 @@
+VerexE2ETests/SourceVerify/proof_unfold_errors.proof.lean:11:11: error: `decide` does not settle the guard of `sum_upto`'s unfolding; state it or its negation:
+  (n, ()).fst == 0
+VerexE2ETests/SourceVerify/proof_unfold_errors.proof.lean:9:8: error: verex verification failed: the proof of `undecided` does not establish its specification
+VerexE2ETests/SourceVerify/proof_unfold_errors.proof.lean:17:11: error: `twice` is no recursive specification function
+VerexE2ETests/SourceVerify/proof_unfold_errors.proof.lean:15:8: error: verex verification failed: the proof of `not_recursive` does not establish its specification
+VerexE2ETests/SourceVerify/proof_unfold_errors.proof.lean:23:11: error: `«spec_fold$lambda$0»` is a specialization the compiler generated; only a recursive specification function named in the source unfolds by `apply`
+VerexE2ETests/SourceVerify/proof_unfold_errors.proof.lean:21:8: error: verex verification failed: the proof of `names` does not establish its specification

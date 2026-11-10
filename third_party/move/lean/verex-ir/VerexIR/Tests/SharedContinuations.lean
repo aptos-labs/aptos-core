@@ -46,7 +46,7 @@ example (left right : Nat) (entry : computedEntry left right) :
   open_computed_entry
   assumption
 
-example (value : Nat) (entry : computedEntry value value) : True := by
+example (value : Nat) (_entry : computedEntry value value) : True := by
   open_computed_entry
   fail_if_success contradiction
   trivial
@@ -65,7 +65,7 @@ elab "check_shared " memory:("keeping_memory ")? closed:("without_entries ")?
   for goal in ← getGoals do
     let some arrival ← arrival? node goal | throwError "not a normal arrival: {← goal.getType}"
     node := { node with arrivals := node.arrivals.push arrival }
-  node ← sealNode node
+  node ← sealNode (← closeArrivals (← prepareArrivals node {}))
   if memory.isSome && node.summaryArguments.any (·.parameter == node.captures + 2) then
     throwError "the summary generalized unchanged memory"
   let some summary := node.summary? | throwError "no summary"

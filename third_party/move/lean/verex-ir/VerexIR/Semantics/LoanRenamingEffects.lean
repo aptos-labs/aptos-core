@@ -141,7 +141,7 @@ theorem borrowRuntimePlace?_mirror (shifted : StateRenamed ρ offset frontier in
       rw [borrowRuntimePlace?_immutable_at (lexical := 0)] at borrow ⊢
       exact borrowRuntimePlaceAt?_mirror shifted frame_within borrow
   | mutable =>
-      cases certificate : certificateLoanId? unit ns.identity site with
+      cases certificate : certificateLoanId? unit ns.unitIdentity site with
       | none =>
           simp [borrowRuntimePlace?, certificate] at borrow
       | some lexical =>
@@ -685,7 +685,7 @@ theorem evaluateGlobalOperation?_mirror
               obtain ⟨storage, storage_eq, evaluate⟩ := evaluate
               simp only [RuntimeValue.storageKey?_rename, storage_eq, Option.some.injEq,
                 exists_eq_left', globalValue?_rename shifted.globals, globalKey_rename]
-              cases lookup : globalValue? state ns.identity resourceType key with
+              cases lookup : globalValue? state ns.unitIdentity resourceType key with
               | none =>
                   rw [lookup, Option.some.injEq] at evaluate
                   subst evaluate
@@ -714,7 +714,7 @@ theorem evaluateGlobalOperation?_mirror
               obtain ⟨storage, storage_eq, evaluate⟩ := evaluate
               simp only [RuntimeValue.storageKey?_rename, storage_eq, Option.some.injEq,
                 exists_eq_left', globalValue?_rename shifted.globals, globalKey_rename]
-              cases lookup : globalValue? state ns.identity resourceType key with
+              cases lookup : globalValue? state ns.unitIdentity resourceType key with
               | none =>
                   rw [lookup, Option.some.injEq] at evaluate
                   subst evaluate
@@ -724,7 +724,7 @@ theorem evaluateGlobalOperation?_mirror
                   subst evaluate
                   refine ⟨_, rfl, ⟨rfl, ?_, frame_within⟩, rfl, shifted.slot_within lookup⟩
                   have erased := shifted.withGlobals
-                    (state.globals.erase (globalKey ns.identity resourceType key))
+                    (state.globals.erase (globalKey ns.unitIdentity resourceType key))
                     (GlobalMap.erase_within shifted.globalsWithin)
                   rwa [GlobalMap.erase_rename, ← shifted.globals] at erased
             · cases evaluate
@@ -737,7 +737,7 @@ theorem evaluateGlobalOperation?_mirror
               obtain ⟨storage, storage_eq, evaluate⟩ := evaluate
               simp only [RuntimeValue.storageKey?_rename, storage_eq, Option.some.injEq,
                 exists_eq_left', globalValue?_rename shifted.globals, globalKey_rename]
-              cases lookup : globalValue? state ns.identity resourceType key with
+              cases lookup : globalValue? state ns.unitIdentity resourceType key with
               | some current =>
                   rw [lookup, Option.some.injEq] at evaluate
                   subst evaluate
@@ -747,7 +747,7 @@ theorem evaluateGlobalOperation?_mirror
                   subst evaluate
                   refine ⟨_, rfl, ⟨rfl, ?_, frame_within⟩, by simp, by simp⟩
                   have inserted := shifted.withGlobals
-                    (state.globals.insert (globalKey ns.identity resourceType key) value)
+                    (state.globals.insert (globalKey ns.unitIdentity resourceType key) value)
                     (GlobalMap.insert_within shifted.globalsWithin
                       (member value (by simp)))
                   rwa [GlobalMap.insert_rename, ← shifted.globals] at inserted

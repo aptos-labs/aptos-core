@@ -1,0 +1,8 @@
+sources/base.move:17:13: error: the assertion `x > 0` does not hold
+sources/client.move:21:5: error: verex verification failed: the automatic verification of `unchecked` failed; provide a proof in `sources/client.proof.lean`:
+  verify unchecked by lean =>
+    verex_obligations
+    verex_on
+    | positive_assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

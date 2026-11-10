@@ -13,14 +13,14 @@ Abrupt flows retain their original destinations and postconditions.
 
 namespace VerexIR.Proofs.Denote
 
-variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
+variable [Carriers] {State : Type}
 
 /-- The postcondition before a value continuation: normal exits establish
 the join's entry predicate, while abrupt flows bypass the continuation. -/
 def Flow.joinPost {ρ : ResultShape} {Γ : NRow} {α β : Type}
-    (entry : α → HEnv Γ → Memory unit → Prop)
-    (ensures : Flow ρ Γ β → Memory unit → Prop) :
-    Flow ρ Γ α → Memory unit → Prop
+    (entry : α → HEnv Γ → State → Prop)
+    (ensures : Flow ρ Γ β → State → Prop) :
+    Flow ρ Γ α → State → Prop
   | .value val env => entry val env
   | .return_ result env => ensures (.return_ result env)
   | .break_ nest env => ensures (.break_ nest env)
@@ -30,11 +30,11 @@ def Flow.joinPost {ρ : ResultShape} {Γ : NRow} {α β : Type}
 predicate may retain guarded alternatives from several incoming edges; it
 must be established by the action, rather than assumed at the join. -/
 theorem wp_flowBind_join {ρ : ResultShape} {Γ : NRow} {α β : Type}
-    (action : Comp unit (Flow ρ Γ α))
-    (next : α → HEnv Γ → Comp unit (Flow ρ Γ β))
-    (entry : α → HEnv Γ → Memory unit → Prop)
-    (ensures : Flow ρ Γ β → Memory unit → Prop) (aborts : Failure → Prop)
-    (state : Memory unit)
+    (action : Spec State Failure (Flow ρ Γ α))
+    (next : α → HEnv Γ → Spec State Failure (Flow ρ Γ β))
+    (entry : α → HEnv Γ → State → Prop)
+    (ensures : Flow ρ Γ β → State → Prop) (aborts : Failure → Prop)
+    (state : State)
     (reaches : wp action (Flow.joinPost entry ensures) aborts state)
     (continues : ∀ value env state, entry value env state →
       wp (next value env) ensures aborts state) :

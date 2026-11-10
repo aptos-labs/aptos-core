@@ -76,13 +76,13 @@ verex module 0x42::table_global_writes where
     Holder[@0x42].s.value := 0u64
 
 /--
-error: the data invariant `invariant value != 0` does not hold for a value written to memory
+error: the data invariant `invariant value != 0` does not hold where a mutation ends
 ---
 error: verex verification failed: the automatic verification of `zero` failed; provide a proof in the module:
   verify zero by lean =>
     verex_obligations
     verex_on
-    | stored_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
@@ -90,13 +90,13 @@ error: verex verification failed: the automatic verification of `zero` failed; p
 verify 0x42::table_global_writes::zero
 
 /--
-error: the data invariant `invariant value != 0` does not hold for a value written to memory
+error: the data invariant `invariant value != 0` does not hold where a mutation ends
 ---
 error: verex verification failed: the automatic verification of `plain_zero` failed; provide a proof in the module:
   verify plain_zero by lean =>
     verex_obligations
     verex_on
-    | stored_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/

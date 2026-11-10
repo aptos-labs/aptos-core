@@ -7,11 +7,13 @@ tests/sources/functional/enum.move:21:5: error: verex verification failed: the a
     | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/enum.move:17:9: error: the data invariant `invariant this.x > 20` does not hold where a mutation ends
 tests/sources/functional/enum.move:18:9: error: the data invariant `invariant this is Bar ==> this.z > 10` does not hold where a mutation ends
 tests/sources/functional/enum.move:31:5: error: verex verification failed: the automatic verification of `test_data_invariant` failed; provide a proof in `tests/sources/functional/enum.proof.lean`:
   verify test_data_invariant by lean =>
     verex_obligations
     verex_on
+    | data_invariant_1 => verex_prepare; sorry
     | data_invariant_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

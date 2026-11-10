@@ -78,7 +78,7 @@ def commentsOfSource (source : String) : Array Comment := Id.run do
       let stop := lineCommentEnd source next
       let text := String.Pos.Raw.extract source pos stop
       comments := comments.push {
-        text, isDoc := text.startsWith "--/", ownLine := lineBlank
+        text, isDoc := text.startsWith "--/" && !text.startsWith "--//", ownLine := lineBlank
         span := { startByte := pos.byteIdx, endByte := stop.byteIdx } }
       previous := none
       lineBlank := false

@@ -372,11 +372,14 @@ verex module 0x42::quicksort where
 
   /-- The generated definition of `count` counts over its vector's values. -/
   theorem count_cnt {u : VerexIR.Validation.ValidatedUnit} [VerexIR.Proofs.Denote.FunctionCarriers u]
-      [Θ : VerexIR.Proofs.Denote.Skolems u]
+      [Θ : VerexIR.Proofs.Denote.Carriers]
+      [VerexIR.Proofs.Denote.CarriersNonempty Θ]
+      (types : Nat → VerexIR.Proofs.Denote.NTy)
       (v : (VerexIR.Proofs.Denote.NTy.param 0).vector.carrier)
       (x : (VerexIR.Proofs.Denote.NTy.param 0).carrier) :
       ∀ (k : Nat) (lo hi : Int), (hi - lo).toNat = k →
-        count.at_T0.spec u Θ (v, x, lo, hi, ()) = cnt default v.values x lo hi := by
+        count.at_T0.spec u Θ types (v, x, lo, hi, ()) =
+          cnt (VerexIR.Proofs.Denote.NTy.inhabitant (.param 0) rfl) v.values x lo hi := by
     intro k
     induction k using Nat.strongRecOn with
     | _ k ih =>
@@ -386,17 +389,19 @@ verex module 0x42::quicksort where
       · simp [hle]
       · simp only [hle, if_false, dite_eq_ite]
         rw [ih (hi - 1 - lo).toNat (by omega) lo (hi - 1) rfl]
-        rfl
 
   /-- The same, at any bundle: the form `simp` rewrites by. -/
   theorem count_eq {u : VerexIR.Validation.ValidatedUnit} [VerexIR.Proofs.Denote.FunctionCarriers u]
-      [Θ : VerexIR.Proofs.Denote.Skolems u]
+      [Θ : VerexIR.Proofs.Denote.Carriers]
+      [VerexIR.Proofs.Denote.CarriersNonempty Θ]
+      (types : Nat → VerexIR.Proofs.Denote.NTy)
       (bundle : (VerexIR.Proofs.Denote.NTy.param 0).vector.carrier ×
         (VerexIR.Proofs.Denote.NTy.param 0).carrier × Int × Int × Unit) :
-      count.at_T0.spec u Θ bundle =
-        cnt default bundle.1.values bundle.2.1 bundle.2.2.1 bundle.2.2.2.1 := by
+      count.at_T0.spec u Θ types bundle =
+        cnt (VerexIR.Proofs.Denote.NTy.inhabitant (.param 0) rfl)
+          bundle.1.values bundle.2.1 bundle.2.2.1 bundle.2.2.2.1 := by
     obtain ⟨v, x, lo, hi, ⟨⟩⟩ := bundle
-    exact count_cnt v x _ lo hi rfl
+    exact count_cnt types v x _ lo hi rfl
 
   verify partition by lean =>
     verex_obligations
@@ -447,9 +452,12 @@ verex module 0x42::quicksort where
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     all_goals (try simp only [count_eq] at *)
-    case ensures_4_3 => apply sort_counts <;> assumption
-    case ensures_3_3 => apply sort_frame <;> assumption
-    case ensures_2_3 => apply sort_order <;> first | assumption | omega
+    case ensures_4_3 =>
+      apply sort_counts <;> first | assumption | (verex_normalize; assumption)
+    case ensures_3_3 =>
+      apply sort_frame <;> first | assumption | (verex_normalize; assumption)
+    case ensures_2_3 =>
+      apply sort_order <;> first | assumption | omega | (verex_normalize; first | assumption | omega)
 
   -- Generic in-place sort by the structural order.
   public fun quick_sort {T has Copy, Drop, Store}(values : Vector<T>) -> Vector<T> :=

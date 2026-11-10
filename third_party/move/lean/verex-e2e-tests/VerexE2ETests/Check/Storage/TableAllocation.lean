@@ -6,7 +6,7 @@ import VerexE2ETests.CheckSupport
 /-! A table is allocated at a fresh handle and filled through its roles: the
 caller reads the contents it built, and its frame leaves the allocation
 history open while keeping every other resource
-(`doc/designs/intrinsic-maps.md`, "Owned Table values"). -/
+(`doc/designs/intrinsic-maps.md`, "Ownership of table contents"). -/
 
 verex module 0x42::table_allocation where
   pragma verify = false

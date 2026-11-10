@@ -78,21 +78,33 @@ postcondition never reaches its callers).
 - A struct's invariants and initializers read its ghost fields by name, as
   they read its fields: the declaration's specification locals are its
   fields, `this`, then its ghost fields (an enum: `this`, then its ghost
-  fields, each read from its variant's slot).
+  fields, each read from its variant's slot).  An initializer runs before
+  the value is made, so `this` has no value there: it reads the fields and
+  the ghost slots of the row being packed, and a use of `this` as a whole
+  is rejected (`declarationRowLocalValues`).
 - Compilation to XIR drops the slots, the declarations, and the conditions.
 
 ## Spec variables
 
-As in the Prover, a spec variable `global x: T` is the ghost memory
-resource `Ghost$x { v: T }` at address 0, whose existence is an axiom of
-its module; the frontend marks the struct `pragma ghost_memory`. Only the
-model's memory holds it: `update x = e` stays a specification condition,
-its target the field `global<Ghost$x>(@0x0).v`, and the denotation writes
-the resource (`Term.ghostStore`, anchored as a publication is, followed by
-the invariants owed where memory is written). It counts as a write of
-memory: a function updating a spec variable gets the frame `modifies *`,
-and a loop whose body updates one touches the store. Compilation to XIR
-drops ghost memory structs, renumbering the others.
+As in the Prover, a spec variable `global x<T>: U` is the ghost memory
+resource `Ghost$x<T> { v: U }` at address 0, one per instantiation; the
+frontend marks the struct `pragma ghost_memory`. Only the model's memory holds
+it: `update x = e` stays a specification condition, its target the field
+`global<Ghost$x>(@0x0).v`, and the denotation writes the resource
+(`Term.ghostStore`, anchored as a publication is, followed by the invariants
+owed where memory is written). A spec variable is always present: a read of an
+absent slot reads the default, a store does not ask, and a global invariant reading
+one has no presence guard. The Prover's existence assumption has no counterpart,
+as nothing removes ghost memory and no specification states its absence.
+
+An update joins the targets of its function's frame and those of its callers at
+their type arguments, as the Prover neither havocs ghost memory nor asks a frame to
+declare it (`Frames.lean`): a function whose only writes are updates keeps a closed
+frame, unless one is in a loop, whose store is unknown after its head. An `update` in a function's specification states its target equal to its
+value, with the target's own reads those before the call, and each return applies
+it, so callers of an opaque function see it and a body that also updates the target
+does not prove it. Compilation to XIR drops ghost memory structs, renumbering the
+others.
 
 ## Denotation
 
@@ -103,8 +115,13 @@ drops ghost memory structs, renumbering the others.
   ghost field or spec variable.
 - `Meanings` holds the ghost tables: by site, the value an `update` writes
   (over the function's locals and state), and the value an initializer
-  gives a pack's slot (over the packed value). A pack fills a slot without
-  an initializer with any value (`Term.arbitrary`). That the table gives a
+  gives a pack's slot (over the pack's field row and the state). A pack
+  fills a slot without an initializer with any value (`Term.arbitrary`).
+  The initializers run over the certified field row, before the row is
+  forgotten and certified as one value (`GhostInits.initialize`;
+  [`data-invariants.md`](data-invariants.md), "Where a value is made"): a value's data invariants are
+  owed once, of the row its initializers leave, so the initializers cannot
+  read the value itself — only its fields and its ghost slots. That the table gives a
   value in the field type's domain is owed (`ghostAt`; the solver cuts it
   with `wp_ghostAt` and reports it at the update), as the Prover asserts
   it.
@@ -120,8 +137,12 @@ callee is inlined, an opaque one replaced by its specification (havoc what
 it modifies, apply its `update`s, assume its `ensures`). Verex follows it:
 
 - A function's theorem is modular: every callee used through its contract
-  is an abstract meaning assumed to satisfy that contract; a callee
-  without one is inlined, its body under the same meanings. The unfolding
+  is an abstract meaning assumed to satisfy that contract, in the view its
+  callers see (`denotation.md`, "Calls"); a callee
+  without one is inlined, its body under the same meanings: in a target proved
+  over every family, under the callee's own routes and ghost tables over the same
+  member meanings (`familyMeanings`), which agree with the target's on all the
+  body reaches, so that the refinement reads alike in every target. The unfolding
   is well founded because a cycle member is a contract callee
   (`usedThroughContract`), and a recursive function without a
   specification is rejected in a ghost unit; unspecified functions are not
@@ -131,7 +152,8 @@ it modifies, apply its `update`s, assume its `ensures`). Verex follows it:
   verified through its model (`compileModelFunction`). The modular theorem
   takes the invocation meaning as a binder (`invoke`), one routing
   equation per routed member (a literal closure of the member invokes the
-  member's meaning on the woven arguments, `invokeAt`), and the hypothesis
+  member's meaning on the woven arguments, the binder `invokeRoutes_<member>`
+  of `modelInvokeBinders`), and the hypothesis
   that an invocation is defined where the target's declared precondition
   holds and, of a value no closure site encodes, always, as the Move Prover
   calls function values without asserting `requires_of` (`RequiresOf` of
@@ -139,8 +161,28 @@ it modifies, apply its `update`s, assume its `ensures`). Verex follows it:
   unit are stated over that binder; a contract reading the unit takes a
   `ModelUnit` where another takes the executable. A closure of a target
   with type parameters carries no family: its invocation is not routed and
-  stays unseen. A value a specification builds carries its type's ghost
-  slots with unspecified contents.
+  stays unseen. `aborts_of` and `ensures_of` of a literal of a known target
+  capturing nothing are not of an invocation: in a model unit they are what the
+  target's contract states at the frame its type arguments induce, possibly its own
+  (`mayAbort`, and `ensures` with its frame), in its interface view where it has one,
+  expanded in the clause, since a contract is a definition over the reader and cannot
+  name a theorem's routed member; in an executable unit a target with type arguments is
+  the run of the target ([`higher-order-functions.md`](higher-order-functions.md)).
+  A call's routed member's `Satisfies` discharges them, or the target's body where it is
+  inlined: an abort implies `aborts`, a return `¬mustAbort`, `ensures` and the frame.
+  `aborts_of` is carried only where the contract states the aborts exactly, as the
+  Prover's `spec_aborts_are_exact`: its callers see an `aborts_if` and it is not
+  `aborts_if_is_partial`. Otherwise the stated disjunction would claim more than the
+  contract in a negative position, so it is an error, as is either predicate of a target
+  without a contract. A state label a predicate defines, `result_of`, `requires_of`, a
+  literal as a value, and a parameter's or field's value stay on the invocation
+  meaning. A value a specification builds carries its
+  type's ghost slots with unspecified contents.
+- The unit model and the composition below are not built: a unit declaring
+  ghosts stops at each function's modular theorem, its callees' contracts
+  hypotheses ([`roadmap.md`](../plan/roadmap.md), "9. Higher-order functions
+  and state labels", G4b; [`assumptions.md`](../status/assumptions.md),
+  "Model agreement").
 - The unit model `M : FunctionHandle → SelfFamily` is the least fixed point
   (`Spec.fixFamily`, indexed by handle, family and instantiation) of the
   unit's bodies under their ghost tables, a native meaning its contract's
