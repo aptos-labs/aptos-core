@@ -1,5 +1,12 @@
-name: Validate Hosted Rust CI
+name: Validate Rust CI
 on:
+  workflow_dispatch:
+    inputs:
+      rust_ci_provider:
+        description: "Provider override for validation (default honors RUST_CI_PROVIDER)"
+        type: choice
+        default: default
+        options: [default, hosted, aws]
   pull_request:
     paths:
       - .github/workflows/lint-test.yaml
@@ -10,6 +17,25 @@ on:
 permissions:
   contents: read
 jobs:
+  rust-ci-provider:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      provider: ${{ steps.select.outputs.provider }}
+    steps:
+      - id: select
+        env:
+          MANUAL_PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.rust_ci_provider || 'default' }}
+          CONFIGURED_PROVIDER: ${{ vars.RUST_CI_PROVIDER }}
+        run: |
+          provider="${CONFIGURED_PROVIDER:-hosted}"
+          if [ "$MANUAL_PROVIDER" != default ]; then
+            provider="$MANUAL_PROVIDER"
+          fi
+          case "$provider" in
+            hosted|aws) printf 'provider=%s\n' "$provider" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::RUST_CI_PROVIDER must be hosted or aws"; exit 1 ;;
+          esac
+
   workflow-contract:
     runs-on: 2cpu-gh-ubuntu24-x64
     timeout-minutes: 10
@@ -21,9 +47,9 @@ jobs:
         run: python3 -m pip install --user PyYAML==6.0.3
       - name: Test fallback and static package coverage
         run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
-  hosted-full-suite:
+  full-suite:
     if: ${{ !contains(github.base_ref, '-release-') }}
-    needs: workflow-contract
+    needs: [workflow-contract, rust-ci-provider]
     uses: ./.github/workflows/hosted-rust-unit-tests.yaml
     with:
-      provider: hosted
+      provider: ${{ needs.rust-ci-provider.outputs.provider }}
