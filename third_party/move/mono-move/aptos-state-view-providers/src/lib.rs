@@ -230,10 +230,7 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
 
         // Materialize the value (BCS → flat) into the provider's arena.
         let mut inner = self.inner.borrow_mut();
-        let (ptr, pin) = inner
-            .arena
-            .deserialize(self.guard, key.value_ty(), &blob)
-            .map_err(|e| internal(format!("stored value failed to deserialize: {e}")))?;
+        let (ptr, pin) = inner.arena.deserialize(self.guard, key.value_ty(), &blob)?;
         let read = StorageRead::ExternalHeap {
             ptr,
             version: None,

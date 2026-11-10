@@ -142,8 +142,9 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
                             invariant_violation(format!("Failed to set group base values: {e:#}"))
                         })?;
                 },
-                // Unlike the legacy VM, MonoMove records no deletion sentinel
-                // for a member storage does not have.
+                // The group has no such member. Like the legacy VM, sequential
+                // execution records nothing: a later creation must find the
+                // tag vacant.
                 Err(UnsyncGroupError::TagNotFound) => {
                     return Ok(StorageRead::DoesNotExist { version: None })
                 },

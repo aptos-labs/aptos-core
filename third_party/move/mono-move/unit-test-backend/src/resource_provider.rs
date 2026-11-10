@@ -77,14 +77,7 @@ where
         blob: &[u8],
     ) -> Result<StorageRead, ResourceProviderError> {
         let mut materialized = self.materialized.borrow_mut();
-        let (ptr, pin) = materialized
-            .arena
-            .deserialize(self.guard, ty, blob)
-            .map_err(|err| {
-                ResourceProviderError::InvariantViolation(format!(
-                    "a stored value does not decode: {err}"
-                ))
-            })?;
+        let (ptr, pin) = materialized.arena.deserialize(self.guard, ty, blob)?;
         materialized.cache.insert(key.clone(), (ptr, pin.clone()));
         Ok(StorageRead::ExternalHeap {
             ptr,
