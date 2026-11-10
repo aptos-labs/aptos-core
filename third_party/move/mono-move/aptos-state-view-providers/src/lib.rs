@@ -27,23 +27,18 @@ use mono_move_core::{
         },
     },
     types::InternedType,
-    ExecutionErrorKind, IntoExecutionError, LayoutProvider, VMInternalError, VMResult,
-    OBJECT_HEADER_SIZE,
+    ExecutionErrorKind, IntoExecutionError, VMInternalError, VMResult,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{deserialize_into, Heap, SharedArena};
+use mono_move_runtime::SegmentedArena;
 use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, move_resource::MoveStructType,
 };
 use shared_dsa::UnorderedMap;
-use std::{cell::RefCell, ptr::NonNull};
+use std::cell::RefCell;
 use thiserror::Error;
-
-/// Default size of the provider's value arena. Occupancy is bounded by one
-/// materialization per distinct key read, so this fits any realistic use.
-const DEFAULT_RESOURCE_ARENA_BYTES: usize = 64 * 1024 * 1024;
 
 /// Errors raised by these providers.
 #[derive(Debug, Error)]
@@ -148,11 +143,11 @@ pub struct StateViewResourceProvider<'a, 'ctx, S> {
 
 /// The provider's interior-mutable state: caches and the value arena.
 struct ProviderState {
-    /// Bump arena holding the flat values that reads hand out pointers into.
-    /// Shared so each read can pin the source heap where the read points to.
-    /// Never collected or reset; occupancy is bounded by one materialization per
-    /// distinct key, thanks to the value cache.
-    arena: std::sync::Arc<SharedArena>,
+    /// Arena holding the flat values that reads hand out pointers into. Each
+    /// read pins the segment its value is in. Never collected or reset;
+    /// occupancy is bounded by one materialization per distinct key, thanks to
+    /// the value cache.
+    arena: SegmentedArena,
     /// Materialized reads, including negative ones. Sound because execution
     /// never mutates a value through a `StorageRead` pointer (mutation copies
     /// into the transaction's own heap first).
@@ -170,21 +165,11 @@ struct ProviderState {
 
 impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
     pub fn new(guard: &'a ExecutionGuard<'ctx>, state_view: &'a S) -> Self {
-        Self::new_with_arena_size(guard, state_view, DEFAULT_RESOURCE_ARENA_BYTES)
-    }
-
-    /// Escape hatch for value arenas beyond the default's reach.
-    pub fn new_with_arena_size(
-        guard: &'a ExecutionGuard<'ctx>,
-        state_view: &'a S,
-        arena_size: usize,
-    ) -> Self {
         Self {
             guard,
             state_view,
             inner: RefCell::new(ProviderState {
-                #[allow(clippy::arc_with_non_send_sync)]
-                arena: std::sync::Arc::new(SharedArena::new(arena_size)),
+                arena: SegmentedArena::new(),
                 values: UnorderedMap::new(),
                 groups: UnorderedMap::new(),
             }),
@@ -244,34 +229,15 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
         };
 
         // Materialize the value (BCS → flat) into the provider's arena.
-        let ty = key.value_ty();
-        let layout = self
-            .guard
-            .layout_by_ty(ty)
-            .ok_or_else(|| internal(format!("no layout for the value at {:?}", key.address())))?;
-        // Lowering publishes a descriptor for every resource a global-storage
-        // instruction reaches, so the read that got here has one already.
-        let descriptor = self
-            .guard
-            .struct_descriptor(ty)
-            .ok_or_else(|| internal(format!("no GC descriptor for {:?}", key.address())))?;
-
         let mut inner = self.inner.borrow_mut();
-        let arena = inner.arena.clone();
-        let obj = arena.with_heap_mut(|heap: &mut Heap| -> Result<NonNull<u8>, _> {
-            let obj = heap
-                .alloc_object(OBJECT_HEADER_SIZE + layout.size as usize, descriptor)
-                .ok_or_else(|| internal("resource arena is full".to_string()))?;
-            // SAFETY: `obj` is a freshly reserved object sized for the value's
-            // layout; `deserialize_into` writes the flat value there.
-            unsafe { deserialize_into(self.guard, heap, ty, &blob, obj.as_ptr()) }
-                .map_err(|e| internal(format!("stored value failed to deserialize: {e}")))?;
-            Ok(obj)
-        })?;
+        let (ptr, pin) = inner
+            .arena
+            .deserialize(self.guard, key.value_ty(), &blob)
+            .map_err(|e| internal(format!("stored value failed to deserialize: {e}")))?;
         let read = StorageRead::ExternalHeap {
-            ptr: obj,
+            ptr,
             version: None,
-            pin: arena,
+            pin,
         };
         inner.values.insert(cache_key, read.clone());
         Ok(read)

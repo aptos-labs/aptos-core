@@ -201,8 +201,8 @@ pub(crate) mod macros {
 /// allocation sizes (e.g. a corrupted descriptor or attacker-controlled
 /// capacity in `alloc_vec`) before we compute a bump-pointer offset.
 ///
-/// Set to the largest buffer the runtime ever creates, so it rejects only
-/// sizes no heap could ever serve. Each allocation is still bounded by its own
+/// Set above every buffer the runtime creates, so it rejects only sizes no heap
+/// could ever serve. Each allocation is still bounded by its own
 /// heap's buffer, which for a session heap is `DEFAULT_HEAP_SIZE`.
 const MAX_SINGLE_ALLOCATION_SIZE: usize = 64 * 1024 * 1024;
 
@@ -300,48 +300,28 @@ impl FrozenHeap {
 // A frozen session heap pins reads that other transactions take against it.
 impl ReadPin for FrozenHeap {}
 
-/// A [`Heap`] that can be shared and appended to through a shared reference.
-///
-/// Storage providers materialize values lazily into a long-lived arena but hand
-/// out reads pinned by an `Arc`. This newtype gives them interior-mutable,
-/// append-only allocation while the arena stays shared. It is never
-/// garbage-collected or reset, so allocated objects never move and the pointers
-/// handed out stay valid for the arena's whole life.
-pub struct SharedArena {
+/// One [`SegmentedArena`] segment: a [`Heap`] appended to through a shared
+/// reference. It is never garbage-collected or reset, so allocated objects
+/// never move and pointers into it stay valid while it is pinned.
+struct Segment {
     heap: RefCell<Heap>,
 }
 
-impl SharedArena {
-    /// Creates a shared arena backed by a fresh buffer of `size` bytes.
-    pub fn new(size: usize) -> Self {
-        Self {
-            heap: RefCell::new(Heap::new(size)),
-        }
-    }
-
-    /// Runs `f` with exclusive access to the inner heap for one allocation
-    /// episode. A pointer `f` returns outlives the borrow: the arena is
-    /// append-only, so the object it points to is never moved or freed.
-    pub fn with_heap_mut<R>(&self, f: impl FnOnce(&mut Heap) -> R) -> R {
-        f(&mut self.heap.borrow_mut())
-    }
-}
-
-impl ReadPin for SharedArena {}
+impl ReadPin for Segment {}
 
 /// Size of one [`SegmentedArena`] segment, and so the largest value it can
 /// hold. Equal to a session heap's capacity: anything a transaction can hold in
 /// its heap, and so write, fits in a fresh segment and can be read back.
 const SEGMENT_BYTES: usize = DEFAULT_HEAP_SIZE;
 
-/// An append-only arena that grows by adding [`SharedArena`] segments.
+/// An append-only arena that grows by adding fixed-size segments.
 ///
 /// Values materialized from storage stay reachable long after the transaction
 /// that read them finished, so nothing here is ever reset or collected while
 /// the block runs. Each allocation hands back the segment it landed in, and the
 /// value pins that segment.
 ///
-/// [`SharedArena`] is interior-mutable and `!Sync`, yet a pin on a segment may
+/// A segment is interior-mutable and `!Sync`, yet a pin on a segment may
 /// be held by another thread. That is sound only because [`ReadPin`] exposes no
 /// methods: a pin holder cannot reach the heap, and the arena's owner is the
 /// only one that ever allocates in it.
@@ -350,7 +330,7 @@ const SEGMENT_BYTES: usize = DEFAULT_HEAP_SIZE;
 // alive until the arena is dropped, so a block can grow it without bound by
 // reading many large pre-block values.
 pub struct SegmentedArena {
-    segments: RefCell<Vec<Arc<SharedArena>>>,
+    segments: RefCell<Vec<Arc<Segment>>>,
 }
 
 impl SegmentedArena {
@@ -369,7 +349,7 @@ impl SegmentedArena {
         guard: &ExecutionGuard<'_>,
         ty: InternedType,
         blob: &[u8],
-    ) -> VMResult<(NonNull<u8>, Arc<SharedArena>)> {
+    ) -> VMResult<(NonNull<u8>, Arc<dyn ReadPin>)> {
         let Some(layout) = guard.layout_by_ty(ty) else {
             invariant_violation!(ValueLayoutNotFound);
         };
@@ -398,7 +378,7 @@ impl SegmentedArena {
                 "stored value does not fit in an arena segment".to_string()
             ));
         };
-        Ok((result?, segment))
+        Ok((result?, segment as Arc<dyn ReadPin>))
     }
 
     /// Runs `alloc` in the current segment, or in a fresh one when the current
@@ -415,11 +395,12 @@ impl SegmentedArena {
     /// before, or two Block-STM schedules could disagree on whether the same
     /// value can be read. Hence the retry starts from an empty segment of a
     /// fixed size.
-    fn alloc_in<T>(&self, alloc: impl Fn(&mut Heap) -> Option<T>) -> Option<(T, Arc<SharedArena>)> {
+    fn alloc_in<T>(&self, alloc: impl Fn(&mut Heap) -> Option<T>) -> Option<(T, Arc<Segment>)> {
         let mut segments = self.segments.borrow_mut();
 
         if let Some(current) = segments.last().cloned() {
-            if let Some(value) = current.with_heap_mut(&alloc) {
+            let value = alloc(&mut current.heap.borrow_mut());
+            if let Some(value) = value {
                 return Some((value, current));
             }
         }
@@ -430,7 +411,7 @@ impl SegmentedArena {
         // TODO(completeness): ensure MonoMove limits any allocation size to
         // some fixed constant.
         let fresh = new_segment(SEGMENT_BYTES);
-        let value = fresh.with_heap_mut(&alloc)?;
+        let value = alloc(&mut fresh.heap.borrow_mut())?;
         segments.push(fresh.clone());
         Some((value, fresh))
     }
@@ -451,9 +432,11 @@ fn is_out_of_heap_memory(e: &VMInternalError) -> bool {
     )
 }
 
-fn new_segment(size: usize) -> Arc<SharedArena> {
+fn new_segment(size: usize) -> Arc<Segment> {
     #[allow(clippy::arc_with_non_send_sync)]
-    Arc::new(SharedArena::new(size))
+    Arc::new(Segment {
+        heap: RefCell::new(Heap::new(size)),
+    })
 }
 
 /// Outcome of a bump-allocation attempt.
@@ -1655,10 +1638,7 @@ mod segmented_arena_tests {
         // existence before filling it.
         alloc(arena, PAYLOAD).expect("A fresh arena serves the first allocation");
         let segment = arena.segments.borrow().last().unwrap().clone();
-        while segment
-            .with_heap_mut(|heap| alloc_in_heap(heap, PAYLOAD))
-            .is_some()
-        {}
+        while alloc_in_heap(&mut segment.heap.borrow_mut(), PAYLOAD).is_some() {}
     }
 
     #[test]
