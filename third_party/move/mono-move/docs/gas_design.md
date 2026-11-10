@@ -110,6 +110,16 @@ A simple accumulation loop. Each block's cost is charged when control transfers 
 
 Costs are summed only for blocks the lowerer emits, and the charge is attached only to real jumps and calls, so unreachable blocks add no standalone ops. The compiler should still eliminate dead basic blocks upstream to avoid emitting them at all.
 
+### 4.5 Chunks and interrupt polling
+
+The block executor can ask a running transaction to stop, e.g. when Block-STM aborts its incarnation. The resource provider reports this through `interrupt_requested()`, and the interpreter polls it from the gas slow path, so the hot path stays one subtraction and one branch.
+
+A meter built with `with_interrupt_polling(chunk_size)` hands out gas in chunks of at most `chunk_size` units and keeps the rest of the budget in a reserve. When a charge does not fit in the current chunk, the interpreter polls for an interrupt, then starts the next chunk. Every loop iteration and every recursion charges gas, so a run polls at least once per chunk. Out-of-gas is decided on the whole balance, so chunking never changes when a transaction runs out of gas.
+
+A meter without polling keeps its whole budget in one chunk and never polls. Only user transactions poll. System transactions do not, because Block-STM runs the block epilogue after it halts the block, when every poll would ask to stop. `unmetered()` keeps the chunk size, so a polling session keeps polling in its unmetered parts.
+
+An interrupt fails the run with `InterruptedError` and marks the session as interrupted. The transaction executor then returns `TxnOutcome::Interrupted`, whatever the error became on its way out. Nothing of it is published.
+
 ---
 
 ## 5. Load-Time Type Costing

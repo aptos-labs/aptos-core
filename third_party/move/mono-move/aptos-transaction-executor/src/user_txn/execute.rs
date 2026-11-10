@@ -29,6 +29,7 @@ use aptos_types::{
 };
 use mono_move_core::{
     intern_type_tag, native::NativeExtensions, types::InternedTypeList, GasMeter, Interner,
+    POLL_INTERVAL,
 };
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;
@@ -68,7 +69,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             loader,
             // TODO(metering): MonoMove gas units are uncalibrated; budgeting
             // 1:1 against the transaction's gas units is a placeholder.
-            GasMeter::new(txn_data.max_gas_amount),
+            GasMeter::new(txn_data.max_gas_amount).with_interrupt_polling(POLL_INTERVAL),
             self.data_provider,
             self.natives,
         )
@@ -81,8 +82,15 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // transaction's dependencies. Finishing also parks the worker's stack
         // and heap for reuse.
         let result = self.run_session(&mut interp, txn, &txn_data);
+        // An interrupt may have been turned into a payload failure or a
+        // discard on its way out, so the session's flag decides.
+        //
+        // TODO(perf): an interrupted session still runs the rest of the
+        // transaction and evacuates its heap; it could be abandoned instead.
+        let interrupted = interp.is_interrupted();
         match (result, interp.finish()) {
             (_, Err(e)) => TxnOutcome::Panic(e),
+            (_, Ok(effects)) if interrupted => TxnOutcome::Interrupted { effects },
             (Ok((status, fee_statement)), Ok(effects)) => TxnOutcome::Executed {
                 status,
                 fee_statement,

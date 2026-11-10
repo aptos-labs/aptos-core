@@ -13247,6 +13247,7 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
+ "proptest",
  "shared-dsa",
  "smallvec",
  "thiserror 2.0.21",
