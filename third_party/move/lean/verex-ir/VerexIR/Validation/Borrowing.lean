@@ -318,8 +318,8 @@ private def loanIndexesLocal (ns : ValidatedNamespace) (loan : LoanFact) (localI
         placeIndexesLocal ns localId place (ns.places.size + 1)
     | _ => false
 
-/-- A write, move, `let` binding or mutable borrow of a local while a mutable loan whose
-place selects an element at that local is active.  The loan is resolved at
+/-- A write, move, `let` or match-arm binding, or mutable borrow of a local
+while a mutable loan whose place selects an element at that local is active.  The loan is resolved at
 its death against the local's value there, while its reference denotes the
 element chosen at the borrow, so such a write would resolve it at another
 element.  Liveness is this analysis's own active set at the access, so a
@@ -1704,10 +1704,20 @@ mutual
                   let state := retainLoansUsedBy ns expressions armState armPreserved armLiveOut
                   let entryDeaths := pushDeaths #[] (diffLoans armState state)
                     { anchor := arm.guard.getD arm.body, before := true }
+                  -- An arm writes every local its pattern binds, as a `let`
+                  -- does, so in a loop it may re-bind the index of a loan
+                  -- held across the back edge.
+                  let patternLoc := (ns.patterns[arm.pattern.index]?).map (·.loc)
+                    |>.getD expression.loc
+                  let indexDiagnostics :=
+                    (patternVariables ns arm.pattern (ns.patterns.size + 1)).foldl
+                      (init := #[]) fun diagnostics localId =>
+                        diagnostics ++ indexWriteDiagnostics ns armState patternLoc localId
                   let armFlow := analyzeArm unit ns arm state armPreserved armLiveOut
                   mergeFlows flow
                     { armFlow with
-                      deaths := appendUniqueDeaths entryDeaths armFlow.deaths }) {}
+                      deaths := appendUniqueDeaths entryDeaths armFlow.deaths
+                      diagnostics := indexDiagnostics ++ armFlow.diagnostics }) {}
                 { armsFlow with
                   breaks := scrutineeFlow.breaks ++ armsFlow.breaks
                   breakValueLoans := scrutineeFlow.breakValueLoans ++ armsFlow.breakValueLoans

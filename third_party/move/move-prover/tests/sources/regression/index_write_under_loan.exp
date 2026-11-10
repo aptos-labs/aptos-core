@@ -70,7 +70,7 @@ error: post-condition does not hold
 error: post-condition does not hold
    ┌─ tests/sources/regression/index_write_under_loan.move:64:9
    │
-64 │         ensures false; // error: refused, the index local is written under a live loan
+64 │         ensures false; // error: the postcondition does not hold
    │         ^^^^^^^^^^^^^^
    │
    =     at tests/sources/regression/index_write_under_loan.move:56: move_under_loan

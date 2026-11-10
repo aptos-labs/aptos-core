@@ -5,20 +5,22 @@ artifact audit (`verify`) admits the named axioms below and nothing else;
 every `verified` theorem names them under `#print axioms`. The others are
 hypotheses the theorems take.
 
-- **`compileFunction_agrees`** (axiom). The denotation of a compiled
-  function is equivalent to its prophetic big-step meaning, over every
-  family and instantiation. The statement is a refinement, which admits
-  `undefined`, and the certifying steps of the denotation reach it: a run
-  that packs a value breaking its data invariant, or that ends a mutable
-  loan over one, has no defined denotation, which the refinement allows and
-  `Satisfies` excludes, so the invariant is owed in the function that breaks
-  it ([`data-invariants.md`](../designs/data-invariants.md), "Where a value
+- **`compileFunction_agrees`** (axiom). Every outcome of a compiled
+  function's prophetic big-step meaning is an outcome of its denotation
+  wherever the denotation is defined, over every family and instantiation
+  (`Spec.Refines`). The certifying steps of the denotation are undefined
+  where a data invariant fails: a run that packs a value breaking its
+  invariant, or that ends a mutable loan over one, keeps its runtime
+  outcomes while the denotation is undefined at its start, so the
+  refinement asserts nothing of that start. `Satisfies` excludes such a
+  start, so the invariant is owed in the function that breaks it
+  ([`data-invariants.md`](../designs/data-invariants.md), "Where a value
   is made"). Establishing it: the induction of
   `denote_agrees` against `BigStep.EvalFunction`, one case per construct
   ([`denotation.md`](../designs/denotation.md), "The design").
 - **`compileFunction_least_cycle`** (axiom; members of cycles of calls).
   The closed meanings of a cycle's members refine the least fixed point of
-  their denotations. Establishing it: a continuity proof over the
+  their denotations, in the same sense. Establishing it: a continuity proof over the
   denotation (a meaning's outcomes use finitely many calls), from which
   the closed agreement follows.
 - **Given-type transfer** (`f.givenTransfer`, an explicit hypothesis of

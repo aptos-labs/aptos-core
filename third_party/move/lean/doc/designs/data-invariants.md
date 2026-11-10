@@ -209,11 +209,12 @@ dereference, while `Mutables.resolve` and `Mutables.assumedAtEntry` skip the
 step altogether.
 
 The agreement with the big-step semantics, `compileFunction_agrees`, is
-`Spec.Refines`, which admits `undefined`: a run that packs a value breaking its
-invariant, or that ends a mutable loan over one, has no defined denotation
-there, which the refinement allows and `Satisfies` excludes, so verification
-owes the invariant in the function that breaks it
-(`VerexIR/Proofs/Denote/Agreement.lean`).
+`Spec.Refines`, which relates the outcomes of a start only where the denotation
+is defined there: a run that packs a value breaking its invariant, or that ends
+a mutable loan over one, keeps its runtime outcomes while the denotation is
+undefined at its start, so the refinement asserts nothing of that start, and
+`Satisfies` excludes it, so verification owes the invariant in the function
+that breaks it (`VerexIR/Proofs/Denote/Agreement.lean`).
 
 ### Open while lent, repacked where the loan dies
 

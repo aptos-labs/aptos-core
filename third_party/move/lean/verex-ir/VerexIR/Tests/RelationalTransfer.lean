@@ -20,6 +20,20 @@ example : ¬Spec.RelationalRefinesAt Eq Eq Eq
   obtain ⟨error, aborts, _⟩ := refines.aborts 7 rfl
   exact aborts
 
+-- Same-frame refinement relates outcomes only where the refined computation
+-- is defined. A run that goes on past a failed data invariant keeps its
+-- outcome, while the certifying step has none and is undefined there: the
+-- outcome is no outcome of the certifying step, so the refinement can hold
+-- only because the step is undefined, and a weakest precondition, which
+-- excludes that start, still transfers.
+example : Spec.Refines (Spec.pure 0 : Spec Unit Nat Nat)
+    (Spec.certified (Invariant := False) False.elim) :=
+  ⟨fun _ _ _ _ => .inr not_false, fun _ _ aborts => aborts.elim,
+    fun _ undefined => undefined.elim⟩
+
+example : ¬(Spec.certified (Invariant := False) False.elim : Spec Unit Nat Nat).ok () 0 () :=
+  fun ⟨holds, _⟩ => holds
+
 -- Failures need not have the same representation, but a permitted given
 -- failure must justify the actual concrete failure along the error relation.
 example : wp (Spec.abort 7 : Spec Unit Nat Unit)

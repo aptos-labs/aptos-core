@@ -1771,20 +1771,6 @@ theorem abortOfSatisfies {Args Result : Type} {function : Args → Comp unit Res
     ∃ error, contract.aborts args initial error :=
   aborted.imp fun error h => (verified args initial assumed permitted).2.1 error h
 
-omit [Skolems unit] in
-/-- A run of a meaning refining another is a run of the other. -/
-theorem okOfRefines {α : Type} {left right : Comp unit α} (refines : Spec.Refines left right)
-    {initial final : Memory unit} {result : α} (run : left.ok initial result final) :
-    right.ok initial result final :=
-  refines.ok initial result final run
-
-omit [Skolems unit] in
-/-- An abort of a meaning refining another is an abort of the other. -/
-theorem abortsOfRefines {α : Type} {left right : Comp unit α} (refines : Spec.Refines left right)
-    {initial : Memory unit} (aborted : ∃ error, left.aborts initial error) :
-    ∃ error, right.aborts initial error :=
-  aborted.imp fun error h => refines.aborts initial error h
-
 end Model
 
 end VerexIR.Proofs

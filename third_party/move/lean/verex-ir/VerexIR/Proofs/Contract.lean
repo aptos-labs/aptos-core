@@ -241,6 +241,24 @@ theorem forall_ok_unit_of_wp {action : Spec σ ε Unit} {ensures : σ → Prop}
     ∀ final, action.ok initial () final → ensures final :=
   fun final => established.1 () final
 
+/-- What holds of every run of a computation refining an action, where the
+action's weakest precondition holds. -/
+theorem forall_ok_of_refines_of_wp {left right : Spec σ ε Result} (refines : Spec.Refines left right)
+    {ensures : Result → σ → Prop} {initial : σ}
+    (established : wp right ensures (fun _ => True) initial) :
+    ∀ result final, left.ok initial result final → ensures result final :=
+  fun result final run =>
+    (refines.ok _ _ _ run).elim (established.1 result final) (absurd · established.2.2)
+
+/-- What holds where a computation refining an action aborts and the
+action's weakest precondition holds. -/
+theorem of_aborts_of_refines_of_wp {left right : Spec σ ε Result}
+    (refines : Spec.Refines left right) {initial : σ} {goal : Prop}
+    (established : wp right (fun _ _ => True) (fun _ => goal) initial)
+    (aborted : ∃ error, left.aborts initial error) : goal :=
+  let ⟨error, aborts⟩ := aborted
+  (refines.aborts _ _ aborts).elim (established.2.1 error) (absurd · established.2.2)
+
 /-- What holds where an action aborts and its weakest precondition holds. -/
 theorem of_aborts_of_wp {action : Spec σ ε Result} {initial : σ} {goal : Prop}
     (established : wp action (fun _ _ => True) (fun _ => goal) initial)
@@ -429,8 +447,9 @@ theorem satisfies_of_refines {left right : Args → Spec σ ε Result}
     Satisfies left contract := by
   intro args initial assumed permitted
   obtain ⟨normal, failing, defined⟩ := verified args initial assumed permitted
-  exact ⟨fun result final execution => normal result final ((refines args).ok _ _ _ execution),
-    fun error execution => failing error ((refines args).aborts _ _ execution),
+  exact ⟨fun result final execution =>
+      ((refines args).ok _ _ _ execution).elim (normal result final) (absurd · defined),
+    fun error execution => ((refines args).aborts _ _ execution).elim (failing error) (absurd · defined),
     fun obligation => defined ((refines args).undefined _ obligation)⟩
 
 /-- A function's in-body assumptions hold: every outcome of a run of it,

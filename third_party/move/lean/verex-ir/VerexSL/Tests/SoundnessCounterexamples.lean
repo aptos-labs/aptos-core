@@ -488,6 +488,62 @@ run_cmd do
       `«0x42».review2_loops.rebind_in_loop.verified] do
     if env.contains name then throwError "rejected proof published {name}"
 
+/-! ## Loops — a match arm re-binding the index
+
+A match arm binds the locals of its pattern as a `let` does, so in a loop the
+arm binds the index again while the previous iteration's loan, indexed by it
+and held across the back edge, is still live (`rebind_in_arm`). The control
+takes and drops the loan inside the arm, so no loan is live at the binding
+(`borrow_in_arm`). -/
+
+verex module 0x42::review2_match_rebind where
+  pragma verify = false
+  enum Slot has Copy, Drop where
+    | At (index : u64)
+  fun rebind_in_arm(n : u64) -> u64 := do
+    let mut values := vector<u64>[0, 0]
+    let mut r := &mut values[0]
+    let mut k : u64 := 0
+    while k < n do
+      match new Slot::At { index := k } with
+        | Slot::At { index := i } => do
+          *r := 7
+          r := &mut values[i]
+      k := k + 1
+    *r := 9
+    values[1]
+  spec rebind_in_arm where
+    requires n == 2
+    ensures false
+    aborts_if false
+
+/--
+error: no denotation for `rebind_in_arm`: a write to a local a live mutable borrow uses as an element index is not carried by the denotation
+-/
+#guard_msgs in
+verify 0x42::review2_match_rebind::rebind_in_arm by lean =>
+  verex_obligations
+  all_goals (verex_prepare <;> simp_all [VerexIR.SpecVector.set])
+
+run_cmd do
+  let env ← getEnv
+  for name in [`«0x42».review2_match_rebind.rebind_in_arm.typedVerified,
+      `«0x42».review2_match_rebind.rebind_in_arm.verified] do
+    if env.contains name then throwError "rejected proof published {name}"
+
+verex module 0x42::review2_match_control where
+  enum Slot has Copy, Drop where
+    | At (index : u64)
+  fun borrow_in_arm(n : u64) -> Unit := do
+    let mut values := vector<u64>[0, 0]
+    let mut k : u64 := 0
+    while k < n do
+      match new Slot::At { index := 0 } with
+        | Slot::At { index := i } => do
+          let r := &mut values[i]
+          *r := 7
+      k := k + 1
+
 -- The control: the loan dies before the loop, the index is written in the
 -- body, and the true postcondition is provable.
 verex module 0x42::review2_loop_control where

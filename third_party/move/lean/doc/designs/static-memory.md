@@ -168,8 +168,8 @@ unconditional even when abort conditions excuse `ensures`.
 ## Agreement
 
 `compileFunction_agrees` is `Spec.Refines (propheticMeaning …) (f.denote
-…)`: every outcome of the prophetic meaning is one of the denotation, the
-only direction used (contract transport, inlining), weaker than an
+…)`: every outcome of the prophetic meaning is one of the denotation
+wherever the denotation is defined, the only direction used (contract transport, inlining), weaker than an
 equivalence, and true at every frame, since at an incoherent one the
 prophetic meaning has no outcome. What the axioms assume about types is
 the compiler's: a coherent caller's calls have coherent frames.

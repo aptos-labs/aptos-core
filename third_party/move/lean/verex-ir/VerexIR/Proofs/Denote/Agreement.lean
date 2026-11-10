@@ -37,11 +37,13 @@ the compiler's types agree with the runtime's, so a coherent caller's calls
 and closures have coherent frames.  To be proved by induction on the fuel of
 `compileExpr`, one case per term constructor.
 
-A refinement admits `undefined`, which the certifying steps of the
-denotation now reach: a run that packs a value breaking its data invariant,
-or that ends a mutable loan over one, has no defined denotation, which this
-statement allows and `Satisfies` excludes, so the invariant is owed in the
-function that breaks it (`doc/designs/data-invariants.md`). -/
+The refinement relates the outcomes of a start only where the denotation
+is defined there, and its certifying steps are undefined where a data
+invariant fails: a run that packs a value breaking its invariant, or that
+ends a mutable loan over one, keeps its big-step outcomes while the
+denotation is undefined at its start, so nothing is asserted of that start,
+and `Satisfies` excludes it, so the invariant is owed in the function that
+breaks it (`doc/designs/data-invariants.md`). -/
 axiom compileFunction_agrees {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit)
     [Skolems unit] (handle : FunctionHandle)
@@ -82,8 +84,9 @@ omit [Skolems unit] in
 theorem wp_of_refines {σ ε α : Type} {a b : Spec σ ε α} (refines : Spec.Refines a b)
     {ensures : α → σ → Prop} {aborts : ε → Prop} {initial : σ}
     (established : wp b ensures aborts initial) : wp a ensures aborts initial :=
-  ⟨fun result final step => established.1 result final (refines.ok _ _ _ step),
-    fun error step => established.2.1 error (refines.aborts _ _ step),
+  ⟨fun result final step =>
+      (refines.ok _ _ _ step).elim (established.1 result final) (absurd · established.2.2),
+    fun error step => (refines.aborts _ _ step).elim (established.2.1 error) (absurd · established.2.2),
     fun undefined => established.2.2 (refines.undefined _ undefined)⟩
 
 /-- A call to a compiled callee reasons over the callee's denotation: an

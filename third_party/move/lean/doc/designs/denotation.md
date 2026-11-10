@@ -35,7 +35,7 @@ denote : ExecutableUnit unit → FunctionHandle →
   Array RuntimeValue → Spec RuntimeState Failure (Array RuntimeValue)
 
 denote_agrees : ∀ unit function arguments,
-  Spec.Equiv (denote unit function arguments) (meaning unit function arguments)
+  Spec.Refines (meaning unit function arguments) (denote unit function arguments)
 ```
 
 - `denote` is a Lean function of the validated unit itself, recursing over
@@ -47,7 +47,11 @@ denote_agrees : ∀ unit function arguments,
   references use the typed memory and the prophecy encoding. `denote` is a
   relation, not an executable.
 - `denote_agrees` is the statement an induction against
-  `BigStep.EvalFunction`, one case per construct, would prove; it is
+  `BigStep.EvalFunction`, one case per construct, would prove: every
+  outcome of the meaning is one of the denotation wherever the denotation
+  is defined, which is not everywhere, since a data invariant is owed where
+  a value is made and nothing checks it at run time
+  ([`data-invariants.md`](data-invariants.md)). It is
   assumed as the named axioms `compileFunction_agrees` and
   `compileFunction_least_cycle` ([`assumptions.md`](../status/assumptions.md)).
   It is what makes a bare
@@ -422,7 +426,9 @@ reference's prophecy, the export of every argument loan in `s₁.pending`
 (returned loans' holes replaced by their prophecies) encodes the
 argument's prophecy, and `final` is `s₁` with the loan fields of
 `initial`; `aborts` and `undefined` likewise. `compileFunction_agrees` is
-`Spec.Equiv (f.denote unit args) (propheticMeaning unit handle f args)`.
+`Spec.Refines (propheticMeaning unit handle f args) (f.denote unit args)`:
+every outcome of the prophetic meaning is one of the denotation wherever the
+denotation is defined.
 
 Intrinsic maps ([`intrinsic-maps.md`](intrinsic-maps.md)): the runtime's
 values are read up to `normalize`, which replaces every well-formed value

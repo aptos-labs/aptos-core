@@ -3348,11 +3348,15 @@ private def modelDenotedRun (goal : MVarId) (callees : Array (Lean.Expr × Strin
     throwError "the routed target has neither a contract nor a body"
   -- The inlined target: its body's run or abort.
   let (binders, _, refined) ← forallMetaTelescope (← whnfR (← zetaReduce (← inferType theoremProof)))
-  let .app (.app _ left) body ← whnfR refined
-    | throwError "an inlined target's refinement does not name its body"
-  unless ← isDefEq left action do throwError "an inlined target's refinement does not meet its run"
+  let refined ← whnfR refined
+  unless refined.isAppOfArity ``VerexIR.Proofs.Spec.Refines 5 do
+    throwError "an inlined target's refinement does not name its body"
+  unless ← isDefEq (refined.getArg! 3) action do
+    throwError "an inlined target's refinement does not meet its run"
   let refinement ← instantiateMVars (mkAppN theoremProof binders)
-  let body ← instantiateMVars body
+  let refined ← instantiateMVars refined
+  let (σ, ε, α) := (refined.getArg! 0, refined.getArg! 1, refined.getArg! 2)
+  let (left, body) := (refined.getArg! 3, refined.getArg! 4)
   let unfoldNames := match body.getAppFn.constName?, body.getAppArgs[5]? with
     | some ``VerexIR.Proofs.Denote.Function.denoteWith, some (.const name _) =>
         [name, name.getPrefix ++ `body, name.getPrefix ++ `mutables, name.getPrefix ++ `params,
@@ -3365,40 +3369,36 @@ private def modelDenotedRun (goal : MVarId) (callees : Array (Lean.Expr × Strin
       -- The leaf, of every run of the body returning the stated result and
       -- final memory: the weakest precondition of the body under which a
       -- run's result and memory being the stated ones gives the leaf.
-      let bodyRun ← mkAppM ``VerexIR.Proofs.okOfRefines #[refinement, .fvar runVar]
-      let bodyRunType ← instantiateMVars (← inferType bodyRun)
-      unless bodyRunType.isAppOfArity ``VerexIR.Proofs.Spec.ok 7 do throwError "not a body run"
-      let (σ, ε, α) := (bodyRunType.getArg! 0, bodyRunType.getArg! 1, bodyRunType.getArg! 2)
-      let (body, initial) := (bodyRunType.getArg! 3, bodyRunType.getArg! 4)
-      let (result, final) := (bodyRunType.getArg! 5, bodyRunType.getArg! 6)
+      let runType ← instantiateMVars (← inferType (.fvar runVar))
+      unless runType.isAppOfArity ``VerexIR.Proofs.Spec.ok 7 do throwError "not a run"
+      let (initial, result, final) := (runType.getArg! 4, runType.getArg! 5, runType.getArg! 6)
       let leaf ← goal.getType
       let ensures ← withLocalDeclD `result α fun r => withLocalDeclD `final σ fun f => do
         mkLambdaFVars #[r, f] (← mkArrow (← mkEq r result) (← mkArrow (← mkEq f final) leaf))
       let established ← mkFreshExprSyntheticOpaqueMVar
         (mkAppN (mkConst ``VerexIR.Proofs.wp) #[σ, ε, α, body, ensures, ← trueFailures ε, initial])
         (← goal.getTag)
-      goal.assign (mkAppN (mkConst ``VerexIR.Proofs.forall_ok_of_wp)
-        #[σ, ε, α, body, ensures, initial, established, result, final, bodyRun,
-          ← mkEqRefl result, ← mkEqRefl final])
+      goal.assign (mkAppN (mkConst ``VerexIR.Proofs.forall_ok_of_refines_of_wp)
+        #[σ, ε, α, left, body, refinement, ensures, initial, established, result, final,
+          .fvar runVar, ← mkEqRefl result, ← mkEqRefl final])
       let next := established.mvarId!
       setGoals [next]
       evalTactic (← `(tactic| try simp only [$unfolds,*, VerexIR.Proofs.Denote.Function.denoteWith,
         VerexIR.Proofs.Denote.NRow.nil_append, VerexIR.Proofs.Denote.NRow.cons_append]))
       return some (← getMainGoal)
   | none =>
-      let bodyAborts ← mkAppM ``VerexIR.Proofs.abortsOfRefines #[refinement, .fvar runVar]
-      let abortsType ← instantiateMVars (← inferType bodyAborts)
+      let abortsType ← instantiateMVars (← inferType (.fvar runVar))
       let .app _ (.lam _ _ aborts _) := abortsType | throwError "the abort is not an existential"
-      let (σ, ε, α) := (aborts.getArg! 0, aborts.getArg! 1, aborts.getArg! 2)
-      let (bodyAction, initial) := (aborts.getArg! 3, aborts.getArg! 4)
+      unless aborts.isAppOfArity ``VerexIR.Proofs.Spec.aborts 6 do throwError "not an abort"
+      let initial := aborts.getArg! 4
       let leaf ← goal.getType
       let returns ← withLocalDeclD `result α fun result => withLocalDeclD `final σ fun final =>
         mkLambdaFVars #[result, final] (mkConst ``True)
       let fails ← withLocalDeclD `error ε fun error => mkLambdaFVars #[error] leaf
       let established ← mkFreshExprSyntheticOpaqueMVar
-        (mkAppN (mkConst ``VerexIR.Proofs.wp) #[σ, ε, α, bodyAction, returns, fails, initial])
-      goal.assign (mkAppN (mkConst ``VerexIR.Proofs.of_aborts_of_wp)
-        #[σ, ε, α, bodyAction, initial, leaf, established, bodyAborts])
+        (mkAppN (mkConst ``VerexIR.Proofs.wp) #[σ, ε, α, body, returns, fails, initial])
+      goal.assign (mkAppN (mkConst ``VerexIR.Proofs.of_aborts_of_refines_of_wp)
+        #[σ, ε, α, left, body, refinement, initial, leaf, established, .fvar runVar])
       setGoals [established.mvarId!]
       evalTactic (← `(tactic| try simp only [$unfolds,*, VerexIR.Proofs.Denote.Function.denoteWith,
         VerexIR.Proofs.Denote.NRow.nil_append, VerexIR.Proofs.Denote.NRow.cons_append]))
