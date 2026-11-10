@@ -1157,7 +1157,7 @@ mod reopen {
     fn position_root(db: &AptosDB) -> HashValue {
         db.get_pre_committed_position_state_summary()
             .expect("position summary")
-            .latest()
+            .last_checkpoint()
             .root_hash()
     }
 
@@ -1486,7 +1486,7 @@ mod reopen {
     fn order_root(db: &AptosDB) -> HashValue {
         db.get_pre_committed_order_state_summary()
             .expect("order summary")
-            .latest()
+            .last_checkpoint()
             .root_hash()
     }
 
@@ -1815,7 +1815,7 @@ mod reopen {
     fn collateral_root(db: &AptosDB) -> HashValue {
         db.get_pre_committed_collateral_state_summary()
             .expect("collateral summary")
-            .latest()
+            .last_checkpoint()
             .root_hash()
     }
 

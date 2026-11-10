@@ -53,11 +53,10 @@ impl ExecutionOutput {
         compute_trading_native_state_roots: bool,
     ) -> Self {
         let next_version = first_version + to_commit.len() as Version;
-        assert_eq!(next_version, result_state.latest().next_version());
+        assert_eq!(next_version, result_state.next_version());
         if is_block {
             // If it's a block, ensure it ends with state checkpoint.
             assert!(to_commit.is_empty() || to_commit.ends_with_sole_checkpoint());
-            assert!(result_state.is_checkpoint());
         } else {
             // If it's not, there shouldn't be any transaction to be discarded or retried.
             assert!(to_discard.is_empty() && to_retry.is_empty());

@@ -162,7 +162,7 @@ impl DoStateCheckpoint {
             .build())
     }
 
-    /// Computes `tree`'s summary (latest + last_checkpoint) and per-txn root
+    /// Computes `tree`'s summary and per-txn root
     /// for this chunk by extending the parent on the persisted base. The root
     /// depends only on the tree's writes, not on the base, so it's
     /// deterministic across nodes.
@@ -180,27 +180,17 @@ impl DoStateCheckpoint {
 
         let num_txns = execution_output.to_commit.len();
         let first_version = execution_output.first_version;
-        let last_checkpoint_index = execution_output
-            .to_commit
-            .state_update_refs()
-            .last_inner_checkpoint_index();
         // No in-memory parent at genesis / first block after enabling: seed
         // from the pre-committed tip (covers committed writes the merklized
         // snapshot may lag).
-        let parent_latest =
-            parent.map_or_else(|| persisted.base().latest().clone(), |p| p.latest().clone());
-        let parent_last_checkpoint = parent.map_or_else(
+        let parent = parent.map_or_else(
             || persisted.base().last_checkpoint().clone(),
             |p| p.last_checkpoint().clone(),
         );
 
         // Empty chunk: nothing to extend (avoids the `num_txns - 1` underflow).
         if num_txns == 0 {
-            let summary = LedgerWithSummary::from_latest_and_last_checkpoint(
-                parent_latest,
-                parent_last_checkpoint,
-            );
-            return Ok((summary, vec![]));
+            return Ok((LedgerWithSummary::new_at_checkpoint(parent), vec![]));
         }
 
         // Collapse the tree's writes (latest-per-key) over a version range into
@@ -223,49 +213,24 @@ impl DoStateCheckpoint {
             latest.into_iter().collect()
         };
 
-        let (new_latest, new_last_checkpoint) = if let Some(ci) = last_checkpoint_index {
-            let checkpoint_version = first_version + ci as u64;
-            let new_ckpt = parent_latest.extend(
-                checkpoint_version,
-                collect(0..ci + 1),
-                persisted.persisted(),
-                persisted,
-            )?;
-            if ci + 1 == num_txns {
-                (new_ckpt.clone(), new_ckpt)
-            } else {
-                let last_version = first_version + num_txns as u64 - 1;
-                let new_latest = new_ckpt.extend(
-                    last_version,
-                    collect(ci + 1..num_txns),
-                    persisted.persisted(),
-                    persisted,
-                )?;
-                (new_latest, new_ckpt)
-            }
-        } else {
-            // No checkpoint in this chunk: only the latest advances.
-            let last_version = first_version + num_txns as u64 - 1;
-            let new_latest = parent_latest.extend(
-                last_version,
-                collect(0..num_txns),
-                persisted.persisted(),
-                persisted,
-            )?;
-            (new_latest, parent_last_checkpoint)
-        };
+        // The chunk ends at a checkpoint.
+        let last_version = first_version + num_txns as u64 - 1;
+        let new_ckpt = parent.extend(
+            last_version,
+            collect(0..num_txns),
+            persisted.persisted(),
+            persisted,
+        )?;
 
         // Per-tx hash vector + known-hash validation (shared with main/hot state).
         let hashes = Self::get_state_checkpoint_hashes(
             execution_output,
             known_checkpoints,
-            new_last_checkpoint.root_hash(),
+            new_ckpt.root_hash(),
             tree.label(),
         )?;
 
-        let summary =
-            LedgerWithSummary::from_latest_and_last_checkpoint(new_latest, new_last_checkpoint);
-        Ok((summary, hashes))
+        Ok((LedgerWithSummary::new_at_checkpoint(new_ckpt), hashes))
     }
 
     fn get_state_checkpoint_hashes(
