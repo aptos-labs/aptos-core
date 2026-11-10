@@ -3,16 +3,17 @@
 
 //! Structural equality and ordering of two VM values, driven by their layout.
 //
-// TODO(correctness): the comparison fast paths assume a little-endian host.
+// Host endianness: every integer goes through `MemAddr::load_unaligned`, which
+// decodes the little-endian in-memory bytes on any host, and the byte-wise
+// fast paths (equality over pointer-free values, address ordering) compare the
+// little-endian image itself, so the walks hold on big-endian hosts by
+// construction.
 
-use crate::{
-    error::{RuntimeError, RuntimeInvariantViolation},
-    memory::{read_enum_tag, read_ptr, read_vec_len},
-    types::VEC_DATA_OFFSET,
-};
+use crate::error::{RuntimeError, RuntimeInvariantViolation};
 use mono_move_core::{
-    types::InternedType, LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult,
-    ENUM_DATA_OFFSET,
+    memory::{vec_len_or_zero, MemAddr, Obj},
+    types::InternedType,
+    LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult, ENUM_DATA_OFFSET,
 };
 use move_core_types::int256::{I256, U256};
 use std::cmp::Ordering;
@@ -21,7 +22,7 @@ use std::cmp::Ordering;
 ///
 /// # Safety
 ///
-/// Input pointers `a` and `b` must point to fully initialized values of the
+/// Input addresses `a` and `b` must point to fully initialized values of the
 /// given type.
 ///
 /// # Precondition
@@ -30,8 +31,8 @@ use std::cmp::Ordering;
 /// the `base` pointer to the actual data; these walks operate on the pointee.
 pub unsafe fn equals<T: LayoutProvider + ?Sized>(
     layouts: &T,
-    a: *const u8,
-    b: *const u8,
+    a: MemAddr,
+    b: MemAddr,
     ty: InternedType,
 ) -> VMResult<bool> {
     let id = layouts.layout_id(ty).ok_or({
@@ -45,7 +46,7 @@ pub unsafe fn equals<T: LayoutProvider + ?Sized>(
 ///
 /// # Safety
 ///
-/// Input pointers `a` and `b` must point to fully initialized values with the
+/// Input addresses `a` and `b` must point to fully initialized values with the
 /// given layout.
 ///
 /// # Precondition
@@ -54,8 +55,8 @@ pub unsafe fn equals<T: LayoutProvider + ?Sized>(
 /// the `base` pointer to the actual data; these walks operate on the pointee.
 pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
     layouts: &T,
-    a: *const u8,
-    b: *const u8,
+    a: MemAddr,
+    b: MemAddr,
     id: LayoutId,
 ) -> VMResult<bool> {
     // TODO(metering): This walk recurses on struct fields and vector elements; convert it
@@ -65,8 +66,8 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
     })?;
 
     if layout.has_no_pointers_no_padding() {
-        // SAFETY: both pointers must have layout's size and have no pointers,
-        // no padding.
+        // SAFETY: both values have `layout.size` initialized bytes and, by
+        // the flag, hold no pointer slots and no padding.
         return Ok(unsafe { bytes_cmp(a, b, layout.size as usize).is_eq() });
     }
 
@@ -82,8 +83,8 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
         ))),
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {
-                // SAFETY: value is a valid struct, so all fields lie at `offset`
-                // and are within bounds.
+                // SAFETY: the field offset is within the value's layout, and
+                // the field holds an initialized value of `field.id`.
                 let eq = unsafe {
                     equals_impl(
                         layouts,
@@ -100,12 +101,12 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
         },
         LayoutKind::Vector { elem_id, .. } => {
             // SAFETY: vector values hold 8-byte heap pointers pointing to
-            // their data for any well-typed value. The length is stored in
-            // the data pointed to.
-            let vec_a = unsafe { read_ptr(a, 0usize) };
-            let len_a = unsafe { read_vec_len(vec_a) };
-            let vec_b = unsafe { read_ptr(b, 0usize) };
-            let len_b = unsafe { read_vec_len(vec_b) };
+            // their data for any well-typed value (null for the empty vector).
+            // The length is stored in the data pointed to.
+            let vec_a = unsafe { a.load_ptr() };
+            let len_a = unsafe { vec_len_or_zero(vec_a) };
+            let vec_b = unsafe { b.load_ptr() };
+            let len_b = unsafe { vec_len_or_zero(vec_b) };
 
             if len_a != len_b {
                 return Ok(false);
@@ -117,25 +118,31 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
             let elem_layout = layouts.layout(*elem_id).ok_or({
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
             })?;
-            let elem_size = elem_layout.size as usize;
+            let elem_size = elem_layout.size;
+            // SAFETY: both vectors are live heap objects: the empty (null)
+            // case was excluded above.
+            let (obj_a, obj_b) = unsafe { (Obj::new(vec_a), Obj::new(vec_b)) };
             if elem_layout.has_no_pointers_no_padding() {
-                // SAFETY: both vectors have same size specified by the layout.
-                let data_a = unsafe { vec_a.add(VEC_DATA_OFFSET) };
-                let data_b = unsafe { vec_b.add(VEC_DATA_OFFSET) };
+                // SAFETY: the data regions hold `len_a` elements of `elem_size`
+                // bytes each, with no pointer slots and no padding by the flag.
                 return Ok(unsafe {
-                    bytes_cmp(data_a, data_b, len_a as usize * elem_size).is_eq()
+                    bytes_cmp(
+                        obj_a.vec_data(),
+                        obj_b.vec_data(),
+                        len_a as usize * elem_size as usize,
+                    )
+                    .is_eq()
                 });
             }
 
-            for i in 0..len_a as usize {
-                // SAFETY: ith element lies within the vector data region,
-                // so the pointer is non-null and new pointer points within
-                // the data region. Lengths of `a` and `b` are the same.
-                let elem_a = unsafe { vec_a.add(VEC_DATA_OFFSET + i * elem_size) };
-                let elem_b = unsafe { vec_b.add(VEC_DATA_OFFSET + i * elem_size) };
+            for i in 0..len_a {
+                // SAFETY: `i < len_a == len_b`, so the ith element lies within
+                // both vectors' data regions.
+                let elem_a = unsafe { obj_a.vec_elem(i, elem_size) };
+                let elem_b = unsafe { obj_b.vec_elem(i, elem_size) };
 
-                // SAFETY: element pointers point to valid vector element
-                // values.
+                // SAFETY: element addresses hold initialized values of
+                // `elem_id`.
                 let eq = unsafe { equals_impl(layouts, elem_a, elem_b, *elem_id)? };
                 if !eq {
                     return Ok(false);
@@ -145,11 +152,11 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
         },
         LayoutKind::FrozenEnum { variants, .. } => {
             // SAFETY: well-typed enum values hold non-null heap pointers and
-            // every enum object stores its data following the offset.
-            let obj_a = unsafe { read_ptr(a, 0usize) };
-            let obj_b = unsafe { read_ptr(b, 0usize) };
-            let tag_a = unsafe { read_enum_tag(obj_a) };
-            let tag_b = unsafe { read_enum_tag(obj_b) };
+            // every enum object stores its tag followed by the variant body.
+            let obj_a = unsafe { Obj::new(a.load_ptr()) };
+            let obj_b = unsafe { Obj::new(b.load_ptr()) };
+            let tag_a = unsafe { obj_a.enum_tag() };
+            let tag_b = unsafe { obj_b.enum_tag() };
 
             // Validate both tags before the equality check. An out-of-range tag
             // is heap corruption and must fail closed even when the tags differ.
@@ -172,12 +179,13 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
                 return Ok(false);
             }
 
-            // SAFETY: both variant bodies live at the specified offset.
+            // SAFETY: both variant bodies live at `ENUM_DATA_OFFSET` within
+            // their enum objects.
             unsafe {
                 equals_impl(
                     layouts,
-                    obj_a.add(ENUM_DATA_OFFSET),
-                    obj_b.add(ENUM_DATA_OFFSET),
+                    obj_a.field(ENUM_DATA_OFFSET),
+                    obj_b.field(ENUM_DATA_OFFSET),
                     variant_id,
                 )
             }
@@ -217,8 +225,8 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
 /// the `base` pointer to the actual data; these walks operate on the pointee.
 pub unsafe fn compare<T: LayoutProvider + ?Sized>(
     layouts: &T,
-    a: *const u8,
-    b: *const u8,
+    a: MemAddr,
+    b: MemAddr,
     ty: InternedType,
 ) -> VMResult<Ordering> {
     let id = layouts.layout_id(ty).ok_or({
@@ -233,7 +241,7 @@ pub unsafe fn compare<T: LayoutProvider + ?Sized>(
 ///
 /// # Safety
 ///
-/// Input pointers `a` and `b` must point to fully initialized values with the
+/// Input addresses `a` and `b` must point to fully initialized values with the
 /// given layout.
 ///
 /// # Precondition
@@ -242,8 +250,8 @@ pub unsafe fn compare<T: LayoutProvider + ?Sized>(
 /// the `base` pointer to the actual data; these walks operate on the pointee.
 pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
     layouts: &T,
-    a: *const u8,
-    b: *const u8,
+    a: MemAddr,
+    b: MemAddr,
     id: LayoutId,
 ) -> VMResult<Ordering> {
     // TODO(metering): This walk recurses on struct fields and vector elements; convert it
@@ -254,28 +262,21 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
     match &layout.kind {
         // A `bool` is a 1-byte `0`/`1` value, so it compares like a `u8`.
         LayoutKind::Bool | LayoutKind::UnsignedInt => {
-            // Read the little-endian bytes into the native integer of the
-            // matching width and compare numerically. `from_le_bytes` keeps
-            // this correct on any host endianness.
+            // Load the little-endian bytes as the native integer of the
+            // matching width and compare numerically. `load_unaligned`
+            // decodes little-endian on any host, and takes no alignment
+            // requirement: these values may sit at any offset in a struct.
             //
-            // TODO(cleanup): These are unaligned, little-endian numeric reads, distinct
-            // from the aligned native-endian helpers in `memory.rs`. Endianness
-            // makes unifying the two non-trivial; revisit whether a shared set
-            // of typed read helpers can serve both.
-            //
-            // SAFETY: both pointers point to a valid `layout.size`-byte region.
+            // SAFETY: both values hold `layout.size` initialized bytes with
+            // no pointer slots.
             Ok(unsafe {
                 match layout.size {
-                    1 => (*a).cmp(&*b),
-                    2 => u16::from_le_bytes(read_array(a)).cmp(&u16::from_le_bytes(read_array(b))),
-                    4 => u32::from_le_bytes(read_array(a)).cmp(&u32::from_le_bytes(read_array(b))),
-                    8 => u64::from_le_bytes(read_array(a)).cmp(&u64::from_le_bytes(read_array(b))),
-                    16 => {
-                        u128::from_le_bytes(read_array(a)).cmp(&u128::from_le_bytes(read_array(b)))
-                    },
-                    32 => {
-                        U256::from_le_bytes(read_array(a)).cmp(&U256::from_le_bytes(read_array(b)))
-                    },
+                    1 => a.load::<u8>().cmp(&b.load::<u8>()),
+                    2 => a.load_unaligned::<u16>().cmp(&b.load_unaligned::<u16>()),
+                    4 => a.load_unaligned::<u32>().cmp(&b.load_unaligned::<u32>()),
+                    8 => a.load_unaligned::<u64>().cmp(&b.load_unaligned::<u64>()),
+                    16 => a.load_unaligned::<u128>().cmp(&b.load_unaligned::<u128>()),
+                    32 => a.load_unaligned::<U256>().cmp(&b.load_unaligned::<U256>()),
                     _ => {
                         return Err(VMInternalError::new(RuntimeError::InvariantViolation(
                             RuntimeInvariantViolation::Unreachable(
@@ -287,19 +288,16 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             })
         },
         LayoutKind::SignedInt => {
-            // SAFETY: both pointers point to a valid `layout.size`-byte region.
+            // SAFETY: both values hold `layout.size` initialized bytes with
+            // no pointer slots.
             Ok(unsafe {
                 match layout.size {
-                    1 => (*(a as *const i8)).cmp(&*(b as *const i8)),
-                    2 => i16::from_le_bytes(read_array(a)).cmp(&i16::from_le_bytes(read_array(b))),
-                    4 => i32::from_le_bytes(read_array(a)).cmp(&i32::from_le_bytes(read_array(b))),
-                    8 => i64::from_le_bytes(read_array(a)).cmp(&i64::from_le_bytes(read_array(b))),
-                    16 => {
-                        i128::from_le_bytes(read_array(a)).cmp(&i128::from_le_bytes(read_array(b)))
-                    },
-                    32 => {
-                        I256::from_le_bytes(read_array(a)).cmp(&I256::from_le_bytes(read_array(b)))
-                    },
+                    1 => a.load::<i8>().cmp(&b.load::<i8>()),
+                    2 => a.load_unaligned::<i16>().cmp(&b.load_unaligned::<i16>()),
+                    4 => a.load_unaligned::<i32>().cmp(&b.load_unaligned::<i32>()),
+                    8 => a.load_unaligned::<i64>().cmp(&b.load_unaligned::<i64>()),
+                    16 => a.load_unaligned::<i128>().cmp(&b.load_unaligned::<i128>()),
+                    32 => a.load_unaligned::<I256>().cmp(&b.load_unaligned::<I256>()),
                     _ => {
                         return Err(VMInternalError::new(RuntimeError::InvariantViolation(
                             RuntimeInvariantViolation::Unreachable(
@@ -311,14 +309,15 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             })
         },
         LayoutKind::Address | LayoutKind::Signer => {
-            // SAFETY: values are valid byte arrays of the size specified by
-            // the layout, as guaranteed by the precondition of this function.
+            // SAFETY: both values are initialized byte arrays of `layout.size`
+            // bytes with no pointer slots, as guaranteed by the precondition of
+            // this function.
             Ok(unsafe { bytes_cmp(a, b, layout.size as usize) })
         },
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {
-                // SAFETY: value is a valid struct, so all fields lie at `offset`
-                // and are within bounds.
+                // SAFETY: the field offset is within the value's layout, and
+                // the field holds an initialized value of `field.id`.
                 let ord = unsafe {
                     compare_impl(
                         layouts,
@@ -335,25 +334,32 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
         },
         LayoutKind::Vector { elem_id, .. } => {
             // SAFETY: vector values hold 8-byte heap pointers pointing to
-            // their data for any well-typed value. The length is stored in
-            // the data pointed to.
-            let vec_a = unsafe { read_ptr(a, 0usize) };
-            let len_a = unsafe { read_vec_len(vec_a) };
-            let vec_b = unsafe { read_ptr(b, 0usize) };
-            let len_b = unsafe { read_vec_len(vec_b) };
+            // their data for any well-typed value (null for the empty vector).
+            // The length is stored in the data pointed to.
+            let vec_a = unsafe { a.load_ptr() };
+            let len_a = unsafe { vec_len_or_zero(vec_a) };
+            let vec_b = unsafe { b.load_ptr() };
+            let len_b = unsafe { vec_len_or_zero(vec_b) };
 
             let elem = layouts.layout(*elem_id).ok_or({
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
             })?;
-            let elem_size = elem.size as usize;
-            for i in 0..len_a.min(len_b) as usize {
-                // SAFETY: ith element lies within the vector data region,
-                // so the pointer is non-null and new pointer points within
-                // the data region.
-                let elem_a = unsafe { vec_a.add(VEC_DATA_OFFSET + i * elem_size) };
-                let elem_b = unsafe { vec_b.add(VEC_DATA_OFFSET + i * elem_size) };
+            let elem_size = elem.size;
+            let common_len = len_a.min(len_b);
+            if common_len == 0 {
+                return Ok(len_a.cmp(&len_b));
+            }
+            // SAFETY: both lengths are non-zero, so both vectors are live
+            // (non-null) heap objects.
+            let (obj_a, obj_b) = unsafe { (Obj::new(vec_a), Obj::new(vec_b)) };
+            for i in 0..common_len {
+                // SAFETY: `i` is below both lengths, so the ith element lies
+                // within both data regions.
+                let elem_a = unsafe { obj_a.vec_elem(i, elem_size) };
+                let elem_b = unsafe { obj_b.vec_elem(i, elem_size) };
 
-                // SAFETY: element pointers point to valid values.
+                // SAFETY: element addresses hold initialized values of
+                // `elem_id`.
                 let ord = unsafe { compare_impl(layouts, elem_a, elem_b, *elem_id)? };
                 if ord.is_ne() {
                     return Ok(ord);
@@ -363,11 +369,11 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
         },
         LayoutKind::FrozenEnum { variants, .. } => {
             // SAFETY: well-typed enum values hold non-null heap pointers and
-            // every enum object stores its tag followed by data payload.
-            let obj_a = unsafe { read_ptr(a, 0usize) };
-            let obj_b = unsafe { read_ptr(b, 0usize) };
-            let tag_a = unsafe { read_enum_tag(obj_a) };
-            let tag_b = unsafe { read_enum_tag(obj_b) };
+            // every enum object stores its tag followed by the variant body.
+            let obj_a = unsafe { Obj::new(a.load_ptr()) };
+            let obj_b = unsafe { Obj::new(b.load_ptr()) };
+            let tag_a = unsafe { obj_a.enum_tag() };
+            let tag_b = unsafe { obj_b.enum_tag() };
 
             // Validate both tags before ordering them. An out-of-range tag is
             // heap corruption and must fail closed even when the tags differ.
@@ -391,12 +397,13 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
                 return Ok(ord);
             }
 
-            // SAFETY: both variant bodies live at the specified offset.
+            // SAFETY: both variant bodies live at `ENUM_DATA_OFFSET` within
+            // their enum objects.
             unsafe {
                 compare_impl(
                     layouts,
-                    obj_a.add(ENUM_DATA_OFFSET),
-                    obj_b.add(ENUM_DATA_OFFSET),
+                    obj_a.field(ENUM_DATA_OFFSET),
+                    obj_b.field(ENUM_DATA_OFFSET),
                     variant_id,
                 )
             }
@@ -413,33 +420,16 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
     }
 }
 
-/// Reads `N` bytes from the pointer into an array.
-///
-/// # Safety
-///
-/// Pointer must point to at least `N` readable, initialized bytes.
-#[inline(always)]
-unsafe fn read_array<const N: usize>(p: *const u8) -> [u8; N] {
-    // SAFETY: `[u8; N]` has alignment 1, so this unaligned read is valid given
-    // the caller's guarantee of `N` readable bytes at `p`.
-    unsafe { (p as *const [u8; N]).read_unaligned() }
-}
-
 /// Byte comparison of two `n`-byte regions.
 ///
 /// # Safety
 ///
-/// Behavior is undefined if any of the following conditions are violated:
-///
-/// 1. Pointers are non-null.
-/// 2. Pointers point to a single allocation of `n` bytes, allocated.
-unsafe fn bytes_cmp(a: *const u8, b: *const u8, n: usize) -> Ordering {
-    // SAFETY: Caller guarantees non-null pointers of the specified length into
-    // a single allocation. The total size never overflows and the data is not
-    // being mutated.
-    unsafe {
-        let a = std::slice::from_raw_parts(a, n);
-        let b = std::slice::from_raw_parts(b, n);
-        a.cmp(b)
-    }
+/// Both `a` and `b` must be readable and initialized for `n` bytes, and the
+/// ranges must hold no pointer slots (they are the pointer-free bytes of a
+/// value whose layout has no pointers, or an address).
+unsafe fn bytes_cmp(a: MemAddr, b: MemAddr, n: usize) -> Ordering {
+    // SAFETY: the caller guarantees `n` initialized, pointer-free bytes at
+    // each address, and the data is not mutated for the duration of the
+    // comparison.
+    unsafe { a.as_bytes(n).cmp(b.as_bytes(n)) }
 }

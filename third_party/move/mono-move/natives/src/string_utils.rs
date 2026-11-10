@@ -5,6 +5,7 @@
 
 use crate::{polymorphic_natives, NativeEntry};
 use mono_move_core::{
+    memory::MemAddr,
     native::{NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref, Vector},
     types::{is_nominal, view_type, view_type_list, InternedType, Type},
     FormatOptions, VMResult,
@@ -38,7 +39,7 @@ pub fn native_format<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     }
 
     // SAFETY: `arg` references a live value of type `ty` for the rest of the call.
-    let formatted = unsafe { ctx.format_value(arg.ptr(), ty, &options)? };
+    let formatted = unsafe { ctx.format_value(arg.addr(), ty, &options)? };
     let out = ctx.new_byte_vector(formatted.as_bytes())?;
     // SAFETY: return 0 is `String`, which has the same representation as
     // `vector<u8>`.
@@ -66,7 +67,7 @@ pub fn native_format_list<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     };
 
     let mut cursor = Cursor {
-        ptr: list.ptr(),
+        addr: list.addr(),
         ty: ctx.ty_arg(0)?,
     };
     let mut out = String::new();
@@ -125,7 +126,7 @@ enum Brace {
 /// Position in the cons list `Cons<T, N> { car: T, cdr: N }` being formatted.
 #[derive(Clone, Copy)]
 struct Cursor {
-    ptr: *const u8,
+    addr: MemAddr,
     ty: InternedType,
 }
 
@@ -152,13 +153,14 @@ impl Cursor {
             return Ok(Err(abort(EARGS_MISMATCH, None)));
         };
 
-        // SAFETY: `self.ptr` references a live `Cons`, so both fields lie at
-        // their offsets within it.
+        // SAFETY: `self.addr` references a live `Cons` of type `self.ty`, and
+        // `field_offset` gave the offsets of its two fields, so both lie
+        // within it.
         unsafe {
-            let car = self.ptr.add(car_offset as usize);
+            let car = self.addr.add(car_offset as usize);
             display(ctx, car, *car_ty, out)?;
             Ok(Ok(Self {
-                ptr: self.ptr.add(cdr_offset as usize),
+                addr: self.addr.add(cdr_offset as usize),
                 ty: *cdr_ty,
             }))
         }
@@ -169,15 +171,15 @@ impl Cursor {
 ///
 /// # Safety
 ///
-/// `ptr` must reference a live value of type `ty`.
+/// `addr` must reference a live value of type `ty`.
 unsafe fn display<C: NativeContext>(
     ctx: &C,
-    ptr: *const u8,
+    addr: MemAddr,
     ty: InternedType,
     out: &mut String,
 ) -> VMResult<()> {
     // SAFETY: forwarded from this function's contract.
-    let formatted = unsafe { ctx.format_value(ptr, ty, &FormatOptions::LIST_ELEMENT)? };
+    let formatted = unsafe { ctx.format_value(addr, ty, &FormatOptions::LIST_ELEMENT)? };
     out.push_str(&formatted);
     Ok(())
 }

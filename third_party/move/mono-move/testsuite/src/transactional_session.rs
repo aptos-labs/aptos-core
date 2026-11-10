@@ -10,7 +10,9 @@ use crate::{
 };
 use bytes::Bytes;
 use mono_move_core::{
-    intern_type_tag, nominal_tag,
+    intern_type_tag,
+    memory::Obj,
+    nominal_tag,
     storage::resource_provider::InMemoryStorageKey,
     type_tag_of,
     types::{is_signer_or_signer_immut_ref, InternedType},
@@ -35,7 +37,6 @@ use move_core_types::{
 use move_transactional_test_runner::vm_test_harness::create_runtime_environment;
 use move_vm_runtime::{config::VMConfig, AsUnsyncModuleStorage, StagingModuleStorage};
 use move_vm_test_utils::InMemoryStorage;
-use std::ptr::NonNull;
 use thiserror::Error;
 
 /// Published modules and global state shared by V1's publishing checks and
@@ -538,8 +539,8 @@ fn resource_changes(
         let tag = nominal_tag(*ty).map_err(|err| RunError::Commit(format!("{err:#}")))?;
         // SAFETY: written pointers refer to live values in the effects' frozen
         // heap, and `guard` is the guard that described them.
-        let written = |ptr: NonNull<u8>| {
-            unsafe { serialize(guard, ptr.as_ptr(), *ty) }
+        let written = |ptr: Obj| {
+            unsafe { serialize(guard, ptr.addr(), *ty) }
                 .map(Bytes::from)
                 .map_err(RunError::from)
         };

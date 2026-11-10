@@ -65,11 +65,11 @@ fn test_returned_region_comes_back() {
 
         let region = arena.take_region(size);
         assert_eq!(region.len(), size);
-        let ptr = region.as_ptr();
+        let ptr = region.base();
         arena.return_region(region);
 
         let taken = arena.take_region(size);
-        assert_eq!(taken.as_ptr(), ptr);
+        assert_eq!(taken.base(), ptr);
         assert_eq!(taken.len(), size);
     }
 }
@@ -84,14 +84,14 @@ fn test_bucket_holds_more_than_one_region() {
 
     let first = arena.take_region(MIN_POOLED);
     let second = arena.take_region(MIN_POOLED);
-    let mut parked = vec![first.as_ptr(), second.as_ptr()];
+    let mut parked = vec![first.base(), second.base()];
     assert_ne!(parked[0], parked[1]);
     arena.return_region(first);
     arena.return_region(second);
 
     let mut taken = vec![
-        arena.take_region(MIN_POOLED).as_ptr(),
-        arena.take_region(MIN_POOLED).as_ptr(),
+        arena.take_region(MIN_POOLED).base(),
+        arena.take_region(MIN_POOLED).base(),
     ];
     parked.sort();
     taken.sort();
@@ -107,15 +107,15 @@ fn test_buckets_do_not_mix_sizes() {
     let arena = pool.lock_arena(0);
 
     let big = arena.take_region(MAX_POOLED);
-    let ptr = big.as_ptr();
+    let ptr = big.base();
     arena.return_region(big);
 
     let small = arena.take_region(MIN_POOLED);
-    assert_ne!(small.as_ptr(), ptr);
+    assert_ne!(small.base(), ptr);
     assert_eq!(small.len(), MIN_POOLED);
 
     // The big region is still parked in its own bucket.
-    assert_eq!(arena.take_region(MAX_POOLED).as_ptr(), ptr);
+    assert_eq!(arena.take_region(MAX_POOLED).base(), ptr);
 }
 
 #[test]

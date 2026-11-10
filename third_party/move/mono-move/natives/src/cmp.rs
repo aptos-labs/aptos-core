@@ -19,7 +19,7 @@ pub fn native_compare<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let first: Ref<Opaque> = unsafe { ctx.arg(0)? };
     let second: Ref<Opaque> = unsafe { ctx.arg(1)? };
     // SAFETY: both references are live values of type `ty` for the rest of the call.
-    let tag: u64 = match unsafe { ctx.compare(first.ptr(), second.ptr(), ty)? } {
+    let tag: u64 = match unsafe { ctx.compare(first.addr(), second.addr(), ty)? } {
         Ordering::Less => 0,
         Ordering::Equal => 1,
         Ordering::Greater => 2,

@@ -24,7 +24,7 @@ pub fn native_to_bytes<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is the reference `&T`, whose pointee type is `ty`.
     let arg: Ref<Opaque> = unsafe { ctx.arg(0)? };
     // SAFETY: `arg` references a live value of type `ty` for the rest of the call.
-    let bytes = unsafe { ctx.bcs_serialize_value(arg.ptr(), ty)? };
+    let bytes = unsafe { ctx.bcs_serialize_value(arg.addr(), ty)? };
     let out = ctx.new_byte_vector(&bytes)?;
     // SAFETY: return 0 is `vector<u8>`.
     unsafe { ctx.set_return(0, out)? };
@@ -42,7 +42,7 @@ pub fn native_serialized_size<C: NativeContext>(ctx: &C) -> VMResult<NativeStatu
     // SAFETY: arg 0 is the reference `&T`, whose pointee type is `ty`.
     let arg: Ref<Opaque> = unsafe { ctx.arg(0)? };
     // SAFETY: `arg` references a live value of type `ty` for the rest of the call.
-    let size = unsafe { ctx.bcs_serialized_size(arg.ptr(), ty)? };
+    let size = unsafe { ctx.bcs_serialized_size(arg.addr(), ty)? };
     // SAFETY: return 0 is `u64`.
     unsafe { ctx.set_return(0, size as u64)? };
     Ok(NativeStatus::Success)

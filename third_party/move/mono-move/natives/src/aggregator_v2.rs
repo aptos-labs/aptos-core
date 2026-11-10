@@ -16,6 +16,7 @@ use aptos_types::{
     serde_helper::bcs_utils::{bcs_size_of_byte_array, size_u32_as_uleb128},
 };
 use mono_move_core::{
+    memory::{MemAddr, Scalar},
     native::{
         native_invariant_violation, NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref,
         RootPool, VMValue, Vector,
@@ -44,43 +45,55 @@ impl<'a, T> VMValue<'a> for AggregatorOrSnapshotRef<'a, T> {
 
     /// # Safety
     ///
-    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// `slot..slot + FRAME_SLOT_SIZE` must lie within the current frame's
     /// arg / return region.
-    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
+    unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {
         Self {
-            inner: unsafe { Ref::read_from_frame(pool, frame_ptr, offset) },
+            // SAFETY: forwarded to the caller; same slot shape as `Ref`.
+            inner: unsafe { Ref::read_from_frame(pool, slot) },
             _t: PhantomData,
         }
     }
 
     /// # Safety
     ///
-    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// `slot..slot + FRAME_SLOT_SIZE` must lie within the current frame's
     /// arg / return region.
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
-        unsafe { self.inner.write_to_frame(frame_ptr, offset) }
+    unsafe fn write_to_frame(self, slot: MemAddr) {
+        // SAFETY: forwarded to the caller; same slot shape as `Ref`.
+        unsafe { self.inner.write_to_frame(slot) }
     }
 }
 
 impl<T: UnsignedInt> AggregatorOrSnapshotRef<'_, T> {
+    /// The referent's address. `value` is the 0th field for **both**
+    /// Aggregator and AggregatorSnapshot, so this is also `value`'s address.
+    fn value_addr(&self) -> MemAddr {
+        self.inner.addr()
+    }
+
     fn read_value(&self) -> T {
         // SAFETY: `value` is the 0th field for **both** Aggregator and
         // AggregatorSnapshot, so we read directly from the referent without
-        // extra offsets. The referent stays rooted for the call.
-        unsafe { T::read(self.inner.ptr()) }
+        // extra offsets. The referent stays rooted for the call. Fields are
+        // not necessarily `T`-aligned in VM memory, so the load is unaligned.
+        unsafe { self.value_addr().load_unaligned::<T>() }
     }
 
     fn write_value(&self, value: T) {
         // SAFETY: `value` is the 0th field for **both** Aggregator and
         // AggregatorSnapshot, so we write directly to the referent without
-        // extra offsets. The referent stays rooted for the call.
-        unsafe { value.write(self.inner.ptr()) }
+        // extra offsets. The referent stays rooted for the call. Fields are
+        // not necessarily `T`-aligned in VM memory, so the store is unaligned.
+        unsafe { self.value_addr().store_unaligned::<T>(value) }
     }
 
     fn read_max_value(&self) -> T {
-        // SAFETY: `max_value` is the 1st Aggregator field, so we have to add
-        // the byte size of the `value` element.
-        unsafe { T::read(self.inner.ptr().add(T::SIZE)) }
+        // SAFETY: `max_value` is the 1st Aggregator field, `T::SIZE` bytes
+        // past `value` within the same live referent, which stays rooted for
+        // the call. Fields are not necessarily `T`-aligned in VM memory, so
+        // the load is unaligned.
+        unsafe { self.value_addr().add(T::SIZE).load_unaligned::<T>() }
     }
 }
 
@@ -95,29 +108,27 @@ impl<'a, T: VMValue<'a>> VMValue<'a> for Aggregator<T> {
 
     /// # Safety
     ///
-    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// `slot..slot + FRAME_SLOT_SIZE` must lie within the current frame's
     /// arg / return region.
-    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
-        let value = unsafe { T::read_from_frame(pool, frame_ptr, offset) };
-        let max_value = unsafe {
-            T::read_from_frame(
-                pool,
-                frame_ptr,
-                offset + <T as VMValue<'a>>::FRAME_SLOT_SIZE,
-            )
-        };
-        Self { value, max_value }
+    unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {
+        // SAFETY: both fields lie within the slot (this function's contract).
+        unsafe {
+            let value = T::read_from_frame(pool, slot);
+            let max_value = T::read_from_frame(pool, slot.add(<T as VMValue<'a>>::FRAME_SLOT_SIZE));
+            Self { value, max_value }
+        }
     }
 
     /// # Safety
     ///
-    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// `slot..slot + FRAME_SLOT_SIZE` must lie within the current frame's
     /// arg / return region.
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
+    unsafe fn write_to_frame(self, slot: MemAddr) {
+        // SAFETY: both fields lie within the slot (this function's contract).
         unsafe {
-            self.value.write_to_frame(frame_ptr, offset);
+            self.value.write_to_frame(slot);
             self.max_value
-                .write_to_frame(frame_ptr, offset + <T as VMValue<'a>>::FRAME_SLOT_SIZE);
+                .write_to_frame(slot.add(<T as VMValue<'a>>::FRAME_SLOT_SIZE));
         }
     }
 }
@@ -132,21 +143,21 @@ impl<'a, T: VMValue<'a>> VMValue<'a> for AggregatorSnapshot<T> {
 
     /// # Safety
     ///
-    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// `slot..slot + FRAME_SLOT_SIZE` must lie within the current frame's
     /// arg / return region.
-    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
+    unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {
         // SAFETY: `value` is the 0th (and only) snapshot field.
-        let value = unsafe { T::read_from_frame(pool, frame_ptr, offset) };
+        let value = unsafe { T::read_from_frame(pool, slot) };
         Self { value }
     }
 
     /// # Safety
     ///
-    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// `slot..slot + FRAME_SLOT_SIZE` must lie within the current frame's
     /// arg / return region.
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
+    unsafe fn write_to_frame(self, slot: MemAddr) {
         // SAFETY: `value` is the 0th (and only) snapshot field.
-        unsafe { self.value.write_to_frame(frame_ptr, offset) };
+        unsafe { self.value.write_to_frame(slot) };
     }
 }
 
@@ -164,15 +175,15 @@ impl<'a> VMValue<'a> for DerivedStringSnapshot<'a> {
 
     /// # Safety
     ///
-    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// `slot..slot + FRAME_SLOT_SIZE` must lie within the current frame's
     /// arg / return region.
-    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
+    unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {
+        // SAFETY: both fields lie within the slot (this function's contract).
         unsafe {
-            let value = Vector::read_from_frame(pool, frame_ptr, offset);
+            let value = Vector::read_from_frame(pool, slot);
             let padding = Vector::read_from_frame(
                 pool,
-                frame_ptr,
-                offset + <Vector<'a, u8> as VMValue<'a>>::FRAME_SLOT_SIZE,
+                slot.add(<Vector<'a, u8> as VMValue<'a>>::FRAME_SLOT_SIZE),
             );
             Self { value, padding }
         }
@@ -180,21 +191,22 @@ impl<'a> VMValue<'a> for DerivedStringSnapshot<'a> {
 
     /// # Safety
     ///
-    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// `slot..slot + FRAME_SLOT_SIZE` must lie within the current frame's
     /// arg / return region.
-    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
+    unsafe fn write_to_frame(self, slot: MemAddr) {
+        // SAFETY: both fields lie within the slot (this function's contract).
         unsafe {
-            self.value.write_to_frame(frame_ptr, offset);
-            self.padding.write_to_frame(
-                frame_ptr,
-                offset + <Vector<'a, u8> as VMValue<'a>>::FRAME_SLOT_SIZE,
-            );
+            self.value.write_to_frame(slot);
+            self.padding
+                .write_to_frame(slot.add(<Vector<'a, u8> as VMValue<'a>>::FRAME_SLOT_SIZE));
         }
     }
 }
 
-/// The integer element types an aggregator holds.
-trait UnsignedInt: Copy + Ord + Display + for<'a> VMValue<'a> {
+/// The integer element types an aggregator holds. The [`Scalar`] bound gives
+/// the (unaligned) loads and stores of the in-memory `value` / `max_value`
+/// fields.
+trait UnsignedInt: Copy + Ord + Display + Scalar + for<'a> VMValue<'a> {
     const ZERO: Self;
     const MAX: Self;
     /// Byte size of the value in a frame slot.
@@ -203,20 +215,6 @@ trait UnsignedInt: Copy + Ord + Display + for<'a> VMValue<'a> {
     const MAX_DECIMAL_DIGITS: usize;
     fn checked_add(self, other: Self) -> Option<Self>;
     fn checked_sub(self, other: Self) -> Option<Self>;
-
-    /// Reads the value from a raw referent pointer.
-    ///
-    /// # Safety
-    ///
-    /// `ptr` must point to [`Self::SIZE`] valid, initialized bytes.
-    unsafe fn read(ptr: *const u8) -> Self;
-
-    /// Writes the value to a raw referent pointer.
-    ///
-    /// # Safety
-    ///
-    /// `ptr` must point to [`Self::SIZE`] writable bytes.
-    unsafe fn write(self, ptr: *mut u8);
 }
 
 impl UnsignedInt for u64 {
@@ -232,14 +230,6 @@ impl UnsignedInt for u64 {
     fn checked_sub(self, other: Self) -> Option<Self> {
         u64::checked_sub(self, other)
     }
-
-    unsafe fn read(ptr: *const u8) -> Self {
-        unsafe { core::ptr::read_unaligned(ptr as *const u64) }
-    }
-
-    unsafe fn write(self, ptr: *mut u8) {
-        unsafe { core::ptr::write_unaligned(ptr as *mut u64, self) }
-    }
 }
 
 impl UnsignedInt for u128 {
@@ -254,14 +244,6 @@ impl UnsignedInt for u128 {
 
     fn checked_sub(self, other: Self) -> Option<Self> {
         u128::checked_sub(self, other)
-    }
-
-    unsafe fn read(ptr: *const u8) -> Self {
-        unsafe { core::ptr::read_unaligned(ptr as *const u128) }
-    }
-
-    unsafe fn write(self, ptr: *mut u8) {
-        unsafe { core::ptr::write_unaligned(ptr as *mut u128, self) }
     }
 }
 

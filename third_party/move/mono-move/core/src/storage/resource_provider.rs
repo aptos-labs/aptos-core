@@ -4,12 +4,13 @@
 //! Resource storage access for the runtime.
 
 use crate::{
-    native::TableHandle, struct_tag_of, types::InternedType, ExecutionErrorKind, IntoExecutionError,
+    memory::Obj, native::TableHandle, struct_tag_of, types::InternedType, ExecutionErrorKind,
+    IntoExecutionError,
 };
 use anyhow::anyhow;
 use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
-use std::{ptr::NonNull, sync::Arc};
+use std::sync::Arc;
 use thiserror::Error;
 
 /// Version of the read value (which can come from storage or from other
@@ -152,10 +153,8 @@ pub enum StorageRead {
     /// Value is allocated in some other arena or cache. For example, it can be
     /// a cached DB read or a write from soe transaction at lower version.
     ExternalHeap {
-        /// Just like any other VM value, the pointer points to the start of
-        /// the value allocation. Value's header is at negative offset.
-        // TODO(cleanup): have a Value pointer unified API?
-        ptr: NonNull<u8>,
+        /// The value's object, allocated in the arena `pin` keeps alive.
+        ptr: Obj,
         /// Version of this read from Block-STM. Used for read-set validation.
         version: Version,
         /// Keeps the arena `ptr` points into alive while this read is retained.

@@ -63,10 +63,9 @@ use crate::{
 };
 use hashbrown::{hash_map::EntryRef, HashMap};
 use mono_move_core::{
-    storage::resource_provider::InMemoryStorageKey, types::InternedType, LayoutProvider,
-    ResourceProvider, StorageRead, VMResult,
+    memory::Obj, storage::resource_provider::InMemoryStorageKey, types::InternedType,
+    LayoutProvider, ResourceProvider, StorageRead, VMResult,
 };
-use std::ptr::NonNull;
 
 /// Counter incremented by every checkpoint. Used to tell whether a pending
 /// write was made in the current checkpoint (and so is directly writable) or
@@ -82,10 +81,7 @@ pub enum StorageWrite {
     Deleted { epoch: CheckpointCounter },
     /// This resource has been copied into local transaction heap at the
     /// specified epoch. It may or may not be modified.
-    LocalHeap {
-        ptr: NonNull<u8>,
-        epoch: CheckpointCounter,
-    },
+    LocalHeap { ptr: Obj, epoch: CheckpointCounter },
 }
 
 impl StorageWrite {
@@ -116,10 +112,10 @@ pub struct Entry {
 /// The write an [`Entry`] contributes to the write set, by its `(read, write)`
 /// pair.
 pub enum WriteClass {
-    /// Did not exist before, now does. Carries the value pointer to serialize.
-    Creation(NonNull<u8>),
-    /// Existed before, now modified. Carries the value pointer to serialize.
-    Modification(NonNull<u8>),
+    /// Did not exist before, now does. Carries the value to serialize.
+    Creation(Obj),
+    /// Existed before, now modified. Carries the value to serialize.
+    Modification(Obj),
     /// Existed before, now moved out.
     Deletion,
 }
@@ -130,11 +126,11 @@ pub enum WriteClass {
 pub(crate) enum EntryPtr {
     /// This pointer lives in the local transaction heap and has the same epoch
     /// as the current epoch. Can be safely used for mutations.
-    Writable(NonNull<u8>),
+    Writable(Obj),
     /// This pointer is not in the local heap yet (read-only) or its epoch is
     /// below the current epoch. For mutations, this pointer needs to be
     /// copied.
-    NonWritable(NonNull<u8>),
+    NonWritable(Obj),
 }
 
 impl Entry {
@@ -172,7 +168,7 @@ impl Entry {
     /// Returns the pointer to the global value (whether local write or
     /// external read). Returns [`None`] if the resource does not exist
     /// (it was deleted or never existed).
-    pub(crate) fn as_ptr(&self) -> Option<NonNull<u8>> {
+    pub(crate) fn as_ptr(&self) -> Option<Obj> {
         match self.write {
             StorageWrite::NotModified => match self.read {
                 StorageRead::DoesNotExist => None,
@@ -276,7 +272,7 @@ impl ResourceReadWriteSet {
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
-    ) -> Result<Option<NonNull<u8>>, RuntimeError> {
+    ) -> Result<Option<Obj>, RuntimeError> {
         Ok(get_or_create_resource_entry(&mut self.entries, provider, key, group)?.as_ptr())
     }
 
@@ -287,7 +283,7 @@ impl ResourceReadWriteSet {
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
-    ) -> Result<NonNull<u8>, RuntimeError> {
+    ) -> Result<Obj, RuntimeError> {
         get_or_create_resource_entry(&mut self.entries, provider, key, group)?
             .as_ptr()
             .ok_or_else(|| RuntimeError::ResourceDoesNotExist {
@@ -327,7 +323,7 @@ impl ResourceReadWriteSet {
     ///
     /// [`Self::try_borrow_global_mut`] ensures that entry exists in the map.
     /// If this condition is violated, panics.
-    pub(crate) fn commit_borrow_global_mut(&mut self, key: &InMemoryStorageKey, ptr: NonNull<u8>) {
+    pub(crate) fn commit_borrow_global_mut(&mut self, key: &InMemoryStorageKey, ptr: Obj) {
         let entry = self
             .entries
             .get_mut(key)
@@ -351,7 +347,7 @@ impl ResourceReadWriteSet {
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
-        ptr: NonNull<u8>,
+        ptr: Obj,
     ) -> Result<(), RuntimeError> {
         let entry = get_or_create_resource_entry(&mut self.entries, provider, key, group)?;
         if entry.exists() {
@@ -472,7 +468,7 @@ impl ResourceReadWriteSet {
                 continue;
             };
             // SAFETY: forwarded from this function's contract.
-            if unsafe { equals(layouts, read.as_ptr(), write.as_ptr(), key.value_ty()) }? {
+            if unsafe { equals(layouts, read.addr(), write.addr(), key.value_ty()) }? {
                 entry.write = StorageWrite::NotModified;
             }
         }
@@ -539,10 +535,10 @@ impl ResourceReadWriteSet {
             if let StorageWrite::LocalHeap { ptr, .. } = write {
                 // `LocalHeap` pointers always live in the local heap
                 // by construction, so `relocate` returns `Some` here.
-                if let Some(relocated) = scanner.relocate(ptr.as_ptr()) {
-                    // SAFETY: `gc_copy_object` never produces a null
-                    // pointer.
-                    *ptr = unsafe { NonNull::new_unchecked(relocated) };
+                if let Some(relocated) = scanner.relocate(ptr.addr()) {
+                    // SAFETY: `relocate` returns the data pointer of the
+                    // object's to-space copy, a live object.
+                    *ptr = unsafe { Obj::new(relocated) };
                 }
             }
         }
@@ -588,11 +584,13 @@ fn get_or_create_resource_entry<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{heap::Heap, write_object_header};
+    use crate::heap::Heap;
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        storage::resource_provider::ResourceProviderError, types::Type, DescriptorId, ReadPin,
-        ValueLayoutTable, OBJECT_HEADER_SIZE,
+        memory::{MemAddr, Obj},
+        storage::resource_provider::ResourceProviderError,
+        types::Type,
+        DescriptorId, ReadPin, ValueLayoutTable, OBJECT_HEADER_SIZE,
     };
     use move_core_types::account_address::AccountAddress;
     use shared_dsa::UnorderedMap;
@@ -636,13 +634,13 @@ mod tests {
     // The map only stores and compares these pointers, never reading through
     // them, so any distinct non-null address works. Real allocation rather than
     // an integer cast, which `-Zmiri-strict-provenance` rejects.
-    fn fake_ptr(n: usize) -> NonNull<u8> {
+    fn fake_ptr(n: usize) -> Obj {
         static BACKING: std::sync::OnceLock<Box<[u8]>> = std::sync::OnceLock::new();
         let backing = BACKING.get_or_init(|| vec![0u8; 0x10000].into_boxed_slice());
         assert!(n < backing.len(), "fake_ptr index out of range");
-        // SAFETY: `n` is within the backing allocation, as just asserted.
-        let ptr = unsafe { backing.as_ptr().add(n) as *mut u8 };
-        NonNull::new(ptr).expect("non-null")
+        // SAFETY: `n` is within the backing allocation, as just asserted. The
+        // address is not a real object, but nothing here reads through it.
+        unsafe { Obj::new(MemAddr::from_const_ptr(backing.as_ptr()).add(n)) }
     }
 
     // The tests only store and compare read pointers, never dereferencing them,
@@ -651,7 +649,7 @@ mod tests {
     struct TestPin;
     impl ReadPin for TestPin {}
 
-    fn ext_read(ptr: NonNull<u8>) -> StorageRead {
+    fn ext_read(ptr: Obj) -> StorageRead {
         StorageRead::ExternalHeap {
             ptr,
             version: 0,
@@ -663,7 +661,7 @@ mod tests {
     /// resources; everything else does not exist.
     #[derive(Default)]
     struct Provider {
-        external: UnorderedMap<InMemoryStorageKey, NonNull<u8>>,
+        external: UnorderedMap<InMemoryStorageKey, Obj>,
     }
 
     impl Provider {
@@ -671,7 +669,7 @@ mod tests {
             Self::default()
         }
 
-        fn with(key: &InMemoryStorageKey, ptr: NonNull<u8>) -> Self {
+        fn with(key: &InMemoryStorageKey, ptr: Obj) -> Self {
             let mut external = UnorderedMap::new();
             external.insert(key.clone(), ptr);
             Self { external }
@@ -1092,8 +1090,10 @@ mod tests {
     // -- Write classification -------------------------------------------------
 
     /// Unlike `fake_ptr`, this points at a value a comparison can read.
-    fn u64_ptr(slot: &u64) -> NonNull<u8> {
-        NonNull::from(slot).cast()
+    fn u64_ptr(slot: &u64) -> Obj {
+        // SAFETY: `slot` is a live `u64`; it has no object header, which the
+        // comparison does not read.
+        unsafe { Obj::new(MemAddr::from_const_ptr(std::ptr::from_ref(slot).cast())) }
     }
 
     fn class_of(read: StorageRead, write: StorageWrite) -> Option<WriteClass> {
@@ -1190,20 +1190,25 @@ mod tests {
         let mut heap = Heap::new(4096);
         let payload: u64 = 0xABCD;
         // SAFETY: write a valid `[header | payload]` block at the bump pointer
-        // and advance it, mirroring the allocator's layout.
+        // and advance it, mirroring the allocator's layout; the fresh 4096-byte
+        // heap has room for it.
         let local = unsafe {
             let header_start = heap.bump_ptr;
-            let obj = header_start.add(OBJECT_HEADER_SIZE);
             let total = OBJECT_HEADER_SIZE + 8;
-            write_object_header(obj, DescriptorId(1), total as u32);
-            (obj as *mut u64).write(payload);
+            let obj = Obj::write_header(
+                header_start.add(OBJECT_HEADER_SIZE),
+                DescriptorId(1),
+                total as u32,
+            );
+            obj.addr().store::<u64>(payload);
             heap.bump_ptr = header_start.add(total);
-            NonNull::new_unchecked(obj)
+            obj
         };
 
         // To-space for the copy; kept alive for the duration of the scan.
         let mut to_space = vec![0u64; 512].into_boxed_slice();
-        let mut scanner = RootScanner::for_test(&heap, to_space.as_mut_ptr() as *mut u8);
+        let mut scanner =
+            RootScanner::for_test(&heap, MemAddr::from_ptr(to_space.as_mut_ptr().cast()));
 
         // One committed (external) resource and one locally-written resource.
         let k_ext = key_a(1);
@@ -1236,7 +1241,7 @@ mod tests {
             StorageWrite::LocalHeap { ptr, .. } => {
                 assert_ne!(ptr, local, "local write must be relocated");
                 // SAFETY: `ptr` is the relocated object in to-space.
-                assert_eq!(unsafe { (ptr.as_ptr() as *const u64).read() }, payload);
+                assert_eq!(unsafe { ptr.addr().load::<u64>() }, payload);
             },
             StorageWrite::NotModified | StorageWrite::Deleted { .. } => {
                 panic!("local write must stay a LocalHeap write")

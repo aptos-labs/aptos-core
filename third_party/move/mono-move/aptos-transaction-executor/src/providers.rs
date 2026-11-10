@@ -46,7 +46,7 @@ fn read_resource_bytes(
     };
     // SAFETY: the read-write set pins `ptr` for as long as `interp` lives, and
     // `read_resource` published the layout of `ty`.
-    unsafe { serialize(guard, ptr.as_ptr(), ty) }
+    unsafe { serialize(guard, ptr.addr(), ty) }
         .map(Some)
         .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))
 }
