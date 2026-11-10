@@ -349,8 +349,9 @@ def writtenIn (ns : ValidatedNamespace) (localCount : Nat) (following : Array Ex
     uses.writes[target.index]?.any (· > 0) || uses.changedInPlace[target.index]?.getD false
 
 /-- What evaluating `value` does once the temporaries it reads are written where they are
-read: its own footprint and those of the single-use `temporary` locals it reads, which move
-along with it. -/
+read: its own footprint and those of the `temporary` locals it reads whose values may be
+written at their reads, which move along with it. Those are the temporaries `substitutable`
+can approve: one read once, and one read more often whose value only reads. -/
 private def carriedFootprint (ns : ValidatedNamespace) (uses : Uses) (temporary : LocalId → Bool) :
     Nat → ExprId → Footprint
   | 0, value => footprint (events ns none value)
@@ -359,8 +360,9 @@ private def carriedFootprint (ns : ValidatedNamespace) (uses : Uses) (temporary 
       (own.reads.filter temporary).foldl (init := own) fun found localId =>
         match uses.values[localId.index]?, uses.reads[localId.index]?,
             uses.writes[localId.index]? with
-        | some (some assigned), some 1, some 1 =>
-            found.merge (carriedFootprint ns uses temporary fuel assigned)
+        | some (some assigned), some reads, some 1 =>
+            let carried := carriedFootprint ns uses temporary fuel assigned
+            if reads == 1 || carried.onlyReads then found.merge carried else found
         | _, _, _ => found
 
 /-- Whether the assignment of `value` to the temporary `target` at
