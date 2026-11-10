@@ -271,13 +271,40 @@ class PrebuiltSetupTests(unittest.TestCase):
         result = self.run_step(2)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_system_drift_never_selects_privileged_setup_on_self_hosted(self):
+    def test_system_drift_requires_explicit_self_hosted_installation_capability(self):
         (self.root / "scripts/dev_setup.sh").write_text("changed setup\n")
         result = self.run_step(0)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("compatible runner image", result.stderr)
         self.assertEqual(self.calls(), [])
         self.assertEqual((self.root / "github-output").read_text(), "")
+
+    def test_isolated_self_hosted_job_can_opt_into_normal_setup(self):
+        (self.root / "scripts/dev_setup.sh").write_text("changed setup\n")
+        for value in ["false", "", "yes", "1"]:
+            with self.subTest(value=value):
+                self.assertNotEqual(
+                    self.run_step(0, ALLOW_SYSTEM_SETUP=value).returncode, 0
+                )
+                self.assertEqual(self.calls(), [])
+        result = self.run_step(0, ALLOW_SYSTEM_SETUP="true")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            (self.root / "github-output").read_text(), "system-setup=true\n"
+        )
+        self.assertEqual(
+            self.action["inputs"]["allow-system-setup"]["default"], "false"
+        )
+        self.assertEqual(
+            self.steps[0]["env"]["ALLOW_SYSTEM_SETUP"],
+            "${{ inputs.allow-system-setup }}",
+        )
+
+    def test_self_hosted_opt_in_does_not_skip_compiler_verification(self):
+        self.set_state(lld_llvm=22)
+        self.assertEqual(self.run_step(0, ALLOW_SYSTEM_SETUP="true").returncode, 0)
+        self.assertNotEqual(self.run_step(2, ALLOW_SYSTEM_SETUP="true").returncode, 0)
+        self.assert_no_exports()
 
     def test_llvm_drift_routes_only_hosted_and_checks_linker_independently(self):
         for key in ["clang_llvm", "lld_llvm"]:

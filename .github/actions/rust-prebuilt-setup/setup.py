@@ -118,8 +118,11 @@ def llvm_matches():
 
 
 def select_system_setup(reason):
-    # Only GitHub-managed disposable VMs may install system dependencies.
-    if os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
+    # Self-hosted installation is an explicit capability of the isolated job.
+    if (
+        os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"
+        and os.environ.get("ALLOW_SYSTEM_SETUP") != "true"
+    ):
         fail(f"{reason}; use a compatible runner image or select the AWS provider")
     print(f"::warning::{reason}; running normal Rust setup", flush=True)
     with Path(os.environ["GITHUB_OUTPUT"]).open("a") as stream:

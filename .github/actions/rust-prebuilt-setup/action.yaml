@@ -7,6 +7,9 @@ inputs:
   save-cache:
     description: Whether this job may update the Cargo build cache
     default: "true"
+  allow-system-setup:
+    description: Permit full setup on an isolated self-hosted job with installation privileges
+    default: "false"
 runs:
   using: composite
   steps:
@@ -15,12 +18,13 @@ runs:
       shell: bash
       env:
         RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        ALLOW_SYSTEM_SETUP: ${{ inputs.allow-system-setup }}
       run: |
         set -euo pipefail
         test "$HOME" = /home/runner
         export PATH="$HOME/bin:$HOME/.cargo/bin:$HOME/.dotnet/tools:$HOME/.local/bin:$PATH"
         python3 "$GITHUB_ACTION_PATH/setup.py" prepare
-    - name: Install checkout dependencies on hosted VMs
+    - name: Install checkout dependencies when required
       if: ${{ steps.setup.outputs.system-setup == 'true' }}
       uses: ./.github/actions/rust-setup
       with:
