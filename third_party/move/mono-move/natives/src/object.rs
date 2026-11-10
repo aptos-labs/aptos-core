@@ -11,7 +11,7 @@ use mono_move_core::{
     VMResult,
 };
 use move_core_types::account_address::AccountAddress;
-use std::collections::HashMap;
+use shared_dsa::UnorderedMap;
 
 /// The `exists_at` type argument is not a struct or enum.
 const NOT_A_RESOURCE_TYPE: u64 = 11;
@@ -20,9 +20,10 @@ const NOT_A_RESOURCE_TYPE: u64 = 11;
 /// optimization — the derivation is deterministic, so caching only saves work.
 #[derive(Default)]
 pub struct ObjectContextExtension {
-    /// The keys are user-controlled addresses, so the DoS-resistant std
-    /// hash table is used.
-    derived: HashMap<(AccountAddress, AccountAddress), AccountAddress>,
+    /// The keys are user-controlled addresses, so a randomly keyed hasher is
+    /// used for DoS resistance. Safe for determinism because `UnorderedMap`
+    /// exposes no ordered iteration, and this map is only ever looked up.
+    derived: UnorderedMap<(AccountAddress, AccountAddress), AccountAddress, ahash::RandomState>,
 }
 
 impl ObjectContextExtension {

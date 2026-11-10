@@ -1,0 +1,26 @@
+[package]
+name = "aptos_lints"
+version = "0.1.0"
+description = "Custom lints for aptos-core, run with cargo dylint"
+edition = "2024"
+publish = false
+
+# Deliberately not a workspace member: this crate compiles against
+# rustc_private on its own pinned nightly (rust-toolchain.toml), so it is a
+# workspace of its own. `cargo dylint` finds it through
+# `[workspace.metadata.dylint]` in the root Cargo.toml.
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+clippy_utils = { git = "https://github.com/rust-lang/rust-clippy", rev = "21baba9c10c5d179915cae82e6247bc2337872fb" }
+dylint_linting = "6.0"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+dylint_testing = "6.0"
+
+[package.metadata.rust-analyzer]
+rustc_private = true

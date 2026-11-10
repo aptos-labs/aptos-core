@@ -563,6 +563,18 @@ function install_cargo_nextest {
   fi
 }
 
+# Custom lints (devtools/lints) run through dylint; the lint library pins its
+# own nightly in devtools/lints/rust-toolchain.toml, which rustup installs on
+# first use.
+function install_cargo_dylint {
+  if ! command -v cargo-dylint &>/dev/null; then
+    cargo install cargo-dylint --locked --version 6.3.2
+  fi
+  if ! command -v dylint-link &>/dev/null; then
+    cargo install dylint-link --locked --version 6.3.2
+  fi
+}
+
 function install_grcov {
   if ! command -v grcov &>/dev/null; then
     cargo install grcov --version="${GRCOV_VERSION}" --locked
@@ -1125,6 +1137,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_cargo_sort
   install_cargo_machete
   install_cargo_nextest
+  install_cargo_dylint
   install_grcov
   install_pkg git "$PACKAGE_MANAGER"
   install_lcov "$PACKAGE_MANAGER"

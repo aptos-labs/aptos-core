@@ -13218,7 +13218,6 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "bytes",
- "fxhash",
  "mono-move-aptos-transaction-executor",
  "mono-move-core",
  "mono-move-global-context",
@@ -13226,6 +13225,7 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
+ "shared-dsa",
  "thiserror 2.0.21",
 ]
 
@@ -13268,7 +13268,6 @@ dependencies = [
  "aptos-types",
  "bitflags 2.13.2",
  "bytes",
- "fxhash",
  "mono-move-alloc",
  "move-binary-format",
  "move-bytecode-verifier",
@@ -13341,6 +13340,7 @@ dependencies = [
 name = "mono-move-natives"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.12",
  "aptos-crypto",
  "aptos-types",
  "ark-bls12-381 0.5.0",
@@ -13366,6 +13366,7 @@ dependencies = [
  "sha2 0.10.9",
  "sha2 0.9.9",
  "sha3 0.9.1",
+ "shared-dsa",
  "siphasher 1.0.4",
  "tiny-keccak",
 ]
