@@ -17,7 +17,7 @@ mod value_display;
 
 pub use error::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError, RuntimeStatus, VecOp};
 pub use global_storage::{ResourceReadWriteSet, WriteClass};
-pub use heap::{FrozenHeap, Heap, SegmentedArena, SharedArena};
+pub use heap::{FrozenHeap, Heap, SegmentedArena};
 pub use interpreter::{
     CallBuilder, CallError, CompletedCall, InterpreterContext, InterpreterOptions, SessionEffects,
 };

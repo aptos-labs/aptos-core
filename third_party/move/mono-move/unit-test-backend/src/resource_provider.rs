@@ -4,7 +4,8 @@
 //! Serves resources to MonoMove from a lookup of their BCS bytes.
 //!
 //! Resources are decoded from BCS into flat values in the provider's arena
-//! on first access. Each storage read includes a pointer and shared ownership of the arena.
+//! on first access. Each storage read includes a pointer and pins the arena
+//! segment it is in.
 //! Materialization is lazy because a type's layout and GC descriptor are only
 //! published once the function that accesses it has been lowered.
 
@@ -15,15 +16,12 @@ use mono_move_core::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
     },
     types::InternedType,
-    LayoutProvider, OBJECT_HEADER_SIZE,
+    ReadPin,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{deserialize_into, Heap, SharedArena, DEFAULT_HEAP_SIZE};
+use mono_move_runtime::SegmentedArena;
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use std::{cell::RefCell, collections::HashMap, ptr::NonNull, sync::Arc};
-
-/// Capacity shared by all materialized resources, matching the default interpreter heap size.
-const MATERIALIZATION_HEAP_SIZE: usize = DEFAULT_HEAP_SIZE;
 
 /// Serves the resources `lookup` finds, looking each up by the struct tag of
 /// its interned type and materializing it on first access. Table items are
@@ -35,10 +33,10 @@ pub struct LazyResourceProvider<'guard, 'ctx, L> {
 }
 
 struct Materialized {
-    /// Holds decoded values and is never reset. Each storage read retains an
-    /// `Arc` to keep the arena alive while its values are in use.
-    arena: Arc<SharedArena>,
-    cache: HashMap<InMemoryStorageKey, NonNull<u8>>,
+    /// Holds decoded values and is never reset. Each storage read pins the
+    /// segment its value is in, keeping it alive while the value is in use.
+    arena: SegmentedArena,
+    cache: HashMap<InMemoryStorageKey, (NonNull<u8>, Arc<dyn ReadPin>)>,
 }
 
 impl<'guard, 'ctx, L> LazyResourceProvider<'guard, 'ctx, L>
@@ -52,8 +50,7 @@ where
             guard,
             lookup,
             materialized: RefCell::new(Materialized {
-                #[allow(clippy::arc_with_non_send_sync)]
-                arena: Arc::new(SharedArena::new(MATERIALIZATION_HEAP_SIZE)),
+                arena: SegmentedArena::new(),
                 cache: HashMap::new(),
             }),
         }
@@ -61,14 +58,14 @@ where
 
     /// The value already materialized for `key`, if any.
     fn cached(&self, key: &InMemoryStorageKey) -> Option<StorageRead> {
-        let materialized = self.materialized.borrow();
-        materialized
+        self.materialized
+            .borrow()
             .cache
             .get(key)
-            .map(|&ptr| StorageRead::ExternalHeap {
-                ptr,
+            .map(|(ptr, pin)| StorageRead::ExternalHeap {
+                ptr: *ptr,
                 version: None,
-                pin: materialized.arena.clone(),
+                pin: pin.clone(),
             })
     }
 
@@ -80,13 +77,19 @@ where
         blob: &[u8],
     ) -> Result<StorageRead, ResourceProviderError> {
         let mut materialized = self.materialized.borrow_mut();
-        let arena = materialized.arena.clone();
-        let ptr = arena.with_heap_mut(|heap| materialize_one(heap, self.guard, ty, blob))?;
-        materialized.cache.insert(key.clone(), ptr);
+        let (ptr, pin) = materialized
+            .arena
+            .deserialize(self.guard, ty, blob)
+            .map_err(|err| {
+                ResourceProviderError::InvariantViolation(format!(
+                    "a stored value does not decode: {err}"
+                ))
+            })?;
+        materialized.cache.insert(key.clone(), (ptr, pin.clone()));
         Ok(StorageRead::ExternalHeap {
             ptr,
             version: None,
-            pin: arena,
+            pin,
         })
     }
 }
@@ -124,36 +127,4 @@ where
             },
         }
     }
-}
-
-/// Allocates a value of type `ty` on `heap` and decodes `blob`, its BCS
-/// encoding, into it. `ty`'s layout and GC descriptor must be published.
-fn materialize_one(
-    heap: &mut Heap,
-    guard: &ExecutionGuard,
-    ty: InternedType,
-    blob: &[u8],
-) -> Result<NonNull<u8>, ResourceProviderError> {
-    let layout = guard.layout_by_ty(ty).ok_or_else(|| {
-        ResourceProviderError::InvariantViolation("no layout for a stored value's type".to_string())
-    })?;
-    // Lowering the accessing function publishes the resource type's GC descriptor.
-    let descriptor = guard.struct_descriptor(ty).ok_or_else(|| {
-        ResourceProviderError::InvariantViolation(
-            "no GC descriptor for a stored value's type".to_string(),
-        )
-    })?;
-    let obj = heap
-        .alloc_object(OBJECT_HEADER_SIZE + layout.size as usize, descriptor)
-        .ok_or_else(|| {
-            ResourceProviderError::InvariantViolation(
-                "the materialization heap is exhausted".to_string(),
-            )
-        })?;
-    // SAFETY: `obj` is a fresh allocation of the type's size, and `blob` is
-    // the BCS encoding of a value of type `ty`.
-    unsafe { deserialize_into(guard, heap, ty, blob, obj.as_ptr()) }.map_err(|err| {
-        ResourceProviderError::InvariantViolation(format!("a stored value does not decode: {err}"))
-    })?;
-    Ok(obj)
 }
