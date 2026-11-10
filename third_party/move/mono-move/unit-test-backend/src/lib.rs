@@ -389,6 +389,7 @@ fn classify(err: &VMInternalError) -> Classification {
         | ExecutionErrorKind::InvalidOperation => Classification::Ran,
         ExecutionErrorKind::InvariantViolation
         | ExecutionErrorKind::LinkingError
+        | ExecutionErrorKind::Interrupted
         | ExecutionErrorKind::Placeholder => Classification::BackendError,
     }
 }

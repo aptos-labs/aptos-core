@@ -21,7 +21,7 @@ use aptos_language_e2e_tests::{
 };
 use aptos_types::{
     secret_sharing::EvalProof,
-    state_store::StateView,
+    state_store::{state_key::StateKey, StateView},
     transaction::{
         encrypted_payload::{
             DecryptedPlaintext, DecryptionFailureReason, EncryptedInner, EncryptedPayload,
@@ -33,7 +33,11 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewResourceProvider};
 use mono_move_aptos_transaction_executor::{
-    production_natives, AptosTransactionExecutor, TxnOutcome,
+    production_natives, AptosDataProvider, AptosTransactionExecutor, GroupMembers, TxnOutcome,
+};
+use mono_move_core::{
+    storage::resource_provider::InMemoryStorageKey, types::InternedType, ResourceProvider,
+    ResourceProviderError, StorageRead,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use move_core_types::{transaction_argument::TransactionArgument, vm_status::StatusCode};
@@ -2377,4 +2381,148 @@ fn gas_dependent_keys(
         StateKey::resource_group(&store, &object_group),
         StateKey::resource_group(&AccountAddress::TEN, &object_group),
     ]
+}
+
+/// A data provider that requests an interrupt every time it is polled.
+struct Interrupting<'p, P>(&'p P);
+
+impl<P: ResourceProvider> ResourceProvider for Interrupting<'_, P> {
+    fn get_resource(
+        &self,
+        key: &InMemoryStorageKey,
+        group: Option<InternedType>,
+    ) -> Result<StorageRead, ResourceProviderError> {
+        self.0.get_resource(key, group)
+    }
+
+    fn interrupt_requested(&self) -> bool {
+        true
+    }
+}
+
+impl<P: AptosDataProvider> AptosDataProvider for Interrupting<'_, P> {
+    fn group_members(
+        &self,
+        group_key: &StateKey,
+    ) -> Result<Option<GroupMembers>, ResourceProviderError> {
+        self.0.group_members(group_key)
+    }
+}
+
+/// Runs `txn` through the MonoMove executor against `state`, with a data
+/// provider that asks for an interrupt on every poll. Returns whether the
+/// outcome is `Interrupted`, and the materialized output if there is one.
+fn execute_v2_interrupting<S: StateView>(
+    state: &S,
+    txn: Transaction,
+    aux_info: AuxiliaryInfo,
+) -> (bool, Option<TransactionOutput>) {
+    let global_ctx = GlobalContext::with_num_execution_workers(1);
+    let guard = global_ctx
+        .try_execution_context(0)
+        .expect("execution context is available");
+    let natives = production_natives();
+    let module_provider = StateViewModuleProvider::new(state);
+    let data_provider = StateViewResourceProvider::new(&guard, state);
+    let interrupting = Interrupting(&data_provider);
+    let env = AptosEnvironment::new(state);
+    let usage = state.get_usage().expect("usage is readable");
+    let executor = AptosTransactionExecutor::new(
+        &guard,
+        natives,
+        &module_provider,
+        &interrupting,
+        &env,
+        usage,
+    );
+    let outcome = executor.execute_transaction(&txn, &aux_info);
+    let interrupted = matches!(outcome, TxnOutcome::Interrupted { .. });
+    let output = outcome
+        .materialize(
+            &guard,
+            &data_provider,
+            env.features(),
+            TransactionAuxiliaryData::default(),
+        )
+        .ok()
+        .map(|(output, _groups)| output);
+    (interrupted, output)
+}
+
+/// A transaction that runs past one gas chunk is interrupted when the provider
+/// asks, and nothing of it can be materialized.
+#[test]
+fn long_running_transaction_is_interrupted() {
+    let (fx, alice, _bob) = setup();
+    let txn = script_txn(
+        &alice,
+        r#"
+script
+
+public fun main()
+    local counter: u64
+    ld_u64 0
+    st_loc counter
+head: copy_loc counter
+    ld_u64 1000000
+    lt
+    br_false exit
+    move_loc counter
+    ld_u64 1
+    add
+    st_loc counter
+    branch head
+exit: ret
+"#,
+        vec![],
+        10,
+    );
+
+    let (interrupted, output) = execute_v2_interrupting(
+        fx.get_state_view(),
+        Transaction::UserTransaction(txn),
+        AuxiliaryInfo::new(PersistedAuxiliaryInfo::None, None),
+    );
+    assert!(interrupted, "the transaction was not interrupted");
+    assert!(output.is_none(), "an interrupted transaction materialized");
+}
+
+/// System transactions never poll, so an interrupt request does not stop them.
+#[test]
+fn block_metadata_is_not_interrupted() {
+    use aptos_types::{
+        block_metadata::BlockMetadata,
+        on_chain_config::{OnChainConfig, ValidatorSet},
+    };
+
+    let (mut fx, _alice, _bob) = setup();
+    let validator_set = ValidatorSet::fetch_config(fx.get_state_view())
+        .expect("the validator set is readable")
+        .expect("genesis has a validator set");
+    let proposer = *validator_set
+        .payload()
+        .next()
+        .expect("genesis has a validator")
+        .account_address();
+    let block_metadata = BlockMetadata::new(
+        aptos_crypto::HashValue::sha3_256_of(b"mono-move block"),
+        1,
+        1,
+        proposer,
+        vec![],
+        vec![],
+        fx.get_block_time() + 100,
+    );
+
+    let (interrupted, output) = execute_v2_interrupting(
+        fx.get_state_view(),
+        Transaction::BlockMetadata(block_metadata),
+        first_txn_aux_info(),
+    );
+    assert!(!interrupted);
+    let output = output.expect("the block metadata materializes");
+    assert_eq!(
+        output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success)
+    );
 }
