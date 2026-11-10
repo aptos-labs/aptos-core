@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{executor_utilities::Materializer, types::InputOutputKey};
+use crate::{executor_utilities::Materializer, types::InputOutputKeySet};
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -192,7 +192,7 @@ pub trait TxnOutput: Send + Debug {
     fn output_approx_size(&self) -> u64;
 
     /// Keys written by transaction.
-    fn get_write_summary(&self) -> HashSet<InputOutputKey<Self::Key, Self::Tag>>;
+    fn get_write_summary(&self) -> InputOutputKeySet<Self::Key, Self::Tag>;
 
     /// State keys read by the VM during the execution that produced this output.
     fn storage_keys_read(&self) -> impl Iterator<Item = &Self::Key>;

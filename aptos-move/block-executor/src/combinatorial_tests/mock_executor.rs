@@ -826,9 +826,9 @@ where
         0
     }
 
-    fn get_write_summary(&self) -> HashSet<crate::types::InputOutputKey<K, u32>> {
+    fn get_write_summary(&self) -> crate::types::InputOutputKeySet<K, u32> {
         _ = self.called_write_summary.set(());
-        HashSet::new()
+        crate::types::InputOutputKeySet::default()
     }
 
     fn storage_keys_read(&self) -> impl Iterator<Item = &K> {

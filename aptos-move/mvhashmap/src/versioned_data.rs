@@ -17,6 +17,7 @@ use claims::{assert_ok, assert_some};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use equivalent::Equivalent;
+use hashbrown::DefaultHashBuilder;
 use std::{
     collections::btree_map::{self, BTreeMap},
     fmt::Debug,
@@ -57,7 +58,7 @@ struct VersionedValue<V> {
 
 /// Maps each key (access path) to an internal versioned value representation.
 pub struct VersionedData<K, V> {
-    values: DashMap<K, VersionedValue<V>>,
+    values: DashMap<K, VersionedValue<V>, DefaultHashBuilder>,
     total_base_value_size: AtomicU64,
 }
 
@@ -236,7 +237,7 @@ impl<V: SpeculativeValue> VersionedValue<V> {
 impl<K: Hash + Clone + Debug + Eq, V: SpeculativeValue> VersionedData<K, V> {
     pub(crate) fn empty() -> Self {
         Self {
-            values: DashMap::new(),
+            values: DashMap::default(),
             total_base_value_size: AtomicU64::new(0),
         }
     }

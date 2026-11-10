@@ -3550,6 +3550,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "equivalent",
  "fail",
+ "hashbrown 0.17.1",
  "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
