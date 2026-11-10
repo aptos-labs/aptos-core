@@ -8,6 +8,7 @@ use crate::{
         state_delta::StateDelta,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::{
+            committed_slots::CommittedSlots,
             db_state_view::DbStateView,
             hot_state_view::{EmptyHotState, HotStateView},
         },
@@ -21,6 +22,7 @@ use aptos_types::{
         state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
         StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
@@ -31,12 +33,117 @@ use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rayon::prelude::*;
 use std::{
-    collections::HashMap,
+    collections::{hash_map, HashMap},
     fmt::{Debug, Formatter},
     sync::Arc,
 };
 
 pub type StateCacheShard = DashMap<StateKey, StateSlot>;
+
+/// A block's writes as the next block sees them before the block's state has
+/// been folded into a `LedgerState`: the last value written to each key, the
+/// version after the block, and the storage usage after it. Lets a block
+/// execute while its parent's output is still being indexed.
+#[derive(Debug)]
+pub struct PendingWrites {
+    /// The last write to each key, with its version so that writes can be
+    /// merged in any order.
+    slots: HashMap<StateKey, (Version, StateSlot)>,
+    next_version: Version,
+    usage: StateStorageUsage,
+}
+
+impl PendingWrites {
+    /// `writes` are one block's value writes, `(key, version, value)` with
+    /// `None` for a deletion, in any order: the highest version of a key wins.
+    /// `old_slots` must answer for every written key with the slot the block
+    /// itself read, which is what the storage usage delta is computed against.
+    /// Runs on the current rayon pool.
+    pub fn new(
+        writes: impl ParallelIterator<Item = (StateKey, Version, Option<StateValue>)>,
+        next_version: Version,
+        base_usage: StateStorageUsage,
+        old_slots: impl Fn(&StateKey) -> Option<StateSlot> + Sync,
+    ) -> Result<Self> {
+        fn keep_latest(
+            map: &mut HashMap<StateKey, (Version, StateSlot)>,
+            key: StateKey,
+            version: Version,
+            slot: StateSlot,
+        ) {
+            match map.entry(key) {
+                hash_map::Entry::Occupied(mut e) if e.get().0 < version => {
+                    e.insert((version, slot));
+                },
+                hash_map::Entry::Occupied(_) => {},
+                hash_map::Entry::Vacant(e) => {
+                    e.insert((version, slot));
+                },
+            }
+        }
+        // Per-worker maps merged in a tree; a serial collect into one map would
+        // cost as much as the whole build.
+        let slots = writes
+            .fold(HashMap::new, |mut map, (key, version, value)| {
+                let slot = StateSlot::from_db_get(key.clone(), value.map(|v| (version, v)));
+                keep_latest(&mut map, key, version, slot);
+                map
+            })
+            .reduce(HashMap::new, |mut a, mut b| {
+                if a.len() < b.len() {
+                    std::mem::swap(&mut a, &mut b);
+                }
+                for (key, (version, slot)) in b {
+                    keep_latest(&mut a, key, version, slot);
+                }
+                a
+            });
+        let usage = if base_usage.is_untracked() {
+            base_usage
+        } else {
+            let (items, bytes) = slots
+                .par_iter()
+                .map(|(key, (_, slot))| -> Result<(i64, i64)> {
+                    let key_size = key.size() as i64;
+                    let mut items = 0i64;
+                    let mut bytes = 0i64;
+                    if slot.is_occupied() {
+                        items += 1;
+                        bytes += key_size + slot.size() as i64;
+                    }
+                    let old = old_slots(key)
+                        .ok_or_else(|| anyhow::anyhow!("written key {key:?} was never read"))?;
+                    if old.is_occupied() {
+                        items -= 1;
+                        bytes -= key_size + old.size() as i64;
+                    }
+                    Ok((items, bytes))
+                })
+                .try_reduce(|| (0, 0), |a, b| Ok((a.0 + b.0, a.1 + b.1)))?;
+            StateStorageUsage::new(
+                (base_usage.items() as i64 + items) as usize,
+                (base_usage.bytes() as i64 + bytes) as usize,
+            )
+        };
+        Ok(Self {
+            slots,
+            next_version,
+            usage,
+        })
+    }
+
+    pub fn next_version(&self) -> Version {
+        self.next_version
+    }
+
+    pub fn usage(&self) -> StateStorageUsage {
+        self.usage
+    }
+
+    pub fn num_keys(&self) -> usize {
+        self.slots.len()
+    }
+}
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -70,6 +177,10 @@ impl ShardedStateCache {
             .map(|r| r.clone())
     }
 
+    pub fn contains(&self, state_key: &StateKey) -> bool {
+        self.shard(state_key.get_shard_id()).contains_key(state_key)
+    }
+
     pub fn next_version(&self) -> Version {
         self.next_version
     }
@@ -100,6 +211,10 @@ pub enum PrimingPolicy {
 pub struct CachedStateView {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
+
+    /// Writes of blocks that executed but whose state is not yet in
+    /// `speculative`, oldest first. Consulted before `speculative`.
+    pending: Vec<Arc<PendingWrites>>,
 
     /// The in-memory state on top of known persisted state.
     speculative: StateDelta,
@@ -153,15 +268,51 @@ impl CachedStateView {
         persisted_state: State,
         state: State,
     ) -> Self {
-        let version = state.version();
+        Self::new_with_pending(id, reader, hot_state, persisted_state, state, vec![])
+    }
+
+    /// A view of `state` with the writes of `pending` blocks on top, as if
+    /// those blocks' state had already been folded in. The view's version and
+    /// usage are the last pending block's.
+    pub fn new_with_pending(
+        id: StateViewId,
+        reader: Arc<dyn DbReader>,
+        hot_state: Arc<dyn HotStateView>,
+        persisted_state: State,
+        state: State,
+        pending: Vec<Arc<PendingWrites>>,
+    ) -> Self {
+        let version = match pending.last() {
+            Some(last) => last.next_version().checked_sub(1),
+            None => state.version(),
+        };
 
         Self {
             id,
+            pending,
             speculative: state.into_delta(persisted_state),
             hot: hot_state,
             cold: reader,
             memorized: ShardedStateCache::new_empty(version),
         }
+    }
+
+    /// Builds a view like [`Self::new`], with `pending` blocks' writes on top.
+    pub fn new_pending(
+        id: StateViewId,
+        reader: Arc<dyn DbReader>,
+        state: State,
+        pending: Vec<Arc<PendingWrites>>,
+    ) -> StateViewResult<Self> {
+        let (hot_state, persisted_state) = reader.get_persisted_state()?;
+        Ok(Self::new_with_pending(
+            id,
+            reader,
+            hot_state,
+            persisted_state,
+            state,
+            pending,
+        ))
     }
 
     pub fn new_dummy(state: &State) -> Self {
@@ -177,15 +328,24 @@ impl CachedStateView {
         )
     }
 
-    pub fn prime_cache(&self, updates: &StateUpdateRefs, policy: PrimingPolicy) -> Result<()> {
+    /// Memorizes the old slot of every key `updates` touches that this view
+    /// was never asked for. `committed` answers for keys the previous blocks
+    /// left behind; the rest are read through the state layers.
+    pub fn prime_cache(
+        &self,
+        updates: &StateUpdateRefs,
+        policy: PrimingPolicy,
+        committed: Option<&CommittedSlots>,
+    ) -> Result<()> {
         let _timer = TIMER.timer_with(&["prime_state_cache"]);
+        let committed = committed.and_then(|c| c.for_block(self.next_version()));
 
         IO_POOL.install(|| {
             if let Some(updates) = updates.for_last_checkpoint_batched() {
-                self.prime_cache_for_batched_updates(updates, policy)?;
+                self.prime_cache_for_batched_updates(updates, policy, committed)?;
             }
             if let Some(updates) = updates.for_latest_batched() {
-                self.prime_cache_for_batched_updates(updates, policy)?;
+                self.prime_cache_for_batched_updates(updates, policy, committed)?;
             }
             Ok(())
         })
@@ -195,6 +355,7 @@ impl CachedStateView {
         &self,
         updates: &BatchedStateUpdateRefs,
         policy: PrimingPolicy,
+        committed: Option<&CommittedSlots>,
     ) -> Result<()> {
         updates.shards.par_iter().try_for_each(|shard| {
             self.prime_cache_for_keys(
@@ -205,6 +366,7 @@ impl CachedStateView {
                         _ => Some(k),
                     })
                     .cloned(),
+                committed,
             )
         })
     }
@@ -212,13 +374,20 @@ impl CachedStateView {
     fn prime_cache_for_keys<'a, T: IntoIterator<Item = &'a StateKey> + Send>(
         &self,
         keys: T,
+        committed: Option<&CommittedSlots>,
     ) -> Result<()> {
         rayon::scope(|s| {
-            keys.into_iter().for_each(|key| {
-                s.spawn(move |_| {
-                    self.get_state_value(key).expect("Must succeed.");
-                })
-            });
+            keys.into_iter()
+                .filter(|key| !self.memorized.contains(key))
+                .for_each(|key| {
+                    if let Some(slot) = committed.and_then(|c| c.get(key)) {
+                        self.memorized.try_insert(key, &slot);
+                        return;
+                    }
+                    s.spawn(move |_| {
+                        self.get_state_value(key).expect("Must succeed.");
+                    })
+                });
         });
         Ok(())
     }
@@ -235,7 +404,15 @@ impl CachedStateView {
     fn get_unmemorized(&self, state_key: &StateKey) -> Result<StateSlot> {
         COUNTER.inc_with(&["sv_unmemorized"]);
 
-        let ret = if let Some(slot) = self.speculative.get_state_slot(state_key) {
+        let pending = self
+            .pending
+            .iter()
+            .rev()
+            .find_map(|writes| writes.slots.get(state_key).map(|(_, slot)| slot.clone()));
+        let ret = if let Some(slot) = pending {
+            COUNTER.inc_with(&["sv_hit_pending"]);
+            slot
+        } else if let Some(slot) = self.speculative.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_speculative"]);
             slot
         } else if let Some(slot) = self.hot.get_state_slot(state_key.crypto_hash_ref()) {
@@ -256,7 +433,10 @@ impl CachedStateView {
     }
 
     pub fn next_version(&self) -> Version {
-        self.speculative.next_version()
+        match self.pending.last() {
+            Some(last) => last.next_version(),
+            None => self.speculative.next_version(),
+        }
     }
 
     pub fn current_state(&self) -> &State {
@@ -300,11 +480,14 @@ impl TStateView for CachedStateView {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-        Ok(self.speculative.current.usage())
+        Ok(match self.pending.last() {
+            Some(last) => last.usage(),
+            None => self.speculative.current.usage(),
+        })
     }
 
     fn next_version(&self) -> Version {
-        self.speculative.next_version()
+        CachedStateView::next_version(self)
     }
 }
 

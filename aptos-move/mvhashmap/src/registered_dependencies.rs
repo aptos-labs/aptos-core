@@ -34,17 +34,38 @@ pub(crate) struct RegisteredReadDependencies {
     /// per txn_idx (since a dependency on an outdated incarnation can safely be removed).
     // TODO(BlockSTMv2): Add support for behavioral validation (read kind).
     dependencies: BTreeMap<TxnIndex, Incarnation>,
+    /// The block the readers belong to. A map kept across blocks tags each
+    /// block's registrations; readers of an earlier block are dropped on the
+    /// first access under a later one, since their indices mean nothing to it.
+    block: u32,
 }
 
 impl RegisteredReadDependencies {
     pub(crate) fn new() -> Self {
         Self {
             dependencies: BTreeMap::new(),
+            block: 0,
         }
     }
 
-    pub(crate) fn from_dependencies(dependencies: BTreeMap<TxnIndex, Incarnation>) -> Self {
-        Self { dependencies }
+    pub(crate) fn from_dependencies(
+        dependencies: BTreeMap<TxnIndex, Incarnation>,
+        block: u32,
+    ) -> Self {
+        Self {
+            dependencies,
+            block,
+        }
+    }
+
+    /// The registrations as seen from `block`: empty if they were made under
+    /// an earlier block.
+    pub(crate) fn for_block(&mut self, block: u32) -> &mut Self {
+        if self.block != block {
+            self.dependencies.clear();
+            self.block = block;
+        }
+        self
     }
 
     // Returns a PanicError if the incarnation is lower than the previous incarnation,
@@ -125,6 +146,10 @@ impl RegisteredReadDependencies {
         self.dependencies
     }
 
+    pub(crate) fn reader_indices(&self) -> impl Iterator<Item = TxnIndex> + '_ {
+        self.dependencies.keys().copied()
+    }
+
     #[cfg(test)]
     pub(crate) fn clone_dependencies_for_test(&self) -> BTreeMap<TxnIndex, Incarnation> {
         self.dependencies.clone()
@@ -133,8 +158,9 @@ impl RegisteredReadDependencies {
 
 pub(crate) fn take_dependencies(
     dependencies_in_mutex: &Mutex<RegisteredReadDependencies>,
+    block: u32,
 ) -> BTreeMap<TxnIndex, Incarnation> {
-    std::mem::take(&mut dependencies_in_mutex.lock().dependencies)
+    std::mem::take(&mut dependencies_in_mutex.lock().for_block(block).dependencies)
 }
 
 #[cfg(test)]
@@ -169,7 +195,7 @@ mod tests {
         assert!(deps.dependencies.is_empty());
 
         let initial_map = BTreeMap::from([(10, 1), (20, 2)]);
-        let mut deps = RegisteredReadDependencies::from_dependencies(initial_map.clone());
+        let mut deps = RegisteredReadDependencies::from_dependencies(initial_map.clone(), 0);
         assert_eq!(deps.dependencies, initial_map);
 
         // Test `insert`.
@@ -192,11 +218,10 @@ mod tests {
 
     #[test]
     fn test_extend_and_extend_with_higher() {
-        let mut deps = RegisteredReadDependencies::from_dependencies(BTreeMap::from([
-            (10, 5),
-            (11, 3),
-            (20, 5),
-        ]));
+        let mut deps = RegisteredReadDependencies::from_dependencies(
+            BTreeMap::from([(10, 5), (11, 3), (20, 5)]),
+            0,
+        );
 
         // Test `extend`.
         let other1 = BTreeMap::from([(11, 4), (15, 6), (20, 3), (25, 6)]);
@@ -226,13 +251,10 @@ mod tests {
 
     #[test]
     fn test_split_off() {
-        let mut deps = RegisteredReadDependencies::from_dependencies(BTreeMap::from([
-            (10, 1),
-            (20, 1),
-            (30, 1),
-            (40, 1),
-            (50, 1),
-        ]));
+        let mut deps = RegisteredReadDependencies::from_dependencies(
+            BTreeMap::from([(10, 1), (20, 1), (30, 1), (40, 1), (50, 1)]),
+            0,
+        );
 
         // Split at an existing key.
         let split_map = deps.split_off(30);
@@ -259,7 +281,7 @@ mod tests {
     #[test]
     fn test_take_and_clone() {
         let initial_map = BTreeMap::from([(10, 1), (20, 2)]);
-        let deps = RegisteredReadDependencies::from_dependencies(initial_map.clone());
+        let deps = RegisteredReadDependencies::from_dependencies(initial_map.clone(), 0);
 
         // Test clone.
         let cloned_deps = deps.clone_dependencies_for_test();
@@ -269,7 +291,7 @@ mod tests {
 
         // Test take.
         let deps = Mutex::new(deps);
-        let taken_deps = take_dependencies(&deps);
+        let taken_deps = take_dependencies(&deps, 0);
         assert_eq!(taken_deps, initial_map);
         // Original dependencies should now be empty.
         assert!(deps.lock().dependencies.is_empty());

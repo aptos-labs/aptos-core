@@ -766,6 +766,9 @@ pub struct InterpreterContext<'guard> {
     /// Per-session reentrancy checker state.
     reentrancy: ReentrancyState,
     rng: StdRng,
+    /// Basic blocks entered since the last provider poll, see
+    /// [`Self::poll_interrupt`].
+    blocks_since_poll: u32,
 }
 
 /// Construction options for an [`InterpreterContext`].
@@ -853,6 +856,7 @@ impl<'guard> InterpreterContext<'guard> {
             read_write_set: ResourceReadWriteSet::new(),
             reentrancy: ReentrancyState::new(),
             rng: StdRng::seed_from_u64(0),
+            blocks_since_poll: 0,
         }
     }
 
@@ -1038,6 +1042,7 @@ impl<'guard> InterpreterContext<'guard> {
             mut read_write_set,
             reentrancy: _,
             rng: _,
+            blocks_since_poll: _,
         } = self;
 
         // The call stack is gone and every handle is scoped to one allocation,
@@ -1058,7 +1063,12 @@ impl<'guard> InterpreterContext<'guard> {
         // TODO(perf): the evacuated region is never returned to the pool. It
         // outlives the session inside an `Arc<FrozenHeap>`, so returning it
         // needs a hook on the last drop.
-        let to_space = guard.take_region(heap.used().max(MAX_ALIGN));
+        //
+        // Uninitialized rather than zeroed: evacuation writes every byte it
+        // later reads, and a zeroed allocation past the allocator's cache
+        // size is served by `madvise`, which flushes the TLB of every core the
+        // process runs on.
+        let to_space = MemoryRegion::new_uninit(heap.used().max(MAX_ALIGN));
         let evacuated =
             evacuate_session_roots(&heap, to_space, guard, &mut read_write_set, &extensions)?;
         guard.return_region(heap.into_region());
@@ -1716,6 +1726,18 @@ unsafe fn int_cmp_bool(fp: *mut u8, lhs: FrameOffset, op: CmpKind, rhs: &IntOper
 // ---------------------------------------------------------------------------
 
 impl InterpreterContext<'_> {
+    /// Asks the provider every 64 basic blocks whether this execution should
+    /// stop, so an incarnation whose reads were invalidated does not run on.
+    /// Every loop iteration and every call passes through here.
+    #[inline(always)]
+    fn poll_interrupt(&mut self) -> VMResult<()> {
+        self.blocks_since_poll = self.blocks_since_poll.wrapping_add(1);
+        if self.blocks_since_poll & 63 == 0 {
+            self.resource_provider.check_interrupted()?;
+        }
+        Ok(())
+    }
+
     /// Shared body of the conditional `Jump*` micro-ops: charge the chosen
     /// edge's cost, then jump to `target` or fall through to the next pc.
     #[inline(always)]
@@ -1727,6 +1749,7 @@ impl InterpreterContext<'_> {
         gas_fallthrough: u64,
         regs: &mut VMRegisters,
     ) -> VMResult<()> {
+        self.poll_interrupt()?;
         if cond {
             self.gas_meter.charge(gas_taken)?;
             regs.pc = target.into();
@@ -2135,6 +2158,7 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::Jump { target, gas } => {
+                        self.poll_interrupt()?;
                         self.gas_meter.charge(gas)?;
                         regs.pc = target.into();
                         continue;
@@ -3589,6 +3613,7 @@ impl InterpreterContext<'_> {
         flag: FrameFlag,
     ) -> VMResult<()> {
         // Charge the callee's entry block before any of its instructions run.
+        self.poll_interrupt()?;
         self.gas_meter.charge(callee.entry_gas)?;
         unsafe {
             // Zero everything beyond parameters (locals, metadata, callee

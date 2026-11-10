@@ -211,10 +211,6 @@ impl<T: Transaction, I: TxnInput, O: TxnOutput<Txn = T, Key = I::Key, Tag = I::T
             maybe_read_write_summary,
             maybe_approx_output_size,
         );
-        if block_limit_processor.is_hot_state_accumulation_enabled() {
-            block_limit_processor
-                .accumulate_hot_state_rw(output.storage_keys_written(), output.storage_keys_read());
-        }
 
         let mut must_create_epilogue_txn = if *skips_rest_flag {
             !has_new_epoch_event
@@ -372,6 +368,25 @@ impl<T: Transaction, I: TxnInput, O: TxnOutput<Txn = T, Key = I::Key, Tag = I::T
 
     /// Takes the recorded output for a committed transaction so it can be
     /// materialized (finalizing resource groups and replacing delayed field ids).
+    /// Runs `f` on the committed output still held for txn_idx.
+    pub(crate) fn with_committed_output(
+        &self,
+        txn_idx: TxnIndex,
+        f: impl FnOnce(&O),
+    ) -> Result<(), PanicError> {
+        match &self.output_wrappers[txn_idx as usize].lock().output {
+            Some(ExecutionStatus::Executed { output, .. }) => {
+                f(output);
+                Ok(())
+            },
+            Some(ExecutionStatus::Aborted(_))
+            | Some(ExecutionStatus::SpeculativeFailure)
+            | None => Err(code_invariant_error(
+                "[BlockSTM]: Output must be recorded after execution",
+            )),
+        }
+    }
+
     pub(crate) fn take_committed_output(&self, txn_idx: TxnIndex) -> Result<O, PanicError> {
         match self.output_wrappers[txn_idx as usize].lock().output.take() {
             Some(ExecutionStatus::Executed { output, .. }) => Ok(output),

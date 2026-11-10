@@ -22,8 +22,12 @@ use mono_move_core::{
 use mono_move_output::to_contract_events;
 use mono_move_runtime::{serialize, SessionEffects, WriteClass};
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
+<<<<<<< HEAD
 use shared_dsa::UnorderedMap;
-use std::{collections::BTreeMap, ptr::NonNull};
+use std::{cell::RefCell, collections::BTreeMap, ptr::NonNull};
+=======
+use std::{collections::HashMap, ptr::NonNull};
+>>>>>>> e44f2677f3 (Revert "[mono-move] Encode group blobs with cached tag bytes")
 
 // TODO(security): audit all error messages and make sure they do not lead to
 // deep recursions or OOMs.
@@ -39,9 +43,10 @@ pub(crate) fn executed_output(
     gas_used: u64,
     status: TransactionStatus,
     auxiliary_data: TransactionAuxiliaryData,
+    member_level: bool,
 ) -> Result<(TransactionOutput, MaterializedGroups), MaterializationError> {
-    let (write_set, groups) =
-        drain_write_set(effects, layouts, provider).map_err(MaterializationError::new)?;
+    let (write_set, groups) = drain_write_set(effects, layouts, provider, member_level)
+        .map_err(MaterializationError::new)?;
     let events = to_contract_events(effects, layouts)
         .map_err(|e| MaterializationError::new(vec![format!("event finalization failed: {e}")]))?;
     let output = TransactionOutput::new(write_set, events, gas_used, status, auxiliary_data);
@@ -93,6 +98,7 @@ fn drain_write_set(
     effects: &SessionEffects,
     layouts: &impl LayoutProvider,
     provider: &dyn AptosDataProvider,
+    member_level: bool,
 ) -> Result<(WriteSet, MaterializedGroups), Vec<String>> {
     let mut writes: Vec<(StateKey, WriteOp)> = vec![];
     // Unordered on purpose: nothing below may depend on the order groups are
@@ -122,6 +128,21 @@ fn drain_write_set(
                 // TODO(correctness): ops carry no `StateValueMetadata` (slot
                 // deposits, refunds, creation time); the legacy VM's
                 // `WriteOpConverter` fills these.
+                let op = match class {
+                    WriteClass::Creation(ptr) => {
+                        WriteOp::legacy_creation(written_bytes(ptr, key.value_ty())?)
+                    },
+                    WriteClass::Modification(ptr) => {
+                        WriteOp::legacy_modification(written_bytes(ptr, key.value_ty())?)
+                    },
+                    WriteClass::Deletion => WriteOp::legacy_deletion(),
+                };
+                writes.push((state_key, op));
+            },
+            Some(_) if member_level => {
+                // The member's own resource key names the write; the block
+                // assembles the group's blob once, after its last transaction.
+                let state_key = key.as_state_key().map_err(|e| format!("{e:#}"))?;
                 let op = match class {
                     WriteClass::Creation(ptr) => {
                         WriteOp::legacy_creation(written_bytes(ptr, key.value_ty())?)
@@ -239,6 +260,61 @@ fn merge_group(
     }
 }
 
+<<<<<<< HEAD
+thread_local! {
+    /// The BCS bytes of every member tag this thread has encoded. A tag is
+    /// a few allocations' worth of serde work and the same handful recur in
+    /// every group. Ordered because the tags are user-chosen.
+    static TAG_BYTES: RefCell<BTreeMap<StructTag, Bytes>> = RefCell::new(BTreeMap::new());
+}
+
+/// The group's blob: BCS of the member map, which orders entries by their
+/// encoded tags, with the tags' encoding cached.
+fn encode_group(members: &GroupMembers) -> Result<Vec<u8>, bcs::Error> {
+    let mut entries = TAG_BYTES.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        members
+            .iter()
+            .map(|(tag, bytes)| {
+                let tag_bytes = match cache.get(tag) {
+                    Some(tag_bytes) => tag_bytes.clone(),
+                    None => {
+                        let tag_bytes = Bytes::from(bcs::to_bytes(tag)?);
+                        cache.insert(tag.clone(), tag_bytes.clone());
+                        tag_bytes
+                    },
+                };
+                Ok((tag_bytes, bytes))
+            })
+            .collect::<Result<Vec<_>, bcs::Error>>()
+    })?;
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut out = Vec::with_capacity(
+        entries
+            .iter()
+            .map(|(tag, bytes)| tag.len() + bytes.len() + 5)
+            .sum::<usize>()
+            + 5,
+    );
+    put_uleb128(&mut out, entries.len());
+    for (tag, bytes) in entries {
+        out.extend_from_slice(&tag);
+        put_uleb128(&mut out, bytes.len());
+        out.extend_from_slice(bytes);
+    }
+    Ok(out)
+}
+
+fn put_uleb128(out: &mut Vec<u8>, mut value: usize) {
+    while value >= 0x80 {
+        out.push((value as u8) | 0x80);
+        value >>= 7;
+    }
+    out.push(value as u8);
+}
+
+=======
+>>>>>>> e44f2677f3 (Revert "[mono-move] Encode group blobs with cached tag bytes")
 /// Builds the write op for a resource-group slot: creation/modification/
 /// deletion by whether the group existed before and has members after.
 //

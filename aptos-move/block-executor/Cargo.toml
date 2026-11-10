@@ -17,6 +17,7 @@ testing = []
 fuzzing = ["criterion", "proptest", "proptest-derive"]
 
 [dependencies]
+ahash = { workspace = true }
 ambassador = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
@@ -42,6 +43,7 @@ dashmap = { workspace = true }
 derivative = { workspace = true }
 fail = { workspace = true }
 hashbrown = { workspace = true }
+libc = { workspace = true }
 mono-move-aptos-state-view-providers = { workspace = true }
 mono-move-aptos-transaction-executor = { workspace = true }
 mono-move-core = { workspace = true }

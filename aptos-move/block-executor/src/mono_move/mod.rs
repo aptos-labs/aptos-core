@@ -6,11 +6,14 @@
 use crate::{
     errors::ResourceGroupSerializationError,
     executor_utilities::Materializer,
-    single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
+    single_transaction_executor::{
+        SharedViewArgs, SingleTransactionExecutor, ViewMode, MEMBER_GROUP_WRITES,
+    },
     task::{ExecutionStatus, TxnOutput},
     types::InputOutputKey,
 };
 use aptos_aggregator::delayed_change::DelayedChange;
+use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::value::SpeculativeValue,
@@ -19,9 +22,10 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue, TStateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        BlockExecutableTransaction as Transaction, TransactionAuxiliaryData, TransactionOutput,
+        BlockExecutableTransaction as Transaction, Transaction as AptosTransaction,
+        TransactionAuxiliaryData, TransactionOutput,
     },
-    write_set::{WriteOpKind, WriteSet},
+    write_set::{WriteOp, WriteOpKind, WriteSet},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
@@ -36,11 +40,12 @@ use mono_move_core::{
     types::InternedType,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_runtime::{SegmentedArena, SessionEffects, WriteClass};
+use mono_move_runtime::{serialize, SegmentedArena, SessionEffects, WriteClass};
 use move_core_types::language_storage::{ModuleId, StructTag};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use once_cell::sync::Lazy;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     ptr::NonNull,
     sync::Arc,
 };
@@ -158,6 +163,14 @@ pub enum MonoTxnOutput {
         /// Writes that land inside a resource group, keyed by the group's own
         /// storage slot and tagged by the member's struct tag.
         group_writes: HashMap<InMemoryStorageKey, BTreeMap<StructTag, MonoValue>>,
+        /// Every storage slot the transaction read, for hot state promotion. A
+        /// group member's read counts for the group's own slot, which is what
+        /// storage holds. May repeat keys; the accumulator dedups.
+        read_keys: Vec<InMemoryStorageKey>,
+        /// Only a block epilogue carries this: the keys its payload asks to
+        /// make hot. Taken from the payload rather than recomputed, so a
+        /// replay promotes the same keys the block's execution decided on.
+        to_make_hot: Option<BTreeSet<StateKey>>,
     },
     /// Signals block executor that this transaction has to be skipped and
     /// retried later.
@@ -202,12 +215,28 @@ impl MonoTxnOutput {
     ///
     /// A group member whose type has no struct tag cannot be written to storage
     /// at all, so it is left out; materialization reports it as a failure.
-    fn executed(outcome: TxnOutcome, skips_rest: bool) -> Self {
+    fn executed(
+        outcome: TxnOutcome,
+        skips_rest: bool,
+        to_make_hot: Option<BTreeSet<StateKey>>,
+    ) -> Self {
         let mut resource_writes = HashMap::new();
         let mut group_writes: HashMap<_, BTreeMap<_, _>> = HashMap::new();
+        let mut read_keys = Vec::new();
 
         if let Some(effects) = committed_effects(&outcome) {
             let pin: Arc<dyn ReadPin> = effects.frozen_heap();
+            read_keys.extend(
+                effects
+                    .read_write_set()
+                    .reads_unordered()
+                    .map(|(key, _, group)| match group {
+                        None => key.clone(),
+                        Some(group_ty) => {
+                            InMemoryStorageKey::resource_group(key.address(), group_ty)
+                        },
+                    }),
+            );
             for (key, class, group) in effects.read_write_set().writes_unordered() {
                 let ty = key.value_ty();
                 let value = written_value(class, ty, &pin);
@@ -233,8 +262,30 @@ impl MonoTxnOutput {
             skips_rest,
             resource_writes,
             group_writes,
+            read_keys,
+            to_make_hot,
         }
     }
+}
+
+/// The hot state promotions a block epilogue's output carries: the keys its
+/// payload names, plus the slots the epilogue itself read without writing,
+/// which the payload was computed too early to include.
+fn epilogue_hotness(
+    to_make_hot: BTreeSet<StateKey>,
+    read_keys: &[InMemoryStorageKey],
+    written: &WriteSet,
+) -> Result<BTreeSet<StateKey>, PanicError> {
+    let mut hotness = to_make_hot;
+    for key in read_keys {
+        let state_key = key
+            .as_state_key()
+            .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))?;
+        if written.get_write_op(&state_key).is_none() {
+            hotness.insert(state_key);
+        }
+    }
+    Ok(hotness)
 }
 
 impl TxnOutput for MonoTxnOutput {
@@ -362,15 +413,25 @@ impl TxnOutput for MonoTxnOutput {
     }
 
     fn storage_keys_read(&self) -> impl Iterator<Item = &Self::Key> {
-        // TODO(correctness): report read keys, including module reads, so the
-        // block epilogue promotes the same keys as the legacy VM.
-        std::iter::empty()
+        let read_keys = match self {
+            MonoTxnOutput::Executed { read_keys, .. } => Some(read_keys),
+            MonoTxnOutput::SkippedToRetry => None,
+        };
+        read_keys.into_iter().flatten()
     }
 
     fn storage_keys_written(&self) -> impl Iterator<Item = &Self::Key> {
-        // TODO(correctness): report written keys, for hot-state promotion
-        // parity with the legacy VM.
-        std::iter::empty()
+        // A group member's write lands in the group's slot, so that is the key
+        // the hot state sees written.
+        let writes = match self {
+            MonoTxnOutput::Executed {
+                resource_writes,
+                group_writes,
+                ..
+            } => Some(resource_writes.keys().chain(group_writes.keys())),
+            MonoTxnOutput::SkippedToRetry => None,
+        };
+        writes.into_iter().flatten()
     }
 
     fn check_materialization(&self, _materializer: &impl Materializer<Self::Txn>) -> bool {
@@ -378,6 +439,12 @@ impl TxnOutput for MonoTxnOutput {
         true
     }
 }
+
+/// Whether MonoMove charges gas. Off by default while its gas schedule is a
+/// placeholder; `MONO_MOVE_METERED=1` turns it on for experiments, which
+/// changes what a transaction writes (fee, burn, supply) and so its output
+/// size.
+static METERED: Lazy<bool> = Lazy::new(|| std::env::var_os("MONO_MOVE_METERED").is_some());
 
 /// A per-worker MonoMove executor.
 pub struct MonoTransactionExecutor {
@@ -441,16 +508,20 @@ impl MonoTransactionExecutor {
 
         // TODO(completeness): Run metered execution. For now using no metering
         // simplifies tests.
-        let outcome = AptosTransactionExecutor::new(
+        let executor = AptosTransactionExecutor::new(
             guard,
             natives,
             &module_provider,
             data_provider,
             &self.environment,
             usage,
-        )
-        .without_metering()
-        .execute_transaction(inner_txn, auxiliary_info);
+        );
+        let executor = if *METERED {
+            executor
+        } else {
+            executor.without_metering()
+        };
+        let outcome = executor.execute_transaction(inner_txn, auxiliary_info);
 
         if let TxnOutcome::Panic(err) = &outcome {
             return Err(code_invariant_error(format!(
@@ -545,9 +616,18 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             },
         };
 
+        let to_make_hot = match txn {
+            SignatureVerifiedTransaction::Valid(AptosTransaction::BlockEpilogue(payload)) => {
+                payload.try_get_keys_to_make_hot().cloned()
+            },
+            SignatureVerifiedTransaction::Valid(_) | SignatureVerifiedTransaction::Invalid(_) => {
+                None
+            },
+        };
+
         Ok((
             ExecutionStatus::Executed {
-                output: MonoTxnOutput::executed(outcome, skips_rest),
+                output: MonoTxnOutput::executed(outcome, skips_rest, to_make_hot),
                 skips_rest,
             },
             reads,
@@ -565,8 +645,13 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         <Self::Output as TxnOutput>::CommittedOutput,
         PanicOr<ResourceGroupSerializationError>,
     > {
-        let outcome = match output {
-            MonoTxnOutput::Executed { outcome, .. } => outcome,
+        let (outcome, read_keys, to_make_hot) = match output {
+            MonoTxnOutput::Executed {
+                outcome,
+                read_keys,
+                to_make_hot,
+                ..
+            } => (outcome, read_keys, to_make_hot),
             // A skipped output renders to an empty, kept-success transaction.
             MonoTxnOutput::SkippedToRetry => {
                 return Ok(TransactionOutput::new_success_with_write_set(
@@ -588,7 +673,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         let materialization_failed =
             |e| PanicOr::CodeInvariantError(format!("Failed to materialize outputs: {e}"));
 
-        match mode {
+        let output = match mode {
             ViewMode::Sequential { unsync_map, .. } => {
                 let provider =
                     BlockSTMSequentialProvider::new(&guard, shared.base_view, unsync_map);
@@ -603,7 +688,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 for (group_key, members) in groups.into_iter_unordered() {
                     unsync_map.insert_group(group_key, members);
                 }
-                Ok(output)
+                output
             },
             ViewMode::Parallel {
                 versioned_map,
@@ -623,11 +708,30 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 // Groups are assembled from the versioned map on demand, so
                 // nothing is cached back here.
                 let (output, _groups) = outcome
-                    .materialize(&guard, &provider, features, auxiliary_data)
+                    .materialize_with(
+                        &guard,
+                        &provider,
+                        features,
+                        auxiliary_data,
+                        *MEMBER_GROUP_WRITES,
+                    )
                     .map_err(materialization_failed)?;
-                Ok(output)
+                output
             },
-        }
+        };
+
+        let Some(to_make_hot) = to_make_hot else {
+            return Ok(output);
+        };
+        let (mut write_set, events, gas_used, status, auxiliary_data) = output.unpack();
+        write_set.add_hotness(epilogue_hotness(to_make_hot, &read_keys, &write_set)?);
+        Ok(TransactionOutput::new(
+            write_set,
+            events,
+            gas_used,
+            status,
+            auxiliary_data,
+        ))
     }
 
     fn check_materialization<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(
@@ -643,5 +747,118 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
     fn materialize_storage_key(&self, key: InMemoryStorageKey) -> Result<StateKey, PanicError> {
         key.as_state_key()
             .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))
+    }
+
+    fn supports_member_group_writes(&self) -> bool {
+        true
+    }
+
+    fn uses_execution_pool() -> bool {
+        true
+    }
+
+    fn member_storage_key(
+        &self,
+        group_key: &InMemoryStorageKey,
+        tag: &StructTag,
+    ) -> Result<StateKey, PanicError> {
+        StateKey::resource(&group_key.address(), tag)
+            .map_err(|e| code_invariant_error(format!("Failed to build a member key: {e:#}")))
+    }
+
+    fn finalize_group_writes<S: TStateView<Key = StateKey> + Sync>(
+        &self,
+        group_keys: Vec<InMemoryStorageKey>,
+        _shared: SharedViewArgs<'_, S>,
+        mode: ViewMode<'_, Self::Input>,
+        next_txn_idx: TxnIndex,
+    ) -> Result<Vec<(StateKey, WriteOp)>, PanicError> {
+        let ViewMode::Parallel { versioned_map, .. } = mode else {
+            return Err(code_invariant_error(
+                "Group writes are only assembled after parallel execution",
+            ));
+        };
+        let group_data = versioned_map.group_data();
+        let assemble = |guard: &ExecutionGuard<'_>,
+                        group_key: InMemoryStorageKey|
+         -> Result<Option<(StateKey, WriteOp)>, PanicError> {
+            let existed = !group_data.group_members_at(&group_key, 0)?.is_empty();
+            let members = group_data.group_members_at(&group_key, next_txn_idx)?;
+            let blob = if members.is_empty() {
+                None
+            } else {
+                let members = members
+                    .into_iter()
+                    .map(|(tag, value)| {
+                        let bytes = match value {
+                            MonoValue::RawFromStorage(bytes) => bytes,
+                            MonoValue::Write { ptr, ty, .. } => {
+                                // SAFETY: the entry holding this pointer pins the frozen
+                                // heap it points into, and that heap is never mutated.
+                                let blob =
+                                    unsafe { serialize(guard, ptr.as_ptr(), ty) }.map_err(|e| {
+                                        code_invariant_error(format!(
+                                            "Failed to serialize a group member: {e}"
+                                        ))
+                                    })?;
+                                Bytes::from(blob)
+                            },
+                            MonoValue::Deletion | MonoValue::GroupMetadata => {
+                                return Err(code_invariant_error(
+                                    "A deleted member or group metadata was assembled",
+                                ))
+                            },
+                        };
+                        Ok((tag, bytes))
+                    })
+                    .collect::<Result<BTreeMap<_, _>, PanicError>>()?;
+                let blob = bcs::to_bytes(&members)
+                    .map_err(|e| code_invariant_error(format!("Failed to encode a group: {e}")))?;
+                Some(Bytes::from(blob))
+            };
+            let op = match (existed, blob) {
+                (false, Some(bytes)) => WriteOp::legacy_creation(bytes),
+                (true, Some(bytes)) => WriteOp::legacy_modification(bytes),
+                (true, None) => WriteOp::legacy_deletion(),
+                (false, None) => return Ok(None),
+            };
+            let state_key = group_key
+                .as_state_key()
+                .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))?;
+            Ok(Some((state_key, op)))
+        };
+        // The workers have returned their arenas, so each chunk takes one: a
+        // block writes thousands of groups and assembling them serially would
+        // cost more than the per-transaction assembly it replaces.
+        let ctx = &self.ctx;
+        let num_workers = ctx.num_execution_workers().max(1);
+        let chunk_len = group_keys.len().div_ceil(num_workers).max(1);
+        let chunks = group_keys.chunks(chunk_len).collect::<Vec<_>>();
+        let results = Mutex::new(Vec::with_capacity(chunks.len()));
+        rayon::scope(|scope| {
+            for (worker_id, chunk) in chunks.into_iter().enumerate() {
+                let results = &results;
+                let assemble = &assemble;
+                scope.spawn(move |_| {
+                    let chunk_writes = ctx
+                        .try_execution_context(worker_id)
+                        .ok_or_else(|| code_invariant_error("No free arena to assemble groups"))
+                        .and_then(|guard| {
+                            chunk
+                                .iter()
+                                .filter_map(|key| assemble(&guard, key.clone()).transpose())
+                                .collect::<Result<Vec<_>, PanicError>>()
+                        });
+                    results.lock().push((worker_id, chunk_writes));
+                });
+            }
+        });
+        let mut results = results.into_inner();
+        results.sort_by_key(|(worker_id, _)| *worker_id);
+        let mut writes = Vec::with_capacity(group_keys.len());
+        for (_, chunk_writes) in results {
+            writes.extend(chunk_writes?);
+        }
+        Ok(writes)
     }
 }

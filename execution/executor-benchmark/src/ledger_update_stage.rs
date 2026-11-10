@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::pipeline::{CommitBlockMessage, LedgerUpdateMessage};
+use crate::{
+    block_timeline::StageSpan,
+    pipeline::{CommitBlockMessage, LedgerUpdateMessage},
+};
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_infallible::Mutex;
@@ -57,6 +60,7 @@ where
     pub fn ledger_update(&mut self, ledger_update_message: LedgerUpdateMessage) {
         // let ledger_update_start_time = Instant::now();
         let LedgerUpdateMessage {
+            block_index,
             first_block_start_time,
             current_block_start_time,
             partition_time,
@@ -67,10 +71,12 @@ where
             stage,
         } = ledger_update_message;
 
+        let span = StageSpan::start("ledger_update", block_index, num_input_txns);
         let output = self
             .executor
             .ledger_update(block_id, parent_block_id)
             .unwrap();
+        span.finish();
         output.execution_output.check_aborts_discards_retries(
             self.allow_aborts,
             self.allow_discards,
@@ -105,6 +111,7 @@ where
         match &self.commit_processing {
             CommitProcessing::SendToQueue(commit_sender) => {
                 let msg = CommitBlockMessage {
+                    block_index,
                     block_id,
                     first_block_start_time,
                     current_block_start_time,

@@ -4,6 +4,7 @@
 mod account_generator;
 pub mod block_preparation;
 pub mod block_recording;
+mod block_timeline;
 pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
@@ -14,6 +15,7 @@ mod metrics;
 pub mod native;
 pub mod pipeline;
 pub mod position_verifier;
+mod resource_usage;
 pub mod transaction_committer;
 pub mod transaction_executor;
 pub mod transaction_generator;

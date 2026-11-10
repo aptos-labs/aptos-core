@@ -405,7 +405,7 @@ pub trait TVersionedDelayedFieldView<K> {
 /// caller side, even if IDs are re-used (say among incarnations) by e.g. assigning odd and
 /// even ids to Aggregators and AggregatorSnapshots, and it allows asserting the uses strictly.
 pub struct VersionedDelayedFields<K> {
-    values: DashMap<K, VersionedValue<K>>,
+    values: DashMap<K, VersionedValue<K>, ahash::RandomState>,
 
     /// No deltas are allowed below next_idx_to_commit version, as all deltas (and snapshots)
     /// must be materialized and converted to Values during commit.
@@ -420,7 +420,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     /// new should only be used from the crate.
     pub(crate) fn empty() -> Self {
         Self {
-            values: DashMap::new(),
+            values: DashMap::with_hasher(ahash::RandomState::new()),
             next_idx_to_commit: CachePadded::new(AtomicTxnIndex::new(0)),
             total_base_value_size: CachePadded::new(AtomicU64::new(0)),
         }

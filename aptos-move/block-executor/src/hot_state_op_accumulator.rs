@@ -4,21 +4,24 @@
 use crate::counters::HOT_STATE_OP_ACCUMULATOR_COUNTER as COUNTER;
 use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{error::PanicError, on_chain_config::OnChainHotStateConfig};
+use dashmap::DashSet;
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
+/// The keys a block promotes to the hot state: every key it read and never
+/// wrote. Reads and writes are collected from any thread and in any order,
+/// since the result does not depend on the order (a written key is never
+/// promoted, whenever the write happened).
 pub struct BlockHotStateOpAccumulator<Key> {
-    /// Keys read but never written to across the entire block are to be made hot (or refreshed
-    /// `hot_since_version` one is already hot but last refresh is far in the history) as the side
-    /// effect of the block epilogue.
+    /// Every key read by a committed transaction.
     ///
     /// Unordered: the in-memory `Key` has no deterministic order, and its `Hash`/`Eq` are cheaper
     /// than materializing the storage key on every read. The deterministic order the epilogue
     /// needs is imposed once, when keys are converted to storage keys in `get_keys_to_make_hot`.
-    to_make_hot: hashbrown::HashSet<Key>,
+    reads: DashSet<Key, ahash::RandomState>,
     /// Keep track of all the keys that are written to across the whole block, these keys are made
     /// hot (or have a refreshed `hot_since_version`) immediately at the version they got changed,
     /// so no need to issue separate HotStateOps to promote them to the hot state.
-    writes: hashbrown::HashSet<Key>,
+    writes: DashSet<Key, ahash::RandomState>,
     /// Caps the total size of the promoted keys, to prevent the block epilogue from being too
     /// heavy.
     max_promotion_bytes_per_block: usize,
@@ -43,33 +46,30 @@ where
 
     pub fn new_with_config(max_promotion_bytes_per_block: usize) -> Self {
         Self {
-            to_make_hot: hashbrown::HashSet::new(),
-            writes: hashbrown::HashSet::new(),
+            reads: DashSet::with_hasher(ahash::RandomState::new()),
+            writes: DashSet::with_hasher(ahash::RandomState::new()),
             max_promotion_bytes_per_block,
         }
     }
 
     pub fn add_transaction<'a>(
-        &mut self,
+        &self,
         writes: impl Iterator<Item = &'a Key>,
         reads: impl Iterator<Item = &'a Key>,
     ) where
         Key: 'a,
     {
         for key in writes {
-            if self.to_make_hot.remove(key) {
-                COUNTER.inc_with(&["promotion_removed_by_write"]);
+            if !self.writes.contains(key) {
+                self.writes.insert(key.clone());
             }
-            self.writes.get_or_insert_owned(key);
         }
-
         for key in reads {
-            if self.writes.contains(key) {
-                continue;
-            }
             // Most reads repeat keys seen in earlier transactions (e.g. framework modules),
             // so clone only when the key is new to the set.
-            self.to_make_hot.get_or_insert_owned(key);
+            if !self.writes.contains(key) && !self.reads.contains(key) {
+                self.reads.insert(key.clone());
+            }
         }
     }
 
@@ -87,9 +87,10 @@ where
         S: Fn(&O) -> usize,
     {
         let mut keys = self
-            .to_make_hot
+            .reads
             .iter()
-            .map(convert)
+            .filter(|key| !self.writes.contains(key.key()))
+            .map(|key| convert(key.key()))
             .collect::<Result<BTreeSet<O>, _>>()?;
         let num_eligible = keys.len();
         let mut remaining_bytes = self.max_promotion_bytes_per_block;
@@ -115,11 +116,11 @@ mod tests {
     use super::*;
     use aptos_types::on_chain_config::HotStateConfigV1;
 
-    fn read(accu: &mut BlockHotStateOpAccumulator<u64>, keys: &[u64]) {
+    fn read(accu: &BlockHotStateOpAccumulator<u64>, keys: &[u64]) {
         accu.add_transaction(std::iter::empty(), keys.iter());
     }
 
-    fn write(accu: &mut BlockHotStateOpAccumulator<u64>, keys: &[u64]) {
+    fn write(accu: &BlockHotStateOpAccumulator<u64>, keys: &[u64]) {
         accu.add_transaction(keys.iter(), std::iter::empty());
     }
 
@@ -154,8 +155,8 @@ mod tests {
 
     #[test]
     fn cap_skips_keys_that_do_not_fit() {
-        let mut accu = BlockHotStateOpAccumulator::<u64>::new_with_config(3);
-        read(&mut accu, &[0, 1, 2, 3, 4]);
+        let accu = BlockHotStateOpAccumulator::<u64>::new_with_config(3);
+        read(&accu, &[0, 1, 2, 3, 4]);
         // 1 alone exceeds the cap, but the keys after it still fill the remaining bytes.
         let size = |k: &u64| if *k == 1 { 100 } else { 1 };
         assert_eq!(
@@ -166,20 +167,20 @@ mod tests {
 
     #[test]
     fn written_keys_are_not_promoted() {
-        let mut accu = BlockHotStateOpAccumulator::<u64>::new_with_config(100);
+        let accu = BlockHotStateOpAccumulator::<u64>::new_with_config(100);
         // 2 is read and written in the same txn; the write makes it hot, so it must not also be
         // promoted by the epilogue.
         accu.add_transaction([2u64].iter(), [1u64, 2, 3].iter());
         // A read of an already-written key in a later txn is likewise ignored.
-        read(&mut accu, &[2]);
+        read(&accu, &[2]);
         assert_eq!(promote(&accu), set(&[1, 3]));
     }
 
     #[test]
     fn write_after_read_removes_promotion() {
-        let mut accu = BlockHotStateOpAccumulator::<u64>::new_with_config(100);
-        read(&mut accu, &[1, 2]);
-        write(&mut accu, &[1]);
+        let accu = BlockHotStateOpAccumulator::<u64>::new_with_config(100);
+        read(&accu, &[1, 2]);
+        write(&accu, &[1]);
         assert_eq!(promote(&accu), set(&[2]));
     }
 
@@ -195,8 +196,8 @@ mod tests {
         let default_cap = BlockHotStateOpAccumulator::<u64>::DEFAULT_MAX_PROMOTION_BYTES_PER_BLOCK;
         let keys: Vec<_> = (0..default_cap as u64 + 1).collect();
         for (config, expected_cap) in [(Some(&on_chain), 2), (None, default_cap)] {
-            let mut accu = BlockHotStateOpAccumulator::<u64>::new(config);
-            read(&mut accu, &keys);
+            let accu = BlockHotStateOpAccumulator::<u64>::new(config);
+            read(&accu, &keys);
             assert_eq!(promote(&accu).len(), expected_cap);
         }
     }

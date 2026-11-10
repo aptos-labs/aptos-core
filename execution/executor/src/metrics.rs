@@ -9,6 +9,7 @@ use aptos_metrics_core::{
 };
 use aptos_types::{
     contract_event::ContractEvent,
+    state_store::state_key::inner::StateKeyInner,
     transaction::{
         authenticator::AccountAuthenticator, signature_verified_transaction::TransactionProvider,
         ExecutionStatus, Transaction, TransactionExecutableRef, TransactionOutput,
@@ -258,6 +259,44 @@ pub static PROCESSED_TXNS_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Output bytes by what they are: a write's key plus value bytes under the key's
+/// kind, and the BCS size of the events. Only with detailed counters.
+pub static PROCESSED_TXNS_OUTPUT_BYTES_BY_KIND: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_processed_txns_output_bytes_by_kind",
+        "Output bytes by kind: resource, group, table_item, module, other, events",
+        &["process", "kind"]
+    )
+    .unwrap()
+});
+
+fn observe_output_bytes_by_kind(process_type: &str, output: &TransactionOutput) {
+    for (key, op) in output.write_set().write_op_iter() {
+        let kind = match key.inner() {
+            StateKeyInner::AccessPath(path) => {
+                if path.is_code() {
+                    "module"
+                } else if path.is_resource_group() {
+                    "group"
+                } else {
+                    "resource"
+                }
+            },
+            StateKeyInner::TableItem { .. } => "table_item",
+            StateKeyInner::Raw(_) | StateKeyInner::TradingNative(_) => "other",
+        };
+        let bytes = key.size() + op.bytes().map_or(0, |b| b.len());
+        PROCESSED_TXNS_OUTPUT_BYTES_BY_KIND
+            .with_label_values(&[process_type, kind])
+            .inc_by(bytes as u64);
+    }
+    if let Ok(size) = bcs::serialized_size(output.events()) {
+        PROCESSED_TXNS_OUTPUT_BYTES_BY_KIND
+            .with_label_values(&[process_type, "events"])
+            .inc_by(size as u64);
+    }
+}
+
 pub static PROCESSED_TXNS_NUM_AUTHENTICATORS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_processed_txns_num_authenticators",
@@ -308,6 +347,7 @@ pub fn update_counters_for_processed_chunk<T>(
             if let Ok(size) = bcs::serialized_size(output) {
                 PROCESSED_TXNS_OUTPUT_SIZE.observe_with(&[process_type], size as f64);
             }
+            observe_output_bytes_by_kind(process_type, output);
         }
 
         let (state, reason, error_code) = match output.status() {

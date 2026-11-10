@@ -1,0 +1,222 @@
+name: "mono-move-scaling-sweep"
+on:
+  # Only here so that GitHub registers the workflow from a branch; nothing runs
+  # on a pull request event.
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      WORKLOADS:
+        description: "Comma-separated workloads; one job per workload"
+        required: false
+        type: string
+        default: "no-op,apt-fa-transfer,account-generation,order-book-no-matches1-market"
+      THREADS:
+        required: false
+        type: string
+        default: "2,4,8,16"
+      VMS:
+        required: false
+        type: string
+        default: "v1,mono"
+      REPEATS:
+        required: false
+        type: choice
+        options: ["1", "2", "3", "5"]
+        default: "3"
+      NUM_BLOCKS:
+        required: false
+        type: string
+        default: "100"
+      BLOCK_SIZE:
+        description: "Overrides every workload's block size when set"
+        required: false
+        type: string
+        default: ""
+      NUM_INIT_ACCOUNTS:
+        required: false
+        type: string
+        default: "2000000"
+      TXNS_PER_SENDER:
+        description: "Consecutive transactions per sender in a block; 5 is the benchmark default and chains them"
+        required: false
+        type: string
+        default: "1"
+      SPLIT_STAGES:
+        description: "Run the pipeline stages one after another (true) or pipelined as a node does (false)"
+        required: false
+        type: boolean
+        default: true
+      MALLOC_CONF:
+        description: "jemalloc MALLOC_CONF for the benchmark process, e.g. dirty_decay_ms:-1,muzzy_decay_ms:-1"
+        required: false
+        type: string
+        default: ""
+      VARIANTS:
+        description: "Variants replayed on the same recording, as name:ENV=1;name2:ENV=2 (default one variant)"
+        required: false
+        type: string
+        default: ""
+      PIPELINED:
+        description: "Overlap each block's output indexing with the next block's execution"
+        required: false
+        type: boolean
+        default: false
+      MONO_METERED:
+        description: "Charge gas on MonoMove (placeholder schedule), so it writes its fee like V1"
+        required: false
+        type: boolean
+        default: false
+      PROFILE:
+        description: "Record perf profiles of one extra replay per PROFILE_CONFIGS entry"
+        required: false
+        type: boolean
+        default: true
+      PROFILE_CONFIGS:
+        description: "vm:threads pairs to profile"
+        required: false
+        type: string
+        default: "v1:2,v1:16,mono:2,mono:16"
+      PERF_FREQ:
+        required: false
+        type: string
+        default: "499"
+      RUNNER:
+        description: "Ephemeral instances run the workloads in parallel on separate machines"
+        required: false
+        type: choice
+        options: [c7a-64, c7-64, benchmark-c3d-60]
+        default: c7a-64
+      BUILD:
+        required: false
+        type: choice
+        options: [release, performance]
+        default: release
+      CHECKOUT_REF:
+        description: "Commit to build and measure; the workflow itself still comes from the dispatched branch"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      workloads: ${{ steps.split.outputs.workloads }}
+      runner: ${{ steps.runner.outputs.label }}
+    steps:
+      - id: split
+        env:
+          WORKLOADS: ${{ inputs.WORKLOADS }}
+        run: |
+          python3 -c 'import json,os; print("workloads=" + json.dumps([w.strip() for w in os.environ["WORKLOADS"].split(",") if w.strip()]))' >> "$GITHUB_OUTPUT"
+      - id: runner
+        env:
+          RUNNER: ${{ inputs.RUNNER }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          case "$RUNNER" in
+            c7a-64) echo "label=runs-on,cpu=64,family=c7a,disk=large,image=aptos-ubuntu-x64,spot=false,run-id=$RUN_ID" ;;
+            c7-64) echo "label=runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,spot=false,run-id=$RUN_ID" ;;
+            benchmark-c3d-60) echo "label=benchmark-c3d-60" ;;
+          esac >> "$GITHUB_OUTPUT"
+
+  sweep:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        workload: ${{ fromJson(needs.plan.outputs.workloads) }}
+    runs-on: ${{ needs.plan.outputs.runner }}
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.CHECKOUT_REF || github.sha }}
+          persist-credentials: false
+
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Install python dependencies
+        run: TABULATE_INSTALL=lib-only pip install tabulate==0.9.0
+
+      - name: Install perf
+        if: ${{ inputs.PROFILE }}
+        continue-on-error: true
+        run: |
+          set -x
+          sudo apt-get update
+          sudo apt-get install -y linux-tools-common "linux-tools-$(uname -r)" || sudo apt-get install -y linux-tools-generic
+          # The wrapper refuses to run a perf built for another kernel; the
+          # binary itself is fine, so point at it directly.
+          PERF=$(ls -d /usr/lib/linux-tools/*/perf 2>/dev/null | head -1)
+          if [ -z "$PERF" ]; then PERF=$(which perf); fi
+          echo "PERF_BIN=$PERF" >> "$GITHUB_ENV"
+          sudo sysctl -w kernel.perf_event_paranoid=-1 || true
+          sudo sysctl -w kernel.kptr_restrict=0 || true
+          "$PERF" --version
+          cat /proc/sys/kernel/perf_event_paranoid
+
+      - name: Run the sweep
+        id: sweep
+        env:
+          WORKLOADS: ${{ matrix.workload }}
+          THREADS: ${{ inputs.THREADS }}
+          VMS: ${{ inputs.VMS }}
+          REPEATS: ${{ inputs.REPEATS }}
+          NUM_BLOCKS: ${{ inputs.NUM_BLOCKS }}
+          BLOCK_SIZE: ${{ inputs.BLOCK_SIZE }}
+          NUM_INIT_ACCOUNTS: ${{ inputs.NUM_INIT_ACCOUNTS }}
+          TXNS_PER_SENDER: ${{ inputs.TXNS_PER_SENDER }}
+          MONO_METERED: ${{ inputs.MONO_METERED && '1' || '' }}
+          SPLIT_STAGES: ${{ inputs.SPLIT_STAGES && '1' || '0' }}
+          PIPELINED: ${{ inputs.PIPELINED && '1' || '' }}
+          VARIANTS: ${{ inputs.VARIANTS }}
+          # jemalloc reads one or the other depending on the symbol prefix it
+          # was built with.
+          MALLOC_CONF: ${{ inputs.MALLOC_CONF }}
+          _RJEM_MALLOC_CONF: ${{ inputs.MALLOC_CONF }}
+          PROFILE: ${{ inputs.PROFILE && 'perf' || '' }}
+          PROFILE_CONFIGS: ${{ inputs.PROFILE_CONFIGS }}
+          PERF_FREQ: ${{ inputs.PERF_FREQ }}
+          BUILD: ${{ inputs.BUILD }}
+          # SMT siblings would share a core on the c3d runner.
+          PIN_ONE_PER_CORE: ${{ inputs.RUNNER == 'benchmark-c3d-60' && '1' || '' }}
+          OUT_DIR: ${{ runner.temp }}/sweep-out
+          WORK_DIR: ${{ runner.temp }}/sweep-work
+        run: |
+          set +e
+          # perf needs the paranoid level below 1 for kernel samples; without
+          # sudo on the runner it still records user space.
+          if [ -n "$PROFILE" ] && [ -z "$PERF_BIN" ]; then
+            if which perf >/dev/null; then export PERF_BIN=perf; else export PROFILE=""; fi
+          fi
+          python3 third_party/move/mono-move/testsuite/e2e-perf/scaling_sweep.py
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Write step summary
+        if: always()
+        run: cat "${{ runner.temp }}/sweep-out/report.md" >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sweep-${{ matrix.workload }}
+          path: |
+            ${{ runner.temp }}/sweep-out/report.md
+            ${{ runner.temp }}/sweep-out/results.jsonl
+            ${{ runner.temp }}/sweep-out/medians.json
+            ${{ runner.temp }}/sweep-out/profiles/
+            ${{ runner.temp }}/sweep-out/timeline/
+          if-no-files-found: warn
+
+      - name: Fail on sweep error
+        if: ${{ steps.sweep.outputs.exit_code != '0' }}
+        run: exit 1
