@@ -41,7 +41,9 @@ cargo dylint --all -p mono-move-core               # one crate
 
 The first run builds the lint library and a driver for its pinned nightly
 (`rust-toolchain.toml`); both are cached afterwards. CI runs the same script
-(`.github/workflows/mono-move-lints.yaml`) on mono-move PRs only.
+(`.github/workflows/mono-move-lints.yaml`) on mono-move PRs only: a cheap
+`mono-move-changes` job decides, and `mono-move-lints` is skipped (which
+counts as passing) on every other PR. Require both on `main`.
 
 ## Scoping
 

@@ -5,9 +5,12 @@ name: "mono-move-lints"
 # runs share one definition. Which crates each lint applies to is configured
 # in /dylint.toml.
 #
-# The required check `mono-move-lints-required` always reports; `changes`
-# decides whether the lints run, so only mono-move PRs pay for the nightly
-# driver build.
+# Two jobs. `mono-move-changes` is cheap and always passes; it decides whether
+# the PR touches anything the lints cover. `mono-move-lints` runs only when it
+# does and is skipped otherwise, which GitHub counts as passing, so only
+# mono-move PRs pay for the nightly driver build. Require both on `main`:
+# `mono-move-lints` is the gate, and requiring `mono-move-changes` too means a
+# broken gate job cannot turn into a silently skipped (passing) lint job.
 on:
   # `pull_request`, never `pull_request_target`: this runs untrusted PR code on
   # a self-hosted runner, and `pull_request_target` would hand that code a
@@ -28,7 +31,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  changes:
+  mono-move-changes:
     runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
       mono_move: ${{ steps.filter.outputs.mono_move }}
@@ -58,10 +61,13 @@ jobs:
             echo "mono_move=false" >> "$GITHUB_OUTPUT"
           fi
 
-  lints:
-    needs: changes
+  mono-move-lints:
+    needs: mono-move-changes
+    # Skipped (which counts as passing) when nothing relevant changed, and for
+    # PRs from forks: the lints run untrusted PR code on a self-hosted runner,
+    # so a fork's branch has to be pushed to this repository to be linted.
     if: |
-      needs.changes.outputs.mono_move == 'true' &&
+      needs.mono-move-changes.outputs.mono_move == 'true' &&
       (
         github.event_name != 'pull_request' ||
         github.event.pull_request.head.repo.full_name == github.repository
@@ -96,19 +102,3 @@ jobs:
       - name: Run the lints over the mono-move crates
         # The lints are deny-by-default: a hit is a review finding.
         run: third_party/move/mono-move/scripts/dylint.sh
-
-  mono-move-lints-required:
-    needs: [changes, lints]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check results
-        env:
-          CHANGES_RESULT: ${{ needs.changes.result }}
-          LINTS_RESULT: ${{ needs.lints.result }}
-        run: |
-          echo "changes: $CHANGES_RESULT, lints: $LINTS_RESULT"
-          case "$CHANGES_RESULT/$LINTS_RESULT" in
-            success/success | success/skipped) ;;
-            *) exit 1 ;;
-          esac
