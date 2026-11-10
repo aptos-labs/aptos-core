@@ -20,11 +20,11 @@ type Entry = FatRef;
 ///
 /// All public methods take `&self`, with the backing store behind a single
 /// `UnsafeCell`, so multiple handles (each borrowing the pool) can coexist.
-/// Soundness relies on
-/// 1. the pool being single-threaded (`!Sync`), and
-/// 2. every method holding at most one borrow of the inner store at a time, never
-///    across a call that could reborrow it. [`RootPool::relocate_each`]
-///    additionally requires the caller's closure not to re-enter the pool.
+/// Soundness relies on the pool being single-threaded (`!Sync`) and on the
+/// cell discipline the `unsafe_cell_reborrow` lint checks: every method
+/// reborrows the store at most once, for that method only, and calls nothing
+/// that could reborrow it meanwhile (the rules are on the runtime's
+/// `ProductionNativeContext`, "Cell discipline").
 pub struct RootPool {
     inner: UnsafeCell<RootPoolInner>,
 }
@@ -96,17 +96,13 @@ impl RootPool {
     /// new address for a live heap object, or `None` to skip — including for the
     /// null bases of freed slots and empty vectors, and for non-heap pointers.
     /// Every entry is therefore passed through unconditionally.
-    ///
-    /// It must also guarantee that it does NOT call any other methods on this pool,
-    /// as that kind of re-entrancy breaks interior mutability -- only one mutable
-    /// borrow is allowed at a time.
     pub unsafe fn relocate_each(&self, mut relocate: impl FnMut(MemAddr) -> Option<MemAddr>) {
-        // SAFETY: short, exclusive reborrow; the caller guarantees `relocate`
-        // does not re-enter, and GC is stop-the-world, so no handle read overlaps.
-        let inner = unsafe { &mut *self.inner.get() };
-        for entry in inner.entries.iter_mut() {
-            if let Some(new) = relocate(entry.base) {
-                entry.base = new;
+        // No borrow of the store is held while `relocate` runs: each slot is
+        // read and written through its own short reborrow, so the callback
+        // may use the pool itself.
+        for idx in 0..self.slot_count() {
+            if let Some(new) = relocate(self.entry(idx).base) {
+                self.set_base(idx, new);
             }
         }
     }
@@ -143,8 +139,14 @@ impl RootPool {
         inner.entries[idx]
     }
 
-    /// Number of slots ever allocated (live + freed-but-not-reclaimed). For tests.
-    #[cfg(test)]
+    /// Points slot `idx` at `base`.
+    fn set_base(&self, idx: usize, base: MemAddr) {
+        // SAFETY: short, exclusive reborrow; `idx` is an allocated slot.
+        let inner = unsafe { &mut *self.inner.get() };
+        inner.entries[idx].base = base;
+    }
+
+    /// Number of slots ever allocated (live + freed-but-not-reclaimed).
     fn slot_count(&self) -> usize {
         // SAFETY: short shared reborrow; single-threaded.
         unsafe { &*self.inner.get() }.entries.len()

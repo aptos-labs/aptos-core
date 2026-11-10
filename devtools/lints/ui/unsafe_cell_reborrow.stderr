@@ -127,6 +127,19 @@ LL |         let heap = unsafe { &mut **self.heap.get() };
    |                             ^^^^^^^^^^^^^^^^^^^^^^
    = help: see `unsafe_cell_reborrow` in devtools/lints/README.md for the rules
 
+error: call through a function value while `Store.inner` is held; the callee may reach the struct through its caller
+  --> $DIR/unsafe_cell_reborrow.rs:233:13
+   |
+LL |             f(*x);
+   |             ^^^^^
+   |
+note: `Store.inner` is reborrowed here
+  --> $DIR/unsafe_cell_reborrow.rs:231:30
+   |
+LL |         let inner = unsafe { &*self.inner.get() };
+   |                              ^^^^^^^^^^^^^^^^^^
+   = help: see `unsafe_cell_reborrow` in devtools/lints/README.md for the rules
+
 error: in `Ctx::escape`, the return type can hold a reference to `Heap`, so a reborrow can escape
   --> $DIR/unsafe_cell_reborrow.rs:91:5
    |
@@ -182,5 +195,5 @@ LL | | }
    |
    = help: see `unsafe_cell_reborrow` in devtools/lints/README.md for the rules
 
-error: aborting due to 17 previous errors
+error: aborting due to 18 previous errors
 

@@ -10,7 +10,7 @@ fully resolved types, HIR and MIR — everything clippy can see.
 |---|---|---|
 | `no_std_hash_map` | `std::collections::{HashMap, HashSet}`, `hashbrown`, and aliases such as `FxHashMap`; use `shared_dsa::{UnorderedMap, UnorderedSet}` (no ordered iteration exposed) or `BTreeMap`/`BTreeSet` | consensus-critical mono-move crates |
 | `raw_memory_access` | raw pointer types, method calls on raw pointers (`p.add(1)`, even when the pointer is never spelled), and `core::ptr::{copy*, read*, write*, swap*}` / `slice::from_raw_parts*`; go through `mono_move_mem::MemAddr` | mono-move crates except `mem`, `alloc`, `lean-link` |
-| `unsafe_cell_reborrow` | breaches of the discipline for structs whose `&self` methods mutate through `UnsafeCell<&mut T>` fields (the native context): see below | mono-move crates; the cell rules fire only in a crate that defines such a struct |
+| `unsafe_cell_reborrow` | breaches of the discipline for structs whose `&self` methods mutate through `UnsafeCell` fields (the native context, the root pool): see below | mono-move crates; the cell rules fire only in a crate that defines such a struct |
 
 ### What `no_std_hash_map` does not guarantee
 
@@ -34,16 +34,18 @@ for picking a map at a given site.
 
 ### The `unsafe_cell_reborrow` rules
 
-A struct whose methods take `&self` but need `&mut` access to some components
-keeps them in `UnsafeCell<&mut T>` fields ("cells") and reborrows
-`&mut **self.cell.get()` inside each method. That is sound only if each cell
-has at most one live reborrow at any instant and none outlives the method that
-made it. The borrow checker cannot see this, so the lint enforces a coarse,
-over-conservative discipline on every function of a crate that defines such a
-struct:
+A struct whose methods take `&self` but need `&mut` access to some state keeps
+it in an `UnsafeCell` field ("cell"), `UnsafeCell<&mut T>` for a borrowed
+component or `UnsafeCell<T>` for an owned one, and reborrows
+`&mut **self.cell.get()` (or `&mut *` for the owned form) inside each method.
+That is sound only if each cell has at most one live reborrow at any instant
+and none outlives the method that made it. The borrow checker cannot see this,
+so the lint enforces a coarse, over-conservative discipline on every function
+of a crate that defines such a struct:
 
 1. Cell fields are private and appear only at a *site*, written
-   `&mut **self.cell.get()` (or `&**` for a shared reborrow).
+   `&mut **self.cell.get()` / `&mut *self.cell.get()` (or `&` for a shared
+   reborrow).
 2. A function has at most one site per cell, and the reborrow counts as held
    for the whole function body.
 3. A function that holds a cell calls nothing that may reborrow the same cell,

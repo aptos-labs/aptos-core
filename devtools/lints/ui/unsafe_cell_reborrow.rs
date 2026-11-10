@@ -214,6 +214,27 @@ impl Adapter<'_> {
     }
 }
 
+// An owned cell is the same hazard, reborrowed with one `*` instead of two.
+struct Store {
+    inner: UnsafeCell<Vec<u64>>,
+}
+
+impl Store {
+    // Not flagged: one reborrow, nothing called that could reborrow again.
+    fn push(&self, x: u64) {
+        let inner = unsafe { &mut *self.inner.get() };
+        inner.push(x);
+    }
+
+    // Flagged: the callback runs while the store is reborrowed.
+    fn each(&self, mut f: impl FnMut(u64)) {
+        let inner = unsafe { &*self.inner.get() };
+        for x in inner.iter() {
+            f(*x);
+        }
+    }
+}
+
 #[cfg_attr(dylint_lib = "aptos_lints", allow(unsafe_cell_reborrow))]
 fn exempted(ctx: &Ctx<'_>) -> u64 {
     let heap = unsafe { &mut **ctx.heap.get() };

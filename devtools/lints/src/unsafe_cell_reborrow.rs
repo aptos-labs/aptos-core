@@ -2,18 +2,21 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! `unsafe_cell_reborrow`: the discipline for `&self` methods that mutate
-//! through `UnsafeCell<&mut T>` fields ("cells").
+//! through `UnsafeCell` fields ("cells").
 //!
-//! A struct whose methods take `&self` but need `&mut` access to some
-//! components keeps them in `UnsafeCell<&mut T>` fields and reborrows
-//! `&mut **self.cell.get()` inside each method. That is sound only if each
-//! cell has at most one live reborrow at any instant and no reborrow outlives
-//! the activation that made it. The borrow checker cannot see this, so this
-//! lint enforces a coarse, over-conservative discipline on every function in
-//! a crate that defines such a struct:
+//! A struct whose methods take `&self` but need `&mut` access to some state
+//! keeps it in an `UnsafeCell` field, `UnsafeCell<&mut T>` for a borrowed
+//! component or `UnsafeCell<T>` for an owned one, and reborrows
+//! `&mut **self.cell.get()` (or `&mut *` for the owned form) inside each
+//! method. That is sound only if each cell has at most one live reborrow at
+//! any instant and no reborrow outlives the activation that made it. The
+//! borrow checker cannot see this, so this lint enforces a coarse,
+//! over-conservative discipline on every function in a crate that defines
+//! such a struct:
 //!
 //! 1. Cell fields are private and appear only at a *site*, written
-//!    `&mut **self.cell.get()` (or `&**` for a shared reborrow).
+//!    `&mut **self.cell.get()` / `&mut *self.cell.get()` (or `&` for a shared
+//!    reborrow).
 //! 2. A function has at most one site per cell, and the reborrow counts as
 //!    held for the whole function body.
 //! 3. A function that holds a cell calls nothing that may reborrow the same
@@ -48,7 +51,7 @@ use rustc_hir::{
     def::{DefKind, Res},
     def_id::{DefId, LocalDefId},
     intravisit::{self, Visitor},
-    BorrowKind, Expr, ExprKind, HirId, Mutability, UnOp,
+    BorrowKind, Expr, ExprKind, HirId, UnOp,
 };
 use rustc_lint::{LateContext, LateLintPass};
 use rustc_middle::ty::{self, Instance, InstanceKind, Ty, TyCtxt, TypeckResults, TypingEnv};
@@ -60,8 +63,8 @@ use std::collections::{BTreeMap, BTreeSet};
 declare_lint! {
     /// ### What it does
     ///
-    /// Checks the discipline for structs that mutate through
-    /// `UnsafeCell<&mut T>` fields from `&self` methods: one reborrow per
+    /// Checks the discipline for structs that mutate through `UnsafeCell`
+    /// fields from `&self` methods: one reborrow per
     /// cell per function, no call that may reborrow a held cell, no escape
     /// of a reborrow, and no call into unseen code while a cell is held.
     ///
@@ -92,7 +95,7 @@ declare_lint! {
     /// ```
     pub UNSAFE_CELL_REBORROW,
     Deny,
-    "overlapping or escaping reborrow of an `UnsafeCell<&mut T>` field"
+    "overlapping or escaping reborrow of an `UnsafeCell` field"
 }
 
 /// Configuration, from `[aptos_lints.unsafe_cell_reborrow]` in `dylint.toml`.
@@ -195,19 +198,23 @@ fn reaches_listed_trait(cx: &LateContext<'_>, list: &[String], trait_def_id: Def
 // Cells
 // ---------------------------------------------------------------------------
 
-/// One `UnsafeCell<&mut T>` field.
+/// One `UnsafeCell` field.
 struct Cell<'tcx> {
     /// The struct that owns the field.
     owner: DefId,
     field: Symbol,
-    /// The `T`.
+    /// What a reborrow yields: the `T` of `UnsafeCell<&mut T>` or of
+    /// `UnsafeCell<T>`.
     target: Ty<'tcx>,
+    /// Derefs between `.get()` and the reborrow: two through a stored
+    /// reference (`&mut **`), one for an owned value (`&mut *`).
+    derefs: usize,
 }
 
 type CellIdx = usize;
 
-/// Every `UnsafeCell<&mut T>` field of every struct in the crate (rule 1's
-/// privacy check happens here too).
+/// Every `UnsafeCell` field of every struct in the crate (rule 1's privacy
+/// check happens here too).
 fn find_cells<'tcx>(cx: &LateContext<'tcx>) -> Vec<Cell<'tcx>> {
     let tcx = cx.tcx;
     let mut cells = Vec::new();
@@ -227,8 +234,10 @@ fn find_cells<'tcx>(cx: &LateContext<'tcx>) -> Vec<Cell<'tcx>> {
             if !tcx.is_lang_item(adt.did(), LangItem::UnsafeCell) {
                 continue;
             }
-            let ty::Ref(_, target, Mutability::Mut) = args.type_at(0).kind() else {
-                continue;
+            let content = args.type_at(0);
+            let (target, derefs) = match content.kind() {
+                ty::Ref(_, target, _) => (*target, 2),
+                _ => (content, 1),
             };
             let owner = item.owner_id.to_def_id();
             if tcx.visibility(field.def_id).is_public() {
@@ -247,7 +256,8 @@ fn find_cells<'tcx>(cx: &LateContext<'tcx>) -> Vec<Cell<'tcx>> {
             cells.push(Cell {
                 owner,
                 field: field.ident.name,
-                target: *target,
+                target,
+                derefs,
             });
         }
     }
@@ -460,9 +470,10 @@ fn ty_mentions_cell_struct<'tcx>(cells: &[Cell<'tcx>], ty: Ty<'tcx>) -> bool {
     })
 }
 
-/// A site is exactly `&mut **<field>.get()` or `&**<field>.get()`: the span
-/// of the whole reborrow if `field_expr` is used that way.
-fn site_span<'tcx>(cx: &LateContext<'tcx>, field_expr: &Expr<'tcx>) -> Option<Span> {
+/// A site is exactly `&mut <*…*><field>.get()` or `&<*…*><field>.get()`
+/// with `derefs` stars: the span of the whole reborrow if `field_expr` is
+/// used that way.
+fn site_span<'tcx>(cx: &LateContext<'tcx>, field_expr: &Expr<'tcx>, derefs: usize) -> Option<Span> {
     let get = get_parent_expr(cx, field_expr)?;
     let ExprKind::MethodCall(segment, receiver, [], _) = get.kind else {
         return None;
@@ -470,25 +481,22 @@ fn site_span<'tcx>(cx: &LateContext<'tcx>, field_expr: &Expr<'tcx>) -> Option<Sp
     if segment.ident.as_str() != "get" || receiver.hir_id != field_expr.hir_id {
         return None;
     }
-    let deref1 = get_parent_expr(cx, get)?;
-    let ExprKind::Unary(UnOp::Deref, inner) = deref1.kind else {
-        return None;
-    };
-    if inner.hir_id != get.hir_id {
-        return None;
+    let mut place = get;
+    for _ in 0..derefs {
+        let deref = get_parent_expr(cx, place)?;
+        let ExprKind::Unary(UnOp::Deref, inner) = deref.kind else {
+            return None;
+        };
+        if inner.hir_id != place.hir_id {
+            return None;
+        }
+        place = deref;
     }
-    let deref2 = get_parent_expr(cx, deref1)?;
-    let ExprKind::Unary(UnOp::Deref, inner) = deref2.kind else {
-        return None;
-    };
-    if inner.hir_id != deref1.hir_id {
-        return None;
-    }
-    let borrow = get_parent_expr(cx, deref2)?;
+    let borrow = get_parent_expr(cx, place)?;
     let ExprKind::AddrOf(BorrowKind::Ref, _, inner) = borrow.kind else {
         return None;
     };
-    (inner.hir_id == deref2.hir_id).then_some(borrow.span)
+    (inner.hir_id == place.hir_id).then_some(borrow.span)
 }
 
 impl<'tcx> Visitor<'tcx> for BodyScan<'_, 'tcx> {
@@ -498,7 +506,7 @@ impl<'tcx> Visitor<'tcx> for BodyScan<'_, 'tcx> {
         match expr.kind {
             ExprKind::Field(base, ident) => {
                 if let Some(cell) = self.cell_field(base, ident.name) {
-                    match site_span(self.cx, expr) {
+                    match site_span(self.cx, expr, self.cells[cell].derefs) {
                         Some(span) => self.info.sites.push((cell, expr.hir_id, span)),
                         None => self.info.misuses.push((expr.hir_id, expr.span, cell)),
                     }
@@ -631,9 +639,10 @@ impl<'a, 'tcx> Analysis<'a, 'tcx> {
                 *span,
                 format!(
                     "{} used outside a reborrow site; the only permitted form is \
-                     `&mut **self.{}.get()` (or `&**`)",
+                     `&mut {stars}self.{}.get()` (or `&{stars}`)",
                     self.cell_name(*cell),
-                    self.cells[*cell].field
+                    self.cells[*cell].field,
+                    stars = "*".repeat(self.cells[*cell].derefs),
                 ),
                 &[],
             );
