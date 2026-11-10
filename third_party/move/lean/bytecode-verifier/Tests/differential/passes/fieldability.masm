@@ -1,0 +1,8 @@
+module 0xa7::fieldability
+
+struct S has copy + drop
+  f: signer
+
+fun f(): u64
+    ld_u64 1
+    ret

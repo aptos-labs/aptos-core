@@ -1,0 +1,28 @@
+module 0xd0::apinone
+
+struct S has drop
+  a: u64
+
+fun pack$Nope(): u64
+    ld_u64 1
+    ret
+
+fun foo$S(): u64
+    ld_u64 1
+    ret
+
+fun borrow$S$x(): u64
+    ld_u64 1
+    ret
+
+fun borrow$S$65536(): u64
+    ld_u64 1
+    ret
+
+fun borrow$S$0$1$2(): u64
+    ld_u64 1
+    ret
+
+fun test_variant$S(): u64
+    ld_u64 1
+    ret

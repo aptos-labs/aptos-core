@@ -1,0 +1,9 @@
+module 0xdf::existsbad
+
+struct R has key
+  v: u64
+
+fun f(): bool
+    ld_u64 1
+    exists R
+    ret

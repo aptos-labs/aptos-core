@@ -1,0 +1,9 @@
+module 0xe1::fieldstore
+
+struct S has store
+  a: u64
+  v: vector<u64>
+
+fun f(): u64
+    ld_u64 1
+    ret

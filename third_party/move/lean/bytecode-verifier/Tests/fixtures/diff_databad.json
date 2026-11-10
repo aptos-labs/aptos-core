@@ -1,0 +1,1105 @@
+{
+  "format": "move-bytecode-lean-diff/1",
+  "modules": [
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 2,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [],
+        [
+          "U64"
+        ]
+      ],
+      "identifiers": [
+        "packbad",
+        "Pair",
+        "f",
+        "a",
+        "b"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000089"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              },
+              {
+                "name": 4,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              "LdTrue",
+              {
+                "Pack": 0
+              },
+              "Pop",
+              {
+                "LdU64": "0"
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 2,
+          "type_parameters": []
+        },
+        {
+          "module": 0,
+          "name": 2,
+          "abilities": 2,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 3,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [],
+        [
+          "U64"
+        ]
+      ],
+      "identifiers": [
+        "unpackbad",
+        "Pair",
+        "One",
+        "f",
+        "a",
+        "b"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000089"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 4,
+                "signature": "U64"
+              },
+              {
+                "name": 5,
+                "signature": "U64"
+              }
+            ]
+          }
+        },
+        {
+          "struct_handle": 1,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 4,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              {
+                "LdU64": "2"
+              },
+              {
+                "Pack": 0
+              },
+              {
+                "Unpack": 1
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [],
+        [
+          {
+            "Vector": "U64"
+          }
+        ],
+        [
+          "U64"
+        ]
+      ],
+      "identifiers": [
+        "vecbad",
+        "f"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000089"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              "LdTrue",
+              {
+                "VecPack": [
+                  2,
+                  "2"
+                ]
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [],
+        [
+          "U8"
+        ],
+        [
+          "U64"
+        ]
+      ],
+      "identifiers": [
+        "vecunpackbad",
+        "f"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000089"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              {
+                "VecPack": [
+                  2,
+                  "1"
+                ]
+              },
+              {
+                "VecUnpack": [
+                  1,
+                  "1"
+                ]
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "parameters": 0,
+          "return_": 0,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [],
+        [
+          "U64"
+        ]
+      ],
+      "identifiers": [
+        "abortbad",
+        "f"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000089"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              {
+                "LdU64": "2"
+              },
+              {
+                "VecPack": [
+                  1,
+                  "1"
+                ]
+              },
+              "AbortMsg"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 0,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 0,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        []
+      ],
+      "identifiers": [
+        "popcoin",
+        "Coin",
+        "f",
+        "value"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000089"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              {
+                "Pack": 0
+              },
+              "Pop",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 0,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Struct": 0
+          }
+        ],
+        [
+          "U64"
+        ],
+        []
+      ],
+      "identifiers": [
+        "copycoin",
+        "Coin",
+        "f",
+        "value"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000089"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "CopyLoc": 0
+              },
+              {
+                "Unpack": 0
+              },
+              {
+                "MoveLoc": 0
+              },
+              {
+                "Unpack": 0
+              },
+              "Add",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 0,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Struct": 0
+          }
+        ],
+        [
+          "U64"
+        ],
+        []
+      ],
+      "identifiers": [
+        "retcoin",
+        "Coin",
+        "f",
+        "value"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000089"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 0,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Struct": 0
+          },
+          {
+            "Struct": 0
+          }
+        ],
+        [
+          "Bool"
+        ],
+        []
+      ],
+      "identifiers": [
+        "eqcoin",
+        "Coin",
+        "f",
+        "value"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000089"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 2,
+            "code": [
+              {
+                "MoveLoc": 0
+              },
+              {
+                "MoveLoc": 1
+              },
+              "Eq",
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 0,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 2,
+          "parameters": 0,
+          "return_": 0,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [
+          {
+            "Struct": 0
+          }
+        ],
+        []
+      ],
+      "identifiers": [
+        "stloccoin",
+        "Coin",
+        "f",
+        "value"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000089"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 3,
+                "signature": "U64"
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 1,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              {
+                "Pack": 0
+              },
+              {
+                "StLoc": 0
+              },
+              {
+                "MoveLoc": 0
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    },
+    {
+      "version": 10,
+      "self_module_handle_idx": 0,
+      "module_handles": [
+        {
+          "address": 0,
+          "name": 0
+        }
+      ],
+      "struct_handles": [
+        {
+          "module": 0,
+          "name": 1,
+          "abilities": 2,
+          "type_parameters": []
+        },
+        {
+          "module": 0,
+          "name": 2,
+          "abilities": 2,
+          "type_parameters": []
+        }
+      ],
+      "function_handles": [
+        {
+          "module": 0,
+          "name": 3,
+          "parameters": 0,
+          "return_": 1,
+          "type_parameters": [],
+          "access_specifiers": null,
+          "attributes": []
+        }
+      ],
+      "field_handles": [],
+      "friend_decls": [],
+      "struct_def_instantiations": [],
+      "function_instantiations": [],
+      "field_instantiations": [],
+      "signatures": [
+        [],
+        [
+          "U64"
+        ]
+      ],
+      "identifiers": [
+        "variantbad",
+        "Pair",
+        "E",
+        "f",
+        "a",
+        "b",
+        "V",
+        "x"
+      ],
+      "address_identifiers": [
+        "0x0000000000000000000000000000000000000000000000000000000000000089"
+      ],
+      "constant_pool": [],
+      "metadata": [],
+      "struct_defs": [
+        {
+          "struct_handle": 0,
+          "field_information": {
+            "Declared": [
+              {
+                "name": 4,
+                "signature": "U64"
+              },
+              {
+                "name": 5,
+                "signature": "U64"
+              }
+            ]
+          }
+        },
+        {
+          "struct_handle": 1,
+          "field_information": {
+            "DeclaredVariants": [
+              {
+                "name": 6,
+                "fields": [
+                  {
+                    "name": 7,
+                    "signature": "U64"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "function_defs": [
+        {
+          "function": 0,
+          "visibility": "Private",
+          "is_entry": false,
+          "acquires_global_resources": [],
+          "code": {
+            "locals": 0,
+            "code": [
+              {
+                "LdU64": "1"
+              },
+              {
+                "LdU64": "2"
+              },
+              {
+                "Pack": 0
+              },
+              {
+                "UnpackVariant": 0
+              },
+              "Ret"
+            ]
+          }
+        }
+      ],
+      "struct_variant_handles": [
+        {
+          "struct_index": 1,
+          "variant": 0
+        }
+      ],
+      "struct_variant_instantiations": [],
+      "variant_field_handles": [],
+      "variant_field_instantiations": []
+    }
+  ],
+  "scripts": [],
+  "rust_verifier": [
+    {
+      "module": "0x89::packbad",
+      "local": "PACK_TYPE_MISMATCH_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0x89::unpackbad",
+      "local": "UNPACK_TYPE_MISMATCH_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0x89::vecbad",
+      "local": "TYPE_MISMATCH",
+      "linking": "ok"
+    },
+    {
+      "module": "0x89::vecunpackbad",
+      "local": "TYPE_MISMATCH",
+      "linking": "ok"
+    },
+    {
+      "module": "0x89::abortbad",
+      "local": "ABORT_TYPE_MISMATCH_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0x89::popcoin",
+      "local": "POP_WITHOUT_DROP_ABILITY",
+      "linking": "ok"
+    },
+    {
+      "module": "0x89::copycoin",
+      "local": "COPYLOC_WITHOUT_COPY_ABILITY",
+      "linking": "ok"
+    },
+    {
+      "module": "0x89::retcoin",
+      "local": "UNSAFE_RET_UNUSED_VALUES_WITHOUT_DROP",
+      "linking": "ok"
+    },
+    {
+      "module": "0x89::eqcoin",
+      "local": "EQUALITY_OP_TYPE_MISMATCH_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0x89::stloccoin",
+      "local": "STLOC_UNSAFE_TO_DESTROY_ERROR",
+      "linking": "ok"
+    },
+    {
+      "module": "0x89::variantbad",
+      "local": "UNPACK_TYPE_MISMATCH_ERROR",
+      "linking": "ok"
+    }
+  ],
+  "calls": []
+}

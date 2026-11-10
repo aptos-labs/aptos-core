@@ -1,0 +1,6 @@
+module 0x99::unassigned
+
+fun f(): u64
+    local x: u64
+    copy_loc x
+    ret

@@ -13604,6 +13604,49 @@ name = "move-borrow-graph"
 version = "0.0.1"
 
 [[package]]
+name = "move-bytecode-lean-config-export"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-gas-schedule",
+ "aptos-types",
+ "aptos-vm-environment",
+ "move-bytecode-verifier",
+ "serde_json",
+]
+
+[[package]]
+name = "move-bytecode-lean-export"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "either",
+ "move-asm",
+ "move-binary-format",
+ "move-core-types",
+ "serde_json",
+]
+
+[[package]]
+name = "move-bytecode-lean-vm-oracle"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-release-bundle",
+ "mono-move-lean-link",
+ "move-binary-format",
+ "move-bytecode-lean-config-export",
+ "move-bytecode-lean-export",
+ "move-bytecode-verifier",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "move-bytecode-source-map"
 version = "0.1.0"
 dependencies = [

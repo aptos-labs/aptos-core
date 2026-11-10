@@ -1,0 +1,10 @@
+module 0x89::popcoin
+
+struct Coin
+  value: u64
+
+fun f()
+    ld_u64 1
+    pack Coin
+    pop
+    ret

@@ -1,0 +1,39 @@
+module 0xe0::closuresok
+
+fun add(x: u64, y: u64): u64
+    move_loc x
+    move_loc y
+    add
+    ret
+
+fun make_adder(x: u64): |u64|u64 has copy + drop
+    move_loc x
+    pack_closure add, 1
+    ret
+
+fun apply(f: |u64|u64 has drop, y: u64): u64
+    move_loc y
+    move_loc f
+    call_closure <|u64|u64 has drop>
+    ret
+
+fun weaken(f: |u64|u64 has copy + drop): |u64|u64 has drop
+    move_loc f
+    ret
+
+fun identity<T>(x: T): T
+    move_loc x
+    ret
+
+fun use_generic(): u64
+    ld_u64 2
+    pack_closure identity<u64>, 1
+    call_closure < | |u64 has drop>
+    ret
+
+fun no_capture(): u64
+    ld_u64 1
+    ld_u64 2
+    pack_closure add, 0
+    call_closure <|u64, u64|u64 has drop>
+    ret

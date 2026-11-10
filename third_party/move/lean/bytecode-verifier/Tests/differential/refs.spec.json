@@ -1,0 +1,23 @@
+{
+  "inputs": [
+    "refs/refsok.masm",
+    "refs/readnocopy.masm",
+    "refs/writeimm.masm",
+    "refs/writenodrop.masm",
+    "refs/borrowref.masm",
+    "refs/movetonokey.masm",
+    "refs/fieldmismatch.masm",
+    "refs/pushimm.masm",
+    "refs/freezeimm.masm",
+    "refs/moveborrowed.masm",
+    "refs/retlocal.masm",
+    "refs/noacquire.masm",
+    "refs/variantmismatch.masm",
+    "refs/testvalue.masm",
+    "refs/existsbad.masm",
+    "refs/writeborrowed.masm",
+    "refs/globaltwice.masm",
+    "refs/callacquires.masm"
+  ],
+  "calls": []
+}

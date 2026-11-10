@@ -1,0 +1,10 @@
+module 0xd3::writenodrop
+
+struct C has store
+  v: u64
+
+fun f(r: &mut C, c: C)
+    move_loc c
+    move_loc r
+    write_ref
+    ret

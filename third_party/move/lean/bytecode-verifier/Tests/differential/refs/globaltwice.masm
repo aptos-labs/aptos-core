@@ -1,0 +1,19 @@
+module 0xe5::globaltwice
+
+struct R has key
+  v: u64
+
+fun f(a: address): u64 acquires R
+    local r: &mut R
+    copy_loc a
+    mut_borrow_global R
+    st_loc r
+    copy_loc a
+    borrow_global R
+    borrow_field R, v
+    read_ref
+    move_loc r
+    mut_borrow_field R, v
+    read_ref
+    add
+    ret

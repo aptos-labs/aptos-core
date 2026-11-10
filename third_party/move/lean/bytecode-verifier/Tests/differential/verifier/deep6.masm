@@ -1,0 +1,22 @@
+module 0x95::deep6
+
+fun f()
+l0: nop
+l1: nop
+l2: nop
+l3: nop
+l4: nop
+l5: nop
+    ld_true
+    br_true l5
+    ld_true
+    br_true l4
+    ld_true
+    br_true l3
+    ld_true
+    br_true l2
+    ld_true
+    br_true l1
+    ld_true
+    br_true l0
+    ret

@@ -1,0 +1,10 @@
+module 0xf3::genretbad
+
+fun id<A>(x: A): A
+    move_loc x
+    ret
+
+fun f(): u8
+    ld_u64 1
+    call id<u64>
+    ret

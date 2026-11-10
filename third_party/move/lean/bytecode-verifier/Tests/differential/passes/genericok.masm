@@ -1,0 +1,15 @@
+module 0xaa::genericok
+
+struct S<A> has drop
+  f: A
+
+struct P<phantom A> has copy + drop
+  n: u64
+
+fun id(x: u64): u64
+    move_loc x
+    ret
+
+fun g<A: drop>(x: u64): u64
+    move_loc x
+    ret

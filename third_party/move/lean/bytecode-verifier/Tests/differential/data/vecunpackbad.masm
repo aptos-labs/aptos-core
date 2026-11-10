@@ -1,0 +1,7 @@
+module 0x89::vecunpackbad
+
+fun f(): u8
+    ld_u64 1
+    vec_pack <u64>, 1
+    vec_unpack <u8>, 1
+    ret

@@ -1,0 +1,7 @@
+module 0xd7::pushimm
+
+fun f(v: &vector<u64>)
+    move_loc v
+    ld_u64 1
+    vec_push_back <u64>
+    ret

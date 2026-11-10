@@ -1,0 +1,24 @@
+module 0xe6::callacquires
+
+struct R has key
+  v: u64
+
+fun get(a: address): u64 acquires R
+    move_loc a
+    borrow_global R
+    borrow_field R, v
+    read_ref
+    ret
+
+fun f(a: address): u64 acquires R
+    local r: &R
+    copy_loc a
+    borrow_global R
+    st_loc r
+    move_loc a
+    call get
+    move_loc r
+    borrow_field R, v
+    read_ref
+    add
+    ret

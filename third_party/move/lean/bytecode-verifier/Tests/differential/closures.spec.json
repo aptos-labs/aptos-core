@@ -1,0 +1,12 @@
+{
+  "inputs": [
+    "closures/closuresok.masm",
+    "closures/clospackbad.masm",
+    "closures/closcallbad.masm",
+    "closures/closabilitybad.masm",
+    "closures/closrefcap.masm",
+    "closures/closmaskbad.masm",
+    "closures/clostorebad.masm"
+  ],
+  "calls": []
+}

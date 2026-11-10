@@ -1,0 +1,16 @@
+{
+  "inputs": [
+    "data/packbad.masm",
+    "data/unpackbad.masm",
+    "data/vecbad.masm",
+    "data/vecunpackbad.masm",
+    "data/abortbad.masm",
+    "data/popcoin.masm",
+    "data/copycoin.masm",
+    "data/retcoin.masm",
+    "data/eqcoin.masm",
+    "data/stloccoin.masm",
+    "data/variantbad.masm"
+  ],
+  "calls": []
+}

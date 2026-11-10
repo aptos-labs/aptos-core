@@ -128,30 +128,38 @@ pub fn run_request(request: &Request, abi: u32) -> Response {
             return Response::uniform_error(request, &identity, Stage::Compile, message)
         },
     };
+    match run_modules(&modules, &request.limits, &request.calls) {
+        Ok(outcomes) => Response {
+            version: PAYLOAD_VERSION,
+            identity,
+            outcomes,
+        },
+        Err(message) => Response::uniform_error(request, &identity, Stage::Internal, message),
+    }
+}
+
+/// Runs `calls` against already compiled `modules`, each call in a fresh
+/// interpreter context. The bytecode-verifier specification
+/// (`third_party/move/lean/bytecode-verifier`) uses this to run bytecode
+/// that was assembled rather than compiled from source.
+pub fn run_modules(
+    modules: &[CompiledModule],
+    limits: &Limits,
+    calls: &[Call],
+) -> Result<Vec<Outcome>, String> {
     let mut provider = InMemoryModuleProvider::new();
-    provider.add_modules(&modules);
+    provider.add_modules(modules);
 
     let global_ctx = GlobalContext::with_num_execution_workers(1);
     let Some(guard) = global_ctx.try_execution_context(0) else {
-        return Response::uniform_error(
-            request,
-            &identity,
-            Stage::Internal,
-            "failed to acquire execution guard 0".to_string(),
-        );
+        return Err("failed to acquire execution guard 0".to_string());
     };
     let natives = production_natives();
 
-    let outcomes = request
-        .calls
+    Ok(calls
         .iter()
-        .map(|call| run_call(&guard, natives, &provider, &request.limits, call))
-        .collect();
-    Response {
-        version: PAYLOAD_VERSION,
-        identity,
-        outcomes,
-    }
+        .map(|call| run_call(&guard, natives, &provider, limits, call))
+        .collect())
 }
 
 /// Runs one call in a fresh interpreter context.

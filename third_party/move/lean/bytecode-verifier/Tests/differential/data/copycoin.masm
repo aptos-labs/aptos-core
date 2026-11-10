@@ -1,0 +1,12 @@
+module 0x89::copycoin
+
+struct Coin
+  value: u64
+
+fun f(c: Coin): u64
+    copy_loc c
+    unpack Coin
+    move_loc c
+    unpack Coin
+    add
+    ret

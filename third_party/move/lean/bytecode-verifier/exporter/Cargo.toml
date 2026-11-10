@@ -1,0 +1,22 @@
+[package]
+name = "move-bytecode-lean-export"
+description = "Exports compiled Move modules and scripts as JSON for the Lean bytecode-verifier specification"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = { workspace = true }
+either = { workspace = true }
+move-asm = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+serde_json = { workspace = true }

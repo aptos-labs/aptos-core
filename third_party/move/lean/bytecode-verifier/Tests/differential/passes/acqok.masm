@@ -1,0 +1,8 @@
+module 0xb2::acqok
+
+struct R has key
+  v: u64
+
+fun f(): u64 acquires R
+    call f
+    ret

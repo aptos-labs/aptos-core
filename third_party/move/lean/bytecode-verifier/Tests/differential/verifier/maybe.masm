@@ -1,0 +1,10 @@
+module 0x9b::maybe
+
+fun f(b: bool): u64
+    local x: u64
+    move_loc b
+    br_false l1
+    ld_u64 1
+    st_loc x
+l1: move_loc x
+    ret

@@ -1,0 +1,6 @@
+module 0xd4::borrowref
+
+fun f(x: &u64)
+    mut_borrow_loc x
+    pop
+    ret

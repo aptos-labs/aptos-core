@@ -1,0 +1,5 @@
+module 0x9c::rettype
+
+fun f(): u64
+    ld_true
+    ret

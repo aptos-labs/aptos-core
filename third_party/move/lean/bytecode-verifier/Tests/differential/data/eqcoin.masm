@@ -1,0 +1,10 @@
+module 0x89::eqcoin
+
+struct Coin
+  value: u64
+
+fun f(a: Coin, b: Coin): bool
+    move_loc a
+    move_loc b
+    eq
+    ret

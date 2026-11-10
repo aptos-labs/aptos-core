@@ -1,0 +1,14 @@
+module 0x78::client
+use 0x77::control as c
+
+public fun fact_plus(n: u64, k: u64): u64
+    move_loc n
+    call c::fact
+    move_loc k
+    add
+    ret
+
+public fun checked(x: u64): u64
+    move_loc x
+    call c::abort_if_zero
+    ret

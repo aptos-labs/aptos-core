@@ -1,0 +1,7 @@
+module 0x89::abortbad
+
+fun f()
+    ld_u64 1
+    ld_u64 2
+    vec_pack <u64>, 1
+    abort_msg

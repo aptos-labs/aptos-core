@@ -1,0 +1,12 @@
+module 0xf7::gentestbad
+
+enum E<A> has drop
+  V1
+    x: A
+  V2
+    y: bool
+
+fun f(e: &E<u64>): bool
+    move_loc e
+    test_variant E<u8>, V1
+    ret

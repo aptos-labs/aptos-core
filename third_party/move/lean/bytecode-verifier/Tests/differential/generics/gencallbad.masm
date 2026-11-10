@@ -1,0 +1,10 @@
+module 0xf2::gencallbad
+
+fun id<A>(x: A): A
+    move_loc x
+    ret
+
+fun f(): u64
+    ld_u8 1
+    call id<u64>
+    ret

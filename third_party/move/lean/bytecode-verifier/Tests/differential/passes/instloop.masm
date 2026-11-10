@@ -1,0 +1,5 @@
+module 0xa5::instloop
+
+fun f<A>()
+    call f<vector<A>>
+    ret

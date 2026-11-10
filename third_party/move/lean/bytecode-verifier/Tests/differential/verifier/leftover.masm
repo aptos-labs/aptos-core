@@ -1,0 +1,7 @@
+module 0x93::leftover
+
+fun f()
+    ld_u64 1
+    branch l1
+l1: pop
+    ret

@@ -1,0 +1,8 @@
+module 0xe2::fieldkey
+
+struct K has key
+  s: signer
+
+fun f(): u64
+    ld_u64 1
+    ret
