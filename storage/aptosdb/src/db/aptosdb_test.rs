@@ -517,8 +517,8 @@ proptest! {
         let hot_root_hashes = |db: &AptosDB| {
             let live = db.state_store.live().unwrap();
             let state = live.current_state_locked();
-            [state.latest(), state.last_checkpoint()]
-                .map(|s| (s.version(), s.summary().hot_root_hash().unwrap()))
+            let s = state.last_checkpoint();
+            (s.version(), s.summary().hot_root_hash().unwrap())
         };
         prop_assert_eq!(hot_root_hashes(&db), hot_root_hashes(&ref_db));
 

@@ -70,7 +70,7 @@ impl DbWriter for AptosDB {
 
             chunk
                 .state_summary
-                .latest()
+                .last_checkpoint()
                 .global_state_summary
                 .log_generation("db_save");
 
@@ -438,9 +438,10 @@ impl AptosDB {
             next_version,
         );
         ensure!(
-            chunk.state.is_checkpoint(),
-            "Chunk ends at version {} in the middle of a block.",
+            chunk.state.next_version() == chunk.next_version(),
+            "Chunk ends at version {}, while its state is at version {:?}.",
             chunk.expect_last_version(),
+            chunk.state.version(),
         );
 
         Ok(())
