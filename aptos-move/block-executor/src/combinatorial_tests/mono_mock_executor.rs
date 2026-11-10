@@ -128,7 +128,7 @@ fn value_type(value: &MonoValue) -> Result<ValueType, PanicError> {
         MonoValue::Deletion => {
             ValueType::new(None, StateValueMetadata::none(), WriteOpKind::Deletion)
         },
-        MonoValue::RawFromStorage(bytes) => ValueType::new(
+        MonoValue::ResourceGroupMemberBytes(bytes) => ValueType::new(
             Some(bytes.clone()),
             StateValueMetadata::none(),
             WriteOpKind::Modification,
@@ -580,7 +580,7 @@ impl MonoMockExecutor {
 /// The stored bytes of a group member the multi-version map holds.
 fn member_bytes(value: &MonoValue) -> Result<Bytes, PanicError> {
     match value {
-        MonoValue::RawFromStorage(bytes) => Ok(bytes.clone()),
+        MonoValue::ResourceGroupMemberBytes(bytes) => Ok(bytes.clone()),
         // SAFETY: the entry holding this pointer also holds its pin.
         MonoValue::Write { ptr, .. } => Ok(unsafe { blob_bytes(*ptr) }.into()),
         MonoValue::Deletion => Err(code_invariant_error("A deleted group member was assembled")),

@@ -85,7 +85,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
     /// The stored bytes of a group member the multi-version map holds.
     fn member_bytes(&self, value: &MonoValue) -> Result<Bytes> {
         match value {
-            MonoValue::RawFromStorage(bytes) => Ok(bytes.clone()),
+            MonoValue::ResourceGroupMemberBytes(bytes) => Ok(bytes.clone()),
             MonoValue::Write { ptr, ty, .. } => {
                 // SAFETY: the entry holding this pointer also pins the frozen
                 // heap it points into, and that heap is never mutated again.
