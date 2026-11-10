@@ -40,23 +40,3 @@ VerexE2ETests/Check/Storage/TableStoredInvariants.lean:113:0: error: ❌️ Docs
       | ensures_1 => verex_prepare; sorry
       | _ => verex_decide
     (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-VerexE2ETests/Check/Storage/TableStoredInvariants.lean:93:4: error: the specification clause `ensures permitted::<Bool>(result)` is not established
-VerexE2ETests/Check/Storage/TableStoredInvariants.lean:128:7: error: verex verification failed: the automatic verification of `wrong_type` exceeded its budget of 25000 maxHeartbeats; provide a proof in the module:
-  verify wrong_type by lean =>
-    verex_obligations
-    verex_on
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-VerexE2ETests/Check/Storage/TableStoredInvariants.lean:127:0: error: ❌️ Docstring on `#guard_msgs` does not match generated message:
-
-  error: the specification clause `ensures permitted::<Bool>(result)` is not established
-  ---
-- error: verex verification failed: the automatic verification of `wrong_type` failed; provide a proof in the module:
-+ error: verex verification failed: the automatic verification of `wrong_type` exceeded its budget of 25000 maxHeartbeats; provide a proof in the module:
-    verify wrong_type by lean =>
-      verex_obligations
-      verex_on
-      | ensures_1 => verex_prepare; sorry
-      | _ => verex_decide
-    (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
