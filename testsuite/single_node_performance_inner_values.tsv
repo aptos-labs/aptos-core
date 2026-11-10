@@ -13,7 +13,7 @@ batch100-transfer	1	VM	172	0.807	1.047	2282.1
 batch100-transfer	1	NativeVM	172	0.799	1.076	4856.6
 vector-picture30k	1	VM	172	0.920	1.025	148.1
 vector-picture30k	100	VM	172	0.815	1.065	2347.9
-smart-table-picture30-k-with200-change	1	VM	172	0.931	1.016	65.4
+smart-table-picture30-k-with200-change	1	VM	172	0.931	1.016	59.8
 smart-table-picture30-k-with200-change	100	VM	172	0.841	1.052	782.9
 modify-global-resource-agg-v2	1	VM	172	0.821	1.032	58823.5
 modify-global-flag-agg-v2	1	VM	172	0.884	1.045	7407.6
