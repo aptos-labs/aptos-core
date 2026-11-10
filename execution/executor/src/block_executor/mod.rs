@@ -31,7 +31,8 @@ use aptos_storage_interface::{
         orders::{OrderParent, ShardedOrderLayers},
         positions::{PositionParent, ShardedPositionLayers},
         state_summary::{
-            ProvableCollateralStateSummary, ProvablePositionStateSummary, ProvableStateSummary,
+            ProvableCollateralStateSummary, ProvableOrderStateSummary,
+            ProvablePositionStateSummary, ProvableStateSummary,
         },
         state_view::cached_state_view::CachedStateView,
     },
@@ -482,6 +483,15 @@ where
                     .transpose()?;
                 let parent_position_summary =
                     parent_block.output.ensure_result_position_state_summary()?;
+                let order_persisted = output
+                    .execution_output
+                    .compute_trading_native_state_roots
+                    .then(|| {
+                        ProvableOrderStateSummary::new_persisted_order(self.db.reader.as_ref())
+                    })
+                    .transpose()?;
+                let parent_order_summary =
+                    parent_block.output.ensure_result_order_state_summary()?;
                 let collateral_persisted = output
                     .execution_output
                     .compute_trading_native_state_roots
@@ -503,6 +513,8 @@ where
                         )?)
                         .maybe_parent_position_state_summary(parent_position_summary)
                         .maybe_persisted_position_state_summary(position_persisted.as_ref())
+                        .maybe_parent_order_state_summary(parent_order_summary)
+                        .maybe_persisted_order_state_summary(order_persisted.as_ref())
                         .maybe_parent_collateral_state_summary(parent_collateral_summary)
                         .maybe_persisted_collateral_state_summary(collateral_persisted.as_ref())
                         .build()?,

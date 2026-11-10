@@ -32,7 +32,8 @@ use aptos_storage_interface::{
         positions::PositionParent,
         state::State,
         state_summary::{
-            ProvableCollateralStateSummary, ProvablePositionStateSummary, ProvableStateSummary,
+            ProvableCollateralStateSummary, ProvableOrderStateSummary,
+            ProvablePositionStateSummary, ProvableStateSummary,
         },
         state_view::cached_state_view::CachedStateView,
     },
@@ -537,6 +538,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         let (
             parent_state_summary,
             parent_position_state_summary,
+            parent_order_state_summary,
             parent_collateral_state_summary,
             parent_accumulator,
             chunk,
@@ -571,6 +573,15 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         let position_persisted = compute_trading_native_state_roots
             .then(|| ProvablePositionStateSummary::new_persisted_position(self.db.reader.as_ref()))
             .transpose()?;
+        let known_order_state_checkpoints = compute_trading_native_state_roots.then(|| {
+            txn_infos
+                .iter()
+                .map(|t| t.order_state_checkpoint_hash())
+                .collect_vec()
+        });
+        let order_persisted = compute_trading_native_state_roots
+            .then(|| ProvableOrderStateSummary::new_persisted_order(self.db.reader.as_ref()))
+            .transpose()?;
         let known_collateral_state_checkpoints = compute_trading_native_state_roots.then(|| {
             txn_infos
                 .iter()
@@ -597,6 +608,9 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .maybe_parent_position_state_summary(parent_position_state_summary.as_ref())
             .maybe_persisted_position_state_summary(position_persisted.as_ref())
             .maybe_known_position_state_checkpoints(known_position_state_checkpoints)
+            .maybe_parent_order_state_summary(parent_order_state_summary.as_ref())
+            .maybe_persisted_order_state_summary(order_persisted.as_ref())
+            .maybe_known_order_state_checkpoints(known_order_state_checkpoints)
             .maybe_parent_collateral_state_summary(parent_collateral_state_summary.as_ref())
             .maybe_persisted_collateral_state_summary(collateral_persisted.as_ref())
             .maybe_known_collateral_state_checkpoints(known_collateral_state_checkpoints)

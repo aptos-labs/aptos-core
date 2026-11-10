@@ -12,7 +12,7 @@ use aptos_storage_interface::state_store::{
     sharded_jmt_state::{NativeSlot, NativeStateWithSummary},
     state_summary::{
         LedgerStateSummary, ProvableCollateralStateSummary, ProvableNativeStateSummary,
-        ProvablePositionStateSummary, ProvableStateSummary,
+        ProvableOrderStateSummary, ProvablePositionStateSummary, ProvableStateSummary,
     },
     state_with_summary::LedgerWithSummary,
 };
@@ -28,6 +28,7 @@ pub struct DoStateCheckpoint;
 #[derive(Clone, Copy)]
 enum NativeTree {
     Position,
+    Order,
     Collateral,
 }
 
@@ -35,6 +36,7 @@ impl NativeTree {
     fn label(self) -> &'static str {
         match self {
             NativeTree::Position => "position_state",
+            NativeTree::Order => "order_state",
             NativeTree::Collateral => "collateral_state",
         }
     }
@@ -43,6 +45,9 @@ impl NativeTree {
         match self {
             NativeTree::Position => write_set
                 .native_position_iter()
+                .for_each(|(key, op)| f(key, op.as_write_op())),
+            NativeTree::Order => write_set
+                .native_order_iter()
                 .for_each(|(key, op)| f(key, op.as_write_op())),
             NativeTree::Collateral => write_set
                 .native_collateral_iter()
@@ -63,6 +68,9 @@ impl DoStateCheckpoint {
         parent_position_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
         persisted_position_state_summary: Option<&'a ProvablePositionStateSummary<'db>>,
         known_position_state_checkpoints: Option<Vec<Option<HashValue>>>,
+        parent_order_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
+        persisted_order_state_summary: Option<&'a ProvableOrderStateSummary<'db>>,
+        known_order_state_checkpoints: Option<Vec<Option<HashValue>>>,
         parent_collateral_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
         persisted_collateral_state_summary: Option<&'a ProvableCollateralStateSummary<'db>>,
         known_collateral_state_checkpoints: Option<Vec<Option<HashValue>>>,
@@ -110,6 +118,21 @@ impl DoStateCheckpoint {
             } else {
                 (None, None)
             };
+        let (order_state_summary, order_state_checkpoint_hashes) =
+            if execution_output.compute_trading_native_state_roots {
+                let persisted = persisted_order_state_summary
+                    .expect("persisted order summary required when feature on");
+                let (summary, hashes) = Self::compute_native_checkpoint(
+                    NativeTree::Order,
+                    execution_output,
+                    parent_order_state_summary,
+                    persisted,
+                    known_order_state_checkpoints,
+                )?;
+                (Some(summary), Some(hashes))
+            } else {
+                (None, None)
+            };
         let (collateral_state_summary, collateral_state_checkpoint_hashes) =
             if execution_output.compute_trading_native_state_roots {
                 let persisted = persisted_collateral_state_summary
@@ -132,6 +155,8 @@ impl DoStateCheckpoint {
             .maybe_hot_state_checkpoint_hashes(hot_state_checkpoint_hashes)
             .maybe_position_state_summary(position_state_summary)
             .maybe_position_state_checkpoint_hashes(position_state_checkpoint_hashes)
+            .maybe_order_state_summary(order_state_summary)
+            .maybe_order_state_checkpoint_hashes(order_state_checkpoint_hashes)
             .maybe_collateral_state_summary(collateral_state_summary)
             .maybe_collateral_state_checkpoint_hashes(collateral_state_checkpoint_hashes)
             .build())
