@@ -587,9 +587,11 @@ impl AptosDB {
             },
         }
 
-        // Orders have no consensus-committed root yet, so the store always
-        // computes its own summary.
-        bundle.store.advance_pipeline(chunk, None, sync_commit)
+        // With the roots on, the summary comes from execution on the chunk;
+        // off, the store computes it so the tree still tracks forward.
+        bundle
+            .store
+            .advance_pipeline(chunk, chunk.order_state_summary, sync_commit)
     }
 
     fn commit_native_collateral(&self, chunk: &ChunkToCommit, sync_commit: bool) -> Result<()> {

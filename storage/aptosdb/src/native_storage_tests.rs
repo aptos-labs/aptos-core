@@ -1040,7 +1040,7 @@ mod reopen {
     /// A one-transaction block whose write set sets each `(key, tag)`;
     /// its transaction info commits `position_root` when given.
     fn block(writes: &[(StateKey, u64)], position_root: Option<HashValue>) -> TransactionToCommit {
-        block_with_orders(writes, &[], position_root)
+        block_with_orders(writes, &[], position_root, None)
     }
 
     /// As [`block`], also writing each `(order key, value)`; `None` deletes.
@@ -1048,6 +1048,7 @@ mod reopen {
         writes: &[(StateKey, u64)],
         orders: &[(StateKey, Option<&[u8]>)],
         position_root: Option<HashValue>,
+        order_root: Option<HashValue>,
     ) -> TransactionToCommit {
         let txn_info = TransactionInfo::builder_v1()
             .transaction_hash(HashValue::random())
@@ -1057,6 +1058,7 @@ mod reopen {
             .gas_used(0)
             .status(ExecutionStatus::Success)
             .maybe_position_state_checkpoint_hash(position_root)
+            .maybe_order_state_checkpoint_hash(order_root)
             .build();
         let positions: BTreeMap<_, _> = writes
             .iter()
@@ -1462,13 +1464,30 @@ mod reopen {
         positions: &[(StateKey, u64)],
         orders: &[(StateKey, Option<&[u8]>)],
     ) {
+        commit_orders_with_root(db, version, positions, orders, None);
+    }
+
+    fn commit_orders_with_root(
+        db: &AptosDB,
+        version: Version,
+        positions: &[(StateKey, u64)],
+        orders: &[(StateKey, Option<&[u8]>)],
+        order_root: Option<HashValue>,
+    ) {
         db.save_transactions_for_test(
-            &[block_with_orders(positions, orders, None)],
+            &[block_with_orders(positions, orders, None, order_root)],
             version,
             None,
             true,
         )
         .expect("commit");
+    }
+
+    fn order_root(db: &AptosDB) -> HashValue {
+        db.get_pre_committed_order_state_summary()
+            .expect("order summary")
+            .latest()
+            .root_hash()
     }
 
     /// The order store's live rows at its latest JMT snapshot, which must be
@@ -2402,5 +2421,179 @@ mod reopen {
         });
         assert_eq!(read(&db, 2), Some(NativeOrder::Single(order(2, 101))));
         assert_eq!(read(&db, 3), Some(NativeOrder::Single(order(3, 102))));
+    }
+
+    /// A node whose order store disagrees with the order root the ledger
+    /// commits refuses to open: here storage is enabled on a node that
+    /// committed orders it never stored.
+    #[test]
+    fn reopening_refuses_an_order_store_that_disagrees_with_the_committed_root() {
+        let root = {
+            let reference_dir = TempPath::new();
+            let db = open(&reference_dir, true);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+            order_root(&db)
+        };
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_orders_with_root(
+                &db,
+                0,
+                &[],
+                &[(order_key(1), Some(&order_value(b'a')))],
+                Some(root),
+            );
+        }
+        let err = match AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            false,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig::default(),
+        ) {
+            Ok(_) => panic!("open must fail"),
+            Err(err) => err,
+        };
+        assert!(
+            err.to_string().contains("disagrees with the order root"),
+            "{err}"
+        );
+    }
+
+    /// A node with storage on throughout reopens cleanly against a ledger
+    /// that commits order roots.
+    #[test]
+    fn reopening_with_matching_order_roots_succeeds() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+            let root = order_root(&db);
+            commit_orders_with_root(&db, 1, &[], &[], Some(root));
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            order_rows(&db),
+            BTreeMap::from([(order_key(1), order_value(b'a'))])
+        );
+    }
+
+    /// Enabling on a ledger whose committed order root is the empty tree
+    /// (roots on, no orders yet) is the normal rollout path and opens.
+    #[test]
+    fn enabling_on_a_ledger_with_an_empty_order_root_opens() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_orders_with_root(&db, 0, &[], &[], Some(*SPARSE_MERKLE_PLACEHOLDER_HASH));
+        }
+        let db = open(&dir, true);
+        commit_orders(&db, 1, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+        assert_eq!(order_rows(&db).len(), 1);
+    }
+
+    /// Generated blocks commit order roots that the storage pipeline
+    /// reproduces, and reopen passes the open-time root check.
+    #[test]
+    fn generated_order_blocks_match_committed_roots() {
+        use crate::db::test_helper::arb_blocks_to_commit_with_orders;
+        use aptos_proptest_helpers::ValueGenerator;
+
+        let dir = TempPath::new();
+        let blocks = ValueGenerator::new().generate(arb_blocks_to_commit_with_orders());
+        let mut last_root = None;
+        {
+            let db = open(&dir, true);
+            let mut version = 0;
+            for (txns, li) in &blocks {
+                db.save_transactions_for_test(txns, version, Some(li), true)
+                    .expect("commit");
+                version += txns.len() as Version;
+                last_root = txns
+                    .last()
+                    .unwrap()
+                    .transaction_info()
+                    .order_state_checkpoint_hash();
+            }
+            assert_eq!(Some(order_root(&db)), last_root);
+        }
+        let db = open(&dir, true);
+        assert_eq!(Some(order_root(&db)), last_root);
+    }
+
+    /// A restore-mode open leaves the order store where it was persisted;
+    /// the reset a replay runs first brings it to the ledger tip.
+    #[test]
+    fn restore_reset_catches_orders_up_to_the_ledger() {
+        use crate::get_restore_handler::GetRestoreHandler;
+        use aptos_storage_interface::state_store::orders::{NativeOrder, OrderKey};
+        use aptos_types::state_store::native_order::NativeSingleOrder;
+        use std::sync::Arc;
+
+        fn read(db: &AptosDB, order_id: u128) -> Option<NativeOrder> {
+            let bundle = db.order().expect("order store attached");
+            let tip = bundle.orders.lock().clone();
+            let key = OrderKey::Single {
+                exchange: exchange(1),
+                market: super::market(7),
+                order_id,
+            };
+            bundle.order_base.with_view(&tip, |view| view.get(&key))
+        }
+        fn decoded(tag: u8) -> Option<NativeOrder> {
+            Some(NativeOrder::Single(
+                NativeSingleOrder::deserialize(&order_value(tag)).unwrap(),
+            ))
+        }
+
+        let dir = TempPath::new();
+        let root = {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+            commit_orders(&db, 1, &[], &[(order_key(2), Some(&order_value(b'b')))]);
+            commit_orders(&db, 2, &[], &[(order_key(1), Some(&order_value(b'c')))]);
+            order_root(&db)
+        };
+        // Lose the in-memory tip: only the oldest snapshot is on disk. The
+        // ledger past it stands in for what a previous restore run replayed.
+        {
+            let db = open(&dir, true);
+            let bundle = db.order().unwrap();
+            crate::utils::truncation_helper::truncate_native_merkle_db(&bundle.store.merkle_db, 0)
+                .unwrap();
+        }
+        let db = Arc::new(
+            AptosDB::open_kv_only(
+                StorageDirPaths::from_path(dir.path()),
+                false,
+                NO_OP_STORAGE_PRUNER_CONFIG,
+                RocksdbConfigs {
+                    enable_trading_native: true,
+                    ..Default::default()
+                },
+                BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                None,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            read(&db, 1),
+            decoded(b'a'),
+            "restore-mode open does not catch up"
+        );
+        assert_eq!(read(&db, 2), None);
+        db.get_restore_handler().reset_state_store().unwrap();
+        assert_eq!(order_root(&db), root);
+        assert_eq!(read(&db, 1), decoded(b'c'));
+        assert_eq!(read(&db, 2), decoded(b'b'));
     }
 }

@@ -416,6 +416,9 @@ pub struct ProvableNativeStateSummary<'db> {
 /// The position tree's provable summary.
 pub type ProvablePositionStateSummary<'db> = ProvableNativeStateSummary<'db>;
 
+/// The order tree's provable summary.
+pub type ProvableOrderStateSummary<'db> = ProvableNativeStateSummary<'db>;
+
 /// The collateral tree's provable summary.
 pub type ProvableCollateralStateSummary<'db> = ProvableNativeStateSummary<'db>;
 
@@ -427,6 +430,17 @@ impl<'db> ProvableNativeStateSummary<'db> {
             db,
             proof: |db, key, version, root_depth| {
                 db.get_position_state_proof_by_version_ext(key, version, root_depth)
+            },
+        })
+    }
+
+    pub fn new_persisted_order(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
+        Ok(Self {
+            persisted: db.get_persisted_order_state_summary()?,
+            pre_committed: db.get_pre_committed_order_state_summary()?,
+            db,
+            proof: |db, key, version, root_depth| {
+                db.get_order_state_proof_by_version_ext(key, version, root_depth)
             },
         })
     }

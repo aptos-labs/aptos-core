@@ -2308,6 +2308,7 @@ impl TransactionInfo {
         status: ExecutionStatus,
         auxiliary_info_hash: Option<HashValue>,
         position_state_checkpoint_hash: Option<HashValue>,
+        order_state_checkpoint_hash: Option<HashValue>,
         collateral_state_checkpoint_hash: Option<HashValue>,
     ) -> Self {
         Self::V1(TransactionInfoV1::new(
@@ -2320,6 +2321,7 @@ impl TransactionInfo {
             status,
             auxiliary_info_hash,
             position_state_checkpoint_hash,
+            order_state_checkpoint_hash,
             collateral_state_checkpoint_hash,
         ))
     }
@@ -2401,6 +2403,13 @@ impl TransactionInfo {
         match self {
             Self::V0(_) => None,
             Self::V1(v) => v.position_state_checkpoint_hash,
+        }
+    }
+
+    pub fn order_state_checkpoint_hash(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(_) => None,
+            Self::V1(v) => v.order_state_checkpoint_hash,
         }
     }
 
@@ -2499,7 +2508,8 @@ pub struct TransactionInfoV1 {
 
     /// Repurposed reserved field; `None` matches the prior BCS encoding.
     position_state_checkpoint_hash: Option<HashValue>,
-    placeholder1: Option<HashValue>,
+    /// Repurposed reserved field; `None` matches the prior BCS encoding.
+    order_state_checkpoint_hash: Option<HashValue>,
     /// Repurposed reserved field; `None` matches the prior BCS encoding.
     collateral_state_checkpoint_hash: Option<HashValue>,
     placeholder3: Option<HashValue>,
@@ -2520,6 +2530,7 @@ impl TransactionInfoV1 {
         status: ExecutionStatus,
         auxiliary_info_hash: Option<HashValue>,
         position_state_checkpoint_hash: Option<HashValue>,
+        order_state_checkpoint_hash: Option<HashValue>,
         collateral_state_checkpoint_hash: Option<HashValue>,
     ) -> Self {
         Self {
@@ -2532,7 +2543,7 @@ impl TransactionInfoV1 {
             hot_state_checkpoint_hash,
             auxiliary_info_hash,
             position_state_checkpoint_hash,
-            placeholder1: None,
+            order_state_checkpoint_hash,
             collateral_state_checkpoint_hash,
             placeholder3: None,
             placeholder4: None,
