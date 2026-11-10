@@ -355,7 +355,7 @@ impl LedgerStateView for LedgerStateWithSummary {
 
 pub trait BufferedStateExtras<P, S>: Send + 'static {
     type ChunkInput;
-    fn absorb_chunk(&mut self, input: Self::ChunkInput, checkpoint_advanced: bool);
+    fn absorb_chunk(&mut self, input: Self::ChunkInput);
     fn build_payload(&mut self, snapshot: S) -> P;
 }
 
@@ -405,7 +405,7 @@ where
 
         *self.core.current_state.lock() = new_state;
 
-        self.extras.absorb_chunk(chunk_input, checkpoint_advanced);
+        self.extras.absorb_chunk(chunk_input);
         self.maybe_commit(checkpoint_to_commit_opt, sync_commit);
 
         Ok(())

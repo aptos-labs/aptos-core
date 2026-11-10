@@ -70,7 +70,7 @@ impl DbWriter for AptosDB {
 
             chunk
                 .state_summary
-                .latest()
+                .last_checkpoint()
                 .global_state_summary
                 .log_generation("db_save");
 
@@ -436,6 +436,12 @@ impl AptosDB {
             "The first version passed in ({}), and the next version expected by db ({}) are inconsistent.",
             chunk.first_version,
             next_version,
+        );
+        ensure!(
+            chunk.state.next_version() == chunk.next_version(),
+            "Chunk ends at version {}, while its state is at version {:?}.",
+            chunk.expect_last_version(),
+            chunk.state.version(),
         );
 
         Ok(())

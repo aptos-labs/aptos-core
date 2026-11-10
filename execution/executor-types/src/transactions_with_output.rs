@@ -68,6 +68,12 @@ impl TransactionsWithOutput {
         )
     }
 
+    /// Whether the last txn ends a block, i.e. is a state checkpoint. True if empty.
+    pub fn ends_at_block_end(&self) -> bool {
+        self.last()
+            .is_none_or(|(txn, output, _)| is_checkpoint(txn, output))
+    }
+
     pub fn last(&self) -> Option<(&Transaction, &TransactionOutput, &PersistedAuxiliaryInfo)> {
         self.transactions.last().map(|txn| {
             (
@@ -79,6 +85,10 @@ impl TransactionsWithOutput {
             )
         })
     }
+}
+
+fn is_checkpoint(txn: &Transaction, output: &TransactionOutput) -> bool {
+    txn.is_non_reconfig_block_ending() || output.has_new_epoch_event()
 }
 
 #[ouroboros::self_referencing]
@@ -195,9 +205,7 @@ impl TransactionsToKeep {
         (
             transactions_with_output
                 .iter()
-                .positions(|(txn, output, _)| {
-                    txn.is_non_reconfig_block_ending() || output.has_new_epoch_event()
-                })
+                .positions(|(txn, output, _)| is_checkpoint(txn, output))
                 .collect(),
             is_reconfig,
         )

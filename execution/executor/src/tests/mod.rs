@@ -507,7 +507,7 @@ fn apply_transaction_by_writeset(
     let state_view = CachedStateView::new(
         StateViewId::Miscellaneous,
         db.reader.clone(),
-        ledger_summary.state.latest().clone(),
+        ledger_summary.state.last_checkpoint().clone(),
     )
     .unwrap();
     let aux_info = txns
