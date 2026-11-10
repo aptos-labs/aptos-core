@@ -23,6 +23,7 @@ use mono_move_core::{
     types::InternedType,
 };
 use mono_move_global_context::ExecutionGuard;
+use mono_move_runtime::SegmentedArena;
 use move_core_types::language_storage::StructTag;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 
@@ -35,6 +36,8 @@ pub(crate) struct BlockSTMSequentialProvider<'a, 'ctx, S> {
     base_view: &'a S,
     /// Caches writes performed by previous transactions.
     unsync_map: &'a MonoUnsyncMap,
+    /// Where values read from the base storage layer are materialized.
+    arena: &'a SegmentedArena,
 }
 
 impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ctx, S> {
@@ -42,11 +45,13 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         guard: &'a ExecutionGuard<'ctx>,
         base_view: &'a S,
         unsync_map: &'a MonoUnsyncMap,
+        arena: &'a SegmentedArena,
     ) -> Self {
         Self {
             guard,
             base_view,
             unsync_map,
+            arena,
         }
     }
 
@@ -152,11 +157,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         key: &InMemoryStorageKey,
         blob: &[u8],
     ) -> Result<MonoValue, ResourceProviderError> {
-        let arena = self
-            .unsync_map
-            .resource_arena()
-            .expect("Arena always exists for MonoMove execution");
-        materialized_value(self.guard, arena, key.value_ty(), blob)
+        materialized_value(self.guard, self.arena, key.value_ty(), blob)
     }
 }
 
