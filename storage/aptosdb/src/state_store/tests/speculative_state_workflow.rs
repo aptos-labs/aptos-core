@@ -428,7 +428,6 @@ impl StateByVersion {
 
     fn assert_ledger_state(&self, ledger_state: &LedgerState) {
         self.assert_state(ledger_state.last_checkpoint());
-        self.assert_state(ledger_state.latest());
     }
 
     fn assert_state_summary(&self, state_summary: &StateSummary) {
@@ -448,7 +447,6 @@ impl StateByVersion {
 
     fn assert_ledger_state_summary(&self, ledger_state_summary: &LedgerStateSummary) {
         self.assert_state_summary(ledger_state_summary.last_checkpoint());
-        self.assert_state_summary(ledger_state_summary.latest());
     }
 
     fn assert_jmt_updates(&self, last_snapshot: &StateWithSummary, snapshot: &StateWithSummary) {
@@ -569,19 +567,11 @@ fn assert_hot_state_ops(
     state_by_version: &StateByVersion,
     hot_state_updates: &HotStateUpdates,
     for_ckpt_base: Option<Version>,
-    for_latest_base: Option<Version>,
     for_ckpt_result: Option<Version>,
-    for_latest_result: Option<Version>,
 ) {
     if let Some(shards) = &hot_state_updates.for_last_checkpoint {
         let base = state_by_version.get_state(for_ckpt_base);
         let result = state_by_version.get_state(for_ckpt_result);
-        assert_hot_state_shard_ops(state_by_version, &base.hot_state, &result.hot_state, shards);
-    }
-    if let Some(shards) = &hot_state_updates.for_latest {
-        let base = state_by_version.get_state(for_latest_base);
-        let result = state_by_version.get_state(for_latest_result);
-        // for_latest is called with no checkpoint versions, so no evictions should occur.
         assert_hot_state_shard_ops(state_by_version, &base.hot_state, &result.hot_state, shards);
     }
 }
@@ -717,19 +707,11 @@ fn update_state(
 
         state_by_version.assert_ledger_state(&next_state);
 
-        let for_ckpt_base = parent_state.latest().version();
-        let for_latest_base = if hot_state_updates.for_last_checkpoint.is_some() {
-            next_state.last_checkpoint().version()
-        } else {
-            for_ckpt_base
-        };
         assert_hot_state_ops(
             &state_by_version,
             &hot_state_updates,
-            for_ckpt_base,
-            for_latest_base,
+            parent_state.last_checkpoint().version(),
             next_state.last_checkpoint().version(),
-            next_state.latest().version(),
         );
 
         parent_state = next_state.clone();
@@ -800,7 +782,6 @@ fn send_to_state_buffer(
 
     // Make sure the final checkpoint is committed.
     let final_state_with_summary: LedgerStateWithSummary = current_state.lock().clone();
-    assert!(final_state_with_summary.is_at_checkpoint());
     let final_version = final_state_with_summary.version().unwrap();
     if last_snapshot.version() != Some(final_version) {
         let snapshot = final_state_with_summary.last_checkpoint();

@@ -13,7 +13,7 @@ use crate::{
     native_store::{
         buffered_state::{
             native_state_at_version, new_empty_native_state, NativeLedgerStateWithSummary,
-            NativePersistedState, NativeProofReader, NativeSlot, NativeStateWithSummary,
+            NativePersistedState, NativeProofReader, NativeSlot,
             MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT,
         },
         kv_db::NativeKvDb,
@@ -380,7 +380,7 @@ impl<T: NativeStoreSpec> NativeStoreBundle<T> {
         }
 
         let state_lock = store.current_state();
-        let pipeline_latest = state_lock.lock().latest().clone();
+        let pipeline_latest = state_lock.lock().last_checkpoint().clone();
         let proof_reader = NativeProofReader {
             merkle_db: Arc::clone(&self.merkle_db),
             version: pipeline_latest.version(),
@@ -397,10 +397,7 @@ impl<T: NativeStoreSpec> NativeStoreBundle<T> {
 
         // Treat the target as a checkpoint so the buffered state
         // sync-commits the JMT snapshot before we return.
-        let new_state = NativeLedgerStateWithSummary::from_latest_and_last_checkpoint(
-            new_latest.clone(),
-            new_latest,
-        );
+        let new_state = NativeLedgerStateWithSummary::new_at_checkpoint(new_latest);
         store.buffered_state_locked().update(
             new_state,
             (),
@@ -519,8 +516,8 @@ impl<T: NativeStoreSpec> NativeStoreBundle<T> {
         )
     }
 
-    /// Extends the in-memory tip to the chunk's last version with its writes,
-    /// freezing on the persisted base, and checkpointing where the chunk does.
+    /// Extends the in-memory tip to the chunk's last version, a checkpoint, with its writes,
+    /// freezing on the persisted base.
     fn summary_at_commit(
         &self,
         store: &NativeStateStore,
@@ -532,52 +529,33 @@ impl<T: NativeStoreSpec> NativeStoreBundle<T> {
             .expect("persisted present when state_store is")
             .get();
 
-        let (mut latest, mut last_checkpoint) = {
-            let state = store.current_state();
-            let current = state.lock();
-            (current.latest().clone(), current.last_checkpoint().clone())
-        };
+        let last_checkpoint = store.current_state().lock().last_checkpoint().clone();
+        let chunk_last_inclusive =
+            chunk.first_version + chunk.transaction_outputs.len() as Version - 1;
 
-        let chunk_first = chunk.first_version;
-        let chunk_last_inclusive = chunk_first + chunk.transaction_outputs.len() as Version - 1;
-        let checkpoint_within_chunk = chunk
-            .state
-            .last_checkpoint()
-            .version()
-            .filter(|v| (chunk_first..=chunk_last_inclusive).contains(v));
-
-        let mut pending: HashMap<HashValue, NativeSlot> = HashMap::new();
-        let extend_on_base = |latest: &NativeStateWithSummary,
-                              version: Version,
-                              updates: Vec<(HashValue, NativeSlot)>|
-         -> Result<NativeStateWithSummary> {
-            let proof_reader = NativeProofReader {
-                merkle_db: Arc::clone(&self.merkle_db),
-                version: persisted_base.version(),
-            };
-            latest.extend(version, updates, &persisted_base, &proof_reader)
-        };
-
-        for (i, output) in chunk.transaction_outputs.iter().enumerate() {
-            let version = chunk_first + i as Version;
+        let mut updates: HashMap<HashValue, NativeSlot> = HashMap::new();
+        for output in chunk.transaction_outputs {
             for (key, op) in T::write_set_ops(output.write_set()) {
-                pending.insert(key.hash(), leaf_update(key, op.as_state_value_opt()));
-            }
-            if Some(version) == checkpoint_within_chunk {
-                let updates: Vec<_> = std::mem::take(&mut pending).into_iter().collect();
-                latest = extend_on_base(&latest, version, updates)?;
-                last_checkpoint = latest.clone();
+                updates.insert(key.hash(), leaf_update(key, op.as_state_value_opt()));
             }
         }
+        let proof_reader = NativeProofReader {
+            merkle_db: Arc::clone(&self.merkle_db),
+            version: persisted_base.version(),
+        };
         // Extended even without writes, so the tree follows the chain and
         // persists snapshots at its checkpoints. A tree stuck below the chain
         // never snapshots, and a reopen would replay from version 0.
-        if latest.version() != Some(chunk_last_inclusive) {
-            let updates: Vec<_> = pending.into_iter().collect();
-            latest = extend_on_base(&latest, chunk_last_inclusive, updates)?;
-        }
+        let last_checkpoint = last_checkpoint.extend(
+            chunk_last_inclusive,
+            updates.into_iter().collect(),
+            &persisted_base,
+            &proof_reader,
+        )?;
 
-        Ok(NativeLedgerStateWithSummary::from_latest_and_last_checkpoint(latest, last_checkpoint))
+        Ok(NativeLedgerStateWithSummary::new_at_checkpoint(
+            last_checkpoint,
+        ))
     }
 }
 
