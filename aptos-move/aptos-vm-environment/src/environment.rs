@@ -417,6 +417,7 @@ pub mod tests {
             max_bytes_per_shard: vec![u64::MAX; NUM_STATE_SHARDS],
             refresh_interval_versions: 0,
             max_promotion_bytes_per_block: 0,
+            defer_cold_writes_to_eviction: false,
         })
     }
 
