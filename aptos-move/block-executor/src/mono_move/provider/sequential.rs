@@ -115,7 +115,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
     ) -> Result<StorageRead, ResourceProviderError> {
         loop {
             match self.unsync_map.fetch_group_tagged_data(group_key, tag) {
-                Ok(MonoValue::RawFromStorage(blob)) => {
+                Ok(MonoValue::ResourceGroupMemberBytes(blob)) => {
                     // A stored group does not name its members' types, so the
                     // first reader that knows one replaces the bytes with the
                     // flat value.
@@ -135,7 +135,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
                         .map_err(|e| invariant_violation(format!("{e:#}")))?
                         .unwrap_or_default()
                         .into_iter()
-                        .map(|(tag, blob)| (tag, MonoValue::RawFromStorage(blob)));
+                        .map(|(tag, blob)| (tag, MonoValue::ResourceGroupMemberBytes(blob)));
                     self.unsync_map
                         .set_group_base_values(group_key.clone(), members)
                         .map_err(|e| {
