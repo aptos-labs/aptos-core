@@ -214,7 +214,7 @@ impl DecConfig {
     }
 
     pub fn get_peer_weight(&self, _peer: &Author) -> u64 {
-        // daniel todo: use weighted config
+        // TODO: use weighted config
         1
     }
 

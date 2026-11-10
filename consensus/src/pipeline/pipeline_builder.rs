@@ -662,7 +662,7 @@ impl PipelineBuilder {
         //     );
         // }
 
-        // daniel todo: skip verifying encrypted txns for now
+        // TODO: skip verifying encrypted txns for now
         let mut sig_verified_decrypted_txns: Vec<SignatureVerifiedTransaction> = decrypted_txns.as_ref().clone().into_iter().map(|t| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(t))).collect();
 
         let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(||
@@ -677,7 +677,7 @@ impl PipelineBuilder {
         assert!(sig_verified_txns.len() == non_encrypted_txns_len, "round {}, block {} sig_verified_txns len {}, non_encrypted_txns_len {}", block.round(), block.id(), sig_verified_txns.len(), non_encrypted_txns_len);
 
         if sig_verified_decrypted_txns.len() > 0 {
-            info!("[daniel] sig_verified_decrypted_txns round {}, block {}, len {}", block.round(), block.id(), sig_verified_decrypted_txns.len());
+            info!("[decryption] sig_verified_decrypted_txns round {}, block {}, len {}", block.round(), block.id(), sig_verified_decrypted_txns.len());
         }
 
         // swap encrypted txns in input_txns with sig_verified_decrypted_txns, and non-encrypted txns with sig_verified_txns
@@ -705,7 +705,7 @@ impl PipelineBuilder {
 
         tracker.start_working();
 
-        // daniel todo: hack before having a large setup
+        // TODO: hack before having a large setup
         let encryption_round = 0;
         let cts: Vec<Ciphertext> = input_txns
             .iter()
@@ -832,7 +832,7 @@ async fn prepare_cts(prepare_fut: TaskFuture<PrepareResult>, digest_fut: TaskFut
             .collect();
 
         if !ct_ids.is_empty() {
-            info!("[daniel] computing prepare_cts round {}, block {}, txn len {}, ids len {}", block.round(), block.id(), input_txns.len(), ct_ids.len());
+            info!("[decryption] computing prepare_cts round {}, block {}, txn len {}, ids len {}", block.round(), block.id(), input_txns.len(), ct_ids.len());
 
             let encrypted_txns = input_txns.iter().filter(|txn| txn.is_encrypted()).collect::<Vec<_>>();
             let ciphertexts = input_txns.iter().filter(|txn| txn.is_encrypted()).map(|txn| txn.ciphertext().unwrap()).collect::<Vec<_>>();
@@ -887,7 +887,7 @@ async fn prepare_cts(prepare_fut: TaskFuture<PrepareResult>, digest_fut: TaskFut
             .collect();
 
         if !ct_ids.is_empty() {
-            info!("[daniel] computing decryption round {}, block {}, txn len {}, ids len {}", block.round(), block.id(), input_txns.len(), ct_ids.len());
+            info!("[decryption] computing decryption round {}, block {}, txn len {}, ids len {}", block.round(), block.id(), input_txns.len(), ct_ids.len());
 
             let encrypted_txns = input_txns.iter().filter(|txn| txn.is_encrypted()).collect::<Vec<_>>();
 

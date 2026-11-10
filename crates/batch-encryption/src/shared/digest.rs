@@ -213,7 +213,7 @@ pub struct EvalProofs {
 
 impl EvalProofs {
     pub fn get(&self, i: &Id) -> Option<EvalProof> {
-        // TODO(ibalajiarun): No need to copy here
+        // TODO: No need to copy here
         Some(EvalProof(self.computed_proofs.get(i).copied()?))
     }
 }

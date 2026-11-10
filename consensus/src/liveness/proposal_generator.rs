@@ -609,7 +609,7 @@ impl ProposalGenerator {
                         recent_max_fill_fraction: max_fill_fraction,
                         block_timestamp: timestamp,
                         // for inline encrypted txns
-                        // daniel todo: move to configs
+                        // TODO: move to configs
                         max_inline_encrypted_txns: PayloadTxnsSize::new(PROTOTYPE_BATCH_SIZE as u64, (PROTOTYPE_BATCH_SIZE as u64) * 10 * 1024),
                     },
                     validator_txn_filter,
