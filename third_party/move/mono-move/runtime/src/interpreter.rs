@@ -95,8 +95,10 @@ macro_rules! resolve_resource_group {
 struct LoaderAdapter<'a, 'guard> {
     loader: &'a Loader<'guard, 'guard>,
     /// Held in an [`UnsafeCell`] because [`LoaderAccess`] takes `&self` but the
-    /// loader needs the read-set by `&mut`. As in [`ProductionNativeContext`],
-    /// at most one borrow is live at a time.
+    /// loader needs the read-set by `&mut`. Follows the same cell discipline
+    /// as [`ProductionNativeContext`] (see its docs), checked by the
+    /// `unsafe_cell_reborrow` lint: each method reborrows once and calls
+    /// nothing that could reborrow again.
     read_set: UnsafeCell<&'a mut ModuleReadSet<'guard>>,
 }
 

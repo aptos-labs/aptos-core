@@ -46,7 +46,7 @@ struct Usage {
     bytes: u64,
 }
 
-impl<'a> VMValue<'a> for Usage {
+unsafe impl<'a> VMValue<'a> for Usage {
     const FRAME_SLOT_SIZE: usize = USAGE_BYTES_OFFSET + 8;
 
     unsafe fn read_from_frame(pool: &'a RootPool, slot: MemAddr) -> Self {

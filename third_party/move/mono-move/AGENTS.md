@@ -31,6 +31,13 @@ Current lints:
 - `raw_memory_access` — no raw pointers, raw-pointer method calls, or
   `ptr::`/`slice::from_raw_parts` calls outside `mem` and `alloc`; see
   "Raw memory access".
+- `unsafe_cell_reborrow` — the discipline for `&self` methods that mutate
+  through `UnsafeCell` fields (the native context, the root pool): one reborrow per
+  cell per method, held for the whole method; no call that may reborrow a
+  held cell; no escape; nothing that can reach the struct handed to unseen
+  code while holding. `VMValue` impls must not reach a `NativeContext`. The
+  rules are on `ProductionNativeContext` ("Cell discipline") and in
+  `devtools/lints/README.md`.
 
 ### Choosing a map
 

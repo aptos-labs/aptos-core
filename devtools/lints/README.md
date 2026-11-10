@@ -10,6 +10,7 @@ fully resolved types, HIR and MIR — everything clippy can see.
 |---|---|---|
 | `no_std_hash_map` | `std::collections::{HashMap, HashSet}`, `hashbrown`, and aliases such as `FxHashMap`; use `shared_dsa::{UnorderedMap, UnorderedSet}` (no ordered iteration exposed) or `BTreeMap`/`BTreeSet` | consensus-critical mono-move crates |
 | `raw_memory_access` | raw pointer types, method calls on raw pointers (`p.add(1)`, even when the pointer is never spelled), and `core::ptr::{copy*, read*, write*, swap*}` / `slice::from_raw_parts*`; go through `mono_move_mem::MemAddr` | mono-move crates except `mem`, `alloc`, `lean-link` |
+| `unsafe_cell_reborrow` | breaches of the discipline for structs whose `&self` methods mutate through `UnsafeCell` fields (the native context, the root pool): see below | mono-move crates; the cell rules fire only in a crate that defines such a struct |
 
 ### What `no_std_hash_map` does not guarantee
 
@@ -30,6 +31,53 @@ accident. It does not make a site deterministic or safe on its own.
 
 `third_party/move/mono-move/AGENTS.md` ("Choosing a map") has the guideline
 for picking a map at a given site.
+
+### The `unsafe_cell_reborrow` rules
+
+A struct whose methods take `&self` but need `&mut` access to some state keeps
+it in an `UnsafeCell` field ("cell"), `UnsafeCell<&mut T>` for a borrowed
+component or `UnsafeCell<T>` for an owned one, and reborrows
+`&mut **self.cell.get()` (or `&mut *` for the owned form) inside each method.
+That is sound only if each cell has at most one live reborrow at any instant
+and none outlives the method that made it. The borrow checker cannot see this,
+so the lint enforces a coarse, over-conservative discipline on every function
+of a crate that defines such a struct:
+
+1. Cell fields are private and appear only at a *site*, written
+   `&mut **self.cell.get()` / `&mut *self.cell.get()` (or `&` for a shared
+   reborrow).
+2. A function has at most one site per cell, and the reborrow counts as held
+   for the whole function body.
+3. A function that holds a cell calls nothing that may reborrow the same cell,
+   directly or transitively (the call graph is followed through this crate; a
+   closure belongs to the function that defines it, and a closure that can
+   reach the struct or a cell is never passed as an argument).
+4. While a cell is held, nothing that can reach the struct is passed to code
+   outside the crate, and no method is called on a type parameter, trait
+   object or function value, other than through a field of the struct.
+   Methods of the traits in `inert_traits` are exempt (see 6).
+5. No method of the struct, and no function with a site, has a signature that
+   can hold a reference to a cell's target type: a reborrow cannot be handed
+   out or stored through an out-parameter. A plain `&mut T` parameter is fine.
+6. An impl of an inert trait cannot reach a trait in `context_traits`: its
+   self type mentions no type parameter bounded by one and no trait object of
+   one, and its methods call none of its methods. That is what makes 4's
+   exemption sound: natives build `VMValue`s that the context writes while
+   holding its cells.
+
+The check is over-conservative by design, and every finding says so. The
+shape that satisfies 2 to 4 without thought: reborrow once in the entry
+point, then call only free helpers that take the components, so the borrow
+checker sees every use. A site that needs something else opts out with
+`allow(unsafe_cell_reborrow)` and a comment, and then owns the soundness
+argument.
+
+```toml
+[aptos_lints.unsafe_cell_reborrow]
+crates = ["mono-move-*"]
+inert_traits = ["mono_move_core::native::value::VMValue"]
+context_traits = ["mono_move_core::native::context::NativeContext"]
+```
 
 ## Running
 

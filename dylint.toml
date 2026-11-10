@@ -25,3 +25,13 @@ exempt = [
     "mono-move-alloc",     # the allocator that hands out the memory
     "mono-move-lean-link", # C ABI buffers for the Lean harness
 ]
+
+[aptos_lints.unsafe_cell_reborrow]
+# The `&self` + `UnsafeCell<&mut T>` discipline of the native context (and
+# any other struct built the same way). The cell rules fire only in crates
+# that define such a struct; the inert-impl rule runs in every VM crate.
+crates = ["mono-move-*"]
+# Natives construct `VMValue`s and the context runs their `write_to_frame`
+# while holding its cells, so an impl must not be able to reach a context.
+inert_traits = ["mono_move_core::native::value::VMValue"]
+context_traits = ["mono_move_core::native::context::NativeContext"]

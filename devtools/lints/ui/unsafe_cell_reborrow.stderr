@@ -1,0 +1,194 @@
+error: cell field `Leaky.cell` is `pub`; cell fields must stay private to the crate
+  --> $DIR/unsafe_cell_reborrow.rs:29:5
+   |
+LL |     pub cell: UnsafeCell<&'a mut Heap>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+   = note: `#[deny(unsafe_cell_reborrow)]` on by default
+
+error: `Ctx.heap` is reborrowed more than once in this function
+  --> $DIR/unsafe_cell_reborrow.rs:87:26
+   |
+LL |         let b = unsafe { &mut **self.heap.get() };
+   |                          ^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: first reborrowed here
+  --> $DIR/unsafe_cell_reborrow.rs:86:26
+   |
+LL |         let a = unsafe { &mut **self.heap.get() };
+   |                          ^^^^^^^^^^^^^^^^^^^^^^
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: `Ctx.heap` used outside a reborrow site; the only permitted form is `&mut **self.heap.get()` (or `&**`)
+  --> $DIR/unsafe_cell_reborrow.rs:105:21
+   |
+LL |         let cell = &self.heap;
+   |                     ^^^^^^^^^
+   |
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: `leaf` may reborrow `Ctx.heap`, which this function already holds
+  --> $DIR/unsafe_cell_reborrow.rs:74:17
+   |
+LL |         let n = self.leaf();
+   |                 ^^^^^^^^^^^
+   |
+note: `Ctx.heap` is reborrowed here
+  --> $DIR/unsafe_cell_reborrow.rs:73:29
+   |
+LL |         let heap = unsafe { &mut **self.heap.get() };
+   |                             ^^^^^^^^^^^^^^^^^^^^^^
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: `orchestrator` may reborrow `Ctx.rws`, which this function already holds
+  --> $DIR/unsafe_cell_reborrow.rs:81:9
+   |
+LL |         self.orchestrator();
+   |         ^^^^^^^^^^^^^^^^^^^
+   |
+note: `Ctx.rws` is reborrowed here
+  --> $DIR/unsafe_cell_reborrow.rs:80:28
+   |
+LL |         let rws = unsafe { &mut **self.rws.get() };
+   |                            ^^^^^^^^^^^^^^^^^^^^^
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: in `escape`, the return type can hold a reference to `Heap`, so a reborrow can escape
+  --> $DIR/unsafe_cell_reborrow.rs:91:5
+   |
+LL |     fn escape(&self) -> &mut Heap {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: in `out_param`, a parameter can hold a reference to `Heap`, so a reborrow can escape
+  --> $DIR/unsafe_cell_reborrow.rs:96:5
+   |
+LL |     fn out_param(&self, out: &mut Option<&mut Heap>) {}
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: a cell struct reaches `std::hint::black_box`, outside this crate, while `Ctx.heap` is held
+  --> $DIR/unsafe_cell_reborrow.rs:111:9
+   |
+LL |         std::hint::black_box(self);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: `Ctx.heap` is reborrowed here
+  --> $DIR/unsafe_cell_reborrow.rs:110:29
+   |
+LL |         let heap = unsafe { &mut **self.heap.get() };
+   |                             ^^^^^^^^^^^^^^^^^^^^^^
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: a closure that can reach a cell struct is passed as an argument; call it directly or pass the components it needs instead
+  --> $DIR/unsafe_cell_reborrow.rs:116:17
+   |
+LL |         let v = Some(1).map(|_| self.leaf());
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: `Value::write` is called on a type parameter or trait object while `Ctx.heap` is held; the callee may reach the struct through its caller
+  --> $DIR/unsafe_cell_reborrow.rs:122:9
+   |
+LL |         v.write(heap.0);
+   |         ^^^^^^^^^^^^^^^
+   |
+note: `Ctx.heap` is reborrowed here
+  --> $DIR/unsafe_cell_reborrow.rs:121:29
+   |
+LL |         let heap = unsafe { &mut **self.heap.get() };
+   |                             ^^^^^^^^^^^^^^^^^^^^^^
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: a call through a function value while `Ctx.heap` is held; the callee may reach the struct through its caller
+  --> $DIR/unsafe_cell_reborrow.rs:134:9
+   |
+LL |         f();
+   |         ^^^
+   |
+note: `Ctx.heap` is reborrowed here
+  --> $DIR/unsafe_cell_reborrow.rs:133:29
+   |
+LL |         let heap = unsafe { &mut **self.heap.get() };
+   |                             ^^^^^^^^^^^^^^^^^^^^^^
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: `Loader::lookup` is called on a type parameter or trait object while `Ctx.heap` is held; the callee may reach the struct through its caller
+  --> $DIR/unsafe_cell_reborrow.rs:141:9
+   |
+LL |         l.lookup(heap.0);
+   |         ^^^^^^^^^^^^^^^^
+   |
+note: `Ctx.heap` is reborrowed here
+  --> $DIR/unsafe_cell_reborrow.rs:139:29
+   |
+LL |         let heap = unsafe { &mut **self.heap.get() };
+   |                             ^^^^^^^^^^^^^^^^^^^^^^
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: `Loader::lookup` is called on a type parameter or trait object while `Ctx.heap` is held; the callee may reach the struct through its caller
+  --> $DIR/unsafe_cell_reborrow.rs:148:9
+   |
+LL |         l.lookup(heap.0);
+   |         ^^^^^^^^^^^^^^^^
+   |
+note: `Ctx.heap` is reborrowed here
+  --> $DIR/unsafe_cell_reborrow.rs:147:29
+   |
+LL |         let heap = unsafe { &mut **self.heap.get() };
+   |                             ^^^^^^^^^^^^^^^^^^^^^^
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: in `dyn_param`, a parameter can hold a trait object, so a reborrow can escape
+  --> $DIR/unsafe_cell_reborrow.rs:146:5
+   |
+LL |     fn dyn_param(&self, l: &dyn Loader) {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: a call through a function value while `Store.inner` is held; the callee may reach the struct through its caller
+  --> $DIR/unsafe_cell_reborrow.rs:233:13
+   |
+LL |             f(*x);
+   |             ^^^^^
+   |
+note: `Store.inner` is reborrowed here
+  --> $DIR/unsafe_cell_reborrow.rs:231:30
+   |
+LL |         let inner = unsafe { &*self.inner.get() };
+   |                              ^^^^^^^^^^^^^^^^^^
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: impl of inert trait `Inert` for a type bounded by `CtxTrait`: the value could reach a cell struct
+  --> $DIR/unsafe_cell_reborrow.rs:187:13
+   |
+LL | impl<'c, C: CtxTrait> Inert for Evil<'c, C> {
+   |             ^^^^^^^^
+   |
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: impl of inert trait `Inert` calls `CtxTrait::leaf`, a context trait method
+  --> $DIR/unsafe_cell_reborrow.rs:189:9
+   |
+LL |         self.0.leaf();
+   |         ^^^^^^^^^^^^^
+   |
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: impl of inert trait `Inert` for a type holding `dyn CtxTrait`: the value could reach a cell struct
+  --> $DIR/unsafe_cell_reborrow.rs:195:1
+   |
+LL | / impl Inert for Hidden<'_> {
+LL | |     fn write(self, _: u64) {}
+LL | | }
+   | |_^
+   |
+   = help: this is a deliberately conservative check of `UnsafeCell` reborrows (the rules are in devtools/lints/README.md); either reborrow once at the entry point and pass the reference down to callees, or opt out with `allow(unsafe_cell_reborrow)` plus a comment and own the soundness argument yourself
+
+error: aborting due to 18 previous errors
+
