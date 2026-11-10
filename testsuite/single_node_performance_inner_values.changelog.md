@@ -6,6 +6,14 @@ Recalibration history, newest first. Each entry lists the tests whose calibrated
 
 | transaction_type | module_working_set | executor | runs | inner tps % change |
 | --- | --- | --- | --- | --- |
+| smart-table-picture30-k-with200-change | 1 | VM | 153 | +9.4% |
+| vector-trim-append-len3000-size1 | 1 | VM | 148 | +36.9% |
+| vector-remove-insert-len3000-size1 | 1 | VM | 148 | +48.3% |
+
+## 2026-11-10
+
+| transaction_type | module_working_set | executor | runs | inner tps % change |
+| --- | --- | --- | --- | --- |
 | smart-table-picture30-k-with200-change | 1 | VM | 5 | -8.6% |
 
 ## 2026-11-04
