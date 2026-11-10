@@ -52,8 +52,7 @@ pub struct UnsyncMap<K, T, V, I> {
     /// Current members of each resource group touched this block, initialized
     /// from storage on the first touch and then overwritten when transaction
     /// commits.
-    // TODO(perf): consider using interned type and an unordered map here.
-    // TODO(cleanup): unify with grpup cache used by V1 VM.
+    // TODO(cleanup): unify with group cache used by V1 VM.
     groups: RefCell<HashMap<K, ResourceGroupEntry>>,
 }
 
