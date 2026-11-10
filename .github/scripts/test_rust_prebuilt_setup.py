@@ -51,7 +51,7 @@ elif name == 'rustc':
 elif name == 'clang':
     print('Ubuntu clang version ' + str(state['clang_llvm']) + '.1.0')
 elif name == 'ld.lld':
-    print('LLD ' + str(state['lld_llvm']) + '.1.0 (compatible with GNU linkers)')
+    print(os.environ.get('LLD_PREFIX', 'Ubuntu ') + 'LLD ' + str(state['lld_llvm']) + '.1.0 (compatible with GNU linkers)')
 else:
     print(name + ' fixture')
 """
@@ -240,6 +240,12 @@ class PrebuiltSetupTests(unittest.TestCase):
         self.assertIn(["rustup", ["toolchain", "install", "1.99.2"]], self.calls())
         self.assertEqual((self.root / "github-output").read_text(), "")
         self.assertEqual(self.run_step(2).returncode, 0)
+
+    def test_upstream_and_ubuntu_linker_version_formats_are_accepted(self):
+        for prefix in ["", "Ubuntu "]:
+            with self.subTest(prefix=prefix):
+                result = self.run_step(0, LLD_PREFIX=prefix)
+                self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_installed_channel_repairs_missing_components(self):
         self.set_state(components=["rustc"])

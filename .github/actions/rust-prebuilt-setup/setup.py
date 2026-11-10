@@ -112,7 +112,7 @@ def llvm_matches():
     versions = [
         re.search(r"^LLVM version: (\d+)\.", output("rustc", "-vV"), re.MULTILINE),
         re.search(r"clang version (\d+)\.", output("clang", "--version")),
-        re.search(r"^LLD (\d+)\.", output("ld.lld", "--version")),
+        re.search(r"(?:^|\s)LLD (\d+)\.", output("ld.lld", "--version")),
     ]
     return all(versions) and len({match[1] for match in versions}) == 1
 
