@@ -13,6 +13,7 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, move_resource::MoveStructType,
 };
 use serde::de::DeserializeOwned;
+use shared_dsa::UnorderedMap;
 use std::collections::BTreeMap;
 
 /// Trait extending the runtime's [`ResourceProvider`] interface with additional capabilities to
@@ -86,9 +87,12 @@ pub(crate) fn read_resource<T: MoveStructType + DeserializeOwned>(
 pub type GroupMembers = BTreeMap<StructTag, Bytes>;
 
 /// The resource groups a transaction assembled during materialization, keyed by
-/// group slot. `None` marks a group the transaction deleted. Ordered so a caller
-/// can merge it into its own cache deterministically.
-pub type MaterializedGroups = BTreeMap<StateKey, Option<GroupMembers>>;
+/// group slot. `None` marks a group the transaction deleted.
+///
+/// Unordered: a caller merges it into its own cache, which does not depend on
+/// order. The default hasher is fine because `StateKey` hashes its
+/// cryptographic digest.
+pub type MaterializedGroups = UnorderedMap<StateKey, Option<GroupMembers>>;
 
 /// Decodes a group's stored blob.
 pub fn decode_group_members(blob: &[u8]) -> Result<GroupMembers, ResourceProviderError> {

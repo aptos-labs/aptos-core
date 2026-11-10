@@ -13340,6 +13340,7 @@ dependencies = [
 name = "mono-move-natives"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.12",
  "aptos-crypto",
  "aptos-types",
  "ark-bls12-381 0.5.0",
@@ -13365,6 +13366,7 @@ dependencies = [
  "sha2 0.10.9",
  "sha2 0.9.9",
  "sha3 0.9.1",
+ "shared-dsa",
  "siphasher 1.0.4",
  "tiny-keccak",
 ]

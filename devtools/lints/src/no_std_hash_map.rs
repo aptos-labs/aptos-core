@@ -8,9 +8,16 @@
 //! hasher's random seed, so any code that walks one is a determinism bug
 //! waiting to happen in a VM whose output must agree across validators; it is
 //! also SipHash, which is slower than needed for keys that are not
-//! attacker-controlled. `shared_dsa::UnorderedMap` is `FxHashMap` with no
-//! iteration over keys or pairs exposed at all. Code that genuinely needs to
-//! iterate uses `BTreeMap` / `BTreeSet`.
+//! attacker-controlled. `shared_dsa::UnorderedMap` is a hash map (Fx by
+//! default) with no ordered iteration exposed: the only way to walk it is the
+//! explicitly named `into_iter_unordered`. Code that genuinely needs to
+//! iterate in order uses `BTreeMap` / `BTreeSet`.
+//!
+//! This only removes accidental dependence on hash order. It does not make a
+//! site correct: a `BTreeMap` is deterministic only if its key's `Ord` is the
+//! same on every build, and the default Fx hasher is not collision resistant,
+//! so attacker-chosen keys need a `BTreeMap` or a randomly keyed hasher. See
+//! "Choosing a map" in `third_party/move/mono-move/AGENTS.md`.
 //!
 //! Flags the type wherever it is written — signatures, fields, annotations,
 //! turbofish, and the self type of a constructor call such as

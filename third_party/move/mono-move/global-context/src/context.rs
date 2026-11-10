@@ -142,6 +142,11 @@ struct Context {
     layouts: Layouts,
     /// Values a client preinstalls before execution for execution guards to
     /// read, keyed by their type. See [`GlobalContext::preinstall`].
+    ///
+    /// This map never needs to be iterated, only looked up by type, so an
+    /// unordered map is the right choice. A `BTreeMap` would be weaker: it
+    /// would expose an ordering based on `TypeId`, which depends on the
+    /// compiler.
     preinstalled: UnorderedMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 

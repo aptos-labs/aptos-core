@@ -45,12 +45,14 @@ pub trait NativeExtension: Any {
 ///
 /// Keyed by `TypeId`, which orders the whole-collection walks (GC root
 /// relocation, checkpoint, rollback). That order is fixed within a build but
-/// not across compiler versions, since `TypeId`'s ordering is its hash; it
-/// only affects to-space layout and which extension reports an error first,
-/// never a committed result.
+/// not across compiler versions, since `TypeId`'s ordering is its hash. Today
+/// it is believed to affect only to-space layout and which extension reports
+/// an error first, not a committed result, but nothing enforces that.
 //
-// TODO(cleanup): key the walks by registration order (a `Vec` plus a
-// `TypeId -> index` lookup) so the order is independent of the compiler.
+// TODO(correctness): this must be fixed. The walks below follow `TypeId`'s
+// ordering, which is not stable across compiler versions, so two builds can
+// walk the extensions in different orders. Key the walks by registration
+// order instead (a `Vec` plus a `TypeId -> index` lookup).
 #[derive(Default)]
 pub struct NativeExtensions {
     map: BTreeMap<TypeId, RefCell<Box<dyn NativeExtension>>>,

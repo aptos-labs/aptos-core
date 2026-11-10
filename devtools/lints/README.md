@@ -8,7 +8,27 @@ fully resolved types, HIR and MIR — everything clippy can see.
 
 | lint | what it flags | applies to (see `/dylint.toml`) |
 |---|---|---|
-| `no_std_hash_map` | `std::collections::{HashMap, HashSet}`, `hashbrown`, and aliases such as `FxHashMap`; use `shared_dsa::{UnorderedMap, UnorderedSet}` (no iteration exposed) or `BTreeMap`/`BTreeSet` | consensus-critical mono-move crates |
+| `no_std_hash_map` | `std::collections::{HashMap, HashSet}`, `hashbrown`, and aliases such as `FxHashMap`; use `shared_dsa::{UnorderedMap, UnorderedSet}` (no ordered iteration exposed) or `BTreeMap`/`BTreeSet` | consensus-critical mono-move crates |
+
+### What `no_std_hash_map` does not guarantee
+
+The lint removes one class of bug: code that depends on hash order by
+accident. It does not make a site deterministic or safe on its own.
+
+- A `BTreeMap` iterates in the order of its key's `Ord`. That is only
+  deterministic if `Ord` is the same on every build: keys ordered by a
+  pointer, an interned id or a `TypeId` are not.
+- A walk whose order can reach an output still needs explicit handling (sort,
+  or collect into an ordered structure). `UnorderedMap::into_iter_unordered`
+  is the one way to walk an `UnorderedMap`, named so the obligation is visible.
+- `UnorderedMap`'s default hasher (Fx) is not collision resistant. A map keyed
+  by attacker-chosen data needs a `BTreeMap` or
+  `UnorderedMap<K, V, ahash::RandomState>`.
+- Where a plain hash map is the better structure, a commented `allow` (see
+  "Suppressing a hit") is an intended outcome.
+
+`third_party/move/mono-move/AGENTS.md` ("Choosing a map") has the guideline
+for picking a map at a given site.
 
 ## Running
 
