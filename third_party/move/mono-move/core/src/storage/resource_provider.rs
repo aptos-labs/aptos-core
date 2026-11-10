@@ -4,7 +4,8 @@
 //! Resource storage access for the runtime.
 
 use crate::{
-    native::TableHandle, struct_tag_of, types::InternedType, ExecutionErrorKind, IntoExecutionError,
+    native::TableHandle, struct_tag_of, types::InternedType, ExecutionErrorKind,
+    IntoExecutionError, VMInternalError,
 };
 use anyhow::anyhow;
 use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
@@ -157,13 +158,20 @@ pub enum ResourceProviderError {
     // TODO(cleanup): replace with Interrupted variant when killswitch lands.
     #[error("resource provider speculative abort: {0}")]
     SpeculativeAbort(String),
+    /// A VM operation the provider ran on the read's behalf failed, such as
+    /// deserializing a stored value.
+    #[error("resource provider VM error: {0}")]
+    VMInternal(#[from] VMInternalError),
 }
 
 impl IntoExecutionError for ResourceProviderError {
     fn kind(&self) -> ExecutionErrorKind {
         match self {
+            // A stored value the provider cannot serve is an invariant
+            // violation, whatever the VM operation failed with.
             ResourceProviderError::InvariantViolation(_)
-            | ResourceProviderError::SpeculativeAbort(_) => ExecutionErrorKind::InvariantViolation,
+            | ResourceProviderError::SpeculativeAbort(_)
+            | ResourceProviderError::VMInternal(_) => ExecutionErrorKind::InvariantViolation,
         }
     }
 }

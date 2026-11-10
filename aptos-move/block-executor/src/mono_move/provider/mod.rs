@@ -37,9 +37,7 @@ pub(crate) fn materialized_value(
     ty: InternedType,
     blob: &[u8],
 ) -> Result<MonoValue, ResourceProviderError> {
-    let (ptr, pin) = arena
-        .deserialize(guard, ty, blob)
-        .map_err(|e| invariant_violation(format!("Storage value failed to deserialize: {e}")))?;
+    let (ptr, pin) = arena.deserialize(guard, ty, blob)?;
     Ok(MonoValue::Write {
         ptr,
         ty,
