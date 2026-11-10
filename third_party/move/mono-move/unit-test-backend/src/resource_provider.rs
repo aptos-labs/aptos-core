@@ -116,8 +116,9 @@ where
             // transactional session can keep tables across tasks once it
             // commits table writes.
             InMemoryStorageKey::TableItem { .. } => Ok(StorageRead::DoesNotExist { version: None }),
-            // Resource groups are a storage-layer concern; this provider serves
-            // members directly by their own key.
+            // TODO(testing): members are served by their own key and the group is
+            // ignored. Serve them from the group's slot so transactional sources
+            // cover resource-group placement.
             InMemoryStorageKey::ResourceGroup { .. } => {
                 Ok(StorageRead::DoesNotExist { version: None })
             },
