@@ -28,4 +28,4 @@ once_cell = { workspace = true }
 rayon = { workspace = true }
 
 # experimental
-hashbrown = "0.14.0"
+hashbrown = { workspace = true }
