@@ -882,54 +882,52 @@ pub fn test_sync_transactions_impl(
     let mut cur_ver: Version = 0;
     let mut estimated_buffer_size = 0;
     let mut snapshot_versions = vec![];
+    let mut saved_without_ledger_info = None;
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
-        // if batch has more than 2 transactions, save them in two batches
-        let batch1_len = txns_to_commit.len() / 2;
-        if batch1_len > 0 {
-            let txns_to_commit_batch = &txns_to_commit[..batch1_len];
-            db.save_transactions_for_test(
-                txns_to_commit_batch,
-                cur_ver, /* first_version */
-                None,    /* ledger_info_with_sigs */
-                false,   /* sync_commit */
-            )
-            .unwrap();
-
-            if let Some(v) = gen_snapshot_version(
-                &mut estimated_buffer_size,
-                txns_to_commit_batch,
-                cur_ver,
-                snapshot_size_threshold,
-            ) {
-                snapshot_versions.push(v);
-            }
-        }
-        let ver = cur_ver + batch1_len as Version;
-        let txns_to_commit_batch = &txns_to_commit[batch1_len..];
+        let is_latest = batch_idx + 1 == num_batches;
+        // Every other block is saved without a ledger info unless it ends an epoch, and is
+        // verified with the next one's.
+        let ledger_info_opt = (saved_without_ledger_info.is_some()
+            || is_latest
+            || ledger_info_with_sigs.ledger_info().ends_epoch())
+        .then_some(ledger_info_with_sigs);
         db.save_transactions_for_test(
-            txns_to_commit_batch,
-            ver,
-            Some(ledger_info_with_sigs),
+            txns_to_commit,
+            cur_ver, /* first_version */
+            ledger_info_opt,
             false, /* sync_commit */
         )
         .unwrap();
 
         if let Some(v) = gen_snapshot_version(
             &mut estimated_buffer_size,
-            txns_to_commit_batch,
-            ver,
+            txns_to_commit,
+            cur_ver,
             snapshot_size_threshold,
         ) {
             snapshot_versions.push(v);
         }
 
-        verify_committed_transactions(
-            &db,
-            txns_to_commit,
-            cur_ver,
-            ledger_info_with_sigs,
-            batch_idx + 1 == num_batches, /* is_latest */
-        );
+        if ledger_info_opt.is_some() {
+            if let Some((first_version, txns)) = saved_without_ledger_info.take() {
+                verify_committed_transactions(
+                    &db,
+                    txns,
+                    first_version,
+                    ledger_info_with_sigs,
+                    false, /* is_latest */
+                );
+            }
+            verify_committed_transactions(
+                &db,
+                txns_to_commit,
+                cur_ver,
+                ledger_info_with_sigs,
+                is_latest,
+            );
+        } else {
+            saved_without_ledger_info = Some((cur_ver, txns_to_commit.as_slice()));
+        }
 
         cur_ver += txns_to_commit.len() as u64;
     }

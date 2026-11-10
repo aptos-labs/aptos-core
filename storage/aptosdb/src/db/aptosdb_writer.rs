@@ -437,6 +437,11 @@ impl AptosDB {
             chunk.first_version,
             next_version,
         );
+        ensure!(
+            chunk.state.is_checkpoint(),
+            "Chunk ends at version {} in the middle of a block.",
+            chunk.expect_last_version(),
+        );
 
         Ok(())
     }
