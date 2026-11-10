@@ -14,7 +14,6 @@ use aptos_types::{
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use bytes::Bytes;
-use mono_move_runtime::SegmentedArena;
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::language_storage::{ModuleId, StructTag};
 use move_vm_runtime::{Module, Script};
@@ -50,16 +49,6 @@ pub struct UnsyncMap<K, T, V, I> {
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
 
-    /// The arena that holds flat values MonoMove uses, converted from storage
-    /// BCS format. Transactions obtain pointers to this arena on reads. This
-    /// arena is per-block and append only. It is never reset and is simply
-    /// dropped together with the map.
-    ///
-    /// Set to [`None`] if MonoMove is not used.
-    // TODO(security): transactions can grow the arena without bound through
-    // their reads, and a rollback does not reclaim what the transaction
-    // allocated.
-    arena: Option<SegmentedArena>,
     /// Current members of each resource group touched this block, initialized
     /// from storage on the first touch and then overwritten when transaction
     /// commits.
@@ -85,16 +74,8 @@ where
             delayed_field_map: RefCell::new(HashMap::new()),
             total_base_resource_size: AtomicU64::new(0),
             total_base_delayed_field_size: AtomicU64::new(0),
-            arena: None,
             groups: RefCell::new(HashMap::new()),
         }
-    }
-
-    pub fn with_mono_move_arena(mut self, enabled: bool) -> Self {
-        if enabled {
-            self.arena = Some(SegmentedArena::new());
-        }
-        self
     }
 
     /// Returns the module cache for this [UnsyncMap].
@@ -307,11 +288,6 @@ where
             Ordering::Relaxed,
         );
         self.delayed_field_map.borrow_mut().insert(id, value);
-    }
-
-    /// Returns the reference to the MonoMove arena.
-    pub fn resource_arena(&self) -> Option<&SegmentedArena> {
-        self.arena.as_ref()
     }
 
     /// Returns the group if exists in the cache.

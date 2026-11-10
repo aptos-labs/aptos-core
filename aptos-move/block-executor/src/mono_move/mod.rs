@@ -386,9 +386,7 @@ pub struct MonoTransactionExecutor {
     environment: AptosEnvironment,
     /// This executor's worker ID.
     worker_id: u32,
-    /// Where this worker materializes the values it reads from storage. Only
-    /// used for parallel execution; sequential execution shares one arena
-    /// through the unsync map.
+    /// Where this worker materializes the values it reads from storage.
     arena: SegmentedArena,
 }
 
@@ -503,8 +501,12 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
 
         let (outcome, skips_rest, reads) = match mode {
             ViewMode::Sequential { unsync_map, .. } => {
-                let provider =
-                    BlockSTMSequentialProvider::new(&guard, shared.base_view, unsync_map);
+                let provider = BlockSTMSequentialProvider::new(
+                    &guard,
+                    shared.base_view,
+                    unsync_map,
+                    &self.arena,
+                );
                 let (outcome, skips_rest) =
                     self.run(&guard, shared.base_view, &provider, txn, auxiliary_info)?;
                 // Sequential execution never validates, so the read set is
@@ -590,8 +592,12 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
 
         match mode {
             ViewMode::Sequential { unsync_map, .. } => {
-                let provider =
-                    BlockSTMSequentialProvider::new(&guard, shared.base_view, unsync_map);
+                let provider = BlockSTMSequentialProvider::new(
+                    &guard,
+                    shared.base_view,
+                    unsync_map,
+                    &self.arena,
+                );
                 let (output, groups) = outcome
                     .materialize(&guard, &provider, features, auxiliary_data)
                     .map_err(materialization_failed)?;
