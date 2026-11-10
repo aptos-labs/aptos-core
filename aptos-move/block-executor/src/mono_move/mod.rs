@@ -84,6 +84,8 @@ pub enum MonoValue {
     /// The value Block-STM versions at a resource group's own slot. MonoMove
     /// carries no group metadata, but the slot still has to hold an entry: the
     /// block executor writes and removes it alongside the group's members.
+    //
+    // TODO(completeness): add state value metadata here.
     GroupMetadata,
 }
 
@@ -101,6 +103,8 @@ impl SpeculativeValue for MonoValue {
     }
 
     fn eq_metadata(&self, other: &Self) -> bool {
+        // TODO(cleanup): refactor group metadata to not be a write op.
+        //
         // Only a group slot carries metadata, and MonoMove's is always the same.
         matches!(
             (self, other),

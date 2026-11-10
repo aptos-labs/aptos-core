@@ -201,10 +201,9 @@ pub(crate) mod macros {
 /// allocation sizes (e.g. a corrupted descriptor or attacker-controlled
 /// capacity in `alloc_vec`) before we compute a bump-pointer offset.
 ///
-/// Set above every buffer the runtime creates, so it rejects only sizes no heap
-/// could ever serve. Each allocation is still bounded by its own
-/// heap's buffer, which for a session heap is `DEFAULT_HEAP_SIZE`.
-const MAX_SINGLE_ALLOCATION_SIZE: usize = 64 * 1024 * 1024;
+/// Set to the largest buffer the runtime creates, a session heap, so it rejects
+/// only sizes no heap could ever serve. Arena segments are the same size.
+const MAX_SINGLE_ALLOCATION_SIZE: usize = DEFAULT_HEAP_SIZE;
 
 /// Heap state for a single interpreter context.
 pub struct Heap {
@@ -267,15 +266,21 @@ impl Heap {
 
     /// Bump-allocates one object of `total_size` bytes (header + payload), stamps the header with
     /// `descriptor_id`, and returns the data pointer (payload start; the header occupies the
-    /// preceding [`OBJECT_HEADER_SIZE`](mono_move_core::OBJECT_HEADER_SIZE) bytes). Returns `None` if
-    /// the heap is full. Does not run GC.
+    /// preceding [`OBJECT_HEADER_SIZE`](mono_move_core::OBJECT_HEADER_SIZE) bytes). Fails with
+    /// [`RuntimeError::OutOfHeapMemory`] if the heap is full. Does not run GC.
     pub fn alloc_object(
         &mut self,
         total_size: usize,
         descriptor_id: DescriptorId,
-    ) -> Option<std::ptr::NonNull<u8>> {
-        let ptr = heap_alloc(self, total_size, descriptor_id).ok()?;
-        std::ptr::NonNull::new(ptr)
+    ) -> VMResult<NonNull<u8>> {
+        let ptr = heap_alloc(self, total_size, descriptor_id)
+            .map_err(|e| VMInternalError::new(e.into_runtime_error()))?;
+        let Some(ptr) = NonNull::new(ptr) else {
+            invariant_violation!(Unreachable(
+                "heap_alloc returned a null pointer".to_string()
+            ));
+        };
+        Ok(ptr)
     }
 }
 
@@ -362,32 +367,24 @@ impl SegmentedArena {
 
         // The flat root and everything nested under it must land in one
         // segment, so they are allocated together and retried together.
-        let Some((result, segment)) = self.alloc_in(|heap| {
+        let (obj, segment) = self.alloc_in(|heap| {
             let obj = heap.alloc_object(total_size, descriptor)?;
             // SAFETY: `obj` is a freshly reserved object sized for the value's
             // layout; `deserialize_into` writes the flat value there and puts
             // the nested allocations in the same heap.
-            match unsafe { deserialize_into(guard, heap, ty, blob, obj.as_ptr()) } {
-                Ok(()) => Some(Ok(obj)),
-                // Only running out of room is worth a fresh segment.
-                Err(e) if is_out_of_heap_memory(&e) => None,
-                Err(e) => Some(Err(e)),
-            }
-        }) else {
-            invariant_violation!(Unreachable(
-                "stored value does not fit in an arena segment".to_string()
-            ));
-        };
-        Ok((result?, segment as Arc<dyn ReadPin>))
+            unsafe { deserialize_into(guard, heap, ty, blob, obj.as_ptr()) }?;
+            Ok(obj)
+        })?;
+        Ok((obj, segment as Arc<dyn ReadPin>))
     }
 
     /// Runs `alloc` in the current segment, or in a fresh one when the current
     /// segment has too little room left. Returns what `alloc` produced together
-    /// with the segment to pin it by, or [`None`] if the value does not fit even
-    /// in a fresh segment.
+    /// with the segment to pin it by.
     ///
-    /// `alloc` returns [`None`] only when it ran out of room; anything it must
-    /// not be retried for belongs in `T`. It may run twice, and whatever it
+    /// Only [`RuntimeError::OutOfHeapMemory`] is retried; any other error is
+    /// returned as is. If the value does not fit even in a fresh segment, that
+    /// segment's error is returned. `alloc` may run twice, and whatever it
     /// allocated in a segment it then failed in is left behind as unreachable
     /// slack.
     ///
@@ -395,13 +392,15 @@ impl SegmentedArena {
     /// before, or two Block-STM schedules could disagree on whether the same
     /// value can be read. Hence the retry starts from an empty segment of a
     /// fixed size.
-    fn alloc_in<T>(&self, alloc: impl Fn(&mut Heap) -> Option<T>) -> Option<(T, Arc<Segment>)> {
+    fn alloc_in<T>(&self, alloc: impl Fn(&mut Heap) -> VMResult<T>) -> VMResult<(T, Arc<Segment>)> {
         let mut segments = self.segments.borrow_mut();
 
         if let Some(current) = segments.last().cloned() {
-            let value = alloc(&mut current.heap.borrow_mut());
-            if let Some(value) = value {
-                return Some((value, current));
+            let result = alloc(&mut current.heap.borrow_mut());
+            match result {
+                Ok(value) => return Ok((value, current)),
+                Err(e) if is_out_of_heap_memory(&e) => {},
+                Err(e) => return Err(e),
             }
         }
 
@@ -413,7 +412,7 @@ impl SegmentedArena {
         let fresh = new_segment(SEGMENT_BYTES);
         let value = alloc(&mut fresh.heap.borrow_mut())?;
         segments.push(fresh.clone());
-        Some((value, fresh))
+        Ok((value, fresh))
     }
 }
 
@@ -1622,7 +1621,7 @@ mod segmented_arena_tests {
 
     const PAYLOAD: usize = SEGMENT_BYTES / 2;
 
-    fn alloc_in_heap(heap: &mut Heap, payload: usize) -> Option<NonNull<u8>> {
+    fn alloc_in_heap(heap: &mut Heap, payload: usize) -> VMResult<NonNull<u8>> {
         heap.alloc_object(OBJECT_HEADER_SIZE + payload, DescriptorId(0))
     }
 
@@ -1630,6 +1629,7 @@ mod segmented_arena_tests {
         arena
             .alloc_in(|heap| alloc_in_heap(heap, payload))
             .map(|(ptr, _)| ptr)
+            .ok()
     }
 
     /// Leaves the arena's newest segment without room for another `PAYLOAD`.
@@ -1638,7 +1638,7 @@ mod segmented_arena_tests {
         // existence before filling it.
         alloc(arena, PAYLOAD).expect("A fresh arena serves the first allocation");
         let segment = arena.segments.borrow().last().unwrap().clone();
-        while alloc_in_heap(&mut segment.heap.borrow_mut(), PAYLOAD).is_some() {}
+        while alloc_in_heap(&mut segment.heap.borrow_mut(), PAYLOAD).is_ok() {}
     }
 
     #[test]
