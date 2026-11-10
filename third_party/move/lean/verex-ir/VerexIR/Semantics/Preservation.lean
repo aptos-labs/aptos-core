@@ -441,7 +441,7 @@ types and names, with each function and constant checked. -/
 theorem checkUnit_namespace {unit : ValidatedUnit} {pointerWidth : Option Nat}
     (checked : checkUnit unit pointerWidth = true) {index : Nat} {ns : ValidatedNamespace}
     (ns_eq : unit.namespaces[index]? = some ns) :
-    ns.identity.index = index ∧ ns.tables.types = unit.tables.types ∧
+    ns.unitIdentity.index = index ∧ ns.tables.types = unit.tables.types ∧
       ns.tables.names = unit.tables.names ∧ ns.structs.all (variantsDistinct ns) = true ∧
       ∃ table, requiredTypes unit = some table ∧
         (∀ functionIndex declaration, ns.functions[functionIndex]? = some declaration →
@@ -465,7 +465,7 @@ theorem checkUnit_namespace {unit : ValidatedUnit} {pointerWidth : Option Nat}
 theorem Placed.identity {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     {namespaceId : NamespaceId} {context : Context}
     (placed : Placed executable namespaceId context) :
-    unit.namespaces[context.ns.identity.index]? = some context.ns := by
+    unit.namespaces[context.ns.unitIdentity.index]? = some context.ns := by
   have := (checkUnit_namespace executable.typed placed.namespace_eq).1
   rw [this]
   exact placed.namespace_eq
@@ -798,7 +798,7 @@ theorem signatureTypes?_frameEnv {ns targetNs : ValidatedNamespace} {env : Array
     (arity : instantiations.size = declaration.signature.generics.size) :
     signatureTypes? targetNs declaration (frameEnv declaration.signature.generics arguments) =
       signatureTypes? targetNs declaration arguments := by
-  simp only [signatureTypes?, resolveIn,
+  simp only [signatureTypes?, resolveIn, resolveAt,
     SemTy.resolveFuel_congr (frameEnv_agree resolved agree arity)]
 
 theorem typeArguments_mem {instantiations : Array GenericArgument} {index : Nat}
@@ -822,9 +822,15 @@ theorem FrameReads.call {unit : ValidatedUnit} {executable : ExecutableUnit unit
     (agree : Context.kindsAgree generics instantiations = true)
     (arity : instantiations.size = generics.size) :
     FrameInstantiation targetNs (requiredAt unit handle)
-      (callTypeInstantiation unit handle frame.typeInstantiation instantiations)
+      (callTypeInstantiation unit handle frame.typeInstantiation
+        (context.ns.genericArguments instantiations))
       (frameEnv generics arguments) := by
+  rw [StaticTyping.resolveArguments_eq] at resolved
+  rw [← Context.kindsAgree_genericArguments context.ns] at agree
+  replace arity : (context.ns.genericArguments instantiations).size = generics.size := by
+    simpa using arity
   unfold Context.edgeClosed at edge
+  generalize context.ns.genericArguments instantiations = instantiations at resolved agree arity edge ⊢
   rw [index_eq, placed.unit_eq] at edge
   simp only [target_eq, Bool.and_eq_true, Array.all_eq_true'] at edge
   obtain ⟨consulted, closed⟩ := edge
@@ -1053,7 +1059,8 @@ theorem Running.call {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     (checked : context.checkCall type (.function reference) instantiations operands = true)
     (resolve_eq : resolveFunction? unit namespaceId reference = some handle)
     (callee : FunctionPreserves unit handle
-      (callTypeInstantiation unit handle frame.typeInstantiation instantiations)
+      (callTypeInstantiation unit handle frame.typeInstantiation
+        (context.ns.genericArguments instantiations))
       state values.toArray finalState outcome) :
     Preserved unit loans inert context (applyPendingFrom state.pending frame finalState).1
       (applyPendingFrom state.pending frame finalState).2 fun loans' =>
@@ -1097,7 +1104,8 @@ theorem Running.closure {unit : ValidatedUnit} {executable : ExecutableUnit unit
     (checked : context.checkCall type (.closure reference mask) instantiations captures = true)
     (resolve_eq : resolveFunction? unit namespaceId reference = some handle) :
     HasType unit loans (.closure handle mask
-      (callTypeInstantiation unit handle frame.typeInstantiation instantiations)
+      (callTypeInstantiation unit handle frame.typeInstantiation
+        (context.ns.genericArguments instantiations))
       values.toArray) type := by
   obtain ⟨targetNs, declaration, target_eq, targetNs_eq, declaration_eq, index_eq⟩ :=
     functionTarget_of_resolve placed.namespace_eq resolve_eq
@@ -1215,7 +1223,7 @@ theorem ValuesTyped.types {unit : ValidatedUnit} {loans : LoanTypes} {context : 
 /-- A frame reads a type it consults as the type the context resolves. -/
 theorem FrameReads.resolves {context : Context} {frame : RuntimeFrame} {typeId : TypeId}
     {type : SemTy} (reads : FrameReads context frame) (consults : context.consults typeId = true)
-    (typed : context.typeOf typeId = some type) :
+    (typed : resolveAt context.ns context.env typeId = some type) :
     Resolves context.ns.tables #[] (instantiatedTypeId frame.typeInstantiation typeId) type := by
   have resolved : Resolves context.ns.tables context.env typeId type := ⟨_, typed⟩
   unfold FrameReads at reads
@@ -1321,7 +1329,7 @@ theorem Running.global {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     (valuesTyped : ValuesTyped unit loans context arguments.toList values)
     (checked : context.checkOperation type (.global kind) instantiations arguments = true)
     (evaluate_eq : evaluateGlobalOperation? unit context.ns resultType exprId kind
-      instantiations values.toArray frame state = some result) :
+      (context.ns.genericArguments instantiations) values.toArray frame state = some result) :
     GlobalResultTyped unit loans inert context.ns context.locals context.env frame state type
       result ∧ ∃ resource, instantiations = #[.typeArg resource] := by
   simp only [Context.checkOperation] at checked
@@ -1331,6 +1339,7 @@ theorem Running.global {unit : ValidatedUnit} {executable : ExecutableUnit unit}
       apply Array.toList_inj.mp
       simpa using instantiations_eq
     subst array_eq
+    rw [ValidatedNamespace.genericArguments_typeArg] at evaluate_eq
     refine ⟨?_, resource, rfl⟩
     simp only [Bool.and_eq_true] at checked
     obtain ⟨consults, checked⟩ := checked
@@ -1550,7 +1559,7 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
     (type_eq : context.typeOf expression.typeId = some type)
     (valuesTyped : ValuesTyped unit loans context operands.toList values)
     (checked : context.checkOperation type operation instantiations operands = true)
-    (evaluate_eq : evaluatePlaceOperation? unit context.ns expression.typeId exprId operation
+    (evaluate_eq : evaluatePlaceOperation? unit context.ns (context.ns.typeId expression.typeId) exprId operation
       values.toArray frame state = some (finalFrame, finalState, value)) :
     Preserved unit loans inert context finalFrame finalState fun loans' =>
       HasType unit loans' value type := by
@@ -1808,12 +1817,12 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
                 obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
                 exact ⟨loans, .refl _, running, stateTyped, .shared _ _ typed⟩
           case mutable =>
-            rw [show evaluatePlaceOperation? unit context.ns expression.typeId exprId
+            rw [show evaluatePlaceOperation? unit context.ns (context.ns.typeId expression.typeId) exprId
               (.reference (.borrow .mutable)) values.toArray frame state = none from rfl]
               at evaluate_eq
             cases evaluate_eq
           case profile value =>
-            rw [show evaluatePlaceOperation? unit context.ns expression.typeId exprId
+            rw [show evaluatePlaceOperation? unit context.ns (context.ns.typeId expression.typeId) exprId
               (.reference (.borrow (.profile value))) values.toArray frame state = none from rfl]
               at evaluate_eq
             cases evaluate_eq
@@ -3173,6 +3182,7 @@ theorem preservation {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     simp only [type_eq, kind_eq] at nodeChecked
     obtain ⟨⟨loans'', extends'', frameTyped, stateTyped'', valueTyped⟩, resource, rfl⟩ :=
       running'.global placed state' valuesTyped nodeChecked evaluate_eq
+    rw [ValidatedNamespace.genericArguments_typeArg] at evaluate_eq
     exact ⟨loans'', extends''.trans extends', running'.of_typed frameTyped
       (evaluateGlobalOperation?_instantiation evaluate_eq), stateTyped'',
       valuesTyped.operation_quiet expression_eq kind_eq, type, exprType_of expression_eq type_eq,

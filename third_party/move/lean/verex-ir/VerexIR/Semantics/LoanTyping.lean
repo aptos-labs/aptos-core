@@ -1630,9 +1630,9 @@ type. -/
 theorem TypedState.resource {unit : ValidatedUnit} {loans : LoanTypes} {state : RuntimeState}
     {ns : ValidatedNamespace} {resourceType : TypeId} {type : SemTy}
     {key value : RuntimeValue} (typed : TypedState unit loans inert state)
-    (ns_eq : unit.namespaces[ns.identity.index]? = some ns)
+    (ns_eq : unit.namespaces[ns.unitIdentity.index]? = some ns)
     (resolves : Resolves ns.tables #[] resourceType type)
-    (lookup_eq : state.globals.lookup (globalKey ns.identity resourceType key) = some value) :
+    (lookup_eq : state.globals.lookup (globalKey ns.unitIdentity resourceType key) = some value) :
     HasType unit loans value type := by
   obtain ⟨ns', type', ns'_eq, resolves', value_typed⟩ := typed.lookup lookup_eq
   simp only [globalKey] at ns'_eq resolves'
@@ -1677,7 +1677,7 @@ theorem evaluateGlobal_contains_typed
   · cases eval
 
 theorem evaluateGlobal_take_typed
-    (ns_eq : unit.namespaces[ns.identity.index]? = some ns)
+    (ns_eq : unit.namespaces[ns.unitIdentity.index]? = some ns)
     (resolves : Resolves ns.tables #[]
       (instantiatedTypeId frame.typeInstantiation resource.typeId) resourceType)
     (frameTyped : TypedFrame unit loans ns locals env frame)
@@ -1702,7 +1702,7 @@ theorem evaluateGlobal_take_typed
   · cases eval
 
 theorem evaluateGlobal_publish_typed
-    (ns_eq : unit.namespaces[ns.identity.index]? = some ns)
+    (ns_eq : unit.namespaces[ns.unitIdentity.index]? = some ns)
     (resolves : Resolves ns.tables #[]
       (instantiatedTypeId frame.typeInstantiation resource.typeId) resourceType)
     (frameTyped : TypedFrame unit loans ns locals env frame)
@@ -1735,19 +1735,19 @@ mutable one mints a loan at its type and leaves the hole in the slot. -/
 theorem borrowRuntimePlace?_global_typed {referenceType : ReferenceType} {kind : BorrowKind}
     {referenceKind : ReferenceKind} {resourceTypeId : TypeId} {key : RuntimeValue}
     {frame' : RuntimeFrame} {state' : RuntimeState} {value : RuntimeValue}
-    (ns_eq : unit.namespaces[ns.identity.index]? = some ns)
+    (ns_eq : unit.namespaces[ns.unitIdentity.index]? = some ns)
     (resolves : Resolves ns.tables #[] resourceTypeId resourceType)
     (kind_eq : StaticTyping.borrowedKind kind = some referenceKind)
     (frameTyped : TypedFrame unit loans ns locals env frame)
     (stateTyped : TypedState unit loans inert state)
     (borrow : borrowRuntimePlace? unit ns site referenceType kind frame state
-      { root := .global (globalKey ns.identity resourceTypeId key) } =
+      { root := .global (globalKey ns.unitIdentity resourceTypeId key) } =
         some (frame', state', value)) :
     ∃ loans', loans'.Extends loans ∧ TypedFrame unit loans' ns locals env frame' ∧
       TypedState unit loans' inert state' ∧
       HasType unit loans' value (.reference referenceKind resourceType) := by
   have reads : ∀ value, readRuntimePlace? frame state
-      { root := .global (globalKey ns.identity resourceTypeId key) } = some value →
+      { root := .global (globalKey ns.unitIdentity resourceTypeId key) } = some value →
       HasType unit loans value resourceType := by
     intro value read
     simp only [readRuntimePlace?, readRoot?, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
@@ -1793,7 +1793,7 @@ theorem borrowRuntimePlace?_global_typed {referenceType : ReferenceType} {kind :
   | profile _ => simp [StaticTyping.borrowedKind] at kind_eq
 
 theorem evaluateGlobal_borrow_typed {kind : BorrowKind} {referenceKind : ReferenceKind}
-    (ns_eq : unit.namespaces[ns.identity.index]? = some ns)
+    (ns_eq : unit.namespaces[ns.unitIdentity.index]? = some ns)
     (resolves : Resolves ns.tables #[]
       (instantiatedTypeId frame.typeInstantiation resource.typeId) resourceType)
     (kind_eq : StaticTyping.borrowedKind kind = some referenceKind)
@@ -2007,7 +2007,7 @@ theorem bindPatternFuel_typed {unit : ValidatedUnit} {loans : LoanTypes}
               have contentsEmpty : contentsTypes unit expected variant arguments.toList = [] := by
                 have typedLength := HasTypes.length_eq fieldsTyped
                 have ghostLength := ResolvesAll.length_eq ghostsResolved
-                simp only [ghostTypeIds, List.length_map, Array.length_toList] at ghostLength
+                rw [ghostTypeIds_length] at ghostLength
                 simp only [Array.length_toList, List.length_append, List.length_map] at typedLength
                 exact List.eq_nil_of_length_eq_zero (by omega)
               rw [contentsEmpty, List.append_nil] at fieldsTyped

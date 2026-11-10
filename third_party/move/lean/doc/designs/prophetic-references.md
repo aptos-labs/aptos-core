@@ -134,7 +134,8 @@ value, universally quantified in the rule:
   a move where the copy is the local's last use
   (`normalizeReferenceCopies`), so one loan rests in one holder.
 - **Globals**: `borrow_global_mut` leaves the prophecy (relationally) or
-  the hole (executably) in the global slot. `RuntimeState.storageLoans`
+  the hole (executably) in the global slot. `RuntimeState.globalLoans`
+  (`VerexIR/Semantics/Runtime.lean`)
   records the storage key of a live global loan and rekeys it from an
   outer loan to a returned reborrow. The key registry is write-back
   metadata, not part of the reference value.
@@ -159,7 +160,13 @@ Validation runs the borrow analysis once and retains `BorrowCertificate`
 2. **Deaths.** Loan death is lexical; the analysis records, per accepted
    loan, its death points as it releases the loan: after an anchor
    expression completes, or before one begins (`CheckedLoanFact.deaths`),
-   at ordinary fallthrough and at explicit return and throw exits. The
+   at ordinary fallthrough and at explicit return and throw exits. A loan
+   is released once none of its holders may be read, before being
+   overwritten, by what follows: the rest of every enclosing sequence, the
+   loop body again across a back edge, and the code after a branch or a
+   loop (`LiveOut`, `liveAfter`, `VerexIR/Validation/Borrowing.lean`); a
+   loan born inside a branch or a loop body is kept live through a holder
+   declared outside it. The
    semantics ends the recorded loans at their anchors (`loanDeathsAt`):
    `EvalExprWith` settles the loans dying before a node, evaluates the node
    (`EvalNodeWith`, which a loop repeats), and settles the loans dying
@@ -190,6 +197,18 @@ A contract names each dying loan's final value through the pending
 exports (`final.pending = initial.pending.push (loan, final_value)`), and
 a caller resolves its holes by `applyPending` at the call boundary.
 
+A loan's death certifies before it relates. Where the referent's type carries
+a data invariant, `Lender.resolve` (`VerexIR/Proofs/Denote/Term.lean`) first
+owes the invariants of the value the loan leaves — the current itself where no
+local lends it, the owner rebuilt with that current where a local does — and
+only then assumes the prophecy equation. The order is load-bearing: a run that
+breaks the invariant is undefined before an equation could prune it, so the
+obligation lands in the function that broke it, and a run that aborts first
+leaves an unobservable well-formed prophecy in the owner. A holder that several
+loans may have come from owes one obligation per distinct lender and states one
+equation beside them, since no single lender may constrain the owner
+([`data-invariants.md`](data-invariants.md), "A borrowed path").
+
 The hole-visibility scans (`holeWithin`, `holeInFrame`, `holeInGlobals`)
 are guarded by their predicates (`fillVisibleHole`), so a refuted
 predicate decides a branch without the scan computing on a symbolic
@@ -202,8 +221,8 @@ search.
 
 The reference-vocabulary typing lemmas: dereference inversion
 (`borrow_current_typed`), borrow introduction (`borrow_value_typed`),
-freeze (`freeze_typed`), and hole writes preserving frame and state
-typing (`typedFrame_set_loanHole`, `typedState_set_loanHole`); the shared
+freeze (`freeze_typed`), and hole writes preserving frame typing
+(`typedFrame_set_loanHole`); the shared
 transparency rule has introduction and inversion lemmas. Walker-level
 preservation of write-back and mutation through a live borrow is not
 stated: a hole types at every type, so only a loan-typing environment

@@ -7,6 +7,8 @@ tests/sources/functional/closures/behavioral_predicates.move:37:5: error: verex 
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/behavioral_predicates.move:11:1: info: `map` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+tests/sources/functional/closures/behavioral_predicates.move:11:1: info: `apply2_generic` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
 tests/sources/functional/closures/behavioral_predicates.move:237:9: error: the specification clause `ensures result == x + 2` is not established
 tests/sources/functional/closures/behavioral_predicates.move:236:5: error: verex verification failed: the automatic verification of `test_wrong_ensures` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates.proof.lean`:
   verify test_wrong_ensures by lean =>

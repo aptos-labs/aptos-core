@@ -572,6 +572,20 @@ def Module.omitted (m : Module) : List Skipped :=
 def Module.ref (m : Module) : ModuleRef :=
   { address := m.address, addressAlias := m.addressAlias, name := m.name }
 
+/-- A type with the type parameters replaced by `args`. -/
+partial def instantiateTypeParameters (args : List Ty) : Ty → Ty
+  | .typeParam index => args[index]?.getD (.typeParam index)
+  | .tuple elements => .tuple (elements.map (instantiateTypeParameters args))
+  | .vector element => .vector (instantiateTypeParameters args element)
+  | .struct name parameters => .struct name (parameters.map (instantiateTypeParameters args))
+  | .function parameters result abilities =>
+      .function (instantiateTypeParameters args parameters) (instantiateTypeParameters args result) abilities
+  | .reference mutable referent => .reference mutable (instantiateTypeParameters args referent)
+  | .typeDomain ty => .typeDomain (instantiateTypeParameters args ty)
+  | .resourceDomain name parameters =>
+      .resourceDomain name (parameters.map (·.map (instantiateTypeParameters args)))
+  | ty => ty
+
 /-- Whether a pragma bag sets a boolean property to `true`. -/
 def pragmaTrue (pragmas : List Pragma) (name : String) : Bool :=
   pragmas.any fun p => p.name == name && p.value == .value (.bool true)

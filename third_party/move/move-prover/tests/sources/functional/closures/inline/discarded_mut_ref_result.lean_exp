@@ -1,0 +1,24 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/discarded_mut_ref_result.move:25:13: error: the loop invariant `∀ (j in 0 .. i),
+        v[j]
+          == core.data.updateField(
+            with_state_anchor!(0, old(v))[j], value,
+            with_state_anchor!(0, old(v))[j].value + 1
+          )
+          && ensures_of<function[Fn(&mut S) -> &mut S](increment)>(
+            with_state_anchor!(0, old(v))[j],
+            result_of<function[Fn(&mut S) -> &mut S](increment)>(
+              with_state_anchor!(0, old(v))[j]
+            ),
+            core.data.updateField(
+              with_state_anchor!(0, old(v))[j], value,
+              with_state_anchor!(0, old(v))[j].value + 1
+            )
+          )` is not preserved by an iteration
+tests/sources/functional/closures/inline/discarded_mut_ref_result.move:36:5: error: verex verification failed: the automatic verification of `run` failed; provide a proof in `tests/sources/functional/closures/inline/discarded_mut_ref_result.proof.lean`:
+  verify run by lean =>
+    verex_obligations
+    verex_on
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

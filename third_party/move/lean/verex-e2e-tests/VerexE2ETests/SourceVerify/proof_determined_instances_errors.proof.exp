@@ -1,0 +1,26 @@
+VerexE2ETests/SourceVerify/proof_determined_instances_errors.proof.lean:11:5: error: the step's fact is not proved:
+  v : (Proofs.Denote.NTy.int 64 false).vector.carrier
+  k : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed : True
+  permitted_1 :
+    ∀ (j : Int),
+      1 ≤ j →
+        j < ↑v.values.size →
+          v.values[(j - 1).toNat]?.getD { val := 0, fits := ⋯ } < v.values[j.toNat]?.getD { val := 0, fits := ⋯ }
+  permitted_2 : k < ↑v.values.size
+  bounds : v.values.size < 2 ^ 64
+  k_lower : 0 ≤ k
+  k_upper : k ≤ 2 ^ 64 - 1
+  left✝¹ : 0 ≤ v.values[k.toNat]?.getD { val := 0, fits := ⋯ }
+  right✝¹ : v.values[k.toNat]?.getD { val := 0, fits := ⋯ } ≤ 2 ^ 64 - 1
+  left✝ : 0 ≤ v.values[(k + 1).toNat]?.getD { val := 0, fits := ⋯ }
+  right✝ : v.values[(k + 1).toNat]?.getD { val := 0, fits := ⋯ } ≤ 2 ^ 64 - 1
+  read_bounds_0 :
+    0 ≤ v.values[k.toNat]?.getD { val := 0, fits := ⋯ } ∧
+      v.values[k.toNat]?.getD { val := 0, fits := ⋯ } ≤ 2 ^ (63 + 1) - 1
+  read_bounds_1 :
+    0 ≤ v.values[(k + 1).toNat]?.getD { val := 0, fits := ⋯ } ∧
+      v.values[(k + 1).toNat]?.getD { val := 0, fits := ⋯ } ≤ 2 ^ (63 + 1) - 1
+  ⊢ v.values[k.toNat]?.getD { val := 0, fits := ⋯ } < v.values[(k + 1).toNat]?.getD { val := 0, fits := ⋯ }
+VerexE2ETests/SourceVerify/proof_determined_instances_errors.proof.lean:9:8: error: verex verification failed: the proof of `not_an_instance` does not establish its specification

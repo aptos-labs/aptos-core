@@ -507,6 +507,9 @@ def certifyUpdate (relation : σ → σ → Prop) (op : Spec σ ε α) :
 @[simp] theorem certified_aborts {Invariant : Prop} (build : Invariant → α) :
     ¬(certified build : Spec σ ε α).aborts initial error := fun h => h
 
+@[simp] theorem certified_undefined {Invariant : Prop} (build : Invariant → α) :
+    (certified build : Spec σ ε α).undefined initial ↔ ¬Invariant := Iff.rfl
+
 /-! Projections distribute over conditionals, so symbolic execution never has
 to unfold a branch it has not yet decided. -/
 

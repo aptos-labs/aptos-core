@@ -52,22 +52,57 @@ more than checking it ([`performance.md`](performance.md)).
   The failure message prints a companion proof template with one alternative
   per undecided clause ([`source-verification.md`](source-verification.md),
   "Proofs").
-- **One leaf cap.** One cap (`verex.leafHeartbeats`, default 20M raw
-  heartbeats; per function `pragma leaf_heartbeats = N`) covers a complete
-  automatic leaf attempt: call observations, deciders, preparation and
-  fallback. The target budget bounds obligation generation and the complete
-  proof. Authored proofs bypass the leaf cap unless they call `verex_solve`.
+- **One leaf cap.** A leaf's allowance (`verex.leafHeartbeats`, default 20M
+  raw heartbeats; per function `pragma leaf_heartbeats = N`) bounds each
+  attempt, the first and each case of its prepared split, excluding the
+  attempt's preparation, which the target budget bounds. The target budget
+  bounds obligation generation and the complete proof. A leaf that exhausts
+  an allowance is logged as `exhausted`, one whose deciders all reject it as
+  `undecided`. `on _ { }` gets the `decide` closer on the block's normal form;
+  an obligation no `on` names gets the leaf's bounded deciders, no residual
+  search, under the target budget. Other authored steps bypass the leaf cap
+  unless they call `verex_solve`.
+- **Facts a decider reads.** `grind` receives the hypotheses connected to the
+  goal: from the goal's free variables, the facts sharing a variable with a
+  reached one, to a fixpoint (`connectedFacts`, the closure the normalization's
+  discharger uses). What is lost is only a contradiction among facts
+  disconnected from the goal. A goal already `False` states no variable and
+  keeps the whole context. A quantified hypothesis is a rewrite rule only if
+  its pattern fixes its data binders and is no bare binder
+  (`rewritesByPattern`): `∀ a b, h a = h b → a = b` would match every term of
+  the binders' type and leave `b` to its premise's discharge. It stays a fact
+  for the deciders that instantiate it.
+- **Bounds follow the obligation.** Preparation states the range of every
+  certified local in context and the bounds of the operation sites of the
+  goal, of the path's decisions (branch conditions, arm tests, the failed
+  checks and abort conditions the walker marks) and of the facts connected to
+  those through shared arithmetic atoms (`obligationTerms`, omega's notion: a
+  read, a projection chain, an uninterpreted application is one atom; `+`, `-`,
+  literal multiples and coercions are not). A fact that is neither seeds
+  nothing; a decider that brings one in, an instance or an implication's
+  conclusion, states its bounds then. They are stated after the stored reads
+  have settled into the normal form, over normal terms, and normalized once.
+  With no atom in the goal and the decisions, the whole context is read.
 - **Shared preparation in authored proofs.** `verex_obligations preparing`
   prepares a completed path's context once before its clauses split;
   `verex_group_contexts` shares preparation after clause-specific routing
   where contexts agree up to local names; `verex_proof preparing` is the
   structured interface, routing source-named alternatives to ordinary Lean
   arguments; `verex_map_simp` evaluates closed map observations directly.
+  The proof language groups an `on` by the prepared path prefix, retaining
+  the longest common context (including shared late premises) and keeping
+  differing binders inside their clauses. Nested `on` blocks run a shared
+  prefix before introducing clause binders; child premises enter the same
+  normal form before shared facts are refreshed. Structured child steps
+  reuse the prepared context when their additions are canonical scalar
+  binders and inequalities; native values, equalities and conditional path
+  facts retain context preparation. Raw Lean steps also retain it. Empty
+  defaults on prepared paths use bounded leaf deciders directly.
   None adds speculative search.
-- **Join scheduler.** The opt-in `verex.sharedContinuations` shares
+- **Join scheduler.** `verex.sharedContinuations` (on by default) shares
   kernel-checked continuation summaries at joins, with entry decomposition,
   selected cases, certificate bounds and map-position facts shared among
-  clause groups within a bounded preparation slice per owner.
+  clause groups, debited to the leaf allowance of every clause they serve.
 
 ## Measurement
 

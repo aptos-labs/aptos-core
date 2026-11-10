@@ -1,4 +1,9 @@
 Move prover returns: exiting with verification errors
+tests/sources/regression/generic_aliasing_ghost_main.move:7:1: info: `set_n` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/regression/generic_aliasing_ghost_main.move:7:1: info: `set_r` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/regression/generic_aliasing_ghost_main.move:7:1: info: `set_s` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/regression/generic_aliasing_ghost_main.move:7:1: info: `set_q` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/regression/generic_aliasing_ghost_main.move:7:1: info: `f` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/regression/generic_aliasing_ghost_main.move:17:9: error: the module invariant `invariant {T} {U} {X} (!exists<N>(@0x42)
         ==> !exists<R<T> >(@0x42) && !exists<S<U> >(@0x42)
           && !exists<Q<X> >(@0x42))
@@ -14,6 +19,10 @@ tests/sources/regression/generic_aliasing_ghost_main.move:56:5: error: verex ver
     | module_invariant => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/generic_aliasing_ghost_main.move:62:1: info: `set_n` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/regression/generic_aliasing_ghost_main.move:62:1: info: `set_r` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/regression/generic_aliasing_ghost_main.move:62:1: info: `set_s` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/regression/generic_aliasing_ghost_main.move:62:1: info: `f` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/regression/generic_aliasing_ghost_main.move:71:9: error: the module invariant `invariant {T} {U} (!exists<N>(@0x43)
         ==> !exists<R<T> >(@0x43) && !exists<S<U> >(@0x43))
         && (exists<M>(@0x43)

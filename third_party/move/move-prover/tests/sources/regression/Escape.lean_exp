@@ -1,4 +1,5 @@
 Move prover returns: exiting with verification errors
+tests/sources/regression/Escape.move:3:1: info: `install` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/regression/Escape.move:36:5: error: the module invariant `invariant ∀ (addr : Address),
         exists<Wrapper<IndoorThing> >(addr) ==> addr == @0x123` does not hold after a write of memory it reads
 tests/sources/regression/Escape.move:37:5: error: the module invariant `invariant ∀ (addr : Address),

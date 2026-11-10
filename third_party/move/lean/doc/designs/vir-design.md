@@ -142,9 +142,13 @@ provenance fidelity is tested separately.
 ## Representation stages
 
 ```text
-RawUnit --normalize/structurize--> StructuredUnit --resolve--> ResolvedUnit
-        --infer/check types--> TypedUnit --validate/index----> ValidatedUnit
+RawUnit --normalize/structurize--> structured --resolve--> resolved
+        --infer/check types--> typed --validate/index----> ValidatedUnit
 ```
+
+The intermediate stages are passes inside one checked call (`validate`,
+`Validation/Check.lean`), not materialized types: `RawUnit` and
+`ValidatedUnit` are the only unit types.
 
 `RawUnit` is the only frontend output: declarations, name and type spellings,
 structured bodies or profile-tagged CFG bodies with neutral control,
@@ -158,14 +162,13 @@ expression, pattern, local, parameter, result, and type argument. Validation
 adds derived indexes and certifies all backend-independent rules;
 `ValidatedUnit` is the only input to backends and most analyses.
 
-Only `RawUnit` and `ValidatedUnit` are public construction boundaries; the
-constructors of the other forms are private. Frontend resolution and type
+Only `RawUnit` and `ValidatedUnit` are public construction boundaries. Frontend resolution and type
 information is a hint the shared checker verifies; a disagreement is a
 diagnostic. Structurization and validation run in one checked call, with
 upstream typed IDs recorded in import evidence while the checker
 independently checks table safety, arena acyclicity, profile vocabulary,
 declaration shape, and CFG structure. Materializing the intermediate stages
-as values changes exposure, not the boundary.
+as values would change exposure, not the boundary.
 
 Staging keeps MIR graph analysis inside VIR: the Rustc Public producer
 exports MIR-shaped raw nodes and owns neither the structurizer, loop
@@ -469,7 +472,7 @@ consistency.
 
 ## Checked construction and analyses
 
-`check` returns diagnostics and, on success, a `ValidatedUnit` whose
+`validate` returns diagnostics and, on success, a `ValidatedUnit` whose
 namespaces carry derived indexes (qualified names, declaration ownership,
 call targets, scopes, loop identities, intrinsic roles, dependency links),
 validated intrinsic graphs, and semantic features; the raw unit is not
@@ -659,58 +662,18 @@ status so a source change cannot retain an old theorem.
 
 Semantic equivalence is not equal text or equal provenance.
 
-## Deferred-work register
+## Boundary classification and adapters
 
-A deferral is recorded here, and in a frontend design when applicable, with
-its reactivation point, and removed only when the work lands, is rejected,
-or is superseded by a recorded decision.
-
-| Deferred item | Reactivate by |
-|---|---|
-| Strict RawUnit JSON v1: the deterministic encoding frozen and published as the external compatibility contract | Before RawUnit JSON is emitted outside the repository |
-| Full dependency interfaces and authoritative cross-namespace resolution (today one `Tables` snapshot with a declared interface for every external import) | Before dependency signatures or bodies participate in typing, interpretation, or verification |
-| Checked trait-selection evidence table, associated normalization, dictionary semantics | Before trait calls are interpreted or trait contracts transfer proofs (Rust M2) |
-| Structurization and semantics of the remaining raw MIR administration and exceptional control: destructive and provenance nodes, cleanup edges, pointer-alignment assertions, reachable unreachable/resume terminators, all rejected today | Rust M4; the unsafe profile for pointer-alignment assertions |
-| Drop flags, cleanup scopes, panic behavior, and unwinding beyond fixed `panic=abort` | Rust M4; full unwinding separately approved |
-| Authoritative resolution, whole-unit semantic type checking, lifetime constraints, and the rest of VIR borrow checking: general non-lexical loan death, dependency and unknown aggregate alias propagation, nominal variance, use-site region constraints | VIR Phase 2; Rust M3 |
-| Freshness and alignment: binding retained import-evidence statements to source, configuration, and semantic hashes; the Rust import receipt in the validated-unit proof boundary | Rust M1.5; M7 before a theorem about an external Rust artifact |
-| Raw pointers, allocation and provenance, unsafe cells and unions, explicit UB semantics | Rust M5 ([`unsafe-pointers.md`](../plan/unsafe-pointers.md)) |
-| Prophetic-reference residue: a loan-typing environment for walker-level preservation, non-lexical loan death, two-phase borrows, interior mutability ([`prophetic-references.md`](prophetic-references.md)) | The evaluator induction; Rust M3; a two-phase/interior-mutability design before `Cell`-style constructs |
-| Source printers and round trips: normalization of validation-only bodies, Move/Verex-native alpha-equivalence, Move/Verex source maps, cross-language location fidelity, corpus-wide round trips | VIR Phase 6; Rust M2/M7 |
-| Materialized `StructuredUnit`, `ResolvedUnit`, `TypedUnit` stages and the full staged API | With authoritative resolution and typing |
-
-## Phases
-
-The phases name the work and its gates; status is in
-[`roadmap.md`](../plan/roadmap.md).
-
-0. Freeze the boundary: every type, operation, effect, outcome, and state
-   component classified as core, Move, Rust, or unsupported. Gate: nothing
-   unclassified.
-1. Neutral core, profiles, IDs, and wire format. Gate: schema, malformed
-   table, normalization, and JSON tests pass without a frontend.
-2. Shared checking and the Move profile; `validate` the only route to
-   `ValidatedUnit`. Gate: raw fixtures exercise core-union, Move-only,
-   synthetic-profile, and invalid cross-profile operations; nothing
-   constructs validated values directly.
-3. The XAST compatibility frontend, the first backend, and the intrinsic
-   role schema. Gate: intrinsic error fixtures use shared codes; no printer
-   or report pass accepts XAST.
-4. Move and Verex frontends building raw VIR directly, authored locations
-   captured before expansion. Gate: the Verex tests and the Move corpus dump
-   validated VIR; an inventory test detects side-table-only semantics.
-5. The `verex-rust` boundary against the frozen profile interface. Gate: the
-   safe sequential Rust subset reaches validated VIR without a
-   frontend-specific analysis path.
-6. Source round trips, compared as semantic VIR. Gate: corpora pass semantic
-   and location fidelity tests.
-7. Lower backends: validated VIR to XIR, verification over validated VIR.
-   Gate: no semantic analysis reads frontend syntax after raw construction;
-   no backend accepts unchecked VIR.
-
-Every compatibility adapter has a named removal phase and gate. A missing
-VIR feature is explicitly unsupported; a frontend side table is not a
-substitute.
+Every type, operation, effect, outcome, and state component is classified as
+core, Move, Rust, or unsupported, mechanized by `Validation/Capability.lean`:
+nothing reaches validated VIR unclassified. A missing VIR feature is
+explicitly unsupported; a frontend side table is not a substitute. A
+compatibility adapter (the XAST frontend among them) is temporary and must
+state its removal criteria, and validated VIR is the only input of a
+backend. Open work on the
+representation is in [`roadmap.md`](../plan/roadmap.md), "4. Shared
+checking", "7. Rust frontend" and "8. Surface and backends"; the external
+freeze of RawUnit JSON v1 is under "Not scheduled".
 
 ## Tests
 
@@ -755,7 +718,7 @@ semantic debt in frontend paths).
 1. `verex-ir` / `VerexIR` is the neutral package and namespace.
 2. VIR has a v1 in-memory schema; XAST is a compatibility frontend; the
    deterministic derived JSON encoding is the external wire contract once
-   frozen (deferred-work register).
+   frozen ([`roadmap.md`](../plan/roadmap.md), "Not scheduled").
 3. Comments are a core table whose producers may leave it empty.
 4. The checked implementation is in Lean.
 5. Semantic profiles are explicit; the first profile is Move, and

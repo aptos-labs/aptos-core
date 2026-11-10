@@ -7,6 +7,18 @@ tests/sources/regression/table_key_encoding_kinds.move:100:5: error: verex verif
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/table_key_encoding_kinds.move:22:9: error: the specification clause `ensures spec_contains(result, k1) && spec_contains(result, k2)` is not established
+tests/sources/regression/table_key_encoding_kinds.move:23:9: error: the specification clause `ensures k1 != k2 ==> spec_get(result, k1) == 1 && spec_get(result, k2) == 2` is not established
+tests/sources/regression/table_key_encoding_kinds.move:24:9: error: the specification clause `ensures k1 == k2 ==> spec_get(result, k2) == 1` is not established
+tests/sources/regression/table_key_encoding_kinds.move:21:5: error: verex verification failed: the automatic verification of `struct_keys` failed; provide a proof in the module:
+  verify struct_keys by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | ensures_3 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/table_key_encoding_kinds.move:36:9: error: the specification clause `ensures spec_get(result, k1) == spec_get(result, k2)` is not established
 tests/sources/regression/table_key_encoding_kinds.move:35:5: error: verex verification failed: the automatic verification of `struct_keys_fail` failed; provide a proof in the module:
   verify struct_keys_fail by lean =>

@@ -1,3 +1,5 @@
 VerexE2ETests/Check/References/PlaceReadErrors.lean:16:0: error: the borrow analysis rejects the unit, so preparation refuses it:
-VIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active shared loan
-VIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active shared loan
+VIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active shared loan at VerexE2ETests/Check/References/PlaceReadErrors.lean:23:14
+  active loan originates here: VerexE2ETests/Check/References/PlaceReadErrors.lean:22:14
+VIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active shared loan at VerexE2ETests/Check/References/PlaceReadErrors.lean:31:15
+  active loan originates here: VerexE2ETests/Check/References/PlaceReadErrors.lean:30:14

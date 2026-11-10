@@ -161,7 +161,7 @@ for two non-semantic purposes:
   facts can be consumed by the verifier.
 - Accepting unsafe Rust in the initial safe subset.  Unsafe-related MIR is
   preserved or rejected with provenance first; checked raw-pointer semantics
-  arrive in the later unsafe milestones.
+  are the unsafe stages below.
 - A complete model of Rust's unsafe memory semantics, concurrency, atomics,
   FFI, inline assembly, async/coroutines, trait objects, or arbitrary
   standard-library implementations in the first release.  Raw-pointer support
@@ -279,14 +279,15 @@ diagnostics but outside the central semantics.
 The primary Rust round-trip property is approximately:
 
 ```text
-semanticProjection(
-  validate(importMir(rustc(printRust(validatedUnit)))))
+semanticProjection(importRustFile(Rust.Source.render(validatedUnit)).unit)
   ≈α
 semanticProjection(validatedUnit)
 ```
 
-`importMir` constructs a fresh `RawUnit`; the ordinary validation pipeline
-must accept it.  Alpha-renaming, compiler temporaries, and printer-only
+`importRustFile` (`VerexRust/Driver.lean`) exports the printed source through
+rustc to a fresh `RawUnit` and validates it through the ordinary pipeline;
+`semanticProjection` (`VerexRust/Equivalence.lean`) is the provenance-free,
+alpha-normal projection compared.  Alpha-renaming, compiler temporaries, and printer-only
 grouping may differ.  If normalized VIR equality is unnecessarily strong, the
 replacement obligation is a checked semantic equivalence over the Rust
 profile.  Original Rust provenance remains associated with the first imported
@@ -304,8 +305,8 @@ semantics or proofs.
 
 This is deliberately a family of profile-selected target surfaces over one
 core and one Verex surface language, not separate Verex Move and Verex Rust
-dialects.  Implementing Rust-profile surface forms is deferred to a later
-session.  A Rust operation can use a Move-profile construct only when its
+dialects; Rust-profile surface forms are open work ([`roadmap.md`](../plan/roadmap.md),
+"8. Surface and backends").  A Rust operation can use a Move-profile construct only when its
 integer, panic, drop, storage, and reference semantics match.  Otherwise the
 one language needs an explicit profile-selected construct or primitive.  A
 backend must never disguise different behavior merely to produce prettier
@@ -353,14 +354,11 @@ path: the generated crate comes back through the same MIR adapter and
 
 ## Small example and representation growth
 
-Consider this current Verex Move function:
+Consider this VerexSL function:
 
 ```lean
-fun bump_if (flag : Bool) (value : U64) : Action U64 := do
-  if flag then
-    pure (value + 1)
-  else
-    pure value
+fun bump_if(flag : Bool, value : u64) -> u64 :=
+  if flag then value + 1 else value
 ```
 
 Its structured body is:
@@ -379,27 +377,23 @@ printer can therefore emit essentially the authored function above.
 A mutable-reference example behaves similarly:
 
 ```lean
-fun bump_ref (slot : &mut U64) : Action Unit := do
-  slot := *slot + 1
+fun bump_ref(slot : &mut u64) -> Unit := do
+  *slot := *slot + 1
 ```
 
-The structured VIR is one sequence with four operations: `readRef`,
-`loadInt 1`, checked `add`, and `writeRef`.  Its proof-facing meaning
-expands:
-
-```lean
-fun slot =>
-  withMutation slot fun mutation =>
-    bind (pure mutation.read) fun old =>
-    bind (checkedAdd old 1) fun new =>
-    pure ((), mutation.write new)
-```
+The structured VIR is one assignment through the place `*slot` of a checked
+`add` of a `read` of `*slot` and the literal `1`.  Its denotation
+([`denotation.md`](denotation.md), "References as prophecies") takes `slot` as a
+prophecy pair, its current value and the value it holds when it dies: the
+checked addition aborts on overflow or binds the new current value, and the
+reference's death assumes that value equals the prophecy.
 
 The semantic growth
 is real: every checked operation has success and exceptional behavior, and
 every mutable borrow introduces a future value plus a reconciliation
-condition.  Keeping `bind`, `withMutation`, and checked operations abstract,
-then reasoning by weakest-precondition rules, keeps the generated term and
+condition.  Keeping `Spec.bind`, the prophecy choice and resolution
+(`Spec.choose`, `Spec.assume`), and checked operations as combinators, then
+reasoning by weakest-precondition rules, keeps the generated term and
 symbolic execution linear in straight-line body size.  Naively unfolding the
 relations can duplicate continuations across normal, exceptional, and
 undefined outcomes.
@@ -739,8 +733,8 @@ implementations at use sites. The importer can preserve:
 The first exporter/codec slice does not gate on implementation-selection or
 proof evidence. It preserves one generic body, core trait declarations,
 predicates, associated items, and impl bindings; `EvidenceId` remains opaque
-until the checked dictionary table and its interpreter/proof rules are added
-in a later milestone.
+until the checked dictionary table and its interpreter/proof rules exist
+([`roadmap.md`](../plan/roadmap.md), "4. Shared checking").
 
 Operationally, an evidence parameter is dictionary passing even if no runtime
 dictionary is emitted.  For example:
@@ -1037,33 +1031,19 @@ defines the distinction between a proof about validated VIR and a claim about
 its source.  Rust adds one temporary assumption: the pinned Rustc Public
 exporter preserves the selected MIR body when constructing `RawUnit`.
 Successful rustc type and borrow checking is upstream admission evidence, not
-a proof of that translation.  M7 replaces the trusted-exporter assumption with
-checked translation/refinement results and composes them with `f.verified`.
+a proof of that translation.  Alignment ([`roadmap.md`](../plan/roadmap.md), "7. Rust frontend", M7) replaces the
+trusted-exporter assumption with checked translation/refinement results and
+composes them with `f.verified`.
 
 ## Source provenance and diagnostics
 
-VIR carries the basic pieces: named locals include an optional source name,
-and instructions and terminators carry optional authored spans.
-
-The current `SourceSpan` is a half-open byte range in one implicit file.  Rust
-requires a multi-file provenance table and macro/desugaring context:
-
-```lean
-structure SourceRange where
-  file  : SourceFileId
-  start : Nat
-  stop  : Nat
-
-structure Origin where
-  primary     : Option SourceRange
-  related     : Array SourceRange
-  expansion   : Array SourceRange
-  generatedBy : Option PassName
-  parent      : Option OriginId
-```
-
-Origins live in a parallel map keyed by stable AST node IDs and are excluded
-from semantic equality.  Lowering passes obey these rules:
+VIR provenance is multi-file and carries macro/desugaring context
+(`verex-ir/VerexIR/Syntax.lean`): a namespace names its `SourceFile`s; a
+`SourceRange` is a half-open byte range in one of them; a `Location` holds a
+primary range, related and macro-expansion ranges, and, for a generated
+node, the generating pass and parent location. Named locals keep an optional
+source name. Locations are interned per namespace and addressed by `LocId`
+from the nodes; they are excluded from semantic equality.  Lowering passes obey these rules:
 
 - one source node to many target nodes: all inherit the source origin;
 - many source nodes to one target node: retain a primary and related origins;
@@ -1098,158 +1078,19 @@ and high-level stepping tactics.  Proofs that unfold raw MIR blocks,
 structurization evidence, or compiler temporaries are allowed to be brittle
 across importer changes.
 
-## Deferred-work register
+## Milestones
 
-Rust-specific entries mirrored from the core VIR design; an item stays here
-until it lands, is rejected, or is superseded by a recorded decision.
-
-| Deferred item | Reactivate by |
-|---|---|
-| Approval and publication of RawUnit JSON v1 as an external compatibility contract | M0, before fixtures beyond the supported mirror become compatibility artifacts |
-| Public function predicate query (function `where` clauses and const-function binder types are not exposed by Rustc Public) | M0; filed upstream as [rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892); public queries are requested rather than reading `rustc_middle` |
-| Remaining MIR-to-RawUnit mapper forms: symbolic const-dependent types, destructive/provenance administration exposed by Rustc Public, constrained and const generic functions | M1 once their metadata is public; M4 adds cleanup and effectful drop glue |
-| Checked implementation-selection evidence and dictionary interpretation (`EvidenceId` is opaque) | M2, before trait method calls execute or transfer contracts and proofs |
-| Destructive/provenance nodes, cleanup edges, pointer-alignment assertions, and reachable `unreachable` blocks, rejected by structurization | M4 for destruction, cleanup, and richer panic behavior; M5 for retag/provenance and alignment assertions |
-| Drop flags, cleanup scopes, and unwinding (only `panic=abort` with unreachable-unwind drops is structurized) | M4 drop effects and flags; full unwinding is a separately approved milestone |
-| A proof-grade semantic-body/alignment receipt (the cache digest binds inputs, not alignment) | the shared proof-facing receipt gate; M7 before source-level theorem claims |
-| Raw pointers, unsafe operations, allocation/provenance, and UB (rejected at the first unsupported node, no partial JSON) | M5, U0–U2 |
-| Trait objects, specialization, higher-ranked bounds outside the initial fragment, async/coroutines, FFI, inline assembly | separately scoped post-M2/M5 milestones with core/profile classification first |
-| Library models (`Box`, `Rc`, slices, `RefCell`, and peers) | M6 or a separately approved library-model milestone |
-
-## Proposed milestones
-
-### M0 — Rustc Public exporter spike and import contract
-
-- Create the `verex-rust` Lake package and its `rust-exporter` Cargo crate.
-  The Lean package depends only on `verex-ir`; the Rust crate contains all
-  Rustc Public/rustc-driver bootstrap dependencies.
-- Freeze RawUnit JSON v1, including the language-neutral generic,
-  trait/implementation and associated-item schema, plus the
-  Rust-profile capability vocabulary. Add fixtures for scalar arithmetic,
-  enums, loops, direct calls, a generic trait method call, ordinary borrows,
-  drops, a raw-pointer operation, and an unsupported operation.
-- Implement the `verex-rust-export` driver against the pinned Rustc Public
-  toolchain.  It must serialize a detached Rust-profile `RawUnit` in its
-  post-analysis callback and return `Compilation::Stop`.  The mapper makes no
-  direct `rustc_middle` queries; startup-only bridge dependencies stay confined
-  to the driver crate.
-- Demonstrate the selected post-analysis optimized generic body shape, source
-  origins, generic predicates, direct callee identity, drop/cleanup data, and
-  raw-pointer tags on that corpus.  Any absent query is a documented blocker
-  or an upstream API request.
-- Decode the RawUnit documents in Lean and verify schema version, enum
-  exhaustiveness, and source tables before validation. The receipt may record
-  Rust-specific inputs, but shared freshness enforcement is not an M0 gate.
-
-Gate: the exporter writes deterministic RawUnit JSON and exits before codegen
-or linking, and a generic trait fixture has exactly one generic body with core
-trait declarations and predicates. Checked trait-selection evidence and
-import-receipt enforcement are deferred from this first gate.
-
-### M1 — Raw MIR ingestion, provenance, and structured control
-
-- Complete the MIR-to-RawUnit mapper for types, named locals, places, basic
-  blocks, direct calls, source origins, and the information needed to
-  structurize reducible control.
-- Register the `VerexRust` profile and decode the generic RawUnit serializer
-  through `VerexIR.Validation.validate`.
-- Validate the structurization witness and reject unsupported control shapes
-  before constructing the shared body.
-- Import generic predicates, core trait/implementation declarations,
-  associated-item bindings, and implementation-selection evidence without
-  cloning a generic body.
-- Differential-test the raw CFG and structurization result against Charon
-  ULLBC/LLBC fixtures, without consuming Charon in the production path.
-
-Gate: fixture crates reach `ValidatedUnit` exclusively through serialized
-RawUnit JSON; neither the Lean decoder nor the driver has a frontend-specific
-validation or reporting path.
-
-### M1.5 — Lean build integration and managed toolchain
-
-- Add a Lean/Lake driver command that invokes `verex-rust-export` for a Cargo
-  manifest, package, feature set, and target, then registers the validated
-  unit for proof and source-backend consumers.
-- Define the tool cache and artifact location from source/Cargo-lock hashes,
-  features, target, profile, exporter, and rustc revision.
-- Implement the Verex-managed exporter/sysroot installation plus an explicit
-  developer override.  Normal users must not install nightly, `rustc-dev`, or
-  the driver with `cargo install`.
-- Run dependencies with ordinary check/metadata artifacts and stop only the
-  extracted root crate after analysis.
-
-Gate: a clean checkout imports a fixture through one Verex setup/build command
-without relying on the user's Rust toolchain, and a repeated build is cached.
-
-### M2 — Basic semantics and contracts
-
-- Support scalar/ADT operations, assignments, direct calls, structured
-  selections, and recovered reducible loops without custom destruction.
-- Generate function meanings only from validated VIR bodies.
-- Verify generic bodies parametrically over trait evidence and method
-  contracts for the initial methods, associated-types, and trait-inheritance
-  subset.
-- Emit canonical Rust source for the accepted scalar/ADT/control subset and
-  check the `Rust → MIR → RawUnit → ValidatedUnit` semantic round trip.
-- Exercise Verex source printing separately as another validated-VIR backend.
-- Attach the existing-style `spec` / `verify` interface.
-- Export modular summaries and source-positioned proof obligations.
-
-### M3 — Ownership and ordinary references
-
-- Model moves and initializedness.
-- Implement the VIR borrow checker, migrating applicable rules from the older
-  translation, and expose its checked loan/lifetime facts or certificate to
-  the verifier.
-- Retain rustc's successful borrow check as upstream admission evidence and a
-  differential oracle, not as the semantic authority for VIR borrowing.
-- Reuse and extend prophecy semantics for `&T`, `&mut T`, reborrows, calls,
-  and returned references.
-- Add positive and negative agreement tests against Rust execution.
-
-### M4 — Drop and panic
-
-- Add explicit destruction and drop-flag behavior.
-- Implement the fixed `panic=abort` terminal semantics; do not support
-  unwinding or `catch_unwind` in this slice.
-- Ensure guard and destructor effects are visible to proofs.
-
-### M5 — Unsafe import and checked raw pointers
-
-- Complete U0: preserve all unsafe-related MIR constructs and reject each
-  unsupported semantic form with its Rust origin.
-- Define the strict allocation/provenance memory profile and the explicit UB
-  outcome; add no-UB safety obligations to the contract interface.
-- Implement U1 typed raw-pointer creation, checked loads/stores, simple
-  offsets, and modular unsafe-function contracts.
-- Compare defined fixture behavior with rustc execution and use Miri only as a
-  differential bug-finding test.
-
-### M6 — Reference-bearing values and interior mutability
-
-- Support references nested in products and ADTs.
-- Preserve signature region relationships at modular boundaries.
-- Add an abstract `RefCell` store, dynamic borrow rules, and guard drop.
-- Treat `Box`, `Rc`, slices, and broader library models as separately scoped
-  extensions, staged with U2 where they require allocation semantics.
-
-### M7 — Alignment
-
-- State and prove the generic core-VIR semantic results.
-- Validate or prove refinement from the MIR exchange through `RawUnit` to the
-  supported `ValidatedUnit` fragment.
-- Establish semantic equivalence for the
-  `ValidatedUnit → Rust source → MIR → RawUnit → ValidatedUnit` round trip,
-  and separately for supported Verex source backends.
-- Prove that generic type/const/implementation-evidence instantiation preserves
-  the function meaning, so generic theorems transfer to concrete calls. Any
-  later native specialization must be a separate refinement of this result.
-- Compose import alignment with `f.verified` into an explicit theorem about
-  the imported Rust MIR body.
+The open work is staged as milestones M0 (exporter and import contract), M1
+(raw MIR ingestion and structured control), M1.5 (build integration and
+managed toolchain), M2 (semantics and contracts), M3 (ownership and ordinary
+references), M4 (drop and panic), M5 (unsafe import and checked raw
+pointers), M6 (library models, reference-bearing values and interior
+mutability), and M7
+(alignment); their open items are in [`roadmap.md`](../plan/roadmap.md), "7. Rust frontend".
 
 ## Open design questions
 
-1. Which Rustc Public capability gaps, if any, block the M0 artifact, and
+1. Which Rustc Public capability gaps, if any, block the exporter artifact, and
    which should be upstreamed before any temporary adapter is considered?
 2. What stability expectations and promotion thresholds should the rolling
    corpus enforce when optimized generic MIR changes between rustc revisions?
@@ -1273,7 +1114,7 @@ For a supported Rust function, the project should be able to:
 6. interpret the resulting VIR for a Rust fixture and obtain the same
    observable result as the Rust execution.
 
-Later verification sessions extend this to:
+Verification extends this to:
 
 7. attach a normal Verex-style contract to the registered function;
 8. prove that contract with the common verification interface;

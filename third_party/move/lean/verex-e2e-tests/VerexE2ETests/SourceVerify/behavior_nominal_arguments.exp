@@ -3,6 +3,7 @@ VerexE2ETests/SourceVerify/behavior_nominal_arguments.move:59:5: error: verex ve
   verify stretch_any by lean =>
     verex_obligations
     verex_on
+    | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/behavior_nominal_arguments.move:72:9: error: the specification clause `ensures p.left == old(p.left)` is not established

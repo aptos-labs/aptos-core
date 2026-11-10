@@ -340,7 +340,7 @@ private def withLoc (loc : LocId) (action : BodyM α) : BodyM α := do
   let saved := (← get)
   let context ← read
   let span := do
-    let location ← context.ns.tables.locations[loc.index]?
+    let location ← context.ns.location? loc
     let range ← location.primary
     pure { start := range.startByte, stop := range.endByte : Xir.Span }
   set { saved with loc := some loc, span := span.orElse fun _ => saved.span }
@@ -1098,7 +1098,7 @@ private def lowerFunction (declaration : FunctionDecl FunctionBody) : M Xir.Func
   let typeParameters ← typeParameters loc declaration.signature.generics
   let returns ← declaration.signature.results.flatMapM fun result =>
     xirTypes loc result.typeId
-  let locations := (← tables).locations
+  let locations := (← read).ns.localTables.locations
   let span : Option Xir.Span := do
     let location ← locations[declaration.loc.index]?
     let range ← location.primary
@@ -1179,7 +1179,8 @@ private def withAcquires (structs : Nat) (functions : Array Xir.Function) : Arra
 
 /-- Lower one namespace of a validated unit to a deployable XIR module. -/
 def lowerModule (unit : ValidatedUnit) (namespaceId : NamespaceId) : Except Failure Xir.Module := do
-  let some ns := unit.namespaces[namespaceId.index]?
+  -- The namespace's body in the unit's numbering, which lowering reads.
+  let some ns := (unit.namespaces[namespaceId.index]?).map (·.inUnitIds)
     | throw { loc := none, message := s!"namespace {namespaceId.index} is out of range" }
   let run : M Xir.Module := do
     unless ns.profile == some .move do

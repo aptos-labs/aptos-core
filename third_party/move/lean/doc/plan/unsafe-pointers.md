@@ -5,8 +5,8 @@ unsafe-pointer profile for validated VIR on top of
 [`prophetic-references.md`](../designs/prophetic-references.md), refining the U-stage
 roadmap of
 [`rust-mir-design.md`](../designs/rust-mir-design.md#unsafe-rust-and-raw-pointers);
-prerequisite for the interior-mutability design demanded by
-[`vir-design.md`](../designs/vir-design.md)'s register.
+prerequisite for the interior-mutability design that
+[`roadmap.md`](roadmap.md), "4. Shared checking" (prophetic residue), demands.
 
 ## 1. Unsafe Memory in Rust
 
@@ -159,8 +159,8 @@ elaborate to checked accesses through the anchor, so safe code and raw
 aliases share one memory cell and observe each other correctly. An escape
 from a live `&mut b` materializes the borrow's `current`; because a hole
 must be reconciled with a value, validation requires the escape to be
-**bracketed**: value read back and allocation dead before the loan's
-`endLoan`, with liveness plus initializedness as the re-entry obligation.
+**bracketed**: value read back and allocation dead before the
+the loan's death (`deathEffect`), with liveness plus initializedness as the re-entry obligation.
 Prophecy reconciliation is untouched, and nothing changes in `pending`,
 `applyPending`, or reference contracts: pointers have no death point and
 no exclusivity, so they get no prophecies.

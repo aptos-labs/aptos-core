@@ -165,7 +165,8 @@ the handle. Allocation freshness is the `new` role's contract over the
 allocation history: a slot no Move specification names, which the frame
 of a function that allocates a table, itself or through a callee at any
 depth (`Contract.allocatesTables`), leaves open while keeping every other
-resource as its `modifies` clauses say. A pure `map_spec_new` of a table
+resource as its `modifies` clauses say, and keeps the stored invariants,
+which do not read that slot. A pure `map_spec_new` of a table
 with a handle is rejected: a specification function has no allocation to
 take its identity from; a placeholder layout has no handle, and its
 `map_spec_new` is the empty map.
@@ -201,6 +202,18 @@ may hold a table. Keeping the VM's representation at runtime, entries in
 native storage behind the handle, was rejected: a run would then depend on
 storage outside the memory, so the behavioral predicates could not be
 functions of the memory.
+
+## Aggregators
+
+`aggregator::Aggregator` is the other abstract nominal of the prelude: its model is the
+tuple (handle, key, limit, val), with structural equality, so `==` compares `val`, which a
+ghost slot would not carry. In verification the structure holds `val` beside its declared
+fields (`moveModelFields`), which no Move code constructs, since its natives do. Its
+operations are the prelude's on that tuple (`moveSpecificationModels`): the getters read a
+field, `spec_aggregator_set_val` writes `val`, and `spec_new_aggregator` is an uninterpreted
+value whose limit is its argument and whose value is zero, so the prelude's two axioms hold
+by construction and no axiom is stated. The natives `add`, `sub` and `read` are read through
+their specifications.
 
 ## Validity
 

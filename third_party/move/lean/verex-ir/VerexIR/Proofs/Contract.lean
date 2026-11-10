@@ -351,6 +351,26 @@ continuation under what the contract guarantees. -/
     rintro ⟨⟩ _ ⟨_, _, rfl⟩
     exact continues
 
+/-- A certified value: the invariant is owed, and what follows sees the value
+the certificate builds, under the invariant it may assume.  The second
+conjunct quantifies over the certificate rather than naming one, so that a
+certified value has the same spelling in the obligation and in the
+continuation: proofs of a proposition are definitionally equal, so the
+continuation's value does not depend on which certificate is taken. -/
+@[simp] theorem wp_certified {Invariant : Prop} (build : Invariant → Result)
+    (ensures : Result → σ → Prop) (aborts : ε → Prop) (initial : σ) :
+    wp (Spec.certified build : Spec σ ε Result) ensures aborts initial ↔
+      Invariant ∧ ∀ holds : Invariant, ensures (build holds) initial := by
+  simp only [wp, Spec.certified]
+  constructor
+  · rintro ⟨normal, _, defined⟩
+    have holds := Classical.not_not.mp defined
+    exact ⟨holds, fun held => normal (build held) initial ⟨held, rfl, rfl⟩⟩
+  · rintro ⟨holds, continues⟩
+    refine ⟨?_, fun _ failure => failure.elim, fun failed => failed holds⟩
+    rintro _ _ ⟨held, rfl, rfl⟩
+    exact continues held
+
 theorem wp_bind (action : Spec σ ε α) (next : α → Spec σ ε β)
     (ensures : β → σ → Prop) (aborts : ε → Prop) (initial : σ) :
     wp (Spec.bind action next) ensures aborts initial ↔

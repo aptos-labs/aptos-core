@@ -1765,11 +1765,11 @@ verex module aptos_framework::big_ordered_map where
   ) -> Option<Child<V> > := do
     let node_index :=
       do
-        let _t6 := &mut path_to_node
-        if _t6.length == 0 then moveVectorError(2)
-        let (_t7, _t8) := core.prim.removeVector(*_t6, _t6.length - 1)
-        *_t6 := _t8
-        _t7
+        let _t0 := &mut path_to_node
+        if _t0.length == 0 then moveVectorError(2)
+        let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+        *_t0 := _t2
+        _t1
     let node :=
       do
         let (self, node_index) := (self, node_index)
@@ -1958,11 +1958,11 @@ verex module aptos_framework::big_ordered_map where
     while !(path_to_node.length == 0) do
       let node_index :=
         do
-          let _t14 := &mut path_to_node
-          if _t14.length == 0 then moveVectorError(2)
-          let (_t15, _t16) := core.prim.removeVector(*_t14, _t14.length - 1)
-          *_t14 := _t16
-          _t15
+          let _t0 := &mut path_to_node
+          if _t0.length == 0 then moveVectorError(2)
+          let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+          *_t0 := _t2
+          _t1
       let node :=
         do
           let (self, node_index) := (self, node_index)
@@ -1986,11 +1986,11 @@ verex module aptos_framework::big_ordered_map where
   ) -> Option<Child<V> > := do
     let node_index :=
       do
-        let _t11 := &mut path_to_node
-        if _t11.length == 0 then moveVectorError(2)
-        let (_t12, _t13) := core.prim.removeVector(*_t11, _t11.length - 1)
-        *_t11 := _t13
-        _t12
+        let _t0 := &mut path_to_node
+        if _t0.length == 0 then moveVectorError(2)
+        let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+        *_t0 := _t2
+        _t1
     let old_child :=
       do
         let node :=

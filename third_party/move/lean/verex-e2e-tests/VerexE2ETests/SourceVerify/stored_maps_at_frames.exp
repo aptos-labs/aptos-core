@@ -1,0 +1,38 @@
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:7:1: info: `registered` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:7:1: info: `registered_false` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:84:9: error: the specification clause `ensures result` is not established
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:82:5: error: verex verification failed: the automatic verification of `registered_false` failed; provide a proof in `VerexE2ETests/SourceVerify/stored_maps_at_frames.proof.lean`:
+  verify registered_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:7:1: info: `registered_count` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:7:1: info: `has_count` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:7:1: info: `count_of` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:7:1: info: `has_proposal` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:7:1: info: `proposal_count` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:7:1: info: `proposal_count_false` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:142:9: error: the specification clause `ensures result == 0` is not established
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:139:5: error: verex verification failed: the automatic verification of `proposal_count_false` failed; provide a proof in `VerexE2ETests/SourceVerify/stored_maps_at_frames.proof.lean`:
+  verify proposal_count_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:7:1: info: `register` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:150:5: error: the continuation after `add` is not established
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:152:9: error: the specification clause `aborts_if !exists<Registry>(@0x1)` is not established
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:153:9: error: the specification clause `aborts_if spec_contains(global<Registry>(@0x1).entries, key)` is not established
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:154:9: error: the specification clause `ensures spec_contains(global<Registry>(@0x1).entries, key)` is not established
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:150:5: error: verex verification failed: the automatic verification of `register` failed; provide a proof in `VerexE2ETests/SourceVerify/stored_maps_at_frames.proof.lean`:
+  verify register by lean =>
+    verex_obligations
+    verex_on
+    | after_add => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -100,7 +100,7 @@ verex module 0x42::ordered_map where
   verify! lower_bound_loop by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-    case requires_3_of_lower_bound_loop_at_call_2 =>
+    case requires_3_of_lower_bound_loop_1 =>
       apply search_above (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (i := i) (high := high.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first
@@ -108,7 +108,7 @@ verex module 0x42::ordered_map where
         | omega
         | infer_instance
         | (rw [‹(_ : Array _)[_]? = some _›]; assumption)
-    case requires_2_of_lower_bound_loop_at_call_1 =>
+    case requires_2_of_lower_bound_loop_2 =>
       apply search_below (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (i := i) (low := low.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first
@@ -209,6 +209,9 @@ verex module 0x42::ordered_map where
         | assumption
         | omega
         | infer_instance
+        | (intro i j h0 hij hj
+           verex_normalize_context
+           apply_assumption <;> omega)
         | (rw [‹(_ : Array _)[_]? = some _›]; rfl)
 
   -- Borrow the value stored under `key`; abort code 2 is `EKEY_NOT_FOUND`.
@@ -288,6 +291,11 @@ verex module 0x42::ordered_map where
   verify borrow by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+    case ensures_1 =>
+      refine ⟨lower_bound_result.val, by omega, by omega, ?_, ?_⟩
+      all_goals verex_normalize_context
+      all_goals verex_decide
+    all_goals try simp (config := { contextual := true }) (disch := omega) only [vir_denote_norm] at *
     all_goals first
       | (apply absent_past (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance)
@@ -395,11 +403,32 @@ verex module 0x42::ordered_map where
       simp only [id] at step
       rw [step, if_neg (by omega), if_neg (by omega)]
 
+  theorem map_insert {α β : Type} (f : α → β) (xs : Array α) (i : Nat) (e : α)
+      (h : i ≤ xs.size) :
+      (xs.insertIdx i e h).map f = (xs.map f).insertIdx i (f e) (by simpa using h) := by
+    apply Array.ext_getElem?
+    intro j
+    simp only [Array.getElem?_map, Array.getElem?_insertIdx]
+    split
+    · rfl
+    · split <;> simp_all
+
   verify add by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+    all_goals try simp (config := { contextual := true }) (disch := omega) only [vir_denote_norm] at *
+    all_goals try simp only [← Array.getElem?_map, map_insert,
+      ← VerexIR.Proofs.Denote.NTy.forget_vector_values,
+      VerexIR.Proofs.Denote.NTy.forget_ofDeepHolds]
     case ensures_2_1 | ensures_2_2 =>
-      apply insert_at Prod.fst (Prod.fst ∘ Prod.snd) <;> first | assumption | omega
+      refine ⟨lower_bound_result.val, by omega, by omega, ?_, ?_, ?_, ?_, ?_, ?_⟩
+      all_goals try (intro i h0 hi)
+      all_goals simp only [Array.getElem?_insertIdx]
+      all_goals verex_normalize_context
+      all_goals first
+        | omega
+        | rfl
+        | (rw [show i.toNat - 1 = (i - 1).toNat by omega] <;> rfl)
     all_goals first
       | (apply absent_past (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance)
@@ -407,8 +436,18 @@ verex module 0x42::ordered_map where
           first | assumption | omega | infer_instance |
             (apply found_ne Prod.fst <;> assumption))
       | (apply present Prod.fst <;> first | assumption | omega)
-      | (apply sorted_insert (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
-          first | assumption | omega | infer_instance)
+      | (apply sorted_insert (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst)
+          (lawful := @VerexIR.Proofs.Denote.instLawfulEqCmpCarrierOrderOrders given.operations 0 _) <;>
+          first | assumption | omega | infer_instance |
+            (intro a ha hb
+             first
+             | (apply absent_past (order := VerexIR.Proofs.Denote.TypedOrder.order _ _)
+                 (key := Prod.fst) (index := lower_bound_result.val) <;>
+                 first | assumption | omega | infer_instance)
+             | (apply absent_at (order := VerexIR.Proofs.Denote.TypedOrder.order _ _)
+                 (key := Prod.fst) (index := lower_bound_result.val) <;>
+                 first | assumption | omega | infer_instance |
+                   (apply found_ne Prod.fst <;> assumption))))
 
   -- Remove an existing key; abort code 2 is `EKEY_NOT_FOUND`.
   public fun remove {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &mut Map<K, V>,
@@ -476,13 +515,33 @@ verex module 0x42::ordered_map where
       simp only [id] at step
       rw [step, if_neg (by omega)]
 
+  theorem map_erase {α β : Type} (f : α → β) (xs : Array α) (i : Nat)
+      (h : i < xs.size) :
+      (xs.eraseIdx i h).map f = (xs.map f).eraseIdx i (by simpa using h) := by
+    apply Array.ext_getElem?
+    intro j
+    simp only [Array.getElem?_map, Array.getElem?_eraseIdx]
+    split <;> rfl
+
   verify remove by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+    all_goals try simp (config := { contextual := true }) (disch := omega) only [vir_denote_norm] at *
+    all_goals try simp only [← Array.getElem?_map, map_erase,
+      ← VerexIR.Proofs.Denote.NTy.forget_vector_values,
+      VerexIR.Proofs.Denote.NTy.forget_ofDeepHolds]
     case ensures_2 =>
-      have found := ‹(_ : Array _)[_]? = some _›
+      have found := ‹(_ : Array {x : _ // _})[_]? = some _›
       erw [(Array.getElem_of_getElem? found).choose_spec]
-      apply erase_at Prod.fst (Prod.fst ∘ Prod.snd) _ _ _ _ _ _ found <;> first | assumption | omega
+      refine ⟨lower_bound_result.val, by omega, by omega, ?_, ?_, ?_, ?_, ?_, ?_⟩
+      all_goals try (intro i h0 hi)
+      all_goals try simp only [Array.getElem?_eraseIdx]
+      all_goals verex_normalize_context
+      all_goals first
+        | omega
+        | rfl
+        | (rw [show i.toNat + 1 = (i + 1).toNat by omega] <;> rfl)
+        | verex_decide
     all_goals first
       | (apply absent_past (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance)

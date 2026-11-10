@@ -630,24 +630,27 @@ private def checkField (tables : Tables) (field : FieldDecl) : Array Diagnostic 
   checkLoc tables field.loc ++ checkName tables field.name (some field.loc) ++
     checkTypeUse tables field.type
 
-/-- Whether a type holds a reference, by its structure; a function value's
-type holds none of its parameters' or result's. -/
-private def typeHoldsReference (tables : Tables) : Nat → TypeId → Bool
-  | 0, _ => true
-  | fuel + 1, typeId => match tables.types[typeId.index]? with
-    | some (.reference _) => true
-    | some (.vector element _) | some (.typeDomain element) =>
-        typeHoldsReference tables fuel element
-    | some (.tuple elements) => elements.any (typeHoldsReference tables fuel)
-    | some (.resourceDomain _ arguments) =>
-        arguments.any (·.any (typeHoldsReference tables fuel))
-    | some (.nominal _ arguments) => arguments.any fun
-        | .typeArg use => typeHoldsReference tables fuel use.typeId
-        | .const _ | .lifetime _ | .evidence _ => false
-    | some .unit | some .never | some .bool | some .character | some .string | some .bytes
-    | some .address | some .signer | some (.integer ..) | some .range | some .eventStore
-    | some .stateDomain | some (.function ..) | some (.typeParameter _) | some (.profile _)
-    | none => false
+/-- A Move nominal declaration's fields hold no reference, at any depth: Move
+has no reference fields, and the borrow analysis treats a value of a Move
+nominal type as loan-free on that ground (`typeMayContainReference` in
+`Validation/Borrowing.lean`). A field of another nominal is covered by that
+nominal's own declaration. Other profiles may declare reference fields. -/
+private def moveReferenceFieldDiagnostics (tables : Tables) (profile : Option Profile)
+    (struct : StructDecl) : Array Diagnostic :=
+  if profile != some .move then #[] else
+  let nameOf (name : NameId) := match tables.names[name.index]? with
+    | some qualified => qualified.name
+    | none => s!"#{name.index}"
+  let check (owner : String) (ds : Array Diagnostic) (field : FieldDecl) :=
+    if typeHoldsReference tables (tables.types.size + 1) field.type.typeId then
+      ds.push <| .at "VIR-MOVE-REFERENCE-FIELD"
+        s!"unsupported construct: field `{nameOf field.name}` of {owner} holds a reference; \
+          Move nominal declarations have no reference fields" field.loc
+    else ds
+  let declaration := s!"Move declaration `{nameOf struct.name}`"
+  let ds := struct.fields.foldl (check declaration) #[]
+  struct.variants.foldl (fun ds variant =>
+    variant.fields.foldl (check s!"variant `{nameOf variant.name}` of {declaration}") ds) ds
 
 /-- A ghost field's declaration (`doc/designs/ghost-fields.md`): its type holds
 no reference, so that its slot holds no loan; an initializer is an
@@ -1016,7 +1019,8 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
       checkParameterFrames unit ns
         (struct.fields.map fun field => { name := "", typeUse := field.type })
         struct.locals struct.contract.parameterFrames ++
-      checkAttributes registry unit unit.tables struct.attributes
+      checkAttributes registry unit unit.tables struct.attributes ++
+      moveReferenceFieldDiagnostics unit.tables ns.profile struct
     let ds := if !struct.fields.isEmpty && !struct.variants.isEmpty then
         ds.push <| .at "VIR-NOMINAL-SHAPE"
           "a nominal declaration cannot contain both struct fields and enum variants" struct.loc
@@ -1357,9 +1361,10 @@ carries the declaration's shape — its binders, abilities, fields, and variants
 and nothing that belongs to a body: contracts and locals stay with the
 declaring unit. -/
 private def checkInterfaceStruct (registry : ProfileRegistry) (unit : RawUnit)
-    (owner : NamespaceId) (struct : StructDecl) : Array Diagnostic :=
+    (owner : NamespaceId) (profile : Option Profile) (struct : StructDecl) : Array Diagnostic :=
   let binders := binderKinds struct.generics
   let ds := checkLoc unit.tables struct.loc ++
+    moveReferenceFieldDiagnostics unit.tables profile struct ++
     checkName unit.tables struct.name (some struct.loc) ++
     checkGenericBinders registry unit unit.tables 0 struct.generics ++
     checkAbilityList "nominal declaration" struct.abilities (some struct.loc) ++
@@ -1446,7 +1451,7 @@ private def checkDependencies (registry : ProfileRegistry) (unit : RawUnit) : Ar
             function.loc
       | none => ds
     let ds := dependency.structs.zipIdx.foldl (init := ds) fun ds (struct, structIndex) =>
-      let ds := ds ++ checkInterfaceStruct registry unit dependency.namespaceId struct
+      let ds := ds ++ checkInterfaceStruct registry unit dependency.namespaceId dependency.profile struct
       if dependency.structs.take structIndex |>.any (·.name == struct.name) then
         ds.push <| .at "VIR-DEPENDENCY-NAME-DUPLICATE"
           s!"dependency namespace {dependency.namespaceId.index} declares nominal {struct.name.index} more than once"
@@ -1761,9 +1766,11 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
     rawUnit.namespaces.size structuredNamespaces
   if resolutionDiagnostics.any (·.severity == .error) then
     throw (dedupDiagnostics resolutionDiagnostics)
-  let orders := valueOrdersOf rawUnit.tables structuredNamespaces
+  let orders := valueOrdersOf (structuredNamespaces.map (rawUnit.tables, ·))
   let namespaces := structurized.zipIdx.map fun (s, index) =>
-    ({ toNamespace := s.ns, tables := rawUnit.tables, orders, holders := holders[index]?.getD #[] }
+    ({ toNamespace := s.ns, tables := rawUnit.tables, links := .identity rawUnit.tables
+       localTables := rawUnit.tables, orders, holders := holders[index]?.getD #[]
+       witnesses := s.witnesses }
       : ValidatedNamespace)
   let unit := Internal.mkValidatedUnit rawUnit.tables rawUnit.profiles namespaces
     (rawUnit.dependencies.map fun dep => {
@@ -1781,17 +1788,16 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
       trusted := evidence.trusted })
     { namespaceCount := namespaces.size
       functionCounts := namespaces.map (·.functions.size) }
-    (structurized.flatMap (·.witnesses))
     resolution
   let unit := Internal.mkValidatedUnit unit.tables unit.profiles
     (unit.namespaces.map (inferLocalAccess unit)) unit.dependencies unit.evidence unit.indexes
-    unit.structurizationWitnesses unit.resolution
+    unit.resolution
   let typingErrors := typingDiagnostics unit
   if typingErrors.any (·.severity == .error) then
     throw (dedupDiagnostics typingErrors)
   let unit := Internal.mkValidatedUnit unit.tables unit.profiles
     (unit.namespaces.map (inferInstantiations unit)) unit.dependencies unit.evidence unit.indexes
-    unit.structurizationWitnesses unit.resolution
+    unit.resolution
   -- Definite initialization and the borrow analysis run exactly once here;
   -- preparation copies the certificates instead of re-running the analyses.
   -- Initialization failures are validate errors. Borrow-analysis rejections
@@ -1823,9 +1829,13 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
     match folded[certificate.namespaceId.index]? with
     | some (_, expressions) => certificate.withoutLoans expressions
     | none => certificate
-  return Internal.mkValidatedUnit unit.tables unit.profiles (folded.map (·.1))
-    unit.dependencies unit.evidence unit.indexes unit.structurizationWitnesses
-    unit.resolution initializationCertificates borrowCertificates borrowDiagnostics
+  -- Each namespace holds its results, its identity being its unit index.
+  let namespaces := folded.map fun (ns, _) => { ns with
+    initializationCertificates := initializationCertificates.filter (·.namespaceId == ns.identity)
+    borrowCertificates := borrowCertificates.filter (·.namespaceId == ns.identity)
+    borrowRejections := borrowDiagnostics.filter (·.namespaceId == ns.identity) }
+  return Internal.mkValidatedUnit unit.tables unit.profiles namespaces
+    unit.dependencies unit.evidence unit.indexes unit.resolution
 
 def ValidatedUnit.namespace? (unit : ValidatedUnit) (id : NamespaceId) : Option ValidatedNamespace :=
   unit.namespaces[id.index]?

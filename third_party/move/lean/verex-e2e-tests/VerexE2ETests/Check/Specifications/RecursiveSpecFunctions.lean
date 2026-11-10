@@ -40,7 +40,8 @@ verex module 0x42::recursive_spec where
       (values : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier) (needle : Int)
       (head : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier)
       (first : values.values[0]? = some head) (equal : head.val = needle) :
-      ∀ (k : Nat) (n : Int), n.toNat = k → 1 ≤ n → 1 ≤ count.spec unit frame (values, needle, n, ()) := by
+      ∀ (k : Nat) (n : Int), n.toNat = k → 1 ≤ n →
+        1 ≤ count.spec unit frame.toCarriers frame.type (values, needle, n, ()) := by
     intro k
     induction k using Nat.strongRecOn with
     | _ k ih =>

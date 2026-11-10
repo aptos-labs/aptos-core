@@ -444,13 +444,13 @@ verex module aptos_std::smart_table where
     let new_bucket :=
       do
         assert!(old_bucket.length >= p, 131072)
-        let _t8 :=
+        let _t2 :=
           slice(
             core.prim.reverseSliceVector(*old_bucket, p, old_bucket.length), p,
             old_bucket.length
           )
         *old_bucket := slice(*old_bucket, 0, p)
-        _t8
+        _t2
     table_with_length::add(&mut self.buckets, new_bucket_index, new_bucket)
 
   spec split_one_bucket where

@@ -6,7 +6,7 @@ import VerexIR.Proofs.Denote.StepLemmas
 /-!
 # The lemmas of function values in step proofs
 
-The built-in lemmas of `doc/plan/proof-language.md` ("Lemmas") that read a
+The built-in lemmas of `doc/designs/proof-language.md` ("Lemmas") that read a
 function value's behavior: the frame lemma, whose conclusion a step matches
 against its obligation (`lemma_stored_invariants_frame`).
 -/
@@ -21,8 +21,8 @@ theorem stored_invariants_frame {unit : Validation.ValidatedUnit} [FunctionCarri
     {initial final : Memory unit} {modified : ResourceType}
     (frame : ∀ resource, resource ≠ modified → final resource = initial resource)
     (trivial : ∀ value, invariant modified value)
-    (holds : MemoryInvariants invariant initial) :
-    MemoryInvariants invariant final := by
+    (holds : DataInvariants invariant initial) :
+    DataInvariants invariant final := by
   intro resource key value read
   by_cases same : resource = modified
   · subst resource

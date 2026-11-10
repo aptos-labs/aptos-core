@@ -20,10 +20,11 @@ namespace VerexIR.Move.Xir
 open Lean Elab Command
 open VerexIR.Validation
 
-/-- Syntax spanning an VIR location, so a message lands on its source. -/
-private def locatedSyntax (unit : ValidatedUnit) (loc : Option LocId) (fallback : Syntax) :
+/-- Syntax spanning a location of a namespace, so a message lands on its
+source. -/
+private def locatedSyntax (ns : ValidatedNamespace) (loc : Option LocId) (fallback : Syntax) :
     Syntax :=
-  match loc.bind (unit.tables.locations[·.index]?) |>.bind (·.primary) with
+  match loc.bind ns.location? |>.bind (·.primary) with
   | some range => Syntax.atom (SourceInfo.synthetic ⟨range.startByte⟩ ⟨range.endByte⟩) ""
   | none => fallback
 
@@ -31,9 +32,9 @@ private def locatedSyntax (unit : ValidatedUnit) (loc : Option LocId) (fallback 
 borrow analysis must have certified every function: its rejections are
 Verex's verdict on the program. -/
 def compileUnit (ref : Syntax) (unit : ValidatedUnit) : CommandElabM (Option Module) := do
-  let errors := unit.borrowDiagnostics.filter (·.severity == .error)
-  for diagnostic in errors do
-    logErrorAt (locatedSyntax unit diagnostic.primary ref)
+  let errors := unit.ownedBorrowDiagnostics.filter (·.2.severity == .error)
+  for (ns, diagnostic) in errors do
+    logErrorAt (locatedSyntax ns diagnostic.primary ref)
       s!"{diagnostic.code}: {diagnostic.message}"
   unless errors.isEmpty do return none
   let modules := unit.namespaces.zipIdx.filter fun (ns, _) => ns.profile == some .move
@@ -43,7 +44,9 @@ def compileUnit (ref : Syntax) (unit : ValidatedUnit) : CommandElabM (Option Mod
   match lowerModule unit ⟨index⟩ with
   | .ok module => return some module
   | .error failure =>
-      logErrorAt (locatedSyntax unit failure.loc ref) failure.message
+      match unit.namespaces[index]? with
+      | some ns => logErrorAt (locatedSyntax ns failure.loc ref) failure.message
+      | none => logErrorAt ref failure.message
       return none
 
 syntax (name := verexXir) "#verex_xir " ident : command

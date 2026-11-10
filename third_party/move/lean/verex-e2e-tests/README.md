@@ -61,12 +61,12 @@ feature (`Scalars/`, `Structs/`, `Enums/`, `Vectors/`, `Control/`,
 `References/`, `Storage/`, `Calls/`, `Generics/`, `Specifications/`,
 `Modules/`), with larger programs under `Examples/`; a file whose name ends
 in `Errors` holds negative cases. The ledger is the
-[roadmap's test section](../designs/roadmap.md#tests). Everything
+[roadmap](../doc/plan/roadmap.md). Everything
 under `Check/` is VerexSL; the frontend paths keep their own directories.
 
 `VerexE2ETests/SourceVerify/` verifies Move and Rust sources as
 `verex-move verify` and `verex-rust verify` do
-([`doc/designs/source-verification.md`](../designs/source-verification.md)): every
+([`doc/designs/source-verification.md`](../doc/designs/source-verification.md)): every
 `.move` and `.rs` file there, a Rust file with the `.spec.lean` items beside
 it and a Move file with its proof file, is rendered as VerexSL and
 elaborated, and its messages, in the coordinates of the Move, Rust,

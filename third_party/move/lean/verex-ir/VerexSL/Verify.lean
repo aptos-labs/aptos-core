@@ -87,10 +87,15 @@ def selectProofModule (environment : Environment) (name : Name) : Environment :=
 def selectedProofModule? (environment : Environment) : Option Name :=
   selectedExtension.getState environment
 
-/-- Elaborate `act` with `Elab.async`: declarations are checked by the
-kernel in its chain, behind the proofs running, and the command waits for
-none of them; a target's own proof tasks are what its conclusion waits for. -/
-private def withAsyncElaboration (act : CommandElabM α) (async := true) : CommandElabM α :=
+/-- Elaborate proofs asynchronously unless one target is requested. In
+parallel mode the kernel checks chain behind the proofs, and each target
+waits for its own proof tasks at conclusion. -/
+private def withAsyncElaboration (act : CommandElabM α) (async := true) : CommandElabM α := do
+  let options ← getOptions
+  -- One target runs in this command; it must not wait on tasks queued behind
+  -- itself when Lean has only one worker. Other target counts preserve
+  -- the existing asynchronous proof and kernel-checking behavior.
+  let async := async && verex.jobs.get options != 1
   withScope (fun scope => { scope with opts := Elab.async.set scope.opts async }) act
 
 @[command_elab verexVerifyCommand]
@@ -103,8 +108,8 @@ def elabVerexVerify : CommandElab := fun stx => Perf.withPhase .certification do
   -- registered at the path as written takes precedence.
   let canonical := VerexSL.canonicalMovePath (← getEnv) segments.pop
   let segments := if segments.size > 1 &&
-      (VerexSL.registeredUnit? (← getEnv) (pathName segments.pop)).isNone &&
-      (VerexSL.registeredUnit? (← getEnv) (pathName canonical)).isSome then
+      (VerexSL.registeredNamespace? (← getEnv) (pathName segments.pop)).isNone &&
+      (VerexSL.registeredNamespace? (← getEnv) (pathName canonical)).isSome then
     canonical.push segments.back!
   else segments
   let script ← scriptOfOptional (stx[2]?.getD .missing)
@@ -115,8 +120,10 @@ def elabVerexVerify : CommandElab := fun stx => Perf.withPhase .certification do
   if segments.size > 1 then
     return ← withAsyncElaboration do
       (← verifyFunction pathSyntax segments.pop function script).finish
-  let owners := (VerexSL.registeredUnits (← getEnv)).filter fun (_, unit) =>
-    (findFunction? unit function).isSome
+  let units ← match VerexSL.registeredUnits (← getEnv) with
+    | .ok units => pure units
+    | .error message => throwErrorAt pathSyntax message
+  let owners := units.filter fun (_, unit) => (findFunction? unit function).isSome
   match owners with
   | [(owner, _)] =>
       let ownerSegments := owner.components.toArray.map (·.toString (escape := false))
@@ -138,9 +145,9 @@ syntax (name := verexClosureSitesCommand) "#verex_closure_sites" verexPath : com
 def elabVerexClosureSites : CommandElab := fun stx => do
   let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
   let name := pathName (pathSegments pathSyntax)
-  let some unit := VerexSL.registeredUnit? (← getEnv) name
-    | throwErrorAt pathSyntax s!"unknown Verex namespace `{name}`"
-  logInfoAt stx (displayClosureSites unit (groupClosureSites (closureSites unit)))
+  let unit ← VerexSL.registeredUnitAt pathSyntax name
+  let sites ← closureSitesOf (pathSegments pathSyntax) unit
+  logInfoAt stx (displayClosureSites unit (groupClosureSites sites))
 
 /-- Declare a registered unit's function values and print them, a
 constructor per closure site (`ensureFunctionCarriers`). -/
@@ -150,8 +157,7 @@ syntax (name := verexFunctionValuesCommand) "#verex_function_values" verexPath :
 def elabVerexFunctionValues : CommandElab := fun stx => do
   let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
   let name := pathName (pathSegments pathSyntax)
-  let some unit := VerexSL.registeredUnit? (← getEnv) name
-    | throwErrorAt pathSyntax s!"unknown Verex namespace `{name}`"
+  let unit ← VerexSL.registeredUnitAt pathSyntax name
   discard <| ensureFunctionCarriers (pathSegments pathSyntax) unit
   let sites ← closureSitesOf (pathSegments pathSyntax) unit
   logInfoAt stx (if sites.isEmpty then "no closure sites" else displayFunctionValues unit sites)
@@ -160,13 +166,14 @@ def elabVerexFunctionValues : CommandElab := fun stx => do
 def elabVerexUnit : CommandElab := fun stx => do
   let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
   let segments := pathSegments pathSyntax
-  let some unit := VerexSL.registeredUnit? (← getEnv) (pathName segments)
-    | throwErrorAt stx s!"unknown Verex namespace `{pathName segments}`"
+  let unit ← VerexSL.registeredUnitAt stx (pathName segments)
   -- A hand-written proof needs the same quoted unit, and its function
-  -- values, the generated script uses, along with the typed twins of its
-  -- declarations.
+  -- values, the generated script uses. The typed twins of its declarations
+  -- are display artifacts, built here on demand: verification never reads
+  -- them.
   discard <| ensureUnitInstance segments unit
   discard <| ensureUnitDefinitions segments unit
+  discard <| VerexSL.SpecTypes.ensureSpecTypes segments unit
 
 /-- A function a module verifies: its name, the syntax errors are reported
 at, and its authored proof, if any. -/
@@ -383,16 +390,41 @@ private def verifyScheduled (unit : ValidatedUnit) (segments : Array String)
     -- is concluded with its messages, and not begun. An error a definition
     -- recovered from is reported with the target's, whose proof goes on as
     -- the definition stands.
+    -- The callees the automatic targets inline, each with the first target
+    -- inlining it; a callee of authored targets alone is not summarized.
+    let mut inlinedCallees : Array (String × Nat) := #[]
     for index in [0:order.size] do
       let (outcome, logged) ← capturingMessages <|
         withScope (fun scope => { scope with opts := Elab.async.set scope.opts asyncBefore })
           (begin order[index]! true)
       messages := messages.modify index (· ++ logged)
-      if outcome matches .failed then
-        begun := begun.set! index true
-        attempted := attempted.set! index true
-        concluded.modify (·.push order[index]!.target.function)
+      match outcome with
+      | .failed =>
+          begun := begun.set! index true
+          attempted := attempted.set! index true
+          concluded.modify (·.push order[index]!.target.function)
+      | .proving pending _ =>
+          if order[index]!.target.script.isNone then
+            for callee in pending.inlinedCallees do
+              unless inlinedCallees.any (·.1 == callee) do
+                inlinedCallees := inlinedCallees.push (callee, index)
+      | .skipped => pure ()
     covered.set #[]
+    -- The inlined callees are summarized once each, before any proof runs,
+    -- after the callees they inline (`summaryOrder`). A summary is optional:
+    -- a derivation that fails leaves the callee inlined and reports nothing
+    -- but a stage-log line.
+    let ordered ← match order[0]? with
+      | some first => summaryOrder first.target.reference segments (inlinedCallees.map (·.1))
+      | none => pure #[]
+    for callee in ordered do
+      let some (_, index) := inlinedCallees.find? (·.1 == callee) | continue
+      let target := order[index]!.target
+      let ((), logged) ← capturingMessages <| inParsedFile target.file <| inModule do
+        try summarizeCallee target.reference segments callee opens
+        catch error =>
+          stageLog s!"summary of {callee} failed: {← error.toMessageData.toString}"
+      messages := messages.modify index (· ++ logged)
     let mut running : Array (Nat × PendingVerification × Array String) := #[]
     repeat
       for index in [0:order.size] do
@@ -434,8 +466,11 @@ private def verifyScheduled (unit : ValidatedUnit) (segments : Array String)
             continue
         | none => break
       -- The first target whose proofs ended concludes.
-      let ended ← running.toList.mapM fun (index, pending, _) =>
-        BaseIO.mapTasks (fun _ => pure index) (pending.tasks.toList.map (·.task))
+      -- Synchronous proofs have already finished. Creating completion tasks
+      -- here would block the only worker while waiting for its own queue.
+      let ended ← if !Elab.async.get (← getOptions) then pure [] else
+        running.toList.mapM fun (index, pending, _) =>
+          BaseIO.mapTasks (fun _ => pure index) (pending.tasks.toList.map (·.task))
       let position ← match ended with
         | [] => pure 0
         | first :: rest => Perf.withPhase .verification do
@@ -490,11 +525,14 @@ private partial def functionItems (stx : Syntax) : Array Syntax :=
 private partial def firstIdentifier? (stx : Syntax) : Option Syntax :=
   if stx.isIdent then some stx else stx.getArgs.findSome? firstIdentifier?
 
-/-- Whether a function's parameters, through a reference, its results, its
-locals, or the values it constructs carry data invariants: what the Move
-Prover checks of every function that handles such values. -/
+/-- Whether a function's parameters or results, through a reference, its
+locals, through a mutable one, or the values it constructs carry data
+invariants: what the Move Prover checks of every function that handles such
+values. -/
 private def handlesDataInvariants (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
+  -- The declaration in the unit's numbering.
+  let declaration := ns.relocate declaration
   let direct (typeId : VerexIR.TypeId) : Bool :=
     (ns.tables.types[typeId.index]?).any (Contract.hasDataInvariant unit)
   let carries (typeId : VerexIR.TypeId) : Bool :=
@@ -502,15 +540,25 @@ private def handlesDataInvariants (unit : ValidatedUnit) (ns : ValidatedNamespac
     | some (.reference reference) => direct reference.referent
     | some _ => direct typeId
     | none => false
+  -- A local holding a mutable reference counts for its referent: a mutation
+  -- through a borrow of global memory has no other local. A shared one
+  -- mutates nothing, so it owes nothing of its own.
+  let mutates (typeId : VerexIR.TypeId) : Bool :=
+    match ns.tables.types[typeId.index]? with
+    | some (.reference reference) =>
+        reference.kind == .mutable && direct reference.referent
+    | some _ => direct typeId
+    | none => false
   let constructs : Bool := match declaration.body with
     | .structured root => (bodyExpressionIds ns root).any fun id =>
         match ns.expressions[id.index]? with
-        | some { kind := .operation (.call (.constructor _ _)) _ _ _, typeId, .. } => direct typeId
+        | some { kind := .operation (.call (.constructor _ _)) _ _ _, typeId, .. } =>
+            direct (ns.typeId typeId)
         | _ => false
     | _ => false
   declaration.signature.parameters.any (carries ·.typeUse.typeId) ||
     declaration.signature.results.any (carries ·.typeId) ||
-    declaration.locals.any (direct ·.type.typeId) || constructs
+    declaration.locals.any (mutates ·.type.typeId) || constructs
 
 /-- Whether a function's body states a condition of a kind `accept` admits. -/
 private def bodyStates (ns : ValidatedNamespace)
@@ -520,37 +568,60 @@ private def bodyStates (ns : ValidatedNamespace)
   | .structured root => !(bodySpecifications ns root accept).isEmpty
   | _ => false
 
+/-- What a module's invariants and functions touch, by qualified resource, as
+another module's unit decides what it links. -/
+private structure ModuleMemory where
+  invariants : Array (Array String × String)
+  reached : Array (Array String × String)
+  written : Array (Array String × String)
+  deriving Inhabited
+
+private initialize moduleMemoryExtension :
+    SimplePersistentEnvExtension (Name × ModuleMemory) (NameMap ModuleMemory) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := fun modules (name, memory) => modules.insert name memory
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries (fun modules (name, memory) => modules.insert name memory) {}
+        entries }
+
+/-- Record what a registered module's invariants and functions touch. -/
+private def recordModuleMemory (environment : Environment) (name : Name) (unit : ValidatedUnit) :
+    Environment :=
+  moduleMemoryExtension.addEntry environment (name, {
+    invariants := Contract.namespaceInvariantMemory unit ⟨0⟩
+    reached := Contract.namespaceFunctionMemory unit ⟨0⟩ false
+    written := Contract.namespaceFunctionMemory unit ⟨0⟩ true })
+
 /-- The registered modules whose invariants concern a module's unit, which
 it links: those whose invariants read memory its functions reach, and those
-registered in this file whose functions write memory its own invariants
-read, whose functions it verifies against them. Iterated to the closure: a
-linked writer's memory reaches further invariants. -/
+of its compilation whose functions write memory its own invariants read,
+whose functions it verifies against them. Iterated to the closure: a linked
+writer's memory reaches further invariants. -/
 private def invariantRelatedModules (environment : Environment) (unit : ValidatedUnit) :
     Array (Array String) := Id.run do
-  let modulePath (module : ValidatedUnit) : Option (Array String) := do
-    let ns ← module.namespaces[0]?
-    module.tables.namespaces[ns.identity.index]? |>.map (·.segments)
-  let some ownPath := modulePath unit | return #[]
-  let modules := (registeredUnits environment).filterMap fun (name, module) => do
-    let path ← modulePath module
+  let some ownPath := unit.namespaces[0]? >>= fun ns =>
+      (unit.tables.namespaces[ns.unitIdentity.index]?).map VerexIR.NamespaceRef.segments
+    | return #[]
+  let memories := moduleMemoryExtension.getState environment
+  let modules := (registeredNamespaces environment).filterMap fun (name, entry) => do
+    let path := entry.object.path
     guard (pathName path == name && path != ownPath)
-    pure (path, module)
-  let inFile := (moduleUnits environment).map (·.1)
+    pure (name, path, ← memories.find? name)
+  let inCompilation := compilationNamespaces environment
   let ownInvariants := Contract.namespaceInvariantMemory unit ⟨0⟩
   let mut reached := Contract.namespaceFunctionMemory unit ⟨0⟩ false
   let mut related : Array (Array String) := #[]
   for _ in [0:modules.length + 1] do
     let mut changed := false
-    for (path, module) in modules do
+    for (name, path, memory) in modules do
       if related.contains path then continue
-      let readsReached := (Contract.namespaceInvariantMemory module ⟨0⟩).any reached.contains
-      let writesOwn := inFile.contains (pathName path) &&
-        (Contract.namespaceFunctionMemory module ⟨0⟩ true).any ownInvariants.contains
+      let readsReached := memory.invariants.any reached.contains
+      let writesOwn := inCompilation.contains name && memory.written.any ownInvariants.contains
       unless readsReached || writesOwn do continue
       related := related.push path
       changed := true
       if writesOwn then
-        for resource in Contract.namespaceFunctionMemory module ⟨0⟩ false do
+        for resource in memory.reached do
           unless reached.contains resource do reached := reached.push resource
     unless changed do break
   return related
@@ -618,8 +689,8 @@ from the module's specification functions: for an owner binding `spec_get`,
 `spec_set`, `spec_remove`, `spec_len`, `spec_contains_key`, `spec_key_at`
 and `spec_rank`, the theorems `lemma_get_set`, `lemma_len_remove`,
 `lemma_contains_key_key_at`, `lemma_key_at_eq_iff`, …
-(`doc/designs/proof-strategy.md`, P2), each the lemma of typed maps it names
-(`VerexIR.SpecMap.valueAt_update`, …). -/
+(`doc/designs/proof-strategy.md`, "Writable goals"), each the lemma of typed
+maps it names (`VerexIR.SpecMap.valueAt_update`, …). -/
 private def ensureMapLemmas (segments : Array String) (unit : ValidatedUnit) : CommandElabM Unit := do
   let some ns := unit.namespaces[0]? | return
   for (lemmaName, lemmaTheorem) in namespaceMapLemmaNames ns do
@@ -631,6 +702,15 @@ private def ensureMapLemmas (segments : Array String) (unit : ValidatedUnit) : C
     let alias : TheoremVal :=
       { name := name, levelParams := info.levelParams, type := info.type, value := value }
     liftTermElabM <| addDecl (.thmDecl alias)
+
+/-- Whether a module verifies a function of another module against its invariants:
+the function writes memory they read, and is verified. -/
+def owesWriterTarget (unit : ValidatedUnit) (invariantNs writerNs : VerexIR.NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
+  declaration.body != .absent &&
+    !automaticVerificationDisabled unit writerNs ns declaration &&
+    Contract.owesInvariantsOf unit invariantNs writerNs declaration
 
 /-- Verify a registered module from the items of `sources`, its command's
 then its proof file's: its theorems in its namespace, then, with that
@@ -651,6 +731,8 @@ private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource)
   let theorems := sources.flatMap fun source =>
     (VerexSL.theoremItems source.stx).map (·, source.file)
   unless theorems.isEmpty do
+    if let some unit := VerexSL.registeredUnit? (← getEnv) moduleNamespace then
+      SpecTypes.ensureNamedTwins segments unit (mkNullNode (theorems.map (·.1)))
     withModuleNamespace moduleNamespace <| Perf.withPhase .verification do
       modifyScope fun scope => { scope with openDecls := theoremOpens ++ scope.openDecls }
       for (theoremCommand, file) in theorems do
@@ -662,9 +744,9 @@ private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource)
   let some unit := VerexSL.registeredUnit? (← getEnv) moduleNamespace | return
   -- The module's lemmas, and those its functions apply, before its functions.
   let ownLemmas := (unit.namespaces.toList.zipIdx.filter fun (ns, _) =>
-      (unit.tables.namespaces[ns.identity.index]?.map (·.segments)) == some segments).flatMap
+      (unit.tables.namespaces[ns.unitIdentity.index]?.map (·.segments)) == some segments).flatMap
     fun (ns, index) => ns.lemmas.toList.map fun lemma =>
-      ({ namespaceId := ⟨index⟩, name := lemma.name } : VerexIR.QualifiedRef)
+      ({ namespaceId := ⟨index⟩, name := ns.nameId lemma.name } : VerexIR.QualifiedRef)
   let appliedByFunctions := unit.namespaces.toList.flatMap fun ns =>
     ns.functions.toList.flatMap fun declaration => (functionLemmas ns declaration).toList
   let roots := (ownLemmas ++ appliedByFunctions).foldl (init := #[]) fun roots lemma =>
@@ -716,24 +798,23 @@ private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource)
           Contract.owesMemoryInvariants unit ⟨namespaceIndex⟩ declaration) then
       none
     some ⟨function, identifier, none, false, false, module.file⟩
-  -- A function of a module this file registered before, which writes memory
-  -- an invariant of this module reads, is verified against it here.
-  let inFile := (moduleUnits (← getEnv)).map (·.1)
+  -- A function of a module of this compilation registered before, which
+  -- writes memory an invariant of this module reads, is verified against it
+  -- here.
+  let inCompilation := compilationNamespaces (← getEnv)
   let writers : Array VerificationTarget :=
     (unit.namespaces.toList.zipIdx.drop 1).toArray.flatMap fun (ns, index) =>
-      let path := (unit.tables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
-      if !inFile.contains (pathName path) then #[] else
+      let path := (unit.tables.namespaces[ns.unitIdentity.index]?.map (·.segments)).getD #[]
+      if !inCompilation.contains (pathName path) then #[] else
       ns.functions.zipIdx.filterMap fun (declaration, functionIndex) =>
-        if declaration.body == .absent ||
-            automaticVerificationDisabled unit ⟨index⟩ ns declaration ||
-            !Contract.owesInvariantsOf unit ⟨0⟩ ⟨index⟩ declaration then none
+        if !owesWriterTarget unit ⟨0⟩ ⟨index⟩ ns declaration then none
         else some ⟨functionKey unit ⟨⟨index⟩, ⟨functionIndex⟩⟩, pathSyntax, none, false, false,
           module.file⟩
   let targets := targets ++ writers
   -- The lemma items of the proof file; a module holds `spec lemma`s.
   let proofLemmas ← sources.toList.zipIdx.toArray.flatMapM fun (source, position) => do
     let found := proofLemmaItems source.stx
-    if position == 0 then
+    if position == 0 && !verex.lemmaItemsInModule.get (← getOptions) then
       for item in found do
         logErrorAt item "a `lemma` item belongs to a proof file; a module states `spec lemma`"
       return #[]
@@ -793,9 +874,12 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
   -- A recursive specification function is a definition of the module.
   let segments := pathSegments pathSyntax
   let some unit := VerexSL.registeredUnit? (← getEnv) (pathName segments) | return
+  modifyEnv (recordModuleMemory · (pathName segments) unit)
   ensureMapLemmas segments unit
   unless (recursiveSpecFunctions unit).isEmpty do
-    liftTermElabM (ensureSpecFunctionDefinitions unit)
+    let unitName ← Contract.ensureUnitDefinition segments unit
+    withNominalUnitCommand unitName do
+      liftTermElabM (ensureSpecFunctionDefinitions unit)
   let proofFile := unit.namespaces[0]? >>= proofFile?
   let deferred := match getDeferral (← getEnv), proofFile with
     | .all, _ => true

@@ -1,0 +1,1 @@
+tests/sources/functional/script_provider.move:3:1: info: `register` uses concrete verification: Given interpretation does not yet support storage interpretation

@@ -1,0 +1,13 @@
+VerexE2ETests/SourceVerify/proof_stored_clauses_errors.proof.lean:11:13: error: the witness's premise is not established:
+  verexInhabitants : Proofs.Denote.CarriersNonempty (Proofs.Denote.Carriers.runtime unit)
+  account : Proofs.Denote.NTy.signer.carrier
+  half small : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed : True
+  permitted : half + half ≤ 18446744073709551615
+  a✝¹ : 0 ≤ half + half
+  a✝ : half + half ≤ 18446744073709551615
+  bounds✝ : 0 ≤ half ∧ half ≤ 2 ^ 64 - 1
+  bounds : 0 ≤ small ∧ small ≤ 2 ^ 64 - 1
+  ⊢ VerexSL.Contract.opaqueSpec "0x42::proof_stored_clauses_errors::held" [] Bool (small, ())
+VerexE2ETests/SourceVerify/proof_stored_clauses_errors.proof.lean:9:8: error: verex verification failed: the proof of `save` does not establish its specification

@@ -89,7 +89,10 @@ verex module 0x42::wrapped_tables where
     ensures result == get(old(t), k)
     ensures !has(t, k)
     ensures size(t) == size(old(t)) - 1
-  verify take
+  verify take by lean =>
+    verex_obligations
+    all_goals (first | verex_decide | (verex_prepare; try verex_decide))
+    all_goals simp_all [VerexIR.SpecMap.hasKey_remove]
 
   public fun count(t : &TableWithLength<u64, u64>, k : u64) -> u64 :=
     if wrapped_contains(t, k) then wrapped_length(t) else 0u64

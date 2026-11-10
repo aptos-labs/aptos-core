@@ -1,0 +1,33 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/joined_mut_ref_lenders.move:32:9: error: the specification clause `ensures result == 0` is not established
+tests/sources/regression/joined_mut_ref_lenders.move:30:5: error: verex verification failed: the automatic verification of `globals_other` failed; provide a proof in `tests/sources/regression/joined_mut_ref_lenders.proof.lean`:
+  verify globals_other by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/joined_mut_ref_lenders.move:17:9: error: the data invariant `invariant x > 1` does not hold where a mutation ends
+tests/sources/regression/joined_mut_ref_lenders.move:65:5: error: verex verification failed: the automatic verification of `locals_broken` failed; provide a proof in `tests/sources/regression/joined_mut_ref_lenders.proof.lean`:
+  verify locals_broken by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/joined_mut_ref_lenders.move:82:9: error: the data invariant `invariant v == 0` does not hold where a mutation ends
+tests/sources/regression/joined_mut_ref_lenders.move:88:5: error: verex verification failed: the automatic verification of `mixed_global_broken` failed; provide a proof in `tests/sources/regression/joined_mut_ref_lenders.proof.lean`:
+  verify mixed_global_broken by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/joined_mut_ref_lenders.move:82:9: error: the data invariant `invariant v == 0` does not hold where a mutation ends
+tests/sources/regression/joined_mut_ref_lenders.move:94:5: error: verex verification failed: the automatic verification of `mixed_global_broken_swapped` failed; provide a proof in `tests/sources/regression/joined_mut_ref_lenders.proof.lean`:
+  verify mixed_global_broken_swapped by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

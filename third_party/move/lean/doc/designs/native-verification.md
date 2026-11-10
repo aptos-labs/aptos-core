@@ -28,10 +28,10 @@ mentions them. There is no option, no encoded fallback, and no construct
 that is "typed where decided": a construct is native or it is reported as
 unsupported.
 
-Two boundaries still hold runtime values: the captures of a closure value
-and the entries of the requires table. Their replacement is
-[`higher-order-functions.md`](higher-order-functions.md), "Function values
-as native data".
+A closure value's captures and the requires table are native too: the
+function carrier is data generated per link set
+([`higher-order-functions.md`](higher-order-functions.md), "Function values
+as native data").
 
 ## Why
 
@@ -66,16 +66,99 @@ denotation and the solver.
 | Vectors | `SpecVector` only: literals, `append`/`push` total under the length bound, `extract`, `set`, element quantifiers over `values` |
 | Maps | the owner is a row and the intrinsic roles act on its `SpecEntries` component wherever it sits; a table's typed map is `SpecMap.ofEntries keys values x`, and a map written back into a table reads back as itself where its length fits and its entries read back; `new` is the empty owner |
 | Equality and order | carrier equality after ghost erasure (`NTy.equal`, identity types by `holdsContents`); `NTy.order`, defined by recursion on the type and used by `Term.order` and the `.compare` primitive, with one theorem `NTy.order_encode` relating it to the order of encodings for the agreement |
-| Memory | reads are `Option.getD` of the carrier at `NTy.storageKey κ k`; `exists` is `isSome`; `MemoryInvariants` over carriers |
+| Memory | reads are `Option.getD` of the carrier at `NTy.storageKey κ k`; `exists` is `isSome`; `Memory unit` is a function into certified carriers |
+| Data invariants | part of the carrier of the type: the plain layer `NTy.plain`, the certified `NTy.carrier` as its subtype by `NTy.deepHolds`, and one certifying step `certifyingAt` where a value is made, a mutation ends, a loan dies, a reference is handed over or returned ([`data-invariants.md`](data-invariants.md)) |
 | Specification functions | definitions and results over native bundles, per instantiation for generic ones (the `.at_…` scheme); opaque functions are `opaqueSpec` constants over native bundles; a definition's value outside its domain is `opaqueSpec "<f>.outside"` of its resolved type arguments |
 | Lemmas | native bundles, instantiated like specification functions; a parameter of native type is bound at the lemma's frame |
 | Behavioral predicates | `EnsuresOf`, `AbortsOf`, `ResultOf`, `StateOf`, `RequiresOf` over an invocation meaning (`closureMeaning executable` or a model unit's `invoke`) with native arguments and results; a `.ref` position is an `(entry, final)` pair |
-| Stored invariants | `StoredCase`: stated at the resource's own type arguments; a generic frame moves its view of the value there (`Skolems.reframe`), so the invariant holds at every frame by construction |
+| Stored invariants | `DataInvariants` and `StoredCase` over carriers, the second invariant layer, which states the invariants of the declarations a carrier cannot ([`data-invariants.md`](data-invariants.md), "The stored-invariant layer beside it") and whose removal is open ([`../plan/data-and-global-invariants.md`](../plan/data-and-global-invariants.md)): stated at the resource's own type arguments; a generic frame moves its view of the value there (`Skolems.reframe`), so the invariant holds at every frame by construction |
 | Type parameters | a value of a parameter type is native at every instantiation, its native type the argument's; an instance substitutes carriers, never domains |
 | Failures | `Failure := ThrowKind × Array Int`, related to the runtime failure by the injective `Failure.encode`; abort codes by `abortCodeMatches` |
 | Hash, serialization, signer facts | `opaqueValue` applications, as a clause's call builds them; `bcs::serialize` is a chosen function of which only non-emptiness is known |
+| Aggregators | `NativeModel.aggregator`: a frame reads an element through `Skolems.aggregatorValuePlain` and tests it by `Skolems.isAggregatorElement`, which are integers and decided at `u64`/`u128` at any frame (`aggregatorValuePlain_int`) and leave a type parameter unconstrained; the abort tests the value `type_name` denotes |
 | Mutable-reference lending in calls | unchanged: `NTy.lend`, `lendArguments`, `argumentsResolve` define what a run is, at the agreement boundary |
 | Obligation markers | unchanged; they carry no values |
+
+## Nominal declaration descriptors
+
+A quoted ADT use identifies its declaration and supplies its type arguments.
+The quotation layer defines one parameterized native descriptor per declaration
+of a defined unit. Nested ADTs refer to their descriptors instead of copying
+field trees. Descriptor identity includes the unit constant and the declaration
+handle: numeric handles are relocated by linking and do not identify a declaration
+across different units. Distinct declarations retain distinct descriptor names
+even when their fields coincide, and phantom type arguments remain explicit.
+Proof-only augmented units reuse the registered source unit's descriptor scope;
+they do not define a second unit or a second set of ADT descriptors.
+
+The validated declaration supplies the descriptor body. Quotation checks an
+incoming finite native layout against that declaration before naming it; it does
+not discard an inconsistent field row. Parameter substitution operates on the
+explicit arguments and preserves the descriptor head. Resolving parameters before
+quotation keeps resolution from depending on whether a definition has been opened.
+A missing unit scope is an error for ADT quotation; low-level synthetic tests
+request raw layouts explicitly. Legacy operations that inspect a field or variant
+use one shallow descriptor view and retain the original descriptor in emitted
+types. Descriptors are ordinary definitions. The kernel checks them against the
+structural backend, while routine reducible normalization retains their names.
+An observer opens one declaration at the operation boundary when constructing its
+existing projection or certificate proof. No global simplification rule unfolds
+the descriptors, and no additional family of equations equates separately
+generated layouts.
+
+Descriptors separate declaration identity from its current implementation. The
+initial backend still uses the finite structural `NTy` layout, its native products
+and variants, and its existing codec proofs. Recursive declarations require a
+backend with nominal carrier families or generated mutual inductives and proofs
+for their codecs and invariant boundaries. A cyclic definition cannot be represented
+by recursively expanding this finite backend, nor does naming that expansion make
+it recursive. Source-level nominal references already provide the finite graph
+needed for that later backend. Mutually recursive declarations must be bound as
+a group; their codecs and recursive invariant predicates must recurse over
+finite values, rather than expand the type graph. Carrier generation must
+distinguish recursive value structure from reference and function handles,
+and check positivity before generating inductives. The Move profile continues
+to reject recursive Move types.
+
+This representation change does not move invariant obligations onto generic
+parameters. Only the declared ADT boundary introduces its own invariant, and the
+existing construction, mutation-completion, and loan-completion checks remain.
+
+Certified struct-field access uses one named operation, `Var.selectCertified`.
+Its definition is uniform across type instantiations; choosing a different
+implementation for certificate-free fields would break that conversion. Table
+and vector observations open the operation only at the field boundary, then
+specialize the field's family through checked conversion. The owner's invariant
+and its proof remain behind their names. Existing table and vector laws apply
+to that canonical field operation.
+
+Field quotation also retains the owner's descriptor in `Term.fieldAt`. Its
+denotation evaluates the owner at that same type index before selecting the
+field. This keeps a global field read and an existence test on the same nominal
+resource key; opening a structurally indexed field constructor first would
+reconstruct the owner's full layout in the recursive read. Construction,
+destructuring, and variant operations likewise retain the owner descriptor in
+`Term.packAt`, `letFieldsAt`, `variantAt`, `isVariantAt`, and `payloadAt`. Their
+denotations use that owner index when reading or writing storage; observing an
+operation never reconstructs a second resource type from its field layout.
+
+A carrier family also stores its canonical plain reader together with a proof
+that it agrees with the existing total codec interpretation. Instantiation
+selects the concrete argument's reader directly. This preserves decoding for
+invalid plain values while avoiding a second reader assembled from codec
+composition. Recovering a plain table from its typed reading still requires
+the table's actual `deepHolds` evidence; the total decoder is not assumed
+injective outside that boundary. A certified argument and a plain argument use
+that same reader at construction; the existing forget/read law accounts for the
+certificate. Named-family inhabitants use one checked projection spelling without
+replacing an independent choice of inhabitants.
+
+Given declaration tables are ordinary named definitions as well. Routine
+normalization retains the table application in dependent binder types, rather than
+expanding the entire declaration registry. A producer that obtains an own-invariant
+proof opens only its selected declaration clause. Observed maps of projected table
+fields retain forward read equations; naming a map never reconstructs its owner
+from that reading.
 
 ## Enforcement
 
@@ -103,6 +186,20 @@ reads (`verex_subst_maps`). Typed maps are named by `verex_prepare typed`
 (`verex_name_maps`); position facts are `typedMapPositionFacts`. Cuts
 meet a named local through the chain of names that defines it
 (`cutNamedValue`).
+
+An equation with a pair on either side, or at a tuple's type whatever its
+sides, is stated at its components, as `NTy.equal` compares rows
+(`pairInjectionRows`, `Prod.ext_iff`), where its type spells a row (a product,
+`HList`, a tuple's carrier; never by reducing the type), and a row of one value's reads is that
+value (`rowOfReads`, by structure eta, with a unit end only where the value's
+own rest is a unit). A pattern equated to an opaque read therefore fixes its
+locals to that read's projections, which substitution takes into every other
+fact. A local the other side does not mention stays whole, for its
+substitution, and so does a struct's value compared whole with no side
+constructed. A run's observation, an equation with a side `result_of` or
+`state_of`, stays whole: the run deciders read it as stated, and what they derive
+of a local decomposes. A rewrite through such an equation of a term holding the opaque
+value whole is given up: `f(e)` no longer meets `f((a, b))` where `e = (a, b)`.
 
 Variant splits: the walk splits only the variants its goal tests, and an
 obligation a hypothesis states closes before it is split. A constructor's

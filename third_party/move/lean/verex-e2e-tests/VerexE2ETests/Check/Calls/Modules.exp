@@ -6,3 +6,4 @@ VerexE2ETests/Check/Calls/Modules.lean:52:7: error: verex verification failed: t
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+`wrap_twice` uses concrete verification: Given interpretation does not yet support calls to callees without a contract

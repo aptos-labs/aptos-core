@@ -35,7 +35,13 @@ instantiation.  Where the frame and the instantiation disagree on a type
 the callee reads the prophetic meaning has no outcome; at a coherent frame
 the compiler's types agree with the runtime's, so a coherent caller's calls
 and closures have coherent frames.  To be proved by induction on the fuel of
-`compileExpr`, one case per term constructor. -/
+`compileExpr`, one case per term constructor.
+
+A refinement admits `undefined`, which the certifying steps of the
+denotation now reach: a run that packs a value breaking its data invariant,
+or that ends a mutable loan over one, has no defined denotation, which this
+statement allows and `Satisfies` excludes, so the invariant is owed in the
+function that breaks it (`doc/designs/data-invariants.md`). -/
 axiom compileFunction_agrees {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit)
     [Skolems unit] (handle : FunctionHandle)
@@ -216,8 +222,8 @@ def GlobalsPreserved {unit : ValidatedUnit} [FunctionCarriers unit]
 the denotation encoded (`Failure.encode`), an abort code or the failed
 operation's operands. An assumption the public theorem states as a
 hypothesis, beside `GlobalsPreserved`; nothing establishes it yet, as
-validation does not constrain a throw's operands (`denotation.md`,
-"Assumption ledger"). -/
+validation does not constrain a throw's operands
+(`doc/status/assumptions.md`, "`FailuresIntegral`"). -/
 def FailuresIntegral {unit : ValidatedUnit} (executable : ExecutableUnit unit) : Prop :=
   ∀ handle typeInstantiation start arguments failure,
     (functionSpecAt executable handle typeInstantiation arguments).aborts start failure →
@@ -278,7 +284,7 @@ holds of the big-step meaning there in its runtime form, for a unit whose
 runs keep global memory typed.  Every runtime execution from an admissible
 start is a prophetic outcome at the value view from a memory its stores
 encode, whose existence the contract's definedness guarantees. -/
-theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
+theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit] [@CarriersNonempty (Carriers.runtime unit)]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId)) (σs : NRow)
@@ -330,7 +336,7 @@ theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
 /-- A contract satisfied by the prophetic meaning at the runtime frame and
 the empty instantiation holds of the big-step meaning in its runtime form,
 for a unit whose runs keep global memory typed. -/
-theorem satisfies_prophetic {unit : ValidatedUnit} [FunctionCarriers unit]
+theorem satisfies_prophetic {unit : ValidatedUnit} [FunctionCarriers unit] [@CarriersNonempty (Carriers.runtime unit)]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (σs : NRow) (shape : ResultShape)
@@ -351,7 +357,7 @@ theorem satisfies_prophetic {unit : ValidatedUnit} [FunctionCarriers unit]
 frame type arguments induce over the runtime family, holds, read at the
 arguments' types, of its big-step meaning at every runtime type
 instantiation coherent with that frame. -/
-theorem satisfies_generic_at {unit : ValidatedUnit} [FunctionCarriers unit]
+theorem satisfies_generic_at {unit : ValidatedUnit} [FunctionCarriers unit] [@CarriersNonempty (Carriers.runtime unit)]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (θ : TypeArgs)

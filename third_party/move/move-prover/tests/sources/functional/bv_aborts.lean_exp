@@ -13,7 +13,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
       (fun result final => final = initialState✝ ∧ x.val ≤ 815)
       (fun failure =>
         VerexIR.Proofs.Obligation "tests/sources/functional/.verex/bv_aborts.move.lean" 1939 2099
