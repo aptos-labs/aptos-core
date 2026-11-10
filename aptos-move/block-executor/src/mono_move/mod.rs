@@ -59,11 +59,17 @@ pub use reads::MonoReads;
 /// can be later converted to storage format if needed.
 #[derive(Clone)]
 pub enum MonoValue {
-    /// A resource-group member exactly as storage holds it. A group's stored
-    /// blob decodes to bytes per member and does not name the member's type, so
-    /// members enter the map like this and the first reader that knows the type
-    /// replaces the entry with [`MonoValue::Write`].
-    RawFromStorage(Bytes),
+    /// A resource-group member's bytes as storage holds them, not yet
+    /// deserialized.
+    ///
+    /// A group is stored as one blob that maps member tags to bytes, without
+    /// the members' types. Deserializing a member needs its type's layout and
+    /// GC descriptor, which exist only once a function using the type is
+    /// lowered. The group still enters the map whole, as Block-STM tracks its
+    /// tags as one unit, so every member starts as bytes. The first reader that
+    /// knows a member's type replaces it with [`MonoValue::Write`]. A member
+    /// nobody reads is written back as these bytes, never deserialized.
+    ResourceGroupMemberBytes(Bytes),
     Write {
         ptr: NonNull<u8>,
         /// The value's interned type, so that any transaction assembling the
@@ -111,7 +117,7 @@ impl SpeculativeValue for MonoValue {
         match self {
             // A heap value's serialized size is unknown until materialization.
             MonoValue::Write { .. } => None,
-            MonoValue::RawFromStorage(_) => None,
+            MonoValue::ResourceGroupMemberBytes(_) => None,
             MonoValue::Deletion => None,
             MonoValue::GroupMetadata => None,
         }
@@ -120,7 +126,9 @@ impl SpeculativeValue for MonoValue {
     fn write_op_kind(&self) -> WriteOpKind {
         match self {
             MonoValue::Write { kind, .. } => kind.clone(),
-            MonoValue::RawFromStorage(_) | MonoValue::GroupMetadata => WriteOpKind::Modification,
+            MonoValue::ResourceGroupMemberBytes(_) | MonoValue::GroupMetadata => {
+                WriteOpKind::Modification
+            },
             MonoValue::Deletion => WriteOpKind::Deletion,
         }
     }

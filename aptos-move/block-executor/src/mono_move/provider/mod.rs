@@ -65,7 +65,7 @@ pub(crate) fn storage_read(
         MonoValue::Deletion => StorageRead::DoesNotExist { version },
         // Both are upgraded or filtered out before a read gets here: stored
         // group members become writes, and a group's own slot is never read.
-        MonoValue::RawFromStorage(_) => {
+        MonoValue::ResourceGroupMemberBytes(_) => {
             return Err(invariant_violation(
                 "Undecoded storage bytes served as a read",
             ))
@@ -211,7 +211,7 @@ where
                 group_data.fetch_tagged_data_no_record(group_key, tag, self.txn_idx)
             };
             match read {
-                Ok((_, MonoValue::RawFromStorage(blob))) => {
+                Ok((_, MonoValue::ResourceGroupMemberBytes(blob))) => {
                     // A stored group does not name its members' types, so the
                     // first reader that knows one replaces the bytes with the
                     // flat value. Re-read, as another worker may have won.
@@ -221,7 +221,7 @@ where
                         tag.clone(),
                         value,
                         |prev, new| {
-                            if matches!(prev, MonoValue::RawFromStorage(_)) {
+                            if matches!(prev, MonoValue::ResourceGroupMemberBytes(_)) {
                                 *prev = new;
                             }
                         },
@@ -232,7 +232,7 @@ where
                     let members = base
                         .group_members(group_key)?
                         .into_iter()
-                        .map(|(tag, blob)| (tag, MonoValue::RawFromStorage(blob)))
+                        .map(|(tag, blob)| (tag, MonoValue::ResourceGroupMemberBytes(blob)))
                         .collect();
                     // The whole group goes in at once: a group left half
                     // initialized cannot be repaired by a later read.
