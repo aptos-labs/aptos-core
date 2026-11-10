@@ -886,6 +886,10 @@ impl<'ctx> LayoutProvider for ExecutionGuard<'ctx> {
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
         self.layout_id_for(ty)
     }
+
+    fn interner(&self) -> Option<&dyn Interner> {
+        Some(self)
+    }
 }
 
 impl<'ctx> Interner for ExecutionGuard<'ctx> {

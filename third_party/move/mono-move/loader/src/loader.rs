@@ -1098,6 +1098,10 @@ impl LayoutProvider for LoweringContext<'_, '_, '_> {
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
         self.loader.guard.layout_id(ty)
     }
+
+    fn interner(&self) -> Option<&dyn Interner> {
+        self.loader.guard.interner()
+    }
 }
 
 impl SpecializerContext for LoweringContext<'_, '_, '_> {
