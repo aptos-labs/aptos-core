@@ -23,6 +23,9 @@ static STATE_ROOT_PROOF: &str = "state_root_proof";
 static POSITION_STATE_RANGE_PROOF: &str = "position_state_range_proof";
 static POSITION_STATE_ITEM_COUNT: &str = "position_state_item_count";
 static POSITION_STATE_SNAPSHOT_CHUNK: &str = "position_state_snapshot_chunk";
+static COLLATERAL_STATE_RANGE_PROOF: &str = "collateral_state_range_proof";
+static COLLATERAL_STATE_ITEM_COUNT: &str = "collateral_state_item_count";
+static COLLATERAL_STATE_SNAPSHOT_CHUNK: &str = "collateral_state_snapshot_chunk";
 static EPOCH_ENDING_LEDGER_INFOS: &str = "epoch_ending_ledger_infos";
 static TRANSACTIONS: &str = "transactions";
 static TRANSACTION_RANGE_PROOF: &str = "transaction_range_proof";
@@ -125,6 +128,41 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
         })
         .recover(handle_rejection);
 
+    // GET collateral_state_range_proof/<version>/<end_key>
+    let bh = backup_handler.clone();
+    let collateral_state_range_proof = warp::path!(Version / HashValue)
+        .map(move |version, end_key| {
+            reply_with_bcs_bytes(
+                COLLATERAL_STATE_RANGE_PROOF,
+                &bh.get_collateral_state_range_proof(end_key, version)?,
+            )
+        })
+        .map(unwrap_or_500)
+        .recover(handle_rejection);
+
+    // GET collateral_state_item_count/<version>
+    let bh = backup_handler.clone();
+    let collateral_state_item_count = warp::path!(Version)
+        .map(move |version| {
+            reply_with_bcs_bytes(
+                COLLATERAL_STATE_ITEM_COUNT,
+                &(bh.get_collateral_state_item_count(version)? as u64),
+            )
+        })
+        .map(unwrap_or_500)
+        .recover(handle_rejection);
+
+    // GET collateral_state_snapshot_chunk/<version>/<start_idx>/<limit>
+    let bh = backup_handler.clone();
+    let collateral_state_snapshot_chunk = warp::path!(Version / usize / usize)
+        .map(move |version, start_idx, limit| {
+            reply_with_bytes_sender(&bh, COLLATERAL_STATE_SNAPSHOT_CHUNK, move |bh, sender| {
+                bh.get_collateral_state_item_iter(version, start_idx, limit)?
+                    .try_for_each(|record_res| sender.send_size_prefixed_bcs_bytes(record_res?))
+            })
+        })
+        .recover(handle_rejection);
+
     // GET epoch_ending_ledger_infos/<start_epoch>/<end_epoch>/
     let bh = backup_handler.clone();
     let epoch_ending_ledger_infos = warp::path!(u64 / u64)
@@ -170,6 +208,9 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
         .or(warp::path(POSITION_STATE_RANGE_PROOF).and(position_state_range_proof))
         .or(warp::path(POSITION_STATE_ITEM_COUNT).and(position_state_item_count))
         .or(warp::path(POSITION_STATE_SNAPSHOT_CHUNK).and(position_state_snapshot_chunk))
+        .or(warp::path(COLLATERAL_STATE_RANGE_PROOF).and(collateral_state_range_proof))
+        .or(warp::path(COLLATERAL_STATE_ITEM_COUNT).and(collateral_state_item_count))
+        .or(warp::path(COLLATERAL_STATE_SNAPSHOT_CHUNK).and(collateral_state_snapshot_chunk))
         .or(warp::path(EPOCH_ENDING_LEDGER_INFOS).and(epoch_ending_ledger_infos))
         .or(warp::path(TRANSACTIONS).and(transactions))
         .or(warp::path(TRANSACTION_RANGE_PROOF).and(transaction_range_proof));

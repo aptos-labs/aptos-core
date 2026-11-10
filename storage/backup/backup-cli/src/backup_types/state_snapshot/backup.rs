@@ -3,7 +3,7 @@
 
 use crate::{
     backup_types::state_snapshot::manifest::{
-        PositionSnapshotBackup, SnapshotKind, StateSnapshotBackup, StateSnapshotChunk,
+        NativeSnapshotBackup, SnapshotKind, StateSnapshotBackup, StateSnapshotChunk,
     },
     metadata::Metadata,
     metrics::backup::BACKUP_TIMER,
@@ -248,18 +248,49 @@ impl StateSnapshotBackupController {
         let chunks = self
             .write_chunks(&backup_handle, SnapshotKind::State)
             .await?;
-        let positions = match txn_info.transaction_info().position_state_checkpoint_hash() {
-            Some(root_hash) => Some(PositionSnapshotBackup {
-                root_hash,
-                chunks: self
-                    .write_chunks(&backup_handle, SnapshotKind::Position)
-                    .await?,
-            }),
-            None => None,
-        };
+        let positions = self
+            .write_native_chunks(
+                &backup_handle,
+                SnapshotKind::Position,
+                txn_info.transaction_info().position_state_checkpoint_hash(),
+            )
+            .await?;
+        let collateral = self
+            .write_native_chunks(
+                &backup_handle,
+                SnapshotKind::Collateral,
+                txn_info
+                    .transaction_info()
+                    .collateral_state_checkpoint_hash(),
+            )
+            .await?;
 
-        self.write_manifest(&backup_handle, proof_bytes, txn_info, chunks, positions)
-            .await
+        self.write_manifest(
+            &backup_handle,
+            proof_bytes,
+            txn_info,
+            chunks,
+            positions,
+            collateral,
+        )
+        .await
+    }
+
+    /// Backs up a native store's tree when the snapshot's transaction info
+    /// commits its root.
+    async fn write_native_chunks(
+        &self,
+        backup_handle: &BackupHandleRef,
+        kind: SnapshotKind,
+        committed_root: Option<HashValue>,
+    ) -> Result<Option<NativeSnapshotBackup>> {
+        let Some(root_hash) = committed_root else {
+            return Ok(None);
+        };
+        Ok(Some(NativeSnapshotBackup {
+            root_hash,
+            chunks: self.write_chunks(backup_handle, kind).await?,
+        }))
     }
 
     async fn write_chunks(
@@ -272,7 +303,7 @@ impl StateSnapshotBackupController {
                 .await?,
         );
         let Some(chunker) = Chunker::new(record_stream, self.max_chunk_size).await? else {
-            ensure!(kind == SnapshotKind::Position, "State is empty.");
+            ensure!(kind != SnapshotKind::State, "State is empty.");
             return Ok(vec![]);
         };
 
@@ -419,6 +450,7 @@ impl StateSnapshotBackupController {
         match kind {
             SnapshotKind::State => "",
             SnapshotKind::Position => "position-",
+            SnapshotKind::Collateral => "collateral-",
         }
     }
 
@@ -509,7 +541,8 @@ impl StateSnapshotBackupController {
         proof_bytes: Vec<u8>,
         txn_info: TransactionInfoWithProof,
         chunks: Vec<StateSnapshotChunk>,
-        positions: Option<PositionSnapshotBackup>,
+        positions: Option<NativeSnapshotBackup>,
+        collateral: Option<NativeSnapshotBackup>,
     ) -> Result<FileHandle> {
         let (proof_handle, mut proof_file) = self
             .storage
@@ -525,6 +558,7 @@ impl StateSnapshotBackupController {
             chunks,
             proof: proof_handle,
             positions,
+            collateral,
         };
 
         let (manifest_handle, mut manifest_file) = self

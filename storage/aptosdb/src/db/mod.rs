@@ -224,6 +224,7 @@ impl AptosDB {
             Arc::clone(&self.state_store),
             Arc::clone(&self.ledger_db),
             self.position.clone(),
+            self.collateral.clone(),
         )
     }
 
