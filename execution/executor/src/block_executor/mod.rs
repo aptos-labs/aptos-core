@@ -257,7 +257,7 @@ where
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
                         Arc::clone(&self.db.reader),
-                        parent_output.result_state().latest().clone(),
+                        parent_output.result_state().last_checkpoint().clone(),
                     )?
                 };
 
@@ -604,7 +604,7 @@ where
         Ok(CachedStateView::new(
             StateViewId::BlockExecution { block_id },
             Arc::clone(&self.db.reader),
-            block.output.result_state().latest().clone(),
+            block.output.result_state().last_checkpoint().clone(),
         )?)
     }
 }
