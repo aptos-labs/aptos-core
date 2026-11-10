@@ -177,6 +177,7 @@ pub enum SnapshotKind {
 impl SnapshotKind {
     pub const HOT_STATE: Self = Self::HotState;
     pub const MAIN_STATE: Self = Self::State(StateKind::MainState);
+    pub const ORDER: Self = Self::State(StateKind::Order);
     pub const POSITION: Self = Self::State(StateKind::Position);
 
     /// Describes the snapshot in logs and errors.
@@ -184,6 +185,7 @@ impl SnapshotKind {
         match self {
             Self::MAIN_STATE => "state",
             Self::POSITION => "position state",
+            Self::ORDER => "order state",
             Self::HOT_STATE => "hot state",
         }
     }
@@ -192,7 +194,7 @@ impl SnapshotKind {
         match self {
             // Main state at a real snapshot is never empty
             Self::MAIN_STATE => false,
-            Self::POSITION | Self::HOT_STATE => true,
+            Self::POSITION | Self::ORDER | Self::HOT_STATE => true,
         }
     }
 
