@@ -2,6 +2,12 @@
 
 Recalibration history, newest first. Each entry lists the tests whose calibrated value drifted out of band, as a signed `inner tps % change` (negative means slower); new tests show `new`.
 
+## 2026-11-10
+
+| transaction_type | module_working_set | executor | runs | inner tps % change |
+| --- | --- | --- | --- | --- |
+| smart-table-picture30-k-with200-change | 1 | VM | 5 | -8.6% |
+
 ## 2026-11-04
 
 | transaction_type | module_working_set | executor | runs | inner tps % change |
