@@ -24,13 +24,14 @@ use crate::{
         DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
         VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
+    value_conv::bcs::deserialize_into,
 };
 use mono_move_core::{
     align_max, checked_align_max,
     native::{NativeABI, NativeExtensions},
     types::InternedType,
-    DescriptorId, DescriptorProvider, FrameOffset, Function, ObjectDescriptorInner, ReadPin,
-    RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
+    DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
+    ReadPin, RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
     FRAME_METADATA_SIZE, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
@@ -361,6 +362,45 @@ impl SegmentedArena {
         }
     }
 
+    /// Deserializes `blob`, the BCS encoding of a value of type `ty`, into one
+    /// segment. Returns the value and the segment to pin it by.
+    pub fn deserialize(
+        &self,
+        guard: &ExecutionGuard<'_>,
+        ty: InternedType,
+        blob: &[u8],
+    ) -> VMResult<(NonNull<u8>, Arc<SharedArena>)> {
+        let Some(layout) = guard.layout_by_ty(ty) else {
+            invariant_violation!(ValueLayoutNotFound);
+        };
+        let Some(descriptor) = guard.struct_descriptor(ty) else {
+            invariant_violation!(Unreachable(
+                "stored value's type has no GC descriptor".to_string()
+            ));
+        };
+        let total_size = OBJECT_HEADER_SIZE + layout.size as usize;
+
+        // The flat root and everything nested under it must land in one
+        // segment, so they are allocated together and retried together.
+        let Some((result, segment)) = self.alloc_in(|heap| {
+            let obj = heap.alloc_object(total_size, descriptor)?;
+            // SAFETY: `obj` is a freshly reserved object sized for the value's
+            // layout; `deserialize_into` writes the flat value there and puts
+            // the nested allocations in the same heap.
+            match unsafe { deserialize_into(guard, heap, ty, blob, obj.as_ptr()) } {
+                Ok(()) => Some(Ok(obj)),
+                // Only running out of room is worth a fresh segment.
+                Err(e) if is_out_of_heap_memory(&e) => None,
+                Err(e) => Some(Err(e)),
+            }
+        }) else {
+            invariant_violation!(Unreachable(
+                "stored value does not fit in an arena segment".to_string()
+            ));
+        };
+        Ok((result?, segment))
+    }
+
     /// Runs `alloc` in the current segment, or in a fresh one when the current
     /// segment has too little room left. Returns what `alloc` produced together
     /// with the segment to pin it by, or [`None`] if the value does not fit even
@@ -375,14 +415,11 @@ impl SegmentedArena {
     /// before, or two Block-STM schedules could disagree on whether the same
     /// value can be read. Hence the retry starts from an empty segment of a
     /// fixed size.
-    pub fn alloc_in<T>(
-        &self,
-        alloc: impl Fn(&Arc<SharedArena>) -> Option<T>,
-    ) -> Option<(T, Arc<SharedArena>)> {
+    fn alloc_in<T>(&self, alloc: impl Fn(&mut Heap) -> Option<T>) -> Option<(T, Arc<SharedArena>)> {
         let mut segments = self.segments.borrow_mut();
 
         if let Some(current) = segments.last().cloned() {
-            if let Some(value) = alloc(&current) {
+            if let Some(value) = current.with_heap_mut(&alloc) {
                 return Some((value, current));
             }
         }
@@ -393,7 +430,7 @@ impl SegmentedArena {
         // TODO(completeness): ensure MonoMove limits any allocation size to
         // some fixed constant.
         let fresh = new_segment(SEGMENT_BYTES);
-        let value = alloc(&fresh)?;
+        let value = fresh.with_heap_mut(&alloc)?;
         segments.push(fresh.clone());
         Some((value, fresh))
     }
@@ -403,6 +440,15 @@ impl Default for SegmentedArena {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Whether the error is the heap running out of room, which a fresh segment
+/// can fix.
+fn is_out_of_heap_memory(e: &VMInternalError) -> bool {
+    matches!(
+        e.downcast_ref::<RuntimeError>(),
+        Some(RuntimeError::OutOfHeapMemory { .. })
+    )
 }
 
 fn new_segment(size: usize) -> Arc<SharedArena> {
@@ -1593,15 +1639,13 @@ mod segmented_arena_tests {
 
     const PAYLOAD: usize = SEGMENT_BYTES / 2;
 
-    fn alloc_in_segment(segment: &SharedArena, payload: usize) -> Option<NonNull<u8>> {
-        segment.with_heap_mut(|heap: &mut Heap| {
-            heap.alloc_object(OBJECT_HEADER_SIZE + payload, DescriptorId(0))
-        })
+    fn alloc_in_heap(heap: &mut Heap, payload: usize) -> Option<NonNull<u8>> {
+        heap.alloc_object(OBJECT_HEADER_SIZE + payload, DescriptorId(0))
     }
 
     fn alloc(arena: &SegmentedArena, payload: usize) -> Option<NonNull<u8>> {
         arena
-            .alloc_in(|segment| alloc_in_segment(segment, payload))
+            .alloc_in(|heap| alloc_in_heap(heap, payload))
             .map(|(ptr, _)| ptr)
     }
 
@@ -1611,7 +1655,10 @@ mod segmented_arena_tests {
         // existence before filling it.
         alloc(arena, PAYLOAD).expect("A fresh arena serves the first allocation");
         let segment = arena.segments.borrow().last().unwrap().clone();
-        while alloc_in_segment(&segment, PAYLOAD).is_some() {}
+        while segment
+            .with_heap_mut(|heap| alloc_in_heap(heap, PAYLOAD))
+            .is_some()
+        {}
     }
 
     #[test]

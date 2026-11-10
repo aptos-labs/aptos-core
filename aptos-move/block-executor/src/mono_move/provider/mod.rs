@@ -21,55 +21,14 @@ use bytes::Bytes;
 use mono_move_core::{
     storage::resource_provider::{ResourceProviderError, StorageRead, Version},
     types::InternedType,
-    LayoutProvider, VMInternalError, OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{deserialize_into, Heap, RuntimeError, SegmentedArena, SharedArena};
+use mono_move_runtime::SegmentedArena;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 pub(crate) use parallel::BlockSTMParallelProvider;
 pub(crate) use sequential::BlockSTMSequentialProvider;
 use serde::Serialize;
-use std::{cell::Cell, fmt::Debug, hash::Hash, ptr::NonNull, sync::Arc};
-
-/// Converts BCS bytes into MonoMove's memory representation, storing the result
-/// in `arena`. Returns the value and the allocation to pin it by.
-pub(crate) fn deserialize_into_arena(
-    guard: &ExecutionGuard<'_>,
-    arena: &SegmentedArena,
-    ty: InternedType,
-    blob: &[u8],
-) -> Result<(NonNull<u8>, Arc<SharedArena>), ResourceProviderError> {
-    let layout = guard
-        .layout_by_ty(ty)
-        .ok_or_else(|| invariant_violation("No layout found when deserializing base value"))?;
-    let descriptor = guard.struct_descriptor(ty).ok_or_else(|| {
-        invariant_violation("No GC descriptor found when deserializing base value")
-    })?;
-    let total_size = OBJECT_HEADER_SIZE + layout.size as usize;
-
-    // The flat root and everything nested under it must land in one segment, so
-    // they are allocated together and retried together.
-    let (result, segment) = arena
-        .alloc_in(|segment| {
-            segment.with_heap_mut(|heap: &mut Heap| {
-                let obj = heap.alloc_object(total_size, descriptor)?;
-                // SAFETY: `obj` is a freshly reserved object sized for the
-                // value's layout; `deserialize_into` writes the flat value
-                // there and puts the nested allocations in the same heap.
-                match unsafe { deserialize_into(guard, heap, ty, blob, obj.as_ptr()) } {
-                    Ok(()) => Some(Ok(obj)),
-                    // Only running out of room is worth a larger segment.
-                    Err(e) if is_out_of_heap_memory(&e) => None,
-                    Err(e) => Some(Err(e)),
-                }
-            })
-        })
-        .ok_or_else(|| invariant_violation("Storage value does not fit in an arena segment"))?;
-
-    let obj = result
-        .map_err(|e| invariant_violation(format!("Storage value failed to deserialize: {e}")))?;
-    Ok((obj, segment))
-}
+use std::{cell::Cell, fmt::Debug, hash::Hash};
 
 /// Materializes a stored blob into the in-memory value for a slot of type `ty`.
 pub(crate) fn materialized_value(
@@ -78,7 +37,9 @@ pub(crate) fn materialized_value(
     ty: InternedType,
     blob: &[u8],
 ) -> Result<MonoValue, ResourceProviderError> {
-    let (ptr, pin) = deserialize_into_arena(guard, arena, ty, blob)?;
+    let (ptr, pin) = arena
+        .deserialize(guard, ty, blob)
+        .map_err(|e| invariant_violation(format!("Storage value failed to deserialize: {e}")))?;
     Ok(MonoValue::Write {
         ptr,
         ty,
@@ -113,14 +74,6 @@ pub(crate) fn storage_read(
             return Err(invariant_violation("Group metadata served as a read"))
         },
     })
-}
-
-/// Whether the value ran out of room, which a larger segment can fix.
-fn is_out_of_heap_memory(e: &VMInternalError) -> bool {
-    matches!(
-        e.downcast_ref::<RuntimeError>(),
-        Some(RuntimeError::OutOfHeapMemory { .. })
-    )
 }
 
 pub(crate) fn invariant_violation(msg: impl ToString) -> ResourceProviderError {
