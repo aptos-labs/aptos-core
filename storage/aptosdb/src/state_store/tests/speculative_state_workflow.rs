@@ -1013,13 +1013,21 @@ proptest! {
 
         let (all_txns, state_by_version) = naive_run_blocks(blocks);
 
+        // Chunks of whole blocks, each extended from `NUM_KEYS / 2` txns to the next block end.
         let mut chunks = vec![];
         let mut next_version = 0;
-        for chunk in &all_txns.into_iter().chunks(NUM_KEYS / 2) {
-            let chunk: Vec<Txn> = chunk.collect();
-            let first_version = next_version;
-            next_version += chunk.len() as Version;
-            chunks.push(Chunk::from_txns(chunk, first_version));
+        let mut chunk = vec![];
+        for txn in all_txns {
+            let is_checkpoint = txn.is_checkpoint;
+            chunk.push(txn);
+            if is_checkpoint && chunk.len() >= NUM_KEYS / 2 {
+                let first_version = next_version;
+                next_version += chunk.len() as Version;
+                chunks.push(Chunk::from_txns(std::mem::take(&mut chunk), first_version));
+            }
+        }
+        if !chunk.is_empty() {
+            chunks.push(Chunk::from_txns(chunk, next_version));
         }
 
         replay_chunks_pipelined(chunks, Arc::new(state_by_version));

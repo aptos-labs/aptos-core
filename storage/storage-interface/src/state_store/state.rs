@@ -1312,22 +1312,18 @@ mod tests {
             creations(&keys[32..]),
         ];
 
-        // All in one batch, like replaying write sets on restart.
-        let (one_batch, _) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 2]);
-        // Split between the change and the next checkpoint.
-        let (first, _) = apply_write_sets(&empty, &empty, &write_sets[..2], vec![0]);
-        let (two_batches, _) = apply_write_sets(&empty, &first, &write_sets[2..], vec![0]);
+        // Blocks [v0], [v1, v2] and [v3]. All in one batch, like replaying write sets on restart.
+        let (one_batch, _) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 2, 3]);
+        // Split right before the change.
+        let (first, _) = apply_write_sets(&empty, &empty, &write_sets[..1], vec![0]);
+        let (two_batches, _) = apply_write_sets(&empty, &first, &write_sets[1..], vec![1, 2]);
 
-        for (a, b) in [
-            (one_batch.last_checkpoint(), two_batches.last_checkpoint()),
-            (one_batch.latest(), two_batches.latest()),
-        ] {
-            assert_eq!(a.hot_state_config, b.hot_state_config);
-            for shard_id in 0..NUM_STATE_SHARDS {
-                assert_eq!(a.num_hot_items(shard_id), b.num_hot_items(shard_id));
-                assert_eq!(a.latest_hot_key(shard_id), b.latest_hot_key(shard_id));
-                assert_eq!(a.oldest_hot_key(shard_id), b.oldest_hot_key(shard_id));
-            }
+        let (a, b) = (one_batch.last_checkpoint(), two_batches.last_checkpoint());
+        assert_eq!(a.hot_state_config, b.hot_state_config);
+        for shard_id in 0..NUM_STATE_SHARDS {
+            assert_eq!(a.num_hot_items(shard_id), b.num_hot_items(shard_id));
+            assert_eq!(a.latest_hot_key(shard_id), b.latest_hot_key(shard_id));
+            assert_eq!(a.oldest_hot_key(shard_id), b.oldest_hot_key(shard_id));
         }
         // The shrink did happen.
         assert!((0..NUM_STATE_SHARDS).all(|i| one_batch.last_checkpoint().num_hot_items(i) <= 2));

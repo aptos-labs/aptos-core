@@ -432,6 +432,13 @@ impl Parser {
                 transaction_outputs,
                 persisted_auxiliary_infos,
             );
+            // Only whole blocks are committed.
+            ensure!(
+                to_commit.ends_at_block_end(),
+                "{} txns to commit from version {} end in the middle of a block.",
+                to_commit.len(),
+                first_version,
+            );
             TransactionsToKeep::index(first_version, to_commit, is_block)
         };
         let next_epoch_state = {
