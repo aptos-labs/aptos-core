@@ -273,14 +273,8 @@ impl Heap {
         total_size: usize,
         descriptor_id: DescriptorId,
     ) -> VMResult<NonNull<u8>> {
-        let ptr = heap_alloc(self, total_size, descriptor_id)
-            .map_err(|e| VMInternalError::new(e.into_runtime_error()))?;
-        let Some(ptr) = NonNull::new(ptr) else {
-            invariant_violation!(Unreachable(
-                "heap_alloc returned a null pointer".to_string()
-            ));
-        };
-        Ok(ptr)
+        heap_alloc(self, total_size, descriptor_id)
+            .map_err(|e| VMInternalError::new(e.into_runtime_error()))
     }
 }
 
@@ -480,13 +474,15 @@ pub(crate) fn alloc_or_gc(
     extensions: &NativeExtensions,
     fp: *mut u8,
     top_frame: TopFrame<'_>,
-    try_alloc: impl Fn(&mut Heap) -> AllocationResult<*mut u8>,
+    try_alloc: impl Fn(&mut Heap) -> AllocationResult<NonNull<u8>>,
 ) -> VMResult<*mut u8> {
     match try_alloc(heap) {
-        Ok(ptr) => Ok(ptr),
+        Ok(ptr) => Ok(ptr.as_ptr()),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
             gc_collect(heap, guard, rws, extra_roots, extensions, fp, top_frame)?;
-            try_alloc(heap).map_err(|e| VMInternalError::new(e.into_runtime_error()))
+            try_alloc(heap)
+                .map(NonNull::as_ptr)
+                .map_err(|e| VMInternalError::new(e.into_runtime_error()))
         },
         Err(e) => Err(VMInternalError::new(e.into_runtime_error())),
     }
@@ -696,7 +692,7 @@ pub(crate) fn heap_alloc(
     heap: &mut Heap,
     total_size: usize,
     descriptor_id: DescriptorId,
-) -> AllocationResult<*mut u8> {
+) -> AllocationResult<NonNull<u8>> {
     // Round up to MAX_ALIGN with overflow protection; the
     // `MAX_SINGLE_ALLOCATION_SIZE` check below then applies to the
     // *aligned* size so the rounding can't smuggle an oversize allocation
@@ -741,7 +737,9 @@ pub(crate) fn heap_alloc(
         std::ptr::write_bytes(header_start, 0, aligned_size);
         let obj_ptr = header_start.add(OBJECT_HEADER_SIZE);
         write_object_header(obj_ptr, descriptor_id, aligned_size as u32);
-        Ok(obj_ptr)
+        // SAFETY: `obj_ptr` lies inside the heap's buffer, a live allocation,
+        // so it is not null.
+        Ok(NonNull::new_unchecked(obj_ptr))
     }
 }
 
@@ -821,7 +819,7 @@ pub(crate) fn alloc_vec_no_gc(
     elem_size: u32,
     len: u64,
 ) -> AllocationResult<*mut u8> {
-    let vec_ptr = heap_alloc(heap, vec_alloc_size(len, elem_size)?, descriptor_id)?;
+    let vec_ptr = heap_alloc(heap, vec_alloc_size(len, elem_size)?, descriptor_id)?.as_ptr();
     // SAFETY: the allocation stores the vector length at this offset.
     unsafe { write_u64(vec_ptr, VEC_LENGTH_OFFSET, len) };
     Ok(vec_ptr)
@@ -839,7 +837,8 @@ pub(crate) fn alloc_enum_no_gc(
         heap,
         OBJECT_HEADER_SIZE + max_size_across_variants,
         descriptor_id,
-    )?;
+    )?
+    .as_ptr();
     // SAFETY: the allocation has enough size to write the tag.
     unsafe { write_enum_tag(obj_ptr, tag) };
     Ok(obj_ptr)
