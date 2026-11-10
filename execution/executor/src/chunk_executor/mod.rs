@@ -937,6 +937,8 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .map(|persisted_aux_info| AuxiliaryInfo::new(*persisted_aux_info, None))
             .collect::<Vec<_>>();
         let onchain_config = chunk_onchain_config(&state_view)?;
+        // TODO: In lazy-quit mode, a divergence that leaves the last block without its checkpoint
+        // fails here, instead of being logged and skipped like a mismatch below.
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             txns.into(),
