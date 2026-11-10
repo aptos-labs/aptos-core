@@ -12,7 +12,9 @@ use crate::mono_move::{
 use anyhow::{anyhow, Result};
 use aptos_mvhashmap::{types::UnsyncGroupError, unsync_map::UnsyncMap};
 use aptos_types::state_store::{state_key::StateKey, TStateView};
-use mono_move_aptos_transaction_executor::{decode_group_members, AptosDataProvider, GroupMembers};
+use mono_move_aptos_transaction_executor::{
+    check_group_key, decode_group_members, AptosDataProvider, GroupMembers,
+};
 use mono_move_core::{
     nominal_tag,
     storage::resource_provider::{
@@ -199,6 +201,7 @@ impl<S: TStateView<Key = StateKey>> AptosDataProvider for BlockSTMSequentialProv
         &self,
         group_key: &InMemoryStorageKey,
     ) -> Result<Option<GroupMembers>, ResourceProviderError> {
+        check_group_key(group_key)?;
         self.fetch_resource_group(group_key)
             .map_err(|e| invariant_violation(format!("{e:#}")))
     }

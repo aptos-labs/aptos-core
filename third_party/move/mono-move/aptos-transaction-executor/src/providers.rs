@@ -28,6 +28,19 @@ pub trait AptosDataProvider: ResourceProvider {
     ) -> Result<Option<GroupMembers>, ResourceProviderError>;
 }
 
+/// Checks that `group_key` names a resource group's slot, as
+/// [`AptosDataProvider::group_members`] requires.
+pub fn check_group_key(group_key: &InMemoryStorageKey) -> Result<(), ResourceProviderError> {
+    match group_key {
+        InMemoryStorageKey::ResourceGroup { .. } => Ok(()),
+        InMemoryStorageKey::Resource { .. } | InMemoryStorageKey::TableItem { .. } => {
+            Err(ResourceProviderError::InvariantViolation(format!(
+                "{group_key:?} is not a resource group"
+            )))
+        },
+    }
+}
+
 /// The BCS bytes of the resource of interned type `ty` at `address`, read
 /// through `interp` so the read is recorded like one made by Move code.
 /// `None` if there is none. The types are interned once, in `FrameworkSymbols`.

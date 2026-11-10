@@ -348,6 +348,10 @@ const MAX_SEGMENT_BYTES: usize = 64 * 1024 * 1024;
 /// be held by another thread. That is sound only because [`ReadPin`] exposes no
 /// methods: a pin holder cannot reach the heap, and the arena's owner is the
 /// only one that ever allocates in it.
+//
+// TODO(security): nothing caps the arena's total size. Every segment stays
+// alive until the arena is dropped, so a block can grow it without bound by
+// reading many large pre-block values.
 pub struct SegmentedArena {
     segments: RefCell<Vec<Arc<SharedArena>>>,
 }
