@@ -497,7 +497,11 @@ impl Eq for StateKey {}
 
 impl Hash for StateKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        state.write(self.crypto_hash_ref().as_ref())
+        // The crypto hash is uniform, so 8 bytes suffice and hash much faster than 32. Take the
+        // tail since the leading nibble picks the shard.
+        let hash: &[u8; HashValue::LENGTH] = self.crypto_hash_ref();
+        let tail = &hash[HashValue::LENGTH - 8..];
+        state.write_u64(u64::from_le_bytes(tail.try_into().expect("8 bytes")))
     }
 }
 
