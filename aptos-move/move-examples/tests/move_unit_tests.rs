@@ -8,12 +8,16 @@ use aptos_types::{
     on_chain_config::{aptos_test_feature_flags_genesis, Features, TimedFeaturesBuilder},
 };
 use aptos_vm::natives;
-use mono_move_testsuite::unit_test;
+use mono_move_unit_test_backend::MonoMoveBackendFactory;
 use move_model::model::GlobalEnv;
 use move_package::{source_package::std_lib::StdVersion, BuildConfig, CompilerConfig};
 use move_unit_test::{
-    package_test::{run_move_unit_tests, UnitTestResult},
-    test_validation, UnitTestingConfig,
+    backend::Backends,
+    package_test::{run_move_unit_tests_with_backend, UnitTestResult},
+    test_reporter::UnitTestFactoryWithCostTable,
+    test_validation,
+    v1_backend::V1BackendFactory,
+    UnitTestingConfig,
 };
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use std::{collections::BTreeMap, path::PathBuf};
@@ -50,44 +54,43 @@ fn build_config(named_addr: BTreeMap<String, AccountAddress>) -> BuildConfig {
     }
 }
 
-/// Runs a package's unit tests on the V1 VM and then on MonoMove, from the
-/// same build configuration so that both see identical bytecode.
-///
-/// A test MonoMove cannot run yet is reported as unsupported and does not fail
-/// the run; only a test it runs and gets wrong is a failure.
+/// Runs a package's unit tests on the V1 VM and MonoMove. A test fails if V1
+/// fails it or the two VMs' outcomes differ. Tests MonoMove cannot run yet, or
+/// whose runs cannot be compared, do not fail the run.
 pub fn run_tests_for_pkg(
     path_to_pkg: impl Into<String>,
     named_addr: BTreeMap<String, AccountAddress>,
 ) {
-    let pkg_path = path_in_crate(path_to_pkg);
-    let config = build_config(named_addr);
-
-    let ok = run_move_unit_tests(
-        &pkg_path,
-        config.clone(),
-        UnitTestingConfig::default(),
+    let v1 = V1BackendFactory::new(
         // TODO(Gas): we may want to switch to non-zero costs in the future
-        aptos_test_natives(),
+        Some(aptos_test_natives()),
+        /* enable_enum_option */ true,
+        UnitTestFactoryWithCostTable::new(
+            /* cost_table */ None,
+            /* gas_limit */ Some(100_000),
+        ),
+    );
+    let mono = MonoMoveBackendFactory::new(u64::MAX);
+    let result = run_move_unit_tests_with_backend(
+        &path_in_crate(path_to_pkg),
+        build_config(named_addr),
+        UnitTestingConfig {
+            allow_inconclusive: true,
+            ..UnitTestingConfig::default()
+        },
+        Backends::Differential {
+            reference: &v1,
+            candidate: &mono,
+        },
         aptos_test_feature_flags_genesis(),
-        /* gas limit */ Some(100_000),
-        /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
-        true,
     );
-    if ok.is_err() || ok.is_ok_and(|r| r == UnitTestResult::Failure) {
-        panic!("move unit tests failed")
+    match result {
+        Ok(UnitTestResult::Success) => {},
+        Ok(UnitTestResult::Failure) => panic!("move unit tests failed"),
+        Err(err) => panic!("move unit tests failed: {err:#}"),
     }
-
-    let summary = unit_test::run_package_unit_tests(&pkg_path, config)
-        .unwrap_or_else(|err| panic!("failed to run MonoMove unit tests: {err}"));
-    println!("{}", summary.render());
-    assert!(
-        summary.failed.is_empty(),
-        "{} test(s) MonoMove ran but got wrong:\n{}",
-        summary.failed.len(),
-        summary.failed.join("\n"),
-    );
 }
 
 pub fn aptos_test_natives() -> NativeFunctionTable {

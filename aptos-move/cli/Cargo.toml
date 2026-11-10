@@ -19,7 +19,7 @@ required-features = ["binary"]
 [features]
 default = []
 binary = ["testing"]
-testing = ["aptos-vm/testing"]
+testing = ["aptos-vm/testing", "mono-move-unit-test-backend/testing"]
 
 [dependencies]
 ahash = { workspace = true }
@@ -53,6 +53,7 @@ futures = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 legacy-move-compiler = { workspace = true }
+mono-move-unit-test-backend = { workspace = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-source-map = { workspace = true }
