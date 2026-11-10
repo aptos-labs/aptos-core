@@ -1,4 +1,4 @@
-# TrX: Artifact for CCS 2026
+# TrX: Artifact for S&P 2027
 
 This is the artifact for the paper "TrX: Encrypted Mempools in High
 Performance BFT Protocols." It is a fork of the open-source blockchain
