@@ -21,8 +21,8 @@ use crate::{
         write_u64, MemoryRegion,
     },
     types::{
-        FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET,
-        VEC_LENGTH_OFFSET,
+        DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
+        VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
 use mono_move_core::{
@@ -203,7 +203,7 @@ pub(crate) mod macros {
 /// Set to the largest buffer the runtime ever creates, so it rejects only
 /// sizes no heap could ever serve. Each allocation is still bounded by its own
 /// heap's buffer, which for a session heap is `DEFAULT_HEAP_SIZE`.
-const MAX_SINGLE_ALLOCATION_SIZE: usize = MAX_SEGMENT_BYTES;
+const MAX_SINGLE_ALLOCATION_SIZE: usize = 64 * 1024 * 1024;
 
 /// Heap state for a single interpreter context.
 pub struct Heap {
@@ -328,14 +328,10 @@ impl SharedArena {
 
 impl ReadPin for SharedArena {}
 
-/// Size of one [`SegmentedArena`] segment. Small enough that an owner touching
-/// few values does not reserve much, large enough that most blocks fit in one
-/// or two segments.
-const SEGMENT_BYTES: usize = 4 * 1024 * 1024;
-
-/// Ceiling on a single segment. A value that needs more than this could not be
-/// used by the interpreter either, whose per-transaction heap is far smaller.
-const MAX_SEGMENT_BYTES: usize = 64 * 1024 * 1024;
+/// Size of one [`SegmentedArena`] segment, and so the largest value it can
+/// hold. Equal to a session heap's capacity: anything a transaction can hold in
+/// its heap, and so write, fits in a fresh segment and can be read back.
+const SEGMENT_BYTES: usize = DEFAULT_HEAP_SIZE;
 
 /// An append-only arena that grows by adding [`SharedArena`] segments.
 ///
@@ -365,19 +361,20 @@ impl SegmentedArena {
         }
     }
 
-    /// Runs `alloc` against a segment until it succeeds, growing the arena when
-    /// the current segment has too little room left. Returns what `alloc`
-    /// produced together with the segment to pin it by.
+    /// Runs `alloc` in the current segment, or in a fresh one when the current
+    /// segment has too little room left. Returns what `alloc` produced together
+    /// with the segment to pin it by, or [`None`] if the value does not fit even
+    /// in a fresh segment.
     ///
     /// `alloc` returns [`None`] only when it ran out of room; anything it must
-    /// not be retried for belongs in `T`. It may run several times, and
-    /// whatever it allocated in a segment it then failed in is left behind as
-    /// unreachable slack.
+    /// not be retried for belongs in `T`. It may run twice, and whatever it
+    /// allocated in a segment it then failed in is left behind as unreachable
+    /// slack.
     ///
     /// Whether this succeeds must not depend on how much the owner allocated
     /// before, or two Block-STM schedules could disagree on whether the same
-    /// value can be read. Hence every retry starts from an empty segment whose
-    /// size depends only on the attempt number.
+    /// value can be read. Hence the retry starts from an empty segment of a
+    /// fixed size.
     pub fn alloc_in<T>(
         &self,
         alloc: impl Fn(&Arc<SharedArena>) -> Option<T>,
@@ -391,25 +388,14 @@ impl SegmentedArena {
         }
 
         // Too little room left, or no segment yet: retire the current one and
-        // grow.
+        // grow. A value that does not fit in a fresh segment is rejected.
+        //
+        // TODO(completeness): ensure MonoMove limits any allocation size to
+        // some fixed constant.
         let fresh = new_segment(SEGMENT_BYTES);
-        if let Some(value) = alloc(&fresh) {
-            segments.push(fresh.clone());
-            return Some((value, fresh));
-        }
-
-        // The value outgrows a whole segment, so give it one of its own. Such a
-        // segment never becomes the allocation target; only the pin returned
-        // here keeps it alive.
-        let mut size = SEGMENT_BYTES;
-        while size < MAX_SEGMENT_BYTES {
-            size = size.saturating_mul(2).min(MAX_SEGMENT_BYTES);
-            let private = new_segment(size);
-            if let Some(value) = alloc(&private) {
-                return Some((value, private));
-            }
-        }
-        None
+        let value = alloc(&fresh)?;
+        segments.push(fresh.clone());
+        Some((value, fresh))
     }
 }
 
@@ -1655,17 +1641,10 @@ mod segmented_arena_tests {
     }
 
     #[test]
-    fn oversized_value_gets_a_private_segment() {
+    fn value_larger_than_a_segment_is_rejected() {
         let arena = SegmentedArena::new();
         alloc(&arena, PAYLOAD).expect("A fresh arena serves the first allocation");
-        // Bigger than a whole segment, so only the doubling ladder can serve it.
-        let (_, segment) = arena
-            .alloc_in(|segment| alloc_in_segment(segment, SEGMENT_BYTES + 1))
-            .expect("A value just over a segment still fits under the cap");
-        assert!(!Arc::ptr_eq(
-            &segment,
-            arena.segments.borrow().last().unwrap()
-        ));
+        assert!(alloc(&arena, SEGMENT_BYTES + 1).is_none());
         assert_eq!(arena.segments.borrow().len(), 1);
     }
 }
