@@ -40,12 +40,16 @@ module 0x42::table_closure_value {
     fun positive(y: u64): bool { y > 0 }
     #[persistent]
     fun large(y: u64): bool { y > 1 }
+    // The lambdas below invoke a function value their invoker supplies, so their footprint
+    // is not known where they are built; the parameters declare the frame that admits them.
     fun apply_copy(f: |u64, (|u64| bool has copy + drop)| bool has drop, x: u64): bool {
         f(x, positive)
     }
+    spec apply_copy { modifies_of<f> *; }
     fun apply_store(f: |u64, (|u64| bool has copy + drop + store)| bool has drop, x: u64): bool {
         f(x, large)
     }
+    spec apply_store { modifies_of<f> *; }
     fun apply_both(x: u64): bool {
         apply_copy(|a, g| g(a), x) && apply_store(|a, g| g(a), x)
     }

@@ -1,0 +1,31 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:12:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a mutation ends
+tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:59:16: error: the assertion `global<S>(@0x42).v == v0` does not hold
+tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:52:5: error: verex verification failed: the automatic verification of `packed_captured` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_packed.proof.lean`:
+  verify packed_captured by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:12:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a mutation ends
+tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:68:16: error: the assertion `global<S>(@0x42).v == v0` does not hold
+tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:62:5: error: verex verification failed: the automatic verification of `packed_twice` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_packed.proof.lean`:
+  verify packed_twice by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:12:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a mutation ends
+tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:77:16: error: the assertion `global<S>(@0x42).v == v0` does not hold
+tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:71:5: error: verex verification failed: the automatic verification of `packed_variant` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_packed.proof.lean`:
+  verify packed_variant by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

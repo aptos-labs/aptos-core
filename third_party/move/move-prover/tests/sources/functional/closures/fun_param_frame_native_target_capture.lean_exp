@@ -1,0 +1,18 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_native_target_capture.move:52:16: error: the assertion `global<S>(@0x42).v == v0` does not hold
+tests/sources/functional/closures/fun_param_frame_native_target_capture.move:48:5: error: verex verification failed: the automatic verification of `spec_declared` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_native_target_capture.proof.lean`:
+  verify spec_declared by lean =>
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_native_target_capture.move:62:5: error: `bare_declared` calls the native `run_bare`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/closures/fun_param_frame_native_target_capture.move:73:16: error: the assertion `global<S>(@0x42).v == v0` does not hold
+tests/sources/functional/closures/fun_param_frame_native_target_capture.move:69:5: error: verex verification failed: the automatic verification of `opaque_declared` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_native_target_capture.proof.lean`:
+  verify opaque_declared by lean =>
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

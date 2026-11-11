@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_transparent_ok.move:1:1: error: VIR-SEMANTIC-TYPE: in fun pure_through_local: function argument types differ from the callee signature at [3257, 3266)

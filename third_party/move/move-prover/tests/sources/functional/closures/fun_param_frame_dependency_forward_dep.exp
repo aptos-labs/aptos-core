@@ -1,0 +1,12 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function argument may modify resource `frame_dep_fwd::R`, which is not declared in `modifies_of` for `g`
+   ┌─ tests/sources/functional/closures/fun_param_frame_dependency_forward_dep.move:16:39
+   │
+16 │     public fun wrapper(x: u64): u64 { frame_fwd_hof::fwd(native_writer); x }
+   │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `frame_dep_fwd::R`, which is not declared in `modifies_of` for `g`
+   ┌─ tests/sources/functional/closures/fun_param_frame_dependency_forward_dep.move:18:43
+   │
+18 │     public fun wrapper_cap(x: u64): u64 { frame_fwd_hof::fwd_cap(native_writer); x }
+   │                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

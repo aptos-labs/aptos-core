@@ -5,8 +5,8 @@ warning: Unused value of parameter `g`. Consider removing the parameter, or pref
 20 │         apply(|x| g(x) spec { aborts_if false with result_of<g>(x); }, a)
    │                                                              ^
 
-error: cannot establish what function argument `f` may modify: the closure's target invokes a function value whose effects no `modifies_of` declaration bounds
-   ┌─ tests/sources/functional/closures/lambda_funparam_aux_exp_memory_err.move:20:9
+error: captured function value `g` may modify resource `launder_aux::Counter`, which is not declared in `modifies_of` for `g` of `launder_aux::__lambda__1__outer`
+   ┌─ tests/sources/functional/closures/lambda_funparam_aux_exp_memory_err.move:20:15
    │
 20 │         apply(|x| g(x) spec { aborts_if false with result_of<g>(x); }, a)
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

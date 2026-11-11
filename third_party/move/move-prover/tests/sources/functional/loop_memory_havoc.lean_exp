@@ -387,7 +387,45 @@ tests/sources/functional/loop_memory_havoc.move:316:5: error: verex verification
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/loop_memory_havoc.move:357:5: error: verification failed with a residual obligation:
+tests/sources/functional/loop_memory_havoc.move:339:5: error: a loop invariant at an iteration is not established
+tests/sources/functional/loop_memory_havoc.move:343:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:339:5: error: verex verification failed: the automatic verification of `fv_wild_forward_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify fv_wild_forward_fails by lean =>
+    verex_obligations
+    verex_on
+    | invariant_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:364:9: error: the precondition `requires exists<R>(a)` of `rec_bump` does not hold at call 1
+tests/sources/functional/loop_memory_havoc.move:365:9: error: the specification clause `ensures global<R>(a).x == old(global<R>(a).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:362:5: error: verex verification failed: the automatic verification of `rec_bump` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify rec_bump by lean =>
+    verex_obligations
+    verex_on
+    | requires_1_of_rec_bump_at_call_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:380:5: error: the data invariant of a value written to memory is not established
+tests/sources/functional/loop_memory_havoc.move:382:9: error: the specification clause `ensures global<G<T> >(a).v == old(global<G<T> >(a).v)` is not established
+tests/sources/functional/loop_memory_havoc.move:380:5: error: verex verification failed: the automatic verification of `gen_bump` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify gen_bump by lean =>
+    verex_obligations
+    verex_on
+    | stored_invariant => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:419:9: error: the specification clause `ensures result == 7` is not established
+tests/sources/functional/loop_memory_havoc.move:416:5: error: verex verification failed: the automatic verification of `untouched_memory_framed` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify untouched_memory_framed by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:485:5: error: verification failed with a residual obligation:
 case step.some.left
 executable✝ : VerexIR.Validation.ExecutableUnit unit
 nativesTyped : VerexIR.NativesTyped executable✝
@@ -409,7 +447,7 @@ a : VerexIR.Proofs.Denote.NTy.address.carrier
 n : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 assumed : True
 this✝ :
-  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 22 } } (a, n, ())
+  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 29 } } (a, n, ())
     initialState✝
 permitted :
   (initialState✝
@@ -521,7 +559,7 @@ right✝ : val✝.val ≤ 18446744073709551615
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
-            ((VerexIR.Proofs.Denote.opAt 244649
+            ((VerexIR.Proofs.Denote.opAt 469964
                   (VerexIR.Proofs.Denote.CheckedOp.add.run
                     (VerexIR.ThrowKind.profile { profile := VerexIR.Profile.move, tag := "runtime.arithmetic_error" })
                     val✝ { val := 1, fits := ⋯ })).bind
@@ -536,10 +574,10 @@ right✝ : val✝.val ≤ 18446744073709551615
           VerexIR.Proofs.Denote.Term.denoteIn
             {
                 call :=
-                  VerexIR.Proofs.Denote.routeMeaning { namespaceId := { index := 0 }, functionId := { index := 18 } }
+                  VerexIR.Proofs.Denote.routeMeaning { namespaceId := { index := 0 }, functionId := { index := 25 } }
                     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address VerexIR.Proofs.Denote.NRow.nil)
                     VerexIR.Proofs.Denote.ResultShape.none self_tick_at
-                    (VerexIR.Proofs.Denote.routeMeaning { namespaceId := { index := 0 }, functionId := { index := 21 } }
+                    (VerexIR.Proofs.Denote.routeMeaning { namespaceId := { index := 0 }, functionId := { index := 28 } }
                       (VerexIR.Proofs.Denote.NRow.cons
                         (VerexIR.Proofs.Denote.NTy.function
                           (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
@@ -554,7 +592,7 @@ right✝ : val✝.val ≤ 18446744073709551615
                           { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil))
                       self_make_curry
                       (VerexIR.Proofs.Denote.routeMeaning
-                        { namespaceId := { index := 0 }, functionId := { index := 20 } }
+                        { namespaceId := { index := 0 }, functionId := { index := 27 } }
                         (VerexIR.Proofs.Denote.NRow.cons
                           (VerexIR.Proofs.Denote.NTy.function
                             (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
@@ -565,7 +603,7 @@ right✝ : val✝.val ≤ 18446744073709551615
                               VerexIR.Proofs.Denote.NRow.nil)))
                         VerexIR.Proofs.Denote.ResultShape.none self_curry_wrap
                         (VerexIR.Proofs.Denote.routeMeaning
-                          { namespaceId := { index := 0 }, functionId := { index := 19 } }
+                          { namespaceId := { index := 0 }, functionId := { index := 26 } }
                           (VerexIR.Proofs.Denote.NRow.cons
                             (VerexIR.Proofs.Denote.NTy.function
                               (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
@@ -584,8 +622,8 @@ right✝ : val✝.val ≤ 18446744073709551615
           self_curry_helper initialState✝ a verexContinuation✝² recursive✝)
         (fun error => True) state)
     (fun error => True) state✝
-tests/sources/functional/loop_memory_havoc.move:359:9: error: the specification clause `ensures global<Counter>(a).x == old(global<Counter>(a).x)` is not established
-tests/sources/functional/loop_memory_havoc.move:357:5: error: verex verification failed: the automatic verification of `fv_curry_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+tests/sources/functional/loop_memory_havoc.move:487:9: error: the specification clause `ensures global<Counter>(a).x == old(global<Counter>(a).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:485:5: error: verex verification failed: the automatic verification of `fv_curry_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
   verify fv_curry_fails by lean =>
     verex_obligations
     verex_on
@@ -593,51 +631,13 @@ tests/sources/functional/loop_memory_havoc.move:357:5: error: verex verification
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/loop_memory_havoc.move:379:5: error: a loop invariant at an iteration is not established
-tests/sources/functional/loop_memory_havoc.move:383:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
-tests/sources/functional/loop_memory_havoc.move:379:5: error: verex verification failed: the automatic verification of `fv_wild_forward_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify fv_wild_forward_fails by lean =>
-    verex_obligations
-    verex_on
-    | invariant_step => verex_prepare; sorry
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/loop_memory_havoc.move:404:5: error: a loop invariant at an iteration is not established
-tests/sources/functional/loop_memory_havoc.move:407:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
-tests/sources/functional/loop_memory_havoc.move:404:5: error: verex verification failed: the automatic verification of `fv_forward_depth2_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+tests/sources/functional/loop_memory_havoc.move:510:5: error: a loop invariant at an iteration is not established
+tests/sources/functional/loop_memory_havoc.move:513:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:510:5: error: verex verification failed: the automatic verification of `fv_forward_depth2_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
   verify fv_forward_depth2_fails by lean =>
     verex_obligations
     verex_on
     | invariant_step => verex_prepare; sorry
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/loop_memory_havoc.move:428:9: error: the precondition `requires exists<R>(a)` of `rec_bump` does not hold at call 1
-tests/sources/functional/loop_memory_havoc.move:429:9: error: the specification clause `ensures global<R>(a).x == old(global<R>(a).x)` is not established
-tests/sources/functional/loop_memory_havoc.move:426:5: error: verex verification failed: the automatic verification of `rec_bump` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify rec_bump by lean =>
-    verex_obligations
-    verex_on
-    | requires_1_of_rec_bump_at_call_1 => verex_prepare; sorry
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/loop_memory_havoc.move:444:5: error: the data invariant of a value written to memory is not established
-tests/sources/functional/loop_memory_havoc.move:446:9: error: the specification clause `ensures global<G<T> >(a).v == old(global<G<T> >(a).v)` is not established
-tests/sources/functional/loop_memory_havoc.move:444:5: error: verex verification failed: the automatic verification of `gen_bump` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify gen_bump by lean =>
-    verex_obligations
-    verex_on
-    | stored_invariant => verex_prepare; sorry
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/loop_memory_havoc.move:483:9: error: the specification clause `ensures result == 7` is not established
-tests/sources/functional/loop_memory_havoc.move:480:5: error: verex verification failed: the automatic verification of `untouched_memory_framed` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify untouched_memory_framed by lean =>
-    verex_obligations
-    verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

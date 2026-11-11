@@ -1,6 +1,6 @@
 Move prover returns: exiting with bytecode transformation errors
-error: cannot establish what function argument `f` may modify: the closure's target invokes a function value whose effects no `modifies_of` declaration bounds
-   ┌─ tests/sources/functional/closures/lambda_funparam_memory_err.move:32:9
+error: function argument may modify resource `lambda_funparam_memory_err::Counter`, which is not declared in `modifies_of` for `g`
+   ┌─ tests/sources/functional/closures/lambda_funparam_memory_err.move:37:9
    │
-32 │         apply(|v| g(v + 1), x)
-   │         ^^^^^^^^^^^^^^^^^^^^^^
+37 │         wrap(|v| debit(v), x)
+   │         ^^^^^^^^^^^^^^^^^^^^^

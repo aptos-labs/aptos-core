@@ -1,0 +1,30 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `f` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:40:9
+   │
+40 │         apply_t(h.f);
+   │         ^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:49:9
+   │
+49 │         apply_t(h.f);
+   │         ^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:57:9
+   │
+57 │         apply_t(h.f);
+   │         ^^^^^^^^^^^^
+
+error: cannot establish what function argument `r` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:65:9
+   │
+65 │         set_fn(&mut h.f);
+   │         ^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:66:9
+   │
+66 │         apply_t(h.f);
+   │         ^^^^^^^^^^^^

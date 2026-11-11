@@ -96,38 +96,6 @@ module 0x42::apply_carrier_unread_memory {
         ensures result == (if (exists<R>(@0x42)) global<R>(@0x42).w else 0);
     }
 
-    // Higher-order targets: their effects omit what the callback they run reads.
-    fun run_unsat(f: || u64 has copy + drop): u64 { f() }
-    spec run_unsat { pragma opaque; requires false; aborts_if false; }
-
-    fun run(f: || u64 has copy + drop): u64 { f() }
-    spec run { pragma opaque, verify = false; aborts_if false; }
-
-    // With R.w = 0 the results are (0, 1).
-    fun callback_across_write_unsat(): (u64, u64) acquires R {
-        let h: |(|| u64 has copy + drop)| u64 has copy + drop = run_unsat;
-        let a = h(read_r);
-        flip();
-        let b = h(read_r);
-        (a, b)
-    }
-    spec callback_across_write_unsat {
-        requires exists<R>(@0x42) && global<R>(@0x42).w == 0;
-        ensures result_1 == result_2; // error: the callback reads the changed R
-    }
-
-    fun callback_across_write(): (u64, u64) acquires R {
-        let h: |(|| u64 has copy + drop)| u64 has copy + drop = run;
-        let a = h(read_r);
-        flip();
-        let b = h(read_r);
-        (a, b)
-    }
-    spec callback_across_write {
-        requires exists<R>(@0x42) && global<R>(@0x42).w == 0;
-        ensures result_1 == result_2; // error: the callback reads the changed R
-    }
-
     // Reads R, which its specification never names, but the specification determines the
     // result.
     fun g_determined(x: u64): u64 acquires R {

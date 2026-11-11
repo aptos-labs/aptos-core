@@ -1,0 +1,18 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function argument may modify resource `fun_param_frame_stored_escape::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_stored_escape.move:44:9
+   │
+44 │         hidden(c)
+   │         ^^^^^^^^^
+
+error: function argument may modify resource `fun_param_frame_stored_escape::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_stored_escape.move:64:9
+   │
+64 │         pack_unpack(c)
+   │         ^^^^^^^^^^^^^^
+
+error: function argument may modify resource `fun_param_frame_stored_escape::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_stored_escape.move:74:38
+   │
+74 │     fun via_set_field(b: &mut Box) { set_field(b, |x| bump(x)) }
+   │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^

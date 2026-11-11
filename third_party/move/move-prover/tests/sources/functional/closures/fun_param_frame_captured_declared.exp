@@ -1,0 +1,24 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/fun_param_frame_captured_declared.move:40:9
+   │
+40 │         ensures global<R2>(@0x42) == old(global<R2>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared.move:34: client
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared.move:35: client
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared.move:36: client
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared.move:40: client (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/fun_param_frame_captured_declared.move:97:9
+   │
+97 │         ensures global<R3>(@0x42) == old(global<R3>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared.move:91: r3
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared.move:92: r3
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared.move:93: r3
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared.move:97: r3 (spec)

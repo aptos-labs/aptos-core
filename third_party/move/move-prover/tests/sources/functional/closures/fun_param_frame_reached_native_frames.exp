@@ -1,0 +1,24 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/fun_param_frame_reached_native_frames.move:52:9
+   │
+52 │         ensures global<R2>(@0x42) == old(global<R2>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/fun_param_frame_reached_native_frames.move:46: client_declared
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_reached_native_frames.move:47: client_declared
+   =     at tests/sources/functional/closures/fun_param_frame_reached_native_frames.move:48: client_declared
+   =     at tests/sources/functional/closures/fun_param_frame_reached_native_frames.move:52: client_declared (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/fun_param_frame_reached_native_frames.move:61:9
+   │
+61 │         ensures global<R2>(@0x42) == old(global<R2>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/fun_param_frame_reached_native_frames.move:55: client_deferred
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_reached_native_frames.move:56: client_deferred
+   =     at tests/sources/functional/closures/fun_param_frame_reached_native_frames.move:57: client_deferred
+   =     at tests/sources/functional/closures/fun_param_frame_reached_native_frames.move:61: client_deferred (spec)

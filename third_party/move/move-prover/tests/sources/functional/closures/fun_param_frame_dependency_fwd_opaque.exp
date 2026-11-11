@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `g` may modify: it is parameter `g` of `frame_fwdo_hof::fwd`, which declares no `modifies_of`/`reads_of` for it and may be called from a dependency, where nothing checks what reaches it
+  ┌─ tests/sources/functional/closures/fun_param_frame_dependency_fwd_opaque_hof.move:9:41
+  │
+9 │     public fun fwd(g: |u64| has drop) { opq(g) }
+  │                                         ^^^^^^

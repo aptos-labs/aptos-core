@@ -1,0 +1,102 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function argument may modify resource `state::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:61:20
+   │
+61 │     fun direct() { apply(|_x| state::bump()) }
+   │                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `state::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:68:28
+   │
+68 │     fun direct_generic() { apply_g(|_x: u64| state::bump(), 1) }
+   │                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `state::S`, which is not declared in `modifies_of` for `g`
+   ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:78:29
+   │
+78 │     fun through_forward() { forward(|_x| state::bump()) }
+   │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `state::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:85:27
+   │
+85 │     fun passes_writer() { apply(|_x| state::bump()) }
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `state::S`, which is not declared in `modifies_of` for `f`
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:103:13
+    │
+103 │             apply_o(|_x| state::bump());
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: captured function value may modify resource `state::S`, which is not declared in `modifies_of` for `f` of `fun_param_frame_transparent::apply_o2`
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:116:17
+    │
+116 │         let h = |y| apply_o2(g, y);
+    │                 ^^^^^^^^^^^^^^^^^^
+
+error: function value passed to an invocation may modify resource `state::S`, which is not declared in `modifies_of` for the parameter of the invoked function value
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:127:9
+    │
+127 │         h(|_x| state::bump())
+    │         ^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `state::S`, which is not declared in `modifies_of` for `f`
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:139:9
+    │
+139 │         apply(g2)
+    │         ^^^^^^^^^
+
+error: function argument may modify resource `state::S`, which is not declared in `modifies_of` for `f`
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:149:23
+    │
+149 │     fun from_call() { apply(make_writer()) }
+    │                       ^^^^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is returned by a call, and not every value the callee returns is a closure with known effects built in a transparent function
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:158:31
+    │
+158 │     fun from_pass_through() { apply(pass_through(|_x| ())) }
+    │                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is returned by a call, and not every value the callee returns is a closure with known effects built in a transparent function
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:166:30
+    │
+166 │     fun from_opaque_call() { apply(make_opaque()) }
+    │                              ^^^^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: the closure's target invokes a function value whose effects no `modifies_of` declaration bounds
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:181:31
+    │
+181 │     fun over_local_invoke() { apply_o(|_x| invokes_local()) }
+    │                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `h` may modify: the closure's effects are not known
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:192:9
+    │
+192 │         apply_hof(h)
+    │         ^^^^^^^^^^^^
+
+error: function argument may modify resource `state::S`, which is not declared in `modifies_of` for `f`
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:200:9
+    │
+200 │         apply(|x| inner_s(g, x))
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `state::S`, which is not declared in `modifies_of` for `f`
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:217:36
+    │
+217 │     fun via_declared_to_opaque() { apply_o(|_x| via_declared()) }
+    │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument `f` may modify resource `state::S`, which is not declared in `modifies_of` for `f`
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:224:45
+    │
+224 │     fun forward_framed(f: |u64| has drop) { apply(f) }
+    │                                             ^^^^^^^^
+
+error: function argument `f` may modify any resource, which is not declared in `modifies_of` for `f`
+    ┌─ tests/sources/functional/closures/fun_param_frame_transparent.move:229:43
+    │
+229 │     fun forward_wild(f: |u64| has drop) { apply(f) }
+    │                                           ^^^^^^^^

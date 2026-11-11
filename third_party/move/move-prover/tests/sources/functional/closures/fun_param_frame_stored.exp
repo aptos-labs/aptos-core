@@ -1,0 +1,30 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function argument may modify resource `state_stored::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_stored.move:44:53
+   │
+44 │     fun push_one(): vector<|u64| has copy + drop> { push(|_x| st::bump()) }
+   │                                                     ^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `state_stored::S`, which is not declared in `modifies_of` for `f1`
+   ┌─ tests/sources/functional/closures/fun_param_frame_stored.move:48:9
+   │
+48 │         new_cbs_invoking(|_x| st::bump(), |_x| st::bump())
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `state_stored::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_stored.move:50:27
+   │
+50 │     fun via_forwarder() { fwd(|_x| st::bump()) }
+   │                           ^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `state_stored::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_stored.move:51:48
+   │
+51 │     fun via_capture(): |u64| has copy + drop { cap(|_x| st::bump()) }
+   │                                                ^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `state_stored::S`, which is not declared in `modifies_of` for `f1`
+   ┌─ tests/sources/functional/closures/fun_param_frame_stored.move:52:28
+   │
+52 │     fun pack_spec(): Cbs { new_cbs_spec(|_x| st::bump(), |_x| ()) }
+   │                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

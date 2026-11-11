@@ -1,0 +1,65 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:47:5: error: the precondition of `hidden` is not established
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:47:5: error: verex verification failed: the automatic verification of `client_vector` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_stored_escape.proof.lean`:
+  verify client_vector by lean =>
+    verex_obligations
+    verex_on
+    | requires_of_hidden => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:67:5: error: the precondition of `pack_unpack` is not established
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:67:5: error: verex verification failed: the automatic verification of `client_pack_unpack` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_stored_escape.proof.lean`:
+  verify client_pack_unpack by lean =>
+    verex_obligations
+    verex_on
+    | requires_of_pack_unpack => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:8:5: error: the specification clause `f : Fn(u64) -> Unit has Copy, Drop` is not established
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:74:5: error: verex verification failed: the automatic verification of `via_set_field` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_stored_escape.proof.lean`:
+  verify via_set_field by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:8:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a value is constructed
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:87:5: error: verex verification failed: the automatic verification of `via_new_box` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_stored_escape.proof.lean`:
+  verify via_new_box by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:10:26: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a value is constructed
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:88:5: error: verex verification failed: the automatic verification of `via_new_slot` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_stored_escape.proof.lean`:
+  verify via_new_slot by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:8:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a value is constructed
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:89:5: error: verex verification failed: the automatic verification of `via_ret_packed` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_stored_escape.proof.lean`:
+  verify via_ret_packed by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:9:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop, Store` does not hold where a value is constructed
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:91:5: error: verex verification failed: the automatic verification of `via_store` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_stored_escape.proof.lean`:
+  verify via_store by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:8:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a value is constructed
+tests/sources/functional/closures/fun_param_frame_stored_escape.move:92:5: error: verex verification failed: the automatic verification of `via_set_box` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_stored_escape.proof.lean`:
+  verify via_set_box by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
