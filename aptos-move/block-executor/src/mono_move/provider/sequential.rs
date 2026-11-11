@@ -16,7 +16,7 @@ use mono_move_aptos_transaction_executor::{
     check_group_key, decode_group_members, AptosDataProvider, GroupAssembly, GroupMembers,
 };
 use mono_move_core::{
-    nominal_tag,
+    intern_struct_tag, nominal_tag,
     storage::resource_provider::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
     },
@@ -153,20 +153,51 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
     }
 
     /// Reads a resource-group member that the map holds under its own key.
-    /// Its pre-block value comes out of the stored group.
+    ///
+    /// The first miss on any member of a group provisions all of its stored
+    /// members as encoded pre-block values, then puts the group sentinel at
+    /// the group's own slot. With the sentinel present, a miss means the
+    /// member is not in the group.
     fn read_flat_group_member(
         &self,
         key: &InMemoryStorageKey,
         group_key: &InMemoryStorageKey,
         tag: &StructTag,
     ) -> Result<StorageRead, ResourceProviderError> {
-        if let Some(value) = self.unsync_map.fetch_data(key) {
-            return storage_read(&value, None);
+        match self.unsync_map.fetch_data(key) {
+            Some(MonoValue::ResourceGroupMemberBytes(blob)) => {
+                return self.cache_existing_value(key, &blob)
+            },
+            Some(value) => return storage_read(&value, None),
+            None => {},
         }
-        let blob = self
+        if let Some(MonoValue::GroupMetadata) = self.unsync_map.fetch_data(group_key) {
+            return Ok(self.cache_not_existing_value(key));
+        }
+
+        let members = self
             .read_group_from_storage(group_key)
             .map_err(|e| invariant_violation(format!("{e:#}")))?
-            .and_then(|mut members| members.remove(tag));
+            .unwrap_or_default();
+        let mut blob = None;
+        for (member_tag, member_blob) in members {
+            // TODO(metering): every stored member is interned, including
+            // members no transaction reads.
+            let member_ty = intern_struct_tag(&member_tag, self.guard)
+                .map_err(|e| invariant_violation(format!("{e:#}")))?;
+            if &member_tag == tag {
+                blob = Some(member_blob.clone());
+            }
+            // The map also holds this block's writes, which a pre-block value
+            // must not replace.
+            let member_key = InMemoryStorageKey::resource(group_key.address(), member_ty);
+            if self.unsync_map.fetch_data(&member_key).is_none() {
+                self.unsync_map
+                    .set_base_value(member_key, MonoValue::ResourceGroupMemberBytes(member_blob));
+            }
+        }
+        self.unsync_map
+            .set_base_value(group_key.clone(), MonoValue::GroupMetadata);
         match blob {
             Some(blob) => self.cache_existing_value(key, &blob),
             None => Ok(self.cache_not_existing_value(key)),

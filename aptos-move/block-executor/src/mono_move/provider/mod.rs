@@ -165,36 +165,17 @@ where
         base: &dyn StorageBase<K, T>,
         key: &K,
     ) -> Result<StorageRead, ResourceProviderError> {
-        self.read_data(key, || {
+        self.read_data(base, key, || {
             Ok(base.resource(key)?.unwrap_or(MonoValue::Deletion))
         })
     }
 
-    /// Reads a resource-group member that the multi-version map holds under its
-    /// own key. Its pre-block value comes out of the stored group.
-    pub(crate) fn read_flat_group_member(
+    /// Reads the data map at `key`, provisioning it with `base_value` if this
+    /// is the block's first read of it. A pre-block value still in its stored
+    /// encoding is materialized on read and replaces the encoding.
+    pub(crate) fn read_data(
         &self,
         base: &dyn StorageBase<K, T>,
-        key: &K,
-        group_key: &K,
-        tag: &T,
-    ) -> Result<StorageRead, ResourceProviderError> {
-        self.read_data(key, || {
-            match base
-                .group_members(group_key)?
-                .into_iter()
-                .find(|(member_tag, _)| member_tag == tag)
-            {
-                Some((_, blob)) => base.materialize_member(key, &blob),
-                None => Ok(MonoValue::Deletion),
-            }
-        })
-    }
-
-    /// Reads the data map at `key`, provisioning it with `base_value` if this
-    /// is the block's first read of it.
-    fn read_data(
-        &self,
         key: &K,
         base_value: impl Fn() -> Result<MonoValue, ResourceProviderError>,
     ) -> Result<StorageRead, ResourceProviderError> {
@@ -206,6 +187,16 @@ where
                 data.fetch_data_no_record(key, self.txn_idx)
             };
             match read {
+                Ok(MVDataOutput::Versioned(_, MonoValue::ResourceGroupMemberBytes(blob))) => {
+                    // Only pre-block values are stored encoded. Re-read, as
+                    // another worker may have materialized it first.
+                    let value = base.materialize_member(key, &blob)?;
+                    data.set_base_value(key.clone(), value, |prev, new| {
+                        if matches!(prev, MonoValue::ResourceGroupMemberBytes(_)) {
+                            *prev = new;
+                        }
+                    });
+                },
                 Ok(MVDataOutput::Versioned(version, value)) => {
                     return storage_read(&value, mono_version(version))
                 },

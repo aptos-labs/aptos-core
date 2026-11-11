@@ -14,7 +14,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_mvhashmap::{
-    types::{Incarnation, TxnIndex},
+    types::{Incarnation, MVDataOutput, TxnIndex},
     MVHashMap,
 };
 use aptos_types::state_store::{state_key::StateKey, TStateView};
@@ -23,7 +23,7 @@ use mono_move_aptos_transaction_executor::{
     check_group_key, decode_group_members, AptosDataProvider, GroupAssembly, GroupMembers,
 };
 use mono_move_core::{
-    nominal_tag,
+    intern_struct_tag, nominal_tag,
     storage::resource_provider::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
     },
@@ -80,6 +80,49 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
             .get_state_value(&state_key)
             .map_err(|e| invariant_violation(format!("Storage read failed: {e}")))?
             .map(|value| value.bytes().clone()))
+    }
+
+    /// Reads a resource-group member that the multi-version map holds under
+    /// its own key.
+    ///
+    /// The first miss on any member of a group provisions all of its stored
+    /// members as encoded pre-block values, then puts the group sentinel at
+    /// the group's own slot. With the sentinel present, a miss means the
+    /// member is not in the group.
+    fn read_flat_group_member(
+        &self,
+        key: &InMemoryStorageKey,
+        group_key: &InMemoryStorageKey,
+        tag: &StructTag,
+    ) -> Result<StorageRead, ResourceProviderError> {
+        let data = self.reader.versioned_map().data();
+        let txn_idx = self.reader.txn_idx();
+        self.reader.read_data(self, key, || {
+            if let Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata)) =
+                data.fetch_data_no_record(group_key, txn_idx)
+            {
+                return Ok(MonoValue::Deletion);
+            }
+            let mut value = MonoValue::Deletion;
+            for (member_tag, blob) in StorageBase::group_members(self, group_key)? {
+                // TODO(metering): every stored member is interned, including
+                // members no transaction reads.
+                let member_ty = intern_struct_tag(&member_tag, self.guard)
+                    .map_err(|e| invariant_violation(format!("{e:#}")))?;
+                if &member_tag == tag {
+                    value = MonoValue::ResourceGroupMemberBytes(blob.clone());
+                }
+                data.set_base_value(
+                    InMemoryStorageKey::resource(group_key.address(), member_ty),
+                    MonoValue::ResourceGroupMemberBytes(blob),
+                    |_, _| {},
+                );
+            }
+            // After the members, so that a reader who sees the sentinel finds
+            // every member that exists.
+            data.set_base_value(group_key.clone(), MonoValue::GroupMetadata, |_, _| {});
+            Ok(value)
+        })
     }
 
     /// The stored bytes of a group member the multi-version map holds.
@@ -148,8 +191,7 @@ impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMParallelProvide
                 let member_tag = nominal_tag(key.value_ty())
                     .map_err(|e| invariant_violation(format!("{e:#}")))?;
                 if GroupAssembly::get().flat_members() {
-                    self.reader
-                        .read_flat_group_member(self, key, &group_key, &member_tag)
+                    self.read_flat_group_member(key, &group_key, &member_tag)
                 } else {
                     self.reader
                         .read_group_member(self, key, &group_key, &member_tag)
