@@ -26,10 +26,11 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
+use group_chain::{group_write, view_below, GroupLink, GroupView};
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
     production_natives, AptosDataProvider, AptosTransactionExecutor, DiscardReason, GroupAssembly,
-    TxnOutcome,
+    TxnOutcome, PER_TXN_ASSEMBLY_GROUPS, PER_TXN_ASSEMBLY_NANOS,
 };
 use mono_move_core::{
     nominal_tag,
@@ -43,9 +44,11 @@ use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ptr::NonNull,
-    sync::Arc,
+    sync::{atomic::Ordering, Arc, Mutex},
+    time::Instant,
 };
 
+mod group_chain;
 mod provider;
 mod reads;
 
@@ -88,6 +91,10 @@ pub enum MonoValue {
     //
     // TODO(completeness): add state value metadata here.
     GroupMetadata,
+    /// An entry at a resource group's own slot under
+    /// [`GroupAssembly::Chained`]: the stored group, or one transaction's
+    /// changes to it.
+    GroupLink(Arc<GroupLink>),
 }
 
 // SAFETY: The value stores the pointer to the immutable value in a frozen,
@@ -125,15 +132,16 @@ impl SpeculativeValue for MonoValue {
             MonoValue::ResourceGroupMemberBytes(_) => None,
             MonoValue::Deletion => None,
             MonoValue::GroupMetadata => None,
+            MonoValue::GroupLink(_) => None,
         }
     }
 
     fn write_op_kind(&self) -> WriteOpKind {
         match self {
             MonoValue::Write { kind, .. } => kind.clone(),
-            MonoValue::ResourceGroupMemberBytes(_) | MonoValue::GroupMetadata => {
-                WriteOpKind::Modification
-            },
+            MonoValue::ResourceGroupMemberBytes(_)
+            | MonoValue::GroupMetadata
+            | MonoValue::GroupLink(_) => WriteOpKind::Modification,
             MonoValue::Deletion => WriteOpKind::Deletion,
         }
     }
@@ -222,6 +230,8 @@ impl MonoTxnOutput {
         if let Some(effects) = committed_effects(&outcome) {
             let pin: Arc<dyn ReadPin> = effects.frozen_heap();
             let flat_members = GroupAssembly::get().flat_members();
+            let mut links: HashMap<InMemoryStorageKey, Vec<(InternedType, MonoValue)>> =
+                HashMap::new();
             for (key, class, group) in effects.read_write_set().writes_unordered() {
                 let ty = key.value_ty();
                 let value = written_value(class, ty, &pin);
@@ -229,7 +239,13 @@ impl MonoTxnOutput {
                     None => {
                         resource_writes.insert(key.clone(), value);
                     },
-                    Some(_) if flat_members => {
+                    Some(group_ty) if flat_members => {
+                        if GroupAssembly::get() == GroupAssembly::Chained {
+                            links
+                                .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
+                                .or_default()
+                                .push((ty, value.clone()));
+                        }
                         resource_writes.insert(key.clone(), value);
                     },
                     Some(group_ty) => {
@@ -243,6 +259,14 @@ impl MonoTxnOutput {
                     },
                 }
             }
+            // One link per group at the group's slot, holding this
+            // transaction's changes to its members.
+            for (group_key, changes) in links {
+                resource_writes.insert(
+                    group_key,
+                    MonoValue::GroupLink(Arc::new(GroupLink::changes(changes))),
+                );
+            }
         }
 
         MonoTxnOutput::Executed {
@@ -251,6 +275,27 @@ impl MonoTxnOutput {
             resource_writes,
             group_writes,
         }
+    }
+
+    /// The group links this transaction wrote, under
+    /// [`GroupAssembly::Chained`].
+    fn group_links(&self) -> Vec<(InMemoryStorageKey, Arc<GroupLink>)> {
+        let MonoTxnOutput::Executed {
+            resource_writes, ..
+        } = self
+        else {
+            return vec![];
+        };
+        resource_writes
+            .iter()
+            .filter_map(|(key, value)| match value {
+                MonoValue::GroupLink(link) => Some((key.clone(), link.clone())),
+                MonoValue::Write { .. }
+                | MonoValue::Deletion
+                | MonoValue::ResourceGroupMemberBytes(_)
+                | MonoValue::GroupMetadata => None,
+            })
+            .collect()
     }
 }
 
@@ -396,6 +441,29 @@ impl TxnOutput for MonoTxnOutput {
     }
 }
 
+/// Adds the write for a group's slot, assembled from the group's view.
+fn add_group_write(
+    output: &mut TransactionOutput,
+    group_key: &InMemoryStorageKey,
+    existed: bool,
+    view: &GroupView,
+) -> Result<(), PanicError> {
+    let state_key = group_key
+        .as_state_key()
+        .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))?;
+    output
+        .write_set_mut()
+        .insert_value_write(state_key, group_write(existed, view)?);
+    Ok(())
+}
+
+fn record_chained_assembly(start: Instant, num_groups: usize) {
+    if num_groups > 0 {
+        PER_TXN_ASSEMBLY_NANOS.fetch_add(start.elapsed().as_nanos() as u64, Ordering::Relaxed);
+        PER_TXN_ASSEMBLY_GROUPS.fetch_add(num_groups as u64, Ordering::Relaxed);
+    }
+}
+
 /// A per-worker MonoMove executor.
 pub struct MonoTransactionExecutor {
     ctx: Arc<GlobalContext>,
@@ -405,6 +473,12 @@ pub struct MonoTransactionExecutor {
     worker_id: u32,
     /// Where this worker materializes the values it reads from storage.
     arena: SegmentedArena,
+    /// Under [`GroupAssembly::Chained`] in sequential execution, each group's
+    /// view after the latest transaction materialized so far, starting from
+    /// the stored group. Sequential execution applies a transaction's writes
+    /// before materializing it, so the group's slot no longer holds the
+    /// previous link by then.
+    sequential_group_views: Mutex<HashMap<InMemoryStorageKey, Arc<GroupView>>>,
 }
 
 impl MonoTransactionExecutor {
@@ -503,6 +577,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             environment: environment.clone(),
             worker_id,
             arena: SegmentedArena::new(),
+            sequential_group_views: Mutex::new(HashMap::new()),
         }
     }
 
@@ -523,6 +598,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     shared.base_view,
                     unsync_map,
                     &self.arena,
+                    &self.sequential_group_views,
                 );
                 let (outcome, skips_rest) =
                     self.run(&guard, shared.base_view, &provider, txn, auxiliary_info)?;
@@ -584,6 +660,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         <Self::Output as TxnOutput>::CommittedOutput,
         PanicOr<ResourceGroupSerializationError>,
     > {
+        let links = output.group_links();
         let outcome = match output {
             MonoTxnOutput::Executed { outcome, .. } => outcome,
             // A skipped output renders to an empty, kept-success transaction.
@@ -614,8 +691,9 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     shared.base_view,
                     unsync_map,
                     &self.arena,
+                    &self.sequential_group_views,
                 );
-                let (output, groups) = outcome
+                let (mut output, groups) = outcome
                     .materialize(&guard, &provider, features, auxiliary_data)
                     .map_err(materialization_failed)?;
 
@@ -626,6 +704,23 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 for (group_key, members) in groups.into_iter_unordered() {
                     unsync_map.insert_group(group_key, members);
                 }
+
+                let start = Instant::now();
+                let mut views = self
+                    .sequential_group_views
+                    .lock()
+                    .map_err(|_| code_invariant_error("Group views lock poisoned"))?;
+                for (group_key, link) in &links {
+                    let prev = views.get(group_key).cloned().ok_or_else(|| {
+                        code_invariant_error(format!(
+                            "Group {group_key:?} was written before it was read"
+                        ))
+                    })?;
+                    let view = link.view_on(&guard, &prev)?;
+                    add_group_write(&mut output, group_key, !prev.is_empty(), &view)?;
+                    views.insert(group_key.clone(), view);
+                }
+                record_chained_assembly(start, links.len());
                 Ok(output)
             },
             ViewMode::Parallel {
@@ -645,9 +740,17 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 );
                 // Groups are assembled from the versioned map on demand, so
                 // nothing is cached back here.
-                let (output, _groups) = outcome
+                let (mut output, _groups) = outcome
                     .materialize(&guard, &provider, features, auxiliary_data)
                     .map_err(materialization_failed)?;
+
+                let start = Instant::now();
+                for (group_key, link) in &links {
+                    let prev = view_below(versioned_map.data(), &guard, group_key, txn_idx)?;
+                    let view = link.view_on(&guard, &prev)?;
+                    add_group_write(&mut output, group_key, !prev.is_empty(), &view)?;
+                }
+                record_chained_assembly(start, links.len());
                 Ok(output)
             },
         }

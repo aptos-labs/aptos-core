@@ -71,6 +71,7 @@ pub(crate) fn storage_read(
         MonoValue::GroupMetadata => {
             return Err(invariant_violation("Group metadata served as a read"))
         },
+        MonoValue::GroupLink(_) => return Err(invariant_violation("Group link served as a read")),
     })
 }
 

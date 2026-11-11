@@ -13,6 +13,9 @@ variant and thread count, alternating variants within every repeat:
   groups at the end of the block, before indexing.
 - `block_end_flat`: like `block_end`, and Block-STM versions group members
   under their own keys instead of inside a group.
+- `chained`: Block-STM versions group members under their own keys, and each
+  transaction assembles its groups at commit from the previous writer's view
+  of the group, found through a chain of links at the group's slot.
 
 A block-end variant may name the pass shape after a slash
 (`GROUP_ASSEMBLY_PASS`): `walk` applies all changes in one serial walk and
@@ -65,7 +68,12 @@ VARIANTS = [
     ).split(",")
     if v
 ]
-MODES = {"per_txn": "PerTxn", "block_end": "BlockEnd", "block_end_flat": "BlockEndFlat"}
+MODES = {
+    "per_txn": "PerTxn",
+    "block_end": "BlockEnd",
+    "block_end_flat": "BlockEndFlat",
+    "chained": "Chained",
+}
 PASSES = {"walk": "Walk", "by_group": "ByGroup"}
 BASELINE = VARIANTS[0]
 REPEATS = int(os.environ.get("REPEATS", default=5))

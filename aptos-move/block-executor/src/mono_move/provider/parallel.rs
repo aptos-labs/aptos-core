@@ -7,6 +7,7 @@
 
 use crate::{
     mono_move::{
+        group_chain::{stored_view, GroupLink},
         provider::{invariant_violation, materialized_value, ParallelReader, StorageBase},
         MonoValue,
     },
@@ -14,7 +15,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDataOutput, TxnIndex},
+    types::{Incarnation, MVDataError, TxnIndex},
     MVHashMap,
 };
 use aptos_types::state_store::{state_key::StateKey, TStateView};
@@ -33,6 +34,7 @@ use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{serialize, SegmentedArena};
 use move_core_types::language_storage::StructTag;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use std::sync::Arc;
 
 /// Provides access to resources and resource groups during parallel execution.
 pub(crate) struct BlockSTMParallelProvider<'a, 'ctx, S> {
@@ -98,13 +100,25 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
         let data = self.reader.versioned_map().data();
         let txn_idx = self.reader.txn_idx();
         self.reader.read_data(self, key, || {
-            if let Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata)) =
-                data.fetch_data_no_record(group_key, txn_idx)
-            {
+            // Any entry at the group's slot below this transaction means the
+            // group was provisioned: a transaction reads a group before it
+            // writes a link there.
+            if !matches!(
+                data.fetch_data_no_record(group_key, txn_idx),
+                Err(MVDataError::Uninitialized)
+            ) {
                 return Ok(MonoValue::Deletion);
             }
+            let members = StorageBase::group_members(self, group_key)?;
+            let sentinel = if GroupAssembly::get() == GroupAssembly::Chained {
+                let view = stored_view(members.iter().cloned())
+                    .map_err(|e| invariant_violation(format!("{e:?}")))?;
+                MonoValue::GroupLink(Arc::new(GroupLink::stored(view)))
+            } else {
+                MonoValue::GroupMetadata
+            };
             let mut value = MonoValue::Deletion;
-            for (member_tag, blob) in StorageBase::group_members(self, group_key)? {
+            for (member_tag, blob) in members {
                 // TODO(metering): every stored member is interned, including
                 // members no transaction reads.
                 let member_ty = intern_struct_tag(&member_tag, self.guard)
@@ -120,7 +134,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
             }
             // After the members, so that a reader who sees the sentinel finds
             // every member that exists.
-            data.set_base_value(group_key.clone(), MonoValue::GroupMetadata, |_, _| {});
+            data.set_base_value(group_key.clone(), sentinel, |_, _| {});
             Ok(value)
         })
     }
@@ -140,6 +154,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
             // group's own slot never appears among its members.
             MonoValue::Deletion => Err(anyhow!("a deleted group member was assembled")),
             MonoValue::GroupMetadata => Err(anyhow!("group metadata was assembled as a member")),
+            MonoValue::GroupLink(_) => Err(anyhow!("a group link was assembled as a member")),
         }
     }
 }

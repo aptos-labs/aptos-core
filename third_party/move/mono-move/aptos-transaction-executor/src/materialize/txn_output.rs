@@ -170,42 +170,49 @@ fn drain_write_set(
     // At block end, the executor assembles groups from every transaction's
     // member ops, so they are passed on as they are.
     let mut pending: BTreeMap<StateKey, PendingGroup> = BTreeMap::new();
-    if GroupAssembly::get().at_block_end() {
-        for (group_key, member_ops) in group_ops.into_iter_unordered() {
-            match group_key.as_state_key() {
-                Ok(state_key) => {
-                    pending.insert(state_key, member_ops);
-                },
-                Err(e) => failures.push(format!("{e:#}")),
+    match GroupAssembly::get() {
+        GroupAssembly::BlockEnd | GroupAssembly::BlockEndFlat => {
+            for (group_key, member_ops) in group_ops.into_iter_unordered() {
+                match group_key.as_state_key() {
+                    Ok(state_key) => {
+                        pending.insert(state_key, member_ops);
+                    },
+                    Err(e) => failures.push(format!("{e:#}")),
+                }
             }
-        }
-    } else {
-        // Merge each group's member ops into its stored members and emit one
-        // write per group. The assembled members are returned so the caller can
-        // cache them without decoding the write op again.
-        //
-        // Note on determinism: the groups are visited in an unspecified order.
-        // `WriteSet::new` sorts the writes and `MaterializationError::new` sorts
-        // the failures, so the order does not reach the result.
-        let start = Instant::now();
-        let num_groups = group_ops.len() as u64;
-        for (group_key, member_ops) in group_ops.into_iter_unordered() {
-            let merged = merge_group(provider, &group_key, member_ops).and_then(|(op, members)| {
-                let state_key = group_key.as_state_key().map_err(|e| format!("{e:#}"))?;
-                Ok((state_key, op, members))
-            });
-            match merged {
-                Ok((state_key, op, members)) => {
-                    materialized_groups.insert(group_key, members);
-                    writes.push((state_key, op));
-                },
-                Err(e) => failures.push(e),
+        },
+        // The block executor assembles groups from the links it versions.
+        GroupAssembly::Chained => {},
+        GroupAssembly::PerTxn => {
+            // Merge each group's member ops into its stored members and emit one
+            // write per group. The assembled members are returned so the caller can
+            // cache them without decoding the write op again.
+            //
+            // Note on determinism: the groups are visited in an unspecified order.
+            // `WriteSet::new` sorts the writes and `MaterializationError::new` sorts
+            // the failures, so the order does not reach the result.
+            let start = Instant::now();
+            let num_groups = group_ops.len() as u64;
+            for (group_key, member_ops) in group_ops.into_iter_unordered() {
+                let merged =
+                    merge_group(provider, &group_key, member_ops).and_then(|(op, members)| {
+                        let state_key = group_key.as_state_key().map_err(|e| format!("{e:#}"))?;
+                        Ok((state_key, op, members))
+                    });
+                match merged {
+                    Ok((state_key, op, members)) => {
+                        materialized_groups.insert(group_key, members);
+                        writes.push((state_key, op));
+                    },
+                    Err(e) => failures.push(e),
+                }
             }
-        }
-        if num_groups > 0 {
-            PER_TXN_ASSEMBLY_NANOS.fetch_add(start.elapsed().as_nanos() as u64, Ordering::Relaxed);
-            PER_TXN_ASSEMBLY_GROUPS.fetch_add(num_groups, Ordering::Relaxed);
-        }
+            if num_groups > 0 {
+                PER_TXN_ASSEMBLY_NANOS
+                    .fetch_add(start.elapsed().as_nanos() as u64, Ordering::Relaxed);
+                PER_TXN_ASSEMBLY_GROUPS.fetch_add(num_groups, Ordering::Relaxed);
+            }
+        },
     }
 
     if !failures.is_empty() {

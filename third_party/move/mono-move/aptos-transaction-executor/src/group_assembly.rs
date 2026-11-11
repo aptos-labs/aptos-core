@@ -17,6 +17,10 @@ pub enum GroupAssembly {
     /// Like [`GroupAssembly::BlockEnd`], and Block-STM versions each member
     /// under its own key instead of inside a group.
     BlockEndFlat,
+    /// Block-STM versions each member under its own key, and each transaction
+    /// assembles its groups at commit from a chain of links at the groups'
+    /// slots.
+    Chained,
 }
 
 impl GroupAssembly {
@@ -26,6 +30,7 @@ impl GroupAssembly {
             Err(_) | Ok("") | Ok("per_txn") => Self::PerTxn,
             Ok("block_end") => Self::BlockEnd,
             Ok("block_end_flat") => Self::BlockEndFlat,
+            Ok("chained") => Self::Chained,
             Ok(other) => panic!("unknown MONO_GROUP_ASSEMBLY value {other:?}"),
         })
     }
@@ -33,7 +38,7 @@ impl GroupAssembly {
     /// Whether transactions leave group assembly to the end of the block.
     pub fn at_block_end(self) -> bool {
         match self {
-            Self::PerTxn => false,
+            Self::PerTxn | Self::Chained => false,
             Self::BlockEnd | Self::BlockEndFlat => true,
         }
     }
@@ -42,14 +47,15 @@ impl GroupAssembly {
     pub fn flat_members(self) -> bool {
         match self {
             Self::PerTxn | Self::BlockEnd => false,
-            Self::BlockEndFlat => true,
+            Self::BlockEndFlat | Self::Chained => true,
         }
     }
 }
 
-/// CPU time spent assembling groups at commit under
-/// [`GroupAssembly::PerTxn`], summed over all workers.
+/// CPU time spent assembling groups at commit under [`GroupAssembly::PerTxn`]
+/// or [`GroupAssembly::Chained`], summed over all workers.
 pub static PER_TXN_ASSEMBLY_NANOS: AtomicU64 = AtomicU64::new(0);
 
-/// Groups assembled at commit under [`GroupAssembly::PerTxn`].
+/// Groups assembled at commit under [`GroupAssembly::PerTxn`] or
+/// [`GroupAssembly::Chained`].
 pub static PER_TXN_ASSEMBLY_GROUPS: AtomicU64 = AtomicU64::new(0);

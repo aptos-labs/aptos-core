@@ -136,6 +136,9 @@ fn value_type(value: &MonoValue) -> Result<ValueType, PanicError> {
         MonoValue::GroupMetadata => {
             return Err(code_invariant_error("Group metadata is not a mock write"))
         },
+        MonoValue::GroupLink(_) => {
+            return Err(code_invariant_error("A group link is not a mock write"))
+        },
     })
 }
 
@@ -586,6 +589,9 @@ fn member_bytes(value: &MonoValue) -> Result<Bytes, PanicError> {
         MonoValue::Deletion => Err(code_invariant_error("A deleted group member was assembled")),
         MonoValue::GroupMetadata => Err(code_invariant_error(
             "Group metadata was assembled as a member",
+        )),
+        MonoValue::GroupLink(_) => Err(code_invariant_error(
+            "A group link was assembled as a member",
         )),
     }
 }
