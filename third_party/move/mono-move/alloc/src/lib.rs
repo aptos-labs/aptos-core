@@ -58,4 +58,4 @@ mod memory_region;
 pub use align::MAX_ALIGN;
 pub use global_arena::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 pub use leaked::{LeakedBoxPtr, VersionedLeakedBoxPtr};
-pub use memory_region::MemoryRegion;
+pub use memory_region::{cache_aligned_regions, MemoryRegion};

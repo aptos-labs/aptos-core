@@ -115,10 +115,14 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
     assembly_pass = assembly_pass or "walk"
     poll_env = ""
     poll = None
+    align = False
     for flag in flags:
-        if flag.startswith("poll="):
+        if flag == "align":
+            align = True
+            poll_env += "MONO_ALIGN_REGIONS=1 "
+        elif flag.startswith("poll="):
             poll = int(flag[len("poll="):])
-            poll_env = f"MONO_POLL_INTERVAL={poll} "
+            poll_env += f"MONO_POLL_INTERVAL={poll} "
         else:
             raise ValueError(f"unknown variant flag {flag!r}")
     tlb_before = tlb_shootdowns()
@@ -186,6 +190,8 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
     if phases:
         for key, value in re.findall(r"(\w+)=" + NUMBER, phases[-1]):
             row["ph_" + key] = float(value)
+    if bool(row.get("align_regions")) != align:
+        raise ValueError(f"asked for {variant} but align_regions={row.get('align_regions')}")
     if poll is not None and row.get("poll_interval") != poll:
         raise ValueError(f"asked for {variant} but poll_interval={row.get('poll_interval')}")
     return row

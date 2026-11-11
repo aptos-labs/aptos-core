@@ -466,7 +466,7 @@ impl OverallMeasurement {
         info!(
             "{} group assembly ({:?}, {:?}): per_txn_cpu_us={:.4} per_txn_groups={:.4} \
              block_end_wall_us={:.4} block_end_serial_us={:.4} block_end_parallel_us={:.4} \
-             block_end_groups={:.4} poll_interval={} (per txn)",
+             block_end_groups={:.4} poll_interval={} align_regions={} (per txn)",
             self.prefix,
             GroupAssembly::get(),
             AssemblyPass::get(),
@@ -477,6 +477,7 @@ impl OverallMeasurement {
             per_txn_us(d.block_end_parallel_total),
             d.block_end_assembly_groups as f64 / num_txns,
             mono_move_aptos_transaction_executor::poll_interval(),
+            u8::from(mono_move_aptos_transaction_executor::cache_aligned_regions()),
         );
 
         let mut phases = String::new();

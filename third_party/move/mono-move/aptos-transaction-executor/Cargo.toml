@@ -20,6 +20,7 @@ aptos-types = { workspace = true }
 aptos-vm-environment = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
+mono-move-alloc = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-global-context = { workspace = true }
 mono-move-loader = { workspace = true }

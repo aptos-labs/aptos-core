@@ -13245,6 +13245,7 @@ dependencies = [
  "aptos-vm-environment",
  "bcs 0.1.4",
  "bytes",
+ "mono-move-alloc",
  "mono-move-aptos-state-view-providers",
  "mono-move-core",
  "mono-move-global-context",

@@ -14,6 +14,18 @@ pub struct MemoryRegion {
     layout: Layout,
 }
 
+/// Whether regions start on and fill whole 128-byte blocks (a cache line and
+/// its prefetch pair), so no other allocation shares their cache lines. Set by
+/// `MONO_ALIGN_REGIONS=1`.
+//
+// TODO(cleanup): experiment flag.
+pub fn cache_aligned_regions() -> bool {
+    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *FLAG.get_or_init(|| std::env::var("MONO_ALIGN_REGIONS").is_ok_and(|v| v == "1"))
+}
+
+const CACHE_BLOCK: usize = 128;
+
 // SAFETY: A region uniquely owns its allocation and holds no thread-affine
 // state, so moving that ownership to another thread is sound. Deliberately not
 // `Sync`: callers write through `as_ptr` with no synchronization.
@@ -97,7 +109,12 @@ impl MemoryRegion {
     /// `handle_alloc_error` on OOM.
     fn new<const ZEROED: bool>(size: usize) -> Self {
         assert!(size > 0);
-        let layout = Layout::from_size_align(size, MAX_ALIGN).expect("invalid memory layout");
+        let (size, align) = if cache_aligned_regions() {
+            (size.next_multiple_of(CACHE_BLOCK), CACHE_BLOCK)
+        } else {
+            (size, MAX_ALIGN)
+        };
+        let layout = Layout::from_size_align(size, align).expect("invalid memory layout");
         // SAFETY: layout is valid (power-of-two alignment, non-zero size). Null
         // is checked below.
         let ptr = unsafe {
