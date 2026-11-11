@@ -2840,14 +2840,6 @@ theorem Carriers.nominalCodec_unit [Carriers] (source : StructHandle) (productiv
 
 instance [Θ : Carriers] (index : Nat) : Inhabited (Carriers.carrier index) := Θ.inhabited index
 
-/-- A type parameter's lent values are inhabited, as its certified ones are. -/
-instance [Θ : Carriers] (index : Nat) : Inhabited ((Carriers.lent index).carrier) :=
-  (Θ.lent index).inhabited
-
-/-- A type parameter's lent values are inhabited at any lent layer. -/
-instance (F : PlainFamily) (index : Nat) : Inhabited ((F.lent index).carrier) :=
-  (F.lent index).inhabited
-
 /-- A type parameter's order compares equal only equal values: its codec's
 encodings are, by the runtime order. -/
 instance [Θ : Carriers] {index : Nat} {rank : ValueRanks} :
@@ -10868,7 +10860,7 @@ def NTy.plainInhabitantOf (F : PlainFamily) : (τ : NTy) → τ.inhabitable = tr
   | .ref referent, inhabitable =>
       let value := NTy.plainInhabitantOf F referent (by simpa [NTy.inhabitable] using inhabitable)
       (value, value)
-  | .param _, _ => default
+  | .param index, _ => (F.lent index).inhabited.default
   | .function _ _ _, inhabitable => absurd inhabitable (by simp [NTy.inhabitable])
   | .nominal source arguments true, inhabitable =>
       F.nominals.nominalInhabitant source (NRow.plainSortsOf F arguments)
