@@ -144,9 +144,6 @@ pub enum RuntimeError {
     #[error("BCS deserialize: cannot deserialize a signer")]
     BCSSignerNotDeserializable,
 
-    #[error("BCS deserialize: invalid {what} tag {tag}")]
-    BCSInvalidWireTag { what: &'static str, tag: u64 },
-
     #[error("BCS deserialize: malformed function value ({0})")]
     BCSInvalidClosure(&'static str),
 
@@ -189,7 +186,6 @@ impl RuntimeError {
             | BCSInvalidBool { .. }
             | BCSSignerNotDeserializable
             | BCSInvalidEnumTag { .. }
-            | BCSInvalidWireTag { .. }
             | BCSInvalidClosure(_) => true,
 
             MalformedStringArgument
@@ -262,7 +258,6 @@ impl IntoExecutionError for RuntimeError {
             | BCSInvalidBool { .. }
             | BCSSignerNotDeserializable
             | BCSInvalidEnumTag { .. }
-            | BCSInvalidWireTag { .. }
             | BCSInvalidClosure(_)
             | MalformedStringArgument
             | ObjectArgumentDoesNotExist

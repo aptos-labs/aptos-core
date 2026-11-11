@@ -30,10 +30,7 @@ use crate::{
         write_ptr, write_u32,
     },
     types::VEC_DATA_OFFSET,
-    value_conv::{
-        layout_wire::{read_closure_header, walk_capture_pair, ClosureHeader},
-        v1_layout::to_v1_type_layout,
-    },
+    value_conv::v1_layout::to_v1_type_layout,
 };
 use mono_move_core::{
     intern_type_tag,
@@ -49,9 +46,14 @@ use mono_move_core::{
     TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::{
-    account_address::AccountAddress, function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
-    language_storage::TypeTag, value::check_layout_within_bounds,
+    account_address::AccountAddress,
+    function::{ClosureMask, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
+    identifier::{IdentStr, Identifier},
+    language_storage::{ModuleId, TypeTag},
+    value::{check_layout_within_bounds, MoveTypeLayout},
 };
+use serde::de::DeserializeSeed;
+use std::marker::PhantomData;
 
 /// Returns the fixed BCS size of a value of the given type, or [`None`] when it
 /// is data-dependent (e.g., for vectors, enums, function values) or the type
@@ -860,18 +862,50 @@ fn deserialize_closure<T: LayoutProvider + ?Sized>(
         ))
     })?;
 
-    let header = read_closure_header(bytes, cursor)?;
-    let func_ref = intern_closure_target(interner, &header)?;
+    // A closure is a BCS sequence of `5 + 2n` elements: the header, then a
+    // `(layout, value)` pair per captured value.
+    let len = read_uleb128_len(bytes, cursor)?;
+    if len < 5 || (len - 5) % 2 != 0 {
+        return Err(RuntimeError::BCSInvalidClosure("sequence length").into());
+    }
+    let version = decode_prefix(PhantomData::<u16>, bytes, cursor, "format version")?;
+    if version != FUNCTION_DATA_SERIALIZATION_FORMAT_V1 {
+        return Err(RuntimeError::BCSInvalidClosure("format version").into());
+    }
+    let module_id = decode_prefix(PhantomData::<ModuleId>, bytes, cursor, "module id")?;
+    let func_name = decode_prefix(PhantomData::<Identifier>, bytes, cursor, "function name")?;
+    let ty_args = decode_prefix(PhantomData::<Vec<TypeTag>>, bytes, cursor, "type arguments")?;
+    let mask = decode_prefix(PhantomData::<ClosureMask>, bytes, cursor, "mask")?;
+    let captured = u64::from(mask.captured_count());
+    // BCS sequences are length-prefixed, so this also rejects trailing
+    // elements.
+    if len - 5 != 2 * captured {
+        return Err(RuntimeError::BCSInvalidClosure("capture count").into());
+    }
+    let func_ref = intern_closure_target(interner, &module_id, &func_name, &ty_args)?;
 
-    // The capture pairs stay as wire bytes, so the walk only has to find where
-    // they end.
+    // The captured values stay wire bytes, so they are decoded only to find
+    // where they end. A value carries no length, so its layout is needed to
+    // read past it.
+    //
+    // TODO(correctness): move-core's decoder differs from V1's on bytes only
+    // `from_bytes` can supply. It rejects a captured `signer`, which V1 decodes,
+    // and accepts decorated struct layouts, which V1 rejects. A closure
+    // capturing a `signer` has no `store`, and V1 never writes decorated
+    // layouts.
     let blob_start = *cursor;
-    for _ in 0..header.captured {
-        walk_capture_pair(bytes, cursor)?;
+    for _ in 0..captured {
+        let layout = decode_prefix(
+            PhantomData::<MoveTypeLayout>,
+            bytes,
+            cursor,
+            "captured layout",
+        )?;
+        decode_prefix(&layout, bytes, cursor, "captured value")?;
     }
     let blob = &bytes[blob_start..*cursor];
 
-    let captured_data = if header.captured == 0 {
+    let captured_data = if captured == 0 {
         // A non-capturing closure carries no captured-data object, exactly as
         // `PackClosure` leaves it.
         std::ptr::null_mut()
@@ -910,11 +944,28 @@ fn deserialize_closure<T: LayoutProvider + ?Sized>(
         write_closure_func_ref_and_mask(
             closure,
             &ClosureFuncRef::Unresolved(func_ref),
-            header.mask,
+            mask.bits(),
         );
         write_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET, captured_data);
     }
     Ok(closure)
+}
+
+/// Decodes one value with `seed` from the front of `bytes[cursor..]` and
+/// advances the cursor past it. `what` names the part of a closure being
+/// decoded, for the error.
+fn decode_prefix<'b, S: DeserializeSeed<'b>>(
+    seed: S,
+    bytes: &'b [u8],
+    cursor: &mut usize,
+    what: &'static str,
+) -> Result<S::Value, RuntimeError> {
+    let rest = bytes.get(*cursor..).ok_or(RuntimeError::BCSEof)?;
+    let (value, used) = bcs::from_bytes_seed_prefix(seed, rest)
+        .map_err(|_| RuntimeError::BCSInvalidClosure(what))?;
+    // `used` is at most `rest.len()`, so this stays within `bytes`.
+    *cursor += used;
+    Ok(value)
 }
 
 /// Interns a decoded closure header's `(module, name, type arguments)` into the
@@ -923,28 +974,27 @@ fn deserialize_closure<T: LayoutProvider + ?Sized>(
 /// allocation each new identity costs.
 fn intern_closure_target(
     interner: &dyn Interner,
-    header: &ClosureHeader<'_>,
+    module_id: &ModuleId,
+    func_name: &IdentStr,
+    ty_args: &[TypeTag],
 ) -> Result<InternedFunctionRef, RuntimeError> {
-    let bad_ty_args = || RuntimeError::BCSInvalidClosure("type arguments");
-    let tags = bcs::from_bytes::<Vec<TypeTag>>(header.ty_args).map_err(|_| bad_ty_args())?;
-    let mut ty_args = Vec::with_capacity(tags.len());
-    for tag in &tags {
-        ty_args.push(intern_type_tag(tag, interner).map_err(|_| bad_ty_args())?);
+    let mut interned_ty_args = Vec::with_capacity(ty_args.len());
+    for tag in ty_args {
+        interned_ty_args.push(
+            intern_type_tag(tag, interner)
+                .map_err(|_| RuntimeError::BCSInvalidClosure("type arguments"))?,
+        );
     }
     Ok(interner.function_ref_of(
-        interner.module_id_of(&header.address, header.module_name),
-        interner.identifier_of(header.func_name),
-        interner.type_list_of(&ty_args),
+        interner.module_id_of(module_id.address(), module_id.name()),
+        interner.identifier_of(func_name),
+        interner.type_list_of(&interned_ty_args),
     ))
 }
 
 /// Borrows the next `n` bytes, advancing the cursor. Returns an error if
 /// there is not enough bytes to read or the size of the slice overflows.
-pub(crate) fn read_slice<'b>(
-    bytes: &'b [u8],
-    cursor: &mut usize,
-    n: usize,
-) -> Result<&'b [u8], RuntimeError> {
+fn read_slice<'b>(bytes: &'b [u8], cursor: &mut usize, n: usize) -> Result<&'b [u8], RuntimeError> {
     let end = cursor.checked_add(n).ok_or(RuntimeError::BCSEof)?;
     if end > bytes.len() {
         return Err(RuntimeError::BCSEof);
@@ -958,7 +1008,7 @@ pub(crate) fn read_slice<'b>(
 // reimplementing the encode/decode here.
 
 /// Writes ULEB128-encoded length data.
-pub(crate) fn write_uleb128_len(out: &mut Vec<u8>, mut v: u64) {
+fn write_uleb128_len(out: &mut Vec<u8>, mut v: u64) {
     loop {
         let mut byte = (v & 0x7F) as u8;
         v >>= 7;
@@ -2333,14 +2383,13 @@ mod tests {
     /// `closure` must be a live closure object whose captures are described by
     /// `layouts`.
     unsafe fn serialize_closure_value(layouts: &ValueLayoutTable, closure: *mut u8) -> Vec<u8> {
-        let slot = closure as u64;
         let mut out = vec![];
-        // SAFETY: a `u64` holding the closure pointer is exactly a function
+        // SAFETY: a slot holding the closure pointer is exactly a function
         // value's in-memory image.
         unsafe {
             serialize_impl(
                 layouts,
-                &slot as *const u64 as *const u8,
+                closure_slot(&closure),
                 &ValueLayout::function(),
                 &mut out,
             )
@@ -2349,19 +2398,25 @@ mod tests {
         out
     }
 
-    /// Decodes `bytes` under `layout` onto `heap`, returning the value's
-    /// in-memory image.
+    /// Views a slot holding a closure pointer as a function value's image.
+    /// The slot keeps the pointer's type, so it keeps its provenance.
+    fn closure_slot(slot: &*mut u8) -> *const u8 {
+        slot as *const *mut u8 as *const u8
+    }
+
+    /// Decodes `bytes` under `layout`, a heap-boxed value, onto `heap` and
+    /// returns its heap pointer.
     ///
     /// # Safety
     ///
-    /// `layout` must describe a value that fits one 8-byte slot.
-    unsafe fn decode_word(
+    /// `layout` must describe a value held as one heap pointer.
+    unsafe fn decode_ptr(
         heap: &mut Heap,
         layouts: &ValueLayoutTable,
         layout: &ValueLayout,
         bytes: &[u8],
-    ) -> [u8; 8] {
-        let mut slot = 0u64;
+    ) -> *mut u8 {
+        let mut slot = std::ptr::null_mut::<u8>();
         let mut cursor = 0;
         // SAFETY: forwarded to the caller.
         unsafe {
@@ -2371,12 +2426,26 @@ mod tests {
                 layout,
                 bytes,
                 &mut cursor,
-                &mut slot as *mut u64 as *mut u8,
+                &mut slot as *mut *mut u8 as *mut u8,
                 None,
             )
             .unwrap()
         };
-        slot.to_ne_bytes()
+        slot
+    }
+
+    /// Writes heap pointer `capture` as the first captured value of `closure`.
+    /// Copying it in as bytes would drop its provenance.
+    ///
+    /// # Safety
+    ///
+    /// `closure` must be a capturing closure whose first capture is a pointer.
+    unsafe fn write_captured_ptr(closure: *mut u8, capture: *mut u8) {
+        // SAFETY: forwarded to the caller.
+        unsafe {
+            let captured_data = read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET);
+            write_ptr(captured_data, CAPTURED_DATA_VALUES_OFFSET, capture);
+        }
     }
 
     /// Publishes the layout of a closure's captured values, one field per
@@ -2480,13 +2549,14 @@ mod tests {
         let encoded = bcs::to_bytes(&elems).unwrap();
         let mut heap = Heap::new(4096);
         let out = unsafe {
-            let values = decode_word(
+            let vec_ptr = decode_ptr(
                 &mut heap,
                 &layouts,
                 layouts.layout(vec_id).unwrap(),
                 &encoded,
             );
-            let closure = build_closure(&mut heap, &func_ref, 0b1, Some(layout_id), &values);
+            let closure = build_closure(&mut heap, &func_ref, 0b1, Some(layout_id), &[0; 8]);
+            write_captured_ptr(closure, vec_ptr);
             serialize_closure_value(&layouts, closure)
         };
 
@@ -2508,13 +2578,8 @@ mod tests {
         let mut heap = Heap::new(4096);
         let out = unsafe {
             let inner = build_closure(&mut heap, &func_ref, 0, None, &[]);
-            let outer = build_closure(
-                &mut heap,
-                &func_ref,
-                0b1,
-                Some(layout_id),
-                &(inner as u64).to_ne_bytes(),
-            );
+            let outer = build_closure(&mut heap, &func_ref, 0b1, Some(layout_id), &[0; 8]);
+            write_captured_ptr(outer, inner);
             serialize_closure_value(&layouts, outer)
         };
 
@@ -2529,13 +2594,12 @@ mod tests {
     fn assert_capture_unsupported(layouts: &ValueLayoutTable, layout_id: LayoutId, values: &[u8]) {
         let func_ref = test_func_ref(EMPTY_TYPE_LIST);
         let mut heap = Heap::new(1 << 20);
-        let slot =
-            unsafe { build_closure(&mut heap, &func_ref, 0b1, Some(layout_id), values) as u64 };
+        let closure = unsafe { build_closure(&mut heap, &func_ref, 0b1, Some(layout_id), values) };
         let mut out = vec![];
         let err = unsafe {
             serialize_impl(
                 layouts,
-                &slot as *const u64 as *const u8,
+                closure_slot(&closure),
                 &ValueLayout::function(),
                 &mut out,
             )
@@ -2597,7 +2661,7 @@ mod tests {
         let func_ref = test_func_ref(EMPTY_TYPE_LIST);
 
         let mut heap = Heap::new(4096);
-        let slot = unsafe {
+        let closure = unsafe {
             let closure = build_closure(
                 &mut heap,
                 &func_ref,
@@ -2607,14 +2671,14 @@ mod tests {
             );
             let captured_data = read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET);
             *captured_data.add(CAPTURED_DATA_TAG_OFFSET) = 0xAB;
-            closure as u64
+            closure
         };
 
         let mut out = vec![];
         let result = unsafe {
             serialize_impl(
                 &layouts,
-                &slot as *const u64 as *const u8,
+                closure_slot(&closure),
                 &ValueLayout::function(),
                 &mut out,
             )
@@ -2801,7 +2865,37 @@ mod tests {
         let bytes = closure_wire(0b1, &[], &[(MoveTypeLayout::Signer, vec![0u8; 33])]);
         assert!(matches!(
             closure_decode_err(&bytes),
-            RuntimeError::Unsupported(_)
+            RuntimeError::BCSInvalidClosure("captured value")
+        ));
+    }
+
+    #[test]
+    fn deserialize_closure_rejects_deeply_nested_layout() {
+        // A captured layout of 1000 nested vectors, one byte per level. The
+        // decode stops at BCS's container depth limit, well before the stack
+        // runs out.
+        let vector_tag =
+            bcs::to_bytes(&MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8))).unwrap()[0];
+        let mut bytes = expected_header(0b1, &[]);
+        bytes.extend(std::iter::repeat_n(vector_tag, 1000));
+        bytes.extend(bcs::to_bytes(&MoveTypeLayout::U8).unwrap());
+        assert!(matches!(
+            closure_decode_err(&bytes),
+            RuntimeError::BCSInvalidClosure("captured layout")
+        ));
+    }
+
+    #[test]
+    fn deserialize_closure_rejects_deeply_nested_closures() {
+        // Each of 200 levels captures the closure below it. The decode stops at
+        // move-core's value depth limit, well before the stack runs out.
+        let mut bytes = expected_header(0, &[]);
+        for _ in 0..200 {
+            bytes = closure_wire(0b1, &[], &[(MoveTypeLayout::Function, bytes)]);
+        }
+        assert!(matches!(
+            closure_decode_err(&bytes),
+            RuntimeError::BCSInvalidClosure("captured value")
         ));
     }
 
