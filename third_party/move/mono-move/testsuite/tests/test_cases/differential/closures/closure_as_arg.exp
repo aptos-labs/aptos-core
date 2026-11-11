@@ -76,6 +76,8 @@ fun apply() {
     0: CallClosure closure=[0], provided_args=[[8](8)] @2
     1: Move8 [0] <- [40] @3
     2: Return @3
+  safe_point_layouts:
+    0: []
 }
 
 fun run() {
