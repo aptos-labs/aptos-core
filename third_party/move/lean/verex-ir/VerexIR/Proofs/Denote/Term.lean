@@ -4701,12 +4701,18 @@ noncomputable def ResultShape.finish [Carriers] {State : Type} {Γ : NRow} (site
   | .break_ _ _ => Spec.bottom
   | .continue_ _ _ => Spec.bottom
 
-/-- A compiled function interpreted in a given carrier family and state. -/
+/-- A compiled function interpreted in a given carrier family and state.
+Its scoped dictionary parameters are checked at entry, as the runtime checks
+them, so that every family's entry is the one semantics. -/
 noncomputable def Function.denoteIn [C : Carriers] {State : Type}
     (operations : InterpreterOps unit C State) (f : Function unit) (args : HList f.params) :
     Spec State Failure f.result.carrier :=
-  Spec.bind (f.body.denoteIn operations (initialEnv f.params f.locals f.frame_eq args))
+  let body := Spec.bind (f.body.denoteIn operations (initialEnv f.params f.locals f.frame_eq args))
     (f.result.finish f.exitSite f.mutables)
+  match f.scopedMethods with
+  | [] => body
+  | _ :: _ =>
+      if scopedValues unit f.scopedMethods (HList.encode args).toArray then body else Spec.stuck
 
 /-- The denotation of a function on native arguments, with calls meaning
 what `meaning` says. -/
