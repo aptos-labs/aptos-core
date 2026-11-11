@@ -44,10 +44,10 @@ are four axes of it, and a few defects of single producers beside them.
 
 | Axis | The two spellings | What it causes | Fixed by |
 |---|---|---|---|
-| Declaration | a declaration's constant (`<decl>.eqb`, `.ofDeepHolds`, `.readPlain`) against its structural row (`Sum.inr …`, `x.val.fst`, `Which.project?`) | NOMINAL (41 headlines, 16 tests), variant projection (7) | native nominal values (S5, S6) |
+| Declaration | a declaration's constant (`<decl>.eqb`, `.ofDeepHolds`, `.readPlain`) against its structural row (`Sum.inr …`, `x.val.fst`, `Which.project?`) | NOMINAL (41 headlines, 16 tests), variant projection (7) | native nominal values (S4, S5) |
 | Layer | a value at its certified carrier against its plain layer (`ofDeepHolds`, `forget`, `plainOf toPlain τ` against `τ.carrier`); an element default at the certified layer, at the plain layer, and through an `Inhabited` instance of a parameter's carrier | ELEM (55, 7 tests), SUB (40, 11 tests), the selected-clause duplication, probably `no_violation` | one element default (D4), the leaf form of a certified value (D1) |
 | Family | a generic callee's values at the induced family against the caller's (`Carriers.lent i`, induced ascriptions, erased transports) | `OrderedMap` at 2–4× its cost, seven targets over their caps; the consumer repairs `canonicalFamilyResult`, `forgottenParameterEquation`, `forgottenVectorEquation`, `selectedForgottenValue`, `plainParameterField` | instantiation at the caller's row (D2) |
-| Frame | a family or frame by name against its unfolded constructor literal | the cost of every pass that walks a wide family literal (measured: one `grind` step nine times dearer); the repair `abstractRuntimeFrames` | families and frames as names (D3) |
+| Frame | a family's constructor literal, which a reduction exposes, at the width of what it spells inline | the cost of every pass that walks a wide literal (measured: one `grind` step nine times dearer with twenty flat fields) | a narrow literal: a group of operations is one field naming a bundle (D3) |
 
 Single producers: a closure's behavior stated at two sites (46 headlines, 10
 tests); loan-death facts missing on an aborting path, which leaves loop
@@ -99,19 +99,26 @@ certified value owes that fact.
 - The walk's environment keeps one certified spelling, `ofDeepHolds τ x h`,
   and each walk-time selection (`selectCertified`, `projectCertified?`,
   `getCertified?`) has one equation at it, so a leaf is plain.
-- Three operations take a certified term and outlive the walk: a memory write,
-  an opaque specification function's result, and an element default. Each gets
-  a plain named operation whose equation takes the fact as a side condition.
-  An opaque specification function's result of a declared type keeps its
-  invariant, as a lemma beside the function's plain constant.
-- The fold is protected: the `deepHolds` equations leave the normal form and
-  the hypothesis split does not open a certificate. A fact is opened by one
-  pass at the leaf's boundary, keyed by the plain value. Facts exist per
-  binder and never per projection, so two certificates of one value are one
-  hypothesis.
+- Two operations take a certified term and outlive the walk: a memory write
+  and an element default. A write gets a plain operation at the frame
+  (`Skolems.plainAt`, `writePlain`) whose read-over-write equation takes the
+  fact as a side condition; the default is the plain one. An opaque
+  specification function's result of a declared type is a plain value with no
+  invariant, as it is today: giving it one would be a new assumption.
+- The fold is a one-field structure, `NTy.Holds τ x`, which no transparency
+  setting opens; a declaration's opening is one generated theorem. The
+  `deepHolds` equations leave the normal form and the hypothesis split does
+  not open a certificate, in the same step that introduces the fold, so a
+  leaf never holds two names for one fact. A fact is opened by one pass at
+  the leaf's boundary, keyed by the plain value. Facts exist per binder and
+  never per projection, so two certificates of one value are one hypothesis.
 - Statement forms: `Contract.atPlain` with its `satisfies` and summary rules,
   and one `EnsuresOfPlain` in place of `EnsuresOfEntries`, `EnsuresOfSettled`
-  and the inline existential over finals.
+  and the inline existential over finals; it is equivalent to `EnsuresOf`
+  because a row's settled entries and finals determine it.
+- A clause's binder over a declared type, certified today, becomes the plain
+  value guarded by the fact. Parameters of lemmas and of recursive
+  specification functions stay plain without a fact, as today.
 - It is independent of the layout, so it lands on the structural layout before
   the nominal work and deletes the layer repairs that work would otherwise
   port.
@@ -142,18 +149,15 @@ family.
   that half of it, where today only calls at reference-holding arguments do.
   `assumptions.md` and `denotation.md` say so.
 
-**D3. Families as names.** A family, a frame and an interpretation are named
-constants that are not reducible, with one equation per data field
-(`Carriers.runtime`, `Skolems.runtime`, `Carriers.toPlain`,
-`FunctionCarriers.runtime`, `Carriers.ground`, `Skolems.type`, the
-`GivenFrame` and `Interpretation` builders, the per-unit instances). A proof
-field has no equation, which is what keeps a pass from walking its statement.
-The interpreters of a type code (`NTy.carrier`, `NTy.plainOf`, `NTy.subst`,
-`NTy.unmark`) and the generated code literals stay reducible: their reduction
-is driven by the code and is what gives a binder its native type.
-`Carriers.instantiate` and `Skolems.instantiate` follow with D2, which removes
-what reads their structure. `abstractRuntimeFrames` goes with D3 where the
-step's gate holds without it.
+**D3. A narrow family literal.** A family stays reducible, and what its
+constructor literal spells inline is kept narrow: a group of operations a
+family carries is one field that names a definition which is not reducible
+(`NominalFunctor`, a unit's `NominalCarriers`), so a pass that walks the
+literal meets a name. Making the family, the frame and the interpretation
+themselves names was measured and is rejected
+([`transitions.md`](transitions.md), "Levers tried and rejected"): the normal
+form relies on their reduction, and no subset of them could be named with the
+tests green.
 
 **D4. Native sorts.** A binder's type is the native Lean type that
 `NTy.carrier` already reduces to at every code but a parameter, a function
@@ -183,50 +187,64 @@ summaries of instances; the contract at a row; then the deletions. Gate:
 carriers with no transport in a leaf, then every `OrderedMap` target within
 its cap; the cost benchmarks unchanged or lower.
 
-**S3. Families as names** (D3). Gate: no new diagnostic at a location that was
-clean; the cost benchmarks unchanged or lower.
-
-**S4. The leaf form of a certified value** (D1), on the structural layout.
+**S3. The leaf form of a certified value** (D1), on the structural layout.
 Authored proofs that name a row's components are rewritten, and the proof
 language gains the steps that open and apply a value's invariant. Gate: the
 SUB and ELEM groups and the selected-clause targets closed, a group that stays
 red re-diagnosed from its leaf; `bitwise_table::add_fail_exists` and `mut_ref`
-at or under their present cost.
+at or under their present cost; `Check/Storage/TableAllocation`'s `duplicate`
+and `verify_table`'s `add_fail_exists` verified (one leaf, decidable and over
+its cap because two spellings of a map's entries are each prepared); and
+`NominalCertificateFrames`, whose value is read from storage at a generic
+resource type and has no fact today.
 
-**S5. Model and generation of nominal declarations**
+**S4. Model and generation of nominal declarations**
 ([`native-nominal-types.md`](native-nominal-types.md), stages 2 and 3): the
 native type, its codec at the storage boundary, its predicate over the native
 value (the own clauses no longer read an encoding), the one-layer model, and
 the unit's instance as a named definition. Gate: a hand-written fixture, then
 generated declarations, with nothing emitted and no baseline moved.
 
-**S6. Nominal operations and emission** (stages 4 and 5). Field, variant and
+**S5. Nominal operations and emission** (stages 4 and 5). Field, variant and
 construction operations denote through the model to native projections and
 constructors; every generated declaration is a nominal. The descriptor
 constants, the `supports` premise and each repair whose producer is gone are
 deleted. Gate: the Declaration row of the diagnosis closed; cost at or under
 the parent's on every benchmark target.
 
-**S7. The single producers**, each with its own fixtures, in this order: a
+**S6. The single producers**, each with its own fixtures, in this order: a
 closure's behavior at its target and full row; loan-death facts on the
 aborting path, with the boundary instances of loop invariants; a lender that
 carries its operands as evaluated at the borrow, which removes the index-write
 refusal; the returned reborrow; a holder that owes what it stores. They are
-independent of S2–S6 and of each other, and one of them proceeds beside
+independent of S2–S5 and of each other, and one of them proceeds beside
 another step where its files are disjoint.
 
-**S8. One obligation system.** Behavioural clauses of a data invariant go into
+**S7. One obligation system.** Behavioural clauses of a data invariant go into
 the carrier; the stored-invariant layer and the markers that check nothing are
 removed.
 
-**S9. The remainder.** The masked failures are rerun. A target still over a
+**S8. The remainder.** The masked failures are rerun. A target still over a
 budget is profiled by step and its term reduced; no budget, guard or
-specification is edited to pass.
+specification is edited to pass. Three items are known:
 
-**S10. The structural layout** is removed for what S6 left to it, after the
+- The Rust branch raised verification cost by 10–17% on the composition
+  targets and re-recorded the cost baselines; `StateLabelCallObservations` and
+  `CertifiedFieldProjections` exceed their budgets by that margin. The
+  increase is attributed by step and reversed, and the baselines re-recorded
+  downward.
+- A leaf that is decidable and reported as not established because it is
+  prepared once per attempt: the preparation is done once.
+- Two failures the Rust branch introduced that are no second spelling of ours:
+  `GivenExecution` states a term form that changed (the test is repaired),
+  and `NominalNormal` shows a substitution whose parameter arm removes a mark
+  while the normal form's replacement of a parameter does not (the place
+  where a mark is removed is decided once, then both follow it).
+
+**S9. The structural layout** is removed for what S5 left to it, after the
 model of an abstract-layout map owner.
 
-**S11. Recursive declarations**
+**S10. Recursive declarations**
 ([`native-nominal-types.md`](native-nominal-types.md), stage 6).
 
 Global invariants and the audit of native models stay in

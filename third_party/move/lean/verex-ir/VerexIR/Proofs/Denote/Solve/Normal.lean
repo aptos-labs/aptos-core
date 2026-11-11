@@ -136,6 +136,23 @@ simproc [vir_denote_norm] nominalEquality
   nominalOperation e (e.getArg! 2)
     #[``NTy.equal_struct_handle, ``NTy.equal_struct] #[``NTy.equal_enum]
 
+/-- The program's equality observes the named declaration's structural
+comparison, as a clause's does (`nominalEquality`): a struct's row, a
+variant's variants. -/
+simproc [vir_denote, vir_denote_norm] nominalEqb
+    (@NTy.eqb ?carriers _ _ _) := fun e => do
+  nominalOperation e (e.getArg! 1) #[``NTy.eqb_struct] #[``NTy.eqb_enum]
+
+/-- A value of a named declaration certified from a plain one is that plain
+value, by the declaration's own equation at the certificate, which the
+comparison above leaves on both of its sides. -/
+simproc [vir_denote, vir_denote_norm] nominalCertifiedValue
+    (@Subtype.val _ _ _) := fun e => do
+  let value := e.appArg!.consumeMData
+  unless value.isAppOfArity ``NTy.ofDeepHolds 4 do return .continue
+  nominalOperation e (value.getArg! 1)
+    #[``NTy.ofDeepHolds_struct_val] #[``NTy.ofDeepHolds_enum_val]
+
 /-- A named declaration is a constructed type. Select its structural order
 before the generic order's parameter alternative can become a proof case.
 Keep the nominal owner on both forgetful reads. -/
@@ -535,7 +552,96 @@ simproc ↓ [vir_denote_norm] bindAction (VerexIR.Proofs.Spec.bind _ _) := bindA
 simproc ↓ [vir_denote_norm] flowBindAction (@VerexIR.Proofs.Denote.Flow.bind ?carriers _ _ _ _ _ _ _) :=
   bindActionStep
 
+/-- The callees whose body compiled at a row the verification published, by
+the unit they belong to: each the call's handle and its type arguments, as
+the certificate `compileFunctionAt unit handle (some θ) = .ok …` the walk is
+given states them. Recorded where that certificate is collected
+(`collectInstances`), so the rewrite below never outruns it. -/
+-- The branch's own state: a proof elaborating in a task of the command that
+-- collected the row reads what that command recorded, and a record made
+-- anywhere else is discarded, which leaves the rewrite unavailable rather
+-- than unfounded.
+initialize compiledRows : EnvExtension (Std.HashMap Name (Array (Lean.Expr × Lean.Expr))) ←
+  registerEnvExtension (pure {}) (asyncMode := .local)
 
+/-- Record that the callee `handle` of the unit `unit` has a body compiled at
+the type arguments `θ`, whose certificate a caller's proof is given. -/
+def recordCompiledRow (unit : Name) (handle θ : Lean.Expr) : CoreM Unit :=
+  modifyEnv fun env => compiledRows.modifyState env fun rows =>
+    rows.insert unit ((rows.getD unit #[]).push (handle, θ))
+
+/-- The rows published for the unit `unit` names, none where it is no
+constant of a verified unit. -/
+def compiledRowsOf (unit : Lean.Expr) : MetaM (Array (Lean.Expr × Lean.Expr)) := do
+  let some name := unit.constName? | return #[]
+  return (compiledRows.getState (← getEnv)).getD name #[]
+
+/-- Whether `rows` holds the callee `handle` at `θ`: the handle and the row
+are compared as the certificate states them. -/
+def compiledRow? (rows : Array (Lean.Expr × Lean.Expr)) (handle θ : Lean.Expr) :
+    MetaM Bool := do
+  for (candidate, row) in rows do
+    if ← withoutModifyingState (withNewMCtxDepth
+        (isDefEq candidate handle <&&> isDefEq row θ)) then
+      return true
+  return false
+
+/-- A generic call whose callee has a body compiled at the call's type
+arguments: its action is the callee's meaning at that row
+(`specializedMeaning_closedGeneric_eq_at`), from which the instance route
+inlines the body (`inlineCompiled`, its substitution branch). This is the one
+place the head a generic call denotes is read, and it reads it before the
+head unfolds: the normalization unfolds a head it leaves standing, where the
+field body's bind stood, so every other call reads as that bind, term for
+term (`doc/plan/one-spelling.md`, D2).
+
+The callee's meaning is read through the field of the meanings the call is
+denoted with (`Meanings.generic`), which the normalization has not yet
+reduced when the head is first visited; the equation holds of the reduced
+spelling, and the rewrite is stated at the term as it stands. -/
+simproc ↓ [vir_denote] specializedGenericAtRow
+    (@VerexIR.Proofs.Denote.specializedMeaning ?unit ?functions ?skolems _ _ _ _ _) :=
+  fun e => do
+  let debug := verex.solverDebug.get (← getOptions)
+  let skip (reason : String) : SimpM Simp.Step := do
+    if debug then IO.println s!"    call at a row: no, {reason}"
+    return .continue
+  unless e.isAppOfArity ``VerexIR.Proofs.Denote.specializedMeaning 8 do return .continue
+  let rows ← compiledRowsOf (e.getArg! 0)
+  if rows.isEmpty then return ← skip "no body at a row of this unit"
+  let given := (e.getArg! 6).consumeMData
+  let meaning ←
+    if given.isAppOfArity ``VerexIR.Proofs.Denote.closedGeneric 10 then pure given
+    else whnfR given
+  unless meaning.isAppOfArity ``VerexIR.Proofs.Denote.closedGeneric 10 do
+    return ← skip s!"the meaning is no closed generic one: {meaning}"
+  let θ := e.getArg! 3
+  -- The call's type arguments are the head's and the callee's meaning's: one
+  -- binder of the field body, so one expression.
+  unless meaning.getArg! 7 == θ || (← isDefEq (meaning.getArg! 7) θ) do
+    return ← skip "the head and the meaning read other type arguments"
+  unless ← compiledRow? rows (meaning.getArg! 5) θ do
+    return ← skip s!"no body of {meaning.getArg! 5} at {θ}"
+  -- The rows the callee reads at the arguments are the caller's: the
+  -- equation holds where no argument carries a reference, which the
+  -- arguments decide.
+  let row ← mkAppOptM ``Subtype.val #[none, none, some θ]
+  let refFree := mkApp (mkConst ``VerexIR.Proofs.Denote.NRow.refFree) row
+  -- The arguments are a literal row: evaluated here, as the kernel evaluates
+  -- the proof of the side condition. The normalization reads its own
+  -- transparency, at which the predicate does not unfold.
+  unless (← withDefault (whnf refFree)).isConstOf ``Bool.true do
+    return ← skip "a type argument carries a reference"
+  let free ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+    (← mkEq refFree (mkConst ``Bool.true))
+  let proof := mkAppN (mkConst ``VerexIR.Proofs.Denote.specializedMeaning_closedGeneric_eq_at)
+    #[meaning.getArg! 0, meaning.getArg! 1, meaning.getArg! 2, meaning.getArg! 3,
+      meaning.getArg! 4, meaning.getArg! 5, meaning.getArg! 6, θ, free, meaning.getArg! 8,
+      meaning.getArg! 9, e.getArg! 7]
+  let some (_, _, rewritten) := (← instantiateMVars (← inferType proof)).eq?
+    | throwError "the equation of a call at its row does not state one"
+  if debug then IO.println s!"    call at a row: {meaning.getArg! 5} at {θ}"
+  return .visit { expr := rewritten, proof? := some (← mkExpectedTypeHint proof (← mkEq e rewritten)) }
 
 /-- An equation between values under the family a call's type arguments
 induce, stated as the caller reads them: the equation of their caller views

@@ -612,12 +612,19 @@ use its contract and never prove an instance of their own.
 - **Agreement.** `compileFunction_agrees` and `compileFunction_least_cycle`
   are stated over every family and instantiation: a skolem value is only
   moved, compared by its encoding, stored, and lent as a `Plain` encoding.
+- **Bodies at a row.** A callee compiled at a call's type arguments
+  (`compileFunctionAt unit handle (some θ)`, one kernel-evaluated compilation
+  per distinct `θ`) is what an inlined generic call is reasoned over, so that
+  no leaf is typed at the family the arguments induce: the agreement theorem's
+  half at a substitution carries every such call, and the walk reaches it by
+  one equation at the call's meaning
+  (`specializedMeaning_closedGeneric_eq_at`). A call whose callee has no body
+  at its row keeps the callee's generic meaning at the induced family.
 - **Instances at a reference.** A type argument holding a mutable reference
   (Rust) is not `Plain`, and no generic theorem transfers to it: dropping the
   parameter resolves a prophecy the generic proof never saw. Such a call is
-  `Term.callInstance`, and the callee is compiled at the arguments
-  (`compileFunctionAt unit handle (some θ)`, one kernel-evaluated compilation
-  per distinct `θ`) and inlined, verified monomorphically. `compileFunction_agrees`
+  `Term.callInstance`, compiled at the arguments and inlined, verified
+  monomorphically. `compileFunction_agrees`
   covers it, `compileFunction_least_cycle` and the `refFree` transfer theorems do
   not: a callee dropping the parameter is rejected at the call (`dropsDestructor`),
   and a native, opaque or recursive callee at such a type is rejected, its generic

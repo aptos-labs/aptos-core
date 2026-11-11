@@ -129,6 +129,22 @@ theorem satisfies_summary (contract : Contract σ ε Args Result) :
   refine ⟨fun result final h => ⟨h.2.1, h.2.2.1, h.2.2.2⟩, fun error h => h.2, ?_⟩
   simp [Contract.summary, permitted]
 
+/-- A contract of other arguments and another result: each condition read
+through a map of the arguments, and the postcondition and the frame also
+through a map of the result.  The image of a contract stated at one layer in
+another (`Contract.atPlain`). -/
+def Contract.comap {σ ε Args Result Args' Result' : Type} (contract : Contract σ ε Args Result)
+    (arguments : Args' → Args) (result : Result' → Result) : Contract σ ε Args' Result' where
+  requires := fun args initial => contract.requires (arguments args) initial
+  assumes := fun args initial => contract.assumes (arguments args) initial
+  ensures := fun args initial value final =>
+    contract.ensures (arguments args) initial (result value) final
+  aborts := fun args initial error => contract.aborts (arguments args) initial error
+  mayAbort := fun args initial => contract.mayAbort (arguments args) initial
+  mustAbort := fun args initial => contract.mustAbort (arguments args) initial
+  frame := fun args initial value final =>
+    contract.frame (arguments args) initial (result value) final
+
 /-- Range-carrying wrapper on one generated proof obligation: the
 proposition of an authored specification clause, tagged with the half-open
 byte range of that clause in the file it names.  Contract generation wraps

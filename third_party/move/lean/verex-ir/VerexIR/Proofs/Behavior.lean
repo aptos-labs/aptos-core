@@ -195,6 +195,84 @@ theorem Denote.atEntryFinals_of_holds {σs : NRow} {holds : HList σs → Prop} 
     AtEntryFinals σs holds (HList.settle σs args) (HList.finals σs args) :=
   ⟨args, rfl, rfl, held⟩
 
+/-- The two components a settled row's equation gives: the head value as the
+clause layer reads it, and the settled tail. -/
+theorem Denote.HList.settle_cons_inj {τ : NTy} {rest : NRow} {left right : HList (.cons τ rest)}
+    (settled : HList.settle (.cons τ rest) left = HList.settle (.cons τ rest) right) :
+    NTy.settle τ left.1 = NTy.settle τ right.1 ∧
+      HList.settle rest left.2 = HList.settle rest right.2 := by
+  have pair : ((NTy.settle τ left.1, HList.settle rest left.2) : HListPlain (.cons τ rest)) =
+      (NTy.settle τ right.1, HList.settle rest right.2) := settled
+  rw [Prod.mk.injEq] at pair
+  exact pair
+
+/-- A row is its head and its tail, the head read off its forgetting: the step
+every type but a mutable reference and a mutable slice reference takes, where
+settling is forgetting. -/
+theorem Denote.HList.cons_injective_of_forget {τ : NTy} {rest : NRow}
+    {left right : HList (.cons τ rest)}
+    (head : NTy.forget τ left.1 = NTy.forget τ right.1) (tail : left.2 = right.2) :
+    left = right :=
+  Prod.ext (NTy.forget_injective τ head) tail
+
+/-- A row of certified arguments is determined by its entry values and the
+finals of its mutable references: settling keeps every value a clause can
+name, and the one value it drops — the prophecy of a top-level mutable
+reference, and of a mutable slice reference its final reading — is exactly
+what `HList.finals` returns. -/
+theorem Denote.HList.settle_finals_injective : (row : NRow) → ∀ {left right : HList row},
+    HList.settle row left = HList.settle row right →
+    HList.finals row left = HList.finals row right → left = right
+  | .nil, _, _, _, _ => rfl
+  | .cons (.ref σ) rest, left, right, settled, finals => by
+      have currents : ((left.1.1, left.1.1) : (NTy.ref σ).plain) = (right.1.1, right.1.1) :=
+        (HList.settle_cons_inj settled).1
+      rw [Prod.mk.injEq] at currents
+      have parts :
+          ((left.1.2, HList.finals rest left.2) :
+            HList (NRow.finals (.cons (.ref σ) rest))) =
+            (right.1.2, HList.finals rest right.2) := finals
+      rw [Prod.mk.injEq] at parts
+      exact Prod.ext (Prod.ext currents.1 parts.1)
+        (HList.settle_finals_injective rest (HList.settle_cons_inj settled).2 parts.2)
+  | .cons (.sliceRef element) rest, left, right, settled, finals => by
+      have same : SpecSliceRef.ofArrays left.1.current left.1.current =
+          SpecSliceRef.ofArrays right.1.current right.1.current :=
+        NTy.forget_injective (.sliceRef element) (HList.settle_cons_inj settled).1
+      have current : (SpecSliceRef.ofArrays left.1.current left.1.current).currentVector =
+          (SpecSliceRef.ofArrays right.1.current right.1.current).currentVector :=
+        congrArg SpecSliceRef.currentVector same
+      have parts :
+          ((left.1.finalVector, HList.finals rest left.2) :
+            HList (NRow.finals (.cons (.sliceRef element) rest))) =
+            (right.1.finalVector, HList.finals rest right.2) := finals
+      rw [Prod.mk.injEq] at parts
+      exact Prod.ext (SpecSliceRef.ext current parts.1)
+        (HList.settle_finals_injective rest (HList.settle_cons_inj settled).2 parts.2)
+  | .cons .unit rest, _, _, settled, finals
+  | .cons .bool rest, _, _, settled, finals
+  | .cons (.int _ _) rest, _, _, settled, finals
+  | .cons .num rest, _, _, settled, finals
+  | .cons .address rest, _, _, settled, finals
+  | .cons .signer rest, _, _, settled, finals
+  | .cons .string rest, _, _, settled, finals
+  | .cons .bytes rest, _, _, settled, finals
+  | .cons .char rest, _, _, settled, finals
+  | .cons (.tuple _) rest, _, _, settled, finals
+  | .cons (.struct _ _ _) rest, _, _, settled, finals
+  | .cons (.enum _ _ _ _ _) rest, _, _, settled, finals
+  | .cons (.vector _) rest, _, _, settled, finals
+  | .cons (.slice _) rest, _, _, settled, finals
+  | .cons (.array _ _) rest, _, _, settled, finals
+  | .cons (.table _ _) rest, _, _, settled, finals
+  | .cons (.ghost _) rest, _, _, settled, finals
+  | .cons (.param _) rest, _, _, settled, finals
+  | .cons (.function _ _ _) rest, _, _, settled, finals
+  | .cons (.nominal _ _ _) rest, _, _, settled, finals
+  | .cons (.observed _) rest, _, _, settled, finals =>
+      HList.cons_injective_of_forget (HList.settle_cons_inj settled).1
+        (HList.settle_finals_injective rest (HList.settle_cons_inj settled).2 finals)
+
 /-- Certified values of a type are equal where the values they certify are:
 the entry-value equation of an argument read at its own type. -/
 theorem Denote.NTy.forget_eq_forget (τ : NTy) {left right : τ.carrier} :
@@ -277,6 +355,79 @@ theorem ensuresOfSettled_of_ensuresOfEntries {invoke : InvokeMeaning} {σs : NRo
     EnsuresOfSettled invoke σs shared σ function entries finals (NTy.forget σ prophecy)
       pre post :=
   ⟨prophecy, rfl, ensures⟩
+
+/-- `ensures_of<f>(x, r, f̄)` as a clause states it, at the plain layer: the
+entry values, the plain finals of the mutable references and the plain result
+of a run.  One form in place of `EnsuresOfEntries`, `EnsuresOfSettled` and the
+inline existential over finals; it is equivalent to `EnsuresOf`, a row being
+determined by its settled entries and its finals
+(`Denote.HList.settle_finals_injective`). -/
+def EnsuresOfPlain (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : ResultShape)
+    (function : (NTy.function σs shared shape.row).carrier) (entries : HListPlain σs)
+    (finals : HListPlain (NRow.finals σs)) (result : shape.plain)
+    (pre post : Memory unit) : Prop :=
+  ∃ (args : HList σs) (value : shape.carrier), HList.settle σs args = entries ∧
+    HList.forget (NRow.finals σs) (HList.finals σs args) = finals ∧
+    shape.forget value = result ∧
+    EnsuresOf invoke σs shared shape function args value pre post
+
+/-- A run of an invocation, read at the plain layer, is that run. -/
+theorem ensuresOfPlain_iff_ensuresOf {invoke : InvokeMeaning} {σs : NRow} {shared : Sharing}
+    {shape : ResultShape} {function : (NTy.function σs shared shape.row).carrier}
+    {args : HList σs} {result : shape.carrier} {pre post : Memory unit} :
+    EnsuresOfPlain invoke σs shared shape function (HList.settle σs args)
+        (HList.forget (NRow.finals σs) (HList.finals σs args)) (shape.forget result) pre post ↔
+      EnsuresOf invoke σs shared shape function args result pre post := by
+  constructor
+  · rintro ⟨row, value, settled, forgotFinals, forgot, ensures⟩
+    obtain rfl : row = args :=
+      Denote.HList.settle_finals_injective σs settled
+        (HList.forget_injective (NRow.finals σs) forgotFinals)
+    obtain rfl : value = result := shape.forget_injective forgot
+    exact ensures
+  · intro ensures
+    exact ⟨args, result, rfl, rfl, rfl, ensures⟩
+
+/-- The plain form states what `EnsuresOfEntries` states of a certified row of
+finals and a certified result. -/
+theorem ensuresOfPlain_iff_ensuresOfEntries {invoke : InvokeMeaning} {σs : NRow}
+    {shared : Sharing} {shape : ResultShape}
+    {function : (NTy.function σs shared shape.row).carrier} {entries : HListPlain σs}
+    {finals : HList (NRow.finals σs)} {result : shape.carrier} {pre post : Memory unit} :
+    EnsuresOfPlain invoke σs shared shape function entries
+        (HList.forget (NRow.finals σs) finals) (shape.forget result) pre post ↔
+      EnsuresOfEntries invoke σs shared shape function entries finals result pre post := by
+  constructor
+  · rintro ⟨row, value, settled, forgotFinals, forgot, ensures⟩
+    obtain rfl : value = result := shape.forget_injective forgot
+    exact ⟨row, settled, HList.forget_injective (NRow.finals σs) forgotFinals, ensures⟩
+  · rintro ⟨row, settled, finalsEq, ensures⟩
+    exact ⟨row, result, settled,
+      congrArg (HList.forget (NRow.finals σs)) finalsEq, rfl, ensures⟩
+
+/-- And what `EnsuresOfSettled` states of a returned mutable reference:
+forgetting a reference keeps its current value and forgets its prophecy, so
+the plain result of a run returning a settled one is that value twice. -/
+theorem ensuresOfPlain_iff_ensuresOfSettled {invoke : InvokeMeaning} {σs : NRow}
+    {shared : Sharing} {σ : NTy}
+    {function : (NTy.function σs shared (ResultShape.one (.ref σ)).row).carrier}
+    {entries : HListPlain σs} {finals : HList (NRow.finals σs)} {current : σ.plain}
+    {pre post : Memory unit} :
+    EnsuresOfPlain invoke σs shared (.one (.ref σ)) function entries
+        (HList.forget (NRow.finals σs) finals) (current, current) pre post ↔
+      EnsuresOfSettled invoke σs shared σ function entries finals current pre post := by
+  constructor
+  · rintro ⟨row, value, settled, forgotFinals, forgot, ensures⟩
+    refine ⟨value.2, congrArg Prod.snd forgot, row, settled,
+      HList.forget_injective (NRow.finals σs) forgotFinals, ?_⟩
+    have same : (NTy.forget σ value.2, value.2) = value :=
+      Prod.ext ((congrArg Prod.snd forgot).trans (congrArg Prod.fst forgot).symm) rfl
+    rw [same]
+    exact ensures
+  · rintro ⟨prophecy, forgotten, row, settled, finalsEq, ensures⟩
+    exact ⟨row, (NTy.forget σ prophecy, prophecy), settled,
+      congrArg (HList.forget (NRow.finals σs)) finalsEq,
+      Prod.ext forgotten forgotten, ensures⟩
 
 /-- `aborts_of<f>(x)`: the invocation of `function` on `args` aborts from
 `state`. -/

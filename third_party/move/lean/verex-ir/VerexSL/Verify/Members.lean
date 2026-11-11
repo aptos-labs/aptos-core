@@ -2505,6 +2505,40 @@ private def rejectingClosures (callee : FunctionHandle) (_ : Nat) (typeArgs : Ar
     (θ : Option TypeArgs) (found : Array ShapeCall) : Array ShapeCall :=
   found.push { callee, typeArgs, θ, closure := true }
 
+/-- Whether an inlined callee's body owes no condition of its own at a row:
+no precondition (which the caller owes at the call and the body assumes), no
+call (whose precondition the body would owe), no loop, no in-body
+specification, no assumption and no ghost state. The solver's tables key such
+a condition by its site alone, and two rows of one callee share their sites
+(`doc/plan/one-spelling.md`, D2, R1), so a body that owes one keeps its
+generic route until they are keyed by row as well. A callee whose signature
+and locals read none of its type parameters keeps it too: its generic body
+is what a summary is derived of (`summaryForm`), the route a call of it takes
+today, and its row's body is the generic one. -/
+private def inlinedWithoutConditions (unit : ValidatedUnit) (handle : FunctionHandle) : Bool :=
+  match declarationOf? unit handle, unit.namespaces[handle.namespaceId.index]? with
+  | some declaration, some ns =>
+      declaration.body != .absent && !isOpaque declaration && !onCallCycle unit handle &&
+        !usedThroughContract unit handle ns declaration &&
+        !isIntrinsic unit handle.namespaceId ns declaration &&
+        !declaresGhosts unit && !statesAssumptions ns declaration &&
+        readsTypeParameter unit ns declaration &&
+        declaration.contract.conditions.all (·.kind != .requires) &&
+        (match declaration.body with
+          | .structured root =>
+              (bodyCallees unit handle).isEmpty && !bodyLoops ns root &&
+                (bodySpecifications ns root (fun _ => true)).isEmpty
+          | _ => false)
+  | _, _ => false
+
+/-- Whether a call with type arguments is routed to the callee's body compiled
+at them rather than to its generic meaning at the family they induce
+(`doc/plan/one-spelling.md`, D2): a callee whose generic theorem does not
+transfer to the arguments, as before; and, at reference-free arguments, an
+inlined callee whose body owes no condition of its own. -/
+private def atRowCall (unit : ValidatedUnit) (handle : FunctionHandle) (θ : TypeArgs) : Bool :=
+  θ.atInstance unit handle || (θ.1.refFree && inlinedWithoutConditions unit handle)
+
 /-- Collects the callees of `m`'s body and of every inlined callee's, from
 `worklist`, into `found`: each by its contract as a hypothesis, by its
 theorem, or inlined; a closure's target with a theorem by it as well. -/
@@ -2626,7 +2660,7 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
                 m!"no denotation for the callee `{calleeKey}`: {reason}"
         liftTermElabM (publishCompiled segments unit calleeKey callee calleeCompiled)
         inlined := inlined.push (callee, calleeNs, calleeDeclaration, calleeCompiled)
-        worklist := calleeCompiled.body.callees worklist
+        worklist := calleeCompiled.body.calleesWith (atRowCall unit) worklist
         unless generic do
           instantiated := calleeCompiled.body.foldCalls (recordGenericCall unit) (fun _ _ found => found) instantiated
         edges := edges.push (callee, calleeCompiled.body.callees #[])
@@ -2672,7 +2706,7 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
               m!"no denotation for the callee `{calleeKey}`: {reason}"
       liftTermElabM (publishCompiled segments unit calleeKey callee calleeCompiled)
       inlined := inlined.push (callee, calleeNs, calleeDeclaration, calleeCompiled)
-      worklist := calleeCompiled.body.callees worklist
+      worklist := calleeCompiled.body.calleesWith (atRowCall unit) worklist
       -- As the target's own: a generic target's calls are proved over every
       -- family and instantiation, with no empty-instantiation frames.
       unless generic do
@@ -2815,9 +2849,9 @@ private def collectInstances (m : Member) (members : Array FunctionHandle)
   let inhabitants ←
     (·.arguments) <$> inhabitantsOf m.unitTerm (← declaresDataInvariants segments unit)
   let mut callees := found
-  let mut pending := m.compiled.body.instances #[]
+  let mut pending := m.compiled.body.rowCalls (atRowCall unit) #[]
   for (_, _, _, inlined) in callees.inlined do
-    pending := inlined.body.instances pending
+    pending := inlined.body.rowCalls (atRowCall unit) pending
   while let some (callee, _, θ) := pending.back? do
     pending := pending.pop
     if callees.instances.any (fun (other, _, at_, _) => other == callee && at_.1 == θ.1) then continue
@@ -2826,19 +2860,25 @@ private def collectInstances (m : Member) (members : Array FunctionHandle)
     let some calleeDeclaration := calleeNs.functions[callee.functionId.index]?
       | throwErrorAt reference "a callee is out of range"
     let calleeKey := functionKey unit callee
-    let refuse (what : String) : CommandElabM Unit := do
+    let unsupported : Option String :=
+      if calleeDeclaration.body == .absent then some "native"
+      else if isOpaque calleeDeclaration && (!θ.1.refFree || !θ.1.toList.contains .unit) then
+        some "opaque"
+      else if onCallCycle unit callee then some "on a cycle of calls"
+      else if !isOpaque calleeDeclaration &&
+          usedThroughContract unit callee calleeNs calleeDeclaration then
+        some "used through its contract"
+      else none
+    if let some what := unsupported then
+      -- A call whose callee's generic theorem transfers keeps that route; one
+      -- at a reading the theorem does not reach has nowhere else to go.
+      unless θ.atInstance unit callee do continue
       if θ.1.refFree && θ.1.toList.contains .unit then
         throwErrorAt reference m!"`{function}` calls `{calleeKey}` at a Unit specialization, \
           and `{calleeKey}` is {what}: its generic contract does not transfer to that reading"
       throwErrorAt reference m!"`{function}` calls `{calleeKey}` at a reference type argument, \
         and `{calleeKey}` is {what}: a generic contract does not transfer to a mutable \
         reference, so it has no reading there"
-    if calleeDeclaration.body == .absent then refuse "native"
-    if isOpaque calleeDeclaration && (!θ.1.refFree || !θ.1.toList.contains .unit) then
-      refuse "opaque"
-    if onCallCycle unit callee then refuse "on a cycle of calls"
-    if !isOpaque calleeDeclaration && usedThroughContract unit callee calleeNs calleeDeclaration then
-      refuse "used through its contract"
     let compiled ← match compileFunctionAt unit callee (some θ) with
       | .ok compiled => pure compiled
       | .error reason =>
@@ -2860,10 +2900,16 @@ private def collectInstances (m : Member) (members : Array FunctionHandle)
       instantiated := if generic then callees.instantiated else
         compiled.body.foldCalls (recordGenericCall unit) (fun _ _ found => found)
           callees.instantiated }
-    callees ← collectCallees m members (compiled.body.callees #[]) callees
-    pending := compiled.body.instances pending
+    -- The row the normal form may read a call at: recorded with the
+    -- compilation certificate the proof is given, and only with it
+    -- (`specializedGenericAtRow`).
+    liftTermElabM do
+      VerexIR.Proofs.Denote.recordCompiledRow (unitName segments) (toExpr callee)
+        (← quoteTypeArgs θ)
+    callees ← collectCallees m members (compiled.body.calleesWith (atRowCall unit) #[]) callees
+    pending := compiled.body.rowCalls (atRowCall unit) pending
     for (_, _, _, inlined) in callees.inlined do
-      pending := inlined.body.instances pending
+      pending := inlined.body.rowCalls (atRowCall unit) pending
   return callees
 
 /-- The generic arguments `typeArgs` as a term. -/
@@ -3493,7 +3539,7 @@ where
       (found : Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs)) :
       Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs) :=
     match θ? with
-    | some θ => if θ.atInstance m.unit callee then found else found.push (callee, typeArgs, θ)
+    | some θ => if atRowCall m.unit callee θ then found else found.push (callee, typeArgs, θ)
     | none => found
 
 /-- The solver's tactics: the automatic verification, and the
@@ -4559,12 +4605,16 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
   let errorsBefore := countErrors (← get).messages
   -- An inlined callee's body brings its own callees into the proof, so the
   -- callees are collected through every inlined body.
-  let worklist := (compiled.body.callees #[]).filter fun callee =>
+  let reached := (compiled.body.callees #[]).filter fun callee =>
+    callee != handle && !members.contains callee
+  -- A callee every call of which is routed to its body at a row needs no
+  -- certificate of its generic body (`doc/plan/one-spelling.md`, D2).
+  let worklist := (compiled.body.calleesWith (atRowCall unit) #[]).filter fun callee =>
     callee != handle && !members.contains callee
   let mut callees ← collectCallees m members worklist {
     assumptionDeps := if ownAssumptions then #[(handle, function)] else #[]
     trustDeps := trustDeps
-    edges := #[(handle, worklist)]
+    edges := #[(handle, reached)]
     instantiated := if generic then ownCalls else
       directTargets.foldl (fun found (callee, typeArgs) => recordGenericCall unit callee typeArgs none found)
         (compiled.body.foldCalls (recordGenericCall unit) (fun _ _ found => found) #[])

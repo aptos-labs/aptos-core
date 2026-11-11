@@ -291,6 +291,124 @@ stored argument is no shared reference, so no mark reaches a key. -/
 @[reducible] def Skolems.resource (type : NTy) (arguments : NRow) : ResourceType :=
   ⟨Θ.resolve type, arguments.map (NTy.argumentWith Θ.argument), .value⟩
 
+/-- Forgetting a value's certificates commutes with reading it off the
+runtime family (`Skolems.forget_toRuntime`, read the other way round). -/
+theorem Skolems.forget_ofRuntime (τ : NTy)
+    (value : @NTy.carrier (Carriers.runtime unit) (Θ.resolve τ)) :
+    NTy.forget τ (Θ.ofRuntime τ value) =
+      Θ.plainOfRuntime τ (@NTy.forget (Carriers.runtime unit) (Θ.resolve τ) value) := by
+  rw [← Θ.plainOfRuntime_plainToRuntime τ (NTy.forget τ (Θ.ofRuntime τ value)),
+    Θ.forget_toRuntime τ (Θ.ofRuntime τ value), Θ.toRuntime_ofRuntime]
+
+/-- A stored value of a frame's resource as the plain value it certifies: what
+a leaf reads of global memory. -/
+def Skolems.plainAt (τ : NTy) (arguments : NRow) (key : StorageKey) (memory : Memory unit) :
+    Option τ.plain :=
+  ((memory (Skolems.resource τ arguments) key).map (Θ.ofRuntime τ)).map (NTy.forget τ)
+
+theorem Skolems.plainAt_def (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (memory : Memory unit) :
+    Skolems.plainAt τ arguments key memory =
+      ((memory (Skolems.resource τ arguments) key).map (Θ.ofRuntime τ)).map (NTy.forget τ) := rfl
+
+open Classical in
+/-- A plain write into a frame's resource, total by a classical test of the
+fact: the read-over-write law takes the fact as a side condition, and the
+unheld branch is unreachable from the walk, whose written value comes from a
+binder or a certifying cut. -/
+noncomputable def Skolems.writePlain (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (value : Option τ.plain) (memory : Memory unit) : Memory unit :=
+  if holds : Option.elim value True (NTy.Holds τ) then
+    memory.set (Skolems.resource τ arguments) key
+      ((NTy.slotOfHolds τ value holds).map (Θ.toRuntime τ))
+  else memory
+
+theorem Skolems.writePlain_of_holds (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (value : Option τ.plain) (memory : Memory unit)
+    (holds : Option.elim value True (NTy.Holds τ)) :
+    Skolems.writePlain τ arguments key value memory =
+      memory.set (Skolems.resource τ arguments) key
+        ((NTy.slotOfHolds τ value holds).map (Θ.toRuntime τ)) :=
+  dif_pos holds
+
+theorem Skolems.writePlain_of_not_holds (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (value : Option τ.plain) (memory : Memory unit)
+    (holds : ¬Option.elim value True (NTy.Holds τ)) :
+    Skolems.writePlain τ arguments key value memory = memory :=
+  dif_neg holds
+
+theorem Skolems.set_toRuntime_ofDeepHolds (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (memory : Memory unit) (value : τ.plain) (holds : NTy.deepHolds τ value) :
+    memory.set (Skolems.resource τ arguments) key
+        (some (Θ.toRuntime τ (NTy.ofDeepHolds τ value holds))) =
+      Skolems.writePlain τ arguments key (some value) memory :=
+  (Skolems.writePlain_of_holds τ arguments key (some value) memory ⟨holds⟩).symm
+
+theorem Skolems.set_none_eq_writePlain (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (memory : Memory unit) :
+    memory.set (Skolems.resource τ arguments) key none =
+      Skolems.writePlain τ arguments key none memory :=
+  (Skolems.writePlain_of_holds τ arguments key none memory trivial).symm
+
+theorem Skolems.plainAt_slot (τ : NTy) : (slot : Option τ.plain) →
+    (holds : Option.elim slot True (NTy.Holds τ)) →
+    (((NTy.slotOfHolds τ slot holds).map (Θ.toRuntime τ)).map (Θ.ofRuntime τ)).map
+        (NTy.forget τ) = slot
+  | none, _ => rfl
+  | some value, holds => by
+      show some (NTy.forget τ (Θ.ofRuntime τ (Θ.toRuntime τ (NTy.ofHolds τ value holds)))) =
+        some value
+      rw [Θ.ofRuntime_toRuntime, NTy.forget_ofDeepHolds]
+
+theorem Skolems.plainAt_writePlain (τ : NTy) (arguments : NRow) (key otherKey : StorageKey)
+    (memory : Memory unit) (value : Option τ.plain)
+    (holds : Option.elim value True (NTy.Holds τ)) :
+    Skolems.plainAt τ arguments otherKey (Skolems.writePlain τ arguments key value memory) =
+      if otherKey = key then value else Skolems.plainAt τ arguments otherKey memory := by
+  rw [Skolems.writePlain_of_holds τ arguments key value memory holds, Skolems.plainAt_def,
+    Memory.set_same, Skolems.plainAt_def]
+  split
+  · exact Skolems.plainAt_slot τ value holds
+  · rfl
+
+theorem Skolems.plainAt_writePlain_other (τ σ : NTy) (arguments others : NRow)
+    (key otherKey : StorageKey) (memory : Memory unit) (value : Option τ.plain)
+    (distinct : Skolems.resource σ others ≠ Skolems.resource τ arguments) :
+    Skolems.plainAt σ others otherKey (Skolems.writePlain τ arguments key value memory) =
+      Skolems.plainAt σ others otherKey memory := by
+  by_cases holds : Option.elim value True (NTy.Holds τ)
+  · rw [Skolems.writePlain_of_holds τ arguments key value memory holds, Skolems.plainAt_def,
+      Skolems.plainAt_def, Memory.set_other _ key otherKey _ distinct]
+  · rw [Skolems.writePlain_of_not_holds τ arguments key value memory holds]
+
+theorem Skolems.holds_plainAt (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (memory : Memory unit) {value : τ.plain}
+    (read : Skolems.plainAt τ arguments key memory = some value) : NTy.Holds τ value := by
+  rw [Skolems.plainAt_def] at read
+  rcases stored : memory (Skolems.resource τ arguments) key with _ | source
+  · rw [stored] at read
+    exact absurd read (by simp)
+  · rw [stored, Option.map_some, Option.map_some] at read
+    exact Option.some.inj read ▸ NTy.holds_forget τ (Θ.ofRuntime τ source)
+
+theorem Skolems.isSome_plainAt (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (memory : Memory unit) :
+    (Skolems.plainAt τ arguments key memory).isSome =
+      (memory (Skolems.resource τ arguments) key).isSome := by
+  rw [Skolems.plainAt_def, Option.isSome_map, Option.isSome_map]
+
+theorem Skolems.plainAt_eq (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (memory : Memory unit) :
+    Skolems.plainAt τ arguments key memory =
+      (memory.plainAt (Skolems.resource τ arguments) key).map (Θ.plainOfRuntime τ) := by
+  rw [Skolems.plainAt_def, Memory.plainAt_eq]
+  rcases memory (Skolems.resource τ arguments) key with _ | source
+  · rfl
+  · show some (NTy.forget τ (Θ.ofRuntime τ source)) =
+      some (Θ.plainOfRuntime τ (ResourceType.forget (Skolems.resource τ arguments) source))
+    rw [Skolems.forget_ofRuntime]
+    rfl
+
 
 end Frames
 

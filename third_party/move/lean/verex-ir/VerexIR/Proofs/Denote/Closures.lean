@@ -1352,15 +1352,6 @@ def _root_.VerexIR.Proofs.Contract.ofSkolem (θ : TypeArgs) {σs : NRow} {shape 
   frame := fun args initial result final =>
     contract.frame (HList.toSkolem θ σs args) initial (ResultShape.toSkolem θ shape result) final
 
-/-- A meaning at the frame type arguments induce, at the caller's types:
-its arguments carried into the callee's view, its result read back. -/
-noncomputable def specializedMeaning (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
-    (meaning : @HList (Skolems.instantiate θ Θ).toCarriers σs →
-      Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)) :
-    HList (NRow.subst θ.1 σs) → Comp unit (shape.subst θ.1).carrier :=
-  fun args => Spec.bind (meaning (HList.toSkolem θ σs args))
-    fun result => Spec.pure (ResultShape.ofSkolem θ shape result)
-
 /-- A meaning satisfying a contract at the frame type arguments induce
 satisfies, at the caller's types, every contract equivalent to that one
 read in the caller's view (`doc/designs/native-verification.md`, "Specialized
@@ -1478,6 +1469,60 @@ theorem satisfies_run_ofSkolem (executable : VerexIR.Validation.ExecutableUnit u
   · rw [Spec.bind_undefined] at undefined
     simp only [Spec.pure_undefined, and_false, exists_false, or_false] at undefined
     exact defined undefined
+
+/-- A callee compiled at type arguments means, over the caller's substituted
+rows, its generic meaning at the family those arguments induce, read in the
+caller's view (`specializedMeaning`): the two guard the same run by the same
+coherence of the induced frame, and `propheticRun_subst` relates the runs. -/
+theorem propheticMeaningAt_eq_specialized (executable : VerexIR.Validation.ExecutableUnit unit)
+    (typeInstantiation : Array (TypeId × TypeId)) (handle : FunctionHandle) (θ : TypeArgs)
+    (free : θ.1.refFree = true) (σs : NRow) (shape : ResultShape)
+    (args : HList (NRow.subst θ.1 σs)) :
+    propheticMeaningAt executable (some θ) typeInstantiation handle (NRow.subst θ.1 σs)
+        (shape.subst θ.1) args =
+      specializedMeaning θ (@propheticMeaning _ _ executable (Skolems.instantiate θ Θ)
+        typeInstantiation handle σs shape) args := by
+  have run := propheticRun_subst executable typeInstantiation handle θ free σs shape args
+  apply Spec.extensionality
+  · funext initial result final
+    apply propext
+    simp only [propheticMeaningAt, specializedMeaning, propheticMeaning, run, Spec.bind_ok,
+      Spec.pure_ok]
+    constructor
+    · rintro ⟨coherent, value, middle, inner, rfl, rfl⟩
+      exact ⟨value, _, ⟨coherent, inner⟩, rfl, rfl⟩
+    · rintro ⟨value, middle, ⟨coherent, inner⟩, rfl, rfl⟩
+      exact ⟨coherent, value, _, inner, rfl, rfl⟩
+  · funext initial error
+    apply propext
+    simp only [propheticMeaningAt, specializedMeaning, propheticMeaning, run, Spec.bind_aborts,
+      Spec.pure_aborts, and_false, exists_false, or_false]
+  · funext initial
+    apply propext
+    simp only [propheticMeaningAt, specializedMeaning, propheticMeaning, run,
+      Spec.bind_undefined, Spec.pure_undefined, and_false, exists_false, or_false]
+
+/-- A generic call at its row, at the spelling the denotation emits it: the
+callee's closed generic meaning read in the caller's view
+(`Meanings.interpreterOps`) is the callee's meaning compiled at the call's
+type arguments, over the caller's substituted rows. The one equation of the
+normalization pass that produces that head (`specializedGenericAtRow`): what
+it leaves is the action the instance route inlines the body at the row from
+(`wp_propheticMeaningAt_of_compiled`), so no leaf is typed at the induced
+family, and a call it does not rewrite keeps the head, which unfolds to the
+bind the field body gives it. -/
+theorem specializedMeaning_closedGeneric_eq_at {unit : VerexIR.Validation.ValidatedUnit}
+    [FunctionCarriers unit] (executable : VerexIR.Validation.ExecutableUnit unit)
+    [Θ : Skolems unit] (typeInstantiation : Array (TypeId × TypeId)) (handle : FunctionHandle)
+    (typeArgs : Array GenericArgument) (θ : TypeArgs) (free : θ.1.refFree = true)
+    (σs : NRow) (shape : ResultShape) (values : HList (NRow.subst θ.1 σs)) :
+    specializedMeaning θ
+        (closedGeneric executable typeInstantiation handle typeArgs θ σs shape) values =
+      propheticMeaningAt executable (some θ)
+        (frameInstantiation unit handle typeInstantiation typeArgs) handle
+        (NRow.subst θ.1 σs) (shape.subst θ.1) values :=
+  (propheticMeaningAt_eq_specialized (Θ := Θ) executable
+    (frameInstantiation unit handle typeInstantiation typeArgs) handle θ free σs shape values).symm
 
 end Transport
 

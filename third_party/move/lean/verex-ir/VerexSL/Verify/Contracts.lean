@@ -914,12 +914,38 @@ def _root_.VerexIR.Proofs.Denote.Term.foldCalls {α : Type}
     {τ : NTy} (term : Term unit ρ Γ τ) (found : α) : α :=
   term.foldNodes visit atSite (fun _ _ _ _ found => found) found
 
+/-- The callees a term calls whose meaning is its generic one, in order of
+first occurrence: a call routed to the callee's body compiled at its row
+(`atRow`) needs no certificate of the generic body, so a callee all of whose
+calls are so routed is not among them. -/
+def _root_.VerexIR.Proofs.Denote.Term.calleesWith {unit : ValidatedUnit} {ρ : ResultShape}
+    {Γ : NRow} {τ : NTy} (atRow : FunctionHandle → TypeArgs → Bool)
+    (term : Term unit ρ Γ τ) (found : Array FunctionHandle) : Array FunctionHandle :=
+  term.foldCalls (fun handle _ θ found =>
+      if θ.any (atRow handle ·) || found.contains handle then found else found.push handle)
+    (fun _ _ found => found)
+    found
+
 /-- The callees a term calls, in order of first occurrence. -/
 def _root_.VerexIR.Proofs.Denote.Term.callees {unit : ValidatedUnit} {ρ : ResultShape} {Γ : NRow}
     {τ : NTy}
     (term : Term unit ρ Γ τ) (found : Array FunctionHandle) : Array FunctionHandle :=
-  term.foldCalls (fun handle _ θ found =>
-      if θ.any (·.atInstance unit handle) || found.contains handle then found else found.push handle)
+  term.calleesWith (fun handle θ => θ.atInstance unit handle) found
+
+/-- The calls of a term routed to the callee's body compiled at their type
+arguments (`atRow`): each a callee compiled at a row, which no other call at
+the same row shares. -/
+def _root_.VerexIR.Proofs.Denote.Term.rowCalls {unit : ValidatedUnit} {ρ : ResultShape} {Γ : NRow}
+    {τ : NTy} (atRow : FunctionHandle → TypeArgs → Bool) (term : Term unit ρ Γ τ)
+    (found : Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs)) :
+    Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs) :=
+  term.foldCalls (fun handle typeArgs θ found => match θ with
+      | some θ =>
+          if atRow handle θ &&
+              !found.any (fun other => other.1 == handle && other.2.2.1 == θ.1) then
+            found.push (handle, typeArgs, θ)
+          else found
+      | none => found)
     (fun _ _ found => found)
     found
 
@@ -929,15 +955,7 @@ def _root_.VerexIR.Proofs.Denote.Term.instances {unit : ValidatedUnit} {ρ : Res
     {τ : NTy} (term : Term unit ρ Γ τ)
     (found : Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs)) :
     Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs) :=
-  term.foldCalls (fun handle typeArgs θ found => match θ with
-      | some θ =>
-          if θ.atInstance unit handle &&
-              !found.any (fun other => other.1 == handle && other.2.2.1 == θ.1) then
-            found.push (handle, typeArgs, θ)
-          else found
-      | none => found)
-    (fun _ _ found => found)
-    found
+  term.rowCalls (fun handle θ => θ.atInstance unit handle) found
 
 /-! ## Closure sites
 
@@ -2529,6 +2547,58 @@ def bodySpecifications (ns : ValidatedNamespace) (root : VerexIR.ExprId)
         if block.conditions.any (accept ·.kind) then found := found.push (id, block)
       pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
     return found
+
+/-- Whether a body holds a loop: its iterations are reasoned about by an
+invariant the solver keys by the loop's site. -/
+def bodyLoops (ns : ValidatedNamespace) (root : VerexIR.ExprId) : Bool := Id.run do
+  let mut pending := #[root]
+  let mut visited : Std.HashSet Nat := {}
+  while let some id := pending.back? do
+    pending := pending.pop
+    if visited.contains id.index then continue
+    visited := visited.insert id.index
+    let some expression := ns.expressions[id.index]? | continue
+    if expression.kind matches .loop .. then return true
+    pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
+  return false
+
+/-- Whether a type mentions a type parameter of its declaration, read through
+the unit's type table from the unit's own identifiers. -/
+private partial def typeReadsTypeParameter (unit : ValidatedUnit) (fuel : Nat)
+    (typeId : VerexIR.TypeId) : Bool :=
+  match fuel, unit.tables.types[typeId.index]? with
+  | 0, _ => false
+  | _, none => false
+  | fuel + 1, some type =>
+    let types (ids : Array VerexIR.TypeId) := ids.any (typeReadsTypeParameter unit fuel)
+    let arguments (given : Array VerexIR.GenericArgument) := given.any fun argument =>
+      match argument with
+      | .typeArg argument => typeReadsTypeParameter unit fuel argument.typeId
+      | .const _ | .lifetime _ | .evidence _ => false
+    match type with
+    | .typeParameter _ => true
+    | .tuple elements => types elements
+    | .vector element _ | .slice element | .typeDomain element =>
+        typeReadsTypeParameter unit fuel element
+    | .resourceDomain _ given => types (given.getD #[])
+    | .nominal _ given => arguments given
+    | .function given result _ => typeReadsTypeParameter unit fuel result || types given
+    | .reference reference => typeReadsTypeParameter unit fuel reference.referent
+    | .unit | .never | .bool | .character | .string | .bytes | .address | .signer
+    | .integer _ _ | .range | .eventStore | .stateDomain | .profile _ => false
+
+/-- Whether a function's parameters, results or locals read one of its type
+parameters. Its compiled row or shape then holds a parameter, so no summary
+of its generic body is derived (`summaryForm`) and a call of it has one route
+less to lose where it is taken at its row (`doc/plan/one-spelling.md`, D2). -/
+def readsTypeParameter (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
+  let fuel := unit.tables.types.size + 1
+  let reads (declared : VerexIR.TypeUse) :=
+    typeReadsTypeParameter unit fuel (ns.typeId declared.typeId)
+  declaration.signature.parameters.any (reads ·.typeUse) ||
+    declaration.signature.results.any reads ||
+    declaration.locals.any (reads ·.type)
 
 /-- The names of the leaves owing a function's clauses, by the clauses' source
 ranges: each clause by its kind, numbered in source order among the clauses

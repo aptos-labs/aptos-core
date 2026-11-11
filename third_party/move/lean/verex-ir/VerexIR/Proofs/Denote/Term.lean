@@ -81,6 +81,13 @@ theorem Var.selectPlain_deepHolds : {Γ : NRow} → {τ : NTy} → (x : Var Γ �
   | _, _, .here, _, held => held.1
   | _, _, .there rest, values, held => rest.selectPlain_deepHolds values.2 held.2
 
+theorem Var.select_ofDeepHolds : {Γ : NRow} → {τ : NTy} → (x : Var Γ τ) →
+    (values : HListPlain Γ) → (holds : HListPlain.deepHolds Γ values) →
+    x.select (HListPlain.ofDeepHolds Γ values holds) =
+      NTy.ofDeepHolds τ (x.selectPlain values) (x.selectPlain_deepHolds values holds)
+  | _, _, .here, _, _ => rfl
+  | _, _, .there rest, values, holds => rest.select_ofDeepHolds values.2 holds.2
+
 /-! ## Certifying a plain value
 
 A struct's or a variant's carrier is its plain row certified by the data
@@ -991,6 +998,13 @@ theorem Var.selectCertified_of_certificateFree {source : StructHandle}
     NTy.forget field (position.selectCertified value) = position.selectPlain value.val :=
   NTy.forget_ofDeepHolds _ _ _
 
+theorem Var.selectCertified_ofDeepHolds {source : StructHandle} {arguments fields : NRow}
+    {field : NTy} (position : Var fields field) (row : HListPlain fields)
+    (holds : NTy.deepHolds (.struct source arguments fields) row) :
+    position.selectCertified (NTy.ofDeepHolds (.struct source arguments fields) row holds) =
+      NTy.ofDeepHolds field (position.selectPlain row)
+        (position.selectPlain_deepHolds row (NTy.fieldsHoldOf row holds)) := rfl
+
 /-- The data invariants of the value of a certified variant: the second
 conjunct of its certificate, read through the statement the type makes of
 it (`NTy.deepHolds_enum`, `NTy.fieldsHold`). -/
@@ -1088,6 +1102,17 @@ theorem Which.projectCertified?_eq_none_iff {source : StructHandle} {arguments :
   rw [← Option.not_isSome_iff_eq_none, ← Option.not_isSome_iff_eq_none,
     choice.isSome_projectCertified? value]
 
+theorem Which.projectCertified?_ofDeepHolds {source : StructHandle} {arguments : NRow}
+    {names : List String} {rows : NRows} {distinct : names.Nodup} {σs : NRow}
+    (choice : Which names rows σs) (value : variantPlain names rows)
+    (holds : NTy.deepHolds (.enum source arguments names rows distinct) value) :
+    choice.projectCertified?
+        (NTy.ofDeepHolds (.enum source arguments names rows distinct) value holds) =
+      withSome (choice.project? value)
+        (fun fields projected => some (HListPlain.ofDeepHolds σs fields
+          (choice.project?_deepHolds value (NTy.variantHoldsOf value holds) fields projected)))
+        none := rfl
+
 /-- The shared field a selection reads out of a value whose data invariants
 hold has its own. -/
 theorem Choices.select?_deepHolds {names : List String} {rows : NRows} {τ : NTy} :
@@ -1163,6 +1188,23 @@ variant. -/
       cases choice.projectCertified? value with
       | some row => simp only [Option.map_some, Var.forget_select]
       | none => exact held
+
+theorem Choices.selectCertified?_ofDeepHolds {source : StructHandle} {arguments : NRow}
+    {names : List String} {rows : NRows} {distinct : names.Nodup} {τ : NTy}
+    (choices : Choices names rows τ) (value : variantPlain names rows)
+    (holds : NTy.deepHolds (.enum source arguments names rows distinct) value) :
+    choices.selectCertified?
+        (NTy.ofDeepHolds (.enum source arguments names rows distinct) value holds) =
+      withSome (choices.select? value)
+        (fun field selected => some (NTy.ofDeepHolds τ field
+          (choices.select?_deepHolds value (NTy.variantHoldsOf value holds) field selected)))
+        none := by
+  refine NTy.slot_forget_injective τ ?_
+  rw [Choices.forget_selectCertified?, NTy.ofDeepHolds_enum_val,
+    map_withSome (Option.map (NTy.forget τ))]
+  simp only [Option.map_some, Option.map_none, NTy.forget_ofDeepHolds]
+  rw [withSome_of_const]
+  cases choices.select? value <;> rfl
 
 /-- A certified selection reads a field exactly where the plain one does. -/
 @[simp, vir_denote_norm] theorem Choices.isSome_selectCertified?
@@ -1545,6 +1587,20 @@ theorem Proj.get?_of_getCertified? {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} (pa
     (read : path.getCertified? env value = some component) :
     path.get? env (NTy.forget τ value) = some (NTy.forget σ component) := by
   rw [← path.forget_getCertified? env inside value, read, Option.map_some]
+
+theorem Proj.getCertified?_ofDeepHolds {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} (path : Proj τ σ)
+    (inside : path.hasDeref = false) (value : τ.plain) (holds : NTy.deepHolds τ value) :
+    path.getCertified? env (NTy.ofDeepHolds τ value holds) =
+      withSome (path.get? env value)
+        (fun component read => some (NTy.ofDeepHolds σ component
+          (path.get?_deepHolds env inside value holds component read)))
+        none := by
+  refine NTy.slot_forget_injective σ ?_
+  rw [path.forget_getCertified? env inside, NTy.forget_ofDeepHolds,
+    map_withSome (Option.map (NTy.forget σ))]
+  simp only [Option.map_some, Option.map_none, NTy.forget_ofDeepHolds]
+  rw [withSome_of_const]
+  cases path.get? env value <;> rfl
 
 @[simp] theorem PlaceIndex.resolve?_literal {Γ : NRow} (env : HEnv Γ) (size index : Nat) :
     (PlaceIndex.literal index).resolve? env size = some index := rfl
@@ -3776,6 +3832,20 @@ theorem resolvedClosure {θ captured supplied captured' supplied' : NRow}
 
 end LocalComputations
 
+/-- A meaning at the frame type arguments induce, at the caller's types:
+its arguments carried into the callee's view, its result read back. What a
+generic call denotes (`Meanings.interpreterOps`), so that the walk meets one
+head at it and reaches the callee's meaning at the caller's rows without a
+transport of its own. -/
+noncomputable def specializedMeaning {unit : VerexIR.Validation.ValidatedUnit}
+    [FunctionCarriers unit] [Θ : Skolems unit]
+    (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
+    (meaning : @HList (Skolems.instantiate θ Θ).toCarriers σs →
+      Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)) :
+    HList (NRow.subst θ.1 σs) → Comp unit (shape.subst θ.1).carrier :=
+  fun args => Spec.bind (meaning (HList.toSkolem θ σs args))
+    fun result => Spec.pure (ResultShape.ofSkolem θ shape result)
+
 /-- The function value of a closure with type arguments: `closureOf` in the
 instantiation its frame computes, carrying the target's own weave and result
 shape and the type arguments, which name the meaning of its invocation at the
@@ -3847,9 +3917,8 @@ The generic boundary transports once, here, into and out of the callee frame. -/
     {executable : Validation.ExecutableUnit unit} [Θ : Skolems unit]
     (meanings : Meanings executable) : InterpreterOps unit Θ.toCarriers (Memory unit) where
   call := meanings.call
-  generic := fun handle typeArgs θ parameters shape values =>
-    Spec.bind (meanings.generic handle typeArgs θ parameters shape (HList.toSkolem θ parameters values))
-      fun result => Spec.pure (ResultShape.ofSkolem θ shape result)
+  generic := fun handle typeArgs θ parameters shape =>
+    specializedMeaning θ (meanings.generic handle typeArgs θ parameters shape)
   invoke := meanings.invoke
   closure := fun handle weave results shared rows sharing closed faithful values =>
     Spec.pure (Skolems.construct _ shared results handle weave.mask #[] values
@@ -5342,6 +5411,10 @@ vir_denote_equations Term.denoteIn Args.denoteIn Arms.denoteIn
 attribute [vir_denote] Term.denote Args.denote Arms.denote Term.denoteIn Args.denoteIn Arms.denoteIn
   Meanings.interpreterOps Function.denote Function.denoteIn ResultShape.ofBody NTy.ofGround
   closedGeneric closedInstance
+  -- A generic call's head: it unfolds where the field's bind stood, so a call
+  -- the normal form does not rewrite at its row reads as that bind
+  -- (`specializedGenericAtRow`).
+  specializedMeaning
   HList.ofGround
   ResultShape.toBody
   ResultShape.finish Flow.iterate Flow.rebase Flow.bind_pure_value Flow.bind_pure_return

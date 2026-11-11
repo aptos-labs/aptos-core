@@ -10,8 +10,11 @@ hypotheses the theorems take.
   wherever the denotation is defined, over every family and instantiation
   (`Spec.Refines`), for `compileFunctionAt unit handle σ = .ok f`: without a
   substitution `σ` the statement of `compileFunction` and `propheticMeaning`;
-  at type arguments holding a mutable reference, over the substituted rows,
-  with the frame's agreement at the family they induce (`propheticMeaningAt`).
+  at a substitution, over its substituted rows, with the frame's agreement at
+  the family the type arguments induce (`propheticMeaningAt`). Every inlined
+  generic call whose callee is compiled at the call's type arguments rests on
+  the half at a substitution, at any arguments, not only a call at arguments
+  holding a mutable reference.
   The certifying steps of the denotation are undefined
   where a data invariant fails: a run that packs a value breaking its
   invariant, or that ends a mutable loan over one, keeps its runtime

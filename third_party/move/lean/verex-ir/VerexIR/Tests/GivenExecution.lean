@@ -289,7 +289,7 @@ theorem generic_call {ρ : ResultShape} {Γ σs σs' : NRow}
           fun result => Spec.pure (.value
             (cast ((congrArg ResultShape.carrier (resolvedCall resolved).2).trans
               shape'.carrier_eq_bodyType) (ResultShape.ofSkolem θ shape result)) env) := by
-  simp only [Term.denote, Term.denoteIn, Args.denote, Meanings.interpreterOps,
+  simp only [Term.denote, Term.denoteIn, Args.denote, Meanings.interpreterOps, specializedMeaning,
     callAt, Spec.bind_assoc, Spec.pure_bind]
 
 /-- A concrete global read still produces the same certified runtime view,

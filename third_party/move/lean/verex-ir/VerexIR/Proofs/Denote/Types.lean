@@ -5427,6 +5427,262 @@ theorem NTy.ofDeepHolds_forget (τ : NTy) (value : τ.carrier) :
     NTy.ofDeepHolds τ (τ.forget value) (τ.deepHolds_forget value) = value :=
   NTy.forget_injective τ (NTy.forget_ofDeepHolds τ (τ.forget value) (τ.deepHolds_forget value))
 
+/-! ### A value's data invariants as one fact
+
+A certificate of a plain value, folded into a one-field proposition.  Nothing
+reduces it: it is a structure, so no transparency setting, no `simp` set and no
+hypothesis split opens it, and a leaf that holds the fact holds one name for it
+(`doc/plan/one-spelling.md`, D1).  It is opened by its reading equations
+alone. -/
+
+/-- The data invariants of a plain value hold, as one fact. -/
+structure NTy.Holds (τ : NTy) (value : τ.plain) : Prop where
+  intro ::
+  deepHolds : NTy.deepHolds τ value
+
+theorem NTy.holds_iff (τ : NTy) (value : τ.plain) :
+    NTy.Holds τ value ↔ NTy.deepHolds τ value :=
+  ⟨NTy.Holds.deepHolds, NTy.Holds.intro⟩
+
+/-- A certified value's plain form holds its data invariants. -/
+theorem NTy.holds_forget (τ : NTy) (value : τ.carrier) : NTy.Holds τ (NTy.forget τ value) :=
+  ⟨NTy.deepHolds_forget τ value⟩
+
+/-- A plain value with the fact as a certified one. -/
+abbrev NTy.ofHolds (τ : NTy) (value : τ.plain) (holds : NTy.Holds τ value) : τ.carrier :=
+  NTy.ofDeepHolds τ value holds.deepHolds
+
+/-- The data invariants of a plain row hold, one fact per component, so that
+a split of the conjunction leaves one fact per binder. -/
+def HListPlain.Holds : (row : NRow) → HListPlain row → Prop
+  | .nil, _ => True
+  | .cons τ rest, values => NTy.Holds τ values.1 ∧ HListPlain.Holds rest values.2
+termination_by structural row _ => row
+
+theorem HListPlain.holds_iff : (row : NRow) → (values : HListPlain row) →
+    (HListPlain.Holds row values ↔ HListPlain.deepHolds row values)
+  | .nil, _ => Iff.rfl
+  | .cons τ rest, values =>
+      ⟨fun holds => ⟨(NTy.holds_iff τ values.1).mp holds.1,
+          (HListPlain.holds_iff rest values.2).mp holds.2⟩,
+        fun holds => ⟨(NTy.holds_iff τ values.1).mpr holds.1,
+          (HListPlain.holds_iff rest values.2).mpr holds.2⟩⟩
+
+/-- A plain row with its facts as a certified row: component by component, so
+that a slot of a split hypothesis is the component's own fact. -/
+def HListPlain.ofHolds : (row : NRow) → (values : HListPlain row) →
+    HListPlain.Holds row values → HList row
+  | .nil, _, _ => ()
+  | .cons τ rest, values, holds =>
+      (NTy.ofHolds τ values.1 holds.1, HListPlain.ofHolds rest values.2 holds.2)
+termination_by structural row _ _ => row
+
+theorem HListPlain.forget_ofHolds : (row : NRow) → (values : HListPlain row) →
+    (holds : HListPlain.Holds row values) →
+    HList.forget row (HListPlain.ofHolds row values holds) = values
+  | .nil, _, _ => rfl
+  | .cons τ rest, values, holds => by
+      show (NTy.forget τ (NTy.ofHolds τ values.1 holds.1),
+        HList.forget rest (HListPlain.ofHolds rest values.2 holds.2)) = values
+      rw [NTy.forget_ofDeepHolds τ values.1 holds.1.deepHolds,
+        HListPlain.forget_ofHolds rest values.2 holds.2]
+      exact Prod.ext rfl rfl
+
+theorem HListPlain.ofHolds_eq (row : NRow) (values : HListPlain row)
+    (holds : HListPlain.Holds row values) :
+    HListPlain.ofHolds row values holds =
+      HListPlain.ofDeepHolds row values ((HListPlain.holds_iff row values).mp holds) :=
+  HList.forget_injective row (by
+    rw [HListPlain.forget_ofHolds, HListPlain.forget_ofDeepHolds])
+
+theorem HList.holds_forget : (row : NRow) → (values : HList row) →
+    HListPlain.Holds row (HList.forget row values)
+  | .nil, _ => trivial
+  | .cons τ rest, values => ⟨NTy.holds_forget τ values.1, HList.holds_forget rest values.2⟩
+
+theorem HListPlain.ofHolds_forget (row : NRow) (values : HList row) :
+    HListPlain.ofHolds row (HList.forget row values) (HList.holds_forget row values) = values :=
+  HList.forget_injective row
+    (HListPlain.forget_ofHolds row (HList.forget row values) (HList.holds_forget row values))
+
+/-- The data invariants of a plain variant value hold: stuck on a variable and
+read at a known variant, as the certificate it folds is. -/
+def variantPlain.Holds : (names : List String) → (rows : NRows) → variantPlain names rows → Prop
+  | _, .nil, _ => True
+  | [], .cons _ _, _ => True
+  | _ :: names, .cons fields rest, value =>
+      Sum.elim (HListPlain.Holds fields) (variantPlain.Holds names rest) value
+termination_by structural _ rows _ => rows
+
+theorem variantPlain.holds_iff : (names : List String) → (rows : NRows) →
+    (value : variantPlain names rows) →
+    (variantPlain.Holds names rows value ↔ variantPlain.deepHolds names rows value)
+  | _, .nil, _ => Iff.rfl
+  | [], .cons _ _, _ => Iff.rfl
+  | _ :: _, .cons fields _, .inl values => HListPlain.holds_iff fields values
+  | _ :: names, .cons _ rest, .inr later => variantPlain.holds_iff names rest later
+
+/-! ### Reading the fold, constructor by constructor
+
+Deliberately in no simp set in this phase: a reading equation in the normal
+form would leave a leaf holding both names for one fact
+(`doc/plan/one-spelling.md`, D1). -/
+
+theorem NTy.holds_unit (value : (NTy.unit).plain) : NTy.Holds .unit value = True :=
+  eq_true ⟨trivial⟩
+theorem NTy.holds_bool (value : (NTy.bool).plain) : NTy.Holds .bool value = True :=
+  eq_true ⟨trivial⟩
+theorem NTy.holds_int (width : Nat) (signed : Bool) (value : (NTy.int width signed).plain) :
+    NTy.Holds (.int width signed) value = True := eq_true ⟨trivial⟩
+theorem NTy.holds_num (value : (NTy.num).plain) : NTy.Holds .num value = True :=
+  eq_true ⟨trivial⟩
+theorem NTy.holds_address (value : (NTy.address).plain) : NTy.Holds .address value = True :=
+  eq_true ⟨trivial⟩
+theorem NTy.holds_signer (value : (NTy.signer).plain) : NTy.Holds .signer value = True :=
+  eq_true ⟨trivial⟩
+theorem NTy.holds_string (value : (NTy.string).plain) : NTy.Holds .string value = True :=
+  eq_true ⟨trivial⟩
+theorem NTy.holds_bytes (value : (NTy.bytes).plain) : NTy.Holds .bytes value = True :=
+  eq_true ⟨trivial⟩
+theorem NTy.holds_char (value : (NTy.char).plain) : NTy.Holds .char value = True :=
+  eq_true ⟨trivial⟩
+theorem NTy.holds_function (parameters : NRow) (shared : Sharing) (results : NRow)
+    (value : (NTy.function parameters shared results).plain) :
+    NTy.Holds (.function parameters shared results) value = True := eq_true ⟨trivial⟩
+
+theorem NTy.holds_tuple (elements : NRow) (values : (NTy.tuple elements).plain) :
+    NTy.Holds (.tuple elements) values = HListPlain.Holds elements values :=
+  propext ((NTy.holds_iff _ values).trans (HListPlain.holds_iff elements values).symm)
+theorem NTy.holds_ref (referent : NTy) (value : (NTy.ref referent).plain) :
+    NTy.Holds (.ref referent) value = NTy.Holds referent value.2 :=
+  propext ((NTy.holds_iff _ value).trans (NTy.holds_iff referent value.2).symm)
+theorem NTy.holds_ghost (slot : NTy) (value : (NTy.ghost slot).plain) :
+    NTy.Holds (.ghost slot) value = NTy.Holds slot value :=
+  propext ((NTy.holds_iff _ value).trans (NTy.holds_iff slot value).symm)
+theorem NTy.holds_observed (referent : NTy) (value : (NTy.observed referent).plain) :
+    NTy.Holds (.observed referent) value = NTy.Holds referent value :=
+  propext ((NTy.holds_iff _ value).trans (NTy.holds_iff referent value).symm)
+theorem NTy.holds_param (index : Nat) (value : (NTy.param index).plain) :
+    NTy.Holds (.param index) value = (Carriers.lent index).holds value :=
+  propext (NTy.holds_iff _ value)
+
+theorem HListPlain.holds_nil (values : HListPlain .nil) :
+    HListPlain.Holds .nil values = True := rfl
+theorem HListPlain.holds_cons (τ : NTy) (rest : NRow) (values : HListPlain (.cons τ rest)) :
+    HListPlain.Holds (.cons τ rest) values =
+      (NTy.Holds τ values.1 ∧ HListPlain.Holds rest values.2) := rfl
+
+theorem variantPlain.holds_inl (name : String) (names : List String) (fields : NRow)
+    (rest : NRows) (values : HListPlain fields) :
+    variantPlain.Holds (name :: names) (.cons fields rest) (.inl values) =
+      HListPlain.Holds fields values := rfl
+theorem variantPlain.holds_inr (name : String) (names : List String) (fields : NRow)
+    (rest : NRows) (value : variantPlain names rest) :
+    variantPlain.Holds (name :: names) (.cons fields rest) (.inr value) =
+      variantPlain.Holds names rest value := rfl
+
+/-- A struct's fact opened: its declaration's clauses of its encoding, and its
+fields' facts.  The opener's equation, never a normal form. -/
+theorem NTy.holds_struct (source : StructHandle) (arguments fields : NRow)
+    (row : HListPlain fields) :
+    NTy.Holds (.struct source arguments fields) row ↔
+      (Carriers.own source arguments (NTy.plainEncode (.struct source arguments fields) row) ∧
+        HListPlain.Holds fields row) := by
+  rw [NTy.holds_iff, NTy.deepHolds_struct, HListPlain.holds_iff]
+
+/-- A variant value's fact opened (`NTy.holds_struct`). -/
+theorem NTy.holds_enum (source : StructHandle) (arguments : NRow) (names : List String)
+    (rows : NRows) (distinct : names.Nodup) (value : variantPlain names rows) :
+    NTy.Holds (.enum source arguments names rows distinct) value ↔
+      (Carriers.own source arguments
+          (NTy.plainEncode (.enum source arguments names rows distinct) value) ∧
+        variantPlain.Holds names rows value) := by
+  rw [NTy.holds_iff, NTy.deepHolds_enum, variantPlain.holds_iff]
+
+/-! A container's fact is never opened whole: it is instantiated at an
+observed element. -/
+
+theorem NTy.Holds.of_mem {element : NTy} {vector : (NTy.vector element).plain}
+    (holds : NTy.Holds (.vector element) vector) {value : element.plain}
+    (member : value ∈ vector.values) : NTy.Holds element value :=
+  ⟨holds.deepHolds value member⟩
+theorem NTy.Holds.of_mem_slice {element : NTy} {vector : (NTy.slice element).plain}
+    (holds : NTy.Holds (.slice element) vector) {value : element.plain}
+    (member : value ∈ vector.values) : NTy.Holds element value :=
+  ⟨holds.deepHolds value member⟩
+theorem NTy.Holds.of_mem_array {element : NTy} {length : Nat}
+    {array : (NTy.array element length).plain}
+    (holds : NTy.Holds (.array element length) array) {value : element.plain}
+    (member : value ∈ array.vector.values) : NTy.Holds element value :=
+  ⟨holds.deepHolds value member⟩
+theorem NTy.Holds.of_mem_table_key {key value : NTy} {entries : (NTy.table key value).plain}
+    (holds : NTy.Holds (.table key value) entries) {entry : key.plain × value.plain}
+    (member : entry ∈ entries.entries) : NTy.Holds key entry.1 :=
+  ⟨(holds.deepHolds entry member).1⟩
+theorem NTy.Holds.of_mem_table_value {key value : NTy} {entries : (NTy.table key value).plain}
+    (holds : NTy.Holds (.table key value) entries) {entry : key.plain × value.plain}
+    (member : entry ∈ entries.entries) : NTy.Holds value entry.2 :=
+  ⟨(holds.deepHolds entry member).2⟩
+theorem NTy.Holds.of_current {element : NTy} {reference : (NTy.sliceRef element).plain}
+    (holds : NTy.Holds (.sliceRef element) reference) {value : element.plain}
+    (member : value ∈ reference.currentVector.values) : NTy.Holds element value :=
+  ⟨holds.deepHolds.1 value member⟩
+theorem NTy.Holds.of_final {element : NTy} {reference : (NTy.sliceRef element).plain}
+    (holds : NTy.Holds (.sliceRef element) reference) {value : element.plain}
+    (member : value ∈ reference.finalVector.values) : NTy.Holds element value :=
+  ⟨holds.deepHolds.2 value member⟩
+
+/-! ### The binder equations
+
+A quantifier over a certified value is a quantifier over the plain value and
+its fact: the carrier is in bijection with the plain values that hold
+(`NTy.forget`, `NTy.ofHolds`).  Deliberately in no simp set: a rule of the
+normal form would respell every binder. -/
+
+theorem NTy.forall_carrier (τ : NTy) (P : τ.carrier → Prop) :
+    (∀ value : τ.carrier, P value) ↔
+      ∀ (plain : τ.plain) (holds : NTy.Holds τ plain), P (NTy.ofHolds τ plain holds) := by
+  constructor
+  · intro held plain holds
+    exact held _
+  · intro held value
+    have step := held (NTy.forget τ value) (NTy.holds_forget τ value)
+    rwa [show NTy.ofHolds τ (NTy.forget τ value) (NTy.holds_forget τ value) = value from
+      NTy.ofDeepHolds_forget τ value] at step
+
+theorem NTy.exists_carrier (τ : NTy) (P : τ.carrier → Prop) :
+    (∃ value : τ.carrier, P value) ↔
+      ∃ (plain : τ.plain) (holds : NTy.Holds τ plain), P (NTy.ofHolds τ plain holds) := by
+  constructor
+  · rintro ⟨value, held⟩
+    refine ⟨NTy.forget τ value, NTy.holds_forget τ value, ?_⟩
+    rwa [show NTy.ofHolds τ (NTy.forget τ value) (NTy.holds_forget τ value) = value from
+      NTy.ofDeepHolds_forget τ value]
+  · rintro ⟨_, _, held⟩
+    exact ⟨_, held⟩
+
+theorem HList.forall_carrier (row : NRow) (P : HList row → Prop) :
+    (∀ values : HList row, P values) ↔
+      ∀ (plain : HListPlain row) (holds : HListPlain.Holds row plain),
+        P (HListPlain.ofHolds row plain holds) := by
+  constructor
+  · intro held plain holds
+    exact held _
+  · intro held values
+    have step := held (HList.forget row values) (HList.holds_forget row values)
+    rwa [HListPlain.ofHolds_forget] at step
+
+theorem HList.exists_carrier (row : NRow) (P : HList row → Prop) :
+    (∃ values : HList row, P values) ↔
+      ∃ (plain : HListPlain row) (holds : HListPlain.Holds row plain),
+        P (HListPlain.ofHolds row plain holds) := by
+  constructor
+  · rintro ⟨values, held⟩
+    refine ⟨HList.forget row values, HList.holds_forget row values, ?_⟩
+    rwa [HListPlain.ofHolds_forget]
+  · rintro ⟨_, _, held⟩
+    exact ⟨_, held⟩
+
 mutual
 /-- A plain value as a clause reads it: each reference settled at its current
 value, or with `prophecies` at its prophecy.  The plain pair of a reference is
@@ -6817,6 +7073,107 @@ def Var.select : {Γ : NRow} → {τ : NTy} → Var Γ τ → HList Γ → τ.ca
 @[simp] theorem Var.select_there {Γ : NRow} {σ τ : NTy} (rest : Var Γ τ)
     (values : HList (.cons σ Γ)) : (Var.there rest).select values = rest.select values.2 := rfl
 
+/-! ### The plain environment
+
+A slot of a plain environment is a plain value, and its fact is the fact of
+the value it holds, as the loop-frame generator already states it. -/
+
+@[reducible] def HEnvPlain : NRow → Type
+  | .nil => Unit
+  | .cons τ Γ => Option τ.plain × HEnvPlain Γ
+
+def HEnv.forget : (Γ : NRow) → HEnv Γ → HEnvPlain Γ
+  | .nil, _ => ()
+  | .cons τ Γ, env => (env.1.map (NTy.forget τ), HEnv.forget Γ env.2)
+
+def HEnvPlain.Holds : (Γ : NRow) → HEnvPlain Γ → Prop
+  | .nil, _ => True
+  | .cons τ Γ, env => Option.elim env.1 True (NTy.Holds τ) ∧ HEnvPlain.Holds Γ env.2
+
+/-- A plain slot with its fact as a certified slot. -/
+def NTy.slotOfHolds (τ : NTy) :
+    (slot : Option τ.plain) → Option.elim slot True (NTy.Holds τ) → Option τ.carrier
+  | none, _ => none
+  | some value, holds => some (NTy.ofHolds τ value holds)
+
+@[simp] theorem NTy.slotOfHolds_some (τ : NTy) (value : τ.plain) (holds : NTy.Holds τ value) :
+    NTy.slotOfHolds τ (some value) holds = some (NTy.ofHolds τ value holds) := rfl
+@[simp] theorem NTy.slotOfHolds_none (τ : NTy) (holds : True) :
+    NTy.slotOfHolds τ none holds = none := rfl
+
+def HEnvPlain.ofHolds : (Γ : NRow) → (env : HEnvPlain Γ) → HEnvPlain.Holds Γ env → HEnv Γ
+  | .nil, _, _ => ()
+  | .cons τ Γ, env, holds =>
+      (NTy.slotOfHolds τ env.1 holds.1, HEnvPlain.ofHolds Γ env.2 holds.2)
+
+/-- A forgotten slot holds its value's fact. -/
+theorem NTy.holds_map_forget (τ : NTy) : (slot : Option τ.carrier) →
+    Option.elim (slot.map (NTy.forget τ)) True (NTy.Holds τ)
+  | none => trivial
+  | some value => NTy.holds_forget τ value
+
+theorem NTy.map_forget_slotOfHolds (τ : NTy) : (slot : Option τ.plain) →
+    (holds : Option.elim slot True (NTy.Holds τ)) →
+    (NTy.slotOfHolds τ slot holds).map (NTy.forget τ) = slot
+  | none, _ => rfl
+  | some value, holds => by
+      show some (NTy.forget τ (NTy.ofHolds τ value holds)) = some value
+      rw [NTy.forget_ofDeepHolds]
+
+theorem NTy.slot_forget_injective (τ : NTy) : {left right : Option τ.carrier} →
+    left.map (NTy.forget τ) = right.map (NTy.forget τ) → left = right
+  | none, none, _ => rfl
+  | none, some _, equal => by simp at equal
+  | some _, none, equal => by simp at equal
+  | some _, some _, equal =>
+      congrArg some (NTy.forget_injective τ (Option.some.inj equal))
+
+theorem HEnv.holds_forget : (Γ : NRow) → (env : HEnv Γ) → HEnvPlain.Holds Γ (HEnv.forget Γ env)
+  | .nil, _ => trivial
+  | .cons τ Γ, env => ⟨NTy.holds_map_forget τ env.1, HEnv.holds_forget Γ env.2⟩
+
+theorem HEnv.forget_ofHolds : (Γ : NRow) → (env : HEnvPlain Γ) → (holds : HEnvPlain.Holds Γ env) →
+    HEnv.forget Γ (HEnvPlain.ofHolds Γ env holds) = env
+  | .nil, _, _ => rfl
+  | .cons τ Γ, env, holds => by
+      show ((NTy.slotOfHolds τ env.1 holds.1).map (NTy.forget τ),
+        HEnv.forget Γ (HEnvPlain.ofHolds Γ env.2 holds.2)) = env
+      rw [NTy.map_forget_slotOfHolds, HEnv.forget_ofHolds Γ env.2 holds.2]
+
+theorem HEnv.forget_injective : (Γ : NRow) → {left right : HEnv Γ} →
+    HEnv.forget Γ left = HEnv.forget Γ right → left = right
+  | .nil, _, _, _ => rfl
+  | .cons τ Γ, _, _, equal =>
+      Prod.ext (NTy.slot_forget_injective τ (congrArg Prod.fst equal))
+        (HEnv.forget_injective Γ (congrArg Prod.snd equal))
+
+theorem HEnv.ofHolds_forget (Γ : NRow) (env : HEnv Γ) :
+    HEnvPlain.ofHolds Γ (HEnv.forget Γ env) (HEnv.holds_forget Γ env) = env :=
+  HEnv.forget_injective Γ
+    (HEnv.forget_ofHolds Γ (HEnv.forget Γ env) (HEnv.holds_forget Γ env))
+
+theorem HEnv.forall_carrier (Γ : NRow) (P : HEnv Γ → Prop) :
+    (∀ env : HEnv Γ, P env) ↔
+      ∀ (plain : HEnvPlain Γ) (holds : HEnvPlain.Holds Γ plain),
+        P (HEnvPlain.ofHolds Γ plain holds) := by
+  constructor
+  · intro held plain holds
+    exact held _
+  · intro held env
+    have step := held (HEnv.forget Γ env) (HEnv.holds_forget Γ env)
+    rwa [HEnv.ofHolds_forget] at step
+
+theorem HEnv.exists_carrier (Γ : NRow) (P : HEnv Γ → Prop) :
+    (∃ env : HEnv Γ, P env) ↔
+      ∃ (plain : HEnvPlain Γ) (holds : HEnvPlain.Holds Γ plain),
+        P (HEnvPlain.ofHolds Γ plain holds) := by
+  constructor
+  · rintro ⟨env, held⟩
+    refine ⟨HEnv.forget Γ env, HEnv.holds_forget Γ env, ?_⟩
+    rwa [HEnv.ofHolds_forget]
+  · rintro ⟨_, _, held⟩
+    exact ⟨_, held⟩
+
 /-- The runtime locals an environment denotes. -/
 noncomputable def HEnv.encode : {Γ : NRow} → HEnv Γ → List (Option RuntimeValue)
   | .nil, _ => []
@@ -6917,6 +7274,127 @@ transparency only. -/
 @[reducible] def ResultShape.row : ResultShape → NRow
   | .none => .nil
   | .one τ => .cons τ .nil
+
+/-! ### The result shape at the plain layer -/
+
+@[reducible] def ResultShape.plain : ResultShape → Type
+  | .none => Unit
+  | .one τ => τ.plain
+
+def ResultShape.forget : (shape : ResultShape) → shape.carrier → shape.plain
+  | .none, _ => ()
+  | .one τ, value => NTy.forget τ value
+
+def ResultShape.Holds : (shape : ResultShape) → shape.plain → Prop
+  | .none, _ => True
+  | .one τ, value => NTy.Holds τ value
+
+def ResultShape.ofHolds : (shape : ResultShape) → (value : shape.plain) → shape.Holds value →
+    shape.carrier
+  | .none, _, _ => ()
+  | .one τ, value, holds => NTy.ofHolds τ value holds
+
+theorem ResultShape.holds_forget : (shape : ResultShape) → (value : shape.carrier) →
+    shape.Holds (shape.forget value)
+  | .none, _ => trivial
+  | .one τ, value => NTy.holds_forget τ value
+
+theorem ResultShape.forget_ofHolds : (shape : ResultShape) → (value : shape.plain) →
+    (holds : shape.Holds value) → shape.forget (shape.ofHolds value holds) = value
+  | .none, _, _ => rfl
+  | .one τ, value, holds => NTy.forget_ofDeepHolds τ value holds.deepHolds
+
+theorem ResultShape.forget_injective : (shape : ResultShape) → {left right : shape.carrier} →
+    shape.forget left = shape.forget right → left = right
+  | .none, _, _, _ => rfl
+  | .one τ, _, _, equal => NTy.forget_injective τ equal
+
+theorem ResultShape.ofHolds_forget (shape : ResultShape) (value : shape.carrier) :
+    shape.ofHolds (shape.forget value) (shape.holds_forget value) = value :=
+  shape.forget_injective
+    (shape.forget_ofHolds (shape.forget value) (shape.holds_forget value))
+
+theorem ResultShape.forall_carrier (shape : ResultShape) (P : shape.carrier → Prop) :
+    (∀ result : shape.carrier, P result) ↔
+      ∀ (plain : shape.plain) (holds : shape.Holds plain), P (shape.ofHolds plain holds) := by
+  constructor
+  · intro held plain holds
+    exact held _
+  · intro held result
+    have step := held (shape.forget result) (shape.holds_forget result)
+    rwa [ResultShape.ofHolds_forget] at step
+
+theorem ResultShape.exists_carrier (shape : ResultShape) (P : shape.carrier → Prop) :
+    (∃ result : shape.carrier, P result) ↔
+      ∃ (plain : shape.plain) (holds : shape.Holds plain), P (shape.ofHolds plain holds) := by
+  constructor
+  · rintro ⟨result, held⟩
+    refine ⟨shape.forget result, shape.holds_forget result, ?_⟩
+    rwa [ResultShape.ofHolds_forget]
+  · rintro ⟨_, _, held⟩
+    exact ⟨_, held⟩
+
+/-! ### A contract stated at the plain layer
+
+The generator states a contract over plain arguments and a plain result; the
+certified contract is its image (`Contract.comap`), and the two rules a leaf
+reads of it are the image of the ones it reads today. -/
+
+@[reducible] def _root_.VerexIR.Proofs.Contract.atPlain {σ ε : Type} {Γ : NRow}
+    {shape : ResultShape} (contract : Contract σ ε (HListPlain Γ) shape.plain) :
+    Contract σ ε (HList Γ) shape.carrier :=
+  contract.comap (HList.forget Γ) shape.forget
+
+theorem satisfies_atPlain {σ ε : Type} {Γ : NRow} {shape : ResultShape}
+    (function : HList Γ → Spec σ ε shape.carrier)
+    (contract : Contract σ ε (HListPlain Γ) shape.plain)
+    (proof : ∀ (args : HListPlain Γ) (holds : HListPlain.Holds Γ args) (initial : σ),
+      contract.assumes args initial → contract.requires args initial →
+      wp (function (HListPlain.ofHolds Γ args holds))
+        (fun result final =>
+          (¬contract.mayAbort args initial → contract.ensures args initial
+            (shape.forget result) final) ∧
+          contract.frame args initial (shape.forget result) final ∧
+          ¬contract.mustAbort args initial)
+        (contract.aborts args initial) initial) :
+    Satisfies function contract.atPlain := by
+  refine satisfies_of_wp function contract.atPlain ?_
+  intro args initial assumed permitted
+  have step := proof (HList.forget Γ args) (HList.holds_forget Γ args) initial assumed permitted
+  rwa [HListPlain.ofHolds_forget] at step
+
+theorem wp_summary_atPlain {σ ε : Type} {Γ : NRow} {shape : ResultShape}
+    (contract : Contract σ ε (HListPlain Γ) shape.plain) (args : HList Γ)
+    (ensures : shape.carrier → σ → Prop) (aborts : ε → Prop) (initial : σ) :
+    wp (contract.atPlain.summary args) ensures aborts initial ↔
+      contract.requires (HList.forget Γ args) initial ∧
+      (∀ (result : shape.plain) (holds : shape.Holds result) (final : σ),
+        (¬contract.mayAbort (HList.forget Γ args) initial →
+          contract.ensures (HList.forget Γ args) initial result final) →
+        contract.frame (HList.forget Γ args) initial result final →
+        ¬contract.mustAbort (HList.forget Γ args) initial →
+        ensures (shape.ofHolds result holds) final) ∧
+      (∀ error, contract.aborts (HList.forget Γ args) initial error → aborts error) := by
+  rw [wp_summary]
+  constructor
+  · rintro ⟨permitted, normal, failing⟩
+    refine ⟨permitted, ?_, failing⟩
+    intro result holds final ensured framed must
+    refine normal (shape.ofHolds result holds) final ?_ ?_ must
+    · intro noAbort
+      show contract.ensures (HList.forget Γ args) initial
+        (shape.forget (shape.ofHolds result holds)) final
+      rw [ResultShape.forget_ofHolds]
+      exact ensured noAbort
+    · show contract.frame (HList.forget Γ args) initial
+        (shape.forget (shape.ofHolds result holds)) final
+      rw [ResultShape.forget_ofHolds]
+      exact framed
+  · rintro ⟨permitted, normal, failing⟩
+    refine ⟨permitted, ?_, failing⟩
+    intro result final ensured framed must
+    have step := normal (shape.forget result) (shape.holds_forget result) final ensured framed must
+    rwa [ResultShape.ofHolds_forget] at step
 
 /-- The result-row codec of a function. -/
 noncomputable def resultCodec : (shape : ResultShape) → Codec shape.carrier (Array RuntimeValue)
@@ -7059,6 +7537,63 @@ slots as they were. -/
     memory.set resource key value other = memory other := by
   funext otherKey
   exact Memory.set_other memory key otherKey value distinct
+
+/-! ### The plain layer of global memory -/
+
+@[reducible] def ResourceType.plain (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
+    (resource : ResourceType) : Type :=
+  match resource.kind with
+  | .value => @NTy.plain (Carriers.runtime unit) resource.type
+  | .collection => Array (@NTy.plain (Carriers.runtime unit) resource.type)
+
+noncomputable def ResourceType.forget (resource : ResourceType)
+    (value : resource.carrier unit) : resource.plain unit :=
+  match resource with
+  | ⟨type, _, .value⟩ => @NTy.forget (Carriers.runtime unit) type value
+  | ⟨type, _, .collection⟩ => value.map (@NTy.forget (Carriers.runtime unit) type)
+
+def ResourceType.Holds (resource : ResourceType) (value : resource.plain unit) : Prop :=
+  match resource with
+  | ⟨type, _, .value⟩ => @NTy.Holds (Carriers.runtime unit) type value
+  | ⟨type, _, .collection⟩ =>
+      ∀ element ∈ value, @NTy.Holds (Carriers.runtime unit) type element
+
+theorem ResourceType.holds_forget (resource : ResourceType) (value : resource.carrier unit) :
+    resource.Holds (resource.forget value) := by
+  rcases resource with ⟨type, arguments, kind⟩
+  cases kind with
+  | value => exact @NTy.holds_forget (Carriers.runtime unit) type value
+  | collection =>
+      show ∀ element ∈ value.map (@NTy.forget (Carriers.runtime unit) type),
+        @NTy.Holds (Carriers.runtime unit) type element
+      intro element member
+      obtain ⟨source, _, equal⟩ := Array.mem_map.mp member
+      exact equal ▸ @NTy.holds_forget (Carriers.runtime unit) type source
+
+/-- A stored value as the plain value it certifies. -/
+noncomputable def Memory.plainAt (memory : Memory unit) (resource : ResourceType)
+    (key : StorageKey) : Option (resource.plain unit) :=
+  (memory resource key).map resource.forget
+
+theorem Memory.plainAt_eq (memory : Memory unit) (resource : ResourceType) (key : StorageKey) :
+    memory.plainAt resource key = (memory resource key).map resource.forget := rfl
+
+theorem Memory.holds_plainAt (memory : Memory unit) {resource : ResourceType} {key : StorageKey}
+    {value : resource.plain unit} (read : memory.plainAt resource key = some value) :
+    resource.Holds value := by
+  rw [Memory.plainAt_eq] at read
+  rcases stored : memory resource key with _ | source
+  · rw [stored] at read
+    exact absurd read (by simp)
+  · rw [stored, Option.map_some] at read
+    exact Option.some.inj read ▸ resource.holds_forget source
+
+theorem Memory.plainAt_set (memory : Memory unit) (resource : ResourceType)
+    (key otherKey : StorageKey) (value : Option (resource.carrier unit)) :
+    (memory.set resource key value).plainAt resource otherKey =
+      if otherKey = key then value.map resource.forget else memory.plainAt resource otherKey := by
+  rw [Memory.plainAt_eq, Memory.plainAt_eq, Memory.set_same]
+  split <;> rfl
 
 /-- A slot read after a write at an undecided key holds a value either way. -/
 @[simp] theorem ite_some_some {α : Type} {condition : Prop} [Decidable condition] (left right : α) :
@@ -9714,6 +10249,12 @@ theorem variantEqbPlain_iff : (names : List String) → (rows : NRows) → rows.
           variantEqbPlain_iff names rest free.2 plain.2, Bool.false_eq_true, reduceCtorEq] <;>
         (constructor <;> intro h) <;> first | (subst h; rfl) | (injection h)
 end
+
+-- The plain comparison a declaration's own equation leaves (`NTy.eqb_struct`,
+-- `NTy.eqb_enum`, through `nominalEqb`) is the equation of the values it
+-- compares: in the normal form, where its reference-freedom and its
+-- ghost-freedom are decided by the row the declaration states.
+attribute [vir_denote, vir_denote_norm] NTy.plainEqb_iff rowEqbPlain_iff variantEqbPlain_iff
 
 mutual
 theorem NTy.eqb_iff : (τ : NTy) → τ.refFree = true → τ.ghostFree = true →
