@@ -138,14 +138,6 @@ pub trait TxnOutput: Send + Debug {
     /// and modules.
     fn resource_write_set(&self) -> HashMap<Self::Key, Self::Value>;
 
-    /// The group a written key belongs to, if any. Used only by the
-    /// experimental members-first write order.
-    //
-    // TODO(cleanup): throwaway experiment hook.
-    fn write_group_ordinal(&self, _key: &Self::Key) -> Option<usize> {
-        None
-    }
-
     /// Get the delayed field changes of a transaction from its output.
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>;
 

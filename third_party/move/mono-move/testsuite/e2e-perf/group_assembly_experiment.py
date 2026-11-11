@@ -100,20 +100,17 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
     base, *flags = variant.split("+")
     mode, _, assembly_pass = base.partition("/")
     assembly_pass = assembly_pass or "walk"
-    members_first = False
     poll_env = ""
     poll = None
     for flag in flags:
-        if flag == "members_first":
-            members_first = True
-        elif flag.startswith("poll="):
+        if flag.startswith("poll="):
             poll = int(flag[len("poll="):])
             poll_env = f"MONO_POLL_INTERVAL={poll} "
         else:
             raise ValueError(f"unknown variant flag {flag!r}")
     output = execute_command(
         f"RUST_BACKTRACE=1 MONO_GROUP_ASSEMBLY={mode} GROUP_ASSEMBLY_PASS={assembly_pass} "
-        f"MONO_WRITE_MEMBERS_FIRST={int(members_first)} {poll_env}"
+        f"{poll_env}"
         f"{BUILD_FOLDER}/aptos-executor-benchmark "
         f"--block-executor-type aptos-vm-with-block-stm "
         f"--execution-threads {threads} --generate-then-execute --split-stages "
@@ -171,8 +168,6 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
     if phases:
         for key, value in re.findall(r"(\w+)=" + NUMBER, phases[-1]):
             row["ph_" + key] = float(value)
-    if bool(row.get("members_first")) != members_first:
-        raise ValueError(f"asked for {variant} but members_first={row.get('members_first')}")
     if poll is not None and row.get("poll_interval") != poll:
         raise ValueError(f"asked for {variant} but poll_interval={row.get('poll_interval')}")
     return row

@@ -39,9 +39,10 @@ pub(crate) type GroupView = BTreeMap<Bytes, Bytes>;
 /// One entry at a group's slot: the stored group, or one transaction's changes
 /// to it.
 pub struct GroupLink {
-    /// The changes of the transaction that wrote this link, by member type: a
-    /// new value, or a deletion. Empty for the stored group.
-    changes: Vec<(InternedType, MonoValue)>,
+    /// The types of the members the transaction that wrote this link changed.
+    /// Their new values are that transaction's entries under the members' own
+    /// keys. Empty for the stored group.
+    changed: Vec<InternedType>,
     /// The group's members after these changes. Set when the stored group is
     /// provisioned, and built once for a transaction's link.
     view: OnceLock<Arc<GroupView>>,
@@ -55,16 +56,16 @@ impl GroupLink {
     /// The link for the group as storage holds it.
     pub(crate) fn stored(view: GroupView) -> Self {
         Self {
-            changes: vec![],
+            changed: vec![],
             view: OnceLock::from(Arc::new(view)),
             prev: OnceLock::new(),
         }
     }
 
     /// The link for one transaction's changes to the group.
-    pub(crate) fn changes(changes: Vec<(InternedType, MonoValue)>) -> Self {
+    pub(crate) fn changed(changed: Vec<InternedType>) -> Self {
         Self {
-            changes,
+            changed,
             view: OnceLock::new(),
             prev: OnceLock::new(),
         }
@@ -86,24 +87,27 @@ impl GroupLink {
     }
 
     /// This link's view, built on top of `prev` if no one built it yet.
+    /// `written` returns the value the link's transaction wrote for a member
+    /// type.
     pub(crate) fn view_on(
         &self,
         guard: &ExecutionGuard<'_>,
         prev: &GroupView,
+        written: impl Fn(InternedType) -> Result<MonoValue, PanicError>,
     ) -> Result<Arc<GroupView>, PanicError> {
         if let Some(view) = self.view.get() {
             return Ok(view.clone());
         }
         let mut view = prev.clone();
-        for (member_ty, value) in &self.changes {
+        for member_ty in &self.changed {
             let tag = nominal_tag(*member_ty)
                 .map_err(|e| code_invariant_error(format!("Group member has no tag: {e:#}")))?;
             let tag = tag_bytes(&tag)?;
-            match value {
+            match written(*member_ty)? {
                 MonoValue::Write { ptr, ty, .. } => {
-                    // SAFETY: the link holds the value, and with it the pin on
-                    // the frozen heap the pointer points into.
-                    let blob = unsafe { serialize(guard, ptr.as_ptr(), *ty) }.map_err(|e| {
+                    // SAFETY: the value holds the pin on the frozen heap the
+                    // pointer points into.
+                    let blob = unsafe { serialize(guard, ptr.as_ptr(), ty) }.map_err(|e| {
                         code_invariant_error(format!("Failed to serialize a group member: {e}"))
                     })?;
                     view.insert(tag, Bytes::from(blob));
@@ -115,7 +119,7 @@ impl GroupLink {
                 | MonoValue::GroupMetadata
                 | MonoValue::GroupLink(_) => {
                     return Err(code_invariant_error(
-                        "A group link holds a change that is not a member write",
+                        "A group member's written value is not a member write",
                     ))
                 },
             }
@@ -156,7 +160,7 @@ pub(crate) fn view_below(
                 }
                 match version {
                     Ok((writer_idx, _)) => {
-                        unbuilt.push(link);
+                        unbuilt.push((writer_idx, link));
                         idx = writer_idx;
                     },
                     Err(_) => {
@@ -181,10 +185,31 @@ pub(crate) fn view_below(
             },
         }
     };
-    for link in unbuilt.into_iter().rev() {
-        view = link.view_on(guard, &view)?;
+    for (writer_idx, link) in unbuilt.into_iter().rev() {
+        view = link.view_on(guard, &view, |member_ty| {
+            committed_member_value(data, group_key, member_ty, writer_idx)
+        })?;
     }
     Ok(view)
+}
+
+/// The value transaction `writer_idx` wrote for the group member of type
+/// `member_ty`, read from the multi-version map.
+///
+/// Only called in post-commit, when the writer's entries are committed.
+pub(crate) fn committed_member_value(
+    data: &VersionedData<InMemoryStorageKey, MonoValue>,
+    group_key: &InMemoryStorageKey,
+    member_ty: InternedType,
+    writer_idx: TxnIndex,
+) -> Result<MonoValue, PanicError> {
+    let key = InMemoryStorageKey::resource(group_key.address(), member_ty);
+    match data.fetch_data_no_record(&key, writer_idx + 1) {
+        Ok(MVDataOutput::Versioned(Ok((idx, _)), value)) if idx == writer_idx => Ok(value),
+        Ok(MVDataOutput::Versioned(_, _)) | Err(_) => Err(code_invariant_error(format!(
+            "Transaction {writer_idx} has no committed write for a member of {group_key:?}"
+        ))),
+    }
 }
 
 /// The write for a group's slot: creation, modification or deletion by whether
