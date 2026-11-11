@@ -18,6 +18,7 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, BlockGen},
     state_store::{
         native_collateral::NativeCollateral,
+        native_order::{NativeSingleOrder, SingleOrderV1, TimeInForce},
         native_position::NativePosition,
         state_key::{inner::CollateralScope, StateKey},
         state_value::StateValue,
@@ -26,7 +27,7 @@ use aptos_types::{
         AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
         TransactionInfo, TransactionToCommit, Version,
     },
-    write_set::{NativeCollateralOp, NativePositionOp, TransactionWrite, WriteOp},
+    write_set::{NativeCollateralOp, NativeOrderOp, NativePositionOp, TransactionWrite, WriteOp},
 };
 use itertools::Itertools;
 use proptest::{
@@ -148,6 +149,7 @@ prop_compose! {
         max_blocks: usize,
         make_hot_in_epilogue: bool,
         with_positions: bool,
+        with_orders: bool,
         with_collateral: bool,
     )(
         mut universe in any_with::<AccountInfoUniverse>(num_accounts).no_shrink(),
@@ -157,6 +159,7 @@ prop_compose! {
         let root_smt = SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH);
         let mut smt = root_smt.clone();
         let mut position_smt = root_smt.clone();
+        let mut order_smt = root_smt.clone();
         let mut collateral_smt = root_smt.clone();
 
         let mut result = Vec::new();
@@ -173,6 +176,14 @@ prop_compose! {
                 add_block_positions(checkpoint, block_idx);
                 position_smt = update_in_memory_positions(&position_smt, &root_smt, checkpoint);
                 position_smt.root_hash()
+            });
+            let order_root_hash = with_orders.then(|| {
+                let checkpoint = txns_to_commit
+                    .last_mut()
+                    .expect("a block ends with its checkpoint");
+                add_block_orders(checkpoint, block_idx);
+                order_smt = update_in_memory_orders(&order_smt, &root_smt, checkpoint);
+                order_smt.root_hash()
             });
             let collateral_root_hash = with_collateral.then(|| {
                 let checkpoint = txns_to_commit
@@ -201,8 +212,8 @@ prop_compose! {
 
                 let auxiliary_info = AuxiliaryInfo::new(PersistedAuxiliaryInfo::V1 { transaction_index: idx as u32 }, None);
 
-                let txn_info = match (position_root_hash, collateral_root_hash) {
-                    (None, None) => TransactionInfo::builder_v0()
+                let txn_info = match (position_root_hash, order_root_hash, collateral_root_hash) {
+                    (None, None, None) => TransactionInfo::builder_v0()
                         .transaction_hash(txn.transaction().committed_hash())
                         .state_change_hash(txn.write_set().hash())
                         .event_root_hash(event_root_hash)
@@ -212,7 +223,7 @@ prop_compose! {
                         .maybe_auxiliary_info_hash(auxiliary_info.persisted_info_hash())
                         .build(),
                     // The native roots ride with the state checkpoint, as in execution.
-                    (position_root_hash, collateral_root_hash) => TransactionInfo::builder_v1()
+                    (position_root_hash, order_root_hash, collateral_root_hash) => TransactionInfo::builder_v1()
                         .transaction_hash(txn.transaction().committed_hash())
                         .state_change_hash(txn.write_set().hash())
                         .event_root_hash(event_root_hash)
@@ -222,6 +233,9 @@ prop_compose! {
                         .maybe_auxiliary_info_hash(auxiliary_info.persisted_info_hash())
                         .maybe_position_state_checkpoint_hash(
                             state_checkpoint_hash.and(position_root_hash),
+                        )
+                        .maybe_order_state_checkpoint_hash(
+                            state_checkpoint_hash.and(order_root_hash),
                         )
                         .maybe_collateral_state_checkpoint_hash(
                             state_checkpoint_hash.and(collateral_root_hash),
@@ -273,6 +287,7 @@ pub fn arb_blocks_to_commit_with_params(
         max_blocks,
         make_hot_in_epilogue,
         false, /* with_positions */
+        false, /* with_orders */
         false, /* with_collateral */
     )
 }
@@ -289,6 +304,23 @@ pub fn arb_blocks_to_commit_with_positions(
         10,    /* max_blocks */
         false, /* make_hot_in_epilogue */
         true,  /* with_positions */
+        false, /* with_orders */
+        false, /* with_collateral */
+    )
+}
+
+/// Like [`arb_blocks_to_commit_with_positions`], but for native orders:
+/// checkpoint transaction infos commit the order root.
+pub fn arb_blocks_to_commit_with_orders(
+) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
+    arb_blocks_to_commit_impl(
+        5,     /* num_accounts */
+        2,     /* max_user_txns_per_block */
+        1,     /* min_blocks */
+        10,    /* max_blocks */
+        false, /* make_hot_in_epilogue */
+        false, /* with_positions */
+        true,  /* with_orders */
         false, /* with_collateral */
     )
 }
@@ -304,6 +336,7 @@ pub fn arb_blocks_to_commit_with_collateral(
         10,    /* max_blocks */
         false, /* make_hot_in_epilogue */
         false, /* with_positions */
+        false, /* with_orders */
         true,  /* with_collateral */
     )
 }
@@ -849,54 +882,52 @@ pub fn test_sync_transactions_impl(
     let mut cur_ver: Version = 0;
     let mut estimated_buffer_size = 0;
     let mut snapshot_versions = vec![];
+    let mut saved_without_ledger_info = None;
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
-        // if batch has more than 2 transactions, save them in two batches
-        let batch1_len = txns_to_commit.len() / 2;
-        if batch1_len > 0 {
-            let txns_to_commit_batch = &txns_to_commit[..batch1_len];
-            db.save_transactions_for_test(
-                txns_to_commit_batch,
-                cur_ver, /* first_version */
-                None,    /* ledger_info_with_sigs */
-                false,   /* sync_commit */
-            )
-            .unwrap();
-
-            if let Some(v) = gen_snapshot_version(
-                &mut estimated_buffer_size,
-                txns_to_commit_batch,
-                cur_ver,
-                snapshot_size_threshold,
-            ) {
-                snapshot_versions.push(v);
-            }
-        }
-        let ver = cur_ver + batch1_len as Version;
-        let txns_to_commit_batch = &txns_to_commit[batch1_len..];
+        let is_latest = batch_idx + 1 == num_batches;
+        // Every other block is saved without a ledger info unless it ends an epoch, and is
+        // verified with the next one's.
+        let ledger_info_opt = (saved_without_ledger_info.is_some()
+            || is_latest
+            || ledger_info_with_sigs.ledger_info().ends_epoch())
+        .then_some(ledger_info_with_sigs);
         db.save_transactions_for_test(
-            txns_to_commit_batch,
-            ver,
-            Some(ledger_info_with_sigs),
+            txns_to_commit,
+            cur_ver, /* first_version */
+            ledger_info_opt,
             false, /* sync_commit */
         )
         .unwrap();
 
         if let Some(v) = gen_snapshot_version(
             &mut estimated_buffer_size,
-            txns_to_commit_batch,
-            ver,
+            txns_to_commit,
+            cur_ver,
             snapshot_size_threshold,
         ) {
             snapshot_versions.push(v);
         }
 
-        verify_committed_transactions(
-            &db,
-            txns_to_commit,
-            cur_ver,
-            ledger_info_with_sigs,
-            batch_idx + 1 == num_batches, /* is_latest */
-        );
+        if ledger_info_opt.is_some() {
+            if let Some((first_version, txns)) = saved_without_ledger_info.take() {
+                verify_committed_transactions(
+                    &db,
+                    txns,
+                    first_version,
+                    ledger_info_with_sigs,
+                    false, /* is_latest */
+                );
+            }
+            verify_committed_transactions(
+                &db,
+                txns_to_commit,
+                cur_ver,
+                ledger_info_with_sigs,
+                is_latest,
+            );
+        } else {
+            saved_without_ledger_info = Some((cur_ver, txns_to_commit.as_slice()));
+        }
 
         cur_ver += txns_to_commit.len() as u64;
     }
@@ -963,6 +994,72 @@ fn update_in_memory_collateral(
     let updates = checkpoint
         .write_set
         .native_collateral_iter()
+        .map(|(k, op)| {
+            (
+                k.hash(),
+                op.as_write_op().as_state_value_opt().map(CryptoHash::hash),
+            )
+        })
+        .collect_vec();
+    smt.freeze(root_smt)
+        .batch_update(updates.iter(), &())
+        .unwrap()
+        .unfreeze()
+}
+
+fn test_order_key(order_id: u128) -> StateKey {
+    let address = |byte: u8| {
+        let mut bytes = [0u8; AccountAddress::LENGTH];
+        bytes[AccountAddress::LENGTH - 1] = byte;
+        AccountAddress::new(bytes)
+    };
+    StateKey::order(address(1), address(7), order_id)
+}
+
+/// As [`add_block_positions`]: block `block_idx` sets orders
+/// `0..=max(1, block_idx % 7)` and deletes order 3 on every fourth block.
+fn add_block_orders(checkpoint: &mut TransactionToCommit, block_idx: usize) {
+    let mut orders = BTreeMap::new();
+    for order_id in 0..=(block_idx % 7).max(1) as u128 {
+        let value = NativeSingleOrder::V1(SingleOrderV1 {
+            account: AccountAddress::ONE,
+            order_id,
+            client_order_id: None,
+            price: 100 + block_idx as u64,
+            orig_size: 10,
+            remaining_size: 10,
+            is_bid: true,
+            trigger_condition: None,
+            time_in_force: TimeInForce::Gtc,
+            creation_time_micros: 0,
+            unique_priority_idx: order_id,
+            metadata: vec![].into(),
+        });
+        let bytes = value.serialize().expect("NativeSingleOrder serialize");
+        orders.insert(
+            test_order_key(order_id),
+            NativeOrderOp::from_write_op(WriteOp::legacy_modification(bytes.into())),
+        );
+    }
+    if block_idx % 4 == 3 {
+        orders.insert(
+            test_order_key(3),
+            NativeOrderOp::from_write_op(WriteOp::legacy_deletion()),
+        );
+    }
+    let mut write_set = std::mem::take(&mut checkpoint.write_set).into_v1();
+    write_set.add_native_orders(orders);
+    checkpoint.write_set = write_set;
+}
+
+fn update_in_memory_orders(
+    smt: &SparseMerkleTree,
+    root_smt: &SparseMerkleTree,
+    checkpoint: &TransactionToCommit,
+) -> SparseMerkleTree {
+    let updates = checkpoint
+        .write_set
+        .native_order_iter()
         .map(|(k, op)| {
             (
                 k.hash(),

@@ -35,7 +35,7 @@ denote : ExecutableUnit unit → FunctionHandle →
   Array RuntimeValue → Spec RuntimeState Failure (Array RuntimeValue)
 
 denote_agrees : ∀ unit function arguments,
-  Spec.Equiv (denote unit function arguments) (meaning unit function arguments)
+  Spec.Refines (meaning unit function arguments) (denote unit function arguments)
 ```
 
 - `denote` is a Lean function of the validated unit itself, recursing over
@@ -46,8 +46,15 @@ denote_agrees : ∀ unit function arguments,
   points; loops are fixed points under their invariant; storage and
   references use the typed memory and the prophecy encoding. `denote` is a
   relation, not an executable.
-- `denote_agrees` is proved once, by induction against
-  `BigStep.EvalFunction`, one case per construct. It is what makes a bare
+- `denote_agrees` is the statement an induction against
+  `BigStep.EvalFunction`, one case per construct, would prove: every
+  outcome of the meaning is one of the denotation wherever the denotation
+  is defined, which is not everywhere, since a data invariant is owed where
+  a value is made and nothing checks it at run time
+  ([`data-invariants.md`](data-invariants.md)). It is
+  assumed as the named axioms `compileFunction_agrees` and
+  `compileFunction_least_cycle` ([`assumptions.md`](../status/assumptions.md)).
+  It is what makes a bare
   `verify` meaningful: vacuity can arise only from preparation admitting a
   node without executable semantics.
 - Per target, `verify f` states the contract over `denote unit f`. The
@@ -165,7 +172,7 @@ substituted once.
 
 **Calls.** A callee is inlined, specified or not, and the caller reasons
 over its compiled body through the agreement theorem
-(`wp_calleeMeaning_of_compiled`). Only a native, an `opaque` callee and a
+(`wp_propheticMeaning_of_compiled`). Only a native, an `opaque` callee and a
 member of a cycle of calls are used through their contracts
 (`usedThroughContract`); such a callee with a body is used by its theorem,
 verified first. A callee without a theorem, whose verification failed or
@@ -371,7 +378,7 @@ restated up to prophecy resolution (the RustHorn model of
   `(x.p, π)` and the lender holds `π` at `p` from then on. A mutable global
   borrow `&mut R[k]` is `(R[k], π)`, and the memory holds `π` at `k`.
 - Reads and writes through a reference act on its current value.
-- A loan's death (its `endLoan` marker) resolves the holder: execution
+- A loan's death (`deathEffect`, one `Term.resolve` per holder) resolves the holder: execution
   continues only where `current = prophecy`. A loan consumed by a call
   argument resolves inside the callee.
 - A `&mut` parameter arrives as `(c, φ)`. Every exit resolves each `&mut`
@@ -392,15 +399,20 @@ through `prophecyOf x p`, which is `Spec.choose` marked with the borrowed
 local and path: its rule (`wp_prophecyOf`) gives the value with an inert
 premise `Prophecy x p π`, which the walk consumes where it introduces `π`:
 a step proof binds a whole local's prophecy as the value written back,
-`x'` (`doc/plan/proof-language.md`, "Semantics and lowering"), any other
+`x'` ([`proof-language.md`](proof-language.md), "Semantics and lowering"), any other
 proof drops it. Both are generic in the value's type and carry no family,
 so the rule needs no instance. A loan's death
 resolves each of its holders that still holds a reference; a holder it
 moved from resolves nothing. A loop that only writes through a reference
 local keeps its prophecy. Callees are collected through every inlined
-body, since a callee returning a reference is inlined. The rule-1 audit
-forbids the loan predicates (`FreshStorageLoanIds`, `LoanDiscipline`,
-`storageLoanTargetIn?`, `removeStorageLoan`) in verified artifacts.
+body, since a callee returning a reference is inlined. The rule-1 audit of
+`verify`'s artifacts (`requireNativeArtifacts`, `VerexSL/Verify/Members.lean`) forbids `RuntimeFrame`
+and the loan predicates (`SemanticOperations.FreshGlobalLoanIds`,
+`LoanDiscipline`, `globalLoanKeyIn?`, `removeGlobalLoan`); the native-only
+check (`runtimeNamespaces`, `runtimeConstants` in
+`VerexIR/Proofs/Denote/NativeOnly.lean`) rejects a contract or leaf that
+states a runtime value, the runtime state or failures, a codec or decoder,
+or a function value's runtime closure.
 
 ### Agreement
 
@@ -414,7 +426,9 @@ reference's prophecy, the export of every argument loan in `s₁.pending`
 (returned loans' holes replaced by their prophecies) encodes the
 argument's prophecy, and `final` is `s₁` with the loan fields of
 `initial`; `aborts` and `undefined` likewise. `compileFunction_agrees` is
-`Spec.Equiv (f.denote unit args) (propheticMeaning unit handle f args)`.
+`Spec.Refines (propheticMeaning unit handle f args) (f.denote unit args)`:
+every outcome of the prophetic meaning is one of the denotation wherever the
+denotation is defined.
 
 Intrinsic maps ([`intrinsic-maps.md`](intrinsic-maps.md)): the runtime's
 values are read up to `normalize`, which replaces every well-formed value
@@ -449,9 +463,9 @@ proved by assuming it at the self-calls is sound because that meaning is
 the least fixed point of the body: big-step derivations are finite.
 
 - The denotation takes the meaning of calls as a parameter
-  (`CalleeMeaning`). The closed denotation passes `closedMeaning unit`; the
-  body of a member of a cycle at a slot passes `cycleMeanings unit members
-  typeInstantiation self slot`. A slot (`CycleSlot`) is a member at the
+  (`CalleeMeaning`). The closed denotation passes `closedMeanings executable
+  typeInstantiation`; the body of a member of a cycle at a slot passes
+  `cycleMeanings executable members typeInstantiation self slot`. A slot (`CycleSlot`) is a member at the
   runtime family, or at a skolem family and type instantiation. A call to
   a member without type arguments means `self` at the caller's slot, one
   with type arguments `self` at the family and frame instantiation the

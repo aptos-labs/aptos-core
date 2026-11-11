@@ -154,7 +154,8 @@ mutual
           (.values argumentState argumentFrame values))
         (resolve_eq : resolveFunction? unit namespaceId reference = some handle)
         (calleeStep : callee handle
-          (callTypeInstantiation unit handle argumentFrame.typeInstantiation instantiations)
+          (callTypeInstantiation unit handle argumentFrame.typeInstantiation
+            (ns.genericArguments instantiations))
           argumentState values.toArray finalState
           (.returned results)) :
         EvalNodeWith executable callee namespaceId frame state exprId
@@ -173,7 +174,8 @@ mutual
           (.values argumentState argumentFrame values))
         (resolve_eq : resolveFunction? unit namespaceId reference = some handle)
         (calleeStep : callee handle
-          (callTypeInstantiation unit handle argumentFrame.typeInstantiation instantiations)
+          (callTypeInstantiation unit handle argumentFrame.typeInstantiation
+            (ns.genericArguments instantiations))
           argumentState values.toArray finalState
           (.threw kind thrown)) :
         EvalNodeWith executable callee namespaceId frame state exprId
@@ -242,7 +244,8 @@ mutual
         (resolve_eq : resolveFunction? unit namespaceId reference = some handle) :
         EvalNodeWith executable callee namespaceId frame state exprId finalFrame finalState
           (.value (.closure handle mask
-            (callTypeInstantiation unit handle finalFrame.typeInstantiation instantiations)
+            (callTypeInstantiation unit handle finalFrame.typeInstantiation
+            (ns.genericArguments instantiations))
             values.toArray))
     | invokeArgumentsControl (namespaceId frame state exprId ns expression instantiations arguments
         surface finalState finalFrame control)
@@ -306,7 +309,7 @@ mutual
           instantiations arguments surface)
         (operands : EvalValuesWith executable callee namespaceId frame state arguments.toList
           (.values finalState finalFrame values))
-        (evaluate_eq : evaluateProfileOperation? executable ns expression.typeId operation values.toArray =
+        (evaluate_eq : evaluateProfileOperation? executable ns (ns.typeId expression.typeId) operation values.toArray =
           some (.ok runtimeValue)) :
         EvalNodeWith executable callee namespaceId frame state exprId
           finalFrame finalState (.value runtimeValue)
@@ -318,7 +321,7 @@ mutual
           instantiations arguments surface)
         (operands : EvalValuesWith executable callee namespaceId frame state arguments.toList
           (.values finalState finalFrame values))
-        (evaluate_eq : evaluateProfileOperation? executable ns expression.typeId operation values.toArray =
+        (evaluate_eq : evaluateProfileOperation? executable ns (ns.typeId expression.typeId) operation values.toArray =
           some (.error (kind, thrown))) :
         EvalNodeWith executable callee namespaceId frame state exprId
           finalFrame finalState (.throw_ kind thrown)
@@ -339,7 +342,7 @@ mutual
           instantiations arguments surface)
         (operands : EvalValuesWith executable callee namespaceId frame state arguments.toList
           (.values finalState finalFrame values))
-        (evaluate_eq : evaluatePrimitiveOperation? ns expression.typeId operation values.toArray
+        (evaluate_eq : evaluatePrimitiveOperation? ns (ns.typeId expression.typeId) operation values.toArray
           executable.targetPointerWidth =
           some (.ok runtimeValue)) :
         EvalNodeWith executable callee namespaceId frame state exprId
@@ -352,7 +355,7 @@ mutual
           instantiations arguments surface)
         (operands : EvalValuesWith executable callee namespaceId frame state arguments.toList
           (.values finalState finalFrame values))
-        (evaluate_eq : evaluatePrimitiveOperation? ns expression.typeId operation values.toArray
+        (evaluate_eq : evaluatePrimitiveOperation? ns (ns.typeId expression.typeId) operation values.toArray
           executable.targetPointerWidth =
           some (.error (kind, thrown))) :
         EvalNodeWith executable callee namespaceId frame state exprId
@@ -372,8 +375,8 @@ mutual
         (kind_eq : expression.kind = .operation (.global kind) instantiations arguments surface)
         (operands : EvalValuesWith executable callee namespaceId frame state arguments.toList
           (.values argumentState argumentFrame values))
-        (evaluate_eq : evaluateGlobalOperation? unit ns expression.typeId exprId kind
-          instantiations values.toArray argumentFrame argumentState =
+        (evaluate_eq : evaluateGlobalOperation? unit ns (ns.typeId expression.typeId) exprId kind
+          (ns.genericArguments instantiations) values.toArray argumentFrame argumentState =
             some (.value finalFrame finalState runtimeValue)) :
         EvalNodeWith executable callee namespaceId frame state exprId
           finalFrame finalState (.value runtimeValue)
@@ -384,8 +387,8 @@ mutual
         (kind_eq : expression.kind = .operation (.global globalKind) instantiations arguments surface)
         (operands : EvalValuesWith executable callee namespaceId frame state arguments.toList
           (.values argumentState argumentFrame values))
-        (evaluate_eq : evaluateGlobalOperation? unit ns expression.typeId exprId globalKind
-          instantiations values.toArray argumentFrame argumentState =
+        (evaluate_eq : evaluateGlobalOperation? unit ns (ns.typeId expression.typeId) exprId
+          globalKind (ns.genericArguments instantiations) values.toArray argumentFrame argumentState =
             some (.throw_ finalFrame finalState throwKind thrown)) :
         EvalNodeWith executable callee namespaceId frame state exprId finalFrame finalState
           (.throw_ throwKind thrown)
@@ -429,7 +432,7 @@ mutual
         (kind_eq : expression.kind = .operation operation instantiations arguments surface)
         (operands : EvalValuesWith executable callee namespaceId frame state arguments.toList
           (.values argumentState argumentFrame values))
-        (evaluate_eq : evaluatePlaceOperation? unit ns expression.typeId exprId operation
+        (evaluate_eq : evaluatePlaceOperation? unit ns (ns.typeId expression.typeId) exprId operation
           values.toArray argumentFrame argumentState = some (finalFrame, finalState, runtimeValue)) :
         EvalNodeWith executable callee namespaceId frame state exprId
           finalFrame finalState (.value runtimeValue)
@@ -440,7 +443,7 @@ mutual
         (kind_eq : expression.kind = .operation operation instantiations arguments surface)
         (operands : EvalValuesWith executable callee namespaceId frame state arguments.toList
           (.values argumentState argumentFrame values))
-        (evaluate_eq : evaluatePlaceOperation? unit ns expression.typeId exprId operation
+        (evaluate_eq : evaluatePlaceOperation? unit ns (ns.typeId expression.typeId) exprId operation
           values.toArray argumentFrame argumentState = none)
         (mismatch : variantMismatch? unit ns operation values.toArray argumentFrame
           argumentState = true)

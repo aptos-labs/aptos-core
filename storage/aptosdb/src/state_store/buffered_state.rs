@@ -35,19 +35,15 @@ pub type BufferedState = crate::common::BufferedState<
 >;
 
 /// `pending` covers `(last_snapshot, current.last_checkpoint()]` and
-/// drains into the snapshot payload on every flush. `post_checkpoint`
-/// covers `(last_checkpoint, latest()]` and folds into `pending` once
-/// a later chunk advances the checkpoint past it.
+/// drains into the snapshot payload on every flush.
 pub struct HotStateAccumulator {
     pending: [HotStateShardUpdates; NUM_STATE_SHARDS],
-    post_checkpoint: [HotStateShardUpdates; NUM_STATE_SHARDS],
 }
 
 impl HotStateAccumulator {
     pub fn new() -> Self {
         Self {
             pending: empty_hot_state_updates(),
-            post_checkpoint: empty_hot_state_updates(),
         }
     }
 
@@ -70,20 +66,9 @@ impl Default for HotStateAccumulator {
 impl BufferedStateExtras<SnapshotToCommit, StateWithSummary> for HotStateAccumulator {
     type ChunkInput = HotStateUpdates;
 
-    fn absorb_chunk(&mut self, input: HotStateUpdates, checkpoint_advanced: bool) {
-        // Order: (1) fold prior post_checkpoint into pending if the
-        // checkpoint advanced past it, (2) merge this chunk's
-        // pre-checkpoint share into pending, (3) merge this chunk's
-        // post-checkpoint share into post_checkpoint.
-        if checkpoint_advanced {
-            let prev_post = std::mem::replace(&mut self.post_checkpoint, empty_hot_state_updates());
-            Self::merge_hot_state_updates(&mut self.pending, prev_post);
-        }
+    fn absorb_chunk(&mut self, input: HotStateUpdates) {
         if let Some(shards) = input.for_last_checkpoint {
             Self::merge_hot_state_updates(&mut self.pending, shards);
-        }
-        if let Some(shards) = input.for_latest {
-            Self::merge_hot_state_updates(&mut self.post_checkpoint, shards);
         }
     }
 

@@ -1,0 +1,2 @@
+VerexE2ETests/Check/Closures/TupleTargets.lean:30:7: error: no denotation for `of_pair`: a function value of `pair` is not supported: `pair` returns a tuple
+VerexE2ETests/Check/Closures/TupleTargets.lean:36:7: error: no denotation for `of_reference`: a function value of `with_reference` is not supported: `with_reference` returns a tuple holding a reference

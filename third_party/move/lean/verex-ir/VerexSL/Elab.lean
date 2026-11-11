@@ -34,6 +34,14 @@ private partial def childrenWhere (predicate : Syntax → Bool)
 private def isAttributeSyntax (stx : Syntax) : Bool :=
   stx.isOfKind ``verexAttributeSyntax || stx.isOfKind ``verexAttributeAssignmentSyntax
 
+private partial def pathSegments (stx : Syntax) : Array String :=
+  if stx.isIdent then
+    let name := stx.getId
+    #[if name.getPrefix.isAnonymous then name.getString! else name.toString]
+  else if stx.isNatLit?.isSome then
+    #[stx.reprint.getD stx.prettyPrint.pretty |>.trimAscii |>.toString]
+  else stx.getArgs.flatMap pathSegments
+
 private partial def attributeOf (stx : Syntax) : Except String SourceAttribute := do
   let some name := stx.getArgs.find? (·.isIdent)
     | throw "an attribute must have a name"
@@ -42,6 +50,8 @@ private partial def attributeOf (stx : Syntax) : Except String SourceAttribute :
     let value ← if let some number := value.isNatLit? then pure (.number number)
       else if let some string := value.isStrLit? then pure (.string string)
       else if value.isIdent then pure (.name value.getId.getString!)
+      else if value.isOfKind ``verexQualifiedNameSyntax then
+        pure (.qualifiedName (String.intercalate "::" (pathSegments value).toList))
       else throw "an attribute value must be a number, string, or name"
     return .assign name.getId.getString! value (spanOf stx)
   return .call name.getId.getString!
@@ -338,14 +348,6 @@ private partial def identifiers (stx : Syntax) : Array String :=
     let name := stx.getId
     #[if name.getPrefix.isAnonymous then name.getString! else name.toString]
   else stx.getArgs.flatMap identifiers
-
-private partial def pathSegments (stx : Syntax) : Array String :=
-  if stx.isIdent then
-    let name := stx.getId
-    #[if name.getPrefix.isAnonymous then name.getString! else name.toString]
-  else if stx.isNatLit?.isSome then
-    #[stx.reprint.getD stx.prettyPrint.pretty |>.trimAscii |>.toString]
-  else stx.getArgs.flatMap pathSegments
 
 /-- A path's first segment. -/
 private partial def firstSegment (stx : Syntax) : Syntax :=
@@ -2205,8 +2207,7 @@ def elaborateCheck : CommandElab := fun stx => do
     | .ok value => pure value
     | .error message => throwErrorAt pathSyntax message
   let name := pathName path
-  let some unit := registeredUnit? (← getEnv) name
-    | throwErrorAt pathSyntax s!"unknown Verex namespace `{name}`"
+  let unit ← registeredUnitAt pathSyntax name
   logInfoAt pathSyntax s!"Verex namespace `{name}`: {unit.namespaces.size} namespace(s), \
     {unit.indexes.functionCounts.foldl (· + ·) 0} executable function(s)"
 

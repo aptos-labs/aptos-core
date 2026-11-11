@@ -81,6 +81,10 @@ pub struct HotStateConfigV1 {
     /// `StateKey::size`. The epilogue txn carries each of them in both its payload and its write
     /// set, and a key can be large, so capping the count alone doesn't bound the txn size.
     pub max_promotion_bytes_per_block: u64,
+    /// If true, writes to hot items reach the cold state only when the items are evicted, so the
+    /// cold state stops paying for hot writes. Otherwise every write goes to both.
+    // TODO(HotState): not honored yet.
+    pub defer_cold_writes_to_eviction: bool,
 }
 
 #[cfg(test)]
@@ -96,6 +100,7 @@ mod tests {
             max_bytes_per_shard: vec![1 << 30; NUM_STATE_SHARDS],
             refresh_interval_versions: 100_000,
             max_promotion_bytes_per_block: 512 * 1024,
+            defer_cold_writes_to_eviction: false,
         });
 
         let mut configs = HashMap::new();
@@ -118,6 +123,7 @@ mod tests {
                 max_bytes_per_shard,
                 refresh_interval_versions: 0,
                 max_promotion_bytes_per_block: 0,
+                defer_cold_writes_to_eviction: false,
             })
         };
         let valid = || vec![1; NUM_STATE_SHARDS];

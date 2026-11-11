@@ -111,14 +111,14 @@ theorem callTypeInstantiation_eraseLoc (unit : ValidatedUnit) (handle : Function
 
 def referencedName? (ns : ValidatedNamespace) (reference : QualifiedRef) :
     Option (NamespaceRef × String) := do
-  let name ← ns.tables.names[reference.name.index]?
-  if name.namespaceId != reference.namespaceId then none else
-    let targetNamespace ← ns.tables.namespaces[reference.namespaceId.index]?
+  let name ← ns.nameOf reference.name
+  if name.namespaceId != ns.namespaceId reference.namespaceId then none else
+    let targetNamespace ← ns.namespaceOf reference.namespaceId
     return (targetNamespace, name.name)
 
 def declaredName? (ns : ValidatedNamespace) (nameId : NameId) :
     Option (NamespaceRef × String) := do
-  let name ← ns.tables.names[nameId.index]?
+  let name ← ns.nameOf nameId
   let targetNamespace ← ns.tables.namespaces[name.namespaceId.index]?
   return (targetNamespace, name.name)
 
@@ -128,34 +128,34 @@ semantic consumers use that index instead of rescanning declarations by name. -/
 def resolveFunction? (unit : ValidatedUnit) (sourceNamespace : NamespaceId)
     (reference : QualifiedRef) : Option FunctionHandle := do
   let source ← unit.namespaces[sourceNamespace.index]?
-  let qualified ← source.tables.names[reference.name.index]?
-  if qualified.namespaceId != reference.namespaceId then none else
-    let functionId ← unit.resolution.function? reference.name
-    let targetNamespace ← unit.namespaces[reference.namespaceId.index]?
+  let qualified ← source.nameOf reference.name
+  if qualified.namespaceId != source.namespaceId reference.namespaceId then none else
+    let functionId ← unit.resolution.function? (source.nameId reference.name)
+    let targetNamespace ← unit.namespaces[(source.namespaceId reference.namespaceId).index]?
     let _ ← targetNamespace.functions[functionId.index]?
-    return { namespaceId := reference.namespaceId, functionId }
+    return { namespaceId := source.namespaceId reference.namespaceId, functionId }
 
 /-- Resolve a namespace-local qualified reference to a constant handle. -/
 def resolveConstant? (unit : ValidatedUnit) (sourceNamespace : NamespaceId)
     (reference : QualifiedRef) : Option ConstantHandle := do
   let source ← unit.namespaces[sourceNamespace.index]?
-  let qualified ← source.tables.names[reference.name.index]?
-  if qualified.namespaceId != reference.namespaceId then none else
-    let constantId ← unit.resolution.constant? reference.name
-    let targetNamespace ← unit.namespaces[reference.namespaceId.index]?
+  let qualified ← source.nameOf reference.name
+  if qualified.namespaceId != source.namespaceId reference.namespaceId then none else
+    let constantId ← unit.resolution.constant? (source.nameId reference.name)
+    let targetNamespace ← unit.namespaces[(source.namespaceId reference.namespaceId).index]?
     let _ ← targetNamespace.constants[constantId.index]?
-    return { namespaceId := reference.namespaceId, constantId := constantId.index }
+    return { namespaceId := source.namespaceId reference.namespaceId, constantId := constantId.index }
 
 /-- Resolve a namespace-local qualified reference to a nominal declaration. -/
 def resolveStruct? (unit : ValidatedUnit) (sourceNamespace : NamespaceId)
     (reference : QualifiedRef) : Option StructHandle := do
   let source ← unit.namespaces[sourceNamespace.index]?
-  let qualified ← source.tables.names[reference.name.index]?
-  if qualified.namespaceId != reference.namespaceId then none else
-    let typeId ← unit.resolution.nominal? reference.name
-    let targetNamespace ← unit.namespaces[reference.namespaceId.index]?
+  let qualified ← source.nameOf reference.name
+  if qualified.namespaceId != source.namespaceId reference.namespaceId then none else
+    let typeId ← unit.resolution.nominal? (source.nameId reference.name)
+    let targetNamespace ← unit.namespaces[(source.namespaceId reference.namespaceId).index]?
     let _ ← targetNamespace.structs[typeId.index]?
-    return { namespaceId := reference.namespaceId, structId := typeId.index }
+    return { namespaceId := source.namespaceId reference.namespaceId, structId := typeId.index }
 
 /-- Runtime identity of the nominal declaration an interned name denotes. -/
 def resolveNominal? (unit : ValidatedUnit) (ns : ValidatedNamespace)
@@ -172,7 +172,7 @@ execution paths use `resolveStruct?`/`resolveNominal?` instead. -/
 def findStructHandle? (unit : ValidatedUnit) (name : String) : Option StructHandle :=
   unit.namespaces.zipIdx.findSome? fun (ns, namespaceIndex) =>
     ns.structs.zipIdx.findSome? fun (declaration, structIndex) =>
-      if (ns.tables.names[declaration.name.index]?).any (·.name == name) then
+      if (ns.nameOf declaration.name).any (·.name == name) then
         some { namespaceId := ⟨namespaceIndex⟩, structId := structIndex }
       else none
 
@@ -181,7 +181,7 @@ def structName? (unit : ValidatedUnit) (handle : StructHandle) : Option Qualifie
   let ns ← unit.namespaces[handle.namespaceId.index]?
   let declaration ← ns.structs[handle.structId]?
   let (_, name) ← declaredName? ns declaration.name
-  let qualified ← ns.tables.names[declaration.name.index]?
+  let qualified ← ns.nameOf declaration.name
   if qualified.name == name then some qualified else none
 
 /-- Ordered fields selected by a structure or enum constructor. A table
@@ -200,7 +200,7 @@ def constructorFields? (unit : ValidatedUnit) (handle : StructHandle)
       else none
   | some variantName =>
       let variantIndex ← declaration.variants.findIdx? fun candidate =>
-        (ns.tables.names[candidate.name.index]?).any (fun name => name.name == variantName)
+        (ns.nameOf candidate.name).any (fun name => name.name == variantName)
       return declaration.variants[variantIndex]!.fields
 
 /-- Interpret an M1 constant literal as a runtime value. -/
@@ -938,7 +938,7 @@ theorem writeProjections?_append (value : RuntimeValue)
         all_goals simp_all
 
 def sourceFieldName? (ns : ValidatedNamespace) (field : NameId) : Option String :=
-  (ns.tables.names[field.index]?).map (·.name)
+  (ns.nameOf field).map (·.name)
 
 /-- Position of a named field in an ordered payload.  The search is written
 as a structural recursion rather than an array search because reduction can
@@ -948,7 +948,7 @@ private def fieldIndexIn (ns : ValidatedNamespace) (fieldName : String) :
     List FieldDecl → Nat → Option Nat
   | [], _ => none
   | field :: rest, index =>
-      if (ns.tables.names[field.name.index]?).any (·.name == fieldName) then some index
+      if (ns.nameOf field.name).any (·.name == fieldName) then some index
       else fieldIndexIn ns fieldName rest (index + 1)
 
 /-- Fields of a handle-identified declaration, indexed directly. -/
@@ -963,7 +963,7 @@ def handleFields? (unit : ValidatedUnit) (handle : StructHandle)
       else none
   | some variantName => do
       let declared ← declaration.variants.toList.find? fun candidate =>
-        (targetNs.tables.names[candidate.name.index]?).any (·.name == variantName)
+        (targetNs.nameOf candidate.name).any (·.name == variantName)
       some (targetNs, declared.fields)
 
 /-- Position of a named field in a handle-identified payload. -/
@@ -978,7 +978,7 @@ def handleGhostIndex? (unit : ValidatedUnit) (handle : StructHandle)
     (variant : Option String) (fieldName : String) : Option Nat := do
   let (targetNs, fields) ← handleFields? unit handle variant
   let position ← (nominalGhosts unit handle).findIdx? fun ghost =>
-    (targetNs.tables.names[ghost.name.index]?).any (·.name == fieldName)
+    (targetNs.nameOf ghost.name).any (·.name == fieldName)
   some (fields.size + position)
 
 private theorem fieldIndexIn_find (ns : ValidatedNamespace) (fieldName : String) :
@@ -986,7 +986,7 @@ private theorem fieldIndexIn_find (ns : ValidatedNamespace) (fieldName : String)
       fieldIndexIn ns fieldName fields start = some index →
         start ≤ index ∧ ∃ field, fields[index - start]? = some field ∧
           fields.find? (fun field =>
-            (ns.tables.names[field.name.index]?).any (·.name == fieldName)) = some field
+            (ns.nameOf field.name).any (·.name == fieldName)) = some field
   | [], _, _, found => by simp [fieldIndexIn] at found
   | field :: rest, start, index, found => by
       unfold fieldIndexIn at found
@@ -1011,7 +1011,7 @@ theorem handleFieldIndex?_find {unit : ValidatedUnit} {handle : StructHandle}
     ∃ targetNs fields field, handleFields? unit handle variant = some (targetNs, fields) ∧
       fields[index]? = some field ∧
       fields.toList.find? (fun field =>
-        (targetNs.tables.names[field.name.index]?).any (·.name == fieldName)) = some field := by
+        (targetNs.nameOf field.name).any (·.name == fieldName)) = some field := by
   simp only [handleFieldIndex?, Option.bind_eq_bind, Option.bind_eq_some_iff] at found
   obtain ⟨⟨targetNs, fields⟩, handle_eq, found⟩ := found
   obtain ⟨-, field, member, find_eq⟩ := fieldIndexIn_find targetNs fieldName fields.toList 0 index found
@@ -1026,7 +1026,7 @@ def variantFieldChoices? (unit : ValidatedUnit) (handle : StructHandle)
   let targetNs ← unit.namespaces[handle.namespaceId.index]?
   let declaration ← targetNs.structs[handle.structId]?
   return declaration.variants.filterMap fun variant => do
-    let variantName ← targetNs.tables.names[variant.name.index]?
+    let variantName ← targetNs.nameOf variant.name
     let selected ← fields.find? (·.1 == variantName.name)
     let index ← fieldIndexIn targetNs selected.2 variant.fields.toList 0
     some (variantName.name, index)
@@ -1041,10 +1041,10 @@ theorem variantFieldChoices?_mem {unit : ValidatedUnit} {handle : StructHandle}
       unit.namespaces[handle.namespaceId.index]? = some targetNs ∧
       targetNs.structs[handle.structId]? = some declaration ∧
       variant ∈ declaration.variants ∧
-      targetNs.tables.names[variant.name.index]? = some name ∧ choice.1 = name.name ∧
+      targetNs.nameOf variant.name = some name ∧ choice.1 = name.name ∧
       (name.name, fieldName) ∈ fields ∧ variant.fields[choice.2]? = some field ∧
       variant.fields.toList.find? (fun field =>
-        (targetNs.tables.names[field.name.index]?).any (·.name == fieldName)) = some field := by
+        (targetNs.nameOf field.name).any (·.name == fieldName)) = some field := by
   simp only [variantFieldChoices?, Option.bind_eq_bind, Option.bind_eq_some_iff, pure,
     Option.some.injEq] at choices_eq
   obtain ⟨targetNs, namespace_eq, declaration, declaration_eq, rfl⟩ := choices_eq
@@ -1083,14 +1083,14 @@ def variantIndex? (unit : ValidatedUnit) (handle : StructHandle)
   let targetNs ← unit.namespaces[handle.namespaceId.index]?
   let declaration ← targetNs.structs[handle.structId]?
   declaration.variants.findIdx? fun candidate =>
-    (targetNs.tables.names[candidate.name.index]?).any (·.name == variant)
+    (targetNs.nameOf candidate.name).any (·.name == variant)
 
 def variantDiscriminant? (unit : ValidatedUnit) (handle : StructHandle)
     (variant : String) : Option Int := do
   let targetNs ← unit.namespaces[handle.namespaceId.index]?
   let declaration ← targetNs.structs[handle.structId]?
   let selected ← declaration.variants.find? fun candidate =>
-    (targetNs.tables.names[candidate.name.index]?).any (·.name == variant)
+    (targetNs.nameOf candidate.name).any (·.name == variant)
   selected.discriminant
 
 /-- Deterministic meaning of typed nominal field and variant operations. -/
@@ -3291,7 +3291,7 @@ mutual
           -- A shared reference is the observed value itself, so a place
           -- dereferencing one is its base; any other dereference projects
           -- into a live mutable borrow.
-          if sharedDereference unit ns.identity placeId then
+          if sharedDereference unit ns.unitIdentity placeId then
             resolvePlaceFuel? unit ns frame state fuel base
           else
           let basePlace ← resolvePlaceFuel? unit ns frame state fuel base
@@ -3305,7 +3305,7 @@ mutual
           -- value-level selection.
           let basePlace ← resolvePlaceFuel? unit ns frame state fuel base
           let .nominal source variant _ ← readRuntimePlace? frame state basePlace | none
-          let declared ← resolveStruct? unit ns.identity owner
+          let declared ← resolveStruct? unit ns.unitIdentity owner
           if source != declared then none else
           let fieldName ← sourceFieldName? ns field
           let index ← handleFieldIndex? unit declared variant fieldName
@@ -3379,7 +3379,7 @@ inductive DerefLocalFieldPath (unit : ValidatedUnit)
     PlaceId → List NominalFieldStep → Type where
   | deref {place base : PlaceId} {localId : LocalId}
       (place_eq : ns.places[place.index]? = some (.deref base))
-      (unshared : sharedDereference unit ns.identity place = false)
+      (unshared : sharedDereference unit ns.unitIdentity place = false)
       (base_eq : ns.places[base.index]? = some (.localVar localId)) :
       DerefLocalFieldPath unit ns place []
   | field {place base : PlaceId} {reversed : List NominalFieldStep}
@@ -3387,7 +3387,7 @@ inductive DerefLocalFieldPath (unit : ValidatedUnit)
       (step : NominalFieldStep)
       (place_eq : ns.places[place.index]? = some (.field base owner field))
       (base_path : DerefLocalFieldPath unit ns base reversed)
-      (resolved_eq : resolveStruct? unit ns.identity owner = some step.source)
+      (resolved_eq : resolveStruct? unit ns.unitIdentity owner = some step.source)
       (name_eq : sourceFieldName? ns field = some fieldName)
       (index_eq : ∀ actualVariant,
         handleFieldIndex? unit step.source actualVariant fieldName =
@@ -3474,7 +3474,7 @@ private theorem resolvePlaceFuel?_of_derefLocalFieldPath
             let basePlace ← resolvePlaceFuel? unit ns frame state fuel base
             let .nominal actualSource actualVariant _ ←
               readRuntimePlace? frame state basePlace | none
-            let declared ← resolveStruct? unit ns.identity owner
+            let declared ← resolveStruct? unit ns.unitIdentity owner
             if actualSource != declared then none else
             let actualFieldName ← sourceFieldName? ns field
             let actualIndex ←
@@ -3528,7 +3528,7 @@ def placeVariantMismatchFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace)
           match resolvePlaceFuel? unit ns frame state fuel base with
           | none => placeVariantMismatchFuel? unit ns frame state fuel base
           | some basePlace =>
-              match readRuntimePlace? frame state basePlace, resolveStruct? unit ns.identity owner,
+              match readRuntimePlace? frame state basePlace, resolveStruct? unit ns.unitIdentity owner,
                   sourceFieldName? ns field with
               | some (.nominal source (some variant) _), some declared, some fieldName =>
                   source == declared && (handleFieldIndex? unit declared (some variant) fieldName).isNone
@@ -3553,7 +3553,7 @@ def variantMismatch? (unit : ValidatedUnit) (ns : ValidatedNamespace) (operation
     (arguments : Array RuntimeValue) (frame : RuntimeFrame) (state : RuntimeState) : Bool :=
   match operation with
   | .data (.selectVariants reference fields) =>
-      match arguments.toList, resolveStruct? unit ns.identity reference with
+      match arguments.toList, resolveStruct? unit ns.unitIdentity reference with
       | [.nominal source (some variant) _], some declared =>
           source == declared && match variantFieldChoices? unit declared fields with
             | some choices => !choices.any (·.1 == variant)
@@ -3662,7 +3662,7 @@ theorem resolvePlace?_fieldOfLocalLiteralIndex {unit : ValidatedUnit}
     (base_eq : ns.places[basePlaceId.index]? = some (.localVar base))
     (index_eq : placeIndexForm? ns indexExpr =
       some (.literal (index : Int)))
-    (resolved_eq : resolveStruct? unit ns.identity owner = some handle)
+    (resolved_eq : resolveStruct? unit ns.unitIdentity owner = some handle)
     (name_eq : sourceFieldName? ns fieldNameId = some fieldName)
     (field_index_eq : ∀ actualVariant,
       handleFieldIndex? unit handle actualVariant fieldName =
@@ -3712,7 +3712,7 @@ theorem resolvePlace?_derefLocalLiteralIndex {unit : ValidatedUnit}
     (place_eq : ns.places[placeId.index]? =
       some (.index basePlaceId indexExpr))
     (base_eq : ns.places[basePlaceId.index]? = some (.deref localPlaceId))
-    (unshared : sharedDereference unit ns.identity basePlaceId = false)
+    (unshared : sharedDereference unit ns.unitIdentity basePlaceId = false)
     (local_eq : ns.places[localPlaceId.index]? = some (.localVar base))
     (index_eq : placeIndexForm? ns indexExpr =
       some (.literal (index : Int))) :
@@ -3740,7 +3740,7 @@ theorem resolvePlace?_derefLocalDynamicIndex {unit : ValidatedUnit}
     {base index : LocalId}
     (place_eq : ns.places[placeId.index]? = some (.index basePlaceId indexExpr))
     (base_eq : ns.places[basePlaceId.index]? = some (.deref localPlaceId))
-    (unshared : sharedDereference unit ns.identity basePlaceId = false)
+    (unshared : sharedDereference unit ns.unitIdentity basePlaceId = false)
     (local_eq : ns.places[localPlaceId.index]? = some (.localVar base))
     (index_eq : placeIndexForm? ns indexExpr = some (.local index) ∨
       placeIndexForm? ns indexExpr = some (.copyLocal index)) :
@@ -3836,9 +3836,9 @@ theorem resolvePlace?_fieldOfDerefLocal {unit : ValidatedUnit}
     {variant : Option String} {index : Nat}
     (place_eq : ns.places[placeId.index]? = some (.field baseId owner field))
     (base_eq : ns.places[baseId.index]? = some (.deref localPlaceId))
-    (unshared : sharedDereference unit ns.identity baseId = false)
+    (unshared : sharedDereference unit ns.unitIdentity baseId = false)
     (local_eq : ns.places[localPlaceId.index]? = some (.localVar localId))
-    (resolved_eq : resolveStruct? unit ns.identity owner = some handle)
+    (resolved_eq : resolveStruct? unit ns.unitIdentity owner = some handle)
     (name_eq : sourceFieldName? ns field = some fieldName)
     (index_eq : ∀ actualVariant,
       handleFieldIndex? unit handle actualVariant fieldName =
@@ -3887,7 +3887,7 @@ theorem resolvePlace?_derefLocal {unit : ValidatedUnit}
     {ns : ValidatedNamespace} {frame : RuntimeFrame} {state : RuntimeState}
     {placeId baseId : PlaceId} {localId : LocalId}
     (place_eq : ns.places[placeId.index]? = some (.deref baseId))
-    (unshared : sharedDereference unit ns.identity placeId = false)
+    (unshared : sharedDereference unit ns.unitIdentity placeId = false)
     (base_eq : ns.places[baseId.index]? = some (.localVar localId)) :
     resolvePlace? unit ns frame state placeId =
       if localId.index < frame.locals.size then
@@ -3912,8 +3912,8 @@ certificate.  The list traversals are structural so head reduction executes
 the search over the quoted unit's literal certificate rows. -/
 def certificateLoanId? (unit : ValidatedUnit) (namespaceId : NamespaceId)
     (site : ExprId) : Option Nat :=
-  unit.borrowCertificates.toList.findSome? fun certificate =>
-    if certificate.namespaceId != namespaceId then none else
+  (unit.namespaces[namespaceId.index]?).bind fun ns =>
+    ns.borrowCertificates.toList.findSome? fun certificate =>
       indexOfFrom (·.expression == site) certificate.loans.toList 0
 
 /-- Attach the checked caller-side lexical identity to a borrow produced by
@@ -3997,7 +3997,7 @@ def borrowRuntimePlace? (unit : ValidatedUnit) (ns : ValidatedNamespace)
   | .mutable => do
       let loanInstance := state.nextLoan
       let state := { state with nextLoan := loanInstance + 1 }
-      let lexical ← certificateLoanId? unit ns.identity site
+      let lexical ← certificateLoanId? unit ns.unitIdentity site
       let (frame, state) ←
         writeRuntimePlace? frame state place (.loanHole loanInstance)
       let state := match place.root with
@@ -4022,7 +4022,7 @@ theorem borrowRuntimePlace?_mutable_at (unit : ValidatedUnit)
     (ns : ValidatedNamespace) (site : ExprId) (referenceType : ReferenceType)
     (lexical : Nat) (frame : RuntimeFrame) (state : RuntimeState)
     (place : RuntimePlace)
-    (loan_eq : certificateLoanId? unit ns.identity site = some lexical) :
+    (loan_eq : certificateLoanId? unit ns.unitIdentity site = some lexical) :
     borrowRuntimePlace? unit ns site referenceType .mutable frame state place =
       borrowRuntimePlaceAt? lexical referenceType .mutable frame state place := by
   simp [borrowRuntimePlace?, borrowRuntimePlaceAt?, loan_eq]
@@ -4186,35 +4186,35 @@ def evaluateGlobalOperation? (unit : ValidatedUnit) (ns : ValidatedNamespace)
       let [key] := arguments.toList | none
       let _ ← key.storageKey?
       some (.value frame state
-        (.bool (globalExists state ns.identity resourceType key)))
+        (.bool (globalExists state ns.unitIdentity resourceType key)))
   | .borrow kind =>
       let [key] := arguments.toList | none
       let _ ← key.storageKey?
-      match globalValue? state ns.identity resourceType key with
+      match globalValue? state ns.unitIdentity resourceType key with
       | none => some (.throw_ frame state .abort)
       | some _ => do
           let .reference referenceType ← ns.tables.types[resultType.index]? | none
           let (frame, state, value) ← borrowRuntimePlace? unit ns site
             referenceType kind frame state
-            { root := .global (globalKey ns.identity resourceType key) }
+            { root := .global (globalKey ns.unitIdentity resourceType key) }
           some (.value frame state value)
   | .take =>
       let [key] := arguments.toList | none
       let _ ← key.storageKey?
-      match globalValue? state ns.identity resourceType key with
+      match globalValue? state ns.unitIdentity resourceType key with
       | none => some (.throw_ frame state .abort)
       | some value =>
           let globals := state.globals.erase
-            (globalKey ns.identity resourceType key)
+            (globalKey ns.unitIdentity resourceType key)
           some (.value frame { state with globals } value)
   | .publish =>
       let [key, value] := arguments.toList | none
       let _ ← key.storageKey?
-      match globalValue? state ns.identity resourceType key with
+      match globalValue? state ns.unitIdentity resourceType key with
       | some _ => some (.throw_ frame state .abort)
       | none =>
           let globals := state.globals.insert
-            (globalKey ns.identity resourceType key) value
+            (globalKey ns.unitIdentity resourceType key) value
           some (.value frame { state with globals } .unit)
 
 /-- Equation after lowering has selected the sole resource instantiation.
@@ -4233,11 +4233,11 @@ theorem evaluateGlobalOperation?_typeArg (unit : ValidatedUnit)
           let [key] := arguments.toList | none
           let _ ← key.storageKey?
           some (.value frame state
-            (.bool (globalExists state ns.identity resourceType key)))
+            (.bool (globalExists state ns.unitIdentity resourceType key)))
       | .borrow borrowKind => do
           let [key] := arguments.toList | none
           let _ ← key.storageKey?
-          match globalValue? state ns.identity resourceType key with
+          match globalValue? state ns.unitIdentity resourceType key with
           | none => some (.throw_ frame state .abort)
           | some _ => do
               let .reference referenceType ←
@@ -4245,25 +4245,25 @@ theorem evaluateGlobalOperation?_typeArg (unit : ValidatedUnit)
               let (frame, state, value) ← borrowRuntimePlace? unit ns site
                 referenceType borrowKind frame state
                 { root := .global
-                    (globalKey ns.identity resourceType key) }
+                    (globalKey ns.unitIdentity resourceType key) }
               some (.value frame state value)
       | .take => do
           let [key] := arguments.toList | none
           let _ ← key.storageKey?
-          match globalValue? state ns.identity resourceType key with
+          match globalValue? state ns.unitIdentity resourceType key with
           | none => some (.throw_ frame state .abort)
           | some value =>
               let globals := state.globals.erase
-                (globalKey ns.identity resourceType key)
+                (globalKey ns.unitIdentity resourceType key)
               some (.value frame { state with globals } value)
       | .publish => do
           let [key, value] := arguments.toList | none
           let _ ← key.storageKey?
-          match globalValue? state ns.identity resourceType key with
+          match globalValue? state ns.unitIdentity resourceType key with
           | some _ => some (.throw_ frame state .abort)
           | none =>
               let globals := state.globals.insert
-                (globalKey ns.identity resourceType key) value
+                (globalKey ns.unitIdentity resourceType key) value
               some (.value frame { state with globals } .unit))) := rfl
 
 /-! Native reference-value operations.  These helpers are below the lowering
@@ -4727,7 +4727,7 @@ def evaluatePlaceOperation? (unit : ValidatedUnit) (ns : ValidatedNamespace)
       -- with its hole immediately.
       mutateBorrow? arguments frame state
   | .data operation => do
-      let value ← evaluateDataOperation? unit ns.identity operation arguments
+      let value ← evaluateDataOperation? unit ns.unitIdentity operation arguments
       some (frame, state, value)
   | _ => none
 
@@ -4775,7 +4775,7 @@ theorem placeVariantMismatchFuel?_resolve (unit : ValidatedUnit) (ns : Validated
                       rename_i source variant fields
                       cases variant
                       · simp at mismatch
-                      cases declared_eq : resolveStruct? unit ns.identity owner
+                      cases declared_eq : resolveStruct? unit ns.unitIdentity owner
                       · simp [declared_eq] at mismatch
                       cases name_eq : sourceFieldName? ns field
                       · simp [declared_eq, name_eq] at mismatch
@@ -4856,7 +4856,7 @@ theorem variantMismatch?_evaluate_none {unit : ValidatedUnit} {ns : ValidatedNam
               cases variant
               · simp [variantMismatch?]
               rename_i variant
-              cases declared_eq : resolveStruct? unit ns.identity reference
+              cases declared_eq : resolveStruct? unit ns.unitIdentity reference
               · simp [variantMismatch?, declared_eq]
               rename_i declared
               cases choices_eq : variantFieldChoices? unit declared fields
@@ -4917,7 +4917,7 @@ theorem evaluatePlaceOperation?_data (unit : ValidatedUnit) (ns : ValidatedNames
     (resultType : TypeId) (site : ExprId) (operation : DataOperation)
     (arguments : Array RuntimeValue) (frame : RuntimeFrame) (state : RuntimeState) :
     evaluatePlaceOperation? unit ns resultType site (.data operation) arguments frame state =
-      (evaluateDataOperation? unit ns.identity operation arguments).bind fun value =>
+      (evaluateDataOperation? unit ns.unitIdentity operation arguments).bind fun value =>
         some (frame, state, value) := rfl
 
 /-- Bind a pattern row pointwise through `bind`.  Structural recursion over
@@ -5060,7 +5060,7 @@ def lowerPatternFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace) :
       | .tuple elements =>
           .tuple <$> lowerPatternRow? (lowerPatternFuel? unit ns fuel) elements.toList
       | .constructor name _ variant fields => do
-          let source ← resolveNominal? unit ns name
+          let source ← resolveNominal? unit ns (ns.nameId name)
           let lowered ← lowerPatternRow? (lowerPatternFuel? unit ns fuel) fields.toList
           some (.constructor source variant lowered (nominalGhosts unit source).size)
       | .literal _ | .range .. => none
@@ -5125,7 +5125,7 @@ def bindPatternFuel (unit : ValidatedUnit) (ns : ValidatedNamespace)
       | _ => none
   | .constructor name _ variant fields =>
       let .nominal actualSource actualVariant values := value | none
-      let expected ← resolveNominal? unit ns name
+      let expected ← resolveNominal? unit ns (ns.nameId name)
       if expected != actualSource || variant != actualVariant ||
           values.size != fields.size + (nominalGhosts unit expected).size then
         none
@@ -5267,7 +5267,7 @@ theorem lowerPatternFuel?_bind_eq {unit : ValidatedUnit} {ns : ValidatedNamespac
                       simp [source_size_eq, native_size_ne]
           | «constructor» name instantiations variant fields =>
               rw [kind_eq] at lower_eq
-              cases resolve_eq : resolveNominal? unit ns name with
+              cases resolve_eq : resolveNominal? unit ns (ns.nameId name) with
               | none => simp [resolve_eq] at lower_eq
               | some source =>
                   simp only [resolve_eq, Option.bind_some] at lower_eq

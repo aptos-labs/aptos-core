@@ -184,9 +184,6 @@ impl CachedStateView {
             if let Some(updates) = updates.for_last_checkpoint_batched() {
                 self.prime_cache_for_batched_updates(updates, policy)?;
             }
-            if let Some(updates) = updates.for_latest_batched() {
-                self.prime_cache_for_batched_updates(updates, policy)?;
-            }
             Ok(())
         })
     }

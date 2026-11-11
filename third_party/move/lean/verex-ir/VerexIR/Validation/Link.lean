@@ -15,9 +15,10 @@ the units that include it. Linking checks only the boundary: that the
 declarations a unit was validated against equal the ones it links, and that
 every name a linked namespace uses resolves in the unit.
 
-Both directions are one operation, relocation: moving a namespace from one
-set of tables into another, interning the entries it uses and renumbering
-its identifiers through the derived `Remap` traversal.
+Extraction is relocation: moving a namespace from its unit's view into
+tables of its own, interning the entries it uses and renumbering its
+identifiers through the derived `Remap` traversal. Linking renumbers no
+body: it records where each namespace's identifiers are in the unit.
 -/
 
 namespace VerexIR.Validation
@@ -44,6 +45,17 @@ def RelocatableNamespace.path (object : RelocatableNamespace) : Array String :=
 def RelocatableNamespace.references (object : RelocatableNamespace) : Array NamespaceRef :=
   object.tables.namespaces.extract 1 object.tables.namespaces.size
 
+/-- A relocatable namespace placed in a unit: its body and validation results
+in its own tables, viewing the unit's `tables` and value `orders`, its
+identifiers reaching them through `links`. -/
+abbrev RelocatableNamespace.place (object : RelocatableNamespace) (tables : Tables)
+    (links : Links) (orders : ValueOrders) : ValidatedNamespace :=
+  { toNamespace := object.body, tables, links, localTables := object.tables, orders
+    holders := object.holders, witnesses := object.witnesses
+    initializationCertificates := object.initializationCertificates
+    borrowCertificates := object.borrowCertificates
+    borrowRejections := object.borrowRejections }
+
 /-- A namespace and its validation results, numbered in some tables. -/
 private structure Placed where
   tables : Tables
@@ -61,14 +73,13 @@ private def RelocatableNamespace.placed (object : RelocatableNamespace) : Placed
 private def placedIn (unit : ValidatedUnit) (identity : NamespaceId) : Option Placed := do
   let ns ← unit.namespaces[identity.index]?
   pure {
-    tables := unit.tables
+    tables := ns.localTables
     body := ns.toNamespace
     holders := ns.holders
-    witnesses := unit.structurizationWitnesses.filter (·.namespaceId == identity)
-    initializationCertificates :=
-      unit.initializationCertificates.filter (·.namespaceId == identity)
-    borrowCertificates := unit.borrowCertificates.filter (·.namespaceId == identity)
-    borrowRejections := unit.borrowRejections.filter (·.namespaceId == identity) }
+    witnesses := ns.witnesses
+    initializationCertificates := ns.initializationCertificates
+    borrowCertificates := ns.borrowCertificates
+    borrowRejections := ns.borrowRejections }
 
 /-! ## Relocation -/
 
@@ -82,6 +93,8 @@ values and are interned; every other entry keeps its identity and is
 appended once. -/
 private structure RelocState where
   target : Tables
+  /-- Whether the target's type table is location-free, as a unit's is. -/
+  eraseTypes : Bool := false
   /-- Where each interned type and name is in the target; a type by its
   erasure, as the type table is location-free (`Ty.eraseLocs`). -/
   typeIndex : Std.HashMap Ty Nat := {}
@@ -178,7 +191,8 @@ private partial def relocateType (source : Tables) (id : TypeId) : RelocM TypeId
   let (state, index) := match state.typeIndex[ty.eraseLocs]? with
     | some index => (state, index)
     | none => let index := state.target.types.size
-        ({ state with target := { state.target with types := state.target.types.push ty }
+        ({ state with target := { state.target with
+                        types := state.target.types.push (if state.eraseTypes then ty.eraseLocs else ty) }
                       typeIndex := state.typeIndex.insert ty.eraseLocs index }, index)
   let result : TypeId := ⟨index⟩
   set { state with types := state.types.insert id.index result }
@@ -370,7 +384,15 @@ def extract (unit : ValidatedUnit) (identity : NamespaceId) :
     borrowCertificates := relocated.borrowCertificates
     borrowRejections := relocated.borrowRejections }
 
-/-! ## Linking -/
+/-! ## Linking
+
+A linked unit keeps every namespace in its own tables and adds its links
+(θ): where each of its types, names, namespaces, and lifetimes is in the
+unit's tables. The unit's tables hold semantic content only, with unit
+identifiers inside: a type or name is interned on its translation through
+θ, the type location-free; a lifetime is a declaration's, so the lifetimes
+of the namespaces are concatenated. Provenance stays in the namespaces'
+own tables. -/
 
 /-- The shape of declarations: types and names interned by content into a
 scratch table, locations erased, lifetimes numbered by first occurrence
@@ -436,12 +458,13 @@ private partial def shapeName (source : Tables) (id : NameId) : ShapeM NameId :=
 
 end
 
-/-- Whether two declarations of one table have the same shape. -/
-private def sameShape [Remap α] [BEq α] (tables : Tables) (left right : α) : Bool :=
-  let (left, state) := (remap left (shaping tables)).run {}
+/-- Whether two declarations, each in its own tables, have the same shape. -/
+private def sameShape [Remap α] [BEq α] (leftTables rightTables : Tables) (left right : α) :
+    Bool :=
+  let (left, state) := (remap left (shaping leftTables)).run {}
   -- The right side shares the interned types and names, and numbers its
-  -- lifetimes afresh.
-  let (right, _) := (remap right (shaping tables)).run
+  -- types and lifetimes afresh.
+  let (right, _) := (remap right (shaping rightTables)).run
     { state with typeMemo := {}, lifetimeMemo := {} }
   left == right
 
@@ -450,32 +473,124 @@ private def nameOf (tables : Tables) (id : NameId) : String :=
 
 /-- The boundary: every declaration of the interface a unit was validated
 against has the same shape in the namespace that replaces it. -/
-private def checkBoundary (tables : Tables) (path : Array String)
+private def checkBoundary (interfaceTables actualTables : Tables) (path : Array String)
     (interface actual : Namespace FunctionBody) : Except String Unit := do
   let located (kind name : String) :=
     s!"`{"::".intercalate path.toList}::{name}`: the linked {kind} differs from the one it \
       was checked against"
   for declared in interface.functions do
-    let name := nameOf tables declared.name
-    let some linked := actual.functions.find? (nameOf tables ·.name == name)
+    let name := nameOf interfaceTables declared.name
+    let some linked := actual.functions.find? (nameOf actualTables ·.name == name)
       | throw s!"`{"::".intercalate path.toList}` does not declare the function `{name}`"
-    unless sameShape tables declared.signature linked.signature do
+    unless sameShape interfaceTables actualTables declared.signature linked.signature do
       throw (located "function" name)
   for declared in interface.specFunctions do
-    let name := nameOf tables declared.name
-    let some linked := actual.specFunctions.find? (nameOf tables ·.name == name)
+    let name := nameOf interfaceTables declared.name
+    let some linked := actual.specFunctions.find? (nameOf actualTables ·.name == name)
       | throw s!"`{"::".intercalate path.toList}` does not declare the specification function \
           `{name}`"
-    unless sameShape tables declared.signature linked.signature do
+    unless sameShape interfaceTables actualTables declared.signature linked.signature do
       throw (located "specification function" name)
   for declared in interface.structs do
-    let name := nameOf tables declared.name
-    let some linked := actual.structs.find? (nameOf tables ·.name == name)
+    let name := nameOf interfaceTables declared.name
+    let some linked := actual.structs.find? (nameOf actualTables ·.name == name)
       | throw s!"`{"::".intercalate path.toList}` does not declare the type `{name}`"
-    unless sameShape tables (declared.generics, declared.fields, declared.variants)
+    unless sameShape interfaceTables actualTables (declared.generics, declared.fields, declared.variants)
           (linked.generics, linked.fields, linked.variants) &&
         declared.abilities == linked.abilities do
       throw (located "type" name)
+
+/-- The unit's tables while linking, with the indexes interning into them,
+and the unit identifiers of the types of the namespace being linked. -/
+private structure LinkState where
+  tables : Tables
+  typeIndex : Std.HashMap Ty Nat := {}
+  nameIndex : Std.HashMap QualifiedName Nat := {}
+  typeMemo : Std.HashMap Nat Nat := {}
+
+private abbrev LinkM := StateT LinkState (Except String)
+
+instance : Inhabited (LinkM α) := ⟨throw "linking failed"⟩
+
+/-- The unit index of each namespace reference of local tables: the
+namespace itself at `identity`, any other interned by its reference. -/
+private def linkNamespaces (source : Tables) (self : NamespaceId) (identity : Nat) :
+    LinkM (Array Nat) :=
+  source.namespaces.zipIdx.mapM fun (ref, index) => do
+    if index == self.index then return identity
+    let state ← get
+    let namespaces := state.tables.namespaces
+    match namespaces.findIdx? (· == ref) with
+    | some found =>
+        if namespaces[found]!.alias.isNone && ref.alias.isSome then
+          set { state with tables := { state.tables with namespaces := namespaces.set! found ref } }
+        return found
+    | none =>
+        set { state with tables := { state.tables with namespaces := namespaces.push ref } }
+        return namespaces.size
+
+/-- The unit index of each name of local tables, its namespace translated. -/
+private def linkNames (source : Tables) (namespaces : Array Nat) : LinkM (Array Nat) :=
+  source.names.mapM fun name => do
+    let some namespaceIndex := namespaces[name.namespaceId.index]?
+      | throw s!"the name `{name.name}` refers past its namespace table"
+    let name := { name with namespaceId := ⟨namespaceIndex⟩ }
+    let state ← get
+    match state.nameIndex[name]? with
+    | some index => return index
+    | none =>
+        let index := state.tables.names.size
+        set { state with
+          tables := { state.tables with names := state.tables.names.push name }
+          nameIndex := state.nameIndex.insert name index }
+        return index
+
+/-- An identifier through a partial link table. -/
+private def through (kind : String) (entries : Array Nat) (index : Nat) : LinkM Nat :=
+  match entries[index]? with
+  | some unitIndex => pure unitIndex
+  | none => throw s!"a type refers past its {kind} table"
+
+/-- The unit index of a local type: its translation through the links,
+location-free, interned. The local table need not be in dependency order,
+so the inner types are linked first, memoized. -/
+private partial def linkType (source : Tables) (links : Links) (depth : Nat) (index : Nat) :
+    LinkM Nat := do
+  if let some done := (← get).typeMemo[index]? then return done
+  if depth > source.types.size then throw "a type of a linked namespace contains itself"
+  let some ty := source.types[index]? | throw "a type refers past its type table"
+  let functions : IdFns LinkM := {
+    file := pure, loc := pure, origin := pure, alignment := pure, profile := pure
+    type := fun id => return ⟨← linkType source links (depth + 1) id.index⟩
+    name := fun id => return ⟨← through "name" links.names id.index⟩
+    namespaceId := fun id => return ⟨← through "namespace" links.namespaces id.index⟩
+    lifetime := fun id => return ⟨← through "lifetime" links.lifetimes id.index⟩ }
+  let ty := (← remap ty functions).eraseLocs
+  let state ← get
+  let (state, unitIndex) := match state.typeIndex[ty]? with
+    | some unitIndex => (state, unitIndex)
+    | none =>
+        let unitIndex := state.tables.types.size
+        ({ state with
+            tables := { state.tables with types := state.tables.types.push ty }
+            typeIndex := state.typeIndex.insert ty unitIndex }, unitIndex)
+  set { state with typeMemo := state.typeMemo.insert index unitIndex }
+  return unitIndex
+
+/-- The links of a namespace in its own tables, placed at `identity`; its
+entries interned into the unit's tables. `beyond` is the unit's to set. -/
+private def linkPlaced (placed : Placed) (identity : Nat) : LinkM Links := do
+  let source := placed.tables
+  let namespaces ← linkNamespaces source placed.body.identity identity
+  let names ← linkNames source namespaces
+  let offset := (← get).tables.lifetimes.size
+  modify fun state => { state with
+    tables := { state.tables with lifetimes := state.tables.lifetimes ++ source.lifetimes }
+    typeMemo := {} }
+  let links : Links := {
+    namespaces, names, lifetimes := (Array.range source.lifetimes.size).map (offset + ·) }
+  let types ← (Array.range source.types.size).mapM (linkType source links 0)
+  return { links with types }
 
 /-- Link relocatable namespaces into a validated unit. A namespace at a path
 the unit declares replaces that namespace, the bodiless interface the unit
@@ -490,48 +605,36 @@ def link (base : ValidatedUnit) (objects : Array RelocatableNamespace) :
   -- namespace linked at its path, then the ones the base lacks.
   let pathOf (id : NamespaceId) := (base.tables.namespaces[id.index]?.map (·.segments)).getD #[]
   let baseEntries := base.namespaces.map fun ns =>
-    (ns.identity, objects.find? (·.path == pathOf ns.identity))
+    (ns.unitIdentity, objects.find? (·.path == pathOf ns.unitIdentity))
   let added := objects.filter fun object =>
-    !base.namespaces.any (pathOf ·.identity == object.path)
+    !base.namespaces.any (pathOf ·.unitIdentity == object.path)
   let refs : Array NamespaceRef :=
     baseEntries.map (fun (id, _) => base.tables.namespaces[id.index]!) ++
       added.map fun object => object.tables.namespaces[0]!
-  -- Every namespace moves into fresh tables whose first entries are the
-  -- unit's namespaces, so each sits at its index.
-  let mut state : RelocState := { target := { namespaces := refs } }
-  let mut placed : Array Placed := #[]
+  -- Every namespace of the unit, in its own tables.
+  let mut members : Array RelocatableNamespace := #[]
   for ((identity, object?), index) in baseEntries.zipIdx do
-    let some own := placedIn base identity | throw "a base namespace is missing"
     match object? with
-    | none =>
-        let (relocated, next) := (relocatePlaced own ⟨index⟩).run state
-        state := next
-        placed := placed.push relocated
+    | none => members := members.push (← extract base identity)
     | some object =>
-        let (linked, next) := (relocatePlaced object.placed ⟨index⟩).run state
-        state := next
-        placed := placed.push linked
-        -- The interface the unit was checked against is relocated beside the
-        -- namespace for the boundary check only, not into the unit.
-        let (interface, checking) := (relocatePlaced own ⟨index⟩).run state
-        checkBoundary checking.target ((refs[index]?.map (·.segments)).getD #[]) interface.body
-          linked.body
-  for (object, offset) in added.zipIdx do
-    let (linked, next) := (relocatePlaced object.placed ⟨baseEntries.size + offset⟩).run state
-    state := next
-    placed := placed.push linked
+        -- The interface the unit was checked against meets the namespace at
+        -- the boundary only.
+        let some own := placedIn base identity | throw "a base namespace is missing"
+        checkBoundary own.tables object.tables ((refs[index]?.map (·.segments)).getD #[])
+          own.body object.body
+        members := members.push object
+  members := members ++ added
+  let (links, state) ← (members.zipIdx.mapM fun ((member : RelocatableNamespace), index) =>
+    linkPlaced member.placed index).run
+    { tables := { namespaces := refs } }
   -- The base's dependency interfaces move along.
-  let dependencies ← do
-    let functions := relocation base.tables
-    let (dependencies, next) := (base.dependencies.mapM (remap · functions)).run
-      { target := state.target, typeIndex := state.typeIndex, nameIndex := state.nameIndex }
-    state := next
-    pure dependencies
-  let tables := state.target
-  let namespaces := placed.map (·.body)
-  let orders := valueOrdersOf tables namespaces
-  let validated := placed.map fun placed =>
-    ({ toNamespace := placed.body, tables, orders, holders := placed.holders } : ValidatedNamespace)
+  let (dependencies, relocated) := (base.dependencies.mapM (remap · (relocation base.tables))).run
+    { target := state.tables, typeIndex := state.typeIndex, nameIndex := state.nameIndex
+      eraseTypes := true }
+  let tables := relocated.target
+  let orders := valueOrdersOf (members.map fun member => (member.tables, member.body))
+  let validated := (members.zip links).map fun ((member : RelocatableNamespace), links) =>
+    member.place tables links orders
   let rawDependencies : Array Import.RawNamespaceInterface := dependencies.map fun dep => {
     namespaceId := dep.namespaceId, profile := dep.profile, exportedNames := dep.exportedNames
     structs := dep.structs
@@ -539,23 +642,24 @@ def link (base : ValidatedUnit) (objects : Array RelocatableNamespace) :
     specFunctions := dep.specFunctions }
   -- Every name a linked namespace uses must resolve in the unit, as it did
   -- in the unit that validated it.
-  let resolution := ResolutionIndex.build tables namespaces rawDependencies
-  let unresolved := (resolveUseSites tables resolution namespaces.size namespaces).filter
+  let nameId (namespaceIndex : Nat) (id : NameId) : NameId :=
+    ((links[namespaceIndex]?).getD {}).nameId id
+  let bodies := members.map (·.body)
+  let resolution := ResolutionIndex.build tables bodies rawDependencies nameId
+  let unresolved := (resolveUseSites tables resolution bodies.size bodies nameId).filter
     (·.severity == .error)
   unless unresolved.isEmpty do
     throw ("\n".intercalate (unresolved.map (·.message)).toList)
-  return Internal.mkValidatedUnit tables base.profiles validated dependencies base.evidence
+  let unit := Internal.mkValidatedUnit tables base.profiles validated dependencies base.evidence
     { namespaceCount := validated.size, functionCounts := validated.map (·.functions.size) }
-    (placed.flatMap (·.witnesses))
     resolution
-    (placed.flatMap (·.initializationCertificates))
-    (placed.flatMap (·.borrowCertificates))
-    (placed.flatMap (·.borrowRejections))
+  unless unit.linksConsistent do throw "the links of a linked unit are inconsistent"
+  return unit
 
 /-- A unit of relocatable namespaces alone, linked into an empty unit. -/
 def assemble (profiles : Array ProfileConfig) (objects : Array RelocatableNamespace) :
     Except String ValidatedUnit :=
   link (Internal.mkValidatedUnit {} profiles #[] #[] #[] { namespaceCount := 0, functionCounts := #[] }
-    #[] (ResolutionIndex.build ({} : Tables) (#[] : Array (Namespace FunctionBody)) #[])) objects
+    (ResolutionIndex.build ({} : Tables) (#[] : Array (Namespace FunctionBody)) #[])) objects
 
 end VerexIR.Validation

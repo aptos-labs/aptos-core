@@ -39,6 +39,14 @@ pub enum PrologueArgs {
     },
 }
 
+/// The arguments of the metered half of the prologue, which runs after the
+/// unmetered system prologue and before the payload, charged against the gas
+/// budget.
+#[derive(Serialize, MoveValueView)]
+pub enum MeteredPrologueArgs {
+    V1 { replay_protector: ReplayProtector },
+}
+
 #[derive(Serialize, MoveValueView)]
 pub enum EpilogueArgs {
     V1 {

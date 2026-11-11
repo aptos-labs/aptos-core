@@ -102,7 +102,7 @@ def frameSemArguments (unit : ValidatedUnit) (function : FunctionHandle)
     (generics : Array GenericBinder) : Array SemArg :=
   (frameArguments unit function typeInstantiation generics).map fun argument =>
     match argument with
-    | .typeArg value => match StaticTyping.resolveIn targetNs #[] value.typeId with
+    | .typeArg value => match StaticTyping.resolveAt targetNs #[] value.typeId with
       | some type => .type type
       | none => .erased
     | _ => .erased
@@ -181,10 +181,11 @@ theorem closureSignature?_eq_some {unit : ValidatedUnit} {function : FunctionHan
       unit.namespaces[function.namespaceId.index]? = some targetNs ∧
       targetNs.functions[function.functionId.index]? = some declaration ∧
       declaration.signature.parameters.toList.mapM
-        (fun parameter => ntyOf unit function.namespaceId parameter.typeUse.typeId) =
+        (fun parameter => ntyOf unit function.namespaceId (targetNs.typeId parameter.typeUse.typeId)) =
           some parameters ∧
       declaration.signature.results.toList.mapM
-        (fun result => ntyOf unit function.namespaceId result.typeId) = some results ∧
+        (fun result => ntyOf unit function.namespaceId (targetNs.typeId result.typeId)) =
+          some results ∧
       (parameters ++ results).all (fun τ => τ.paramsAll fun index =>
         (declaration.signature.generics[index]?.any fun binder => binder.kind matches .typeArg) &&
           (paramNodeIn? unit function.namespaceId index).isSome) = true := by
@@ -195,7 +196,7 @@ theorem closureSignature?_eq_some {unit : ValidatedUnit} {function : FunctionHan
   split at bounded
   · next mentions =>
       simp only [Option.some.injEq, Prod.mk.injEq] at final
-      obtain ⟨rfl, rfl⟩ := final
+      obtain ⟨_, _, rfl, rfl⟩ := final
       exact ⟨targetNs, declaration, namespace_eq, declaration_eq, readParameters,
         readResults_eq, mentions⟩
   · cases bounded
@@ -329,12 +330,19 @@ theorem NRows.refFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
         NRows.refFree_substWith plain rest mentioned.2 free.2, and_self]
 end
 
+theorem resolveAt_subst {ns : ValidatedNamespace} {env : Array SemArg} {typeId : TypeId}
+    {type : SemTy} (arguments : Array SemArg)
+    (resolved : StaticTyping.resolveAt ns env typeId = some type) :
+    StaticTyping.resolveAt ns (env.map (·.subst arguments)) typeId =
+      some (type.subst arguments) :=
+  SemTy.resolveFuel_subst ns.tables env arguments _ typeId type resolved
+
 theorem resolveIn_subst {ns : ValidatedNamespace} {env : Array SemArg} {typeId : TypeId}
     {type : SemTy} (arguments : Array SemArg)
     (resolved : StaticTyping.resolveIn ns env typeId = some type) :
     StaticTyping.resolveIn ns (env.map (·.subst arguments)) typeId =
       some (type.subst arguments) :=
-  SemTy.resolveFuel_subst ns.tables env arguments _ typeId type resolved
+  resolveAt_subst arguments resolved
 
 private theorem mapM_resolveIn_subst {ns : ValidatedNamespace} {env : Array SemArg}
     (arguments : Array SemArg) {α : Type} (typeOf : α → TypeId) :
@@ -462,7 +470,7 @@ theorem faithful_argument {unit : ValidatedUnit} {function : FunctionHandle}
       ntyOf unit function.namespaceId
           (instantiatedTypeId typeInstantiation
             ((paramNodeIn? unit function.namespaceId index).get!)) = some τ ∧
-      StaticTyping.resolveIn targetNs #[]
+      StaticTyping.resolveAt targetNs #[]
           (instantiatedTypeId typeInstantiation
             ((paramNodeIn? unit function.namespaceId index).get!)) = some type ∧
       type.referenceFree = true ∧ τ.paramFree = true ∧ τ.refFree = true := by
@@ -622,8 +630,8 @@ theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans :
           rw [extract_map, ← NRow.ofList_substWith] at suppliedTyped
           have sharing : closureShared unit function mask =
               { parameters := ClosureMask.extract mask false
-                  (parameterSharing unit function declaration)
-                results := resultSharing unit function declaration } := by
+                  (parameterSharing unit function targetNs declaration)
+                results := resultSharing unit function targetNs declaration } := by
             simp [closureShared, namespace_eq, declaration_eq, parameterSharing, resultSharing]
           rw [sharingEq] at sharing
           subst sharing
@@ -682,7 +690,8 @@ theorem VariantsTypedAs.find {unit : ValidatedUnit} {source : StructHandle}
       rows.paramFree = true → rows.refFree = true →
       ∃ ns declared fieldTypes ghostTypes,
         SemanticOperations.handleFields? unit source (some name) = some (ns, declared) ∧
-        ResolvesAll ns.tables arguments.toArray (declared.toList.map (·.type.typeId)) fieldTypes ∧
+        ResolvesAll ns.tables arguments.toArray (declared.toList.map (ns.typeId ·.type.typeId))
+          fieldTypes ∧
         ResolvesAll ns.tables arguments.toArray (ghostTypeIds unit source) ghostTypes ∧
         row.TypedAs unit (fieldTypes ++ ghostTypes.map .ghost) ∧ row.paramFree = true ∧
         row.refFree = true
@@ -842,12 +851,16 @@ theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} [FunctionCarriers uni
     {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
     (returns : ∀ result final,
       EnsuresOf (closureMeaning executable) σs shared shape function args result initial final →
-      ¬AbortsOf (closureMeaning executable) σs shared shape function args initial →
-      (∀ default, ResultOf (closureMeaning executable) σs shared shape function args initial
-        default = result) →
-      StateOf (closureMeaning executable) σs shared shape function args initial = final →
+      ¬AbortsOfEntries (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial →
+      (∀ default, ResultOf (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial default = result) →
+      StateOf (closureMeaning executable) σs shared shape function (HList.settle σs args) initial =
+        final →
       ensures result final)
     (fails : ∀ error, AbortsOf (closureMeaning executable) σs shared shape function args initial →
+      AbortsOfEntries (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial →
       aborts error) :
     wp (closureMeaning executable σs shared shape function args) ensures aborts initial := by
   obtain ⟨_, resultTypes, targetTypes, -, typed, -, decodes⟩ :=
@@ -869,18 +882,20 @@ theorem returns_of_terminating {unit : ValidatedUnit} [FunctionCarriers unit]
     (agree : TypesAgree unit) (representable : OwnersRepresentable unit)
     (parametersScalar : ScalarAt unit σs) (resultsScalar : ScalarAt unit shape.row)
     {initial : Memory unit} (globals : MemoryTyped unit initial)
-    (unaborted : ¬AbortsOf (closureMeaning executable) σs shared shape function args initial) :
+    (unaborted : ¬AbortsOfEntries (closureMeaning executable) σs shared shape function
+      (HList.settle σs args) initial) :
     ∃ result final,
       EnsuresOf (closureMeaning executable) σs shared shape function args result initial final ∧
-      (∀ default, ResultOf (closureMeaning executable) σs shared shape function args initial
-        default = result) ∧
-      StateOf (closureMeaning executable) σs shared shape function args initial = final := by
+      (∀ default, ResultOf (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial default = result) ∧
+      StateOf (closureMeaning executable) σs shared shape function (HList.settle σs args) initial =
+        final := by
   obtain ⟨parameterTypes, resultTypes, targetTypes, observed, typed, rowTyped, decodes⟩ :=
     closureTyped_ofCarrier agree representable function shapeFree parametersScalar resultsScalar
   rcases terminating ‹_› _ σs shape args targetTypes resultTypes initial free shapeFree
       typed (HasTypes.ofObserved (observed ▸ rowTyped args)) (decodes shape rfl) globals with
     ⟨error, aborted⟩ | ⟨result, final, run⟩
-  · exact absurd ⟨error, aborted⟩ unaborted
+  · exact absurd (abortsOfEntries_of_abortsOf ⟨error, aborted⟩) unaborted
   · have flat := NRow.lentFlat_of_refFree σs free
     have shapeFlat := NRow.lentFlat_of_refFree shape.row shapeFree
     have settled := ResultShape.settled_of_refFree shape shapeFree result

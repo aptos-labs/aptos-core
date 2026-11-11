@@ -174,11 +174,11 @@ invocation boundary then decides state visibility:
   throws.
 
 The semantic outcome is independent of provenance, but executable results
-pair it with an `ExecutionOrigin`. At minimum this records the `LocId` of
-the expression that returned or threw. Runtime errors record the location of
-the operation which became stuck or exhausted its local fuel budget. Calls
-retain both the call-site location and the callee location as a compact
-stack so an abort or panic can be reported at its origin with related caller
+wrap it in `Located` (`Semantics/Runtime.lean`): a primary
+`RuntimeLocation` (namespace and `LocId`) of the expression that returned or
+threw, and the call sites it propagated through, innermost first. Runtime
+errors record the location of the operation which became stuck or exhausted
+its fuel, so an abort or panic is reported at its origin with related caller
 ranges. Locations are observational metadata: changing them cannot change
 whether a program returns, throws, or mutates state.
 
@@ -284,23 +284,24 @@ The interpreter mirrors the big-step rules but is explicitly fuelled over
 loops, recursion, and calls:
 
 ```lean
-interpret : ExecutableUnit -> Fuel -> FunctionRef ->
-  RuntimeState -> Array RuntimeValue ->
-  Except LocatedInterpError (RuntimeState × LocatedOutcome)
+Interpreter.run : ExecutableUnit unit → (fuel : Nat) → FunctionHandle →
+  Array RuntimeValue → RuntimeState →
+  Except LocatedInterpreterError (RuntimeState × LocatedOutcome)
 ```
 
-`LocatedInterpError` carries an `InterpError` (unsupported external
-implementation, stuck or malformed input, `outOfFuel`), a primary `LocId`
-and related call locations; `LocatedOutcome` carries the `Outcome` and its
-`ExecutionOrigin`, so a language `throw_` is a successful, source-positioned
+`LocatedInterpreterError` is a `Located InterpreterError` (stuck or
+malformed input, `outOfFuel`); `LocatedOutcome` is a `Located Outcome`, so a
+language throw (`Outcome.threw`) is a successful, source-positioned
 result. The interpreter executes structured VIR directly; no lowering
 defines execution, a lowering is tested against the interpreter. The
 foundational theorem is:
 
 ```text
-interpret executable fuel f state args = ok (state', outcome)
-  -> f.semantics.Relates state args state' outcome
+run executable fuel f args state = ok (state', outcome)
+  -> BigStep.EvalFunction executable f #[] state args state' outcome.value
 ```
+
+(`run_sound`, `Proofs/Interpreter.lean`).
 
 `outOfFuel` makes no semantic claim and is never converted to abort or panic.
 
@@ -368,15 +369,18 @@ tests live in `verex-e2e-tests`, not in `verex-ir` or a profile package.
 
 ## Correctness obligations
 
-The following claims are explicit:
+The following claims are explicit; open work on them is in
+[`roadmap.md`](../plan/roadmap.md), "5. Runtime semantics":
 
-- interpreter results are admitted by VIR big-step semantics (`run_sound`);
-- finite deterministic VIR executions are reproduced with sufficient fuel
-  (`evalFunction_complete`, `run_complete` over fuel monotonicity; big-step
-  determinism of `EvalFunction` and `FunctionMeaning` follows because the
-  interpreter is a function);
-- semantic preparation plus well-typed inputs implies preservation and no
-  stuck execution;
+- interpreter results are admitted by VIR big-step semantics (`run_sound`,
+  `Proofs/Interpreter.lean`);
+- finite VIR executions are reproduced with sufficient fuel
+  (`evalFunction_complete`, `run_complete`, `Proofs/Completeness.lean`, over
+  fuel monotonicity), and big-step evaluation is deterministic
+  (`evalFunction_deterministic`, `meaning_deterministic`), because the
+  interpreter is a function;
+- semantic preparation plus well-typed inputs implies preservation
+  (`preservation`, `Semantics/Preservation.lean`) and no stuck execution;
 - interpreter outcomes, errors, and generated proof obligations preserve
   their originating VIR locations;
 - calculated WP implies semantic WP;

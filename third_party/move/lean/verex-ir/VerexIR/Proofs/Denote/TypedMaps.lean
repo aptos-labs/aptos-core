@@ -43,29 +43,31 @@ theorem duplicate_indices_map {α β : Type} (f : α → β) (xs : Array α) (ab
     simpa [hi, hj] using eq
 
 /-- A value of a two-variant enum not of one variant is of the other: what a
-proof's step reads `x != End` as, `x is Some`. -/
+proof's step reads `x != End` as, `x is Some`.  The observation is of the
+plain value a certified enum carries (`NTy.carrier`), as every variant
+observation is. -/
 @[vir_denote_spec]
-theorem variantName_ne_first [Carriers] {first second : String} {fields others : NRow}
-    (distinct : first ≠ second) (value : variantCarrier [first, second] (.cons fields (.cons others .nil))) :
-    ¬variantName [first, second] (.cons fields (.cons others .nil)) value = first ↔
-      variantName [first, second] (.cons fields (.cons others .nil)) value = second := by
+theorem variantPlainName_ne_first [Carriers] {first second : String} {fields others : NRow}
+    (distinct : first ≠ second) (value : variantPlain [first, second] (.cons fields (.cons others .nil))) :
+    ¬variantPlainName [first, second] (.cons fields (.cons others .nil)) value = first ↔
+      variantPlainName [first, second] (.cons fields (.cons others .nil)) value = second := by
   match value with
   | .inl _ => show ¬first = first ↔ first = second; exact ⟨fun h => absurd rfl h, fun h => absurd h distinct⟩
   | .inr (.inl _) => show ¬second = first ↔ second = second; exact ⟨fun _ => rfl, fun _ => Ne.symm distinct⟩
   | .inr (.inr empty) => nomatch empty
 
 @[vir_denote_spec]
-theorem variantName_ne_second [Carriers] {first second : String} {fields others : NRow}
-    (distinct : first ≠ second) (value : variantCarrier [first, second] (.cons fields (.cons others .nil))) :
-    ¬variantName [first, second] (.cons fields (.cons others .nil)) value = second ↔
-      variantName [first, second] (.cons fields (.cons others .nil)) value = first := by
+theorem variantPlainName_ne_second [Carriers] {first second : String} {fields others : NRow}
+    (distinct : first ≠ second) (value : variantPlain [first, second] (.cons fields (.cons others .nil))) :
+    ¬variantPlainName [first, second] (.cons fields (.cons others .nil)) value = second ↔
+      variantPlainName [first, second] (.cons fields (.cons others .nil)) value = first := by
   match value with
   | .inl _ => show ¬first = second ↔ first = first; exact ⟨fun _ => rfl, fun _ => distinct⟩
   | .inr (.inl _) => show ¬second = second ↔ second = first; exact ⟨fun h => absurd rfl h, fun h => absurd h.symm distinct⟩
   | .inr (.inr empty) => nomatch empty
 
 /-- An optional value's case analysis equated to a value, read as the case
-it takes (`doc/plan/proof-language.md`, "Semantics and lowering"): what a
+it takes (`doc/designs/proof-language.md`, "Semantics and lowering"): what a
 split's case fact states of an optional model value a role's result reads. -/
 @[vir_denote_spec]
 theorem Option.elim_eq_iff {α β : Sort _} (option : _root_.Option α) (none : β) (some : α → β)
@@ -74,7 +76,7 @@ theorem Option.elim_eq_iff {α β : Sort _} (option : _root_.Option α) (none : 
   cases option <;> simp
 
 /-- Adding entries from lists of certified integer keys aborts as the
-specification states it (`doc/plan/proof-language.md`, "Normal-form
+specification states it (`doc/designs/proof-language.md`, "Normal-form
 fixes"): two indices whose keys are equal, or lists of unequal lengths. The
 keys' default is the inhabitant a specification's read takes. -/
 @[vir_denote_spec]
@@ -96,14 +98,15 @@ theorem abortsNewFrom_indexed {n : Nat} {signed : Bool} {β : Type} (g : β → 
     · exact Or.inl (by omega)
 
 /-- A value of a two-variant enum named by its second variant is that
-variant's payload. -/
-theorem variantCarrier.second_of_name {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
+variant's payload, as a plain row: a field of a certified enum is plain,
+and its own invariant is a projection of the enum value's. -/
+theorem variantPlain.second_of_name {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
     [Skolems unit]
     (first second : String) (distinct : first ≠ second)
-    {leading trailing : NRow} {value : variantCarrier [first, second] (.cons leading (.cons trailing .nil))}
-    (named : variantName [first, second] (.cons leading (.cons trailing .nil)) value = second) :
-    ∃ payload : HList trailing,
-      value = @Sum.inr (HList leading) (variantCarrier [second] (.cons trailing .nil)) (.inl payload) := by
+    {leading trailing : NRow} {value : variantPlain [first, second] (.cons leading (.cons trailing .nil))}
+    (named : variantPlainName [first, second] (.cons leading (.cons trailing .nil)) value = second) :
+    ∃ payload : HListPlain trailing,
+      value = @Sum.inr (HListPlain leading) (variantPlain [second] (.cons trailing .nil)) (.inl payload) := by
   rcases value with payload | payload | empty
   · exact absurd named distinct
   · exact ⟨payload, rfl⟩
@@ -119,6 +122,9 @@ macro "verex_prepare" &"values" : tactic => `(tactic| (
   all_goals verex_subst_vars
   all_goals verex_reduce_projections
   all_goals try verex_trivial
+  -- Open the selected own clauses before authored steps consume the path's
+  -- facts. The declaration predicates stay nominal outside this boundary.
+  all_goals verex_certified_clauses
   all_goals verex_normalize_context
   all_goals verex_spec_forms
   all_goals verex_split_hypotheses

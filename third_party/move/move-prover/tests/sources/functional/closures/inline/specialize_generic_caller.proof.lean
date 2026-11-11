@@ -16,7 +16,8 @@ verify use_concrete by lean =>
   all_goals
     have counts (n : Int) (lo : 0 ≤ n) (hi : n ≤ (v.values.size : Int)) :
         «spec_fold$lambda$0».at_T0.spec unit
-          (Skolems.instantiate ⟨.cons (.int 64 false) .nil, by decide⟩ (Skolems.runtime unit))
+          (Skolems.instantiate ⟨.cons (.int 64 false) .nil, by decide⟩ (Skolems.runtime unit)).toCarriers
+          (Skolems.instantiate ⟨.cons (.int 64 false) .nil, by decide⟩ (Skolems.runtime unit)).type
           (v, 0, n, ()) = n := by
       have fact := count_is_len.lemma unit
         (Skolems.instantiate ⟨.cons (.int 64 false) .nil, by decide⟩ (Skolems.runtime unit))

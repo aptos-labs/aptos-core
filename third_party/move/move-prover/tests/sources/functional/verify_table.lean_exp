@@ -7,6 +7,20 @@ tests/sources/functional/verify_table.move:30:5: error: verex verification faile
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/verify_table.move:89:9: error: the specification clause `ensures spec_contains(result, 1) && spec_contains(result, 2)` is not established
+tests/sources/functional/verify_table.move:90:9: error: the specification clause `ensures spec_len(result) == 2` is not established
+tests/sources/functional/verify_table.move:91:9: error: the specification clause `ensures spec_get(result, 1) == 4` is not established
+tests/sources/functional/verify_table.move:92:9: error: the specification clause `ensures spec_get(result, 2) == 3` is not established
+tests/sources/functional/verify_table.move:88:5: error: verex verification failed: the automatic verification of `borrow_mut` failed; provide a proof in `tests/sources/functional/verify_table.proof.lean`:
+  verify borrow_mut by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | ensures_3 => verex_prepare; sorry
+    | ensures_4 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_table.move:133:9: error: the specification clause `ensures spec_get(result.t, k1) == 23` is not established
 tests/sources/functional/verify_table.move:134:9: error: the specification clause `ensures spec_get(result.t, k2) == 22` is not established
 tests/sources/functional/verify_table.move:128:5: error: verex verification failed: the automatic verification of `add_R_fail` failed; provide a proof in `tests/sources/functional/verify_table.proof.lean`:
@@ -15,5 +29,17 @@ tests/sources/functional/verify_table.move:128:5: error: verex verification fail
     verex_on
     | ensures_3 => verex_prepare; sorry
     | ensures_4 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/verify_table.move:146:9: error: the specification clause `ensures spec_len(result.t) == 2` is not established
+tests/sources/functional/verify_table.move:147:9: error: the specification clause `ensures spec_get(result.t, k1) == 44` is not established
+tests/sources/functional/verify_table.move:148:9: error: the specification clause `ensures spec_get(result.t, k2) == 23` is not established
+tests/sources/functional/verify_table.move:143:5: error: verex verification failed: the automatic verification of `borrow_mut_R` failed; provide a proof in `tests/sources/functional/verify_table.proof.lean`:
+  verify borrow_mut_R by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | ensures_3 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

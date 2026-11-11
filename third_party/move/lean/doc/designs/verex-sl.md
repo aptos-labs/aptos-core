@@ -601,7 +601,8 @@ uses labels (`loop@outer`, `break@outer`), and unknown labels are rejected.
 Loops are expressions and may produce a value through `break`. A body that
 can fall through must match its declared result type; a loop body, an `if`
 without `else`, and a fall-through pattern assignment have type `Unit`.
-Abrupt control is polymorphic through `Never`.
+Abrupt control is polymorphic through `Never`. An `else` left of the offside
+column of the enclosing block belongs to an `if` outside that block.
 
 `for iterator in lower..upper do` is the half-open range loop. Each bound is
 evaluated once, in order. Lowering expands it to typed locals, a `loop`, a
@@ -977,13 +978,13 @@ The canonical `spec.*` vocabulary maps one-to-one to `SpecOperation`:
 
 | Family | Operations |
 |---|---|
-| Calls and results | `functionCall`, `result` |
+| Calls and results | `functionCall`, `lemma`, `result` |
 | Domains | `typeValue`, `typeDomain`, `resourceDomain`, `stateDomain` |
-| State and frames | `global`, `canModify`, `old`, `final`, `saveStateAnchor`, `withStateAnchor`, `foldsCaptureAnchor`, `inlineCallSummary` |
-| Function behavior | `requiresOf`, `abortsOf`, `ensuresOf`, `resultOf`, `unchangedOf`, `foldsOf`, `writeOf(index)` |
-| Tracing | `traceUser`, `traceAutomatic`, `traceSubAutomatic` |
+| State and frames | `global`, `exists`, `canModify`, `old`, `final`, `saveStateAnchor`, `withStateAnchor`, `foldsCaptureAnchor`, `inlineCallSummary` |
+| Function behavior | `behavior(kind)`, `kind` a `BehaviorKind`: `requiresOf`, `abortsOf`, `ensuresOf`, `resultOf`, `unchangedOf`, `foldsOf`, `writeOf(index)` |
+| Tracing | `trace(kind)`, `kind` a `TraceKind`: `user`, `automatic`, `subAutomatic` |
 | Logical resources | `publish`, `remove`, `update` |
-| Vectors | `emptyVector`, `singletonVector`, `updateVector`, `concatVector`, `indexOfVector`, `containsVector`, `inRange`, `inVectorRange`, `vectorRange` |
+| Vectors | `emptyVector`, `singletonVector`, `updateVector`, `concatVector`, `indexOfVector`, `containsVector`, `lengthVector`, `indexVector`, `sliceVector`, `inRange`, `inVectorRange`, `vectorRange` |
 | Integers and bit vectors | `maxValue`, `bitVectorToInt`, `intToBitVector` |
 | Execution observations | `abortFlag`, `abortCode`, `wellFormed` |
 | Boxing | `boxValue`, `unboxValue` |

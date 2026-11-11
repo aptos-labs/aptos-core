@@ -12,9 +12,11 @@ use aptos_types::{
     account_address::AccountAddress,
     state_store::native_order::{NativeBulkOrder, NativeSingleOrder, TriggerCondition},
 };
+use itertools::{EitherOrBoth, Itertools};
 use std::{
     cmp::Reverse,
     collections::{BTreeMap, BTreeSet},
+    sync::LazyLock,
 };
 
 /// Which order a book entry belongs to.
@@ -257,4 +259,128 @@ fn sub_depth<K: Ord>(depth: &mut BTreeMap<K, u128>, price: K, size: u64) {
             depth.remove(&price);
         }
     }
+}
+
+/// What writes change in a base book: the written orders' old values derived
+/// into `retracted`, their new values into `inserted`, by the same index rule.
+#[derive(Debug, Default)]
+pub struct BookDelta {
+    pub retracted: MarketBook,
+    pub inserted: MarketBook,
+}
+
+static EMPTY_DELTA: LazyLock<BookDelta> = LazyLock::new(BookDelta::default);
+
+impl BookDelta {
+    pub fn empty() -> &'static BookDelta {
+        &EMPTY_DELTA
+    }
+}
+
+/// A base book with a delta applied on read, without copying it: every query
+/// merges `base - retracted + inserted`. Costs what the delta holds plus what
+/// the query walks, never the size of the book.
+pub struct BookView<'a> {
+    base: Option<&'a MarketBook>,
+    delta: &'a BookDelta,
+}
+
+impl<'a> BookView<'a> {
+    pub fn new(base: Option<&'a MarketBook>, delta: &'a BookDelta) -> Self {
+        Self { base, delta }
+    }
+
+    /// Bids, best first.
+    pub fn bids(&self) -> impl Iterator<Item = (u64, &BookEntry)> {
+        merge_entries(
+            self.base.map(|book| &book.bids),
+            &self.delta.retracted.bids,
+            &self.delta.inserted.bids,
+        )
+        .map(|((Reverse(price), _), entry)| (*price, entry))
+    }
+
+    /// Asks, best first.
+    pub fn asks(&self) -> impl Iterator<Item = (u64, &BookEntry)> {
+        merge_entries(
+            self.base.map(|book| &book.asks),
+            &self.delta.retracted.asks,
+            &self.delta.inserted.asks,
+        )
+        .map(|((price, _), entry)| (*price, entry))
+    }
+
+    /// `(best bid, best ask)`; `None` for an empty side.
+    pub fn best_prices(&self) -> (Option<u64>, Option<u64>) {
+        (
+            self.bids().next().map(|(price, _)| price),
+            self.asks().next().map(|(price, _)| price),
+        )
+    }
+
+    /// Aggregate size per price on a side, best first.
+    pub fn depth_levels(&self, is_bid: bool) -> Box<dyn Iterator<Item = (u64, u128)> + '_> {
+        if is_bid {
+            Box::new(
+                merge_depth(
+                    self.base.map(|book| &book.bid_depth),
+                    &self.delta.retracted.bid_depth,
+                    &self.delta.inserted.bid_depth,
+                )
+                .map(|(Reverse(price), size)| (price, size)),
+            )
+        } else {
+            Box::new(merge_depth(
+                self.base.map(|book| &book.ask_depth),
+                &self.delta.retracted.ask_depth,
+                &self.delta.inserted.ask_depth,
+            ))
+        }
+    }
+
+    /// The best `max_levels` depth levels on a side.
+    pub fn depth(&self, is_bid: bool, max_levels: usize) -> Vec<(u64, u128)> {
+        self.depth_levels(is_bid).take(max_levels).collect()
+    }
+}
+
+/// Base entries not retracted, merged in key order with the inserted ones.
+/// A key both retracted and inserted (a partial fill keeps its key) reads as
+/// the inserted entry.
+fn merge_entries<'a, K: Ord, V>(
+    base: Option<&'a BTreeMap<K, V>>,
+    retracted: &'a BTreeMap<K, V>,
+    inserted: &'a BTreeMap<K, V>,
+) -> impl Iterator<Item = (&'a K, &'a V)> {
+    let base = base
+        .into_iter()
+        .flatten()
+        .filter(move |(key, _)| !retracted.contains_key(key));
+    base.merge_join_by(inserted, |(a, _), (b, _)| a.cmp(b))
+        .map(|either| match either {
+            EitherOrBoth::Left(entry) | EitherOrBoth::Right(entry) => entry,
+            EitherOrBoth::Both(_, inserted) => inserted,
+        })
+}
+
+/// `base - retracted + inserted` per price, in key order, dropping levels
+/// that net to zero. Retracted sizes only ever come out of base levels.
+fn merge_depth<'a, K: Ord + Copy>(
+    base: Option<&'a BTreeMap<K, u128>>,
+    retracted: &'a BTreeMap<K, u128>,
+    inserted: &'a BTreeMap<K, u128>,
+) -> impl Iterator<Item = (K, u128)> + 'a {
+    base.into_iter()
+        .flatten()
+        .merge_join_by(inserted, |(a, _), (b, _)| a.cmp(b))
+        .filter_map(move |either| {
+            let (key, base_size, inserted_size) = match either {
+                EitherOrBoth::Left((key, size)) => (key, *size, 0),
+                EitherOrBoth::Right((key, size)) => (key, 0, *size),
+                EitherOrBoth::Both((key, base_size), (_, size)) => (key, *base_size, *size),
+            };
+            let size =
+                base_size.saturating_sub(retracted.get(key).copied().unwrap_or(0)) + inserted_size;
+            (size > 0).then_some((*key, size))
+        })
 }

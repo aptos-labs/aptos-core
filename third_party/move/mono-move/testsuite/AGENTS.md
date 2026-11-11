@@ -37,3 +37,11 @@ A source whose MonoMove output legitimately differs is listed in the matrix crat
 cargo test -p mono-move-testsuite --test transactional          # verify
 UB=1 cargo test -p mono-move-testsuite --test transactional     # create or refresh overrides
 ```
+
+## Move Unit Tests
+
+`tests/unit_tests.rs` (framework packages) and `tests/benches_e2e_unit_tests.rs` (`benches-e2e` packages) run each package's `#[test]`s on V1 and MonoMove through `move-unit-test`'s runner with the `mono-move-unit-test-backend` backend. A test fails if the two VMs disagree or MonoMove fails on its own; tests MonoMove cannot run yet are reported as unsupported, and tests whose runs cannot be compared (e.g. V1 writes different values on every run) as incomparable, each with a per-reason histogram (`--nocapture`). `tests/unit_test_fixtures.rs` covers the backend over the `tests/unit-test-fixtures` package.
+
+```bash
+cargo test -p mono-move-testsuite --test unit_tests -- --nocapture
+```

@@ -960,11 +960,11 @@ structure RuntimeLocation where
   deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- Resolve a runtime source point back through the validated namespace's
-location table. -/
+own location table. -/
 def RuntimeLocation.resolve? (unit : ValidatedUnit) (location : RuntimeLocation) :
     Option Location := do
   let targetNamespace ← unit.namespaces[location.namespaceId.index]?
-  targetNamespace.tables.locations[location.loc.index]?
+  targetNamespace.location? location.loc
 
 /-- Primary authored byte range for a runtime source point, when supplied by
 the frontend. -/

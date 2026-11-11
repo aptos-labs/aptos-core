@@ -1032,7 +1032,7 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     refine ⟨finalState₂, finalShifted, final_within,
       (evaluatePrimitiveOperation?_within base (fun value member => values_within value (by simpa using member))
         evaluate_eq).1 runtimeValue rfl, ?_⟩
-    have evaluate₂ := evaluatePrimitiveOperation?_rename ρ ns expression.typeId operation
+    have evaluate₂ := evaluatePrimitiveOperation?_rename ρ ns (ns.typeId expression.typeId) operation
       values.toArray executable.targetPointerWidth
     rw [evaluate_eq, Option.map_some, renameResult_ok] at evaluate₂
     exact .primitiveValue _ _ _ _ _ _ _ _ _ _ _ _ _ _ namespace_eq expression_eq kind_eq operands₂
@@ -1048,7 +1048,7 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     refine ⟨finalState₂, finalShifted, final_within,
       (evaluatePrimitiveOperation?_within base (fun value member => values_within value (by simpa using member))
         evaluate_eq).2 kind thrown rfl, ?_⟩
-    have evaluate₂ := evaluatePrimitiveOperation?_rename ρ ns expression.typeId operation
+    have evaluate₂ := evaluatePrimitiveOperation?_rename ρ ns (ns.typeId expression.typeId) operation
       values.toArray executable.targetPointerWidth
     rw [evaluate_eq, Option.map_some, renameResult_error] at evaluate₂
     rw [Control.rename_throw]

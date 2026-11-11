@@ -16,10 +16,14 @@ and acceptance states that every node it runs satisfies its check.
 
 namespace VerexIR.Validation.StaticTyping
 
-/-- A type of a namespace's table resolved under an environment, within as
-many nested nodes as the table has. -/
-def resolveIn (ns : ValidatedNamespace) (env : Array SemArg) (typeId : TypeId) : Option SemTy :=
+/-- A type of the unit's table resolved under an environment, within as many
+nested nodes as the table has. -/
+def resolveAt (ns : ValidatedNamespace) (env : Array SemArg) (typeId : TypeId) : Option SemTy :=
   SemTy.resolveFuel ns.tables env (ns.tables.types.size + 1) typeId
+
+/-- A type of a namespace's body resolved under an environment. -/
+def resolveIn (ns : ValidatedNamespace) (env : Array SemArg) (typeId : TypeId) : Option SemTy :=
+  resolveAt ns env (ns.typeId typeId)
 
 /-- A generic body's environment: each type binder its rigid parameter. Any
 other binder shapes no value. -/
@@ -35,6 +39,25 @@ def resolveArguments (ns : ValidatedNamespace) (env : Array SemArg)
     | .typeArg value => SemArg.type <$> resolveIn ns env value.typeId
     | .const value => some (.const value)
     | .lifetime _ | .evidence _ => some .erased
+
+/-- An instantiation of unit identifiers' semantic generic arguments under an
+environment. -/
+def resolveArgumentsAt (ns : ValidatedNamespace) (env : Array SemArg)
+    (arguments : Array GenericArgument) : Option (Array SemArg) :=
+  arguments.mapM fun
+    | .typeArg value => SemArg.type <$> resolveAt ns env value.typeId
+    | .const value => some (.const value)
+    | .lifetime _ | .evidence _ => some .erased
+
+theorem resolveArguments_eq (ns : ValidatedNamespace) (env : Array SemArg)
+    (arguments : Array GenericArgument) :
+    resolveArguments ns env arguments =
+      resolveArgumentsAt ns env (ns.genericArguments arguments) := by
+  simp only [resolveArguments, resolveArgumentsAt, ValidatedNamespace.genericArguments,
+    Array.mapM_map]
+  congr 1
+  funext argument
+  cases argument <;> rfl
 
 /-- The static length of a subslice of a vector of a static length. -/
 def subsliceLength (length : Option ConstValue) (start stop : Nat) (fromEnd : Bool) :
@@ -182,12 +205,12 @@ def TypeTable.at (table : TypeTable) (position : Nat × Nat) : Array TypeId :=
 own index. -/
 def functionIndex? (unit : ValidatedUnit) (ns : ValidatedNamespace) (reference : QualifiedRef) :
     Option (Nat × Nat) := do
-  let qualified ← ns.tables.names[reference.name.index]?
-  if qualified.namespaceId != reference.namespaceId then none else
-    let functionId ← unit.resolution.function? reference.name
-    let targetNs ← unit.namespaces[reference.namespaceId.index]?
+  let qualified ← ns.nameOf reference.name
+  if qualified.namespaceId != ns.namespaceId reference.namespaceId then none else
+    let functionId ← unit.resolution.function? (ns.nameId reference.name)
+    let targetNs ← unit.namespaces[(ns.namespaceId reference.namespaceId).index]?
     let _ ← targetNs.functions[functionId.index]?
-    some (reference.namespaceId.index, functionId.index)
+    some ((ns.namespaceId reference.namespaceId).index, functionId.index)
 
 /-! ## Contexts -/
 
@@ -239,20 +262,20 @@ namespace. -/
 /-- The function a reference names, with its namespace. -/
 def functionTarget? (unit : ValidatedUnit) (ns : ValidatedNamespace) (reference : QualifiedRef) :
     Option (ValidatedNamespace × FunctionDecl FunctionBody) := do
-  let qualified ← ns.tables.names[reference.name.index]?
-  if qualified.namespaceId != reference.namespaceId then none else
-    let functionId ← unit.resolution.function? reference.name
-    let targetNs ← unit.namespaces[reference.namespaceId.index]?
+  let qualified ← ns.nameOf reference.name
+  if qualified.namespaceId != ns.namespaceId reference.namespaceId then none else
+    let functionId ← unit.resolution.function? (ns.nameId reference.name)
+    let targetNs ← unit.namespaces[(ns.namespaceId reference.namespaceId).index]?
     let declaration ← targetNs.functions[functionId.index]?
     some (targetNs, declaration)
 
 /-- The constant a reference names, with its namespace. -/
 def constantTarget? (unit : ValidatedUnit) (ns : ValidatedNamespace) (reference : QualifiedRef) :
     Option (ValidatedNamespace × ConstantDecl) := do
-  let qualified ← ns.tables.names[reference.name.index]?
-  if qualified.namespaceId != reference.namespaceId then none else
-    let constantId ← unit.resolution.constant? reference.name
-    let targetNs ← unit.namespaces[reference.namespaceId.index]?
+  let qualified ← ns.nameOf reference.name
+  if qualified.namespaceId != ns.namespaceId reference.namespaceId then none else
+    let constantId ← unit.resolution.constant? (ns.nameId reference.name)
+    let targetNs ← unit.namespaces[(ns.namespaceId reference.namespaceId).index]?
     let declaration ← targetNs.constants[constantId.index]?
     some (targetNs, declaration)
 
@@ -264,7 +287,7 @@ def nominalTarget? (unit : ValidatedUnit) (ns : ValidatedNamespace) (name : Name
   let typeId ← unit.resolution.nominal? name
   let targetNs ← unit.namespaces[qualified.namespaceId.index]?
   let declaration ← targetNs.structs[typeId.index]?
-  let spelled ← targetNs.tables.names[declaration.name.index]?
+  let spelled ← targetNs.nameOf declaration.name
   let _ ← targetNs.tables.namespaces[spelled.namespaceId.index]?
   some (targetNs, declaration, spelled)
 
@@ -272,7 +295,7 @@ def nominalTarget? (unit : ValidatedUnit) (ns : ValidatedNamespace) (name : Name
 finds the variant a value of it holds. -/
 def variantsDistinct (targetNs : ValidatedNamespace) (declaration : StructDecl) : Bool :=
   decide (declaration.variants.toList.map fun variant =>
-    (targetNs.tables.names[variant.name.index]?).map (·.name)).Nodup
+    (targetNs.nameOf variant.name).map (·.name)).Nodup
 
 /-- The fields a variant (or, without one, a structure) declares. -/
 def fieldsOf (targetNs : ValidatedNamespace) (declaration : StructDecl) :
@@ -280,7 +303,7 @@ def fieldsOf (targetNs : ValidatedNamespace) (declaration : StructDecl) :
   | none => if declaration.variants.isEmpty then some declaration.fields else none
   | some variantName => do
       let declared ← declaration.variants.toList.find? fun candidate =>
-        (targetNs.tables.names[candidate.name.index]?).any (·.name == variantName)
+        (targetNs.nameOf candidate.name).any (·.name == variantName)
       some declared.fields
 
 /-- The names of the variants of a declaration that declare a field of this
@@ -303,7 +326,7 @@ def fieldType? (targetNs : ValidatedNamespace) (declaration : StructDecl)
     (variant : Option String) (arguments : List SemArg) (fieldName : String) : Option SemTy := do
   let fields ← fieldsOf targetNs declaration variant
   let field ← fields.find? fun field =>
-    (targetNs.tables.names[field.name.index]?).any (·.name == fieldName)
+    (targetNs.nameOf field.name).any (·.name == fieldName)
   resolveIn targetNs arguments.toArray field.type.typeId
 
 /-- The types of a declaration's ghost fields under arguments: a constructor
@@ -416,10 +439,10 @@ def fieldTypesAcross? (targetNs : ValidatedNamespace) (declaration : StructDecl)
     (fieldType? targetNs declaration none arguments fieldName).map ([·])
   else
     declaration.variants.toList.filterMapM fun variant => do
-      let variantName ← targetNs.tables.names[variant.name.index]?
+      let variantName ← targetNs.nameOf variant.name
       let fields ← fieldsOf targetNs declaration (some variantName.name)
       if fields.any fun field =>
-          (targetNs.tables.names[field.name.index]?).any (·.name == fieldName) then
+          (targetNs.nameOf field.name).any (·.name == fieldName) then
         some <$> fieldType? targetNs declaration (some variantName.name) arguments fieldName
       else some none
 
@@ -449,16 +472,16 @@ def placeType (context : Context) : Nat → PlaceId → Option (SemTy × Option 
         -- shared as its base: the record must be the reference's kind.
         match type with
         | .reference kind referent =>
-            if (kind == .shared) == sharedDereference context.unit context.ns.identity id then
+            if (kind == .shared) == sharedDereference context.unit context.ns.unitIdentity id then
               some (referent, none)
             else none
         | _ => none
     | some (.field base owner field) => do
         let (type, variant) ← context.placeType fuel base
         let .nominal name arguments := type | none
-        let (targetNs, declaration, spelled) ← nominalTarget? context.unit context.ns owner.name
+        let (targetNs, declaration, spelled) ← nominalTarget? context.unit context.ns (context.ns.nameId owner.name)
         if spelled != name then none else
-          let fieldName ← context.ns.tables.names[field.index]?
+          let fieldName ← context.ns.nameOf field
           let fieldType ← fieldTypeAt? targetNs declaration variant arguments fieldName.name
           some (fieldType, none)
     -- A ghost field is the verification model's alone (`doc/designs/ghost-fields.md`).
@@ -483,7 +506,7 @@ def placeType (context : Context) : Nat → PlaceId → Option (SemTy × Option 
     | some (.downcast base variant) => do
         let (type, _) ← context.placeType fuel base
         let .nominal _ _ := type | none
-        let variantName ← context.ns.tables.names[variant.index]?
+        let variantName ← context.ns.nameOf variant
         some (type, some variantName.name)
 
 /-- The type of a place's value. -/
@@ -507,7 +530,7 @@ def patternTypedFuel (context : Context) : Nat → PatternId → SemTy → Bool
                 context.patternTypedFuel fuel element elementType
           | _ => false
       | .constructor name instantiations variant fields =>
-          match nominalTarget? context.unit context.ns name,
+          match nominalTarget? context.unit context.ns (context.ns.nameId name),
               resolveArguments context.ns context.env instantiations with
           | some (targetNs, declaration, spelled), some arguments =>
               type == .nominal spelled arguments.toList &&
@@ -529,10 +552,10 @@ end Context
 runtime's lookups: where it finds none, the runtime resolves none. -/
 def declarationTarget? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (reference : QualifiedRef) : Option (ValidatedNamespace × StructDecl) := do
-  let qualified ← ns.tables.names[reference.name.index]?
-  if qualified.namespaceId != reference.namespaceId then none else
-    let typeId ← unit.resolution.nominal? reference.name
-    let targetNs ← unit.namespaces[reference.namespaceId.index]?
+  let qualified ← ns.nameOf reference.name
+  if qualified.namespaceId != ns.namespaceId reference.namespaceId then none else
+    let typeId ← unit.resolution.nominal? (ns.nameId reference.name)
+    let targetNs ← unit.namespaces[(ns.namespaceId reference.namespaceId).index]?
     let declaration ← targetNs.structs[typeId.index]?
     some (targetNs, declaration)
 
@@ -541,7 +564,7 @@ spelled name. -/
 def structTarget? (unit : ValidatedUnit) (ns : ValidatedNamespace) (reference : QualifiedRef) :
     Option (ValidatedNamespace × StructDecl × QualifiedName) := do
   let (targetNs, declaration) ← declarationTarget? unit ns reference
-  let spelled ← targetNs.tables.names[declaration.name.index]?
+  let spelled ← targetNs.nameOf declaration.name
   let _ ← targetNs.tables.namespaces[spelled.namespaceId.index]?
   some (targetNs, declaration, spelled)
 
@@ -568,6 +591,16 @@ def kindsAgree (generics : Array GenericBinder) (instantiations : Array GenericA
   (generics.toList.zip instantiations.toList).all fun (binder, argument) =>
     (binder.kind matches .typeArg) == (argument matches .typeArg _)
 
+theorem kindsAgree_genericArguments (ns : ValidatedNamespace) (generics : Array GenericBinder)
+    (instantiations : Array GenericArgument) :
+    kindsAgree generics (ns.genericArguments instantiations) = kindsAgree generics instantiations := by
+  simp only [kindsAgree, ValidatedNamespace.genericArguments, Array.toList_map, List.zip_map_right,
+    List.all_map]
+  congr 1
+  funext entry
+  obtain ⟨binder, argument⟩ := entry
+  cases argument <;> rfl
+
 /-- Whether the frame reads its instantiation at a type. -/
 def consults (context : Context) (typeId : TypeId) : Bool :=
   match context.required with
@@ -579,6 +612,7 @@ is interned at the call's arguments, read by the calling frame, and free of
 lifetime parameters (`doc/historical/static-typing.md`, "Instantiation"). -/
 def edgeClosed (context : Context) (reference : QualifiedRef)
     (instantiations : Array GenericArgument) : Bool :=
+  let instantiations := context.ns.genericArguments instantiations
   (typeArguments instantiations).all context.consults &&
     match functionIndex? context.unit context.ns reference with
     | some target => match context.unit.namespaces[target.1]? with
@@ -595,7 +629,7 @@ runtime reads to tell a shared operand from a mutable one
 (`sharedOperandAt`). -/
 def sharedNode (ns : ValidatedNamespace) (id : ExprId) : Bool :=
   match ns.expressions[id.index]? with
-  | some expression => match ns.tables.types[expression.typeId.index]? with
+  | some expression => match ns.typeOf expression.typeId with
       | some (.reference reference) => reference.kind == .shared
       | _ => false
   | none => false
@@ -750,7 +784,7 @@ def checkOperation (context : Context) (result : SemTy) (operation : Operation)
   | .drop place => operands.isEmpty && (context.placeTypeOf place).isSome && packs [] result
   | .call kind => context.checkCall result kind instantiations operands
   | .global kind => match instantiations.toList with
-      | [.typeArg resource] => context.consults resource.typeId &&
+      | [.typeArg resource] => context.consults (context.ns.typeId resource.typeId) &&
           match context.typeOf resource.typeId with
           | some resourceType => match kind, operands.toList with
               | .contains, [_] => result == .bool
@@ -968,9 +1002,11 @@ def bodyFacts (unit : ValidatedUnit) (ns : ValidatedNamespace) :
     | some expression =>
         let facts := match expression.kind with
           | .operation (.global _) instantiations _ _ =>
-              { facts with consulted := facts.consulted ++ typeArguments instantiations }
+              { facts with consulted :=
+                  facts.consulted ++ typeArguments (ns.genericArguments instantiations) }
           | .operation (.call (.function reference)) instantiations _ _
           | .operation (.call (.closure reference _)) instantiations _ _ =>
+              let instantiations := ns.genericArguments instantiations
               let facts := { facts with consulted := facts.consulted ++ typeArguments instantiations }
               match functionIndex? unit ns reference with
               | some target => { facts with edges := facts.edges.push (target, instantiations) }
@@ -1018,7 +1054,7 @@ def checkUnit (unit : ValidatedUnit) (pointerWidth : Option Nat) : Bool :=
   match requiredTypes unit with
   | none => false
   | some table => unit.namespaces.zipIdx.all fun (ns, index) =>
-      ns.identity.index == index && decide (ns.tables.types = unit.tables.types) &&
+      ns.unitIdentity.index == index && decide (ns.tables.types = unit.tables.types) &&
         decide (ns.tables.names = unit.tables.names) &&
         ns.structs.all (variantsDistinct ns) &&
         ns.functions.zipIdx.all (fun (declaration, functionIndex) =>
@@ -1044,8 +1080,8 @@ def unitFailures (unit : ValidatedUnit) (pointerWidth : Option Nat) : Array Stri
   unless (requiredTypes unit).isSome do
     found := found.push "a type a generic frame requires is not interned at a call's arguments"
   for ns in unit.namespaces, index in [0:unit.namespaces.size] do
-    if ns.identity.index != index then
-      found := found.push s!"namespace {index} has identity {ns.identity.index}"
+    if ns.unitIdentity.index != index then
+      found := found.push s!"namespace {index} has identity {ns.unitIdentity.index}"
     if !decide (ns.tables.types = unit.tables.types) || !decide (ns.tables.names = unit.tables.names) then
       found := found.push s!"namespace {index} does not read the unit's tables"
     for declaration in ns.structs, structIndex in [0:ns.structs.size] do
@@ -1053,7 +1089,7 @@ def unitFailures (unit : ValidatedUnit) (pointerWidth : Option Nat) : Array Stri
         found := found.push s!"declaration #{structIndex} of namespace {index} repeats a variant name"
     for declaration in ns.functions, functionIndex in [0:ns.functions.size] do
       if checkFunction unit pointerWidth ns table (index, functionIndex) declaration then continue
-      let name := (ns.tables.names[declaration.name.index]?).map (·.name) |>.getD s!"#{functionIndex}"
+      let name := (ns.nameOf declaration.name).map (·.name) |>.getD s!"#{functionIndex}"
       match declaration.body, signatureTypes? ns declaration (staticEnv declaration.signature.generics) with
       | .structured root, some (_, results) =>
           let context := functionContext unit pointerWidth ns table (index, functionIndex)

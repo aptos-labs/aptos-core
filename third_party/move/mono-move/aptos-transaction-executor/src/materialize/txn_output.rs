@@ -22,7 +22,8 @@ use mono_move_core::{
 use mono_move_output::to_contract_events;
 use mono_move_runtime::{serialize, SessionEffects, WriteClass};
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
-use std::{collections::HashMap, ptr::NonNull};
+use shared_dsa::UnorderedMap;
+use std::{collections::BTreeMap, ptr::NonNull};
 
 // TODO(security): audit all error messages and make sure they do not lead to
 // deep recursions or OOMs.
@@ -94,7 +95,10 @@ fn drain_write_set(
     provider: &dyn AptosDataProvider,
 ) -> Result<(WriteSet, MaterializedGroups), Vec<String>> {
     let mut writes: Vec<(StateKey, WriteOp)> = vec![];
-    let mut group_ops: HashMap<StateKey, HashMap<StructTag, MemberOp>> = HashMap::new();
+    // Unordered on purpose: nothing below may depend on the order groups are
+    // visited in (see the SAFETY note above). The inner map is ordered because
+    // its keys are user-chosen struct tags and it merges into `GroupMembers`.
+    let mut group_ops: UnorderedMap<StateKey, BTreeMap<StructTag, MemberOp>> = UnorderedMap::new();
     let mut materialized_groups = MaterializedGroups::new();
     let mut failures: Vec<String> = vec![];
 
@@ -167,7 +171,11 @@ fn drain_write_set(
     // Merge each group's member ops into its stored members and emit one write
     // per group. The assembled members are returned so the caller can cache them
     // without decoding the write op again.
-    for (group_key, member_ops) in group_ops {
+    //
+    // Note on determinism: the groups are visited in an unspecified order.
+    // `WriteSet::new` sorts the writes and `MaterializationError::new` sorts
+    // the failures, so the order does not reach the result.
+    for (group_key, member_ops) in group_ops.into_iter_unordered() {
         match merge_group(provider, &group_key, member_ops) {
             Ok((op, members)) => {
                 materialized_groups.insert(group_key.clone(), members);
@@ -200,7 +208,7 @@ fn drain_write_set(
 fn merge_group(
     provider: &dyn AptosDataProvider,
     group_key: &StateKey,
-    member_ops: HashMap<StructTag, MemberOp>,
+    member_ops: BTreeMap<StructTag, MemberOp>,
 ) -> Result<(WriteOp, Option<GroupMembers>), String> {
     let old = provider
         .group_members(group_key)

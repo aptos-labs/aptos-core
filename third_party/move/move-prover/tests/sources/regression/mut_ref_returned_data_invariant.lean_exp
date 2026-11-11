@@ -1,0 +1,57 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/mut_ref_returned_data_invariant.move:14:9: error: the specification clause `invariant v == 0` is not established
+tests/sources/regression/mut_ref_returned_data_invariant.move:20:5: error: verex verification failed: the automatic verification of `break_and_keep` failed; provide a proof in `tests/sources/regression/mut_ref_returned_data_invariant.proof.lean`:
+  verify break_and_keep by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/mut_ref_returned_data_invariant.move:14:9: error: the specification clause `invariant v == 0` is not established
+tests/sources/regression/mut_ref_returned_data_invariant.move:26:5: error: verex verification failed: the automatic verification of `break_and_return` failed; provide a proof in `tests/sources/regression/mut_ref_returned_data_invariant.proof.lean`:
+  verify break_and_return by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/mut_ref_returned_data_invariant.move:14:9: error: the specification clause `invariant v == 0` is not established
+tests/sources/regression/mut_ref_returned_data_invariant.move:41:5: error: verex verification failed: the automatic verification of `return_reborrow_broken` failed; provide a proof in `tests/sources/regression/mut_ref_returned_data_invariant.proof.lean`:
+  verify return_reborrow_broken by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/mut_ref_returned_data_invariant.move:14:9: error: the specification clause `invariant v == 0` is not established
+tests/sources/regression/mut_ref_returned_data_invariant.move:54:5: error: verex verification failed: the automatic verification of `return_free_reborrow_broken` failed; provide a proof in `tests/sources/regression/mut_ref_returned_data_invariant.proof.lean`:
+  verify return_free_reborrow_broken by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/mut_ref_returned_data_invariant.move:14:9: error: the specification clause `invariant v == 0` is not established
+tests/sources/regression/mut_ref_returned_data_invariant.move:83:5: error: verex verification failed: the automatic verification of `early_return_broken` failed; provide a proof in `tests/sources/regression/mut_ref_returned_data_invariant.proof.lean`:
+  verify early_return_broken by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/mut_ref_returned_data_invariant.move:14:9: error: the specification clause `invariant v == 0` is not established
+tests/sources/regression/mut_ref_returned_data_invariant.move:101:5: error: verex verification failed: the automatic verification of `nested_return_broken` failed; provide a proof in `tests/sources/regression/mut_ref_returned_data_invariant.proof.lean`:
+  verify nested_return_broken by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/mut_ref_returned_data_invariant.move:14:9: error: the specification clause `invariant v == 0` is not established
+tests/sources/regression/mut_ref_returned_data_invariant.move:114:5: error: verex verification failed: the automatic verification of `loop_return_broken` failed; provide a proof in `tests/sources/regression/mut_ref_returned_data_invariant.proof.lean`:
+  verify loop_return_broken by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

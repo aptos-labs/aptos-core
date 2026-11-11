@@ -211,43 +211,29 @@ impl StateSummary {
     }
 }
 
-/// At a given version, the summaries of the state and the last checkpoint state at or before the version.
+/// The summary of the state at the last checkpoint, which is where the ledger ends, as only
+/// whole blocks are committed.
 #[derive(Clone, Debug, Deref)]
 pub struct LedgerStateSummary {
     #[deref]
-    latest: StateSummary,
     last_checkpoint: StateSummary,
 }
 
 impl LedgerStateSummary {
-    pub fn new(last_checkpoint: StateSummary, latest: StateSummary) -> Self {
-        assert!(last_checkpoint.next_version() <= latest.next_version());
-
-        Self {
-            last_checkpoint,
-            latest,
-        }
+    pub fn new(last_checkpoint: StateSummary) -> Self {
+        Self { last_checkpoint }
     }
 
     pub fn new_empty() -> Self {
-        let state_summary = StateSummary::new_empty();
-        Self::new(state_summary.clone(), state_summary)
+        Self::new(StateSummary::new_empty())
     }
 
     pub fn next_version(&self) -> Version {
-        self.latest.next_version()
+        self.last_checkpoint.next_version()
     }
 
     pub fn assert_versions_match(&self, state: &LedgerState) {
         assert_eq!(self.next_version(), state.next_version());
-        assert_eq!(
-            self.last_checkpoint.next_version(),
-            state.last_checkpoint().next_version()
-        );
-    }
-
-    pub fn latest(&self) -> &StateSummary {
-        &self.latest
     }
 
     pub fn last_checkpoint(&self) -> &StateSummary {
@@ -263,7 +249,7 @@ impl LedgerStateSummary {
         let _timer = TIMER.timer_with(&["ledger_state_summary__update"]);
 
         let last_checkpoint = if let Some(updates) = updates.for_last_checkpoint_batched() {
-            self.latest.update(
+            self.last_checkpoint.update(
                 persisted,
                 hot_state_updates.for_last_checkpoint.as_ref().unwrap(),
                 updates,
@@ -272,22 +258,7 @@ impl LedgerStateSummary {
             self.last_checkpoint.clone()
         };
 
-        let base_of_latest = if updates.for_last_checkpoint_batched().is_none() {
-            self.latest()
-        } else {
-            &last_checkpoint
-        };
-        let latest = if let Some(updates) = updates.for_latest_batched() {
-            base_of_latest.update(
-                persisted,
-                hot_state_updates.for_latest.as_ref().unwrap(),
-                updates,
-            )?
-        } else {
-            base_of_latest.clone()
-        };
-
-        Ok(Self::new(last_checkpoint, latest))
+        Ok(Self::new(last_checkpoint))
     }
 }
 
@@ -416,6 +387,9 @@ pub struct ProvableNativeStateSummary<'db> {
 /// The position tree's provable summary.
 pub type ProvablePositionStateSummary<'db> = ProvableNativeStateSummary<'db>;
 
+/// The order tree's provable summary.
+pub type ProvableOrderStateSummary<'db> = ProvableNativeStateSummary<'db>;
+
 /// The collateral tree's provable summary.
 pub type ProvableCollateralStateSummary<'db> = ProvableNativeStateSummary<'db>;
 
@@ -427,6 +401,17 @@ impl<'db> ProvableNativeStateSummary<'db> {
             db,
             proof: |db, key, version, root_depth| {
                 db.get_position_state_proof_by_version_ext(key, version, root_depth)
+            },
+        })
+    }
+
+    pub fn new_persisted_order(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
+        Ok(Self {
+            persisted: db.get_persisted_order_state_summary()?,
+            pre_committed: db.get_pre_committed_order_state_summary()?,
+            db,
+            proof: |db, key, version, root_depth| {
+                db.get_order_state_proof_by_version_ext(key, version, root_depth)
             },
         })
     }

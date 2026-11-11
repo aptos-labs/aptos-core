@@ -33,6 +33,24 @@ def selfReferential (type : Expr) : MetaM Bool := do
     -- An instance as rewriting finds one, up to reducible unfolding.
     return (← withReducible (kabstract right left)).hasLooseBVars
 
+/-- Whether a quantified fact can rewrite: its pattern, the side of its
+conclusion a rule matches, fixes every data binder and is no bare binder.
+Otherwise it matches any subterm of the binder's type, and its other binders
+are left to the discharge of its premises. It stays a fact, for the deciders
+that instantiate it. -/
+def rewritesByPattern (type : Expr) : MetaM Bool := do
+  unless type.isForall do return true
+  forallTelescope type fun binders conclusion => do
+    let pattern := match conclusion.eq?, conclusion.iff? with
+      | some (_, left, _), _ => left
+      | _, some (left, _) => left
+      | _, _ => conclusion
+    if pattern.isFVar && binders.contains pattern then return false
+    let fixed := (collectFVars {} pattern).fvarSet
+    binders.allM fun binder => do
+      if fixed.contains binder.fvarId! then return true
+      isProp (← inferType binder)
+
 /-- Whether rewriting `left` to `right` closes a cycle with the admitted
 equations (origin, left side, right side): `left` is reached from `right`
 through equations whose left sides occur in the right sides met. Ground
@@ -90,6 +108,7 @@ equation whose left side its right side mentions, nor one closing a cycle
 with the admitted equations; an admitted equation is recorded. -/
 private def admit (id : Origin) (type : Expr) : M Bool := do
   if ← selfReferential type then return false
+  unless ← rewritesByPattern type do return false
   let some (_, left, right) := type.eq? | return true
   if ← closesCycle (← get).rules left right then return false
   modify fun s => { s with rules := s.rules.push (id, left, right) }

@@ -7,20 +7,37 @@
 //! Such extensions are enabled by cfg features and must be compiled into the test
 //! to be usable.
 
-#[cfg(feature = "table-extension")]
+use crate::backend::TestEffects;
 use itertools::Itertools;
+use move_binary_format::errors::PartialVMResult;
 #[cfg(feature = "table-extension")]
 use move_table_extension::NativeTableContext;
-use move_vm_runtime::native_extensions::NativeContextExtensions;
+use move_table_extension::TableChangeSet;
+use move_vm_runtime::{native_extensions::NativeContextExtensions, FunctionValueExtensionAdapter};
 #[cfg(feature = "table-extension")]
 use move_vm_test_utils::BlankStorage;
-use move_vm_types::value_serde::FunctionValueExtension;
 use once_cell::sync::Lazy;
-use std::{fmt::Write, sync::Mutex};
+use std::{
+    fmt::Write,
+    sync::{Mutex, RwLock},
+};
 
-static EXTENSION_HOOK: Lazy<
-    Mutex<Option<Box<dyn Fn(&mut NativeContextExtensions<'_>) + Send + Sync>>>,
-> = Lazy::new(|| Mutex::new(None));
+type ExtensionHook = Box<dyn Fn(&mut NativeContextExtensions<'_>) + Send + Sync>;
+
+type EffectsHook = Box<
+    dyn Fn(
+            &mut NativeContextExtensions<'_>,
+            &FunctionValueExtensionAdapter<'_>,
+            &mut TestEffects,
+        ) -> PartialVMResult<()>
+        + Send
+        + Sync,
+>;
+
+static EXTENSION_HOOK: Lazy<Mutex<Option<ExtensionHook>>> = Lazy::new(|| Mutex::new(None));
+
+/// A shared read lock lets runner threads collect effects concurrently.
+static EFFECTS_HOOK: Lazy<RwLock<Option<EffectsHook>>> = Lazy::new(|| RwLock::new(None));
 
 /// Sets a hook which is called to populate additional native extensions. This can be used to
 /// get extensions living outside of the Move repo into the unit testing environment.
@@ -34,8 +51,16 @@ static EXTENSION_HOOK: Lazy<
 ///
 /// Note that the table extension is handled already internally, and does not need to added via
 /// this hook.
-pub fn set_extension_hook(p: Box<dyn Fn(&mut NativeContextExtensions<'_>) + Send + Sync>) {
+pub fn set_extension_hook(p: ExtensionHook) {
     *EXTENSION_HOOK.lock().unwrap() = Some(p)
+}
+
+/// Sets a hook to collect effects, such as events and table changes, from
+/// extensions installed through [`set_extension_hook`].
+pub fn set_effects_hook(hook: EffectsHook) {
+    *EFFECTS_HOOK
+        .write()
+        .expect("no thread panics while holding the effects hook") = Some(hook)
 }
 
 /// Create all available native context extensions.
@@ -50,15 +75,73 @@ pub(crate) fn new_extensions<'a>() -> NativeContextExtensions<'a> {
     e
 }
 
-/// Print the change sets for available native context extensions.
+/// Collects effects from custom native extensions into `effects`.
+pub(crate) fn collect_hooked_effects(
+    extensions: &mut NativeContextExtensions,
+    function_value_extension: &FunctionValueExtensionAdapter,
+    effects: &mut TestEffects,
+) -> PartialVMResult<()> {
+    match &*EFFECTS_HOOK
+        .read()
+        .expect("no thread panics while holding the effects hook")
+    {
+        Some(hook) => hook(extensions, function_value_extension, effects),
+        None => Ok(()),
+    }
+}
+
+/// Takes the table extension's changes, or returns `None` when the
+/// `table-extension` feature is disabled.
 #[allow(unused)]
-pub(crate) fn print_change_sets<W: Write>(
-    w: &mut W,
-    native_extensions: &mut NativeContextExtensions,
-    function_value_extension: &impl FunctionValueExtension,
-) {
+pub(crate) fn take_table_changes(
+    extensions: &mut NativeContextExtensions,
+    function_value_extension: &FunctionValueExtensionAdapter,
+) -> PartialVMResult<Option<TableChangeSet>> {
     #[cfg(feature = "table-extension")]
-    print_table_extension(w, native_extensions, function_value_extension);
+    let changes = Some(
+        extensions
+            .remove::<NativeTableContext>()
+            .into_change_set(function_value_extension)?,
+    );
+    #[cfg(not(feature = "table-extension"))]
+    let changes = None;
+    Ok(changes)
+}
+
+/// Prints the table changes for `--dump`.
+pub(crate) fn print_table_changes<W: Write>(
+    writer: &mut W,
+    changes: &TableChangeSet,
+) -> std::fmt::Result {
+    if !changes.new_tables.is_empty() {
+        writeln!(
+            writer,
+            "new tables {}",
+            changes
+                .new_tables
+                .iter()
+                .map(|(handle, table)| format!("({handle}: {table})"))
+                .join(", ")
+        )?;
+    }
+    if !changes.removed_tables.is_empty() {
+        writeln!(
+            writer,
+            "removed tables {}",
+            changes
+                .removed_tables
+                .iter()
+                .map(|handle| handle.to_string())
+                .join(", ")
+        )?;
+    }
+    for (handle, change) in &changes.changes {
+        writeln!(writer, "for {}", handle)?;
+        for (key, op) in &change.entries {
+            writeln!(writer, "  {:X?} := {:X?}", key, op)?;
+        }
+    }
+    Ok(())
 }
 
 // =============================================================================================
@@ -67,44 +150,6 @@ pub(crate) fn print_change_sets<W: Write>(
 #[cfg(feature = "table-extension")]
 fn create_table_extension(native_extensions: &mut NativeContextExtensions) {
     native_extensions.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
-}
-
-#[cfg(feature = "table-extension")]
-fn print_table_extension<W: Write>(
-    w: &mut W,
-    native_extensions: &mut NativeContextExtensions,
-    function_value_extension: &impl FunctionValueExtension,
-) {
-    let cs = native_extensions
-        .remove::<NativeTableContext>()
-        .into_change_set(function_value_extension);
-    if let Ok(cs) = cs {
-        if !cs.new_tables.is_empty() {
-            writeln!(
-                w,
-                "new tables {}",
-                cs.new_tables
-                    .iter()
-                    .map(|(handle, table)| format!("({handle}: {table})"))
-                    .join(", ")
-            )
-            .unwrap();
-        }
-        if !cs.removed_tables.is_empty() {
-            writeln!(
-                w,
-                "removed tables {}",
-                cs.removed_tables.iter().map(|h| h.to_string()).join(", ")
-            )
-            .unwrap();
-        }
-        for (h, c) in cs.changes {
-            writeln!(w, "for {}", h).unwrap();
-            for (k, v) in c.entries {
-                writeln!(w, "  {:X?} := {:X?}", k, v).unwrap();
-            }
-        }
-    }
 }
 
 #[cfg(feature = "table-extension")]

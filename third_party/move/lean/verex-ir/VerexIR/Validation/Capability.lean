@@ -10,6 +10,7 @@ import VerexIR.Validation.Eliminate
 import VerexIR.Validation.IndexedArena
 import VerexIR.Validation.StaticTyping
 import VerexIR.Validation.TableRoles
+import VerexIR.Relocate
 
 /-!
 # VIR semantic capability preparation
@@ -707,6 +708,9 @@ private def specProjectedAgree (ns : ValidatedNamespace)
      -- A vector reads its elements at projection too.
      | fuel + 1, some (.vector specElement _), some (.vector execElement _) =>
          specProjectedAgree ns specElement execElement fuel
+     -- So does a reference its referent.
+     | fuel + 1, some (.reference specReference), some (.reference execReference) =>
+         specProjectedAgree ns specReference.referent execReference.referent fuel
      | _, _, _ => false) ||
     (isAnyIntegerType ns specType && isAnyIntegerType ns execType) ||
     (match ns.tables.types[execType.index]? with
@@ -1931,6 +1935,65 @@ private def contextTypeHasAbility? (unit : ValidatedUnit) (ns : ValidatedNamespa
     (context : ScanContext) (typeId : TypeId) (ability : Ability) : Bool :=
   typeHasAbility? unit ns context.profile context.generics typeId ability == some true
 
+/-- Whether a type holds a reference, by its structure; a function value's
+type holds none of its parameters' or result's. -/
+def typeHoldsReference (tables : Tables) : Nat → TypeId → Bool
+  | 0, _ => true
+  | fuel + 1, typeId => match tables.types[typeId.index]? with
+    | some (.reference _) => true
+    | some (.vector element _) | some (.typeDomain element) =>
+        typeHoldsReference tables fuel element
+    | some (.tuple elements) => elements.any (typeHoldsReference tables fuel)
+    | some (.resourceDomain _ arguments) =>
+        arguments.any (·.any (typeHoldsReference tables fuel))
+    | some (.nominal _ arguments) => arguments.any fun
+        | .typeArg use => typeHoldsReference tables fuel use.typeId
+        | .const _ | .lifetime _ | .evidence _ => false
+    | some .unit | some .never | some .bool | some .character | some .string | some .bytes
+    | some .address | some .signer | some (.integer ..) | some .range | some .eventStore
+    | some .stateDomain | some (.function ..) | some (.typeParameter _) | some (.profile _)
+    | none => false
+
+/-- The display name of a qualified reference's target. -/
+private def referenceName (ns : ValidatedNamespace) (reference : QualifiedRef) : String :=
+  match ns.tables.names[reference.name.index]? with
+  | some qualified => qualified.name
+  | none => s!"#{reference.name.index}"
+
+/-- A Move type argument holds no reference, at any depth: Move has no
+reference type arguments, and the borrow analysis treats a value of a Move
+type parameter, or of a Move nominal type at any arguments, as loan-free on
+that ground (`typeMayContainReference` in `Validation/Borrowing.lean`). `site`
+names the instantiation. -/
+private def moveTypeArgumentDiagnostics (ns : ValidatedNamespace) (loc : LocId)
+    (site : String) (arguments : Array GenericArgument) : Array Diagnostic :=
+  if ns.profile != some .move then #[] else
+  arguments.zipIdx.foldl (init := #[]) fun ds (argument, index) => match argument with
+    | .typeArg value =>
+        if typeHoldsReference ns.tables (ns.tables.types.size + 1) value.typeId then
+          ds.push <| .at "VIR-MOVE-REFERENCE-TYPE-ARGUMENT"
+            s!"unsupported construct: type argument {index} of {site} holds a reference; \
+              Move type arguments cannot be references" loc
+        else ds
+    | .const _ | .lifetime _ | .evidence _ => ds
+
+/-- The declaration whose generic binders an operation's instantiation
+binds, as the site that instantiation names; `none` where the instantiation
+binds no declaration's binders but annotates the operation. -/
+private def operationSite? (ns : ValidatedNamespace) : Operation → Option String
+  | .call (.function reference) => some s!"the call of `{referenceName ns reference}`"
+  | .call (.closure reference _) => some s!"the closure of `{referenceName ns reference}`"
+  | .call (.constructor reference _) => some s!"the constructor `{referenceName ns reference}`"
+  | .call (.destructor reference _) =>
+      some s!"the destructor of `{referenceName ns reference}`"
+  | .specification (.functionCall reference _) =>
+      some s!"the call of `{referenceName ns reference}`"
+  | .specification (.lemma reference _) =>
+      some s!"the application of `{referenceName ns reference}`"
+  | .call .invoke | .call (.extension ..) | .global _ | .specification _ | .move _ | .copy _
+  | .borrow .. | .read _ | .write _ | .primitive _ | .reference _ | .data _ | .assert
+  | .drop _ | .profile .. => none
+
 private def genericAbilityDiagnostics (unit : ValidatedUnit) (sourceNs : ValidatedNamespace)
     (profile : Profile) (sourceGenerics : Array GenericBinder) (description : String)
     (binders : Array GenericBinder) (arguments : Array GenericArgument)
@@ -1959,6 +2022,8 @@ private def fieldRequirementForDeclaredAbility (profile : Profile)
 
 private def structAbilityDiagnostics (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : StructDecl) : Array Diagnostic :=
+  -- A spec variable's memory never exists at run time.
+  if declaration.isGhostMemory then #[] else
   let profile := ns.profile.getD .move
   let fields := declaration.fields ++ declaration.variants.flatMap (·.fields)
   declaration.abilities.foldl (fun ds declaredAbility =>
@@ -2091,7 +2156,7 @@ this path, so the interpreter-facing unit is unchanged; global operations
 still require their explicit resource argument. -/
 private def inferredInstantiationDiagnostics (unit : ValidatedUnit)
     (ns : ValidatedNamespace) (context : ScanContext) (loc : LocId)
-    (description : String) (targetNs : ValidatedNamespace) (profile : Profile)
+    (description : String) (site : String) (targetNs : ValidatedNamespace) (profile : Profile)
     (binders : Array GenericBinder)
     (pairs? : Option (Array (TypeId × TypeId))) : Array Diagnostic :=
   match pairs? with
@@ -2099,6 +2164,7 @@ private def inferredInstantiationDiagnostics (unit : ValidatedUnit)
       s!"no {description} matches the call's argument and result types"
   | some pairs => match Unify.solveCall ns context.logical targetNs binders loc pairs with
       | .solved inferred =>
+          moveTypeArgumentDiagnostics ns loc site inferred ++
           genericAbilityDiagnostics unit ns profile context.generics description binders
             inferred (logical := context.logical)
       | .mismatch => typeMismatch loc
@@ -2125,7 +2191,7 @@ private def directCallTypeDiagnostics (mode : PreparationMode) (unit : Validated
             declaration.signature.parameters.size arguments.size
         else
           profileErrors ++ inferredInstantiationDiagnostics unit ns context loc
-            "function instantiation" targetNs declaration.profile
+            "function instantiation" s!"the call of `{referenceName ns reference}`" targetNs declaration.profile
             declaration.signature.generics
             (callOccurrencePairs? ns arguments declaration.signature.parameters resultType
               declaration.signature.results)
@@ -2165,7 +2231,8 @@ private def specFunctionCallTypeDiagnostics (mode : PreparationMode) (unit : Val
             declaration.signature.parameters.size arguments.size
         else
           profileErrors ++ inferredInstantiationDiagnostics unit ns context loc
-            "specification function instantiation" targetNs declaration.profile
+            "specification function instantiation"
+            s!"the call of `{referenceName ns reference}`" targetNs declaration.profile
             declaration.signature.generics
             (callOccurrencePairs? ns arguments declaration.signature.parameters resultType
               declaration.signature.results)
@@ -2252,8 +2319,10 @@ private def applyFormulaDiagnostics (ns : ValidatedNamespace) (loc : LocId) :
           "an `apply` step is a lemma instance under implications and universal quantifiers" loc]
 
 /-- Whether a value of a type holds a reference. A function value holds
-none, since its captures cannot; a Move nominal type or type argument is
-never one. -/
+none, since its captures cannot. A Move nominal type or type parameter never
+holds one: validation rejects a Move declaration with a reference field
+(`moveReferenceFieldDiagnostics` in `Validation/Check.lean`) and a Move type
+argument that holds a reference (`moveTypeArgumentDiagnostics`). -/
 private def valueHoldsReference (ns : ValidatedNamespace) : Nat → TypeId → Bool
   | 0, _ => true
   | fuel + 1, typeId =>
@@ -2317,7 +2386,8 @@ private def closureTypeDiagnostics (mode : PreparationMode) (unit : ValidatedUni
                   functionResult declaration.signature.results).map fun pairs =>
                 pairs ++ functionArguments.zip (remaining.map (·.typeUse.typeId))
               abilityErrors ++ inferredInstantiationDiagnostics unit ns context loc
-                "closure instantiation" targetNs declaration.profile
+                "closure instantiation" s!"the closure of `{referenceName ns reference}`"
+                targetNs declaration.profile
                 declaration.signature.generics pairs?
           else
             let genericErrors := genericInstantiationDiagnostics loc "closure instantiation"
@@ -3495,11 +3565,17 @@ mutual
           | .resourceDomain name arguments =>
               arguments.toArray.flatten.foldl
                   (fun ds type => ds ++ scanType registry unit mode ns loc type generics (logical := logical)) #[] ++
+                typingGate mode (moveTypeArgumentDiagnostics ns loc
+                  s!"the resource domain of `{(ns.tables.names[name.index]?).map (·.name) |>.getD ""}`"
+                  (arguments.toArray.flatten.map fun typeId => .typeArg { loc, typeId })) ++
                 resourceDomainTypeDiagnostics mode unit ns generics loc name arguments
           | .nominal name arguments =>
               let argumentErrors := arguments.foldl
                 (fun ds argument => ds ++ scanGenericArgument registry unit mode ns loc argument
                   generics (logical := logical)) #[]
+              let argumentErrors := argumentErrors ++ typingGate mode
+                (moveTypeArgumentDiagnostics ns loc
+                  s!"the type `{(ns.tables.names[name.index]?).map (·.name) |>.getD ""}`" arguments)
               let targetErrors := match ns.tables.names[name.index]? with
                 | none => #[.at "VIR-SEMANTICS-INTERNAL"
                     "validated nominal type name is missing" loc]
@@ -3552,7 +3628,9 @@ mutual
       (mode : PreparationMode) (ns : ValidatedNamespace) (loc : LocId)
       (trait : TraitRef) (generics : Array GenericBinder := #[]) : Array Diagnostic :=
     let argumentErrors := trait.arguments.foldl
-      (fun ds argument => ds ++ scanGenericArgument registry unit mode ns loc argument generics) #[]
+      (fun ds argument => ds ++ scanGenericArgument registry unit mode ns loc argument generics) #[] ++
+      typingGate mode (moveTypeArgumentDiagnostics ns loc
+        s!"the trait `{referenceName ns trait.trait}`" trait.arguments)
     let targetErrors := match resolveTraitDeclaration? unit ns trait.trait with
       | none => if mode matches .typing then #[] else
           #[.at "VIR-SEMANTIC-TARGET" "trait target does not resolve" loc]
@@ -3645,6 +3723,9 @@ mutual
               let ds := instantiations.foldl (fun ds value =>
                 ds ++ scanGenericArgument registry unit mode ns pattern.loc value
                   context.generics (logical := context.logical)) ds
+              let ds := ds ++ typingGate mode (moveTypeArgumentDiagnostics ns pattern.loc
+                s!"the constructor pattern `{(ns.tables.names[name.index]?).map (·.name) |>.getD ""}`"
+                instantiations)
               fields.foldl (fun ds child =>
                 ds ++ scanPattern registry unit mode ns context child) ds
           | .literal value => scanConst registry unit mode ns pattern.loc value ++
@@ -3985,6 +4066,11 @@ mutual
               let ds := instantiations.foldl (fun ds value =>
                 ds ++ scanGenericArgument registry unit mode ns expression.loc value
                   context.generics (logical := context.logical)) ds
+              let ds := match operationSite? ns operation with
+                | some site =>
+                    ds ++ typingGate mode (moveTypeArgumentDiagnostics ns expression.loc site
+                      instantiations)
+                | none => ds
               let observesProjection := allowNonCopyPlaceRead && (operation matches
                 .data (.select ..) | .primitive .index | .primitive .copyValue |
                 .reference .dereference)
@@ -4323,11 +4409,9 @@ does. -/
 private def stateLabelDiagnostics (ns : ValidatedNamespace) (contract : FunctionContract) :
     Array Diagnostic := Id.run do
   let mut ds : Array Diagnostic := #[]
-  let mut bound : Array Nat := #[]
-  let mut defined : Array Nat := #[]
-  let mut used : Array (Nat × LocId) := #[]
-  let labelName (label : Nat) : String :=
-    (ns.tables.names[label]?.map (·.name)).getD s!"{label}"
+  let mut bound : Array NameId := #[]
+  let mut defined : Array NameId := #[]
+  let mut used : Array (NameId × LocId) := #[]
   for condition in contract.conditions do
     let mut pending := #[condition.expression]
     let mut fuel := ns.expressions.size + 1
@@ -4368,12 +4452,15 @@ private def stateLabelDiagnostics (ns : ValidatedNamespace) (contract : Function
               if let some label := range.post then defined := defined.push label
       | _ => pure ()
   for (label, loc) in used do
-    if label ≥ ns.tables.names.size then
-      ds := ds.push (.at "VIR-SEMANTIC-STATE-LABEL" s!"state label {label} is not a name of the unit" loc)
-    else if !bound.contains label && !defined.contains label then
+    match ns.nameOf label with
+    | none =>
       ds := ds.push (.at "VIR-SEMANTIC-STATE-LABEL"
-        s!"state label `{labelName label}` is neither bound by a quantifier over the state domain nor defined by a state-change predicate"
-        loc)
+        s!"state label {label.index} is not a name of the unit" loc)
+    | some name =>
+      if !bound.contains label && !defined.contains label then
+        ds := ds.push (.at "VIR-SEMANTIC-STATE-LABEL"
+          s!"state label `{name.name}` is neither bound by a quantifier over the state domain nor defined by a state-change predicate"
+          loc)
   return ds
 
 private def scanContract (registry : SemanticsRegistry) (unit : ValidatedUnit)
@@ -4674,8 +4761,11 @@ private def scanNamespace (registry : SemanticsRegistry) (unit : ValidatedUnit)
   functionErrors ++ constantErrors ++ structErrors ++ associatedItemErrors ++ traitErrors ++
     implementationErrors ++ logicalDeclErrors ++ intrinsicErrors ++ metadataErrors
 
+/-- Preparation's diagnostics. The scan reads one table space, so it runs over
+the unit with every body numbered in the unit's tables. -/
 private def prepareDiagnostics (registry : SemanticsRegistry) (unit : ValidatedUnit)
     (mode : PreparationMode) : Array Diagnostic :=
+  let unit := unit.inUnitIds
   dedupDiagnostics <| unit.namespaces.foldl (fun ds ns =>
       ds ++ scanNamespace registry unit mode ns)
     (registryDiagnostics registry unit) ++
@@ -4712,7 +4802,7 @@ def sharedOperand (ns : ValidatedNamespace) (expressionAt : Nat → Option Expr)
     (typeAt : Nat → Option Ty) (arguments : Array ExprId) : Bool :=
   match arguments[0]? with
   | some id => match expressionAt id.index with
-    | some expression => isSharedReferenceType ns expression.typeId typeAt
+    | some expression => isSharedReferenceType ns (ns.typeId expression.typeId) typeAt
     | none => false
   | none => false
 
@@ -5070,8 +5160,8 @@ def sharedDereferenceSites (unit : ValidatedUnit) (ns : ValidatedNamespace)
 
 /-- The places of a namespace that dereference a shared reference, indexed. -/
 def sharedDereferenceIndex (unit : ValidatedUnit) (namespaceId : NamespaceId) : KeyTree Unit :=
-  let places := unit.borrowCertificates.toList.foldl (init := []) fun places certificate =>
-    if certificate.namespaceId != namespaceId then places else
+  let certificates := ((unit.namespaces[namespaceId.index]?).map (·.borrowCertificates)).getD #[]
+  let places := certificates.toList.foldl (init := []) fun places certificate =>
     certificate.sharedDereferences.toList.foldl (init := places) fun places place =>
       (place.index, ()) :: places
   let distinct := (sortByIndex places).foldl (init := []) fun distinct entry =>

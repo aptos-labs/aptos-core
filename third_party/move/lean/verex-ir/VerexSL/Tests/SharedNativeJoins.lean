@@ -20,7 +20,7 @@ error: verex verification failed: the automatic verification of `wrong` failed; 
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
-#guard_msgs in
+#guard_msgs (drop info, all) in
 verex module 0x42::shared_native_joins where
   enum Optional {T} has Copy, Drop where
     | None

@@ -37,36 +37,27 @@ verify test_verify_drain_symbolic by
   }
 
   on aborts_if 1, ensures 1, ensures 2, invariant 2 entry { }
+  on _ { }
 
 -- The walk writes each value in place: the write hits the key at the walk's
 -- position, so the keys and the size are unchanged, and the invariant over
 -- the earlier positions carries over.
 verify test_verify_iter_walk_mut_symbolic by
-  on invariant 1 step, invariant 2 step, invariant 4 step, invariant 5 step {
+  on invariant 1 step, invariant 2 step, invariant 3 step, invariant 4 step,
+    invariant 5 step, invariant 6 step {
     split it
     split iter_next_result
     let k := spec_key_at(m, count)
     apply lemma_contains_key_key_at(m, count)
     apply lemma_len_set(m, k, 7)
-  }
-  on invariant 3 step {
-    split it
-    split iter_next_result
-    let k := spec_key_at(m, count)
-    apply lemma_contains_key_key_at(m, count)
-    apply lemma_len_set(m, k, 7)
-    apply lemma_key_at_set_present(m, k, 7, i)
-  }
-  on invariant 6 step {
-    split it
-    split iter_next_result
-    let k := spec_key_at(m, count)
-    apply lemma_contains_key_key_at(m, count)
-    apply lemma_len_set(m, k, 7)
-    apply lemma_key_at_set_present(m, k, 7, i)
-    apply lemma_get_set(m, k, 7, spec_key_at(m, i))
-    apply lemma_key_at_eq_iff(m, i, count)
-    split i == count
+    on invariant 3 step, invariant 6 step {
+      apply lemma_key_at_set_present(m, k, 7, i)
+    }
+    on invariant 6 step {
+      apply lemma_get_set(m, k, 7, spec_key_at(m, i))
+      apply lemma_key_at_eq_iff(m, i, count)
+      split i == count
+    }
   }
   on invariant 4 entry, invariant 5 entry {
     split internal_new_begin_iter_result
@@ -81,6 +72,7 @@ verify test_aborts_if_new_from_2 by
 
 verify test_verify_iter_remove_shift_at_position by
   on ensures 5, ensures 1, aborts_if 1 { }
+  on _ { }
 
 verify test_verify_iter_borrow_mut_at_position by
   on ensures 2 {
@@ -102,6 +94,7 @@ verify test_verify_iter_borrow_mut_at_position by
     let k := spec_key_at(m, i)
     apply lemma_get_set(m, k, 7, k)
   }
+  on _ { }
 
 verify test_verify_iter_borrow_mut_symbolic by
   on ensures 1 {
@@ -129,9 +122,11 @@ verify test_verify_iter_borrow_mut_symbolic by
     apply lemma_rank_lt_len(m, k)
     apply lemma_rank_nonneg(m, k)
   }
+  on _ { }
 
 verify test_verify_iter_add_middle_symbolic by
   on ensures 2, ensures 4, ensures 5, aborts_if 1 { }
+  on _ { }
 
 verify test_verify_iter_add_append_symbolic by
   on _ {
@@ -151,3 +146,55 @@ verify ground_enum_123 by
     apply lemma_key_at_rank(map, 2)
     apply lemma_key_at_rank(map, 3)
   }
+
+verify test_verify_remove_shift_symbolic by
+  on ensures 2 {
+    apply lemma_contains_key_remove(m, k, k)
+  }
+  on ensures 4 {
+    let probe := spec_key_at(m', i)
+    apply lemma_contains_key_key_at(m', i)
+    apply lemma_contains_key_remove(m, k, probe)
+    apply lemma_get_remove(m, k, probe)
+  }
+  on _ { }
+
+verify test_verify_lower_bound_gap_symbolic by
+  on ensures 1 {
+    split internal_lower_bound_result
+    apply lemma_contains_key_key_at(m, internal_lower_bound_result.index)
+    split k == spec_key_at(m, internal_lower_bound_result.index)
+  }
+  on _ { }
+
+-- Apply the sum recurrence at the successor position. The prepared branch
+-- uses the same certified map; align its named inhabitant wrapper and use
+-- the iterator's successor equation before substituting the sum invariant.
+verify test_verify_iter_sum_symbolic by
+  on invariant 3 step {
+    split it
+    split iter_next_result
+    apply spec_om_sum_upto.unfold(m, count + 1)
+    lean =>
+      verex_prepare
+      all_goals
+        simp only [NTy.inhabitant] at *
+        try simp only [iter_next_result_0_Position_eq, Int.add_sub_cancel] at fact_2_0
+        erw [← invariant_3] at fact_2_0
+        simp only [iter_borrow_frame] at fact_2_0 ⊢
+        exact fact_2_0.symm
+  }
+  on invariant 3 entry {
+    apply spec_om_sum_upto.unfold(m, 0)
+  }
+  on invariant 2 entry, invariant 4 entry {
+    split internal_new_begin_iter_result
+  }
+  on invariant 2 step, invariant 4 step {
+    split it
+    split iter_next_result
+  }
+  on ensures 1 {
+    split it
+  }
+  on _ { }

@@ -833,7 +833,7 @@ theorem FrameInstantiation.call {unit : ValidatedUnit} {callerNs targetNs : Vali
         instance_ ∈ callerRequired ∧
         StaticTyping.mentionsLifetimeParameter callerNs (callerNs.tables.types.size + 1)
           instance_ = false)
-    (resolved : StaticTyping.resolveArguments callerNs callerEnv instantiations = some arguments)
+    (resolved : StaticTyping.resolveArgumentsAt callerNs callerEnv instantiations = some arguments)
     (kinds : ∀ (index : Nat) (binder : GenericBinder) (argument : GenericArgument),
       generics[index]? = some binder → instantiations[index]? = some argument →
         (binder.kind = .typeArg ↔ ∃ value, argument = .typeArg value))
@@ -870,7 +870,7 @@ theorem FrameInstantiation.call {unit : ValidatedUnit} {callerNs targetNs : Vali
           obtain ⟨binder, binder_eq⟩ : ∃ binder, generics[index]? = some binder :=
             ⟨_, Array.getElem?_eq_getElem bound⟩
           have kind := (kinds index binder _ binder_eq argument_eq).mpr ⟨original, rfl⟩
-          simp only [StaticTyping.resolveArguments] at resolved
+          simp only [StaticTyping.resolveArgumentsAt] at resolved
           obtain ⟨semantic, semantic_eq, image⟩ := Array.mapM_getElem? resolved argument_eq
           simp only [Functor.map, Option.map_eq_some_iff] at image
           obtain ⟨type, type_eq, rfl⟩ := image

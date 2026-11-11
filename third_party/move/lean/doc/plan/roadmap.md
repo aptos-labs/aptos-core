@@ -18,17 +18,50 @@ Designs: [`denotation.md`](../designs/denotation.md),
   `test_verify_modify`; the cost of generic map targets; reframe lemmas for
   enum and table fields of a parameter's type, and an opaque specification
   function read through the runtime frame for an invariant applying it to
-  move; the transport of a definition taking types but no frame (SC2);
-  addresses as `u256` values.
+  move; the transport of a definition taking types but no frame (SC2).
+- **Address representation.** Addresses are strings in the runtime and the
+  denotation (`RuntimeValue.address`, `NTy.address`); the Move Prover's are
+  integers in `0 .. 2^256`. Integers (`u256` values) would remove the second
+  spelling of an address key's `DecidableEq` instance ("Key-instance
+  spelling" below) and bring addresses within reach of the arithmetic
+  deciders.
+- **Frames of loops.** A loop writing the store keeps no frame, where the
+  Prover havocs only what the loop modifies; one that only reads it keeps it
+  whole. A function updating a spec variable in a loop therefore has the
+  frame `modifies *`, and any function's closed frame over a loop's real
+  writes fails. A frame per loop, from what its body writes, removes both.
+- **A generic callee without a contract takes its caller off the Given
+  route.** `givenUnsupported?` (`VerexSL/Verify/Given.lean`) reports "calls
+  to callees without a contract", and the caller is verified concretely with
+  the callee inlined ([`given-parameters.md`](../designs/given-parameters.md),
+  "Which members take the route, and what happens when they cannot"). A
+  derived summary cannot fill the gap: summaries are the concrete route's,
+  and the Given branch of `verifyMember` (`VerexSL/Verify/Members.lean`)
+  excludes a member being summarized. A summary derived over a Given
+  interpretation would keep such callers on the route; it is the same work
+  as the generic-signature callees of "Cost" below.
 - **Quantifier syntax aligned with Move.** VerexSL's `∀ (i : T), P` should
   move toward Move's spelling, `forall i: T @ P`, with `forall` and `@`
   also accepted as symbol tokens.
-- **Function values as native data**: [`native-function-values.md`](native-function-values.md),
-  steps 2b and 3. Ordered with the proof language
-  ([`proof-language.md`](proof-language.md)): that plan's L0–L2
-  interleaved with steps 2b and 3, then the language's function-value
-  constructs (its L4). L0's keys of calls are done; its path decisions and
-  selectors are next.
+- **Function values as native data, remaining items**
+  ([`higher-order-functions.md`](../designs/higher-order-functions.md),
+  "Function values as native data"): the invocation equations of closure
+  sites with type arguments, which keep `functionOfGeneric` and its
+  invocation rule; captures holding a function value under a vector or a
+  map, which the generator rejects because such a carrier's certificate is a
+  proof over its elements — the decided remedy is to drop that certificate
+  and make the bound a leaf fact, as an integer's range is; and the sharing
+  marks of `NTy.function`, which should be derived data of the target.
+- **Behaviour facts of closures are not resolved against the target's
+  contract.** A closure's or function literal's behaviour facts at entries
+  (`AbortsOfEntries`, `EnsuresOfEntries`, `AtEntries … CallAborts`,
+  `KeepsMemoryAtOf`) stay as they are stated, while the goal states the same
+  behaviour at other entries or through the target's contract, and nothing
+  relates the two. At 821af8289ba against main: 46 headlines (31 clauses),
+  17 functions, 10 tests. Reproducer:
+  `verex-e2e-tests/VerexE2ETests/Check/Closures/WovenBehaviors.lean`,
+  `leading`, whose leaf is
+  `EnsuresOfEntries (closureMeaning) (site0 (x)) (y) … ↔ EnsuresOfEntries (closureMeaning) (site2 ()) (x, y) …`.
 - **Turned off, to fix.** `pool_u64::deduct_shares` sets `pragma verex_verify = false`: the
   obligation that a removed shareholder is no longer in `shareholders` (a
   quantified read after `eraseIdx`) falls to the general pipeline, which
@@ -60,7 +93,7 @@ Designs: [`denotation.md`](../designs/denotation.md),
   discrimination-tree keys and breaks automatic proofs (`bitwise_table`,
   `data_invariant_in_loop`); declaring it an instance does not help.
   Decided for authored proofs: the proof language's elaborator spells the
-  instance as the leaf does ([`proof-language.md`](proof-language.md),
+  instance as the leaf does ([`proof-language.md`](../designs/proof-language.md),
   "Semantics and lowering", 2); until then a script works on the leaf's
   own terms (as `pool_u64`'s `redeem_shares` does). Open for the normal
   form: whether the synthesized instance at every closed concrete type,
@@ -71,17 +104,78 @@ Designs: [`denotation.md`](../designs/denotation.md),
   below roughly 1.9G heartbeats including authored proofs. Then the levers of
   [`performance.md`](../designs/performance.md), "Open levers", in its order,
   postponed for now; the next is fact dependencies of normalized subterms
-  (Preparation, 6), then fail fast and ground evaluation of literal leaves,
-  and the opt-in join scheduler (`verex.sharedContinuations`) enabled for
-  automatic verification or removed. Debts:
+  (Preparation, 6), then fail fast and ground evaluation of literal leaves.
+  First: data and global invariants,
+  [`data-and-global-invariants.md`](data-and-global-invariants.md).
+  Debts:
   [`measurement-debts.md`](../status/measurement-debts.md).
+  - **Callee summaries do not pay for themselves on a fresh run**
+    ([`performance.md`](../designs/performance.md), "Callee summaries"; the
+    measurements are in [`transitions.md`](transitions.md), "Verification
+    cost and callee summaries"). Each item needs a design decision before
+    code, in this order:
+    1. *Application cost of four or more conjuncts.* Applying a large
+       summary can cost more than inlining the callee. Measure which of
+       `normalizeAround`, `introNP` and `releaseContinuations` dominates the
+       per-conjunct loop, then design; without this, more coverage can cost
+       more.
+    2. *Derivations are not stored in compiled namespaces.* Every module's
+       process derives its callees' summaries again, which is what makes
+       summaries a net loss.
+    3. *Generic-signature and loop callees get no summary.* The largest
+       lever left: a summary quantified over the callee's instantiation, and
+       loop invariants carrying provenance.
+    4. *No summary inside a shared-fold region* (`activeSummary`), the
+       largest group of skipped call sites. Some of these callees have no
+       summary either; count them before designing.
+    5. *Call sites skipped because the call lacks a hypothesis the summary
+       needs* (`error::invalid_state`, `invalid_argument`); not examined.
+    6. *The leaf side*, after the walk: opening only what a leaf inspects,
+       guarded facts, the memory frame as a common fact at joins.
+  - **Shared work across targets and leaves.** Closed normalized call
+    equations are reused only within a target; sharing them across targets
+    must keep the argument-shape and family-transport key. The release of a
+    call's continuation is not measured separately from its no-held-head
+    fast path. The deciders' successes and failures per leaf are not
+    profiled, which any change of their order or a cheaper applicability
+    check needs first. Relevance-directed preparation is unmeasured: only a
+    minority of prepared hypotheses are used by the proof, which does not
+    imply a proportional saving; a closure from the goal and the names the
+    proof reads must keep the omitted facts explicitly reachable.
+  - **OrderedMap costs two to four times main per target.** Of the 17
+    targets of `verex-e2e-tests/VerexE2ETests/Check/Examples/OrderedMap.lean`,
+    measured uncapped at 821af8289ba against main 7a89e8311c5: `empty` 2.7×,
+    `borrow_key_at` 3.0×, `lower_bound` 2.0×, `add` 3.0× (243M),
+    `remove` 2.4×, `missing_scenario` 3.4×, `absent_lookup_scenario` 3.0×
+    (170M), `duplicate_scenario` 3.4× (199M), `bool_key_scenario` 4.3×
+    (377M), `ordering_scenario` 3.5× (419M), `lookup_scenario` 3.6× (466M);
+    `length`, `lower_bound_loop`, `contains` and `borrow` are within 1.0–1.6×.
+    So `add` and four scenarios exceed the end-to-end driver's 180M
+    per-target cap, and `remove_scenario` and `remove_edges_scenario` (165M
+    and 202M at main) exceed their own `pragma heartbeats = 300` even
+    without a cap. The file passes at main. The cause is not localized
+    beyond the carriers commit; neither the removal nor the nominal
+    declaration work is known to own it. Reproducer: the file under
+    `-DmaxHeartbeats=180000 -Dweak.verex.verifyHeartbeats=180000`.
+  - **Failures that are only cost.** Some failures against main close with
+    the leaf budget doubled (`-Dweak.verex.leafHeartbeats=40000`): at
+    821af8289ba, 13 headlines, 8 functions, 6 tests; three functions verify
+    whole (`generic_function_literals` `via`, `spec_fun_cross_resource`
+    `test_behavior_cross_resource`, `uninterpreted_spec_fun_congruence`
+    `scramble_all`), the rest are single clauses in functions failing for
+    other causes. 3bd43a06681 was measured to remove `scramble_all`'s
+    errors and half of `spec_fun_cross_resource`'s. Each is a leaf whose
+    decision got more expensive under the carriers, not a missing rule.
+    Reproducer: `verex-e2e-tests/VerexE2ETests/SourceVerify/generic_function_literals.move`,
+    `via`, with and without the doubled leaf budget.
 - **Assumptions.** Discharge the hypotheses in
   [`assumptions.md`](../status/assumptions.md): the compilation agreement
   (`compileFunction_agrees`, `compileFunction_least_cycle`, which need a
   continuity proof over the denotation), the connection between native
   storage and verification values, the remaining global-preservation
-  hypotheses, `FailuresIntegral`, `RunsAgree` and `OwnersRepresentable` for
-  units whose owners are all tables.
+  hypotheses, `FailuresIntegral`, `RunsAgree`, `OwnersRepresentable` for
+  units whose owners are all tables, and `DataInvariantsSatisfiable`, which
+  a witness per declaration would discharge.
 - **Denotation coverage not carried.** Signed bitwise operations, `bytes`
   and fixed-length vectors, unspecified pure callees used as summaries,
   references inside an aggregate, range patterns over characters; generics:
@@ -94,6 +188,14 @@ Designs: [`denotation.md`](../designs/denotation.md),
   is costly: target relevant patterns and share preparation without
   enlarging budgets. Conditional self-referential equations cannot drive
   recursive simplification.
+  A loop invariant `∀ j < i, …` over a vector is not instantiated at the
+  element the body observes (`v.values[i]? = some val`), so the iteration
+  leaf lacks the invariant at `j = i`; the instantiation of a *data*
+  invariant at an observed element (`observedOwnInstances`) does not cover a
+  loop invariant. At 821af8289ba against main: 23 headlines (18 clauses),
+  7 functions in `vector_hofs_for_each` and `vector_hofs_mut_receiver`.
+  Reproducer: `move-prover/tests/sources/functional/closures/inline/vector_hofs_for_each.move`,
+  `increment_all`.
 - **Abstract maps (A4).** `big_ordered_map`'s use-case tests and their cost;
   the construction, representation-reading and identity-update diagnostics;
   an equation between a nominal literal and a model operation projected
@@ -138,12 +240,26 @@ Designs: [`denotation.md`](../designs/denotation.md),
 
 Design: [`relocatable-namespaces.md`](../designs/relocatable-namespaces.md).
 
+- **R2, compiled namespaces everywhere.** `scripts/verify-modules.py` compiles a
+  package's namespaces to `.olean` files and each module imports them. Open: the
+  Rust driver's pass over crates (the same `compileNamespace`), and `verex-move
+  verify <package>` and `move prove --lean`, which still elaborate all in one
+  rendering.
 - **R3, proof reuse.** An opaque callee of another module is verified again
   in every importer, and every linked module's unit certificates are checked
   again (7.5 s for a client of `ordered_map`). Needs the semantics invariant
   under consistent renumbering, or semantics over namespace-local identities.
 - **R4, shipped namespaces.** The exchange format carries relocatable
   namespaces so a frontend ships a precompiled package.
+- **What a module is verified against depends on the export.** A target's
+  rendering imports every namespace rendered before it in its own export,
+  because those decide which modules' invariants its unit links
+  (`invariantRelatedModules`). So a module rendered after it, whose
+  invariant reads memory the target writes, is not linked, and the function
+  is verified against that invariant in that module's own command instead,
+  which the rendering must therefore elaborate. Compiled namespaces keep
+  this. The fix is a package-level memory summary, computed before any
+  target, that makes the related set a function of the package.
 
 ## 3. The Move standard library as the corpus
 
@@ -157,8 +273,18 @@ Design: [`source-verification.md`](../designs/source-verification.md).
 
 Design: [`vir-design.md`](../designs/vir-design.md).
 
-- The checked trait-selection evidence table (also blocking the Rust
-  frontend).
+- The checked trait-selection evidence table, associated-item
+  normalization and dictionary semantics (`EvidenceId` is an opaque slot),
+  before trait calls are interpreted or trait contracts transfer proofs
+  (also blocking the Rust frontend).
+- **Dependency interfaces as checked data.** A unit holds one `Tables`
+  snapshot with a declared interface for every external import. Dependency
+  interfaces (exported declarations, signatures, visible contracts,
+  intrinsic declarations; [`vir-design.md`](../designs/vir-design.md),
+  "Compilation units and dependencies") are not resolved authoritatively
+  across namespaces, so dependency signatures or bodies cannot take part in
+  typing, interpretation or verification. Changes `Validation/Resolve.lean`
+  and `Validation/Link.lean`.
 - The certification pass that turns `prepare*` into pure mode filters.
 - Borrow checking: general non-lexical loan death, dependency and unknown
   aggregate alias propagation, nominal variance, use-site region solving.
@@ -182,9 +308,15 @@ Design: [`vir-design.md`](../designs/vir-design.md).
 
 Design: [`elaboration-design.md`](../designs/elaboration-design.md).
 
-- The rest of the metatheory of the big-step semantics: determinism,
-  completeness of the interpreter up to fuel, and no-stuck for prepared
-  invocations.
+- No-stuck for prepared invocations, the open part of the big-step
+  metatheory (determinism and completeness of the interpreter up to fuel are
+  proved, `Proofs/Completeness.lean`).
+- **Stated obligations without a theorem**
+  ([`elaboration-design.md`](../designs/elaboration-design.md), "Correctness
+  obligations"): Move abort finalization rolls back exactly the required
+  state; VIR → XIR lowering preserves outcomes (`VerexMove/Xir/Lower.lean`);
+  interpreter outcomes, errors and generated obligations keep their VIR
+  locations. None is a theorem, so a claim resting on them is unproved.
 - The unsupported primitive and reference subset, trait and predicate
   satisfaction, non-nominal whole-unit type well-formedness, the remaining
   declaration families.
@@ -232,6 +364,32 @@ Design: [`rust-mir-design.md`](../designs/rust-mir-design.md); proposal
   selection stays conservative); M4 drops and panics: cleanup edges,
   `Resume`, effectful drop glue and drop flags are rejection boundaries
   today; M5 the unsafe profile; M6 library models; M7 alignment proofs.
+- Milestone contents the design no longer spells out: M0 is the exporter
+  and import contract; M1.5 build integration with a managed toolchain. M3
+  also covers moves and initializedness in the VIR borrow checker, with
+  rustc's borrow check kept as admission evidence and differential oracle,
+  and positive/negative agreement tests against Rust execution. M4 covers
+  `panic=abort` only; unwinding and `catch_unwind` need their own approved
+  milestone. M6 is reference-bearing values and interior mutability beyond
+  library models: references nested in products and ADTs (the denotation
+  rejects a reference inside an aggregate), signature region relationships
+  at modular boundaries, and an abstract `RefCell` store with dynamic borrow
+  state and guard drop ([`rust-mir-design.md`](../designs/rust-mir-design.md),
+  "Interior mutability and `RefCell`"); it needs the two-phase and
+  interior-mutability design of §4 first. M7: a theorem that generic
+  type/const/evidence instantiation preserves function meaning, so generic
+  theorems transfer to concrete calls, and import alignment composed with
+  `f.verified` into a theorem about the Rust MIR body.
+- Mapper forms still rejected: symbolic const-dependent types; destructive
+  and provenance administration, pointer-alignment assertions and reachable
+  `unreachable` blocks (M4 for destruction and cleanup, M5 for retag,
+  provenance and alignment).
+- Function values in Rust: the native model of
+  [`higher-order-functions.md`](../designs/higher-order-functions.md),
+  "Function values as native data", read for Rust — a closure type as a
+  struct of its upvars, `dyn Fn*` as the link set's closure structs plus
+  `foreign`, function pointers as nullary constructors per target and
+  instantiation — is designed and not implemented.
 
 ## 8. Surface and backends
 
@@ -253,6 +411,11 @@ Designs: [`verex-sl.md`](../designs/verex-sl.md), [`vir-design.md`](../designs/v
   corpus-wide round trips.
 - A compiler-correctness theorem connecting source verification to the
   emitted bytecode.
+- VerexSL type spellings `EventStore`, `TypeDomain<T>`, `ResourceDomain<R>`
+  and `profile_type[p, tag, payload]` are in the `verex-sl.md` grammar but
+  have no parser keyword, and the printer rejects them (`VerexSL/Print.lean`),
+  so units with such types cannot round-trip through VerexSL. Changes
+  `VerexSL/Syntax.lean`, `Elab.lean`, `Print.lean`.
 
 ## 9. Higher-order functions and state labels
 
@@ -266,8 +429,25 @@ Designs: [`higher-order-functions.md`](../designs/higher-order-functions.md),
   defined by such invocations (H4d; `prover-test-problems.md`, V20); frames
   without `modifies_of` as generated preconditions.
 - **H5.** The re-entrancy lock.
+- **Data invariants over function-valued fields.** A clause stating the
+  behavior of a stored function value (`aborts_of`, a field frame) depends on
+  memory, so it cannot be the type of a stored value; a known Move Prover
+  issue. Probable solution: read such clauses at the big-step semantics,
+  over runtime states, which mention no carrier — a spike
+  ([`data-and-global-invariants.md`](data-and-global-invariants.md),
+  "Behavioural clauses inside a data invariant").
 - **C4.** Prover tests `closures/stored_fun_values` and
   `behavioral_target_two_masks`.
+- **Closure frames of open generic targets; `result_of` and wildcard frames
+  under state labels.** Focused probes around `functional/closures/amm_example.move`
+  found proof gaps in both; the checked regressions cover only concrete
+  generic instantiation and `ensures_of` invariants. No fixture isolates
+  either gap.
+- **Results as rows.** Function values of tuple-returning functions: `ResultShape`
+  gains a row case and a tuple result reads as its elements with their sharing
+  marks. Until then such a value is refused where it is constructed: "a function
+  value of `f` is not supported: `f` returns a tuple"
+  ([`higher-order-functions.md`](../designs/higher-order-functions.md)).
 - Unsupported, diagnosed: explicit enum-field write frames; write frames at
   dependency-interface boundaries. Not scheduled: closures whose targets
   return references; function types as type arguments
@@ -281,11 +461,42 @@ Designs: [`higher-order-functions.md`](../designs/higher-order-functions.md),
 - **Ghost fields (G4b).** Modular theorems, the unit model as one least
   fixed point, the agreement up to ghost contents; generic functions and
   closure targets in the model; the remaining C8 tests.
+- **Ghost memory through `modifies *`.** A callee with frame `modifies *`
+  leaves every spec variable unconstrained, where the Prover never havocs
+  ghost memory, so `ensures supply<T> == old(supply<T>)` fails across such a
+  call. The loose and open frames would gain one conjunct: every ghost
+  resource instantiation other than the function's targets reads the same,
+  owed by the callee and discharged by the `ghostWrites` fixed point; a
+  callee of unknown body gets no such conjunct. It adds an obligation to
+  every memory-writing function; size it first.
 
 ## Not scheduled
 
-- Phase 0 of `vir-design.md`, a multi-party freeze of RawUnit JSON v1: the
-  "no construct unclassified" gate is mechanized by `Capability.lean`, and
-  publishing v1 becomes work only when an external consumer depends on it.
+- A multi-party freeze of RawUnit JSON v1: the "no construct unclassified"
+  gate is mechanized by `Capability.lean`
+  ([`vir-design.md`](../designs/vir-design.md), "Boundary classification and
+  adapters"), and publishing v1 becomes work only when an external consumer
+  depends on it.
+- Rust features outside the profile: trait objects, specialization,
+  higher-ranked bounds outside the initial fragment, async and coroutines,
+  FFI, inline assembly. Each needs a core/profile classification and a
+  model; the exporter rejects them at the first node.
 - The design documents inside `v0/` describe the deprecated stack; nothing
   is scheduled from them.
+- **Per-target result reuse (S1).** Not a Move Prover feature and no help to
+  a fresh CI run. The proposal: key a verified result by the declarations
+  its proof uses (the theorem statement, referenced constant types and the
+  definitions reached transitively, toolchain, verifier build, options),
+  not by source files, compared at theorem start; an opaque callee's body
+  change leaves callers cached when its contract is unchanged, while the
+  module audit always runs; recursive cycle groups are cached together.
+  Failed and budget-stopped targets have no proof term, so they would take a
+  conservative solver-visible environment key, with `--fresh` to bypass
+  reuse. Unresolved: how importing cached results avoids stale or
+  conflicting declarations (import-and-alias against kernel replay), and
+  what validation, loading and replay cost.
+- **Sharing across authored points.** Arrivals waiting at different program
+  points of an authored proof (`verex_obligations at`) do not share a join's
+  suffix (`partitionArrivals`). They could, with the suffix running each of
+  their hooks, as a suffix already owes the union of its arrivals' clauses.
+  Open: whether a hook's result holds for arrivals that did not pass its point.

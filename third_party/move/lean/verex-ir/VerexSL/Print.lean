@@ -46,16 +46,17 @@ private partial def primaryRange? (tables : Tables) (id : LocId) (fuel : Nat) :
     | some range => some range
     | none => location.parent.bind fun parent => primaryRange? tables parent (fuel - 1)
 
-private def errorAt (unit : ValidatedUnit) (loc : LocId) (message : String) : Error :=
+/-- An error at a location of a namespace, read in its own tables. -/
+private def errorAt (tables : Tables) (loc : LocId) (message : String) : Error :=
   let location := do
-    let range ← primaryRange? unit.tables loc (unit.tables.locations.size + 1)
-    let source ← unit.tables.files[range.file.index]?
+    let range ← primaryRange? tables loc (tables.locations.size + 1)
+    let source ← tables.files[range.file.index]?
     some (source, range)
   { message, location }
 
-private def atLocation (unit : ValidatedUnit) (loc : LocId) (result : Except String α) :
+private def atLocation (tables : Tables) (loc : LocId) (result : Except String α) :
     Except Error α :=
-  result.mapError (errorAt unit loc)
+  result.mapError (errorAt tables loc)
 
 private def commaSep (values : Array String) : String :=
   ", ".intercalate values.toList
@@ -106,8 +107,7 @@ private def sourceIdentifier (value : String) : String :=
       (value.drop 1).toString
     else value
   if !value.isEmpty && value.all Char.isDigit then value
-  else (Lean.Name.mkSimple value).toStringWithToken
-    (isToken := isReservedWord)
+  else escapedIdentifier value
 
 /-- Compiler-v2 records the authored receiver head (for example
 `self.list.contains`) in the call name for some Move 2 calls. The semantic
@@ -446,6 +446,8 @@ private def PrintNamespace.importsNamespace (ns : PrintNamespace) (unit : Valida
 
 def PrintNamespace.of (unit : ValidatedUnit) (ns : ValidatedNamespace) :
     Except String PrintNamespace := do
+  -- Rendering reads the body in the unit's numbering.
+  let ns := ns.inUnitIds
   let references := referencedNames unit ns
   let mut spellings : Std.HashMap String (Array NamespaceId) := {}
   let mut complete := true
@@ -1087,10 +1089,10 @@ spelling: `S |~ ` where both are `S`, else `S.. |~ `, `..T |~ `, or
 is the name it was interned as. -/
 private def stateRangePrefix (context : Context) (range : MemoryRange) :
     Except String String := do
-  let labelName (label : Nat) : Except String String :=
-    match context.unit.tables.names[label]? with
+  let labelName (label : NameId) : Except String String :=
+    match context.ns.nameOf label with
     | some name => pure name.name
-    | none => throw s!"state label {label} is not a name of the unit"
+    | none => throw s!"state label {label.index} is not a name of the unit"
   match range.pre, range.post with
   | none, none => pure ""
   | some pre, some post =>
@@ -1372,6 +1374,12 @@ private partial def observesPlace (context : Context) (fuel : Nat) (value : Expr
         owner == owner' &&
           (context.ns.tables.names[field'.index]?).any (·.name == field) &&
           observesPlace context fuel inner base
+    | some (.operation (.data (.selectVariants owner fields)) _ #[inner] _),
+      some (.field base owner' field') =>
+        owner == owner' &&
+          (context.ns.tables.names[field'.index]?).any (fun name =>
+            fields.any (·.2 == name.name)) &&
+          observesPlace context fuel inner base
     | some (.operation (.primitive .index) _ #[inner, i] _), some (.index base j) =>
         i == j && observesPlace context fuel inner base
     | _, _ => false
@@ -1443,6 +1451,9 @@ private partial def sameCollection (context : Context) (left right : ExprId) : B
      | some (.operation (.data (.select owner field)) _ #[a] _),
        some (.operation (.data (.select owner' field')) _ #[b] _) =>
          owner == owner' && field == field' && sameCollection context a b
+     | some (.operation (.data (.selectVariants owner fields)) _ #[a] _),
+       some (.operation (.data (.selectVariants owner' fields')) _ #[b] _) =>
+         owner == owner' && fields == fields' && sameCollection context a b
      | _, _ => false)
 
 /-- Whether a place reaches the element `collection` observes at `index`,
@@ -2335,7 +2346,7 @@ private def nominalAt? (unit : ValidatedUnit) (name : NameId) :
     Option VerexIR.StructDecl := do
   let qualified ← unit.tables.names[name.index]?
   -- Owned namespaces are a list, not an array keyed by namespace identity.
-  let ns ← unit.namespaces.find? (·.identity == qualified.namespaceId)
+  let ns ← (unit.namespaces.find? (·.unitIdentity == qualified.namespaceId)).map (·.inUnitIds)
   ns.structs.find? (·.name == name)
 
 /-- The variants of an enum that declare a field of this name. -/
@@ -2409,8 +2420,8 @@ from the dependency interface that declares it. -/
 private def functionSignatureFor? (unit : ValidatedUnit) (reference : QualifiedRef) :
     Option Signature :=
   let owned := do
-    let targetNs ← unit.namespaces.find? fun (candidate : ValidatedNamespace) =>
-      candidate.identity == reference.namespaceId
+    let targetNs ← (unit.namespaces.find? fun (candidate : ValidatedNamespace) =>
+      candidate.unitIdentity == reference.namespaceId).map (·.inUnitIds)
     let declaration ← targetNs.functions.find? fun
       (candidate : VerexIR.FunctionDecl FunctionBody) => candidate.name == reference.name
     pure declaration.signature
@@ -2426,8 +2437,8 @@ private def specificationSignatureFor? (unit : ValidatedUnit) (reference : Quali
     Option Signature :=
   let specification :=
     (do
-      let targetNs ← unit.namespaces.find? fun (candidate : ValidatedNamespace) =>
-        candidate.identity == reference.namespaceId
+      let targetNs ← (unit.namespaces.find? fun (candidate : ValidatedNamespace) =>
+        candidate.unitIdentity == reference.namespaceId).map (·.inUnitIds)
       let declaration ← targetNs.specFunctions.find? fun
         (candidate : VerexIR.SpecFunctionDecl) => candidate.name == reference.name
       pure declaration.signature) <|>
@@ -3275,8 +3286,8 @@ private partial def expressionText (context : Context) (id : ExprId)
           -- interface carries — is what the reader needs to recover the
           -- result type, so only a call without one is annotated.
           let hasDeclaration := context.unit.namespaces.any (fun candidate =>
-              candidate.identity == reference.namespaceId &&
-                candidate.functions.any (·.name == reference.name)) ||
+              candidate.unitIdentity == reference.namespaceId &&
+                candidate.functions.any (candidate.nameId ·.name == reference.name)) ||
             context.unit.dependencies.any fun interface =>
               interface.namespaceId == reference.namespaceId &&
                 interface.functions.any (·.name == reference.name)
@@ -3554,9 +3565,9 @@ private partial def expressionText (context : Context) (id : ExprId)
           -- interface carries — gives the reader the result type, so only a
           -- call without one is annotated.
           let hasDeclaration := context.unit.namespaces.any (fun candidate =>
-              candidate.identity == reference.namespaceId &&
-                (candidate.specFunctions.any (·.name == reference.name) ||
-                  candidate.functions.any (·.name == reference.name))) ||
+              candidate.unitIdentity == reference.namespaceId &&
+                (candidate.specFunctions.any (candidate.nameId ·.name == reference.name) ||
+                  candidate.functions.any (candidate.nameId ·.name == reference.name))) ||
             context.unit.dependencies.any fun interface =>
               interface.namespaceId == reference.namespaceId &&
                 (interface.specFunctions.any (·.name == reference.name) ||
@@ -4521,9 +4532,9 @@ private def fieldText (unit : ValidatedUnit) (ns : PrintNamespace)
   pure s!"{← nameAt unit field.name} : {← typeText unit ns binders field.type.typeId}"
 
 /-- Canonical declaration metadata, separate from contract pragmas. -/
-private partial def sourceAttributeText : Attribute → Except String String
+private partial def sourceAttributeText (unit : ValidatedUnit) : Attribute → Except String String
   | .call name arguments _ => do
-      let arguments ← arguments.mapM sourceAttributeText
+      let arguments ← arguments.mapM (sourceAttributeText unit)
       pure <| sourceIdentifier name ++ (if arguments.isEmpty then "" else
         s!" ({commaSep arguments})")
   | .assign name (.constant (.integer value)) _ => do
@@ -4533,6 +4544,10 @@ private partial def sourceAttributeText : Attribute → Except String String
       pure s!"{sourceIdentifier name} = {repr value}"
   | .assign name (.name none value) _ =>
       pure s!"{sourceIdentifier name} = {sourceIdentifier value}"
+  | .assign name (.name (some namespaceId) value) _ => do
+      pure s!"{sourceIdentifier name} = {← namespacePath unit namespaceId}::{sourceIdentifier value}"
+  | .assign name (.qualifiedName value) _ =>
+      pure s!"{sourceIdentifier name} = {value}"
   | attr => throw s!"attribute `{repr attr}` has no canonical source spelling"
 
 private def isFunctionModifierAttribute : Attribute → Bool
@@ -4715,11 +4730,11 @@ private def canonicalProfileConfig : Profile → Option ProfileConfig
   | .rust => some ProfileName.rust.config
   | .extension _ => none
 
-private def sourceOrderKey (unit : ValidatedUnit) (loc : LocId) (fallback : Nat) :
+private def sourceOrderKey (tables : Tables) (loc : LocId) (fallback : Nat) :
     Nat × Nat × Nat :=
-  match unit.tables.locations[loc.index]?.bind (·.primary) with
+  match tables.locations[loc.index]?.bind (·.primary) with
   | some range => (range.file.index, range.startByte, fallback)
-  | none => (Nat.succ unit.tables.files.size, fallback, fallback)
+  | none => (Nat.succ tables.files.size, fallback, fallback)
 
 private def documentationLines (documentation : String) : List String :=
   let rawLines := documentation.trimAscii.toString.splitOn "\n"
@@ -4943,57 +4958,57 @@ This stage is deliberately private: callers must not observe a second,
 unformatted source representation. -/
 private def renderSemanticNamespace (unit : ValidatedUnit)
     (identity : NamespaceId) : Except Error String := do
-  let some ns := unit.namespaces.find? (·.identity == identity)
+  let some ns := unit.namespaces.find? (·.unitIdentity == identity)
     | throw { message := s!"VerexSL source references missing owned namespace {identity.index}" }
-  renderNamespaceText unit (← atLocation unit ns.loc (PrintNamespace.of unit ns))
+  renderNamespaceText unit (← atLocation ns.localTables ns.loc (PrintNamespace.of unit ns))
 where
   renderNamespaceText (unit : ValidatedUnit) (ns : PrintNamespace) : Except Error String := do
     let (profile, profileName) ← match ns.profile with
       | some .move => pure (.move, "move")
       | some .rust => pure (.rust, "rust")
       | some (.extension _) =>
-          throw <| errorAt unit ns.loc "extension-profile namespaces are outside the current printer"
-      | none => throw <| errorAt unit ns.loc "profileless namespaces are outside the current printer"
+          throw <| errorAt ns.localTables ns.loc "extension-profile namespaces are outside the current printer"
+      | none => throw <| errorAt ns.localTables ns.loc "profileless namespaces are outside the current printer"
     unless canonicalProfileConfig profile == unit.profiles[0]? && unit.profiles.size == 1 do
-      throw <| errorAt unit ns.loc
+      throw <| errorAt ns.localTables ns.loc
         "profile configuration has no lossless spelling in the current VerexSL header"
     unless ns.imports.isEmpty do
-      throw <| errorAt unit ns.loc "namespace imports are outside the current VerexSL printer"
+      throw <| errorAt ns.localTables ns.loc "namespace imports are outside the current VerexSL printer"
     let owner := (unit.tables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
     let mut skippedComments := #[]
     let mut friends := #[]
     for value in ns.profileMetadata do
       unless isResolvedMoveEnvironment unit ns value do
-        match ← atLocation unit ns.loc (friendPath? owner value) with
+        match ← atLocation ns.localTables ns.loc (friendPath? owner value) with
         | some path => friends := friends.push path
         | none =>
-          match ← atLocation unit ns.loc (skippedDeclarationComment? value) with
+          match ← atLocation ns.localTables ns.loc (skippedDeclarationComment? value) with
           | some comment => skippedComments := skippedComments.push comment
-          | none => throw (errorAt unit ns.loc
+          | none => throw (errorAt ns.localTables ns.loc
               s!"namespace profile metadata `{value.tag}` is outside the current VerexSL printer")
     unless ns.attributes.isEmpty do
-      throw <| errorAt unit ns.loc "namespace attributes are outside the current VerexSL printer"
-    let pragmas ← atLocation unit ns.loc <| ns.pragmas.mapM pragmaText
+      throw <| errorAt ns.localTables ns.loc "namespace attributes are outside the current VerexSL printer"
+    let pragmas ← atLocation ns.localTables ns.loc <| ns.pragmas.mapM pragmaText
     let uses := ns.usePaths
     unless ns.traits.isEmpty && ns.implementations.isEmpty do
-      throw <| errorAt unit ns.loc
+      throw <| errorAt ns.localTables ns.loc
         "namespace traits and implementations are outside the current VerexSL printer"
     unless ns.specVars.isEmpty do
-      throw <| errorAt unit ns.loc
+      throw <| errorAt ns.localTables ns.loc
         "namespace specification variables are outside the current VerexSL printer"
     -- Intrinsic declarations print inverted, as source attributes on their
     -- owner and target declarations (`@[intrinsic_map]` on the owner,
     -- `@[map_new (Owner)]` on each bound function or specification function).
     let mut intrinsicAttributes : Array (Nat × String) := #[]
     for declaration in ns.intrinsics do
-      let some owner := ns.tables.names[declaration.owner.index]?
-        | throw <| errorAt unit declaration.loc "an intrinsic owner name is out of range"
+      let some owner := ns.nameOf declaration.owner
+        | throw <| errorAt ns.localTables declaration.loc "an intrinsic owner name is out of range"
       let ownerText := sourceIdentifier owner.name
       intrinsicAttributes := intrinsicAttributes.push
         (declaration.owner.index, s!"intrinsic_{declaration.model}")
       for binding in declaration.executableBindings ++ declaration.specBindings do
         unless binding.target.namespaceId == ns.identity do
-          throw <| errorAt unit binding.loc
+          throw <| errorAt ns.localTables binding.loc
             "an intrinsic binding outside its owner's namespace is outside the current VerexSL printer"
         intrinsicAttributes := intrinsicAttributes.push
           (binding.target.name.index, s!"{binding.role} ({ownerText})")
@@ -5001,45 +5016,45 @@ where
         (body : String) : Except Error String := do
       let values := intrinsicAttributes.filterMap fun (index, value) =>
         if index == name.index then some value else none
-      let values := values ++ (← (attributes.mapM sourceAttributeText).mapError
+      let values := values ++ (← (attributes.mapM (sourceAttributeText unit)).mapError
         fun message => ({ message } : Error))
       pure <| if values.isEmpty then body
         else s!"@[{", ".intercalate values.toList}]\n{body}"
     let mut ordered : Array SourceOrderedText := #[]
     let mut fallback := 0
     for declaration in ns.constants do
-      let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+      let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
       ordered := ordered.push {
         file, start, priority := 1, fallback
         text := documented declaration.doc
-          (← atLocation unit declaration.loc (constantText unit ns declaration)) }
+          (← atLocation ns.localTables declaration.loc (constantText unit ns declaration)) }
       fallback := fallback + 1
     for declaration in ns.structs do
-      let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+      let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
       ordered := ordered.push {
         file, start, priority := 1, fallback
         text := documented (nominalDocumentation declaration)
           (← withAttributes declaration.name declaration.attributes
-            (← atLocation unit declaration.loc (nominalText unit ns declaration))) }
+            (← atLocation ns.localTables declaration.loc (nominalText unit ns declaration))) }
       fallback := fallback + 1
     for declaration in ns.specFunctions do
       unless isDerivedSpecFunction unit ns declaration do
-        let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+        let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
         ordered := ordered.push {
           file, start, priority := 1, fallback
           text := documented declaration.doc
             (← withAttributes declaration.name declaration.contract.pragmas
-              (← atLocation unit declaration.loc (specFunctionText unit ns declaration))) }
+              (← atLocation ns.localTables declaration.loc (specFunctionText unit ns declaration))) }
         fallback := fallback + 1
     for declaration in ns.lemmas do
-      let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+      let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
       ordered := ordered.push {
         file, start, priority := 1, fallback
         text := documented declaration.doc
-          (← atLocation unit declaration.loc (lemmaText unit ns declaration)) }
+          (← atLocation ns.localTables declaration.loc (lemmaText unit ns declaration)) }
       fallback := fallback + 1
     for declaration in ns.invariants do
-      let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+      let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
       -- A generic declaration's type parameters, by name.
       let binders := match declaration.condition.kind with
         | .axiom_ typeParameters | .globalInvariant typeParameters
@@ -5052,20 +5067,20 @@ where
           (some declaration.condition.expression)
         specification := true
         logicalLocals := declaration.locals.map (fun localDecl => localDecl.id) }
-      let invariant ← atLocation unit declaration.loc
+      let invariant ← atLocation ns.localTables declaration.loc
         (conditionText context declaration.condition)
       ordered := ordered.push {
         file, start, priority := 1, fallback
         text := s!"spec module where\n{indent invariant}" }
       fallback := fallback + 1
     for declaration in ns.functions do
-      let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+      let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
       ordered := ordered.push {
         file, start, priority := 1, fallback
         text := documented declaration.doc
           (← withAttributes declaration.name
             (declaration.attributes.filter (!isFunctionModifierAttribute ·))
-            (← atLocation unit declaration.loc (functionText unit ns declaration))) }
+            (← atLocation ns.localTables declaration.loc (functionText unit ns declaration))) }
       fallback := fallback + 1
     -- Compiler-v2 can retain comments from dependency files whose inline
     -- functions were expanded into this module. Those declarations do not
@@ -5075,12 +5090,12 @@ where
       ns.structs.map (·.loc) ++ ns.specFunctions.map (·.loc) ++ ns.lemmas.map (·.loc) ++
       ns.invariants.map (·.loc) ++ ns.functions.map (·.loc)
     let declarationFiles := declarationLocations.filterMap fun loc =>
-      (primaryRange? unit.tables loc (unit.tables.locations.size + 1)).map (·.file.index)
+      (primaryRange? ns.localTables loc (ns.localTables.locations.size + 1)).map (·.file.index)
     for comment in ns.comments do
       let commentFile? :=
-        (primaryRange? unit.tables comment.loc (unit.tables.locations.size + 1)).map (·.file.index)
+        (primaryRange? ns.localTables comment.loc (ns.localTables.locations.size + 1)).map (·.file.index)
       if commentFile?.all declarationFiles.contains then
-        let (file, start, _) := sourceOrderKey unit comment.loc fallback
+        let (file, start, _) := sourceOrderKey ns.localTables comment.loc fallback
         ordered := ordered.push {
           file, start, priority := if comment.isDoc then 0 else 1, fallback
           text := sourceCommentText comment }
@@ -5099,7 +5114,7 @@ where
       else #[lines (friends.map fun path => s!"friend {path};")] ++ declarations
     let declarations := if uses.isEmpty then declarations
       else #[lines (uses.map fun path => s!"use {path}")] ++ declarations
-    let path ← atLocation unit ns.loc (namespacePath unit ns.identity)
+    let path ← atLocation ns.localTables ns.loc (namespacePath unit ns.identity)
     pure <| "-- Copyright © Aptos Foundation\n" ++
       "-- SPDX-License-Identifier: Apache-2.0\n\n" ++
       "import VerexSL\n\n" ++
@@ -5137,7 +5152,7 @@ def render (environment : Lean.Environment) (unit : ValidatedUnit)
     (width : Nat := 80) : Except Error String := do
   let [ns] := unit.namespaces.toList
     | throw { message := "VerexSL source currently requires exactly one owned namespace" }
-  renderWithLeadingCommentsAt environment unit ns.identity width #[]
+  renderWithLeadingCommentsAt environment unit ns.unitIdentity width #[]
 
 /-- Render one selected namespace while retaining the compilation unit's
 other owned namespaces as authoritative declaration context for imports. -/
@@ -5148,6 +5163,7 @@ def renderNamespace (environment : Lean.Environment) (unit : ValidatedUnit)
 /-- The other namespaces a namespace's rendering names. -/
 def referencedNamespaces (unit : ValidatedUnit) (ns : ValidatedNamespace) :
     Array NamespaceId :=
+  let ns := ns.inUnitIds
   (referencedNames unit ns).foldl (init := #[]) fun found id =>
     match unit.tables.names[id.index]? with
     | some name =>
@@ -5155,14 +5171,38 @@ def referencedNamespaces (unit : ValidatedUnit) (ns : ValidatedNamespace) :
         else found.push name.namespaceId
     | none => found
 
+/-- The owned namespaces a namespace of a unit uses, and those `also` names. -/
+def namespaceUsesIn (unit : ValidatedUnit) (also : NamespaceId → Array NamespaceId)
+    (ns : ValidatedNamespace) : Array NamespaceId :=
+  let owned := unit.namespaces.map (·.unitIdentity)
+  ((referencedNamespaces unit ns) ++ also ns.unitIdentity).filter owned.contains
+
+/-- The unit's owned namespaces, each after the owned namespaces it uses: those
+its rendering names, and those `also` gives it, which items spliced into it name. -/
+def dependencyOrder (unit : ValidatedUnit)
+    (also : NamespaceId → Array NamespaceId := fun _ => #[]) :
+    Except String (Array NamespaceId) := do
+  let owned := unit.namespaces.map (·.unitIdentity)
+  let uses := namespaceUsesIn unit also
+  let mut ordered : Array NamespaceId := #[]
+  -- Each round places every namespace whose uses are placed; a round that
+  -- places none leaves a cycle.
+  while ordered.size < owned.size do
+    let ready := unit.namespaces.filter fun ns =>
+      !ordered.contains ns.unitIdentity && (uses ns).all ordered.contains
+    if ready.isEmpty then throw "the unit's modules use each other in a cycle"
+    ordered := ordered ++ ready.map (·.unitIdentity)
+  return ordered
+
 /-- Render several owned namespaces of a unit as one self-contained source,
-in the given order: a namespace must follow the namespaces it uses. -/
+in the given order: a namespace must follow the namespaces it uses, or be
+among the modules it imports. -/
 def renderNamespaceParts (environment : Lean.Environment) (unit : ValidatedUnit)
-    (identities : Array NamespaceId) (width : Nat := 80) :
+    (identities : Array NamespaceId) (width : Nat := 80) (imports : Array Lean.Name := #[]) :
     Except Error (String × Array String) := do
   let sources ← identities.mapM (renderSemanticNamespace unit)
   Layout.formatSourceParts environment sources width "<generated>"
-      (undeclaredAliases environment unit) |>.mapError fun message =>
+      (undeclaredAliases environment unit) imports |>.mapError fun message =>
     { message := s!"{message}\n--- semantic sources ---\n{"\n".intercalate sources.toList}" }
 
 private def compileErrorText : CompileError → String
@@ -5221,8 +5261,11 @@ private def dependencyInterfaceItem? : Item → Option Item
       declaration with isOpaque := true, body := none }
   | .lemma declaration => some <| .lemma {
       declaration with decreases := #[], contract := #[], proof := #[] }
+  -- A spec variable's memory is one in every namespace that names it.
   | .struct declaration => some <| .struct {
-      declaration with contract := #[], pragmas := #[] }
+      declaration with
+      contract := #[]
+      pragmas := declaration.pragmas.filter (·.name == "ghost_memory") }
   | .enum declaration => some <| .enum {
       declaration with contract := #[], pragmas := #[] }
   | .constant _ => none
@@ -5242,7 +5285,10 @@ private def interfaceSource (ns : ValidatedNamespace) : ValidatedNamespace :=
     functions := ns.functions.map fun declaration =>
       { declaration with body := .absent, contract := {}, pragmas := #[] }
     specFunctions := ns.specFunctions.map fun declaration => { declaration with body := none }
-    structs := ns.structs.map fun declaration => { declaration with contract := {} }
+    structs := ns.structs.map fun declaration => { declaration with
+      contract := if declaration.isGhostMemory then
+          { pragmas := declaration.contract.pragmas }
+        else {} }
     constants := #[], invariants := #[], comments := #[], pragmas := #[] }
 
 /-- The Move function whose logical meaning this specification function is,
@@ -5289,7 +5335,7 @@ def formatSource (environment : Lean.Environment) (source : String) (width : Nat
     message := compileErrorTextAt command error }
   let [ns] := unit.namespaces.toList
     | throw { message := "formatted VerexSL source must own exactly one namespace" }
-  renderWithLeadingCommentsAt environment unit ns.identity width #[]
+  renderWithLeadingCommentsAt environment unit ns.unitIdentity width #[]
 
 /-- Render a dependency's public nominal declarations as an interface
 namespace. A unit that constructs, selects, or matches a value of an imported
@@ -5312,7 +5358,9 @@ private def dependencyInterfaceText (unit : ValidatedUnit)
     structs := interface.structs
     functions := interface.functions
     specFunctions := interface.specFunctions
-    tables := unit.tables }
+    tables := unit.tables
+    links := .identity unit.tables
+    localTables := unit.tables }
   let ns ← (PrintNamespace.of unit declarations).mapError fun message => { message }
   let path ← (namespacePath unit interface.namespaceId).mapError fun message => { message }
   let nominals ← interface.structs.mapM fun declaration =>
@@ -5349,7 +5397,7 @@ namespace is lowered against: its signatures, without bodies or contracts. -/
 def interfaceNamespace (environment : Lean.Environment) (unit : ValidatedUnit)
     (identity : NamespaceId) (aliases : Array (String × String) := unitAliases unit) :
     Except Error Namespace := do
-  let some dependency := unit.namespaces.find? (·.identity == identity)
+  let some dependency := (unit.namespaces.find? (·.unitIdentity == identity)).map (·.inUnitIds)
     | throw { message := s!"missing dependency namespace {identity.index} in compilation context" }
   let some dependencyPath := unit.tables.namespaces[identity.index]?.map (·.segments)
     | throw { message := s!"missing dependency namespace {identity.index} in compilation context" }
@@ -5392,9 +5440,9 @@ def reimportSourceInContext (environment : Lean.Environment) (source : String)
     throw { message := s!"source namespace `{"::".intercalate sourceNs.path.toList}` does not match compilation-context namespace `{"::".intercalate storedPath.toList}`" }
   let mut dependencies := #[]
   for dependency in context.namespaces do
-    if dependency.identity != identity then
+    if dependency.unitIdentity != identity then
       dependencies := dependencies.push
-        (← interfaceNamespace environment context dependency.identity aliases)
+        (← interfaceNamespace environment context dependency.unitIdentity aliases)
   for interface in context.dependencies do
     let semantic ← dependencyInterfaceText context interface
     let parsed ← parseSourceUnit environment semantic
@@ -5422,13 +5470,13 @@ def reimportUnit (environment : Lean.Environment) (unit : ValidatedUnit)
     (width : Nat := 80) : Except Error ValidatedUnit := do
   let mut namespaces := #[]
   for original in unit.namespaces do
-    let source ← renderNamespace environment unit original.identity width
+    let source ← renderNamespace environment unit original.unitIdentity width
     let parsed ← parseSourceUnit environment source
-      s!"<reimport {original.identity.index}>" (unitAliases unit)
+      s!"<reimport {original.unitIdentity.index}>" (unitAliases unit)
     let [parsedNs] := parsed.namespaces.toList
       | throw
           { message :=
-            s!"reimported namespace {original.identity.index} did not render as one namespace" }
+            s!"reimported namespace {original.unitIdentity.index} did not render as one namespace" }
     namespaces := namespaces.push parsedNs
   compile { sourceName := "<reimport>", namespaces := namespaces } |>.mapError
     fun error =>

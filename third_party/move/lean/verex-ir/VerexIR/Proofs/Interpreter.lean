@@ -389,7 +389,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                       | some handle =>
                                           let calleeInstantiation := callTypeInstantiation
                                             unit handle operandFrame.typeInstantiation
-                                              instantiations
+                                              (ns.genericArguments instantiations)
                                           cases callee_eq : Internal.evalFunction fuel executable handle
                                               calleeInstantiation operandState values.toArray with
                                           | error error =>
@@ -648,7 +648,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                         (operands := operands_sound)
                                   | values operandState operandFrame values =>
                                       cases evaluate_eq : evaluatePlaceOperation? unit ns
-                                          expression.typeId exprId (.call (.extension value targets))
+                                          (ns.typeId expression.typeId) exprId (.call (.extension value targets))
                                           values.toArray operandFrame operandState with
                                       | none =>
                                           cases mismatch : variantMismatch? unit ns (.call (.extension value targets)) values.toArray
@@ -691,7 +691,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (operands := operands_sound)
                               | values operandState operandFrame values =>
                                   cases evaluate_eq : evaluateProfileOperation? executable ns
-                                      expression.typeId operation values.toArray with
+                                      (ns.typeId expression.typeId) operation values.toArray with
                                   | none =>
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                         evaluate_eq, failAt] at h
@@ -731,7 +731,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluatePrimitiveOperation? ns expression.typeId
+                                  cases evaluate_eq : evaluatePrimitiveOperation? ns (ns.typeId expression.typeId)
                                       operation values.toArray
                                       executable.targetPointerWidth with
                                   | none =>
@@ -774,7 +774,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (operands := operands_sound)
                               | values operandState operandFrame values =>
                                   cases evaluate_eq : evaluatePlaceOperation? unit ns
-                                      expression.typeId exprId (.reference referenceOperation)
+                                      (ns.typeId expression.typeId) exprId (.reference referenceOperation)
                                       values.toArray operandFrame operandState with
                                   | none =>
                                       cases mismatch : variantMismatch? unit ns (.reference referenceOperation) values.toArray
@@ -817,7 +817,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (operands := operands_sound)
                               | values operandState operandFrame values =>
                                   cases evaluate_eq : evaluateDataOperation? unit
-                                      ns.identity dataOperation values.toArray with
+                                      ns.unitIdentity dataOperation values.toArray with
                                   | none =>
                                       cases mismatch : variantMismatch? unit ns (.data dataOperation) values.toArray
                                           operandFrame operandState with
@@ -860,7 +860,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (operands := operands_sound)
                               | values operandState operandFrame values =>
                                   cases evaluate_eq : evaluatePlaceOperation? unit ns
-                                      expression.typeId exprId (.specification specificationOperation)
+                                      (ns.typeId expression.typeId) exprId (.specification specificationOperation)
                                       values.toArray operandFrame operandState with
                                   | none =>
                                       cases mismatch : variantMismatch? unit ns (.specification specificationOperation) values.toArray
@@ -902,8 +902,8 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluateGlobalOperation? unit ns expression.typeId exprId
-                                      globalKind instantiations values.toArray operandFrame operandState with
+                                  cases evaluate_eq : evaluateGlobalOperation? unit ns (ns.typeId expression.typeId)
+                                      exprId globalKind (ns.genericArguments instantiations) values.toArray operandFrame operandState with
                                   | none =>
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                         evaluate_eq, failAt] at h
@@ -1031,7 +1031,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
                                   cases evaluate_eq : evaluatePlaceOperation? unit ns
-                                      expression.typeId exprId (.move place) values.toArray operandFrame
+                                      (ns.typeId expression.typeId) exprId (.move place) values.toArray operandFrame
                                       operandState with
                                   | none =>
                                       cases mismatch : variantMismatch? unit ns (.move place) values.toArray
@@ -1072,7 +1072,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
                                   cases evaluate_eq : evaluatePlaceOperation? unit ns
-                                      expression.typeId exprId (.copy place) values.toArray operandFrame
+                                      (ns.typeId expression.typeId) exprId (.copy place) values.toArray operandFrame
                                       operandState with
                                   | none =>
                                       cases mismatch : variantMismatch? unit ns (.copy place) values.toArray
@@ -1113,7 +1113,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
                                   cases evaluate_eq : evaluatePlaceOperation? unit ns
-                                      expression.typeId exprId (.borrow borrowKind place) values.toArray
+                                      (ns.typeId expression.typeId) exprId (.borrow borrowKind place) values.toArray
                                       operandFrame operandState with
                                   | none =>
                                       cases mismatch : variantMismatch? unit ns (.borrow borrowKind place) values.toArray
@@ -1154,7 +1154,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
                                   cases evaluate_eq : evaluatePlaceOperation? unit ns
-                                      expression.typeId exprId (.read place) values.toArray operandFrame
+                                      (ns.typeId expression.typeId) exprId (.read place) values.toArray operandFrame
                                       operandState with
                                   | none =>
                                       cases mismatch : variantMismatch? unit ns (.read place) values.toArray
@@ -1195,7 +1195,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
                                   cases evaluate_eq : evaluatePlaceOperation? unit ns
-                                      expression.typeId exprId (.write place) values.toArray operandFrame
+                                      (ns.typeId expression.typeId) exprId (.write place) values.toArray operandFrame
                                       operandState with
                                   | none =>
                                       cases mismatch : variantMismatch? unit ns (.write place) values.toArray
@@ -1236,7 +1236,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
                                   cases evaluate_eq : evaluatePlaceOperation? unit ns
-                                      expression.typeId exprId (.drop place) values.toArray operandFrame
+                                      (ns.typeId expression.typeId) exprId (.drop place) values.toArray operandFrame
                                       operandState with
                                   | none =>
                                       cases mismatch : variantMismatch? unit ns (.drop place) values.toArray

@@ -246,8 +246,11 @@ mod tests {
             let hot_root_hash = |db: &AptosDB| {
                 let live = db.state_store.live().unwrap();
                 let state = live.current_state_locked();
-                let latest = state.latest();
-                (latest.version(), latest.summary().hot_root_hash().unwrap())
+                let last_checkpoint = state.last_checkpoint();
+                (
+                    last_checkpoint.version(),
+                    last_checkpoint.summary().hot_root_hash().unwrap(),
+                )
             };
 
             let tmp_dir = TempPath::new();

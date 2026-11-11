@@ -1227,8 +1227,7 @@ elab "#guard_verex_frontend" : command => do
       | place => place
     pure <| VerexIR.Validation.Internal.mkValidatedUnit unit.tables unit.profiles
       (unit.namespaces.set! 0 { ns with places }) unit.dependencies unit.evidence unit.indexes
-      unit.structurizationWitnesses unit.resolution unit.initializationCertificates
-      unit.borrowCertificates unit.borrowRejections
+      unit.resolution
   match VerexSL.Print.render env (← shareCheckedIndex `«0x42».conditional_index_check) with
   | .error error => throwError "the conditional index-check fixture did not render: {error}"
   | .ok printed =>

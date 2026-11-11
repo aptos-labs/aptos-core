@@ -57,7 +57,7 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
       (declaration_eq : SemanticOperations.handleFields? unit source none =
         some (declaringNs, declared))
       (resolve : ResolvesAll declaringNs.tables arguments.toArray
-        (declared.toList.map (·.type.typeId)) fieldTypes)
+        (declared.toList.map (declaringNs.typeId ·.type.typeId)) fieldTypes)
       (ghostsResolve : ResolvesAll declaringNs.tables arguments.toArray
         (ghostTypeIds unit source) ghostTypes)
       (typed : Denote.NRow.TypedAs unit fields
@@ -153,7 +153,7 @@ inductive Denote.NRows.VariantsTypedAs (unit : ValidatedUnit) :
       (declaration_eq : SemanticOperations.handleFields? unit source (some name) =
         some (declaringNs, declared))
       (resolve : ResolvesAll declaringNs.tables arguments.toArray
-        (declared.toList.map (·.type.typeId)) fieldTypes)
+        (declared.toList.map (declaringNs.typeId ·.type.typeId)) fieldTypes)
       (ghostsResolve : ResolvesAll declaringNs.tables arguments.toArray
         (ghostTypeIds unit source) ghostTypes)
       (typed : Denote.NRow.TypedAs unit fields (fieldTypes ++ ghostTypes.map .ghost))
@@ -172,7 +172,8 @@ theorem HasTypeEach.of_forall {unit : ValidatedUnit} {loans : LoanTypes} {type :
 theorem declaredTypes?_resolves {ns : ValidatedNamespace} {arguments : List SemArg}
     {declared : Array FieldDecl} {fieldTypes : List SemTy}
     (resolved : declaredTypes? ns arguments declared = some fieldTypes) :
-    ResolvesAll ns.tables arguments.toArray (declared.toList.map (·.type.typeId)) fieldTypes :=
+    ResolvesAll ns.tables arguments.toArray (declared.toList.map (ns.typeId ·.type.typeId))
+      fieldTypes :=
   ResolvesAll.of_mapM resolved
 
 mutual
@@ -742,19 +743,22 @@ end
 /-- The sharing a function's declared parameters have, as a function type
 marks it. -/
 def parameterSharing (unit : ValidatedUnit) (function : FunctionHandle)
-    (declaration : FunctionDecl Validation.FunctionBody) : List Bool :=
+    (targetNs : ValidatedNamespace) (declaration : FunctionDecl Validation.FunctionBody) :
+    List Bool :=
   declaration.signature.parameters.toList.map fun parameter =>
-    sharedReference (unitTypes unit) function.namespaceId parameter.typeUse.typeId
+    sharedReference (unitTypes unit) function.namespaceId (targetNs.typeId parameter.typeUse.typeId)
 
 /-- The sharing a function's declared results have, as a function type marks
 it. -/
 def resultSharing (unit : ValidatedUnit) (function : FunctionHandle)
-    (declaration : FunctionDecl Validation.FunctionBody) : List Bool :=
+    (targetNs : ValidatedNamespace) (declaration : FunctionDecl Validation.FunctionBody) :
+    List Bool :=
   declaration.signature.results.toList.map fun result =>
-    sharedReference (unitTypes unit) function.namespaceId result.typeId
+    sharedReference (unitTypes unit) function.namespaceId (targetNs.typeId result.typeId)
 
 /-- Whether a closure target's signature reads alike natively and
-semantically, over its own environment. -/
+semantically, over its own environment; true of a function that is not a
+closure target (`closureSignature?` is `none`), which no function value holds. -/
 def signatureAgrees (unit : ValidatedUnit) (function : FunctionHandle) : Bool :=
   match unit.namespaces[function.namespaceId.index]? with
   | none => true
@@ -767,57 +771,194 @@ def signatureAgrees (unit : ValidatedUnit) (function : FunctionHandle) : Bool :=
               (StaticTyping.staticEnv declaration.signature.generics) with
           | some (parameterTypes, resultTypes) =>
               NRow.parametersCheck unit (NRow.ofList parameters)
-                  (parameterSharing unit function declaration) parameterTypes &&
+                  (parameterSharing unit function targetNs declaration) parameterTypes &&
                 NRow.parametersCheck unit (NRow.ofList results)
-                  (resultSharing unit function declaration) resultTypes
+                  (resultSharing unit function targetNs declaration) resultTypes
           | none => false
+
+/-! A type identifier means what its namespace's tables say, and a unit's
+namespaces hold one view of its tables: the checks below read each table once,
+so that their cost does not grow with the namespaces times the types. -/
+
+theorem resolveNominal?_sameNames {unit : ValidatedUnit} {a b : ValidatedNamespace}
+    (names : a.tables.names = b.tables.names) :
+    SemanticOperations.resolveNominal? unit a = SemanticOperations.resolveNominal? unit b := by
+  funext name; simp only [SemanticOperations.resolveNominal?, names]
+
+theorem ntyOfFuel_sameTables {unit : ValidatedUnit} {i j : NamespaceId} {a b : ValidatedNamespace}
+    (ha : unit.namespaces[i.index]? = some a) (hb : unit.namespaces[j.index]? = some b)
+    (types : a.tables.types = b.tables.types) (names : a.tables.names = b.tables.names) (fuel : Nat) :
+    ntyOfFuel (unitTypes unit) unit fuel i = ntyOfFuel (unitTypes unit) unit fuel j := by
+  have lookup : unitTypes unit i = unitTypes unit j := by
+    funext t; simp only [unitTypes, ha, hb, Option.bind_some, types]
+  have shared : sharedReference (unitTypes unit) i = sharedReference (unitTypes unit) j := by
+    funext t; simp only [sharedReference, lookup]
+  have resolve := resolveNominal?_sameNames (unit := unit) names
+  induction fuel with
+  | zero => funext t; simp only [ntyOfFuel]
+  | succ fuel ih =>
+    funext t
+    simp only [ntyOfFuel, ha, hb, Option.bind_eq_bind, Option.bind_some, ih, shared, resolve, lookup]
+
+theorem resolveFuel_sameTables {left right : Tables}
+    (types : left.types = right.types) (names : left.names = right.names) (env : Array SemArg) (fuel : Nat) :
+    SemTy.resolveFuel left env fuel = SemTy.resolveFuel right env fuel := by
+  induction fuel with
+  | zero => funext t; simp only [SemTy.resolveFuel]
+  | succ fuel ih =>
+    funext t
+    simp only [SemTy.resolveFuel, types, names, ih]
+
+theorem resolveAt_sameTables {a b : ValidatedNamespace}
+    (types : a.tables.types = b.tables.types) (names : a.tables.names = b.tables.names) :
+    StaticTyping.resolveAt a #[] = StaticTyping.resolveAt b #[] := by
+  funext t
+  simp only [StaticTyping.resolveAt, types, resolveFuel_sameTables types names]
+
+theorem resourceOf_sameTables {unit : ValidatedUnit} {i j : NamespaceId} {a b : ValidatedNamespace}
+    (ha : unit.namespaces[i.index]? = some a) (hb : unit.namespaces[j.index]? = some b)
+    (types : a.tables.types = b.tables.types) (names : a.tables.names = b.tables.names) (t : TypeId) :
+    resourceOf unit i t = resourceOf unit j t := by
+  have lookup : unitTypes unit i = unitTypes unit j := by
+    funext t; simp only [unitTypes, ha, hb, Option.bind_some, types]
+  have nty : ntyOf unit i = ntyOf unit j := by
+    funext t; simp only [ntyOf, ntyOfFuel_sameTables ha hb types names]
+  simp only [resourceOf, lookup, nty, ha, hb, Option.bind_eq_bind, Option.bind_some, resolveNominal?_sameNames (unit := unit) names]
+
+def sameTypes : List Ty → List Ty → Bool
+  | [], [] => true
+  | left :: lefts, right :: rights => Ty.beq left right && sameTypes lefts rights
+  | _, _ => false
+
+theorem sameTypes_eq : (lefts rights : List Ty) → sameTypes lefts rights = true → lefts = rights
+  | [], [], _ => rfl
+  | [], _ :: _, same => by simp [sameTypes] at same
+  | _ :: _, [], same => by simp [sameTypes] at same
+  | left :: lefts, right :: rights, same => by
+      simp only [sameTypes, Bool.and_eq_true] at same
+      rw [(Ty.beq_iff left right).mp same.1, sameTypes_eq lefts rights same.2]
+
+def sameNames : List QualifiedName → List QualifiedName → Bool
+  | [], [] => true
+  | left :: lefts, right :: rights => decide (left = right) && sameNames lefts rights
+  | _, _ => false
+
+theorem sameNames_eq : (lefts rights : List QualifiedName) →
+    sameNames lefts rights = true → lefts = rights
+  | [], [], _ => rfl
+  | [], _ :: _, same => by simp [sameNames] at same
+  | _ :: _, [], same => by simp [sameNames] at same
+  | left :: lefts, right :: rights, same => by
+      simp only [sameNames, Bool.and_eq_true, decide_eq_true_eq] at same
+      rw [same.1, sameNames_eq lefts rights same.2]
+
+/-- Whether two namespaces hold the same types and names. -/
+def sameTables (left right : ValidatedNamespace) : Bool :=
+  sameTypes left.tables.types.toList right.tables.types.toList &&
+    sameNames left.tables.names.toList right.tables.names.toList
+
+/-- A check of every type identifier of every namespace, of a namespace
+holding the first namespace's tables by the first's. -/
+def everyNamespaceType (unit : ValidatedUnit) (check : Nat → ValidatedNamespace → Nat → Bool) :
+    Bool :=
+  (List.range unit.namespaces.size).all fun index =>
+    match unit.namespaces[index]? with
+    | none => true
+    | some ns =>
+        (index != 0 && (unit.namespaces[0]?).any (sameTables ns)) ||
+          (List.range ns.tables.types.size).all (check index ns)
+
+theorem everyNamespaceType_sound {unit : ValidatedUnit}
+    {check : Nat → ValidatedNamespace → Nat → Bool}
+    (transport : ∀ {index other : Nat} {left right : ValidatedNamespace},
+      unit.namespaces[index]? = some left → unit.namespaces[other]? = some right →
+      left.tables.types = right.tables.types → left.tables.names = right.tables.names →
+      ∀ type, check index left type = check other right type)
+    (checked : everyNamespaceType unit check = true) {index : Nat} {ns : ValidatedNamespace}
+    (namespace_eq : unit.namespaces[index]? = some ns) {type : Nat}
+    (inTable : type < ns.tables.types.size) : check index ns type = true := by
+  simp only [everyNamespaceType, List.all_eq_true, List.mem_range] at checked
+  have direct : ∀ {index : Nat} {ns : ValidatedNamespace}, unit.namespaces[index]? = some ns →
+      index = 0 → ∀ type, type < ns.tables.types.size → check index ns type = true := by
+    intro index ns namespace_eq isFirst type inTable
+    have inNamespaces : index < unit.namespaces.size := by
+      rcases Nat.lt_or_ge index unit.namespaces.size with inside | beyond
+      · exact inside
+      · simp [Array.getElem?_eq_none beyond] at namespace_eq
+    have atNamespace := checked index inNamespaces
+    rw [namespace_eq] at atNamespace
+    simp only [isFirst, bne_self_eq_false, Bool.false_and, Bool.false_or, List.all_eq_true,
+      List.mem_range] at atNamespace
+    subst isFirst
+    exact atNamespace type inTable
+  have inNamespaces : index < unit.namespaces.size := by
+    rcases Nat.lt_or_ge index unit.namespaces.size with inside | beyond
+    · exact inside
+    · simp [Array.getElem?_eq_none beyond] at namespace_eq
+  have atNamespace := checked index inNamespaces
+  rw [namespace_eq] at atNamespace
+  rcases (Bool.or_eq_true _ _).mp atNamespace with shared | own
+  · obtain ⟨_, shared⟩ := (Bool.and_eq_true _ _).mp shared
+    cases first_eq : unit.namespaces[0]? with
+    | none => simp [first_eq] at shared
+    | some first =>
+        simp only [first_eq, Option.any_some, sameTables, Bool.and_eq_true] at shared
+        have types := Array.toList_inj.mp (sameTypes_eq _ _ shared.1)
+        have names := Array.toList_inj.mp (sameNames_eq _ _ shared.2)
+        rw [transport namespace_eq first_eq types names type]
+        exact direct first_eq rfl type (types ▸ inTable)
+  · simp only [List.all_eq_true, List.mem_range] at own
+    exact own type inTable
+
+/-- Whether a type identifier stating no reference reads natively as its
+semantic type. -/
+def typeAgrees (unit : ValidatedUnit) (index : Nat) (ns : ValidatedNamespace) (type : Nat) : Bool :=
+  match ntyOf unit ⟨index⟩ ⟨type⟩, StaticTyping.resolveAt ns #[] ⟨type⟩ with
+  | some τ, some type => !type.referenceFree || τ.typedAsCheck unit type
+  | _, _ => true
 
 /-- Whether a unit's native and semantic readings agree: every closed type
 identifier stating no reference reads natively as its semantic type, and
 every closure target's signature reads alike. Decided by evaluation over the
 unit. -/
 def typesAgreeCheck (unit : ValidatedUnit) : Bool :=
-  (List.range unit.namespaces.size).all fun index =>
+  everyNamespaceType unit (typeAgrees unit) &&
+    (List.range unit.namespaces.size).all fun index =>
       match unit.namespaces[index]? with
       | none => true
-      | some ns =>
-          (List.range ns.tables.types.size).all (fun typeIndex =>
-            match ntyOf unit ⟨index⟩ ⟨typeIndex⟩,
-                StaticTyping.resolveIn ns #[] ⟨typeIndex⟩ with
-            | some τ, some type => !type.referenceFree || τ.typedAsCheck unit type
-            | _, _ => true) &&
-          (List.range ns.functions.size).all fun functionIndex =>
-            signatureAgrees unit ⟨⟨index⟩, ⟨functionIndex⟩⟩
+      | some ns => (List.range ns.functions.size).all fun functionIndex =>
+          signatureAgrees unit ⟨⟨index⟩, ⟨functionIndex⟩⟩
 
 /-- A unit's native and semantic readings agree (`typesAgreeCheck`). -/
 structure TypesAgree (unit : ValidatedUnit) : Prop where
   types : ∀ namespaceId typeId ns τ type, unit.namespaces[namespaceId.index]? = some ns →
-    ntyOf unit namespaceId typeId = some τ → StaticTyping.resolveIn ns #[] typeId = some type →
+    ntyOf unit namespaceId typeId = some τ → StaticTyping.resolveAt ns #[] typeId = some type →
     type.referenceFree = true → τ.TypedAs unit type
   signatures : ∀ function, signatureAgrees unit function = true
 
 theorem TypesAgree.ofCheck {unit : ValidatedUnit} (check : typesAgreeCheck unit = true) :
     TypesAgree unit := by
-  simp only [typesAgreeCheck, List.all_eq_true, List.mem_range] at check
-  have namespaces := check
+  obtain ⟨types, functions⟩ := (Bool.and_eq_true _ _).mp check
+  simp only [List.all_eq_true, List.mem_range] at functions
   refine ⟨fun namespaceId typeId ns τ type namespace_eq native resolved free => ?_,
     fun function => ?_⟩
-  · have inNamespaces : namespaceId.index < unit.namespaces.size := by
-      rcases Nat.lt_or_ge namespaceId.index unit.namespaces.size with inside | beyond
-      · exact inside
-      · simp [Array.getElem?_eq_none beyond] at namespace_eq
-    have atNamespace := namespaces namespaceId.index inNamespaces
-    rw [namespace_eq] at atNamespace
-    simp only [Bool.and_eq_true, List.all_eq_true, List.mem_range] at atNamespace
-    have inTable : typeId.index < ns.tables.types.size := by
+  · have inTable : typeId.index < ns.tables.types.size := by
       rcases Nat.lt_or_ge typeId.index ns.tables.types.size with inside | beyond
       · exact inside
-      · simp [StaticTyping.resolveIn, SemTy.resolveFuel, Array.getElem?_eq_none beyond] at resolved
-    have atType := atNamespace.1 typeId.index inTable
+      · simp [StaticTyping.resolveAt, SemTy.resolveFuel, Array.getElem?_eq_none beyond] at resolved
+    have transport : ∀ {index other : Nat} {left right : ValidatedNamespace},
+        unit.namespaces[index]? = some left → unit.namespaces[other]? = some right →
+        left.tables.types = right.tables.types → left.tables.names = right.tables.names →
+        ∀ type, typeAgrees unit index left type = typeAgrees unit other right type := by
+      intro index other left right left_eq right_eq types names type
+      simp only [typeAgrees, ntyOf]
+      rw [ntyOfFuel_sameTables (i := ⟨index⟩) (j := ⟨other⟩) left_eq right_eq types names,
+        resolveAt_sameTables types names]
+    have atType := everyNamespaceType_sound transport types namespace_eq inTable
     have identifier : (⟨namespaceId.index⟩ : NamespaceId) = namespaceId := rfl
     have typeIdentifier : (⟨typeId.index⟩ : TypeId) = typeId := rfl
-    rw [identifier, typeIdentifier, native, resolved] at atType
-    simp only [free, Bool.not_true, Bool.false_or] at atType
+    simp only [typeAgrees, identifier, typeIdentifier, native, resolved, free, Bool.not_true,
+      Bool.false_or] at atType
     exact NTy.typedAs_of_check atType
   · cases namespace_eq : unit.namespaces[function.namespaceId.index]? with
     | none => simp [signatureAgrees, namespace_eq]
@@ -826,9 +967,9 @@ theorem TypesAgree.ofCheck {unit : ValidatedUnit} (check : typesAgreeCheck unit 
           rcases Nat.lt_or_ge function.namespaceId.index unit.namespaces.size with inside | beyond
           · exact inside
           · simp [Array.getElem?_eq_none beyond] at namespace_eq
-        have atNamespace := namespaces function.namespaceId.index inNamespaces
+        have atNamespace := functions function.namespaceId.index inNamespaces
         rw [namespace_eq] at atNamespace
-        simp only [Bool.and_eq_true, List.all_eq_true, List.mem_range] at atNamespace
+        simp only [List.all_eq_true, List.mem_range] at atNamespace
         cases function_eq : ns.functions[function.functionId.index]? with
         | none => simp [signatureAgrees, namespace_eq, function_eq]
         | some declaration =>
@@ -836,7 +977,7 @@ theorem TypesAgree.ofCheck {unit : ValidatedUnit} (check : typesAgreeCheck unit 
               rcases Nat.lt_or_ge function.functionId.index ns.functions.size with inside | beyond
               · exact inside
               · simp [Array.getElem?_eq_none beyond] at function_eq
-            exact atNamespace.2 function.functionId.index inFunctions
+            exact atNamespace function.functionId.index inFunctions
 
 mutual
 /-- Whether a type mentions no function type. -/
@@ -879,19 +1020,16 @@ def resourceTypedCheck (unit : ValidatedUnit) (agree : Bool) (namespaceId : Name
   | none => true
   | some resource =>
       resource.type.paramFree && resource.type.refFree && (resource.type.closureFree || agree) &&
-        match StaticTyping.resolveIn ns #[] typeId with
+        match StaticTyping.resolveAt ns #[] typeId with
         | some type => resource.type.typedAsCheck unit type
         | none => false
 
 /-- Whether every resource type of a unit corresponds to its type, decided
-by evaluation over its type tables; the readings' agreement is evaluated
-only for a resource type stating a function type. -/
-def resourcesTypedCheck (unit : ValidatedUnit) : Bool :=
-  (List.range unit.namespaces.size).all fun index =>
-    match unit.namespaces[index]? with
-    | none => true
-    | some ns => (List.range ns.tables.types.size).all fun typeIndex =>
-        resourceTypedCheck unit (typesAgreeCheck unit) ⟨index⟩ ns ⟨typeIndex⟩
+by evaluation over its type tables, given the verdict on the readings' agreement,
+which a resource type stating a function type needs. -/
+def resourcesTypedCheck (unit : ValidatedUnit) (agree : Bool) : Bool :=
+  everyNamespaceType unit fun index ns typeIndex =>
+    resourceTypedCheck unit agree ⟨index⟩ ns ⟨typeIndex⟩
 
 /-- A type identifier outside its namespace's table denotes no resource. -/
 theorem runtimeResourceOf_beyond {unit : ValidatedUnit} {namespaceId : NamespaceId} {ns : ValidatedNamespace}
@@ -899,7 +1037,10 @@ theorem runtimeResourceOf_beyond {unit : ValidatedUnit} {namespaceId : Namespace
     (beyond : ns.tables.types.size ≤ typeId.index) : runtimeResourceOf unit namespaceId typeId = none := by
   simp [runtimeResourceOf, resourceOf, unitTypes, namespace_eq, Array.getElem?_eq_none beyond]
 
-theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} (check : resourcesTypedCheck unit = true) :
+/-- Resource typing from the check, its verdict on the readings' agreement proved apart
+(`TypesAgree.ofCheck`), so that the agreement is evaluated once. -/
+theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} {agree : Bool}
+    (agreed : agree = true → TypesAgree unit) (check : resourcesTypedCheck unit agree = true) :
     ResourcesTyped unit := by
   intro ⟨namespaceIndex⟩ ⟨typeIndex⟩ resource named
   have namespaceAt : ∃ ns, unit.namespaces[namespaceIndex]? = some ns := by
@@ -907,19 +1048,22 @@ theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} (check : resourcesTypedChe
     | some ns => exact ⟨ns, rfl⟩
     | none => simp [runtimeResourceOf, resourceOf, unitTypes, namespace_eq] at named
   obtain ⟨ns, namespace_eq⟩ := namespaceAt
-  have inNamespaces : namespaceIndex < unit.namespaces.size := by
-    rcases Nat.lt_or_ge namespaceIndex unit.namespaces.size with inside | beyond
-    · exact inside
-    · simp [Array.getElem?_eq_none beyond] at namespace_eq
   have inTable : typeIndex < ns.tables.types.size := by
     rcases Nat.lt_or_ge typeIndex ns.tables.types.size with inside | beyond
     · exact inside
     · rw [runtimeResourceOf_beyond (namespaceId := ⟨namespaceIndex⟩) namespace_eq
         (typeId := ⟨typeIndex⟩) beyond] at named
       cases named
-  have checked := List.all_eq_true.mp check namespaceIndex (List.mem_range.mpr inNamespaces)
-  simp only [namespace_eq] at checked
-  have typed := List.all_eq_true.mp checked typeIndex (List.mem_range.mpr inTable)
+  have transport : ∀ {index other : Nat} {left right : ValidatedNamespace},
+      unit.namespaces[index]? = some left → unit.namespaces[other]? = some right →
+      left.tables.types = right.tables.types → left.tables.names = right.tables.names →
+      ∀ type, resourceTypedCheck unit agree ⟨index⟩ left ⟨type⟩ =
+        resourceTypedCheck unit agree ⟨other⟩ right ⟨type⟩ := by
+    intro index other left right left_eq right_eq types names type
+    simp only [resourceTypedCheck, runtimeResourceOf]
+    rw [resourceOf_sameTables (i := ⟨index⟩) (j := ⟨other⟩) left_eq right_eq types names,
+      resolveAt_sameTables types names]
+  have typed := everyNamespaceType_sound transport check namespace_eq inTable
   unfold resourceTypedCheck at typed
   rw [named] at typed
   simp only [Bool.and_eq_true] at typed
@@ -927,7 +1071,7 @@ theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} (check : resourcesTypedChe
   have closures : resource.type.closureFree = true ∨ TypesAgree unit := by
     rcases (Bool.or_eq_true _ _).mp closures with closureFree | agree
     · exact .inl closureFree
-    · exact .inr (TypesAgree.ofCheck agree)
+    · exact .inr (agreed agree)
   split at typed
   · next type resolved =>
       exact ⟨ns, type, namespace_eq, ⟨_, resolved⟩, NTy.typedAs_of_check typed, closed, plain,
@@ -935,9 +1079,9 @@ theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} (check : resourcesTypedChe
   · cases typed
 
 /-- Declared types that resolve by evaluation. -/
-theorem ResolvesAll.ofResolveIn {ns : ValidatedNamespace} {typeIds : List TypeId}
+theorem ResolvesAll.ofResolveAt {ns : ValidatedNamespace} {typeIds : List TypeId}
     {types : List SemTy}
-    (resolved : typeIds.mapM (StaticTyping.resolveIn ns #[]) = some types) :
+    (resolved : typeIds.mapM (StaticTyping.resolveAt ns #[]) = some types) :
     ResolvesAll ns.tables #[] typeIds types :=
   ResolvesAll.of_mapM resolved
 
