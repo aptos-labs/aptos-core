@@ -19,7 +19,7 @@ use move_binary_format::{
     file_format::{FunctionAttribute, StructDefinitionIndex, Visibility},
 };
 use move_core_types::identifier::IdentStr;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use shared_dsa::{Entry, UnorderedMap, UnorderedSet};
 use specializer::{FunctionIR, ModuleIR};
 use std::{
@@ -38,6 +38,15 @@ use std::{
 pub fn instantiation_read_lock() -> bool {
     static FLAG: OnceLock<bool> = OnceLock::new();
     *FLAG.get_or_init(|| std::env::var("MONO_INSTANTIATION_RWLOCK").is_ok_and(|v| v == "1"))
+}
+
+type InstantiationMap = UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>;
+
+/// The instantiated-function cache, behind the lock [`instantiation_read_lock`]
+/// selects when the module is loaded.
+enum InstantiationCache {
+    Mutex(Mutex<InstantiationMap>),
+    RwLock(RwLock<InstantiationMap>),
 }
 
 /// One counter per cache-line pair.
@@ -217,8 +226,7 @@ pub struct LoadedModule {
     /// 2. The type arguments are fully concrete — they're the actual
     ///    runtime types the function was monomorphized for.
     // TODO(cleanup): revisit data structure used for actual monomorphized function storage.
-    instantiated_functions:
-        RwLock<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
+    instantiated_functions: InstantiationCache,
     /// Maps the name of a group member defined in this module (a nominal type)
     /// to its group container type (also a nominal type). Built once when the
     /// module is loaded. If struct's or enum's name is not in the map, then it
@@ -278,7 +286,11 @@ impl LoadedModule {
             mandatory_dependencies,
             functions,
             function_indices,
-            instantiated_functions: RwLock::new(UnorderedMap::new()),
+            instantiated_functions: if instantiation_read_lock() {
+                InstantiationCache::RwLock(RwLock::new(UnorderedMap::new()))
+            } else {
+                InstantiationCache::Mutex(Mutex::new(UnorderedMap::new()))
+            },
             resource_group_members,
             randomness_annotated,
             public_pack_apis,
@@ -444,27 +456,29 @@ impl LoadedModule {
         name: InternedIdentifier,
         ty_args: InternedTypeList,
     ) -> Option<(FunctionPtr, Arc<[LoadedModuleSlot]>)> {
-        let lookup = |map: &UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>| {
+        let lookup = |map: &InstantiationMap| {
             map.get(&(name, ty_args))
                 .map(|f| (f.function, f.mandatory_dependencies.clone()))
         };
-        let lock = &self.instantiated_functions;
-        if instantiation_read_lock() {
-            if let Some(map) = lock.try_read() {
-                return lookup(&map);
-            }
-            let start = Instant::now();
-            let map = lock.read();
-            record_contended_lookup(start);
-            lookup(&map)
-        } else {
-            if let Some(map) = lock.try_write() {
-                return lookup(&map);
-            }
-            let start = Instant::now();
-            let map = lock.write();
-            record_contended_lookup(start);
-            lookup(&map)
+        match &self.instantiated_functions {
+            InstantiationCache::Mutex(lock) => {
+                if let Some(map) = lock.try_lock() {
+                    return lookup(&map);
+                }
+                let start = Instant::now();
+                let map = lock.lock();
+                record_contended_lookup(start);
+                lookup(&map)
+            },
+            InstantiationCache::RwLock(lock) => {
+                if let Some(map) = lock.try_read() {
+                    return lookup(&map);
+                }
+                let start = Instant::now();
+                let map = lock.read();
+                record_contended_lookup(start);
+                lookup(&map)
+            },
         }
     }
 
@@ -479,9 +493,13 @@ impl LoadedModule {
         function: Function,
         function_ms: Arc<[LoadedModuleSlot]>,
     ) -> FunctionPtr {
-        match self.instantiated_functions.write().entry((name, ty_args)) {
+        let insert = |map: &mut InstantiationMap| match map.entry((name, ty_args)) {
             Entry::Occupied(e) => e.get().function,
             Entry::Vacant(e) => e.insert(FunctionSlot::new(function, function_ms)).function,
+        };
+        match &self.instantiated_functions {
+            InstantiationCache::Mutex(lock) => insert(&mut lock.lock()),
+            InstantiationCache::RwLock(lock) => insert(&mut lock.write()),
         }
     }
 
@@ -532,9 +550,15 @@ impl Drop for LoadedModule {
             }
             false
         });
-        self.instantiated_functions.write().for_each_value(|slot| {
-            // SAFETY: see impl-level comment — no aliases at drop time.
-            unsafe { slot.function.free_unchecked() };
-        });
+        let free = |map: &mut InstantiationMap| {
+            map.for_each_value(|slot| {
+                // SAFETY: see impl-level comment — no aliases at drop time.
+                unsafe { slot.function.free_unchecked() };
+            })
+        };
+        match &self.instantiated_functions {
+            InstantiationCache::Mutex(lock) => free(&mut lock.lock()),
+            InstantiationCache::RwLock(lock) => free(&mut lock.write()),
+        }
     }
 }
