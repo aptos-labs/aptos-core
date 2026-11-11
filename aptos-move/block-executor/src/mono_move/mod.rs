@@ -44,7 +44,7 @@ use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ptr::NonNull,
-    sync::{atomic::Ordering, Arc, Mutex},
+    sync::{atomic::Ordering, Arc},
     time::Instant,
 };
 
@@ -473,12 +473,6 @@ pub struct MonoTransactionExecutor {
     worker_id: u32,
     /// Where this worker materializes the values it reads from storage.
     arena: SegmentedArena,
-    /// Under [`GroupAssembly::Chained`] in sequential execution, each group's
-    /// view after the latest transaction materialized so far, starting from
-    /// the stored group. Sequential execution applies a transaction's writes
-    /// before materializing it, so the group's slot no longer holds the
-    /// previous link by then.
-    sequential_group_views: Mutex<HashMap<InMemoryStorageKey, Arc<GroupView>>>,
 }
 
 impl MonoTransactionExecutor {
@@ -577,7 +571,6 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             environment: environment.clone(),
             worker_id,
             arena: SegmentedArena::new(),
-            sequential_group_views: Mutex::new(HashMap::new()),
         }
     }
 
@@ -591,20 +584,24 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
     ) -> Result<(ExecutionStatus<Self::Output>, Self::Input), PanicError> {
         let guard = self.execution_guard()?;
 
-        let (outcome, skips_rest, reads) = match mode {
+        let (outcome, skips_rest, reads, unsync_map) = match mode {
             ViewMode::Sequential { unsync_map, .. } => {
                 let provider = BlockSTMSequentialProvider::new(
                     &guard,
                     shared.base_view,
                     unsync_map,
                     &self.arena,
-                    &self.sequential_group_views,
                 );
                 let (outcome, skips_rest) =
                     self.run(&guard, shared.base_view, &provider, txn, auxiliary_info)?;
                 // Sequential execution never validates, so the read set is
                 // not collected.
-                (outcome, skips_rest, MonoReads::empty(None))
+                (
+                    outcome,
+                    skips_rest,
+                    MonoReads::empty(None),
+                    Some(unsync_map),
+                )
             },
             ViewMode::Parallel {
                 versioned_map,
@@ -636,17 +633,30 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     Some(rws) => MonoReads::from_read_write_set(rws, incarnation)?,
                     None => MonoReads::empty(Some(incarnation)),
                 };
-                (outcome, skips_rest, reads)
+                (outcome, skips_rest, reads, None)
             },
         };
 
-        Ok((
-            ExecutionStatus::Executed {
-                output: MonoTxnOutput::executed(outcome, skips_rest),
-                skips_rest,
-            },
-            reads,
-        ))
+        let output = MonoTxnOutput::executed(outcome, skips_rest);
+        // Sequential execution applies this transaction's writes before it is
+        // materialized, replacing the previous link at each group's slot. That
+        // link's view is already built, so this transaction's link keeps it.
+        if let Some(unsync_map) = unsync_map {
+            for (group_key, link) in output.group_links() {
+                let prev = match unsync_map.fetch_data(&group_key) {
+                    Some(MonoValue::GroupLink(prev)) => prev.built_view().cloned(),
+                    _ => None,
+                }
+                .ok_or_else(|| {
+                    code_invariant_error(format!(
+                        "Group {group_key:?} was written before it was read"
+                    ))
+                })?;
+                link.set_prev(prev)?;
+            }
+        }
+
+        Ok((ExecutionStatus::Executed { output, skips_rest }, reads))
     }
 
     fn materialize<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(
@@ -691,7 +701,6 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     shared.base_view,
                     unsync_map,
                     &self.arena,
-                    &self.sequential_group_views,
                 );
                 let (mut output, groups) = outcome
                     .materialize(&guard, &provider, features, auxiliary_data)
@@ -706,19 +715,12 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 }
 
                 let start = Instant::now();
-                let mut views = self
-                    .sequential_group_views
-                    .lock()
-                    .map_err(|_| code_invariant_error("Group views lock poisoned"))?;
                 for (group_key, link) in &links {
-                    let prev = views.get(group_key).cloned().ok_or_else(|| {
-                        code_invariant_error(format!(
-                            "Group {group_key:?} was written before it was read"
-                        ))
+                    let prev = link.prev().cloned().ok_or_else(|| {
+                        code_invariant_error("A sequential group link has no previous view")
                     })?;
                     let view = link.view_on(&guard, &prev)?;
                     add_group_write(&mut output, group_key, !prev.is_empty(), &view)?;
-                    views.insert(group_key.clone(), view);
                 }
                 record_chained_assembly(start, links.len());
                 Ok(output)

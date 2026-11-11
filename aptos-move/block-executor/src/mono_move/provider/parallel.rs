@@ -7,7 +7,7 @@
 
 use crate::{
     mono_move::{
-        group_chain::{stored_view, GroupLink},
+        group_chain::{stored_view, tag_bytes, GroupLink, GroupView},
         provider::{invariant_violation, materialized_value, ParallelReader, StorageBase},
         MonoValue,
     },
@@ -15,7 +15,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDataError, TxnIndex},
+    types::{Incarnation, MVDataError, MVDataOutput, TxnIndex},
     MVHashMap,
 };
 use aptos_types::state_store::{state_key::StateKey, TStateView};
@@ -97,26 +97,18 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
         group_key: &InMemoryStorageKey,
         tag: &StructTag,
     ) -> Result<StorageRead, ResourceProviderError> {
+        if GroupAssembly::get() == GroupAssembly::Chained {
+            return self.read_chained_group_member(key, group_key, tag);
+        }
         let data = self.reader.versioned_map().data();
         let txn_idx = self.reader.txn_idx();
         self.reader.read_data(self, key, || {
-            // Any entry at the group's slot below this transaction means the
-            // group was provisioned: a transaction reads a group before it
-            // writes a link there.
-            if !matches!(
-                data.fetch_data_no_record(group_key, txn_idx),
-                Err(MVDataError::Uninitialized)
-            ) {
+            if let Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata)) =
+                data.fetch_data_no_record(group_key, txn_idx)
+            {
                 return Ok(MonoValue::Deletion);
             }
             let members = StorageBase::group_members(self, group_key)?;
-            let sentinel = if GroupAssembly::get() == GroupAssembly::Chained {
-                let view = stored_view(members.iter().cloned())
-                    .map_err(|e| invariant_violation(format!("{e:?}")))?;
-                MonoValue::GroupLink(Arc::new(GroupLink::stored(view)))
-            } else {
-                MonoValue::GroupMetadata
-            };
             let mut value = MonoValue::Deletion;
             for (member_tag, blob) in members {
                 // TODO(metering): every stored member is interned, including
@@ -134,9 +126,70 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
             }
             // After the members, so that a reader who sees the sentinel finds
             // every member that exists.
-            data.set_base_value(group_key.clone(), sentinel, |_, _| {});
+            data.set_base_value(group_key.clone(), MonoValue::GroupMetadata, |_, _| {});
             Ok(value)
         })
+    }
+
+    /// Reads a resource-group member under chained group assembly. The
+    /// stored group's link, the base entry at the group's slot, holds the
+    /// decoded group, so a member's pre-block value is looked up there.
+    /// Members no transaction reads are never materialized or interned.
+    fn read_chained_group_member(
+        &self,
+        key: &InMemoryStorageKey,
+        group_key: &InMemoryStorageKey,
+        tag: &StructTag,
+    ) -> Result<StorageRead, ResourceProviderError> {
+        self.reader.read_data(self, key, || {
+            let view = self.stored_group_view(group_key)?;
+            let tag = tag_bytes(tag).map_err(|e| invariant_violation(format!("{e:?}")))?;
+            match view.get(&tag) {
+                Some(blob) => StorageBase::materialize_member(self, key, blob),
+                None => Ok(MonoValue::Deletion),
+            }
+        })
+    }
+
+    /// The stored group's view, provisioning the group's slot with it on the
+    /// block's first read of the group. Reading the slot at index 0 sees only
+    /// its base entry, never a transaction's link.
+    fn stored_group_view(
+        &self,
+        group_key: &InMemoryStorageKey,
+    ) -> Result<Arc<GroupView>, ResourceProviderError> {
+        let data = self.reader.versioned_map().data();
+        loop {
+            match data.fetch_data_no_record(group_key, 0) {
+                Ok(MVDataOutput::Versioned(_, MonoValue::GroupLink(link))) => {
+                    return link
+                        .built_view()
+                        .cloned()
+                        .ok_or_else(|| invariant_violation("The stored group's link has no view"));
+                },
+                Ok(MVDataOutput::Versioned(_, _)) => {
+                    return Err(invariant_violation(
+                        "A group slot's base entry is not a link",
+                    ))
+                },
+                Err(MVDataError::Uninitialized) => {
+                    let view = stored_view(StorageBase::group_members(self, group_key)?)
+                        .map_err(|e| invariant_violation(format!("{e:?}")))?;
+                    // Another worker may be provisioning the same group from the
+                    // same storage, so whichever link is already there stands.
+                    data.set_base_value(
+                        group_key.clone(),
+                        MonoValue::GroupLink(Arc::new(GroupLink::stored(view))),
+                        |_, _| {},
+                    );
+                },
+                Err(MVDataError::Dependency(_)) => {
+                    return Err(invariant_violation(
+                        "A group slot's base entry has a dependency",
+                    ))
+                },
+            }
+        }
     }
 
     /// The stored bytes of a group member the multi-version map holds.

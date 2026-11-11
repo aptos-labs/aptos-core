@@ -45,6 +45,10 @@ pub struct GroupLink {
     /// The group's members after these changes. Set when the stored group is
     /// provisioned, and built once for a transaction's link.
     view: OnceLock<Arc<GroupView>>,
+    /// The group's members before these changes. Only set in sequential
+    /// execution, where this link replaces the previous one at the group's
+    /// slot before it is materialized.
+    prev: OnceLock<Arc<GroupView>>,
 }
 
 impl GroupLink {
@@ -53,6 +57,7 @@ impl GroupLink {
         Self {
             changes: vec![],
             view: OnceLock::from(Arc::new(view)),
+            prev: OnceLock::new(),
         }
     }
 
@@ -61,7 +66,19 @@ impl GroupLink {
         Self {
             changes,
             view: OnceLock::new(),
+            prev: OnceLock::new(),
         }
+    }
+
+    /// Records the group's members before this link's changes.
+    pub(crate) fn set_prev(&self, prev: Arc<GroupView>) -> Result<(), PanicError> {
+        self.prev
+            .set(prev)
+            .map_err(|_| code_invariant_error("A group link's previous view was set twice"))
+    }
+
+    pub(crate) fn prev(&self) -> Option<&Arc<GroupView>> {
+        self.prev.get()
     }
 
     pub(crate) fn built_view(&self) -> Option<&Arc<GroupView>> {
@@ -181,7 +198,8 @@ pub(crate) fn group_write(existed: bool, view: &GroupView) -> Result<WriteOp, Pa
     })
 }
 
-fn tag_bytes(tag: &StructTag) -> Result<Bytes, PanicError> {
+/// The BCS encoding of a member's struct tag, which keys it in a view.
+pub(crate) fn tag_bytes(tag: &StructTag) -> Result<Bytes, PanicError> {
     bcs::to_bytes(tag)
         .map(Bytes::from)
         .map_err(|e| code_invariant_error(format!("Failed to encode a struct tag: {e}")))

@@ -6,7 +6,7 @@
 //! layers.
 
 use crate::mono_move::{
-    group_chain::{stored_view, GroupLink, GroupView},
+    group_chain::{stored_view, tag_bytes, GroupLink},
     provider::{invariant_violation, materialized_value, storage_read},
     MonoValue,
 };
@@ -27,10 +27,7 @@ use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::SegmentedArena;
 use move_core_types::language_storage::StructTag;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::Arc;
 
 type MonoUnsyncMap = UnsyncMap<InMemoryStorageKey, StructTag, MonoValue, DelayedFieldID>;
 
@@ -43,9 +40,6 @@ pub(crate) struct BlockSTMSequentialProvider<'a, 'ctx, S> {
     unsync_map: &'a MonoUnsyncMap,
     /// Where values read from the base storage layer are materialized.
     arena: &'a SegmentedArena,
-    /// Under chained group assembly, each group's latest view, which starts
-    /// as the stored group when the group is provisioned.
-    group_views: &'a Mutex<HashMap<InMemoryStorageKey, Arc<GroupView>>>,
 }
 
 impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ctx, S> {
@@ -54,14 +48,12 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         base_view: &'a S,
         unsync_map: &'a MonoUnsyncMap,
         arena: &'a SegmentedArena,
-        group_views: &'a Mutex<HashMap<InMemoryStorageKey, Arc<GroupView>>>,
     ) -> Self {
         Self {
             guard,
             base_view,
             unsync_map,
             arena,
-            group_views,
         }
     }
 
@@ -181,9 +173,10 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
             Some(value) => return storage_read(&value, None),
             None => {},
         }
-        // Anything at the group's slot means the group was provisioned: a
-        // transaction reads a group before it writes a link there.
-        if self.unsync_map.fetch_data(group_key).is_some() {
+        if GroupAssembly::get() == GroupAssembly::Chained {
+            return self.read_chained_group_member(key, group_key, tag);
+        }
+        if let Some(MonoValue::GroupMetadata) = self.unsync_map.fetch_data(group_key) {
             return Ok(self.cache_not_existing_value(key));
         }
 
@@ -191,21 +184,6 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
             .read_group_from_storage(group_key)
             .map_err(|e| invariant_violation(format!("{e:#}")))?
             .unwrap_or_default();
-        let sentinel = if GroupAssembly::get() == GroupAssembly::Chained {
-            let view = stored_view(
-                members
-                    .iter()
-                    .map(|(tag, blob)| (tag.clone(), blob.clone())),
-            )
-            .map_err(|e| invariant_violation(format!("{e:?}")))?;
-            self.group_views
-                .lock()
-                .map_err(|_| invariant_violation("Group views lock poisoned"))?
-                .insert(group_key.clone(), Arc::new(view.clone()));
-            MonoValue::GroupLink(Arc::new(GroupLink::stored(view)))
-        } else {
-            MonoValue::GroupMetadata
-        };
         let mut blob = None;
         for (member_tag, member_blob) in members {
             // TODO(metering): every stored member is interned, including
@@ -223,9 +201,55 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
                     .set_base_value(member_key, MonoValue::ResourceGroupMemberBytes(member_blob));
             }
         }
-        self.unsync_map.set_base_value(group_key.clone(), sentinel);
+        self.unsync_map
+            .set_base_value(group_key.clone(), MonoValue::GroupMetadata);
         match blob {
             Some(blob) => self.cache_existing_value(key, &blob),
+            None => Ok(self.cache_not_existing_value(key)),
+        }
+    }
+
+    /// Reads a resource-group member under chained group assembly.
+    ///
+    /// A member nobody wrote in this block is looked up in the view at the
+    /// group's slot. That is the link of the latest materialized writer, or
+    /// the stored group's link, so its view is the group as this transaction
+    /// sees it.
+    fn read_chained_group_member(
+        &self,
+        key: &InMemoryStorageKey,
+        group_key: &InMemoryStorageKey,
+        tag: &StructTag,
+    ) -> Result<StorageRead, ResourceProviderError> {
+        if let Some(value) = self.unsync_map.fetch_data(key) {
+            return storage_read(&value, None);
+        }
+        let link = match self.unsync_map.fetch_data(group_key) {
+            Some(MonoValue::GroupLink(link)) => link,
+            Some(_) => {
+                return Err(invariant_violation(
+                    "A group slot holds a value that is not a link",
+                ))
+            },
+            None => {
+                let members = self
+                    .read_group_from_storage(group_key)
+                    .map_err(|e| invariant_violation(format!("{e:#}")))?
+                    .unwrap_or_default();
+                let view =
+                    stored_view(members).map_err(|e| invariant_violation(format!("{e:?}")))?;
+                let link = Arc::new(GroupLink::stored(view));
+                self.unsync_map
+                    .set_base_value(group_key.clone(), MonoValue::GroupLink(link.clone()));
+                link
+            },
+        };
+        let view = link
+            .built_view()
+            .ok_or_else(|| invariant_violation("The group slot's link has no view"))?;
+        let tag = tag_bytes(tag).map_err(|e| invariant_violation(format!("{e:?}")))?;
+        match view.get(&tag) {
+            Some(blob) => self.cache_existing_value(key, blob),
             None => Ok(self.cache_not_existing_value(key)),
         }
     }

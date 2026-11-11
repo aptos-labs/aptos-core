@@ -113,6 +113,9 @@ fn drain_write_set(
             .map_err(|e| format!("failed to serialize written value: {e}"))?;
         Ok(Bytes::from(blob))
     };
+    // Under chained assembly the block executor serializes group members once,
+    // when it builds the first view that contains them.
+    let chained = GroupAssembly::get() == GroupAssembly::Chained;
     let mut convert = |key: &InMemoryStorageKey,
                        class: WriteClass,
                        group: Option<InternedType>|
@@ -134,6 +137,7 @@ fn drain_write_set(
                 };
                 writes.push((state_key, op));
             },
+            Some(_) if chained => {},
             Some(group_ty) => {
                 let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
                 let member_op = match class {
