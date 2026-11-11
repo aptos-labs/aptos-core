@@ -3719,7 +3719,6 @@ def satisfiabilityOf (unitTerm : Term) (dataInvariants : Bool) :
       $statement) }
 
 
--- MERGE-REVIEW: an opaque instance's theorem binds no `DataInvariantsSatisfiable` hypothesis and its simp set names no `Carriers.own` equation; does a unit with data invariants need `satisfiabilityOf` here as the public theorems do?
 /-- Prove an opaque adapter's contract independently at its concrete reading.
 The caller receives only this checked contract theorem, never its body. Richer
 bodies keep the existing rejection until their instance-scoped conditions are

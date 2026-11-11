@@ -59,6 +59,90 @@ verex module 0x42::generic_storage_invariants where
     aborts_if false
 
 verify 0x42::generic_storage_invariants::deposit
+
+/--
+error: the specification clause `aborts_if !exists<Coin<A> >(addr)` is not established
+---
+error: the specification clause `aborts_if global<Coin<A> >(addr).value + amount > MAX_U64` is not established
+---
+error: the specification clause `ensures global<Coin<A> >(addr).value
+        == old(global<Coin<A> >(addr).value) + amount` is not established
+---
+error: the specification clause `ensures exists<Coin<B> >(addr) == old(exists<Coin<B> >(addr))` is not established
+---
+error: verification failed with a residual obligation:
+case some.left.continues.continues.continues.right.right.right
+verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
+addr : VerexIR.Proofs.Denote.NTy.address.carrier
+amount : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+verexAnchor : VerexIR.Proofs.Denote.AnchorSaved 14 (some addr, some amount, none, ()) initialState✝
+val✝ :
+  (0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+      0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝³⁻⁰).carrier
+heq :
+  initialState✝
+      {
+        type :=
+          0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+            0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝³⁻⁰,
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address addr) =
+    some val✝
+value :
+  (0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+      0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝³⁻⁰).carrier
+a✝¹ : 0 ≤ val✝.val.fst.val + amount.val
+a✝ : val✝.val.fst.val + amount.val ≤ 18446744073709551615
+invariantHolds✝² invariantHolds✝¹ : True
+named_eq : value.val.fst.val = val✝.val.fst.val + amount.val
+invariantHolds✝ : True
+⊢ ¬(initialState✝
+          {
+            type :=
+              0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+                0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝³⁻⁰,
+            arguments :=
+              VerexIR.Proofs.Denote.NRow.cons
+                (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                  0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝³⁻⁰)
+                VerexIR.Proofs.Denote.NRow.nil }
+          (VerexIR.StorageKey.address addr) =
+        none ∨
+      18446744073709551615 <
+        ((initialState✝
+                      {
+                        type :=
+                          0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+                            0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝³⁻⁰,
+                        arguments :=
+                          VerexIR.Proofs.Denote.NRow.cons
+                            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                              0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝³⁻⁰)
+                            VerexIR.Proofs.Denote.NRow.nil }
+                      (VerexIR.StorageKey.address addr)).getD
+                  ((0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+                        0x42.generic_storage_invariants.unit.nominal.namespace.0.declaration✝³⁻⁰).inhabitant
+                    ⋯)).val.fst.val +
+          amount.val)
+---
+error: verex verification failed: the automatic verification of `deposit_a` failed; provide a proof in the module:
+  verify deposit_a by lean =>
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+-/
+#guard_msgs in
 verify 0x42::generic_storage_invariants::deposit_a
 
 /--

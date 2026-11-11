@@ -150,6 +150,14 @@ Rust `SourceVerify` fixtures verify except for these:
   (`library_for_errors`, `nested`).
 - The cheap witness pass exhausts its budget on behavior compositions before the
   later pass succeeds. This is cost, not correctness.
+- A leaf statement carrying a function value spells the unit's carrier family
+  at every encoding and behavior term, which makes it about three times the
+  size it needs and every normal-form step over it dearer; the wider type
+  language adds about a third to the unfoldings of type reduction. Targets with
+  contract calls and function values pay 20–40% for this, and those recorded
+  over budget in `VerexSL/Tests` are its measure. Bind the carrier family once
+  per leaf statement; an induced frame built at a call with no type arguments
+  is the larger part and the larger change.
 - Relating a *read* through a yielded mutable reference to the element before
   the write is not derived automatically (`library_slice_get_mut_errors`).
 - An element-wise postcondition over the lender needs a loop invariant reading
@@ -157,6 +165,11 @@ Rust `SourceVerify` fixtures verify except for these:
   holding references denotes the prophecy
   ([`denotation.md`](../designs/denotation.md)), so the spelling for the current
   one inside an invariant is the open question there.
+- The theorem of an opaque adapter's instance (`verifyOpaqueInstance`) binds
+  no `DataInvariantsSatisfiable` hypothesis and its simp set names no
+  `Carriers.own` equation, where the public theorems take both
+  (`satisfiabilityOf`). Whether a unit with data invariants needs them there is
+  not checked by any fixture.
 - The differential check is parked. Its tree evaluator
   (`VerexRust/Tests/DenoteEval.lean`) does not build on the carriers base:
   values of declared types carry certificates and their encodings are

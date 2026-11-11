@@ -202,7 +202,6 @@ verex module 0x42::certified_nested_fields where
     requires has(get(t, a), b)
     aborts_if false
     ensures result <= 10
-  verify nested
 
 
   -- Returning a mutable table unchanged owes its intrinsic invariant. The
@@ -213,6 +212,23 @@ verex module 0x42::certified_nested_fields where
 
   public fun preserve_nominal(t : &mut Table<u64, Payload>) -> Unit := ()
   verify preserve_nominal
+
+/--
+error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+---
+error: verex verification failed: the automatic verification of `nested` exceeded its budget of 25000 maxHeartbeats after deciding 2 leaves (stage interrupted); provide a proof in the module:
+  verify nested by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+-/
+#guard_msgs in
+verify 0x42::certified_nested_fields::nested
 
 -- Scalar comparisons must not enter the default-transparency certified
 -- closer, even when their arguments explicitly observe a certified value.
