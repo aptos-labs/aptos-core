@@ -6,11 +6,13 @@ use crate::{
     ledger_db::LedgerDb,
     native_store::{
         bundle::{NativeStoreBundle, NativeStoreConfigs},
+        state_sync::NativeStoreReader,
         NativeStoreSpec, OrderStore,
     },
     utils::truncation_helper::get_native_commit_progress,
 };
 use aptos_config::config::StorageDirPaths;
+use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_schemadb::{Cache, Env};
@@ -127,6 +129,51 @@ impl AptosDB {
 }
 
 impl AptosDB {
+    pub(crate) fn order_store_reader(&self) -> Result<NativeStoreReader<'_, OrderStore>> {
+        let bundle = self
+            .order
+            .as_ref()
+            .ok_or_else(|| AptosDbError::Other("native-order store is not enabled".into()))?;
+        Ok(bundle.store.reader(&self.ledger_db))
+    }
+
+    /// Rebuild the order store against the snapshot a fast sync just restored
+    /// at `version`: the store, then the resident index and the overlay over
+    /// it.
+    pub(crate) fn reset_order_after_fast_sync(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<()> {
+        let Some(bundle) = self.order.as_ref() else {
+            return Ok(());
+        };
+        bundle.store.reset_after_fast_sync(
+            &self.ledger_db,
+            version,
+            expected_root_hash,
+            |rows| {
+                // Held across the rebuild: until the re-seat the published
+                // overlay relates to nothing in the base.
+                let mut tip = bundle.orders.lock();
+                bundle.order_base.reset_from_rows(
+                    Some(version),
+                    ORDER_INDEX_FAMILY,
+                    rows.into_iter().flatten(),
+                )?;
+                *tip = bundle.order_base.new_overlay();
+                Ok(())
+            },
+        )?;
+
+        info!(
+            version = version,
+            n_orders = bundle.order_base.read(|view| view.num_orders()),
+            "Order store reset after fast sync."
+        );
+        Ok(())
+    }
+
     /// Bring the order store up to the ledger after a restore saved
     /// transactions past its snapshot without executing them.
     pub(crate) fn reset_order_store_to_ledger(&self) -> Result<()> {

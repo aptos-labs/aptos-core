@@ -202,6 +202,17 @@ impl DbWriter for AptosDB {
                     expected_root_hash,
                 )
             },
+            StateKind::Order => {
+                let order = self.order.as_ref().ok_or_else(|| {
+                    AptosDbError::Other("native-order store is not enabled".into())
+                })?;
+                crate::native_store::state_sync::get_native_snapshot_receiver(
+                    &order.store.kv_db,
+                    &order.store.merkle_db,
+                    version,
+                    expected_root_hash,
+                )
+            },
         })
     }
 
@@ -262,6 +273,18 @@ impl DbWriter for AptosDB {
                      native-position snapshot cannot be restored or verified. Enable \
                      COMPUTE_TRADING_NATIVE_STATE_ROOTS on the source chain, or run without \
                      native-position storage.",
+                    version,
+                );
+            }
+            let order_root =
+                output_with_proof.proof.transaction_infos[0].order_state_checkpoint_hash();
+            if self.order.is_some() {
+                ensure!(
+                    order_root.is_some(),
+                    "Fast sync target at version {} commits no order state root, so the \
+                     native-order snapshot cannot be restored or verified. Enable \
+                     COMPUTE_TRADING_NATIVE_STATE_ROOTS on the source chain, or run without \
+                     native-order storage.",
                     version,
                 );
             }
@@ -411,6 +434,9 @@ impl DbWriter for AptosDB {
             // After the restored rows are durable.
             if let Some(expected_root_hash) = position_root {
                 self.reset_position_after_fast_sync(version, expected_root_hash)?;
+            }
+            if let Some(expected_root_hash) = order_root {
+                self.reset_order_after_fast_sync(version, expected_root_hash)?;
             }
 
             Ok(())
