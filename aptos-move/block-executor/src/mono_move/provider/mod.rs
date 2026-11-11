@@ -150,6 +150,7 @@ where
     /// Blocks until `dep_idx` resolves, failing the read if the block halted
     /// first.
     fn wait(&self, dep_idx: TxnIndex) -> Result<(), ResourceProviderError> {
+        let _timer = crate::phase_times::timer(crate::phase_times::Phase::DependencyWait);
         match wait_for_dependency(&self.scheduler, self.txn_idx, dep_idx) {
             Ok(true) => Ok(()),
             Ok(false) => Err(self.abort("Block execution was halted")),

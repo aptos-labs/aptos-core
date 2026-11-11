@@ -152,6 +152,8 @@ struct ExecutionTimeMeasurement {
     block_end_serial_total: f64,
     block_end_parallel_total: f64,
     block_end_assembly_groups: u64,
+    /// Worker time per BlockSTMv2 phase: name, seconds, count.
+    phases: Vec<(&'static str, f64, u64)>,
 }
 
 impl ExecutionTimeMeasurement {
@@ -192,6 +194,7 @@ impl ExecutionTimeMeasurement {
         let other_timer = |label: &str| OTHER_TIMERS.with_label_values(&[label]).get_sample_sum();
 
         Self {
+            phases: aptos_block_executor::phase_times::snapshot(),
             per_txn_assembly_total: PER_TXN_ASSEMBLY_NANOS.load(Ordering::Relaxed) as f64 / 1e9,
             per_txn_assembly_groups: PER_TXN_ASSEMBLY_GROUPS.load(Ordering::Relaxed),
             block_end_assembly_total: other_timer("assemble_groups"),
@@ -242,6 +245,14 @@ impl ExecutionTimeMeasurement {
             block_end_parallel_total: end.block_end_parallel_total - self.block_end_parallel_total,
             block_end_assembly_groups: end.block_end_assembly_groups
                 - self.block_end_assembly_groups,
+            phases: end
+                .phases
+                .iter()
+                .zip(self.phases.iter())
+                .map(|((name, secs, count), (_, prev_secs, prev_count))| {
+                    (*name, secs - prev_secs, count - prev_count)
+                })
+                .collect(),
         }
     }
 }
@@ -467,6 +478,17 @@ impl OverallMeasurement {
             d.block_end_assembly_groups as f64 / num_txns,
             u8::from(aptos_block_executor::executor::write_members_first()),
         );
+
+        let mut phases = String::new();
+        for (name, secs, count) in &d.phases {
+            let _ = write!(
+                phases,
+                " {name}_us={:.4} {name}_n={:.4}",
+                secs * 1e6 / num_txns,
+                *count as f64 / num_txns
+            );
+        }
+        info!("{} worker phases per txn:{}", self.prefix, phases);
 
         info!(
             "{} fraction of total: {:.4} in ledger update (component TPS: {:.1})",

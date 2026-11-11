@@ -159,6 +159,10 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
     }
     for key, value in re.findall(r"(\w+)=" + NUMBER, assembly):
         row[key] = float(value)
+    phases = re.findall(r"Overall worker phases per txn:(.*)", output)
+    if phases:
+        for key, value in re.findall(r"(\w+)=" + NUMBER, phases[-1]):
+            row["ph_" + key] = float(value)
     if bool(row.get("members_first")) != members_first:
         raise ValueError(f"asked for {variant} but members_first={row.get('members_first')}")
     return row
@@ -287,12 +291,75 @@ def build_report(rows, failures):
         )
         lines.append("")
 
+    lines.extend(phase_report(rows))
+
     if failures:
         lines.append("#### Failures")
         lines.append("")
         lines.extend(f"- {f}" for f in failures)
         lines.append("")
     return "\n".join(lines)
+
+
+PHASES = [
+    "commit_hooks",
+    "next_task",
+    "vm_first",
+    "vm_retry",
+    "apply",
+    "post_commit",
+    "module_validation",
+    "dependency_wait",
+]
+
+
+def phase_report(rows):
+    """Worker time per BlockSTMv2 phase, summed over workers, in us per txn."""
+    rows = [r for r in rows if "ph_vm_first_us" in r and r["threads"] > 1]
+    if not rows:
+        return []
+    lines = [
+        "### Worker phases (BlockSTMv2, us per txn summed over workers)",
+        "",
+        "`workers x inner` is the worker time available; `phases` is what the phases account for.",
+        "",
+    ]
+    for workload in sorted({r["workload"] for r in rows}):
+        table = []
+        for threads in sorted({r["threads"] for r in rows if r["workload"] == workload}):
+            for variant in VARIANTS:
+                vrows = [
+                    r
+                    for r in rows
+                    if r["workload"] == workload
+                    and r["threads"] == threads
+                    and r["variant"] == variant
+                ]
+                if not vrows:
+                    continue
+                phase_us = [median(vrows, f"ph_{p}_us") for p in PHASES]
+                table.append(
+                    [threads, variant, f"{threads * median(vrows, 'inner_us'):.1f}", f"{sum(phase_us):.1f}"]
+                    + [f"{v:.2f}" for v in phase_us]
+                    + [
+                        f"{median(vrows, 'ph_vm_retry_n'):.3f}",
+                        f"{median(vrows, 'ph_dependency_wait_n'):.3f}",
+                        f"{median(vrows, 'ph_speculative_failure_n'):.3f}",
+                    ]
+                )
+        lines.append(f"#### {workload}")
+        lines.append("")
+        lines.append(
+            tabulate(
+                table,
+                headers=["T", "variant", "workers x inner", "phases"]
+                + PHASES
+                + ["retries/txn", "waits/txn", "spec fails/txn"],
+                tablefmt="github",
+            )
+        )
+        lines.append("")
+    return lines
 
 
 def report_from(directory):

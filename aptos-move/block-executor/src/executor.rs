@@ -454,8 +454,18 @@ where
             runtime_environment,
             global_module_cache,
         };
+        let vm_start = std::time::Instant::now();
         let (execution_result, mut read_set) =
             executor.execute(shared, mode, txn, auxiliary_info, idx_to_execute)?;
+        crate::phase_times::record(
+            if incarnation == 0 {
+                crate::phase_times::Phase::VmFirst
+            } else {
+                crate::phase_times::Phase::VmRetry
+            },
+            vm_start,
+        );
+        let _apply_timer = crate::phase_times::timer(crate::phase_times::Phase::Apply);
 
         if read_set.is_incorrect_use() {
             return Err(code_invariant_error(format!(
@@ -464,6 +474,7 @@ where
         }
 
         if execution_result.is_speculative_failure() {
+            crate::phase_times::count(crate::phase_times::Phase::SpeculativeFailure);
             // Recording in order to check the invariant that the final, committed incarnation
             // of each transaction is not a speculative failure.
             last_input_output.record_speculative_failure(idx_to_execute);
@@ -1323,6 +1334,7 @@ where
 
         loop {
             while scheduler.commit_hooks_try_lock() {
+                let commit_hooks_start = std::time::Instant::now();
                 // Perform sequential commit hooks.
                 let blocked_by_validation = loop {
                     match scheduler.start_commit()? {
@@ -1345,6 +1357,10 @@ where
                 };
 
                 scheduler.commit_hooks_unlock();
+                crate::phase_times::record(
+                    crate::phase_times::Phase::CommitHooks,
+                    commit_hooks_start,
+                );
 
                 // When blocked by cold validation, break out of the try_lock loop.
                 // Otherwise commit_hooks_unlock re-arms (the txn is Executed), and
@@ -1355,7 +1371,10 @@ where
                 }
             }
 
-            match scheduler.next_task(worker_id)? {
+            let next_task_start = std::time::Instant::now();
+            let task = scheduler.next_task(worker_id)?;
+            crate::phase_times::record(crate::phase_times::Phase::NextTask, next_task_start);
+            match task {
                 TaskKind::Execute(txn_idx, incarnation) => {
                     if incarnation > num_workers.pow(2) + num_txns + 30 {
                         // Something is wrong if we observe high incarnations (e.g. a bug
@@ -1389,6 +1408,7 @@ where
                     )?;
                 },
                 TaskKind::PostCommitProcessing(txn_idx) => {
+                    let _timer = crate::phase_times::timer(crate::phase_times::Phase::PostCommit);
                     let output = self.materialize_txn_commit(
                         txn_idx,
                         scheduler_wrapper,
@@ -1402,6 +1422,8 @@ where
                     // TODO: Anything intelligent to do here?.
                 },
                 TaskKind::ModuleValidation(txn_idx, incarnation, modules_to_validate) => {
+                    let _timer =
+                        crate::phase_times::timer(crate::phase_times::Phase::ModuleValidation);
                     Self::module_validation_v2(
                         txn_idx,
                         incarnation,
