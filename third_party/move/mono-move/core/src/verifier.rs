@@ -940,6 +940,18 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 );
             },
         }
+        // The captured-data object records the layout of its values, so the
+        // layout must be present exactly when there are captures.
+        if op.captured_layout_id.is_some() == op.captured.is_empty() {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured_layout_id {:?} does not match {} captures",
+                    op.captured_layout_id,
+                    op.captured.len()
+                ),
+            );
+        }
         // Captured sources: verify each (offset, size) is in-bounds.
         for slot in &op.captured {
             self.check_nonzero_size(pc, slot.size);

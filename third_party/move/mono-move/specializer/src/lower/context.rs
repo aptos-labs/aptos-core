@@ -41,7 +41,9 @@ use move_binary_format::{
     access::ModuleAccess,
     file_format::{FunctionHandleIndex, VariantFieldHandleIndex},
 };
-use move_core_types::{account_address::AccountAddress, function::ClosureMask, ident_str};
+use move_core_types::{
+    account_address::AccountAddress, function::ClosureMask, ident_str, identifier::Identifier,
+};
 use shared_dsa::{UnorderedMap, UnorderedSet};
 
 /// Alignment the frame's data region (params + locals + scratch) is rounded to.
@@ -210,15 +212,19 @@ pub struct ClosurePackInfo {
     pub captured_data_descriptor_id: Option<DescriptorId>,
     /// Byte width of the captured-data values region (`0` if non-capturing).
     pub values_size: u32,
+    /// Layout of the captured values; `None` for a non-capturing closure.
+    pub captured_layout_id: Option<LayoutId>,
 }
 
 /// Captured-data layout for one capturing `PackClosure`: the GC trace
-/// descriptor (the reserved `Trivial` slot when pointer-free) and the byte
-/// width of the values region, which the allocation needs.
+/// descriptor (the reserved `Trivial` slot when pointer-free), the byte width
+/// of the values region, which the allocation needs, and the layout of the
+/// captured values, which serialization needs.
 #[derive(Clone, Copy)]
 pub struct ClosureCapturedInfo {
     pub descriptor_id: DescriptorId,
     pub values_size: u32,
+    pub layout_id: LayoutId,
 }
 
 /// Per-`PackClosure` outcome of the discovery pass, in IR order. Distinguishes
@@ -698,11 +704,13 @@ pub fn try_build_context<'a>(
                     interner.function_ref_of(callee_module_id, callee_func_name, closure_ty_args);
                 let layout = descriptors.closure_captured[closure_pack_idx];
                 closure_pack_idx += 1;
-                let (captured_data_descriptor_id, values_size) = match layout {
-                    CapturedDataLayout::NonCapturing => (None, 0),
-                    CapturedDataLayout::Capturing(info) => {
-                        (Some(info.descriptor_id), info.values_size)
-                    },
+                let (captured_data_descriptor_id, values_size, captured_layout_id) = match layout {
+                    CapturedDataLayout::NonCapturing => (None, 0, None),
+                    CapturedDataLayout::Capturing(info) => (
+                        Some(info.descriptor_id),
+                        info.values_size,
+                        Some(info.layout_id),
+                    ),
                     CapturedDataLayout::NotDerivable => {
                         return Ok(BuildContextOutcome::Skipped(
                             "captured-data layout not derivable",
@@ -713,6 +721,7 @@ pub fn try_build_context<'a>(
                     func_ref,
                     captured_data_descriptor_id,
                     values_size,
+                    captured_layout_id,
                 });
                 continue;
             },
@@ -945,6 +954,15 @@ pub trait SpecializerContext: LayoutProvider {
         values_size: u32,
         pointer_offsets: &[FrameOffset],
     ) -> DescriptorId;
+
+    /// Publishes the layout of a closure's captured values, an anonymous struct
+    /// with one field per capture, and returns its id. Idempotent on
+    /// `captured`, the captured types in capture order.
+    fn publish_captured_values_layout(
+        &self,
+        captured: InternedTypeList,
+        layout: ValueLayout,
+    ) -> LayoutId;
 
     /// Publishes `layout` for the type it was built for and returns its
     /// assigned id. Idempotent. [`None`] if the layout carries no type, which
@@ -1286,6 +1304,8 @@ fn try_discover_types_for_lowering_in_function_impl(
                 data.function_handle,
                 data.mask,
                 closure_ty_args,
+                visited,
+                descriptors,
             )?;
             descriptors.closure_captured.push(layout);
         }
@@ -1313,7 +1333,7 @@ fn try_discover_types_for_lowering_in_function_impl(
 
 /// Resolves the captured-data layout for one `PackClosure`: which of
 /// [`CapturedDataLayout`]'s cases it is and, when capturing, its GC trace
-/// descriptor and values-region size.
+/// descriptor, values-region size and the layout of the captured values.
 ///
 /// Captured values are laid out at their natural alignment (see
 /// [`next_captured_value_offset`]) so heap pointers inside captures stay
@@ -1326,30 +1346,62 @@ fn discover_captured_data_descriptor(
     fhi: FunctionHandleIndex,
     mask: ClosureMask,
     ty_args: InternedTypeList,
+    visited: &mut UnorderedSet<InternedType>,
+    descriptors: &mut LoweringDescriptors,
 ) -> VMResult<CapturedDataLayout> {
     let Some(captured_list) = captured_types_of(interner, module_ir, fhi, mask, ty_args)? else {
         return Ok(CapturedDataLayout::NonCapturing);
     };
     let mut cursor = 0usize;
+    let mut max_align = 1u32;
     let mut pointer_offsets = Vec::new();
-    for &ty in view_type_list(captured_list) {
+    let mut fields = Vec::new();
+    let mut field_ids = Vec::new();
+    for (i, &ty) in view_type_list(captured_list).iter().enumerate() {
         let Some((size, align)) = ctx.size_and_align(ty) else {
             return Ok(CapturedDataLayout::NotDerivable);
         };
         if !gc_layout_supports(ctx, ty) {
             return Ok(CapturedDataLayout::NotDerivable);
         }
+        // The capture types are already substituted, so the walk needs no
+        // further type arguments. It publishes the layouts serialization
+        // reads; the loop above would otherwise leave them to chance.
+        field_ids.push(discover_type_metadata(
+            ctx,
+            interner,
+            ty,
+            EMPTY_TYPE_LIST,
+            visited,
+            descriptors,
+        )?);
         let (offset, next) = next_captured_value_offset(cursor, size as usize, align as usize);
         for rel in type_pointer_offsets(ctx, ty)? {
             pointer_offsets.push(FrameOffset(offset as u32 + rel));
         }
+        // Captures have no names, so they are named by position.
+        let name = Identifier::new(format!("_{i}")).expect("`_<index>` is a valid identifier");
+        fields.push(VariantFieldLayout {
+            offset: offset as u32,
+            size,
+            ty,
+            name: interner.identifier_of(&name),
+        });
+        max_align = max_align.max(align);
         cursor = next;
     }
     let values_size = cursor as u32;
+    let Some(layout) =
+        try_build_inline_value_layout(&*ctx, None, &fields, &field_ids, values_size, max_align)?
+    else {
+        return Ok(CapturedDataLayout::NotDerivable);
+    };
     let descriptor_id = ctx.publish_captured_data_descriptor(values_size, &pointer_offsets);
+    let layout_id = ctx.publish_captured_values_layout(captured_list, layout);
     Ok(CapturedDataLayout::Capturing(ClosureCapturedInfo {
         descriptor_id,
         values_size,
+        layout_id,
     }))
 }
 

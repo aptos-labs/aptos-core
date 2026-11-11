@@ -144,6 +144,9 @@ pub enum RuntimeError {
     #[error("BCS deserialize: cannot deserialize a signer")]
     BCSSignerNotDeserializable,
 
+    #[error("BCS deserialize: malformed function value ({0})")]
+    BCSInvalidClosure(&'static str),
+
     /// A `String` argument is not valid UTF-8.
     #[error("argument check: a `String` is not valid UTF-8")]
     MalformedStringArgument,
@@ -182,7 +185,8 @@ impl RuntimeError {
             | BCSRemainingInput { .. }
             | BCSInvalidBool { .. }
             | BCSSignerNotDeserializable
-            | BCSInvalidEnumTag { .. } => true,
+            | BCSInvalidEnumTag { .. }
+            | BCSInvalidClosure(_) => true,
 
             MalformedStringArgument
             | ObjectArgumentDoesNotExist
@@ -254,6 +258,7 @@ impl IntoExecutionError for RuntimeError {
             | BCSInvalidBool { .. }
             | BCSSignerNotDeserializable
             | BCSInvalidEnumTag { .. }
+            | BCSInvalidClosure(_)
             | MalformedStringArgument
             | ObjectArgumentDoesNotExist
             | ObjectArgumentLacksResource => ExecutionErrorKind::InvalidOperation,

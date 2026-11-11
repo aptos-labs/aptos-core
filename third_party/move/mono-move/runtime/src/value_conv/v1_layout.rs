@@ -7,11 +7,11 @@
 //! so serializing one needs this conversion.
 
 use crate::error::{RuntimeError, RuntimeInvariantViolation};
-use hashbrown::HashMap;
 use mono_move_core::{
     FieldValueLayout, LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult, ValueLayout,
 };
 use move_core_types::value::{MoveStructLayout, MoveTypeLayout};
+use shared_dsa::UnorderedMap;
 use std::sync::Arc;
 
 /// Converts layout `id` to the [`MoveTypeLayout`] V1 builds for the same type.
@@ -29,14 +29,13 @@ use std::sync::Arc;
 // only needed for serialization. Needed before production: building the
 // layout is a DoS vector.
 // TODO(metering): ensure the layout is bounded.
-#[allow(dead_code)]
 pub(crate) fn to_v1_type_layout<T: LayoutProvider + ?Sized>(
     layouts: &T,
     id: LayoutId,
 ) -> VMResult<MoveTypeLayout> {
     Converter {
         layouts,
-        struct_cache: HashMap::new(),
+        struct_cache: UnorderedMap::new(),
     }
     .convert(id)
 }
@@ -44,7 +43,8 @@ pub(crate) fn to_v1_type_layout<T: LayoutProvider + ?Sized>(
 struct Converter<'a, T: ?Sized> {
     layouts: &'a T,
     // Cache for same instance of a struct identity, shared via the pointer.
-    struct_cache: HashMap<LayoutId, Arc<MoveStructLayout>>,
+    // Never iterated, and keyed by layout ids an attacker cannot choose.
+    struct_cache: UnorderedMap<LayoutId, Arc<MoveStructLayout>>,
 }
 
 impl<'a, T: LayoutProvider + ?Sized> Converter<'a, T> {

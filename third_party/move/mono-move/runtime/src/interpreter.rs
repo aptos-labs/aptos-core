@@ -53,7 +53,8 @@ use mono_move_core::{
     ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef, GasMeter,
     IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
     PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult, VecPackOp,
-    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    VecUnpackOp, CAPTURED_DATA_BLOB_SIZE_OFFSET, CAPTURED_DATA_LAYOUT_ID_OFFSET,
+    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_TAG_RAW,
     CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
@@ -3267,6 +3268,15 @@ impl InterpreterContext<'_> {
                 CAPTURED_DATA_VALUES_SIZE_OFFSET,
                 op.values_size,
             );
+            write_u32(captured_data, CAPTURED_DATA_BLOB_SIZE_OFFSET, 0);
+            let captured_layout_id = op
+                .captured_layout_id
+                .expect("verifier ensures Some when captured is non-empty");
+            write_u32(
+                captured_data,
+                CAPTURED_DATA_LAYOUT_ID_OFFSET,
+                captured_layout_id.as_u32(),
+            );
 
             // Captured values are laid out at their natural alignment within
             // the values region (see `next_captured_value_offset`), matching the
@@ -3388,12 +3398,18 @@ impl InterpreterContext<'_> {
                     if captured_data.is_null() {
                         invariant_violation!(NullCapturedData);
                     }
-                    let cap_tag = *captured_data.add(CAPTURED_DATA_TAG_OFFSET);
-                    if cap_tag != CAPTURED_DATA_TAG_MATERIALIZED {
-                        // TODO(completeness): handle `CAPTURED_DATA_TAG_RAW` here once
-                        // that tag has a writer. Until then only `Materialized` is ever
-                        // written, so any other tag is corruption.
-                        invariant_violation!(InvalidCapturedDataTag { tag: cap_tag });
+                    match *captured_data.add(CAPTURED_DATA_TAG_OFFSET) {
+                        CAPTURED_DATA_TAG_MATERIALIZED => {},
+                        CAPTURED_DATA_TAG_RAW => {
+                            // TODO(completeness): decode the blob into the callee's
+                            // captured values here, so a deserialized closure can be
+                            // called instead of falling back to the legacy VM.
+                            return Err(RuntimeError::Unsupported(
+                                "calling a deserialized function value",
+                            )
+                            .into());
+                        },
+                        tag => invariant_violation!(InvalidCapturedDataTag { tag }),
                     }
                     // The resolved callee's captured `values_size` must equal the
                     // one the object was packed with (persisted exactly, not the

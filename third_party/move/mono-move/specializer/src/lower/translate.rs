@@ -1804,6 +1804,7 @@ impl<'a> LoweringState<'a> {
                     mask: data.mask.bits(),
                     captured_data_descriptor_id: info.captured_data_descriptor_id,
                     values_size: info.values_size,
+                    captured_layout_id: info.captured_layout_id,
                     captured: captured_slots,
                 })))?;
             },
