@@ -322,7 +322,10 @@ own pattern (`withSome_cases`).  Taken this way and not by generalizing the
 reading, which would leave each case stating the computation the split has
 just consumed: a leaf cannot read that statement without taking the
 computation again, while the option's pattern is what the normal forms
-decide and what a context fixing the value refutes.  `none` where the
+decide and what a context fixing the value refutes.  A chain of readings
+(`Choices.selectCertified?`) is split one reading at a time: the branch past
+the reading split here is the next reading, whose own match this rule takes
+again, so that every case states one projection's pattern.  `none` where the
 discriminant reads no option, or already reads a pattern. -/
 private def splitReadingAction? (goal : MVarId) (target reading : Lean.Expr) :
     MetaM (Option (List MVarId)) := do
@@ -355,7 +358,12 @@ private def splitReadingAction? (goal : MVarId) (target reading : Lean.Expr) :
       #[α, β, motive, option, found, missing, isSome, isNone])
     let (_, taken) ← isSome.mvarId!.introNP 2
     let (_, missed) ← isNone.mvarId!.introNP 1
-    pure [← reduceCaseMatcher taken, ← reduceCaseMatcher missed]
+    -- The branch the reading takes reads the pattern its case fixed, so its
+    -- match reduces.  The branch past it reduces where it is a pattern of its
+    -- own, and is the next reading of a chain where it is not: that match is
+    -- kept, for this rule to take again.
+    let reduced ← observing? (reduceCaseMatcher missed)
+    pure [← reduceCaseMatcher taken, reduced.getD missed]
   return cases
 
 /-- The cases of a weakest precondition over a match on one discriminant,
