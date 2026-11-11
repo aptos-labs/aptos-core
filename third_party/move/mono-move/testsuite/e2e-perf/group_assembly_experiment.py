@@ -116,11 +116,15 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
     poll_env = ""
     poll = None
     align = False
-    rwlock = False
+    # The read-locked instantiation cache is the default; "+mutex" restores
+    # the mutex baseline. "+rwlock" is kept as a no-op alias.
+    rwlock = True
     for flag in flags:
         if flag == "rwlock":
-            rwlock = True
-            poll_env += "MONO_INSTANTIATION_RWLOCK=1 "
+            pass
+        elif flag == "mutex":
+            rwlock = False
+            poll_env += "MONO_INSTANTIATION_RWLOCK=0 "
         elif flag == "align":
             align = True
             poll_env += "MONO_ALIGN_REGIONS=1 "

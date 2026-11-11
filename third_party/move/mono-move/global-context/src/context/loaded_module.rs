@@ -31,13 +31,13 @@ use std::{
 };
 
 /// Whether lookups in the instantiated-function cache take its read lock, so
-/// they never block each other, rather than its write lock. Set by
-/// `MONO_INSTANTIATION_RWLOCK=1`.
+/// they never block each other, rather than a mutex. On by default;
+/// `MONO_INSTANTIATION_RWLOCK=0` restores the mutex.
 //
 // TODO(cleanup): experiment flag.
 pub fn instantiation_read_lock() -> bool {
     static FLAG: OnceLock<bool> = OnceLock::new();
-    *FLAG.get_or_init(|| std::env::var("MONO_INSTANTIATION_RWLOCK").is_ok_and(|v| v == "1"))
+    *FLAG.get_or_init(|| std::env::var("MONO_INSTANTIATION_RWLOCK").map_or(true, |v| v != "0"))
 }
 
 type InstantiationMap = UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>;
