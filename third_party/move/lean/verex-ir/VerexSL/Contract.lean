@@ -2317,6 +2317,16 @@ def storedInvariantAt (unit : ValidatedUnit) (predicate : Lean.Expr) (executable
         not take"
   return mkApp atUnit executable
 
+/-- The type arguments a declaration is read at, as a context's
+`typeArgumentTypes`: each argument's native type, under which a type
+parameter of the declaration stands for the argument's native type and a
+declared type is read at the arguments rather than substituted
+(`Context.ntyOf?`, `Context.readAtArguments`). -/
+def atArgumentTypes :
+    Option VerexIR.Proofs.Denote.NRow → Array (Option VerexIR.Proofs.Denote.NTy)
+  | none => #[]
+  | some row => row.toList.toArray.map some
+
 /-- The conjunction of a loop annotation's `invariant` clauses over the
 given local binders: the clause translation the contracts use, with no
 runtime row, frame, or route-specific representation. Each clause is marked
@@ -2339,11 +2349,13 @@ def translateLoopInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.Namesp
     (kind : VerexIR.ConditionKind := .loopInvariant)
     (labeledAnchors : Array (Nat × Array (Option Lean.Expr) × Lean.Expr) := #[])
     (finalLocals oldFinalLocals : Array (Option Lean.Expr) := #[])
-    (interpretation : Option TranslationFrame := none) : MetaM Lean.Expr := do
+    (interpretation : Option TranslationFrame := none)
+    (atArguments : Option VerexIR.Proofs.Denote.NRow := none) : MetaM Lean.Expr := do
   let context : Context := {
     unit, namespaceId, ns, locals, oldLocals, localTypes, localNames, results := #[],
     finalLocals, oldFinalLocals, types, state, oldState := some oldState,
-    anchorLocals := entryLocals, anchorState := entryState, labeledAnchors, executable, interpretation }
+    anchorLocals := entryLocals, anchorState := entryState, labeledAnchors, executable, interpretation,
+    typeArgumentTypes := atArgumentTypes atArguments, readAtArguments := atArguments.isSome }
   let mut clauses ← block.conditions.filterMapM fun condition => do
     if condition.kind != kind then return none
     -- A split directs the cases on a Boolean; one on an enum is no step.
@@ -2372,11 +2384,13 @@ def valueDataInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceI
     (ns : ValidatedNamespace) (types : Option Lean.Expr)
     (ty : IrTy) (τ : VerexIR.Proofs.Denote.NTy)
     (value state : Lean.Expr) (executable : Option Lean.Expr)
-    (carried : Array VerexIR.StructHandle := #[]) : MetaM Lean.Expr := do
+    (carried : Array VerexIR.StructHandle := #[])
+    (atArguments : Option VerexIR.Proofs.Denote.NRow := none) : MetaM Lean.Expr := do
   let context : Context := {
     unit, namespaceId, ns, locals := #[], oldLocals := #[], localTypes := #[],
     localNames := #[], results := #[], types, state := some state,
-    oldState := some state, executable }
+    oldState := some state, executable,
+    typeArgumentTypes := atArgumentTypes atArguments, readAtArguments := atArguments.isSome }
   conjunction ((← dataInvariantTerms context ty τ value carried).map fun (clause, range) =>
     markObligation range clause)
 
@@ -2387,10 +2401,12 @@ def translateUpdateValue (unit : ValidatedUnit) (namespaceId : VerexIR.Namespace
     (ns : ValidatedNamespace) (expression : ExprId)
     (locals : Array (Option Lean.Expr)) (localTypes : Array IrTy) (types : Option Lean.Expr)
     (localNames : Array String) (state : Lean.Expr)
-    (executable : Option Lean.Expr) (τ : VerexIR.Proofs.Denote.NTy) : MetaM Lean.Expr := do
+    (executable : Option Lean.Expr) (τ : VerexIR.Proofs.Denote.NTy)
+    (atArguments : Option VerexIR.Proofs.Denote.NRow := none) : MetaM Lean.Expr := do
   let context : Context := {
     unit, namespaceId, ns, locals, oldLocals := locals.map fun _ => none, localTypes,
-    localNames, results := #[], types, state := some state, executable }
+    localNames, results := #[], types, state := some state, executable,
+    typeArgumentTypes := atArgumentTypes atArguments, readAtArguments := atArguments.isSome }
   nativeOfClause (← context.carriers) τ (← translate context expression)
 
 /-- The locals a ghost field's initializer reads, over the certified field
@@ -3815,7 +3831,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (atArguments : Option VerexIR.Proofs.Denote.NRow := none) :
     MetaM Lean.Expr := do
   let typeArgumentTypes :=
-    atArguments.map (fun row => row.toList.toArray.map some) |>.getD typeArgumentTypes
+    if atArguments.isSome then atArgumentTypes atArguments else typeArgumentTypes
   let readAtArguments := atArguments.isSome
   let uses := frameUses unit namespaceId declaration
   -- The data invariants of stored resources hold of the memory a function
@@ -4291,14 +4307,16 @@ the caller's obligation it would be is not stated. -/
 def startPrecondition (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (ns : ValidatedNamespace) (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (locals : Array (Option Lean.Expr)) (localTypes : Array IrTy) (types : Option Lean.Expr)
-    (state : Lean.Expr) (executable : Option Lean.Expr) :
+    (state : Lean.Expr) (executable : Option Lean.Expr)
+    (atArguments : Option VerexIR.Proofs.Denote.NRow := none) :
     MetaM Lean.Expr := do
   let conditions := (ContractView.interface.of declaration).contract.conditions
   let groups ← groupConditions ns conditions
   let context : Context := {
     unit, namespaceId, ns, locals, oldLocals := locals, localTypes,
     localNames := declaration.locals.map (·.name), results := #[], types,
-    state := some state, oldState := some state, executable }
+    state := some state, oldState := some state, executable,
+    typeArgumentTypes := atArgumentTypes atArguments, readAtArguments := atArguments.isSome }
   let context ← bindLets context groups.lets false
   conjunction (← (conditions.filter fun condition => condition.kind == .requires &&
       !conditionReadsRequires unit namespaceId condition.expression).mapM fun condition => do

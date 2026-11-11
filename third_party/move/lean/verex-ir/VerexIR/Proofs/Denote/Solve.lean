@@ -2206,16 +2206,35 @@ private def compiledUnfoldLemmas (compiled : Lean.Expr) :
   unfoldNames.toArray.mapM fun name =>
     `(Lean.Parser.Tactic.simpLemma| $(mkIdent (rootNamespace ++ name)):ident)
 
+/-- The entry an instance of a callee at a row has where its declaration
+states no precondition: the producer records one for every instance
+(`memberConditions`), so that an instance the walk meets with no entry at
+all is a defect there and never a body walked without its condition. -/
+def noPrecondition : Prop := True
+
 /-- An inlined callee starts here, on the main goal: its loops' invariants
 read `old` from its arguments at the call, and its precondition is read
 there. The caller owes the precondition where the callee starts, as the Move
 Prover asserts it at the call; the body may assume it. False where a
-precondition that does not hold closes what follows. -/
+precondition that does not hold closes what follows.
+
+A callee inlined as its body compiled at a row is found by `instance?`, the
+compilation the proof is given: its handle is the generic callee's, which
+two rows of it share, while the compilation is the one name of the callee at
+that row (`doc/plan/one-spelling.md`, D2). Its loops and assertions need
+nothing here: their sites are the row's own. -/
 private def enterCallee (ctx : SolveContext) (step : SolveStep) (handle : Lean.Expr)
+    (instance? : Option Lean.Expr)
     (calleeName : String) (unit frame arguments state : Lean.Expr) : SolveM Bool := do
   let goal := step.goal
-  let precondition? ← ctx.preconditions.findM? fun (function, _) =>
-    goal.withContext (isDefEq function handle)
+  let key := instance?.getD handle
+  let registered? ← ctx.preconditions.findM? fun (function, _) =>
+    goal.withContext (isDefEq function key)
+  if instance?.isSome && registered?.isNone then
+    throwError m!"the conditions of `{calleeName}` at its row are missing: its compilation \
+      {key} is given to the proof without them"
+  let precondition? := registered?.filter fun (_, condition) =>
+    !condition.consumeMData.isConstOf ``noPrecondition
   if precondition?.isSome ||
       (← ctx.invariants.anyM fun (_, function, _) => goal.withContext (isDefEq function handle)) then
     let inlined ← getMainGoal
@@ -2257,7 +2276,7 @@ private def inlineModelBody (ctx : SolveContext) (step : SolveStep) (handle? : O
   let compiled := body.getArg! 5
   let lemmas ← compiledUnfoldLemmas compiled
   if let some handle := handle? then
-    unless ← enterCallee ctx step handle calleeName (body.getArg! 0) (body.getArg! 3)
+    unless ← enterCallee ctx step handle none calleeName (body.getArg! 0) (body.getArg! 3)
         (body.getArg! 6) (target.getArg! 6) do
       charge "inline" stageStart
       return
@@ -2329,13 +2348,19 @@ private def inlineCompiled (ctx : SolveContext) (step : SolveStep) (handle : Lea
     goal.assign (mkApp rule next)
     pure next.mvarId!
   setGoals [next]
-  -- A generic contract's conditions do not transfer to a substitution's rows: the body
-  -- at them stands alone.
-  unless atSubstitution do
-    unless ← enterCallee ctx step handle calleeName (action.getArg! 0) (action.getArg! 3)
-        (action.getArg! 8) (target.getArg! 6) do
-      charge "call" stageStart
-      return
+  -- The callee starts here, with the conditions of the body the proof
+  -- inlines: its own where the body is the generic one, those of its
+  -- reading at the row where it is compiled at one, found by that
+  -- compilation (`enterCallee`).
+  let entered ← if atSubstitution then
+      enterCallee ctx step handle (some compiled) calleeName (action.getArg! 0)
+        (action.getArg! 3) (action.getArg! 9) (target.getArg! 6)
+    else
+      enterCallee ctx step handle none calleeName (action.getArg! 0) (action.getArg! 3)
+        (action.getArg! 8) (target.getArg! 6)
+  unless entered do
+    charge "call" stageStart
+    return
   let sizeBefore ← if ctx.debug then do
       let goal ← getMainGoal
       pure (← goal.withContext do pure (treeSize (← instantiateMVars (← goal.getType)) 100000000))

@@ -2661,7 +2661,9 @@ call's site, the callee's name, and the call's number among the calls of
 the callee and among all calls (`doc/designs/proof-language.md`, "Obligation
 addressing and provenance"). -/
 def callSites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex : Nat)
-    (root : VerexIR.ExprId) : Array (Nat × String × Nat × Nat) := Id.run do
+    (root : VerexIR.ExprId) (space : Option Nat := none) :
+    Array (Nat × String × Nat × Nat) := Id.run do
+  let space := space.getD namespaceIndex
   let mut found : Array (VerexIR.Proofs.ObligationRange × Nat × String) := #[]
   let mut pending := #[root]
   let mut visited : Std.HashSet Nat := {}
@@ -2685,7 +2687,7 @@ def callSites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
   for (_, index, name) in ordered, overall in [1:ordered.size + 1] do
     let number := counts.getD name 0 + 1
     counts := counts.insert name number
-    sites := sites.push (loopSite namespaceIndex index, name, number, overall)
+    sites := sites.push (loopSite space index, name, number, overall)
   return sites
 
 /-- The sites of a body a path's decisions name, by kind in source order:
@@ -2700,8 +2702,9 @@ testing an arm of one an import pass lowered (`ExprOrigin.matchArm`) its
 `matchArm`, labeled by the arm's variant, with the untested last arm's
 variant as its `matchElse`. -/
 def bodySites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex : Nat)
-    (root : VerexIR.ExprId) (kinds : Std.HashMap Nat String) :
+    (root : VerexIR.ExprId) (kinds : Std.HashMap Nat String) (space : Option Nat := none) :
     Array (Nat × String × Nat × String) := Id.run do
+  let space := space.getD namespaceIndex
   let kindOf (id : VerexIR.ExprId) := (ns.expressions[id.index]?).map (·.kind)
   let isBreak (id : VerexIR.ExprId) := (kindOf id).any (· matches .break_ ..)
   -- Each site with its kind and source range; a lowered `match`'s arms as
@@ -2721,7 +2724,7 @@ def bodySites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
     -- A loop is one whatever its site also names: the throw after a loop of a
     -- value type, which never completes, is at its site.
     let kind := if expression.kind matches .loop .. then some "loop"
-      else kinds[loopSite namespaceIndex id.index]?
+      else kinds[loopSite space id.index]?
     match kind, expression.origin with
     | some "if", some (.matchArm site variant last) =>
         arms := arms.push (Contract.locRange ns site, id.index, variant, last)
@@ -2748,7 +2751,7 @@ def bodySites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
     -- A `v[i]` is one operation: its element read is the site of its check.
     if (kindOf ⟨index⟩).any (· matches .operation (.primitive .index) ..) then
       if let some (_, number) := checks.find? (·.1 == range) then
-        sites := sites.push (loopSite namespaceIndex index, kind, number, "")
+        sites := sites.push (loopSite space index, kind, number, "")
         continue
     let number := counts.getD kind 0 + 1
     if (kindOf ⟨index⟩).any (· matches .operation (.primitive (.checkVectorIndex _)) ..) then
@@ -2757,15 +2760,15 @@ def bodySites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
     if kind == "match" then numbered := numbered.push (range, number)
     -- A lowered match has no site of its own, only its arms'.
     unless kind == "match" && index == 0 do
-      sites := sites.push (loopSite namespaceIndex index, kind, number, "")
+      sites := sites.push (loopSite space index, kind, number, "")
   for (range, index, variant, last) in arms do
     if let some (_, number) := numbered.find? (·.1 == range) then
-      sites := sites.push (loopSite namespaceIndex index, "matchArm", number, variant)
+      sites := sites.push (loopSite space index, "matchArm", number, variant)
       if let some last := last then
-        sites := sites.push (loopSite namespaceIndex index, "matchElse", number, last)
+        sites := sites.push (loopSite space index, "matchElse", number, last)
   for (loopIndex, header) in headers do
-    if let some (_, _, number, _) := sites.find? (·.1 == loopSite namespaceIndex loopIndex) then
-      sites := sites.push (loopSite namespaceIndex header, "loopHeader", number, "")
+    if let some (_, _, number, _) := sites.find? (·.1 == loopSite space loopIndex) then
+      sites := sites.push (loopSite space header, "loopHeader", number, "")
   return sites
 
 /-- The source a rendering is elaborated from: its unit, and a source file's
@@ -2830,7 +2833,7 @@ each shape in the same order. Bodies that do not correspond have none. -/
 private def renderedSiteOrigins (source : RenderedSource) (unit : ValidatedUnit)
     (ns : ValidatedNamespace) (namespaceIndex : Nat)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) (root : VerexIR.ExprId)
-    (kinds : Std.HashMap Nat String) :
+    (kinds : Std.HashMap Nat String) (space : Nat) :
     Array (VerexIR.LocId × VerexIR.Proofs.ObligationRange × Bool) :=
   Id.run do
   let name := (ns.nameOf declaration.name).map SpecTypes.scopedSpelling
@@ -2843,7 +2846,7 @@ private def renderedSiteOrigins (source : RenderedSource) (unit : ValidatedUnit)
   let fails (id : VerexIR.ExprId) (expression : VerexIR.Expr) : Bool :=
     (failureShape? unit namespaceIndex expression).isSome &&
       (expression.kind matches .operation (.call _) .. ||
-        (kinds[loopSite namespaceIndex id.index]?).any fun kind =>
+        (kinds[loopSite space id.index]?).any fun kind =>
           kind == "abort" || kind == "op" || kind == "invoke")
   let rendered := expressionsInOrder ns fails root #[]
   let shapes := rendered.filterMap (failureShape? unit namespaceIndex)
@@ -2860,10 +2863,13 @@ elaborates one, else its own; and whether a macro of another crate raised it. -/
 def failureSites (environment : Environment) (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (namespaceIndex : Nat) (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (root : VerexIR.ExprId) (kinds : Std.HashMap Nat String)
-    (sites : Array (Nat × String × Nat × String)) (calls : Array (Nat × String × Nat × Nat)) :
+    (sites : Array (Nat × String × Nat × String)) (calls : Array (Nat × String × Nat × Nat))
+    (space : Option Nat := none) :
     Array (String × VerexIR.Proofs.ObligationRange × Bool) := Id.run do
+  let space := space.getD namespaceIndex
   let origins := match renderedSourceExtension.getState environment with
-    | some source => renderedSiteOrigins source unit ns namespaceIndex declaration root kinds
+    | some source =>
+        renderedSiteOrigins source unit ns namespaceIndex declaration root kinds space
     | none => #[]
   let mut locations : Std.HashMap Nat VerexIR.LocId := {}
   let mut pending := #[root]
@@ -2874,7 +2880,7 @@ def failureSites (environment : Environment) (unit : ValidatedUnit) (ns : Valida
     visited := visited.insert id.index
     let some expression := ns.expressions[id.index]? | continue
     if expression.kind matches .spec _ then continue
-    locations := locations.insert (loopSite namespaceIndex id.index) expression.loc
+    locations := locations.insert (loopSite space id.index) expression.loc
     pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
   let located (site : Nat) (decision : VerexIR.Proofs.Denote.AbortSite) :=
     (locations[site]?).map fun loc =>
@@ -2965,9 +2971,14 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (params : NRow) (row : NRow) (types : Option Lean.Expr)
     (storedInvariant : Option Lean.Expr) (restated : NTy → Bool)
-    (interpretation : Option Contract.TranslationFrame := none) :
+    (interpretation : Option Contract.TranslationFrame := none)
+    (atArguments : Option NRow := none) :
     TermElabM (Array (Nat × Lean.Expr × Bool)) := do
   let .structured root := declaration.body | return #[]
+  -- The body's site space: the namespace's, or the one its reading at type
+  -- arguments has (`siteSpaceOf`), so that the invariants of two readings
+  -- of one loop are keyed apart.
+  let space := siteSpaceOf unit.namespaces.size namespaceId.index atArguments
   let carriers ← match interpretation with
     | some frame => pure frame.carriers
     | none => synthInstance (mkConst ``Carriers)
@@ -2993,7 +3004,7 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
         withLocalDeclD `state stateType fun state => do
           mkLambdaFVars #[start, startState, entry, initial, env, state]
             (← mkAppM ``And #[← mkEq env entry, ← mkEq state initial])
-      invariants := invariants.push (loopSite namespaceId.index site.index, invariant, false)
+      invariants := invariants.push (loopSite space site.index, invariant, false)
       continue
     let changed := loopBodyLocals ns site
     let storeTouched := mayTouchStore unit namespaceId site #[] kept
@@ -3172,7 +3183,7 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
               (declaration.locals.map (·.name)) oldLocals startState
               dataInvariantSlots entryLocals (some initial) (some state) executable
               (finalLocals := finalLocals) (oldFinalLocals := oldFinalLocals)
-              (interpretation := interpretation)
+              (interpretation := interpretation) (atArguments := atArguments)
         let authored ← authoredOver 0 #[] #[]
         -- The store the body leaves alone keeps its entry value; one it
         -- changes keeps the data invariants of its stored resources, where
@@ -3194,7 +3205,7 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
         let conjunction ← ((frame.push authored) ++ stateFrame).foldrM (init := mkConst ``True)
           fun clause rest => mkAppM ``And #[clause, rest]
         mkLambdaFVars #[start, startState, entry, initial, env, state] conjunction
-    invariants := invariants.push (loopSite namespaceId.index site.index, invariant, readsUnit)
+    invariants := invariants.push (loopSite space site.index, invariant, readsUnit)
   return invariants
 
 /-- The labels of the state anchors an expression tree reads. -/
@@ -3229,7 +3240,7 @@ private partial def oldLocalsAt (ns : ValidatedNamespace) (id : VerexIR.ExprId)
           (fun found child => oldLocalsAt ns child anchor within found) found
 
 /-- The site of the specification block saving the state anchor `label`. -/
-private def anchorSite? (namespaceId : NamespaceId) (ns : ValidatedNamespace)
+private def anchorSite? (space : Nat) (ns : ValidatedNamespace)
     (root : VerexIR.ExprId) (label : Nat) : Option Nat :=
   let saves (condition : VerexIR.Condition) : Bool :=
     condition.kind matches .assumption &&
@@ -3238,7 +3249,7 @@ private def anchorSite? (namespaceId : NamespaceId) (ns : ValidatedNamespace)
           saved == label
       | _ => false
   (bodySpecifications ns root (· matches .assumption)).findSome? fun (id, block) =>
-    if block.conditions.any saves then some (loopSite namespaceId.index id.index) else none
+    if block.conditions.any saves then some (loopSite space id.index) else none
 
 /-- Assert the slots `referenced` of a row defined, each value bound under
 its local's name with `suffix`, and continue with the clause-level values
@@ -3272,9 +3283,10 @@ def assertionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId 
     (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (params : NRow) (row : NRow) (types : Option Lean.Expr)
-    (ownProof : Bool := true) :
+    (ownProof : Bool := true) (atArguments : Option NRow := none) :
     TermElabM (Array (Nat × Lean.Expr × Bool)) := do
   let .structured root := declaration.body | return #[]
+  let space := siteSpaceOf unit.namespaces.size namespaceId.index atArguments
   let rowType ← quoteRow row
   let envType ← mkAppM ``HEnv #[rowType]
   let argumentsType ← mkAppM ``HList #[← quoteRow params]
@@ -3295,7 +3307,7 @@ def assertionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId 
     let labels := asserted.foldl
       (fun found condition => anchorLabels ns condition.expression found) #[]
     let anchors ← labels.mapM fun label => do
-      let some anchorSite := anchorSite? namespaceId ns root label
+      let some anchorSite := anchorSite? space ns root label
         | throwError m!"an in-body assertion reads the state anchor {label}, which its \
             function does not save"
       pure (label, ← anchorOfType anchorSite rowType)
@@ -3343,12 +3355,13 @@ def assertionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId 
                           types (declaration.locals.map (·.name)) oldLocals startState
                           (state := some state) (executable := executable)
                           (kind := asserted.kind) (labeledAnchors := labeled)
+                          (atArguments := atArguments)
                 return Contract.markCondition ns asserted (← overAnchors 0 #[])
               let conjunction ← clauses.foldrM (init := mkConst ``True)
                 fun clause rest => mkAppM ``And #[clause, rest]
               mkLambdaFVars (bound ++ #[env, state]) conjunction
         mkLambdaFVars #[start, startState] (← withAnchors 0 #[])
-    conditions := conditions.push (loopSite namespaceId.index site.index, condition, readsUnit)
+    conditions := conditions.push (loopSite space site.index, condition, readsUnit)
   return conditions
 
 /-- The precondition an inlined callee's caller owes where the callee
@@ -3358,7 +3371,7 @@ over its arguments and the memory at its start
 def preconditionCondition (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : NamespaceId)
     (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
-    (params : NRow) (types : Option Lean.Expr) :
+    (params : NRow) (types : Option Lean.Expr) (atArguments : Option NRow := none) :
     TermElabM (Option (Lean.Expr × Bool)) := do
   let required := (ContractView.interface.of declaration).contract.conditions.filter
     fun condition => condition.kind == .requires &&
@@ -3379,7 +3392,8 @@ def preconditionCondition (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceI
         | some τ => logicalLocal unit namespaceId ns declaration index τ startSlots[index]!
         | none => pure none
       mkLambdaFVars #[start, startState] (← Contract.startPrecondition unit namespaceId ns
-        declaration locals localTypes types startState executable)
+        declaration locals localTypes types startState executable
+        (atArguments := atArguments))
   return some (condition, readsUnit)
 
 /-- Whether a condition of a specification block marks the state or a
@@ -3678,16 +3692,16 @@ def mutationConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Func
   for fact in loanFactsOf unit handle do
     if let some lender := view.lender? fact then
       if carries lender then
-        sites := sites.push (loopSite namespaceId.index fact.expression.index, lender.index)
+        sites := sites.push (view.site fact.expression.index, lender.index)
     else if view.writesGlobal fact then
       -- The holders live on each death (`LoanDeath.holders`).
       if let some holder := (fact.deaths.flatMap (·.holders)).find? carriesReferent then
-        sites := sites.push (loopSite namespaceId.index fact.expression.index, holder.index)
+        sites := sites.push (view.site fact.expression.index, holder.index)
   for id in bodyExpressionIds ns root do
     if let some { kind := .assign place _, .. } := ns.expressions[id.index]? then
       unless view.place? place matches some (.localVar _) do
         if let some owner := view.ownedRoot? view.placeFuel place then
-          if carries owner then sites := sites.push (loopSite namespaceId.index id.index, owner.index)
+          if carries owner then sites := sites.push (view.site id.index, owner.index)
   if sites.isEmpty then return #[]
   let envType ← mkAppM ``HEnv #[rowType]
   let argumentsType ← mkAppM ``HList #[← quoteRow params]
@@ -3710,6 +3724,7 @@ def mutationConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Func
             types (declaration.locals.map (·.name)) #[] startState
             ((row[slot]?.map fun | .ref referent => (slot, referent) | .sliceRef element => (slot, .vector element) | τ => (slot, τ)).toArray)
             (state := some state) (executable := executable) (kind := .assertion)
+            (atArguments := view.substitution)
         mkLambdaFVars #[start, startState, env, state] owed
     conditions := conditions.push (site, condition, readsUnit)
   return conditions
@@ -3748,8 +3763,9 @@ def constructionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : 
           -- has it by typing and the pack would owe it a second time.
           let owed ← Contract.valueDataInvariants unit namespaceId ns types ty τ
             value state executable (carried := own.carriers)
+            (atArguments := view.substitution)
           mkLambdaFVars #[start, startState, value, state] owed
-    conditions := conditions.push (loopSite namespaceId.index id.index, condition, readsUnit)
+    conditions := conditions.push (view.site id.index, condition, readsUnit)
   return conditions
 
 /-- The namespace invariants a function owes where a write of global memory

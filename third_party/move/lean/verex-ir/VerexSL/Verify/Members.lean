@@ -793,7 +793,8 @@ private def publishCompileView (segments : Array String) (unit : ValidatedUnit)
     toExpr view.expressions, toExpr view.places, toExpr view.patterns, toExpr view.types,
     toExpr view.deaths, toExpr view.carrierDeaths, toExpr view.shared, toExpr view.invariants, toExpr view.typeFuel,
     toExpr view.fuel, toExpr view.placeFuel,
-    mkApp (mkConst ``Option.none [Level.zero]) (mkConst ``NRow)]
+    mkApp (mkConst ``Option.none [Level.zero]) (mkConst ``NRow),
+    toExpr view.namespaces, toExpr view.siteSpace]
   addDecl (.defnDecl {
     name := viewName, levelParams := []
     type := mkConst ``CompileNamespace
@@ -2361,6 +2362,11 @@ private structure Member where
   unitDefinition : Name
   unitTerm : Term
   handleTerm : Term
+  /-- The type arguments this member's body is compiled at, where it is an
+  instance of a generic function rather than the function itself: its
+  markers are numbered in that reading's site space, and its conditions are
+  read at the arguments (`doc/plan/one-spelling.md`, D2). -/
+  atRow : Option TypeArgs := none
 
 /-- The theorem of a verified callee, and the dependencies its theorems
 take: the natives they assume, the functions whose in-body assumptions they
@@ -2446,6 +2452,18 @@ private def recordGenericCall (unit : ValidatedUnit) (callee : FunctionHandle)
   if typeArgs.isEmpty || found.contains (callee, typeArgs) || !readsFrame unit callee then found
   else found.push (callee, typeArgs)
 
+/-- A callee whose body compiled at a row the proof inlines: the owner of
+the conditions at that row (`memberConditions`). -/
+private structure RowOwner (unit : ValidatedUnit) where
+  handle : FunctionHandle
+  θ : TypeArgs
+  ns : ValidatedNamespace
+  declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody
+  compiled : Function unit
+  /-- The name the compilation at the row is published under, which names
+  its conditions after it. -/
+  key : String
+
 /-- The callees a proof meets, collected through every inlined body. -/
 private structure Callees (unit : ValidatedUnit) where
   calleePairs : Array Term := #[]
@@ -2458,6 +2476,11 @@ private structure Callees (unit : ValidatedUnit) where
   at them, with no contract and no invariant of its generic declaration. -/
   instances : Array (FunctionHandle × VerexIR.FunctionDecl VerexIR.Validation.FunctionBody ×
     TypeArgs × Function unit) := #[]
+  /-- The callees inlined as their body compiled at a row, each an owner of
+  the conditions at that row: its handle, the row, the namespace and
+  declaration they are read from, the compilation the proof is given, and
+  the name it is published under. -/
+  rowOwners : Array (RowOwner unit) := #[]
   /-- The inlined callees, whose loops the proof meets with their invariants. -/
   inlined : Array (FunctionHandle × ValidatedNamespace ×
     VerexIR.FunctionDecl VerexIR.Validation.FunctionBody × Function unit) := #[]
@@ -2505,17 +2528,22 @@ private def rejectingClosures (callee : FunctionHandle) (_ : Nat) (typeArgs : Ar
     (θ : Option TypeArgs) (found : Array ShapeCall) : Array ShapeCall :=
   found.push { callee, typeArgs, θ, closure := true }
 
-/-- Whether an inlined callee's body owes no condition of its own at a row:
-no precondition (which the caller owes at the call and the body assumes), no
-call (whose precondition the body would owe), no loop, no in-body
-specification, no assumption and no ghost state. The solver's tables key such
-a condition by its site alone, and two rows of one callee share their sites
-(`doc/plan/one-spelling.md`, D2, R1), so a body that owes one keeps its
-generic route until they are keyed by row as well. A callee whose signature
-and locals read none of its type parameters keeps it too: its generic body
-is what a summary is derived of (`summaryForm`), the route a call of it takes
-today, and its row's body is the generic one. -/
-private def inlinedWithoutConditions (unit : ValidatedUnit) (handle : FunctionHandle) : Bool :=
+/-- Whether an inlined callee's conditions are carried at a row: its loop
+invariants, its assertions, the data invariants it owes where a mutation
+ends and where it constructs a value, and its own precondition are built at
+the row and keyed by the sites that reading's site space gives them
+(`siteSpaceOf`), which are apart from every other reading's
+(`doc/plan/one-spelling.md`, D2, R1).
+
+Not carried, and so kept on the generic route: a callee without a body, an
+opaque or intrinsic one, one on a call cycle, one used through its contract,
+and a unit's model state — ghost writes and in-body assumptions, whose
+tables are read by site inside the denotation itself and not at a row. A
+callee whose signature and locals read none of its type parameters keeps the
+generic route too: its generic body is what a summary is derived of
+(`summaryForm`), the route a call of it takes today, and its row's body is
+the generic one. -/
+private def carriesConditionsAtRow (unit : ValidatedUnit) (handle : FunctionHandle) : Bool :=
   match declarationOf? unit handle, unit.namespaces[handle.namespaceId.index]? with
   | some declaration, some ns =>
       declaration.body != .absent && !isOpaque declaration && !onCallCycle unit handle &&
@@ -2523,12 +2551,7 @@ private def inlinedWithoutConditions (unit : ValidatedUnit) (handle : FunctionHa
         !isIntrinsic unit handle.namespaceId ns declaration &&
         !declaresGhosts unit && !statesAssumptions ns declaration &&
         readsTypeParameter unit ns declaration &&
-        declaration.contract.conditions.all (·.kind != .requires) &&
-        (match declaration.body with
-          | .structured root =>
-              (bodyCallees unit handle).isEmpty && !bodyLoops ns root &&
-                (bodySpecifications ns root (fun _ => true)).isEmpty
-          | _ => false)
+        (declaration.body matches .structured _)
   | _, _ => false
 
 /-- Whether a call with type arguments is routed to the callee's body compiled
@@ -2537,7 +2560,7 @@ at them rather than to its generic meaning at the family they induce
 transfer to the arguments, as before; and, at reference-free arguments, an
 inlined callee whose body owes no condition of its own. -/
 private def atRowCall (unit : ValidatedUnit) (handle : FunctionHandle) (θ : TypeArgs) : Bool :=
-  θ.atInstance unit handle || (θ.1.refFree && inlinedWithoutConditions unit handle)
+  θ.atInstance unit handle || (θ.1.refFree && carriesConditionsAtRow unit handle)
 
 /-- Collects the callees of `m`'s body and of every inlined callee's, from
 `worklist`, into `found`: each by its contract as a hypothesis, by its
@@ -2820,6 +2843,7 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
   return {
     visited := visited
     instances := found.instances
+    rowOwners := found.rowOwners
     calleePairs := calleePairs
     modelMembers := modelMembers
     inlined := inlined
@@ -2895,6 +2919,8 @@ private def collectInstances (m : Member) (members : Array FunctionHandle)
       continue
     callees := { callees with
       instances := callees.instances.push (callee, calleeDeclaration, θ, compiled)
+      rowOwners := callees.rowOwners.push
+        { handle := callee, θ, ns := calleeNs, declaration := calleeDeclaration, compiled, key }
       calleePairs := callees.calleePairs.push (← `(term| PProd.mk $(← handleSyntax callee)
         (PProd.mk $(Syntax.mkStrLit calleeKey) $(rootIdent (compiledEqName segments key)))))
       instantiated := if generic then callees.instantiated else
@@ -3111,33 +3137,57 @@ private abbrev Owners (unit : ValidatedUnit) := Array (FunctionHandle × Validat
 /-- The conditions the proof meets, each as an abbreviation applied at the
 unit and frame its marker names: the loop invariants, assertions, data and
 memory invariants of `owners`, paired by site and function, and the
-preconditions of the inlined callees, paired by function. -/
+preconditions of the inlined callees, paired by function.
+
+A callee whose body the proof inlines compiled at a row (`rowOwners`) is an
+owner too: its conditions are built at the row, which the clauses' types are
+read at, and keyed by the sites that reading's site space gives them, apart
+from every other owner's, which this refuses to proceed without.
+Its precondition is keyed by the compilation the proof is given, the one
+name of the instance, since its handle is the generic callee's
+(`doc/plan/one-spelling.md`, D2). -/
 private def memberConditions (m : Member) (owners : Owners m.unit)
+    (rowOwners : Array (RowOwner m.unit))
     (stored : Contract.StoredInvariants) (own : Contract.DataOwn) (summary : Bool := false) :
     CommandElabM (Array Term × Array Term) := do
-  let { handle, artifacts, unitTerm, .. } := m
+  let { handle, artifacts, unitTerm, segments, .. } := m
   let unit := m.unit
   let ambientFrame ← if m.generic then `(term| Θ)
     else `(term| VerexIR.Proofs.Denote.Skolems.runtime $unitTerm)
   -- The callees a body the proof meets calls: a closure's target, reached
   -- through a function value, owes no precondition of its own there (its
   -- invocation's is the value's, `requires_of`).
-  let called := owners.foldl (fun found (owner, _, _, _) =>
+  let push := fun (found : Array FunctionHandle) (owner : FunctionHandle) =>
     (bodyCallees unit owner).foldl (fun found callee =>
-      if found.contains callee then found else found.push callee) found) #[]
+      if found.contains callee then found else found.push callee) found
+  -- A body read at a row calls what the generic body calls, at the row's
+  -- arguments: the callee it inlines generically owes its precondition
+  -- there as it does in any caller.
+  let called := rowOwners.foldl (fun found owner => push found owner.handle)
+    (owners.foldl (fun found (owner, _, _, _) => push found owner) #[])
   let invariants ← liftTermElabM <| withExecutableSkolems unit fun executable skolems => do
-    owners.flatMapM fun (owner, ownerNs, ownerDeclaration, ownerCompiled) => do
+    let generic ← owners.flatMapM fun (owner, ownerNs, ownerDeclaration, ownerCompiled) => do
       let types ← Contract.frameTypes skolems
       let row := ownerCompiled.frame
+      -- The target's own body is read at a row where the target is an
+      -- instance of a generic function (`verifyOpaqueInstance`); an inlined
+      -- callee's generic body is read at its own parameters.
+      let atArguments := if owner == handle then m.atRow.map (·.1) else none
       -- The data invariants owed where mutations end and values are built,
-      -- read off the namespace's compilation view where the unit has any.
+      -- read off the namespace's compilation view where the unit has any,
+      -- at the row the body is read at.
       let view? :=
-        if unitCarriesInvariants unit then compileNamespaceAt? unit owner.namespaceId else none
+        if unitCarriesInvariants unit then
+          (compileNamespaceAt? unit owner.namespaceId).map fun view =>
+            if owner == handle then (m.atRow.map view.at).getD view else view
+        else none
       let invariants ← loopInvariants unit executable owner.namespaceId ownerNs ownerDeclaration
         ownerCompiled.params row types stored.predicate
         (fun τ => view?.all fun view => markedInvariant own view τ)
+        (atArguments := atArguments)
       let assertions ← assertionConditions unit executable owner.namespaceId ownerNs ownerDeclaration
         ownerCompiled.params row types (ownProof := owner == handle)
+        (atArguments := atArguments)
       let mutations ← view?.mapM fun view => mutationConditions unit executable owner own view
         ownerNs ownerDeclaration ownerCompiled.params row types
       let constructions ← view?.mapM fun view => constructionConditions unit executable owner own
@@ -3159,7 +3209,7 @@ private def memberConditions (m : Member) (owners : Owners m.unit)
         else
           preconditionCondition unit executable owner.namespaceId ownerNs ownerDeclaration
             ownerCompiled.params types
-      let invariants := invariants.map (fun (site, invariant, readsUnit) =>
+      let conditions := invariants.map (fun (site, invariant, readsUnit) =>
         (site, invariant, readsUnit, "loopInvariant")) ++
         assertions.map (fun (site, condition, readsUnit) =>
           (site, condition, readsUnit, "assertion")) ++
@@ -3173,15 +3223,71 @@ private def memberConditions (m : Member) (owners : Owners m.unit)
           (site, condition, readsUnit, "afterCall")) ++
         (precondition.map fun (condition, readsUnit) =>
           (0, condition, readsUnit, "precondition")).toArray
-      invariants.mapM fun (site, invariant, readsUnit, kind) =>
+      conditions.mapM fun (site, invariant, readsUnit, kind) =>
         return (site, owner, ← mkLambdaFVars (← executableBinders executable skolems) invariant,
-          readsUnit, kind)
+          readsUnit, kind, (none : Option String))
+    let atRows ← rowOwners.flatMapM fun owner => do
+      let types ← Contract.frameTypes skolems
+      let row := owner.compiled.frame
+      let atArguments := some owner.θ.1
+      let view? :=
+        if unitCarriesInvariants unit then
+          (compileNamespaceAt? unit owner.handle.namespaceId).map (·.at owner.θ)
+        else none
+      let invariants ← loopInvariants unit executable owner.handle.namespaceId owner.ns
+        owner.declaration owner.compiled.params row types stored.predicate
+        (fun τ => view?.all fun view => markedInvariant own view τ)
+        (atArguments := atArguments)
+      -- A step of the callee's own proof states nothing in its caller, as
+      -- for a callee inlined generically.
+      let assertions ← assertionConditions unit executable owner.handle.namespaceId owner.ns
+        owner.declaration owner.compiled.params row types (ownProof := false)
+        (atArguments := atArguments)
+      let mutations ← view?.mapM fun view => mutationConditions unit executable owner.handle own
+        view owner.ns owner.declaration owner.compiled.params row types
+      let constructions ← view?.mapM fun view => constructionConditions unit executable
+        owner.handle own view owner.ns owner.declaration owner.compiled.params types
+      -- The caller owes the callee's precondition where its body at the row
+      -- starts, as it owes an inlined callee's; the body may assume it.
+      let precondition ← preconditionCondition unit executable owner.handle.namespaceId owner.ns
+        owner.declaration owner.compiled.params types (atArguments := atArguments)
+      let conditions := invariants.map (fun (site, invariant, readsUnit) =>
+        (site, invariant, readsUnit, "loopInvariant")) ++
+        assertions.map (fun (site, condition, readsUnit) =>
+          (site, condition, readsUnit, "assertion")) ++
+        (mutations.getD #[]).map (fun (site, condition, readsUnit) =>
+          (site, condition, readsUnit, "mutationEnd")) ++
+        (constructions.getD #[]).map (fun (site, condition, readsUnit) =>
+          (site, condition, readsUnit, "construction")) ++
+        (precondition.map fun (condition, readsUnit) =>
+          (0, condition, readsUnit, "precondition")).toArray
+      conditions.mapM fun (site, invariant, readsUnit, kind) =>
+        return (site, owner.handle, ← mkLambdaFVars (← executableBinders executable skolems) invariant,
+          readsUnit, kind, some owner.key)
+    return generic ++ atRows
+  -- A site of an owner at a row stands for one program point of one
+  -- reading: were it another owner's, a condition would be read at the
+  -- wrong frame or an assertion checked against another's condition. The
+  -- site space makes them disjoint by construction (`siteSpaceOf`); this
+  -- refuses the target rather than look one up wrongly.
+  for (site, _, _, _, kind, row?) in invariants do
+    if row?.isNone || kind == "precondition" then continue
+    for (other, _, _, _, otherKind, otherRow?) in invariants do
+      if otherKind == "precondition" || otherRow? == row? then continue
+      if other == site then
+        throwErrorAt m.reference m!"a condition of `{m.function}` at a row shares the site \
+          {site} with another owner's: the site spaces of its readings are not disjoint"
   let mut loopPairs : Array Term := #[]
   let mut preconditionPairs : Array Term := #[]
-  for (site, owner, invariant, _, kind) in invariants do
-    let name := if kind == "precondition" then
-        artifacts ++ Name.mkSimple s!"precondition_{functionKey unit owner}"
-      else artifacts ++ Name.mkSimple s!"{kind}_{site}"
+  for (condition, index) in invariants.zipIdx do
+    let (site, owner, invariant, _, kind, row?) := condition
+    let name := match row?, kind == "precondition" with
+      -- An instance's conditions are named after the compilation at the
+      -- row and their order, not after a site: a site of a row is a wide
+      -- number, which no name should carry.
+      | some key, _ => artifacts ++ Name.mkSimple s!"{kind}_{index}_{key}"
+      | none, true => artifacts ++ Name.mkSimple s!"precondition_{functionKey unit owner}"
+      | none, false => artifacts ++ Name.mkSimple s!"{kind}_{site}"
     -- Declared when the target is prepared; the proof finds it.
     unless (← getEnv).contains name do liftTermElabM (addAbbrev name invariant)
     -- An inlined concrete callee's precondition is read at the frame
@@ -3190,8 +3296,12 @@ private def memberConditions (m : Member) (owners : Owners m.unit)
         (Θ : VerexIR.Proofs.Denote.Skolems $unitTerm) =>
           @$(rootIdent name) $unitTerm _ $(← unitReaderTerm unit) Θ)
     if kind == "precondition" then
-      preconditionPairs := preconditionPairs.push
-        (← `(term| ($(← handleSyntax owner), $applied)))
+      -- An instance is named by its compilation, the one name of the callee
+      -- at that row; a callee inlined generically by its handle.
+      let key : Term ← match row? with
+        | some key => `(term| $(rootIdent (compiledName segments key)))
+        | none => handleSyntax owner
+      preconditionPairs := preconditionPairs.push (← `(term| ($key, $applied)))
     else
       -- Retain the producer's concrete frame explicitly for state-only
       -- markers. The walker selects a different frame only for a marker
@@ -3201,6 +3311,15 @@ private def memberConditions (m : Member) (owners : Owners m.unit)
         (fun Θ => @$(rootIdent name) $unitTerm _ $(← unitReaderTerm unit) Θ))
       loopPairs := loopPairs.push
         (← `(term| ($(Syntax.mkNumLit (toString site)), $(← handleSyntax owner), $condition)))
+  -- Every instance the proof inlines has an entry, so that one the walk
+  -- meets without one is a defect of this producer and not a body walked
+  -- without its condition (`enterCallee`).
+  for owner in rowOwners do
+    unless invariants.any (fun (_, _, _, _, kind, row?) =>
+        kind == "precondition" && row? == some owner.key) do
+      preconditionPairs := preconditionPairs.push (← `(term|
+        ($(rootIdent (compiledName segments owner.key)),
+          VerexIR.Proofs.Denote.noPrecondition)))
   return (loopPairs, preconditionPairs)
 
 /-- A model's ghost tables, as abbreviations the normalizer reads a write's
@@ -3553,6 +3672,10 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
     TermElabM (TSyntax `tactic × TSyntax `tactic) := do
   let { reference, namespaceIndex, ns, declaration, model, .. } := m
   let unit := m.unit
+  -- The site space the member's own body is numbered in: its namespace's,
+  -- or the space of the row an instance's body is read at (`siteSpaceOf`).
+  let space := VerexIR.Proofs.Denote.siteSpaceOf unit.namespaces.size namespaceIndex
+    (m.atRow.map (·.1))
   let mut flags : Array (TSyntax `solveFlag) := #[]
   if Contract.contractBindsStateLabel unit ⟨namespaceIndex⟩ declaration then
     flags := flags.push (← `(solveFlag| labeled))
@@ -3562,7 +3685,7 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
     | _ => none
   let unrollPairs ← match unrollBound?, declaration.body with
     | some bound, .structured root => (loopSpecifications ns root).mapM fun (site, _) =>
-        `(term| ($(quote (loopSite namespaceIndex site.index)), $(quote bound)))
+        `(term| ($(quote (loopSite space site.index)), $(quote bound)))
     | _, _ => pure #[]
   let writes ← (if model then ghostWriteSites unit owners else #[]).mapM fun (site, range) =>
     `(ghostWriteSite| ($(Syntax.mkNumLit (toString site)), $(Syntax.mkStrLit range.file),
@@ -3591,7 +3714,7 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
     `(preconditionNumber| ($(Syntax.mkNumLit (toString number)), $(Syntax.mkStrLit range.file),
       $(Syntax.mkNumLit (toString range.startByte)), $(Syntax.mkNumLit (toString range.endByte))))
   let sites : Array (Nat × String × Nat × Nat) := match declaration.body with
-    | .structured root => callSites unit ns namespaceIndex root
+    | .structured root => callSites unit ns namespaceIndex root (space := some space)
     | _ => #[]
   let calls ← sites.mapM fun (site, callee, number, overall) =>
     `(callSite| ($(Syntax.mkNumLit (toString site)), $(Syntax.mkStrLit callee),
@@ -3612,7 +3735,7 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
   let kinds := m.compiled.body.foldCalls (fun _ _ _ found => found)
     (fun kind site found => found.insert site kind) ({} : Std.HashMap Nat String)
   let sourceSites : Array (Nat × String × Nat × String) := match declaration.body with
-    | .structured root => bodySites unit ns namespaceIndex root kinds
+    | .structured root => bodySites unit ns namespaceIndex root kinds (space := some space)
     | _ => #[]
   let sited ← sourceSites.mapM fun (site, kind, number, label) =>
     `(sourceSite| ($(Syntax.mkNumLit (toString site)), $(Syntax.mkStrLit kind),
@@ -3620,7 +3743,7 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
   let environment ← getEnv
   let failures := match declaration.body, Contract.noFailureKey? declaration with
     | .structured root, some _ =>
-        failureSites environment unit ns namespaceIndex declaration root
+        failureSites environment unit ns namespaceIndex declaration root (space := some space)
           kinds sourceSites sites
     | _, _ => #[]
   let faulted ← failures.mapM fun (selector, range, expanded) => do
@@ -3794,7 +3917,7 @@ private def verifyOpaqueInstance (caller : Member) (handle : FunctionHandle)
     ns, declaration, handle, compiled, model := false, family := true, generic := true,
     framed := false, ownAssumptions := false, artifacts := Name.str caller.namespaceName key,
     base := (← getCurrNamespace) ++ Name.str caller.namespaceName key,
-    handleTerm := ← handleSyntax handle }
+    handleTerm := ← handleSyntax handle, atRow := some θ }
   discard <| liftTermElabM (auditedUnit caller.segments unit)
   -- The data invariants the unit's `Carriers.own` carries, which this
   -- contract states nothing of at its boundary (`ensureDataOwn`).
@@ -4145,7 +4268,8 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   -- proof meets: the function's own and those of its inlined callees, each
   -- keyed by its site and function.
   let owners : Owners unit := #[(handle, ns, declaration, compiled)] ++ inlined
-  let (loopPairs, preconditionPairs) ← memberConditions m owners stored dataOwn summary
+  let (loopPairs, preconditionPairs) ←
+    memberConditions m owners callees.rowOwners stored dataOwn summary
   stageLog s!"{function}: member conditions"
   liftTermElabM (publishCompiled segments unit function handle compiled)
   let pattern ← argumentPattern unit declaration compiled.params

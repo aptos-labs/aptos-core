@@ -75,6 +75,104 @@ every other pack's and ghost field's. -/
 def ghostInitSite (namespaceIndex expressionIndex k : Nat) : Nat :=
   loopSite (loopSite namespaceIndex expressionIndex) k
 
+/-- The widest number a site token holds, in bits: beyond it a token's code
+is no longer self-delimiting, and two site spaces could meet, which the
+gate where the conditions are built reports. -/
+def siteTokenBits : Nat := 128
+
+/-- The width of `n` in bits, by at most `fuel` halvings: a loop the kernel
+evaluates by division, where `Nat.log2` recurses on its argument. -/
+def siteWidth : Nat → Nat → Nat
+  | 0, _ => 0
+  | _, 0 => 0
+  | fuel + 1, n => siteWidth fuel (n / 2) + 1
+
+/-- A number appended to a stream of numbers, self-delimiting: the stream
+shifted by the width of the appended number's code, `0^(w-1) 1 b…b` of the
+number above zero, which a reader of the stream delimits by its leading
+digits. Injective in the stream and a token below `2 ^ siteTokenBits`. -/
+def siteToken (stream token : Nat) : Nat :=
+  let width := siteWidth siteTokenBits (token + 1)
+  stream * 2 ^ (2 * width - 1) + (token + 1)
+
+/-- A list of bits appended to a stream: its length, then each bit. -/
+def siteBoolTokens (bits : List Bool) (stream : Nat) : Nat :=
+  bits.foldl (fun stream bit => siteToken stream (if bit then 2 else 1))
+    (siteToken stream bits.length)
+
+mutual
+/-- A type appended to a stream of numbers: its constructor's tag, then the
+numbers it holds and the types it is built from. A declared type is written
+as its tag, its handle and its arguments, which within one unit determine
+its field rows, so no row of a declaration is walked here. -/
+def NTy.siteTokens : NTy → Nat → Nat
+  | .unit, stream => siteToken stream 0
+  | .bool, stream => siteToken stream 1
+  | .int width signed, stream =>
+      siteToken (siteToken (siteToken stream 2) width) (if signed then 1 else 0)
+  | .num, stream => siteToken stream 3
+  | .address, stream => siteToken stream 4
+  | .signer, stream => siteToken stream 5
+  | .string, stream => siteToken stream 6
+  | .bytes, stream => siteToken stream 7
+  | .char, stream => siteToken stream 8
+  | .tuple elements, stream => NRow.siteTokens elements (siteToken stream 9)
+  | .struct source arguments _, stream =>
+      NRow.siteTokens arguments
+        (siteToken (siteToken (siteToken stream 10) source.namespaceId.index) source.structId)
+  | .enum source arguments _ _ _, stream =>
+      NRow.siteTokens arguments
+        (siteToken (siteToken (siteToken stream 11) source.namespaceId.index) source.structId)
+  | .vector element, stream => NTy.siteTokens element (siteToken stream 12)
+  | .slice element, stream => NTy.siteTokens element (siteToken stream 13)
+  | .array element length, stream =>
+      NTy.siteTokens element (siteToken (siteToken stream 14) length)
+  | .table key value, stream =>
+      NTy.siteTokens value (NTy.siteTokens key (siteToken stream 15))
+  | .ghost slot, stream => NTy.siteTokens slot (siteToken stream 16)
+  | .ref referent, stream => NTy.siteTokens referent (siteToken stream 17)
+  | .sliceRef element, stream => NTy.siteTokens element (siteToken stream 18)
+  | .param index, stream => siteToken (siteToken stream 19) index
+  | .function parameters shared results, stream =>
+      NRow.siteTokens results (siteBoolTokens shared.results
+        (siteBoolTokens shared.parameters (NRow.siteTokens parameters (siteToken stream 20))))
+  | .observed referent, stream => NTy.siteTokens referent (siteToken stream 21)
+  | .nominal source arguments productive, stream =>
+      NRow.siteTokens arguments
+        (siteToken (siteToken (siteToken (siteToken stream 22) source.namespaceId.index)
+          source.structId) (if productive then 1 else 0))
+
+/-- A row appended to a stream of numbers: a mark per element, then the
+element, so that the row's end is read off the stream. -/
+def NRow.siteTokens : NRow → Nat → Nat
+  | .nil, stream => siteToken stream 0
+  | .cons head tail, stream =>
+      NRow.siteTokens tail (NTy.siteTokens head (siteToken stream 1))
+end
+
+/-- A row as one number, apart from every other row's: the stream of its
+types' tokens over a leading digit. -/
+def NRow.siteKey (row : NRow) : Nat := row.siteTokens 1
+
+/-- Whether a row is a function's own type parameters in order, the
+substitution under which a body is the function's own body. -/
+def NRow.isOwnParameters (row : NRow) : Bool :=
+  let rec go : Nat → NRow → Bool
+    | _, .nil => true
+    | index, .cons (.param other) tail => other == index && go (index + 1) tail
+    | _, .cons _ _ => false
+  go 0 row
+
+/-- The site space of a body: its namespace, or, where it is read at type
+arguments that are not its own parameters in order, a space of the
+namespace and the arguments, apart from every namespace's. A body at the
+identity row is the function's own body, at its own space. -/
+def siteSpaceOf (namespaces namespaceIndex : Nat) : Option NRow → Nat
+  | none => namespaceIndex
+  | some row =>
+      if row.isOwnParameters then namespaceIndex
+      else namespaces + loopSite namespaceIndex row.siteKey
+
 /-- The rejection of a construct. -/
 def notCarried (what : String) : Except String α :=
   .error s!"{what} is not carried by the denotation"
@@ -106,6 +204,14 @@ structure CompileNamespace where
   /-- The type arguments a function is compiled at, where its body is read at a type
   argument holding a mutable reference; `nty` applies them. -/
   substitution : Option NRow := none
+  /-- The unit's namespace count, which separates the site space of a body
+  read at type arguments from every namespace's. -/
+  namespaces : Nat := 0
+  /-- The site space the body's markers are numbered in (`siteSpaceOf`):
+  the namespace's for the function's own body, one of the namespace and the
+  type arguments for its body read at them, so that the conditions of two
+  readings of one body are keyed apart. -/
+  siteSpace : Nat := 0
 
 /-- Move function-valued fields carry a checked modification frame, empty
 unless explicitly declared. Only a function type at the field has one, not an
@@ -149,7 +255,14 @@ def CompileNamespace.of (unit : ValidatedUnit) (namespaceId : NamespaceId)
     .ofArray ns.tables.types, deathIndex unit namespaceId, carrierDeathIndex unit namespaceId,
     sharedDereferenceIndex unit namespaceId,
     invariantIndex unit, VerexIR.Proofs.Denote.typeFuel unit, unitFuel unit, ns.places.size + 1,
-    none⟩
+    none, unit.namespaces.size, namespaceId.index⟩
+
+/-- The site of an expression of the body this view reads: its expression
+index in the view's site space. Every marker of a compiled body carries
+one, so the conditions of a body read at type arguments are keyed apart
+from the same body read at others (`doc/plan/one-spelling.md`, D2). -/
+def CompileNamespace.site (ns : CompileNamespace) (expressionIndex : Nat) : Nat :=
+  loopSite ns.siteSpace expressionIndex
 
 /-- Whether a value of a type carries a data invariant at any depth. -/
 def CompileNamespace.carriesInvariant (ns : CompileNamespace) (τ : NTy) : Bool :=
@@ -975,7 +1088,7 @@ def deathEffect (unit : ValidatedUnit) (ns : CompileNamespace)
       | some path => death.holderPaths.contains (holder, path)
   let deaths ← places.filterMapM fun (holder, path?, fact, certain) => do
     let some ⟨σ, x⟩ := Var.ofIndex Γ holder.index | .error "a local is out of range"
-    let site := loopSite ns.namespaceId.index fact.expression.index
+    let site := ns.site fact.expression.index
     let origins := originsAt holder path?
     match path? with
     | some steps =>
@@ -1006,7 +1119,7 @@ def deathEffect (unit : ValidatedUnit) (ns : CompileNamespace)
     let records := fact.deaths.toList.filter fun death =>
       death.anchor == anchor && death.before == before && !death.alone
     if records.isEmpty then return []
-    let site := loopSite ns.namespaceId.index fact.expression.index
+    let site := ns.site fact.expression.index
     let written := Term.memoryWritten (ρ := ρ) (Γ := Γ) site
     let mutated := Term.mutationEnd (ρ := ρ) (Γ := Γ) site
     if ns.writesGlobal fact then
@@ -1041,7 +1154,7 @@ def withDeaths (ns : CompileNamespace) (loanFacts : Array CheckedLoanFact) (id :
     if places.isEmpty then return loanEffect
     let carrierEffects ← places.toList.flatMapM fun (holder, path) => do
       let some ⟨_, x⟩ := Var.ofIndex Γ holder.index | .error "a local is out of range"
-      holderDeaths unit ns ρ (loopSite ns.namespaceId.index id.index) x [path.toArray]
+      holderDeaths unit ns ρ (ns.site id.index) x [path.toArray]
     let effects := loanEffect.toList ++ carrierEffects
     if effects.isEmpty then .ok none
     else .ok (some (effects.foldr (fun effect rest => Term.drop effect rest) (.lit () rfl)))
@@ -1483,7 +1596,7 @@ mutual
                 compileArgs unit loanFacts ρ Γ ns namespaceId true fuel arguments.toList
                 parameters
               let value : Term unit ρ Γ shape.bodyType :=
-                .call (loopSite namespaceId.index id.index) handle shape arguments
+                .call (ns.site id.index) handle shape arguments
               match τ? with
               | some τ => .ok (.at τ (← Compiled.at? τ (.at shape.bodyType value)))
               | none => .ok (.never fun _ => .drop value .unreachable)
@@ -1516,7 +1629,7 @@ mutual
                 let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId true fuel
                   arguments.toList parameters
                 let value : Term unit ρ Γ shape.bodyType :=
-                  .callInstance (loopSite namespaceId.index id.index) handle typeArgs θ shape
+                  .callInstance (ns.site id.index) handle typeArgs θ shape
                     arguments
                 return ← match τ? with
                   | some τ => .ok (.at τ (← Compiled.at? τ (.at shape.bodyType value)))
@@ -1529,7 +1642,7 @@ mutual
               let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId true fuel arguments.toList
                 parameters'
               let value : Term unit ρ Γ shape'.bodyType :=
-                .callGeneric (loopSite namespaceId.index id.index) handle typeArgs θ shape
+                .callGeneric (ns.site id.index) handle typeArgs θ shape
                   shape' resolved arguments
               match τ? with
               | some τ => .ok (.at τ (← Compiled.at? τ (.at shape'.bodyType value)))
@@ -1624,7 +1737,7 @@ mutual
               (.function parameters shared shape.row)
             let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId true fuel arguments parameters
             let value : Term unit ρ Γ shape.bodyType :=
-              .invoke (loopSite namespaceId.index id.index) shape function arguments
+              .invoke (ns.site id.index) shape function arguments
             match τ? with
             | some τ => .ok (.at τ (← Compiled.at? τ (.at shape.bodyType value)))
             | none => .ok (.never fun _ => .drop value .unreachable)
@@ -1648,24 +1761,24 @@ mutual
             | .borrow .immutable, [key] => do
                 let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
                 unless τ = native do .error "a global read's type differs from its resource type"
-                .ok (.at native (.globalRead (loopSite namespaceId.index id.index) typeArguments key))
+                .ok (.at native (.globalRead (ns.site id.index) typeArguments key))
             | .borrow .mutable, [key] => do
                 let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
                 unless τ = .ref native do
                   .error "a mutable global borrow's type differs from its resource type"
                 .ok (.at (.ref native)
-                  (.globalBorrow (τ := native) (loopSite namespaceId.index id.index) typeArguments key))
+                  (.globalBorrow (τ := native) (ns.site id.index) typeArguments key))
             | .take, [key] => do
                 let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
                 unless τ = native do .error "a take's type differs from its resource type"
                 -- The write ends with the operation.
-                let site := loopSite namespaceId.index id.index
+                let site := ns.site id.index
                 .ok (.at native (.seqAfter (.globalTake site typeArguments key) (.memoryWritten site)))
             | .publish, [key, value] => do
                 let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
                 let value ← Compiled.at? native
                   (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value)
-                let site := loopSite namespaceId.index id.index
+                let site := ns.site id.index
                 .ok (.at .unit (.seqAfter (.globalPublish site typeArguments key value)
                   (.memoryWritten site)))
             | _, _ => notCarried "a storage operation of this kind or arity"
@@ -1688,13 +1801,13 @@ mutual
                     | .error "a ghost slot is out of range"
                   match σ, x with
                   | .ghost _, x =>
-                      pure (GhostInits.cons (ghostInitSite namespaceId.index id.index k) x rest)
+                      pure (GhostInits.cons (loopSite (ns.site id.index) k) x rest)
                   | _, _ => .error "a ghost field's position holds no ghost slot"
-                let packed := Term.pack (loopSite namespaceId.index id.index) source
+                let packed := Term.pack (ns.site id.index) source
                   nominalArguments fields inits
                 .ok (.at (.struct source nominalArguments σs)
                   (if ns.carriesInvariant (.struct source nominalArguments σs) then
-                    .constructed (loopSite namespaceId.index id.index) packed else packed))
+                    .constructed (ns.site id.index) packed else packed))
             | .enum source nominalArguments names rows distinct, some name =>
                 unless handle = source do .error "a constructor's declaration differs from its type"
                 let some ⟨σs, choice⟩ := Which.ofName names rows name
@@ -1709,13 +1822,13 @@ mutual
                     | .error "a ghost slot is out of range"
                   match σ, x with
                   | .ghost _, x =>
-                      pure (GhostInits.cons (ghostInitSite namespaceId.index id.index k) x rest)
+                      pure (GhostInits.cons (loopSite (ns.site id.index) k) x rest)
                   | _, _ => .error "a ghost field's position holds no ghost slot"
-                let packed := Term.variant (loopSite namespaceId.index id.index) source
+                let packed := Term.variant (ns.site id.index) source
                   nominalArguments distinct choice fields inits
                 .ok (.at (.enum source nominalArguments names rows distinct)
                   (if ns.carriesInvariant (.enum source nominalArguments names rows distinct) then
-                    .constructed (loopSite namespaceId.index id.index) packed else packed))
+                    .constructed (ns.site id.index) packed else packed))
             | _, _ => .error "a constructor's type is not its declaration's"
         | .operation operation _ arguments _ =>
             let some τ := τ? | notCarried "an operation of type never"
@@ -1751,7 +1864,7 @@ mutual
               let variant := match ns.patterns.get? arm.pattern.index with
                 | some { kind := .constructor _ _ (some variant) _, .. } => variant
                 | _ => "_"
-              .ok (some (loopSite namespaceId.index id.index, variant), pattern, guard, body)
+              .ok (some (ns.site id.index, variant), pattern, guard, body)
             -- A match of type never may still have arms that complete.
             let resultType? := τ?.orElse fun _ => arms.findSome? fun (_, _, _, body) =>
               match body with
@@ -1782,7 +1895,7 @@ mutual
                         kindOf thenBranch matches some (.block #[] none)) &&
                       kindOf elseBranch matches some (.throw_ ..))
               | none => true
-            let site := if lowered || shaped then some (loopSite namespaceId.index id.index)
+            let site := if lowered || shaped then some (ns.site id.index)
               else none
             let condition ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel condition).at? .bool
             let thenBranch ← compileExpr unit loanFacts ρ Γ ns namespaceId fuel thenBranch
@@ -1806,12 +1919,12 @@ mutual
                     .ok (.at σ (.ite site condition thenBranch elseBranch))
         | .throw_ kind arguments =>
             match arguments.toList with
-            | [] => .ok (.never fun _ => .throw0 (loopSite namespaceId.index id.index) kind)
+            | [] => .ok (.never fun _ => .throw0 (ns.site id.index) kind)
             | [code] => do
                 let ⟨σ, code⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel code).some
                 match σ, code with
                 | .int _ _, code =>
-                    .ok (.never fun _ => .throw1 (loopSite namespaceId.index id.index) kind code)
+                    .ok (.never fun _ => .throw1 (ns.site id.index) kind code)
                 | _, _ => notCarried "a throw of a value that is not an integer"
             | _ => notCarried "a throw with several arguments"
         | .return_ values =>
@@ -1824,7 +1937,7 @@ mutual
                 -- An explicit return is a normal exit: a mutable reference
                 -- leaving here owes its referent's invariants (`certifiedResult`).
                 .ok (.never fun _ =>
-                  .return_ (certifiedResult (loopSite namespaceId.index id.index) value))
+                  .return_ (certifiedResult (ns.site id.index) value))
             | _ => notCarried "a return of several values"
         | .assign place value =>
             match ns.place? place with
@@ -1843,20 +1956,20 @@ mutual
                   (Var.ofIndex Γ root.index).map (·.1)
                 if owner.any ns.carriesInvariant then
                   .ok (.at .unit (.seqAfter
-                    (.writePlace (loopSite namespaceId.index id.index) (ns.mismatchOn path)
+                    (.writePlace (ns.site id.index) (ns.mismatchOn path)
                       x path value)
-                    (.mutationEnd (loopSite namespaceId.index id.index))))
-                else .ok (.at .unit (.writePlace (loopSite namespaceId.index id.index)
+                    (.mutationEnd (ns.site id.index))))
+                else .ok (.at .unit (.writePlace (ns.site id.index)
                   (ns.mismatchOn path) x path value))
         | .loop _ body => do
             let body ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel body).at? .unit
-            let loop := Term.loop (loopSite namespaceId.index id.index) body
+            let loop := Term.loop (ns.site id.index) body
             match τ? with
             | none | some .unit | some (.tuple .nil) => .ok (.at .unit loop)
             -- A loop of another type completes only by a break with a value,
             -- which is not carried, so it never completes: what follows it
             -- is unreachable.
-            | some τ => .ok (.at τ (.drop loop (.throw0 (loopSite namespaceId.index id.index) .panic)))
+            | some τ => .ok (.at τ (.drop loop (.throw0 (ns.site id.index) .panic)))
         | .break_ nest none => .ok (.never fun _ => .break_ nest)
         | .continue_ nest => .ok (.never fun _ => .continue_ nest)
         -- An anchor records the state a later assertion reads, and the
@@ -1864,7 +1977,7 @@ mutual
         -- block's site, in the order the block states them; the rest is no
         -- step.
         | .spec block =>
-            let site := loopSite namespaceId.index id.index
+            let site := ns.site id.index
             let isSave := fun (condition : Condition) =>
               condition.kind matches .assumption &&
                 (ns.expressions.get? condition.expression.index).any
@@ -1895,7 +2008,7 @@ mutual
             let writes ← (all.filter isUpdate).mapM fun condition => do
               let some (_, target) := condition.auxiliary.find? (·.1 == "updateTarget")
                 | .error "an update has no target"
-              let site := loopSite namespaceId.index condition.expression.index
+              let site := ns.site condition.expression.index
               match ns.expressions.get? target.index with
               | some { kind := .operation (.read place) _ _ _, .. } =>
                   unless ns.place? place matches some (.ghostField ..) do
@@ -1989,7 +2102,7 @@ mutual
             -- sequence length; the slice's checked bounds reject it.
             let upper := if fromEnd then Term.modular .subtract (.length vector) offset else offset
             .ok (.at (.slice element)
-              (.vectorSlice (.slice (loopSite ns.namespaceId.index place.index) vector lower upper)))
+              (.vectorSlice (.slice (ns.site place.index) vector lower upper)))
         -- Reading an unsize observes the array contents without moving it.
         | some (.unsize base) => do
             let ⟨_, baseType, _, _⟩ ← compilePlace unit Γ ns fuel base
@@ -2044,7 +2157,7 @@ mutual
         let head : Term unit ρ Γ σ := match σ, head with
           | .ref referent, head =>
               if handsOver && !referent.certificateFree then
-                .handedOver (loopSite namespaceId.index argument.index) head
+                .handedOver (ns.site argument.index) head
               else head
           | _, head => head
         let tail ← compileArgs unit loanFacts ρ Γ ns namespaceId handsOver fuel arguments σs
@@ -2140,22 +2253,22 @@ mutual
     | fuel + 1, origin, τ, .primitive primitive, arguments =>
         compilePrimitive unit loanFacts ρ Γ ns namespaceId fuel origin τ primitive arguments
     | fuel + 1, origin, τ, .copy place, [] =>
-        compileRead unit Γ ns (loopSite namespaceId.index origin.index) false fuel τ place
+        compileRead unit Γ ns (ns.site origin.index) false fuel τ place
     | fuel + 1, origin, τ, .move place, [] =>
-        compileRead unit Γ ns (loopSite namespaceId.index origin.index) true fuel τ place
+        compileRead unit Γ ns (ns.site origin.index) true fuel τ place
     | fuel + 1, origin, τ, .read place, [] =>
-        compileRead unit Γ ns (loopSite namespaceId.index origin.index) false fuel τ place
+        compileRead unit Γ ns (ns.site origin.index) false fuel τ place
     | fuel + 1, origin, .int width signed, .readDiscriminant place, [] => do
         let ⟨_, σ, x, path⟩ ← compilePlace unit Γ ns fuel place
         match σ, path with
         | .enum source _ names rows _, path =>
             .ok (.at (.int width signed)
-              (.caseOf (readOut (loopSite namespaceId.index origin.index) (ns.mismatchOn path) x path)
+              (.caseOf (readOut (ns.site origin.index) (ns.mismatchOn path) x path)
                 (← discriminantArms unit source rows names)))
         | _, _ => notCarried "a discriminant read of a non-enum place"
     | fuel + 1, origin, τ, .borrow .immutable place, [] => do
         -- A shared view holds no loan: what the place holds, observed.
-        let site := loopSite namespaceId.index origin.index
+        let site := ns.site origin.index
         match compilePlace unit Γ ns fuel place with
         | .ok ⟨_, component, x, path⟩ =>
             if component = τ then compileRead unit Γ ns site false fuel τ place
@@ -2199,7 +2312,7 @@ mutual
               return .at τ (equal ▸ .sliceCurrent (.var x))
             else throw "a slice dereference has an unexpected type"
           let x ← Var.at? Γ localId.index (.ref τ)
-          return .at τ (copyOut (loopSite namespaceId.index origin.index) (.var x))
+          return .at τ (copyOut (ns.site origin.index) (.var x))
         let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
         match σ, operand with
         | .sliceRef element, operand =>
@@ -2208,7 +2321,7 @@ mutual
             else .error "a slice dereference has an unexpected type"
         | .ref referent, operand =>
             if equal : referent = τ then
-              .ok (.at τ (copyOut (loopSite namespaceId.index origin.index) (equal ▸ operand)))
+              .ok (.at τ (copyOut (ns.site origin.index) (equal ▸ operand)))
             else .error "a dereference has an unexpected type"
         | _, _ => notCarried "a dereference of a non-reference"
     | fuel + 1, origin, τ, .reference (.borrow .immutable), [operand] => do
@@ -2216,7 +2329,7 @@ mutual
         -- reference denotes its referent, as a shared borrow of a place
         -- denotes the place's read.
         let ⟨σ, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
-        let site := loopSite namespaceId.index origin.index
+        let site := ns.site origin.index
         if equal : σ = τ then .ok (.at τ (equal ▸ value))
         else if equal : σ.erase = τ then .ok (.at τ (equal ▸ .observe site value))
         else match σ, value, τ with
@@ -2239,7 +2352,7 @@ mutual
         -- resolves its prophecy.
         let some localId := heldLocal? ns operand
           | notCarried "a freeze of a reference that no local holds"
-        let site := loopSite namespaceId.index origin.index
+        let site := ns.site origin.index
         if let some ⟨.sliceRef element, x⟩ := Var.ofIndex Γ localId.index then
           if equal : (NTy.slice element).erase = τ then
             return .at τ (equal ▸ .observe site (.sliceCurrent (.var x)))
@@ -2351,7 +2464,7 @@ mutual
         let zero ← compileLiteral (.int width signed) (.integer 0)
         let operand ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at?
           (.int width signed)
-        .ok (.at (.int width signed) (.checked (loopSite namespaceId.index origin.index) .subtract failure zero operand))
+        .ok (.at (.int width signed) (.checked (ns.site origin.index) .subtract failure zero operand))
     | fuel + 1, origin, τ, .checkedMultiply failure, [left, right] =>
         compileChecked unit loanFacts ρ Γ ns namespaceId fuel origin τ .multiply failure left right
     | fuel + 1, origin, τ, .checkedDivide failure, [left, right] =>
@@ -2439,12 +2552,12 @@ mutual
         let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width signed)
         let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width signed)
         .ok (.at (.int width signed)
-          (.divideUnchecked (loopSite namespaceId.index origin.index) false left right))
+          (.divideUnchecked (ns.site origin.index) false left right))
     | fuel + 1, origin, .int width signed, .modulo, [left, right] => do
         let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width signed)
         let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width signed)
         .ok (.at (.int width signed)
-          (.divideUnchecked (loopSite namespaceId.index origin.index) true left right))
+          (.divideUnchecked (ns.site origin.index) true left right))
     | fuel + 1, _, .tuple (.cons (.int width signed) (.cons .bool .nil)), .overflowingAdd, [left, right] =>
         compileOverflowing unit loanFacts ρ Γ ns namespaceId fuel width signed .add left right
     | fuel + 1, _, .tuple (.cons (.int width signed) (.cons .bool .nil)), .overflowingSubtract, [left, right] =>
@@ -2466,13 +2579,13 @@ mutual
     | fuel + 1, origin, .char, .cast, [value] => do
         let ⟨σ, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).some
         match σ, value with
-        | .int _ _, value => .ok (.at .char (.charOf (loopSite namespaceId.index origin.index) value))
+        | .int _ _, value => .ok (.at .char (.charOf (ns.site origin.index) value))
         | _, _ => notCarried "a cast to a character from a non-integer"
     | fuel + 1, origin, .char, .checkedCast failure, [value] => do
         let ⟨σ, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).some
         match σ, value with
         | .int _ _, value =>
-            .ok (.at .char (.charOfChecked (loopSite namespaceId.index origin.index) failure value))
+            .ok (.at .char (.charOfChecked (ns.site origin.index) failure value))
         | _, _ => notCarried "a cast to a character from a non-integer"
     | fuel + 1, origin, τ, .checkedShiftLeft failure, [value, distance] =>
         compileShift unit loanFacts ρ Γ ns namespaceId fuel origin τ true failure value distance
@@ -2481,9 +2594,9 @@ mutual
     | fuel + 1, origin, .int width' signed', .checkedCast failure, [value] => do
         let ⟨σ, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).some
         match σ, value with
-        | .int _ _, value => .ok (.at (.int width' signed') (.cast (loopSite namespaceId.index origin.index) failure value))
+        | .int _ _, value => .ok (.at (.int width' signed') (.cast (ns.site origin.index) failure value))
         | .char, value =>
-            .ok (.at (.int width' signed') (.cast (loopSite namespaceId.index origin.index) failure (.charCode value)))
+            .ok (.at (.int width' signed') (.cast (ns.site origin.index) failure (.charCode value)))
         | _, _ => notCarried "a cast from a non-integer"
     | fuel + 1, origin, .array τ length, .vector, elements => do
         let count := elements.length
@@ -2517,12 +2630,12 @@ mutual
         match σ, vector with
         | .vector τ, vector =>
             match π, position with
-            | .int _ _, position => .ok (.at τ (.index (loopSite namespaceId.index origin.index) vector position))
+            | .int _ _, position => .ok (.at τ (.index (ns.site origin.index) vector position))
             | _, _ => notCarried "an element read at a non-integer position"
         | .array τ _, array =>
             match π, position with
             | .int _ _, position =>
-                .ok (.at τ (.index (loopSite namespaceId.index origin.index) (.arrayVector array) position))
+                .ok (.at τ (.index (ns.site origin.index) (.arrayVector array) position))
             | _, _ => notCarried "an element read at a non-integer position"
         | _, _ => notCarried "an element read of a non-vector"
     | fuel + 1, origin, .unit, .checkVectorIndex failure, [vector, position] => do
@@ -2531,12 +2644,12 @@ mutual
         match σ, vector with
         | .vector _, vector =>
             match π, position with
-            | .int _ _, position => .ok (.at .unit (.checkIndex (loopSite namespaceId.index origin.index) failure vector position))
+            | .int _ _, position => .ok (.at .unit (.checkIndex (ns.site origin.index) failure vector position))
             | _, _ => notCarried "a bounds check at a non-integer position"
         | .array _ _, array =>
             match π, position with
             | .int _ _, position =>
-                .ok (.at .unit (.checkIndex (loopSite namespaceId.index origin.index) failure
+                .ok (.at .unit (.checkIndex (ns.site origin.index) failure
                   (.arrayVector array) position))
             | _, _ => notCarried "a bounds check at a non-integer position"
         | _, _ => notCarried "a bounds check of a non-vector"
@@ -2555,7 +2668,7 @@ mutual
             match π, position with
             | .int _ _, position => do
                 let element ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel element).at? τ
-                .ok (.at (.vector τ) (.insert (loopSite namespaceId.index origin.index) vector position element))
+                .ok (.at (.vector τ) (.insert (ns.site origin.index) vector position element))
             | _, _ => notCarried "an insertion at a non-integer position"
         | _, _ => notCarried "an insertion into a non-vector"
     | fuel + 1, origin, _, .removeVector, [vector, position] => do
@@ -2565,7 +2678,7 @@ mutual
         | .vector τ, vector =>
             match π, position with
             | .int _ _, position =>
-                .ok (.at (.tuple (.cons τ (.cons (.vector τ) .nil))) (.remove (loopSite namespaceId.index origin.index) vector position))
+                .ok (.at (.tuple (.cons τ (.cons (.vector τ) .nil))) (.remove (ns.site origin.index) vector position))
             | _, _ => notCarried "a removal at a non-integer position"
         | _, _ => notCarried "a removal from a non-vector"
     | fuel + 1, origin, _, .swapVector, [vector, left, right] => do
@@ -2577,7 +2690,7 @@ mutual
           | .int width signed, left => do
               let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at?
                 (.int width signed)
-              .ok (.at (.vector τ) (.swap (loopSite namespaceId.index origin.index) vector left right))
+              .ok (.at (.vector τ) (.swap (ns.site origin.index) vector left right))
           | _, _ => notCarried "a swap at non-integer positions"
         | _, _ => notCarried "a swap in a non-vector"
     | fuel + 1, origin, _, .concatVector, [left, right] => do
@@ -2596,7 +2709,7 @@ mutual
           | .int width signed, start => do
               let stop ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel stop).at?
                 (.int width signed)
-              .ok (.at (.vector τ) (.slice (loopSite namespaceId.index origin.index) vector start stop))
+              .ok (.at (.vector τ) (.slice (ns.site origin.index) vector start stop))
           | _, _ => notCarried "a slice at non-integer positions"
         | _, _ => notCarried "a slice of a non-vector"
     | fuel + 1, origin, _, .reverseSliceVector, [vector, start, stop] => do
@@ -2608,13 +2721,13 @@ mutual
           | .int width signed, start => do
               let stop ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel stop).at?
                 (.int width signed)
-              .ok (.at (.vector τ) (.reverseSlice (loopSite namespaceId.index origin.index) vector start stop))
+              .ok (.at (.vector τ) (.reverseSlice (ns.site origin.index) vector start stop))
           | _, _ => notCarried "a reversal at non-integer positions"
         | _, _ => notCarried "a reversal of a non-vector"
     | fuel + 1, origin, .unit, .destroyEmptyVector, [vector] => do
         let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
         match σ, vector with
-        | .vector _, vector => .ok (.at .unit (.destroyEmpty (loopSite namespaceId.index origin.index) vector))
+        | .vector _, vector => .ok (.at .unit (.destroyEmpty (ns.site origin.index) vector))
         | _, _ => notCarried "a destruction of a non-vector"
     | fuel + 1, origin, _, .containsVector, [vector, needle] => do
         let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).sequenceContents.some
@@ -2652,7 +2765,7 @@ mutual
     | fuel + 1, origin, .int width signed, op, failure, left, right => do
         let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width signed)
         let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width signed)
-        .ok (.at (.int width signed) (.checked (loopSite namespaceId.index origin.index) op failure left right))
+        .ok (.at (.int width signed) (.checked (ns.site origin.index) op failure left right))
     | _ + 1, _, _, _, _, _, _ => notCarried "checked arithmetic at a non-integer type"
 
   def compileModular (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
@@ -2696,7 +2809,7 @@ mutual
     | fuel + 1, origin, .int width signed, left, failure, value, distance => do
         let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? (.int width signed)
         let ⟨σ, distance⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel distance).some
-        let site := loopSite namespaceId.index origin.index
+        let site := ns.site origin.index
         match σ, distance with
         | .int _ true, distance =>
             .ok (.at (.int width signed) (.shiftSigned site left failure value distance))
@@ -2717,7 +2830,7 @@ mutual
         match σ, distance with
         | .int _ _, distance =>
             .ok (.at (.int width signed)
-              (.shiftUnchecked (loopSite namespaceId.index origin.index) left value distance))
+              (.shiftUnchecked (ns.site origin.index) left value distance))
         | _, _ => notCarried "a shift by a non-integer distance"
     | _ + 1, _, _, _, _, _ => notCarried "a shift of a non-integer"
 
@@ -2912,7 +3025,7 @@ def compileFunctionIn (unit : ValidatedUnit) (view : CompileNamespace) (handle :
   let mutables ← mutableSlots frame 0 allLocals.length
   -- The function's exit, where a mutable parameter's loan ends and its data
   -- invariant is owed (`Mutables.resolve`).
-  let exitSite := loopSite handle.namespaceId.index root.index
+  let exitSite := view.site root.index
   -- A mutable reference the function returns owes its referent's data
   -- invariants there too (`Term.returned`): the slot it left is empty, so no
   -- resolution at the exit reaches it, while the caller reads it as a
@@ -2968,7 +3081,9 @@ def compileModelFunction (unit : ValidatedUnit)
 
 /-- A namespace's view read at type arguments. -/
 def CompileNamespace.at (view : CompileNamespace) (θ : TypeArgs) : CompileNamespace :=
-  { view with substitution := some θ.1 }
+  { view with
+    substitution := some θ.1
+    siteSpace := siteSpaceOf view.namespaces view.namespaceId.index (some θ.1) }
 
 /-- A function compiled at a substitution: `compileFunction` without one. At type
 arguments `θ` its body is read at them, under the same frames and certificates. -/

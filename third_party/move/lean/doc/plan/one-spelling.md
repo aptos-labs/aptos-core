@@ -25,7 +25,11 @@ takes precedence over the order either of them suggests.
   cost paid at every mention and at every pass that walks the result.
 - **An instantiation is computed once.** A generic thing at given arguments is
   a named constant with a fixed meaning; a mention does not repeat the
-  substitution.
+  substitution. This holds for a function's body at a row and for a
+  declaration at its type arguments alike: the layout of a struct or an enum
+  at an argument row, and each operation's equation at that layout, are
+  computed once per row and reused, not derived where a consumer opens the
+  declaration.
 - **Repair the producer.** A wrong or second spelling is fixed where it is
   emitted. A rewrite at the consumer is refused, and the existing ones are
   retired as their producers are fixed.
