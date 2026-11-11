@@ -34,9 +34,18 @@ pub enum Phase {
     Poll,
     /// A storage read through the parallel provider. Part of VM time.
     Read,
+    /// Thread CPU time of the VM call, next to its wall time in `VmFirst`
+    /// and `VmRetry`.
+    VmCpu,
+    /// Minor page faults during the VM call; counted, not timed.
+    VmMinorFaults,
+    /// Voluntary context switches during the VM call; counted, not timed.
+    VmVoluntarySwitches,
+    /// Involuntary context switches during the VM call; counted, not timed.
+    VmInvoluntarySwitches,
 }
 
-pub const PHASES: [Phase; 11] = [
+pub const PHASES: [Phase; 15] = [
     Phase::CommitHooks,
     Phase::NextTask,
     Phase::VmFirst,
@@ -48,6 +57,10 @@ pub const PHASES: [Phase; 11] = [
     Phase::SpeculativeFailure,
     Phase::Poll,
     Phase::Read,
+    Phase::VmCpu,
+    Phase::VmMinorFaults,
+    Phase::VmVoluntarySwitches,
+    Phase::VmInvoluntarySwitches,
 ];
 
 impl Phase {
@@ -64,6 +77,10 @@ impl Phase {
             Phase::SpeculativeFailure => "speculative_failure",
             Phase::Poll => "poll",
             Phase::Read => "read",
+            Phase::VmCpu => "vm_cpu",
+            Phase::VmMinorFaults => "vm_minflt",
+            Phase::VmVoluntarySwitches => "vm_nvcsw",
+            Phase::VmInvoluntarySwitches => "vm_nivcsw",
         }
     }
 
@@ -92,6 +109,72 @@ pub fn record(phase: Phase, start: Instant) {
 /// Counts one occurrence of `phase` without timing it.
 pub fn count(phase: Phase) {
     COUNTS[phase.index()].0.fetch_add(1, Ordering::Relaxed);
+}
+
+fn add(phase: Phase, nanos: u64, count: u64) {
+    NANOS[phase.index()].0.fetch_add(nanos, Ordering::Relaxed);
+    COUNTS[phase.index()].0.fetch_add(count, Ordering::Relaxed);
+}
+
+/// The calling thread's CPU time, minor faults and context switches so far.
+/// Zero outside Linux.
+#[derive(Clone, Copy, Default)]
+pub struct ThreadUsage {
+    cpu_nanos: u64,
+    minor_faults: u64,
+    voluntary_switches: u64,
+    involuntary_switches: u64,
+}
+
+impl ThreadUsage {
+    #[cfg(target_os = "linux")]
+    pub fn now() -> Self {
+        // SAFETY: both calls only write into the zeroed structs passed in.
+        unsafe {
+            let mut usage: libc::rusage = std::mem::zeroed();
+            libc::getrusage(libc::RUSAGE_THREAD, &mut usage);
+            let mut cpu: libc::timespec = std::mem::zeroed();
+            libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut cpu);
+            Self {
+                cpu_nanos: cpu.tv_sec as u64 * 1_000_000_000 + cpu.tv_nsec as u64,
+                minor_faults: usage.ru_minflt as u64,
+                voluntary_switches: usage.ru_nvcsw as u64,
+                involuntary_switches: usage.ru_nivcsw as u64,
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn now() -> Self {
+        Self::default()
+    }
+}
+
+/// Adds the calling thread's usage since `start` to the VM-call counters.
+pub fn record_vm_usage(start: ThreadUsage) {
+    let end = ThreadUsage::now();
+    add(
+        Phase::VmCpu,
+        end.cpu_nanos.saturating_sub(start.cpu_nanos),
+        1,
+    );
+    add(
+        Phase::VmMinorFaults,
+        0,
+        end.minor_faults.saturating_sub(start.minor_faults),
+    );
+    add(
+        Phase::VmVoluntarySwitches,
+        0,
+        end.voluntary_switches
+            .saturating_sub(start.voluntary_switches),
+    );
+    add(
+        Phase::VmInvoluntarySwitches,
+        0,
+        end.involuntary_switches
+            .saturating_sub(start.involuntary_switches),
+    );
 }
 
 /// Records the time until it is dropped.

@@ -801,6 +801,7 @@ dependencies = [
  "fail",
  "hashbrown 0.14.3",
  "itertools 0.15.0",
+ "libc",
  "mono-move-aptos-state-view-providers",
  "mono-move-aptos-transaction-executor",
  "mono-move-core",

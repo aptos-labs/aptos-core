@@ -96,6 +96,19 @@ def component_tps(pattern, output, what):
     return float(get_last(pattern + r".*?\(component TPS: " + NUMBER + r"\)", output, what))
 
 
+def tlb_shootdowns():
+    """TLB-shootdown interrupts so far, summed over CPUs, or None off Linux."""
+    try:
+        with open("/proc/interrupts") as f:
+            for line in f:
+                fields = line.split()
+                if fields and fields[0] == "TLB:":
+                    return sum(int(x) for x in fields[1:] if x.isdigit())
+    except OSError:
+        pass
+    return None
+
+
 def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path):
     base, *flags = variant.split("+")
     mode, _, assembly_pass = base.partition("/")
@@ -108,6 +121,7 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
             poll_env = f"MONO_POLL_INTERVAL={poll} "
         else:
             raise ValueError(f"unknown variant flag {flag!r}")
+    tlb_before = tlb_shootdowns()
     output = execute_command(
         f"RUST_BACKTRACE=1 MONO_GROUP_ASSEMBLY={mode} GROUP_ASSEMBLY_PASS={assembly_pass} "
         f"{poll_env}"
@@ -164,6 +178,10 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
     }
     for key, value in re.findall(r"(\w+)=" + NUMBER, assembly):
         row[key] = float(value)
+    tlb_after = tlb_shootdowns()
+    txns = float(get_last(r"Overall TPS: \S+ txn/s \(over " + NUMBER + r" txns", output, "txn count"))
+    if tlb_before is not None and tlb_after is not None and txns:
+        row["tlb_per_txn"] = (tlb_after - tlb_before) / txns
     phases = re.findall(r"Overall worker phases per txn:(.*)", output)
     if phases:
         for key, value in re.findall(r"(\w+)=" + NUMBER, phases[-1]):
@@ -366,6 +384,11 @@ def phase_report(rows):
                         f"{median(vrows, 'ph_poll_n'):.2f}",
                         f"{median(vrows, 'ph_read_us'):.2f}",
                         f"{median(vrows, 'ph_read_n'):.2f}",
+                        f"{median(vrows, 'ph_vm_cpu_us'):.2f}",
+                        f"{median(vrows, 'ph_vm_minflt_n'):.2f}",
+                        f"{median(vrows, 'ph_vm_nvcsw_n'):.3f}",
+                        f"{median(vrows, 'ph_vm_nivcsw_n'):.3f}",
+                        f"{median(vrows, 'tlb_per_txn'):.2f}",
                     ]
                 )
         lines.append(f"#### {workload}")
@@ -375,7 +398,19 @@ def phase_report(rows):
                 table,
                 headers=["T", "variant", "workers x inner", "phases"]
                 + PHASES
-                + ["retries/txn", "waits/txn", "spec fails/txn", "polls/txn", "read us", "reads/txn"],
+                + [
+                    "retries/txn",
+                    "waits/txn",
+                    "spec fails/txn",
+                    "polls/txn",
+                    "read us",
+                    "reads/txn",
+                    "vm cpu us",
+                    "vm minflt/txn",
+                    "vm nvcsw/txn",
+                    "vm nivcsw/txn",
+                    "tlb/txn",
+                ],
                 tablefmt="github",
             )
         )

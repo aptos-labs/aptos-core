@@ -390,8 +390,10 @@ where
             global_module_cache,
         };
         let vm_start = std::time::Instant::now();
+        let vm_usage = crate::phase_times::ThreadUsage::now();
         let (execution_result, mut read_set) =
             executor.execute(shared, mode, txn, auxiliary_info, idx_to_execute)?;
+        crate::phase_times::record_vm_usage(vm_usage);
         crate::phase_times::record(
             if incarnation == 0 {
                 crate::phase_times::Phase::VmFirst
