@@ -5,6 +5,7 @@
 
 use crate::{
     errors::MaterializationError,
+    group_assembly::{GroupAssembly, PER_TXN_ASSEMBLY_GROUPS, PER_TXN_ASSEMBLY_NANOS},
     providers::{AptosDataProvider, GroupMembers, MaterializedGroups},
 };
 use aptos_types::{
@@ -12,7 +13,7 @@ use aptos_types::{
     transaction::{
         ExecutionStatus, TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
-    write_set::{WriteOp, WriteSet},
+    write_set::{PendingGroup, WriteOp, WriteSet},
 };
 use bytes::Bytes;
 use mono_move_core::{
@@ -23,7 +24,7 @@ use mono_move_output::to_contract_events;
 use mono_move_runtime::{serialize, SessionEffects, WriteClass};
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
 use shared_dsa::UnorderedMap;
-use std::{collections::BTreeMap, ptr::NonNull};
+use std::{collections::BTreeMap, ptr::NonNull, sync::atomic::Ordering, time::Instant};
 
 // TODO(security): audit all error messages and make sure they do not lead to
 // deep recursions or OOMs.
@@ -166,24 +167,44 @@ fn drain_write_set(
         }
     }
 
-    // Merge each group's member ops into its stored members and emit one write
-    // per group. The assembled members are returned so the caller can cache them
-    // without decoding the write op again.
-    //
-    // Note on determinism: the groups are visited in an unspecified order.
-    // `WriteSet::new` sorts the writes and `MaterializationError::new` sorts
-    // the failures, so the order does not reach the result.
-    for (group_key, member_ops) in group_ops.into_iter_unordered() {
-        let merged = merge_group(provider, &group_key, member_ops).and_then(|(op, members)| {
-            let state_key = group_key.as_state_key().map_err(|e| format!("{e:#}"))?;
-            Ok((state_key, op, members))
-        });
-        match merged {
-            Ok((state_key, op, members)) => {
-                materialized_groups.insert(group_key, members);
-                writes.push((state_key, op));
-            },
-            Err(e) => failures.push(e),
+    // At block end, the executor assembles groups from every transaction's
+    // member ops, so they are passed on as they are.
+    let mut pending: BTreeMap<StateKey, PendingGroup> = BTreeMap::new();
+    if GroupAssembly::get().at_block_end() {
+        for (group_key, member_ops) in group_ops.into_iter_unordered() {
+            match group_key.as_state_key() {
+                Ok(state_key) => {
+                    pending.insert(state_key, member_ops);
+                },
+                Err(e) => failures.push(format!("{e:#}")),
+            }
+        }
+    } else {
+        // Merge each group's member ops into its stored members and emit one
+        // write per group. The assembled members are returned so the caller can
+        // cache them without decoding the write op again.
+        //
+        // Note on determinism: the groups are visited in an unspecified order.
+        // `WriteSet::new` sorts the writes and `MaterializationError::new` sorts
+        // the failures, so the order does not reach the result.
+        let start = Instant::now();
+        let num_groups = group_ops.len() as u64;
+        for (group_key, member_ops) in group_ops.into_iter_unordered() {
+            let merged = merge_group(provider, &group_key, member_ops).and_then(|(op, members)| {
+                let state_key = group_key.as_state_key().map_err(|e| format!("{e:#}"))?;
+                Ok((state_key, op, members))
+            });
+            match merged {
+                Ok((state_key, op, members)) => {
+                    materialized_groups.insert(group_key, members);
+                    writes.push((state_key, op));
+                },
+                Err(e) => failures.push(e),
+            }
+        }
+        if num_groups > 0 {
+            PER_TXN_ASSEMBLY_NANOS.fetch_add(start.elapsed().as_nanos() as u64, Ordering::Relaxed);
+            PER_TXN_ASSEMBLY_GROUPS.fetch_add(num_groups, Ordering::Relaxed);
         }
     }
 
@@ -192,8 +213,11 @@ fn drain_write_set(
     }
     // `WriteSet::new` collects into a `BTreeMap`, so we do not need to sort the
     // `writes` vector here.
-    let write_set =
+    let mut write_set =
         WriteSet::new(writes).map_err(|e| vec![format!("failed to build the write set: {e:?}")])?;
+    if !pending.is_empty() {
+        write_set.add_pending_groups(pending);
+    }
     Ok((write_set, materialized_groups))
 }
 

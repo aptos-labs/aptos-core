@@ -13,6 +13,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_std::iterable::Iterable;
 use bytes::Bytes;
 use itertools::{EitherOrBoth, Itertools};
+use move_core_types::language_storage::StructTag;
 use once_cell::sync::Lazy;
 use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -636,7 +637,15 @@ pub enum Extension {
     NativePosition(BTreeMap<StateKey, NativePositionOp>),
     NativeOrder(BTreeMap<StateKey, NativeOrderOp>),
     NativeCollateral(BTreeMap<StateKey, NativeCollateralOp>),
+    /// Resource-group member changes not yet assembled into group blobs. The
+    /// executor replaces them with group writes before the write set is
+    /// hashed or persisted.
+    PendingGroups(BTreeMap<StateKey, PendingGroup>),
 }
+
+/// A transaction's changes to one resource group's members: new bytes, or
+/// `None` for a removed member.
+pub type PendingGroup = BTreeMap<StructTag, Option<Bytes>>;
 
 #[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum WriteSet {
@@ -711,7 +720,9 @@ impl WriteSet {
                     );
                     result = Some(m);
                 },
-                Extension::NativeOrder(_) | Extension::NativeCollateral(_) => {},
+                Extension::NativeOrder(_)
+                | Extension::NativeCollateral(_)
+                | Extension::PendingGroups(_) => {},
             }
         }
         result
@@ -728,7 +739,9 @@ impl WriteSet {
                     );
                     result = Some(m);
                 },
-                Extension::NativePosition(_) | Extension::NativeCollateral(_) => {},
+                Extension::NativePosition(_)
+                | Extension::NativeCollateral(_)
+                | Extension::PendingGroups(_) => {},
             }
         }
         result
@@ -745,7 +758,9 @@ impl WriteSet {
                     );
                     result = Some(m);
                 },
-                Extension::NativePosition(_) | Extension::NativeOrder(_) => {},
+                Extension::NativePosition(_)
+                | Extension::NativeOrder(_)
+                | Extension::PendingGroups(_) => {},
             }
         }
         result
@@ -945,6 +960,44 @@ impl WriteSet {
 
     pub fn has_native_collateral(&self) -> bool {
         self.native_collaterals().is_some_and(|m| !m.is_empty())
+    }
+
+    /// Install the resource-group member changes still to be assembled.
+    pub fn add_pending_groups(&mut self, groups: BTreeMap<StateKey, PendingGroup>) {
+        let extensions = self.extensions_mut();
+        assert!(
+            !extensions
+                .iter()
+                .any(|e| matches!(e, Extension::PendingGroups(_))),
+            "pending groups should only be initialized once."
+        );
+        extensions.push(Extension::PendingGroups(groups));
+    }
+
+    /// Removes and returns the resource-group member changes still to be
+    /// assembled, if any.
+    pub fn take_pending_groups(&mut self) -> Option<BTreeMap<StateKey, PendingGroup>> {
+        let extensions = self.extensions_mut();
+        let idx = extensions
+            .iter()
+            .position(|e| matches!(e, Extension::PendingGroups(_)))?;
+        match extensions.remove(idx) {
+            Extension::PendingGroups(groups) => Some(groups),
+            Extension::NativePosition(_)
+            | Extension::NativeOrder(_)
+            | Extension::NativeCollateral(_) => unreachable!("position matched PendingGroups"),
+        }
+    }
+
+    pub fn has_pending_groups(&self) -> bool {
+        self.extensions_ref()
+            .iter()
+            .any(|e| matches!(e, Extension::PendingGroups(_)))
+    }
+
+    /// Adds or replaces the value write at `key`.
+    pub fn insert_value_write(&mut self, key: StateKey, op: WriteOp) {
+        self.value_writes_mut().insert((key, op));
     }
 
     /// Install the native-collateral bucket. BCS encodes `extensions` in insertion order, so

@@ -1,0 +1,140 @@
+name: "mono-move-group-assembly-experiment"
+on:
+  # Only here so that GitHub registers the workflow from a branch; nothing runs
+  # on a pull request event.
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      WORKLOADS:
+        description: "Comma-separated workloads; one job per workload"
+        required: false
+        type: string
+        default: "apt-fa-transfer,airdrop-fanout,clmm-swap,stableswap,nft-mint-market,bridge-relay"
+      THREADS:
+        required: false
+        type: string
+        default: "1,16"
+      VARIANTS:
+        description: "MONO_GROUP_ASSEMBLY values; the first is the baseline"
+        required: false
+        type: string
+        default: "per_txn,block_end/walk,block_end/by_group,block_end_flat/by_group"
+      REPEATS:
+        required: false
+        type: choice
+        options: ["1", "3", "5", "7"]
+        default: "5"
+      NUM_BLOCKS_PER_TEST:
+        required: false
+        type: string
+        default: "50"
+      NUM_INIT_ACCOUNTS:
+        required: false
+        type: string
+        default: "2000000"
+      BUILD:
+        required: false
+        type: choice
+        options: [release, performance]
+        default: release
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      workloads: ${{ steps.split.outputs.workloads }}
+    steps:
+      - id: split
+        env:
+          WORKLOADS: ${{ inputs.WORKLOADS }}
+        run: |
+          python3 -c 'import json,os; print("workloads=" + json.dumps([w.strip() for w in os.environ["WORKLOADS"].split(",") if w.strip()]))' >> "$GITHUB_OUTPUT"
+
+  experiment:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        workload: ${{ fromJson(needs.plan.outputs.workloads) }}
+    runs-on: runs-on,cpu=64,family=c7a,disk=large,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Install python dependencies
+        run: TABULATE_INSTALL=lib-only pip install tabulate==0.9.0
+
+      - name: Run the experiment
+        id: run
+        env:
+          WORKLOADS: ${{ matrix.workload }}
+          THREADS: ${{ inputs.THREADS }}
+          VARIANTS: ${{ inputs.VARIANTS }}
+          REPEATS: ${{ inputs.REPEATS }}
+          NUM_BLOCKS_PER_TEST: ${{ inputs.NUM_BLOCKS_PER_TEST }}
+          NUM_INIT_ACCOUNTS: ${{ inputs.NUM_INIT_ACCOUNTS }}
+          BUILD: ${{ inputs.BUILD }}
+          HIDE_OUTPUT: "1"
+          OUT_DIR: ${{ runner.temp }}/out/${{ matrix.workload }}
+          WORK_DIR: ${{ runner.temp }}/work
+        run: |
+          set +e
+          python3 third_party/move/mono-move/testsuite/e2e-perf/group_assembly_experiment.py
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Write step summary
+        if: always()
+        run: cat "${{ runner.temp }}/out/${{ matrix.workload }}/report.md" >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: group-assembly-${{ matrix.workload }}
+          path: ${{ runner.temp }}/out/${{ matrix.workload }}/
+          if-no-files-found: warn
+
+      - name: Fail on experiment error
+        if: ${{ steps.run.outputs.exit_code != '0' }}
+        run: exit 1
+
+  report:
+    needs: experiment
+    if: always() && needs.experiment.result != 'skipped'
+    runs-on: 2cpu-gh-ubuntu24-x64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: third_party/move/mono-move/testsuite/e2e-perf
+
+      - name: Install python dependencies
+        run: TABULATE_INSTALL=lib-only pip install tabulate==0.9.0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: group-assembly-*
+          path: ${{ runner.temp }}/all
+
+      - name: Combined report
+        env:
+          REPORT_FROM: ${{ runner.temp }}/all
+        run: |
+          python3 third_party/move/mono-move/testsuite/e2e-perf/group_assembly_experiment.py || true
+          cat "${{ runner.temp }}/all/report.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: group-assembly-report
+          path: ${{ runner.temp }}/all/report.md

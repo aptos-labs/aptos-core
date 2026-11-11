@@ -13,7 +13,7 @@ use anyhow::{anyhow, Result};
 use aptos_mvhashmap::{types::UnsyncGroupError, unsync_map::UnsyncMap};
 use aptos_types::state_store::{state_key::StateKey, TStateView};
 use mono_move_aptos_transaction_executor::{
-    check_group_key, decode_group_members, AptosDataProvider, GroupMembers,
+    check_group_key, decode_group_members, AptosDataProvider, GroupAssembly, GroupMembers,
 };
 use mono_move_core::{
     nominal_tag,
@@ -152,6 +152,27 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         }
     }
 
+    /// Reads a resource-group member that the map holds under its own key.
+    /// Its pre-block value comes out of the stored group.
+    fn read_flat_group_member(
+        &self,
+        key: &InMemoryStorageKey,
+        group_key: &InMemoryStorageKey,
+        tag: &StructTag,
+    ) -> Result<StorageRead, ResourceProviderError> {
+        if let Some(value) = self.unsync_map.fetch_data(key) {
+            return storage_read(&value, None);
+        }
+        let blob = self
+            .read_group_from_storage(group_key)
+            .map_err(|e| invariant_violation(format!("{e:#}")))?
+            .and_then(|mut members| members.remove(tag));
+        match blob {
+            Some(blob) => self.cache_existing_value(key, &blob),
+            None => Ok(self.cache_not_existing_value(key)),
+        }
+    }
+
     /// Materializes a stored group member, whose type `key` names.
     fn materialized_value(
         &self,
@@ -192,7 +213,11 @@ impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMSequentialProvi
                 let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
                 let member_tag = nominal_tag(key.value_ty())
                     .map_err(|e| invariant_violation(format!("{e:#}")))?;
-                self.read_group_member(key, &group_key, &member_tag)
+                if GroupAssembly::get().flat_members() {
+                    self.read_flat_group_member(key, &group_key, &member_tag)
+                } else {
+                    self.read_group_member(key, &group_key, &member_tag)
+                }
             },
         }
     }

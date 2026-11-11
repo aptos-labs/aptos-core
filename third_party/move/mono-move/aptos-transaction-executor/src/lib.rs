@@ -12,6 +12,7 @@
 mod calls;
 mod errors;
 mod executor;
+mod group_assembly;
 mod materialize;
 mod natives;
 mod outcome;
@@ -24,6 +25,7 @@ pub use errors::{
     NoEffectsReason, PreExecutionCheckFailure, SystemTxnFailure,
 };
 pub use executor::AptosTransactionExecutor;
+pub use group_assembly::{GroupAssembly, PER_TXN_ASSEMBLY_GROUPS, PER_TXN_ASSEMBLY_NANOS};
 pub use natives::production_natives;
 pub use outcome::TxnOutcome;
 pub use providers::{check_group_key, decode_group_members, AptosDataProvider, GroupMembers};

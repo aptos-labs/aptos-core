@@ -28,7 +28,8 @@ use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
-    production_natives, AptosDataProvider, AptosTransactionExecutor, DiscardReason, TxnOutcome,
+    production_natives, AptosDataProvider, AptosTransactionExecutor, DiscardReason, GroupAssembly,
+    TxnOutcome,
 };
 use mono_move_core::{
     nominal_tag,
@@ -220,11 +221,15 @@ impl MonoTxnOutput {
 
         if let Some(effects) = committed_effects(&outcome) {
             let pin: Arc<dyn ReadPin> = effects.frozen_heap();
+            let flat_members = GroupAssembly::get().flat_members();
             for (key, class, group) in effects.read_write_set().writes_unordered() {
                 let ty = key.value_ty();
                 let value = written_value(class, ty, &pin);
                 match group {
                     None => {
+                        resource_writes.insert(key.clone(), value);
+                    },
+                    Some(_) if flat_members => {
                         resource_writes.insert(key.clone(), value);
                     },
                     Some(group_ty) => {

@@ -76,6 +76,14 @@ pub static OTHER_TIMERS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static ASSEMBLED_GROUPS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_executor_assembled_groups_total",
+        "Resource-group writes assembled at the end of a block"
+    )
+    .unwrap()
+});
+
 pub static EXECUTOR_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("aptos_executor_error_total", "Cumulative number of errors").unwrap()
 });

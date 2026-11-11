@@ -24,6 +24,7 @@ use aptos_types::{
     error::{code_invariant_error, PanicError},
     vm::modules::AptosModuleExtension,
 };
+use mono_move_aptos_transaction_executor::GroupAssembly;
 use mono_move_core::{
     nominal_tag,
     storage::resource_provider::{InMemoryStorageKey, Version},
@@ -100,9 +101,11 @@ impl MonoReads<InMemoryStorageKey, StructTag> {
             incarnation: Some(incarnation),
             ..Default::default()
         };
+        let flat_members = GroupAssembly::get().flat_members();
         for (key, version, group) in rws.reads_unordered() {
             match group {
                 None => reads.record_data_read(key.clone(), version),
+                Some(_) if flat_members => reads.record_data_read(key.clone(), version),
                 Some(group_ty) => {
                     let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
                     let tag = nominal_tag(key.value_ty()).map_err(|e| {

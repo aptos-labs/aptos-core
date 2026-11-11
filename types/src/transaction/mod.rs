@@ -2133,6 +2133,10 @@ impl TransactionOutput {
         &self.write_set
     }
 
+    pub fn write_set_mut(&mut self) -> &mut WriteSet {
+        &mut self.write_set
+    }
+
     pub fn convert_write_set_to_v1(&mut self) {
         self.write_set = std::mem::take(&mut self.write_set).into_v1();
     }

@@ -20,7 +20,7 @@ use aptos_mvhashmap::{
 use aptos_types::state_store::{state_key::StateKey, TStateView};
 use bytes::Bytes;
 use mono_move_aptos_transaction_executor::{
-    check_group_key, decode_group_members, AptosDataProvider, GroupMembers,
+    check_group_key, decode_group_members, AptosDataProvider, GroupAssembly, GroupMembers,
 };
 use mono_move_core::{
     nominal_tag,
@@ -147,8 +147,13 @@ impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMParallelProvide
                 let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
                 let member_tag = nominal_tag(key.value_ty())
                     .map_err(|e| invariant_violation(format!("{e:#}")))?;
-                self.reader
-                    .read_group_member(self, key, &group_key, &member_tag)
+                if GroupAssembly::get().flat_members() {
+                    self.reader
+                        .read_flat_group_member(self, key, &group_key, &member_tag)
+                } else {
+                    self.reader
+                        .read_group_member(self, key, &group_key, &member_tag)
+                }
             },
         }
     }

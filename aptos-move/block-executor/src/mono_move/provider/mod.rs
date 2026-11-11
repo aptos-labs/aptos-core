@@ -165,6 +165,39 @@ where
         base: &dyn StorageBase<K, T>,
         key: &K,
     ) -> Result<StorageRead, ResourceProviderError> {
+        self.read_data(key, || {
+            Ok(base.resource(key)?.unwrap_or(MonoValue::Deletion))
+        })
+    }
+
+    /// Reads a resource-group member that the multi-version map holds under its
+    /// own key. Its pre-block value comes out of the stored group.
+    pub(crate) fn read_flat_group_member(
+        &self,
+        base: &dyn StorageBase<K, T>,
+        key: &K,
+        group_key: &K,
+        tag: &T,
+    ) -> Result<StorageRead, ResourceProviderError> {
+        self.read_data(key, || {
+            match base
+                .group_members(group_key)?
+                .into_iter()
+                .find(|(member_tag, _)| member_tag == tag)
+            {
+                Some((_, blob)) => base.materialize_member(key, &blob),
+                None => Ok(MonoValue::Deletion),
+            }
+        })
+    }
+
+    /// Reads the data map at `key`, provisioning it with `base_value` if this
+    /// is the block's first read of it.
+    fn read_data(
+        &self,
+        key: &K,
+        base_value: impl Fn() -> Result<MonoValue, ResourceProviderError>,
+    ) -> Result<StorageRead, ResourceProviderError> {
         let data = self.versioned_map.data();
         loop {
             let read = if self.scheduler.is_v2() {
@@ -177,7 +210,7 @@ where
                     return storage_read(&value, mono_version(version))
                 },
                 Err(MVDataError::Uninitialized) => {
-                    let value = base.resource(key)?.unwrap_or(MonoValue::Deletion);
+                    let value = base_value()?;
                     // Another worker may be provisioning the same slot from the
                     // same storage, so whichever value is already there stands.
                     data.set_base_value(key.clone(), value, |_, _| {});

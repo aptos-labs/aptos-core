@@ -6,16 +6,23 @@ use aptos_block_executor::counters::{
     self as block_executor_counters, GasType, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
 };
 use aptos_db::metrics::OTHER_TIMERS_SECONDS as STORAGE_OTHER_TIMERS;
-use aptos_executor::metrics::{
-    COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS,
-    PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER,
+use aptos_executor::{
+    metrics::{
+        ASSEMBLED_GROUPS, COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS,
+        PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER,
+    },
+    workflow::do_assemble_groups::AssemblyPass,
 };
 use aptos_logger::info;
 use aptos_metrics_core::Histogram;
+use mono_move_aptos_transaction_executor::{
+    GroupAssembly, PER_TXN_ASSEMBLY_GROUPS, PER_TXN_ASSEMBLY_NANOS,
+};
 use move_core_types::language_storage::StructTag;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Write,
+    sync::atomic::Ordering,
     time::Instant,
 };
 
@@ -137,6 +144,14 @@ struct ExecutionTimeMeasurement {
     position_fold_total: f64,
     /// Native-position KV + JMT commit, inside the commit stage.
     position_commit_total: f64,
+    /// Group assembly at commit, summed over workers.
+    per_txn_assembly_total: f64,
+    per_txn_assembly_groups: u64,
+    /// Group assembly at the end of the block, wall time.
+    block_end_assembly_total: f64,
+    block_end_serial_total: f64,
+    block_end_parallel_total: f64,
+    block_end_assembly_groups: u64,
 }
 
 impl ExecutionTimeMeasurement {
@@ -174,7 +189,15 @@ impl ExecutionTimeMeasurement {
             .with_label_values(&["commit_native_position"])
             .get_sample_sum();
 
+        let other_timer = |label: &str| OTHER_TIMERS.with_label_values(&[label]).get_sample_sum();
+
         Self {
+            per_txn_assembly_total: PER_TXN_ASSEMBLY_NANOS.load(Ordering::Relaxed) as f64 / 1e9,
+            per_txn_assembly_groups: PER_TXN_ASSEMBLY_GROUPS.load(Ordering::Relaxed),
+            block_end_assembly_total: other_timer("assemble_groups"),
+            block_end_serial_total: other_timer("assemble_groups__serial"),
+            block_end_parallel_total: other_timer("assemble_groups__parallel"),
+            block_end_assembly_groups: ASSEMBLED_GROUPS.get(),
             output_size,
             output_count,
             sig_verify_total_time: sig_verify_total,
@@ -212,6 +235,13 @@ impl ExecutionTimeMeasurement {
             commit_total_time: end.commit_total_time - self.commit_total_time,
             position_fold_total: end.position_fold_total - self.position_fold_total,
             position_commit_total: end.position_commit_total - self.position_commit_total,
+            per_txn_assembly_total: end.per_txn_assembly_total - self.per_txn_assembly_total,
+            per_txn_assembly_groups: end.per_txn_assembly_groups - self.per_txn_assembly_groups,
+            block_end_assembly_total: end.block_end_assembly_total - self.block_end_assembly_total,
+            block_end_serial_total: end.block_end_serial_total - self.block_end_serial_total,
+            block_end_parallel_total: end.block_end_parallel_total - self.block_end_parallel_total,
+            block_end_assembly_groups: end.block_end_assembly_groups
+                - self.block_end_assembly_groups,
         }
     }
 }
@@ -419,6 +449,23 @@ impl OverallMeasurement {
                 );
             }
         }
+
+        let d = &self.delta_execution;
+        let per_txn_us = |secs: f64| secs * 1e6 / num_txns;
+        info!(
+            "{} group assembly ({:?}, {:?}): per_txn_cpu_us={:.4} per_txn_groups={:.4} \
+             block_end_wall_us={:.4} block_end_serial_us={:.4} block_end_parallel_us={:.4} \
+             block_end_groups={:.4} (per txn)",
+            self.prefix,
+            GroupAssembly::get(),
+            AssemblyPass::get(),
+            per_txn_us(d.per_txn_assembly_total),
+            d.per_txn_assembly_groups as f64 / num_txns,
+            per_txn_us(d.block_end_assembly_total),
+            per_txn_us(d.block_end_serial_total),
+            per_txn_us(d.block_end_parallel_total),
+            d.block_end_assembly_groups as f64 / num_txns,
+        );
 
         info!(
             "{} fraction of total: {:.4} in ledger update (component TPS: {:.1})",

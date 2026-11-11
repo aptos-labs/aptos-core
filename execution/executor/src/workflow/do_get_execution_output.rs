@@ -4,7 +4,10 @@
 use crate::{
     metrics,
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
-    workflow::{do_collateral::DoCollateral, do_orders::DoOrders, do_positions::DoPositions},
+    workflow::{
+        do_assemble_groups::DoAssembleGroups, do_collateral::DoCollateral, do_orders::DoOrders,
+        do_positions::DoPositions,
+    },
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
@@ -415,6 +418,8 @@ impl Parser {
             &mut transaction_outputs,
             &mut persisted_auxiliary_infos,
         );
+
+        DoAssembleGroups::run(&mut transaction_outputs, &base_state_view)?;
 
         let mut block_end_info = None;
         if is_block {
