@@ -77,10 +77,8 @@ right✝ :
                   generic := VerexIR.Proofs.Denote.closedGeneric executable✝ #[],
                   invoke := verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit), typeInstantiation := #[],
                   assumption := fun x => none,
-                  ghost :=
-                    ghosts
-                      { executable := executable✝, invoke := verexInvoke,
-                        coherent := verexInvokeCoherent } }.interpreterOps
+                  ghost := ghosts { executable := executable✝, invoke := verexInvoke, coherent := verexInvokeCoherent },
+                  atInstance := VerexIR.Proofs.Denote.closedInstance executable✝ #[] }.interpreterOps
               ((VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there).drop
                 ((VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there.there).drop
                   (VerexIR.Proofs.Denote.Term.lit false _proof_7)))

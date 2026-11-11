@@ -5,8 +5,8 @@ case continues.continues.right.right
 Θ✝ : VerexIR.Proofs.Denote.Skolems unit
 typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
 frame✝ :
-  VerexIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 6 } } 1
-    typeInstantiation✝
+  VerexIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 6 } }
+    [VerexIR.BinderKind.typeArg] typeInstantiation✝
 x y : (VerexIR.Proofs.Denote.NTy.param 0).carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted invariantHolds✝¹ left✝⁴ : True

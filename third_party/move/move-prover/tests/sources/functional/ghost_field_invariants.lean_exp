@@ -34,14 +34,6 @@ tests/sources/functional/ghost_field_invariants.move:120:5: error: verex verific
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/ghost_field_invariants.move:127:9: error: the specification clause `invariant h < 100` is not established
-tests/sources/functional/ghost_field_invariants.move:132:5: error: verex verification failed: the automatic verification of `einit_update_ok` failed; provide a proof in `tests/sources/functional/ghost_field_invariants.proof.lean`:
-  verify einit_update_ok by lean =>
-    verex_obligations
-    verex_on
-    | data_invariant_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/ghost_field_invariants.move:127:9: error: the specification clause `invariant h < 100` is not established
 tests/sources/functional/ghost_field_invariants.move:134:5: error: verex verification failed: the automatic verification of `einit_update_bad` failed; provide a proof in `tests/sources/functional/ghost_field_invariants.proof.lean`:
   verify einit_update_bad by lean =>
     verex_obligations

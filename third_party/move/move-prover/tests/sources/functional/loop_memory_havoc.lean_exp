@@ -118,7 +118,7 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  attempt_1._verexContinuation_1_6 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s
+  attempt_1._verexContinuation_1_7 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s
 verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
@@ -169,7 +169,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  attempt_1._verexContinuation_1_7 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s verexContinuation✝¹
+  attempt_1._verexContinuation_1_8 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s verexContinuation✝¹
     recursive✝
 verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
@@ -181,7 +181,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
     (VerexIR.Proofs.Denote.NTy.int 64 false).carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  attempt_1._verexContinuation_1_8 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s verexContinuation✝¹
+  attempt_1._verexContinuation_1_9 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s verexContinuation✝¹
     recursive✝
 val✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 pathDecision✝ : val✝.val < n.val
@@ -197,7 +197,7 @@ right✝ : val✝.val ≤ 18446744073709551615
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
-            ((VerexIR.Proofs.Denote.opAt 190035
+            ((VerexIR.Proofs.Denote.opAt 171404
                   (VerexIR.Proofs.Denote.CheckedOp.add.run
                     (VerexIR.ThrowKind.profile { profile := VerexIR.Profile.move, tag := "runtime.arithmetic_error" })
                     val✝ { val := 1, fits := ⋯ })).bind
@@ -217,9 +217,10 @@ right✝ : val✝.val ≤ 18446744073709551615
                     (VerexIR.Proofs.Denote.propheticMeaning executable✝ #[]),
                 generic := VerexIR.Proofs.Denote.closedGeneric executable✝ #[],
                 invoke := verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit), typeInstantiation := #[],
-                assumption := fun x => none }.interpreterOps
+                assumption := fun x => none,
+                atInstance := VerexIR.Proofs.Denote.closedInstance executable✝ #[] }.interpreterOps
             (VerexIR.Proofs.Denote.Term.lit () _proof_2) env)
-        (attempt_1._verexContinuation_1_7 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s
+        (attempt_1._verexContinuation_1_8 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s
           verexContinuation✝¹ recursive✝)
         (fun failure => True) state)
     (fun failure => True) state✝
@@ -263,7 +264,7 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  attempt_1._verexContinuation_1_8 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter initialState✝ s
+  attempt_1._verexContinuation_1_9 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter initialState✝ s
 verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
@@ -314,7 +315,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  attempt_1._verexContinuation_1_9 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter initialState✝ s
+  attempt_1._verexContinuation_1_10 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter initialState✝ s
     verexContinuation✝¹ recursive✝
 verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
@@ -326,7 +327,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
     (VerexIR.Proofs.Denote.NTy.int 64 false).carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  attempt_1._verexContinuation_1_10 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter initialState✝ s
+  attempt_1._verexContinuation_1_11 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter initialState✝ s
     verexContinuation✝¹ recursive✝
 val✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 pathDecision✝ : val✝.val < n.val
@@ -342,7 +343,7 @@ right✝ : val✝.val ≤ 18446744073709551615
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
-            ((VerexIR.Proofs.Denote.opAt 212877
+            ((VerexIR.Proofs.Denote.opAt 192509
                   (VerexIR.Proofs.Denote.CheckedOp.add.run
                     (VerexIR.ThrowKind.profile { profile := VerexIR.Profile.move, tag := "runtime.arithmetic_error" })
                     val✝ { val := 1, fits := ⋯ })).bind
@@ -370,9 +371,10 @@ right✝ : val✝.val ≤ 18446744073709551615
                       (VerexIR.Proofs.Denote.propheticMeaning executable✝ #[])),
                 generic := VerexIR.Proofs.Denote.closedGeneric executable✝ #[],
                 invoke := verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit), typeInstantiation := #[],
-                assumption := fun x => none }.interpreterOps
+                assumption := fun x => none,
+                atInstance := VerexIR.Proofs.Denote.closedInstance executable✝ #[] }.interpreterOps
             (VerexIR.Proofs.Denote.Term.lit () _proof_2) env)
-        (attempt_1._verexContinuation_1_9 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter
+        (attempt_1._verexContinuation_1_10 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter
           initialState✝ s verexContinuation✝¹ recursive✝)
         (fun error => True) state)
     (fun error => True) state✝
@@ -425,7 +427,7 @@ verexContinuation✝³ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  attempt_1._verexContinuation_1_8 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
+  attempt_1._verexContinuation_1_9 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
     self_curry_helper initialState✝ a
 verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
@@ -478,7 +480,7 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  attempt_1._verexContinuation_1_9 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
+  attempt_1._verexContinuation_1_10 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
     self_curry_helper initialState✝ a verexContinuation✝² recursive✝
 verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
@@ -490,7 +492,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
     (VerexIR.Proofs.Denote.NTy.int 64 false).carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  attempt_1._verexContinuation_1_10 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
+  attempt_1._verexContinuation_1_11 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
     self_curry_helper initialState✝ a verexContinuation✝² recursive✝
 val✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 pathDecision✝ : val✝.val < n.val
@@ -504,7 +506,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
     (VerexIR.Proofs.Denote.NTy.int 64 false).carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  attempt_1._verexContinuation_1_11 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
+  attempt_1._verexContinuation_1_12 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
     self_curry_helper initialState✝ a verexContinuation✝² recursive✝
 n_lower : 0 ≤ n.val
 n_upper : n.val ≤ 18446744073709551615
@@ -519,7 +521,7 @@ right✝ : val✝.val ≤ 18446744073709551615
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
-            ((VerexIR.Proofs.Denote.opAt 290702
+            ((VerexIR.Proofs.Denote.opAt 244649
                   (VerexIR.Proofs.Denote.CheckedOp.add.run
                     (VerexIR.ThrowKind.profile { profile := VerexIR.Profile.move, tag := "runtime.arithmetic_error" })
                     val✝ { val := 1, fits := ⋯ })).bind
@@ -575,9 +577,10 @@ right✝ : val✝.val ≤ 18446744073709551615
                           (VerexIR.Proofs.Denote.propheticMeaning executable✝ #[])))),
                 generic := VerexIR.Proofs.Denote.closedGeneric executable✝ #[],
                 invoke := verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit), typeInstantiation := #[],
-                assumption := fun x => none }.interpreterOps
+                assumption := fun x => none,
+                atInstance := VerexIR.Proofs.Denote.closedInstance executable✝ #[] }.interpreterOps
             (VerexIR.Proofs.Denote.Term.lit () _proof_2) env)
-        (attempt_1._verexContinuation_1_9 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
+        (attempt_1._verexContinuation_1_10 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
           self_curry_helper initialState✝ a verexContinuation✝² recursive✝)
         (fun error => True) state)
     (fun error => True) state✝

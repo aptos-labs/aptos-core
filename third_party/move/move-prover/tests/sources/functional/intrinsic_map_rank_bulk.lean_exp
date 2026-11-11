@@ -1,4 +1,54 @@
 Move prover returns: exiting with verification errors
+tests/sources/functional/intrinsic_map_rank_bulk.move:70:9: error: the specification clause `ensures enumerated(m)` is not established
+tests/sources/functional/intrinsic_map_rank_bulk.move:69:5: error: verex verification failed: the automatic verification of `bulk_add` failed; provide a proof in `tests/sources/functional/intrinsic_map_rank_bulk.proof.lean`:
+  verify bulk_add by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/intrinsic_map_rank_bulk.move:77:9: error: the specification clause `ensures enumerated(m)` is not established
+tests/sources/functional/intrinsic_map_rank_bulk.move:76:5: error: verex verification failed: the automatic verification of `bulk_upsert` failed; provide a proof in `tests/sources/functional/intrinsic_map_rank_bulk.proof.lean`:
+  verify bulk_upsert by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/intrinsic_map_rank_bulk.move:84:9: error: the specification clause `ensures enumerated(m)` is not established
+tests/sources/functional/intrinsic_map_rank_bulk.move:83:5: error: verex verification failed: the automatic verification of `merge` failed; provide a proof in `tests/sources/functional/intrinsic_map_rank_bulk.proof.lean`:
+  verify merge by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/intrinsic_map_rank_bulk.move:91:9: error: the specification clause `ensures enumerated(m)` is not established
+tests/sources/functional/intrinsic_map_rank_bulk.move:90:5: error: verex verification failed: the automatic verification of `merge_disjoint` failed; provide a proof in `tests/sources/functional/intrinsic_map_rank_bulk.proof.lean`:
+  verify merge_disjoint by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/intrinsic_map_rank_bulk.move:99:9: error: the specification clause `ensures enumerated(m)` is not established
+tests/sources/functional/intrinsic_map_rank_bulk.move:100:9: error: the specification clause `ensures enumerated(result)` is not established
+tests/sources/functional/intrinsic_map_rank_bulk.move:98:5: error: verex verification failed: the automatic verification of `split` failed; provide a proof in `tests/sources/functional/intrinsic_map_rank_bulk.proof.lean`:
+  verify split by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/intrinsic_map_rank_bulk.move:108:9: error: the specification clause `ensures enumerated(m)` is not established
+tests/sources/functional/intrinsic_map_rank_bulk.move:107:5: error: verex verification failed: the automatic verification of `rename` failed; provide a proof in `tests/sources/functional/intrinsic_map_rank_bulk.proof.lean`:
+  verify rename by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/intrinsic_map_rank_bulk.move:119:9: error: the specification clause `ensures spec_key_at(result, 0) == keys[0]` is not established
 tests/sources/functional/intrinsic_map_rank_bulk.move:116:5: error: verex verification failed: the automatic verification of `build_wrong` failed; provide a proof in `tests/sources/functional/intrinsic_map_rank_bulk.proof.lean`:
   verify build_wrong by lean =>
