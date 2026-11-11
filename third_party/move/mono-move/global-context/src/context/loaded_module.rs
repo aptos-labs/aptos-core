@@ -465,19 +465,21 @@ impl LoadedModule {
                 if let Some(map) = lock.try_lock() {
                     return lookup(&map);
                 }
+                // Counted after the lock is released, so measuring does not
+                // lengthen the critical section.
                 let start = Instant::now();
-                let map = lock.lock();
+                let found = lookup(&lock.lock());
                 record_contended_lookup(start);
-                lookup(&map)
+                found
             },
             InstantiationCache::RwLock(lock) => {
                 if let Some(map) = lock.try_read() {
                     return lookup(&map);
                 }
                 let start = Instant::now();
-                let map = lock.read();
+                let found = lookup(&lock.read());
                 record_contended_lookup(start);
-                lookup(&map)
+                found
             },
         }
     }
