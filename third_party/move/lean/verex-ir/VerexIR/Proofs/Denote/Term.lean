@@ -158,6 +158,34 @@ theorem wp_certifyingAt_intro (site : Nat) (kind : CertifyKind) (τ : NTy) (valu
     wp (certifyingAt (State := State) site kind τ value) ensures aborts initial :=
   (wp_certifyingAt site kind value ensures aborts initial).mpr ⟨holds, continues⟩
 
+/-- The certifying step read at the fold: the obligation is the value's one
+fact and the continuation sees it, the form the walk normalizes once no
+producer unfolds a certificate (`doc/plan/one-spelling.md`, D1).
+
+The value handed on is spelled `NTy.ofDeepHolds` and not through the
+abbreviation `NTy.ofHolds`: a leaf that spells the abbreviation is indexed
+by it, and every equation of a certified value is stated at
+`NTy.ofDeepHolds`. -/
+theorem wp_certifying_holds {τ : NTy} (value : τ.plain) (ensures : τ.carrier → State → Prop)
+    (aborts : Failure → Prop) (initial : State) :
+    wp (certifying (State := State) τ value) ensures aborts initial ↔
+      NTy.Holds τ value ∧
+        ∀ holds : NTy.Holds τ value,
+          ensures (NTy.ofDeepHolds τ value holds.deepHolds) initial := by
+  rw [wp_certifying]
+  exact and_congr (NTy.holds_iff τ value).symm ⟨fun k h => k h.deepHolds, fun k h => k ⟨h⟩⟩
+
+/-- The cut the solver takes at a certifying step, at the fold
+(`wp_certifyingAt_intro`). -/
+theorem wp_certifyingAt_intro_holds (site : Nat) (kind : CertifyKind) (τ : NTy) (value : τ.plain)
+    (ensures : τ.carrier → State → Prop) (aborts : Failure → Prop) (initial : State)
+    (holds : NTy.Holds τ value)
+    (continues : ∀ held : NTy.Holds τ value,
+      ensures (NTy.ofDeepHolds τ value held.deepHolds) initial) :
+    wp (certifyingAt (State := State) site kind τ value) ensures aborts initial :=
+  wp_certifyingAt_intro site kind τ value ensures aborts initial holds.deepHolds
+    fun held => continues ⟨held⟩
+
 /-- The certifying step of a struct: the obligation is the declaration's
 data invariants at every depth and the value is the certified row, the form
 the solver walks at a pack and at a write into a certified owner, where the

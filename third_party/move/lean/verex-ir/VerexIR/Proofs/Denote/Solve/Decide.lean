@@ -5378,6 +5378,12 @@ private partial def entryHoldsProof? (type : Lean.Expr) (fuel : Nat := 8) : Meta
   for decl in ← getLCtx do
     if decl.isImplementationDetail then continue
     if ← withNewMCtxDepth (isDefEq decl.type type) then return some decl.toExpr
+    -- The certificate a leaf holds folded, as the value's one fact
+    -- (`NTy.Holds`, `doc/plan/one-spelling.md`, D1).
+    if type.isAppOfArity ``NTy.deepHolds 3 then
+      let folded := mkAppN (mkConst ``NTy.Holds) type.getAppArgs
+      if ← withNewMCtxDepth (isDefEq decl.type folded) then
+        return some (mkAppN (mkConst ``NTy.Holds.deepHolds) (type.getAppArgs.push decl.toExpr))
   let reduced ← whnf type
   if reduced.isConstOf ``True then return some (mkConst ``True.intro)
   if let some (left, right) := reduced.app2? ``And then
@@ -6906,6 +6912,11 @@ macro_rules
        -- Nor does a behavior at entry values that a run in the context reads.
        | verex_timed "entry reading" verex_entry_behavior
        | verex_timed "stated facts" verex_stated
+       -- A goal stating a value's data invariants: the one consumer of the
+       -- fold on the goal's side, which reads it to the parts it is of and
+       -- decides each (`openHoldsGoal`, `doc/plan/one-spelling.md`, D1).
+       | (verex_timed "holds goal" verex_holds
+          all_goals verex_leaf_attempt)
        -- An impossible path closes before preparing its context. Arithmetic
        -- conclusions wait for normalization, which first computes their guards.
        | verex_timed "early contradiction" (exfalso; verex_omega_unsplit)

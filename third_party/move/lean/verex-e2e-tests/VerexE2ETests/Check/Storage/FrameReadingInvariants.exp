@@ -47,7 +47,7 @@ Note: The full type of the term is
             (VerexIR.Proofs.Denote.NTy.param 0)).plainEncode
         (Θ✝.plainReframe ⋯ ⋯ ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())))
 
-case holds
+case holds.left
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit «0x42».frame_reading_invariants.unit
 prepared✝ : VerexIR.Validation.prepareExecution registry✝ «0x42».frame_reading_invariants.unit = Except.ok executable✝
@@ -209,7 +209,7 @@ Note: The full type of the term is
         (Θ✝.plainReframe ⋯ ⋯
           ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, (VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())))
 
-case holds
+case holds.left
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit «0x42».frame_reading_invariants.unit
 prepared✝ : VerexIR.Validation.prepareExecution registry✝ «0x42».frame_reading_invariants.unit = Except.ok executable✝

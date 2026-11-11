@@ -1400,8 +1400,8 @@ private partial def deepInvariantTerms (context : Context)
   -- of the enclosing function, or a representation the arms do not know.
   -- Stated whole and of a plain value only — a certified value carries it
   -- by its type, so the one value this statement serves is the current of
-  -- a `&mut`, plain while lent (`NTy.deepHolds`; the normal form unfolds
-  -- it element by element).
+  -- a `&mut`, plain while lent (`NTy.Holds`; the opener reads it where the
+  -- leaf needs its clauses).
   let whole (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) (range : ObligationRange) :
       MetaM (Array (Lean.Expr × ObligationRange)) := do
     unless includePlainDeep do return #[]
@@ -1409,7 +1409,7 @@ private partial def deepInvariantTerms (context : Context)
     let quoted ← quoteNTy τ
     unless ← withNewMCtxDepth (isDefEq (← inferType value) (plainType carriers quoted)) do
       return #[]
-    return #[(mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.deepHolds) carriers quoted value, range)]
+    return #[(mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) carriers quoted value, range)]
   if ty matches .typeParameter _ then return ← whole τ value fallback
   match ty, τ with
   | .reference reference, _ =>

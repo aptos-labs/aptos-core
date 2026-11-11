@@ -257,6 +257,24 @@ verex module 0x42::read_only_invariant_loan where
     all_goals observe_canonical_entry_invariant
     all_goals verex_decide
 
+  -- A mutation that writes back what it read owes the invariant of the value
+  -- it wrote, which the entry states one for: the owed spelling and the held
+  -- one are compared here, where a read-only loan's owed invariant is closed
+  -- by the value's own fact before any spelling is read
+  -- (`openHoldsGoal`, `doc/plan/one-spelling.md`, D1).
+  public fun reseat {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &mut Map<K, V>) -> Unit := do
+    let entries := &mut map.entries
+    *entries := *entries
+  spec reseat where
+    aborts_if false
+    ensures map.entries.length == old(map).entries.length
+
+  verify reseat by lean =>
+    verex_obligations
+    all_goals verex_prepare
+    all_goals observe_canonical_entry_invariant
+    all_goals verex_decide
+
 run_cmd do
   let result ← observation.get
   unless result.count > 0 do throwError "no entry invariant comparison observed"

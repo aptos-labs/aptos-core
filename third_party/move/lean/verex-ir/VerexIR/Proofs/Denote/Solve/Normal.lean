@@ -295,11 +295,14 @@ simproc [vir_denote_norm] nominalViewed
 simproc [vir_denote_norm] nominalHandle (NTy.handle? _) := fun e => do
   nominalOperation e (e.getArg! 0) #[``NTy.handle?_struct] #[``NTy.handle?_enum]
 
-simproc [vir_denote_norm] nominalDeepHolds
-    (@NTy.deepHolds ?carriers _ _) := fun e => do
+-- A declaration's fact at a descriptor-typed code: a certified value's row
+-- holds the invariants, which is what its certificate says.  The fact of a
+-- plain row stays folded: the opener reads it (`NTy.holds_struct`,
+-- `doc/plan/one-spelling.md`, D1).
+simproc [vir_denote_norm] nominalHolds
+    (@NTy.Holds ?carriers _ _) := fun e => do
   nominalOperation e (e.getArg! 1)
-    #[``NTy.deepHolds_struct_val, ``NTy.deepHolds_struct]
-    #[``NTy.deepHolds_enum_val, ``NTy.deepHolds_enum]
+    #[``NTy.holds_struct_val] #[``NTy.holds_enum_val]
 
 simproc [vir_denote, vir_denote_norm] nominalForget
     (@NTy.forget ?carriers _ _) := fun e => do
@@ -1033,12 +1036,12 @@ simproc ↓ [vir_denote, vir_denote_norm] selectedForgottenValue
   return .visit { expr := candidate, proof? := some proof }
 
 /-- A forgotten certified vector retains its element invariants. -/
-simproc ↓ [vir_denote, vir_denote_norm] deepHoldsForgottenVector
-    (@VerexIR.Proofs.Denote.NTy.deepHolds ?carriers _ _) := fun e => do
-  let_expr VerexIR.Proofs.Denote.NTy.deepHolds carriers τ value := e | return .continue
+simproc ↓ [vir_denote, vir_denote_norm] holdsForgottenVector
+    (@VerexIR.Proofs.Denote.NTy.Holds ?carriers _ _) := fun e => do
+  let_expr VerexIR.Proofs.Denote.NTy.Holds carriers τ value := e | return .continue
   let some proof ← (try withNewMCtxDepth <| withTransparency .default do
       let some vector ← forgottenVector? carriers τ value | return none
-      let held := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.deepHolds_forget) carriers τ vector
+      let held := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.holds_forget) carriers τ vector
       unless ← isDefEq (← inferType held) e do return none
       return some (← mkAppM ``eq_true #[held])
     catch _ => pure none) | return .continue
@@ -1448,7 +1451,8 @@ private def canonicalFamilies (e : Lean.Expr) : MetaM Lean.Expr := do
       let family ← args[0]?
       let (outer, row) ← induced family
       if head == ``VerexIR.Proofs.Denote.NTy.carrier ||
-          head == ``VerexIR.Proofs.Denote.NTy.deepHolds then
+          head == ``VerexIR.Proofs.Denote.NTy.deepHolds ||
+          head == ``VerexIR.Proofs.Denote.NTy.Holds then
         let τ ← args[1]?
         let τ' ← substituteNTy row τ
         pure (mkAppN t.getAppFn (#[outer, τ'] ++ args.extract 2 args.size))
@@ -3249,9 +3253,9 @@ step closes it whole (`variantPlain.deepHolds_of_certificateFree`,
 clauses, which the split at the cut reads
 (`doc/designs/data-invariants.md`). -/
 simproc [vir_denote_norm] variantWithoutCertificates
-    (@VerexIR.Proofs.Denote.variantPlain.deepHolds ?carriers _ _ _) := fun e => do
+    (@VerexIR.Proofs.Denote.variantPlain.Holds ?carriers _ _ _) := fun e => do
   let e := e.consumeMData
-  unless e.isAppOfArity ``VerexIR.Proofs.Denote.variantPlain.deepHolds 4 do return .continue
+  unless e.isAppOfArity ``VerexIR.Proofs.Denote.variantPlain.Holds 4 do return .continue
   let parts := e.getAppArgs
   -- Only a declaration whose rows the term spells: the criterion is read by
   -- evaluation, and a row given by a substitution or a family's field would
@@ -3263,8 +3267,32 @@ simproc [vir_denote_norm] variantWithoutCertificates
   let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
     (← mkEq free (mkConst ``Bool.true))
   let holds := mkAppN
-    (mkConst ``VerexIR.Proofs.Denote.variantPlain.deepHolds_of_certificateFree)
+    (mkConst ``VerexIR.Proofs.Denote.variantPlain.holds_of_certificateFree)
     #[parts[0]!, parts[1]!, parts[2]!, decided, parts[3]!]
+  return .done { expr := mkConst ``True, proof? := some (← mkAppM ``eq_true #[holds]) }
+
+/-- A value of a type that carries no certificate holds the data invariants
+of its type: nothing is stated of it, so the fact closes where the code is
+spelled and the criterion evaluates (`NTy.holds_of_certificateFree`).
+Without it a fact at a container of scalars, which the certificate's reading
+equations took to `True` through its elements, would stay folded in a
+leaf. -/
+simproc [vir_denote_norm] holdsWithoutCertificates
+    (@VerexIR.Proofs.Denote.NTy.Holds ?carriers _ _) := fun e => do
+  let e := e.consumeMData
+  unless e.isAppOfArity ``VerexIR.Proofs.Denote.NTy.Holds 3 do return .continue
+  let parts := e.getAppArgs
+  -- Only a code the term spells: a code given by a substitution or by a
+  -- family's field would be unfolded for an answer it cannot give.
+  unless spelledNTy parts[1]! (some (← getEnv)) do return .continue
+  let free := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.certificateFree) parts[1]!
+  unless (← (try withDefault (whnf free) catch _ => pure free)).isConstOf ``Bool.true do
+    return .continue
+  let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+    (← mkEq free (mkConst ``Bool.true))
+  let holds := mkAppN
+    (mkConst ``VerexIR.Proofs.Denote.NTy.holds_of_certificateFree)
+    #[parts[0]!, parts[1]!, decided, parts[2]!]
   return .done { expr := mkConst ``True, proof? := some (← mkAppM ``eq_true #[holds]) }
 
 -- Constructed values compared: a different constructor refutes, the same
@@ -3284,14 +3312,13 @@ attribute [vir_denote_norm] VerexIR.Proofs.wp_choose VerexIR.Proofs.wp_assume
 -- `doc/designs/data-invariants.md`). The obligation keeps its site
 -- through the enclosing `constructedAt`/`mutationEndAt` marker, which the
 -- step that cuts here reads (`dataInvariantStep`).
+-- Read at the fold: the obligation is the value's one fact and the
+-- continuation sees it, so that no normalization spells a declaration's
+-- clauses (`wp_certifying_holds`, `doc/plan/one-spelling.md`, D1).
 attribute [vir_denote_norm] VerexIR.Proofs.wp_certified
-  VerexIR.Proofs.Denote.wp_certifying
-  VerexIR.Proofs.Denote.certifying_struct VerexIR.Proofs.Denote.certifying_enum
--- A value's data invariants at every depth: a declaration's clauses of its
--- encoding and its fields' (`NTy.deepHolds`), and the certification of a
--- lent value that satisfies them.
-attribute [vir_denote_norm] VerexIR.Proofs.Denote.NTy.deepHolds_struct
-  VerexIR.Proofs.Denote.NTy.deepHolds_enum
+  VerexIR.Proofs.Denote.wp_certifying_holds
+-- The certification of a lent value that satisfies the invariants.
+attribute [vir_denote_norm]
   VerexIR.Proofs.Denote.NTy.forget_ofDeepHolds VerexIR.Proofs.Denote.NTy.ofDeepHolds_forget
   VerexIR.Proofs.Denote.NTy.plainEncode_ofDeepHolds
 -- The ghost initializers a construction applies, and the lender a loan's

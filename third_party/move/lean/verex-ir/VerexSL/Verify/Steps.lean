@@ -1301,12 +1301,13 @@ open Meta Tactic VerexIR.Proofs.Denote
 /-- The family a local's type or a hypothesis names: a certified value's
 (`NTy.carrier`), a plain value's, which names the family through its lent
 layer (`NTy.plainOf Carriers.toPlain`), or the data invariants of a plain
-value (`NTy.deepHolds`).  A leaf whose certified values the preparation
+value (`NTy.Holds`).  A leaf whose certified values the preparation
 opened holds the plain row and its invariants in place of the certified
 value, and the family is the same one
 (`doc/designs/data-invariants.md`). -/
 private def declCarriers? (type : Lean.Expr) : Option Lean.Expr :=
-  if type.isAppOfArity ``NTy.carrier 2 || type.isAppOfArity ``NTy.deepHolds 3 then
+  if type.isAppOfArity ``NTy.carrier 2 || type.isAppOfArity ``NTy.deepHolds 3 ||
+      type.isAppOfArity ``NTy.Holds 3 then
     some (type.getArg! 0).consumeMData
   else if type.isAppOfArity ``NTy.plainOf 2 then
     let plain := (type.getArg! 0).consumeMData

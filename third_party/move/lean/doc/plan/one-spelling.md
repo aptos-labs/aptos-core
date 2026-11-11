@@ -198,9 +198,7 @@ SUB and ELEM groups and the selected-clause targets closed, a group that stays
 red re-diagnosed from its leaf; `bitwise_table::add_fail_exists` and `mut_ref`
 at or under their present cost; `Check/Storage/TableAllocation`'s `duplicate`
 and `verify_table`'s `add_fail_exists` verified (one leaf, decidable and over
-its cap because two spellings of a map's entries are each prepared); and
-`NominalCertificateFrames`, whose value is read from storage at a generic
-resource type and has no fact today.
+its cap because two spellings of a map's entries are each prepared).
 
 **S4. Model and generation of nominal declarations**
 ([`native-nominal-types.md`](native-nominal-types.md), stages 2 and 3): the
@@ -214,7 +212,11 @@ construction operations denote through the model to native projections and
 constructors; every generated declaration is a nominal. The descriptor
 constants, the `supports` premise and each repair whose producer is gone are
 deleted. Gate: the Declaration row of the diagnosis closed; cost at or under
-the parent's on every benchmark target.
+the parent's on every benchmark target; `NominalCertificateFrames` verified:
+its value is read from storage at a generic resource type, and its own clauses
+decode an encoding at the frame the type arguments induce while the value
+stands at the function's frame, which a predicate of the native value does
+not do.
 
 **S6. The single producers**, each with its own fixtures, in this order: a
 closure's behavior at its target and full row; loan-death facts on the

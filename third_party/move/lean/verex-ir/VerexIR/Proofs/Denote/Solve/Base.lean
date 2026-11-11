@@ -5089,11 +5089,11 @@ def splitHypotheses (observe : MVarId → Lean.Expr → MetaM MVarId) : TacticM 
         -- A native row splits into its components; a runtime pair, such as
         -- a failure's payload, stays one value.
         let carrier ← whnfD ty
-        let certificate := ty.isAppOf ``NTy.deepHolds ||
-          ty.isAppOf ``HListPlain.deepHolds || ty.isAppOf ``variantPlain.deepHolds
+        -- A value's invariants are one fact, which the split does not open:
+        -- the opener reads it, keyed by the value (`assertCertifiedClauses`,
+        -- `doc/plan/one-spelling.md`, D1).
         let own := ty.isAppOf ``Carriers.own || ty.isAppOf ``FunctionCarriers.own
         if own ||
-            (certificate && carrier.isAppOfArity ``And 2) ||
             (carrier.isAppOfArity ``Prod 2 && (runtimeValueMentions carrier).isEmpty) ||
             carrier.isAppOfArity ``PUnit 0 then
           return some decl.fvarId
@@ -6011,6 +6011,155 @@ private def casesLocal (goal : MVarId) (value : FVarId) (names : Array AltVarNam
     saved.restore
     canonical (← goal.cases value names)
 
+/-- A certificate a producer leaves spelled, folded to the value's one fact
+(`NTy.Holds`): `rintro` on an argument pattern and `cases` on a certified
+local leave a hypothesis `NTy.deepHolds` of a plain value, which no
+normalization visits, so they fold it where they make it.  Every other
+producer states a certificate inside a goal the walk normalizes, where the
+bridge equations fold it (`doc/plan/one-spelling.md`, D1). -/
+def foldCertificates (goal : MVarId) : MetaM MVarId := do
+  let folds ← goal.withContext do
+    let mut folds := #[]
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail || decl.isLet then continue
+      let type ← instantiateMVars decl.type
+      let folded? : Option (Lean.Expr × Lean.Expr) ←
+        if type.isAppOfArity ``NTy.deepHolds 3 then
+          let arguments := type.getAppArgs
+          pure (some (mkAppN (mkConst ``NTy.Holds) arguments,
+            mkAppN (mkConst ``NTy.Holds.intro) (arguments.push decl.toExpr)))
+        else if type.isAppOfArity ``HListPlain.deepHolds 3 then
+          let arguments := type.getAppArgs
+          pure (some (mkAppN (mkConst ``HListPlain.Holds) arguments,
+            ← mkAppM ``Iff.mpr
+              #[mkAppN (mkConst ``HListPlain.holds_iff) arguments, decl.toExpr]))
+        else if type.isAppOfArity ``variantPlain.deepHolds 4 then
+          let arguments := type.getAppArgs
+          pure (some (mkAppN (mkConst ``variantPlain.Holds) arguments,
+            ← mkAppM ``Iff.mpr
+              #[mkAppN (mkConst ``variantPlain.holds_iff) arguments, decl.toExpr]))
+        else pure none
+      let some (folded, proof) := folded? | continue
+      folds := folds.push (decl.fvarId, decl.userName, folded, proof)
+    return folds
+  let mut current := goal
+  for (fvarId, name, folded, proof) in folds do
+    current ← (try
+        current.withContext do
+          let (_, next) ← (← current.assert name folded proof).intro1P
+          let cleared ← (try next.clear fvarId catch _ => pure next)
+          pure cleared
+      catch _ => pure current)
+  return current
+
+@[inherit_doc foldCertificates]
+elab "verex_fold_certificates" : tactic => focusGoal do
+  if (← getGoals).isEmpty then return
+  replaceMainGoal [← foldCertificates (← getMainGoal)]
+
+/-- A goal stating a value's fact, opened: closed by the fact the context
+states of that value, else read to the parts the fact is of — a
+declaration's clauses and its fields' facts (`NTy.holds_struct`), a
+container's elementwise statement (`NTy.holds_vector`), nothing at a type
+that carries no certificate (`NTy.holds_of_certificateFree`).  The goal's
+own consumer of the fold, as the opener of `assertCertifiedClauses` is the
+hypotheses' (`doc/plan/one-spelling.md`, D1).  A goal that is no fact, and
+one at a type the opener does not read, is returned as it is. -/
+partial def openHoldsGoal (goal : MVarId) : MetaM (List MVarId) := goal.withContext do
+  let target := (← instantiateMVars (← goal.getType)).consumeMData
+  if target.isAppOfArity ``NTy.Holds 3 then
+    let (carriers, τ, value) := (target.getArg! 0, target.getArg! 1, target.getArg! 2)
+    -- The fact the context already states of this value: a fact exists per
+    -- binder, never per projection.
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail then continue
+      if ← withNewMCtxDepth (isDefEq (← instantiateMVars decl.type) target) then
+        goal.assign decl.toExpr
+        return []
+    let free := mkApp (mkConst ``NTy.certificateFree) τ
+    if (← (try withDefault (whnf free) catch _ => pure free)).isConstOf ``Bool.true then
+      let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+        (← mkEq free (mkConst ``Bool.true))
+      goal.assign (mkAppN (mkConst ``NTy.holds_of_certificateFree) #[carriers, τ, decided, value])
+      return []
+    -- The code as a constructor: a registered declaration's descriptor
+    -- through its view, and every other definition by reduction, which is
+    -- how a certified value's own clauses are read (`certifiedClauses?`).
+    let declared := isNominalType (← getEnv) τ
+    let view ← (try nativeTypeView τ catch _ => pure τ)
+    let view ← if view.getAppFn.isConst &&
+        !(view.isAppOfArity ``NTy.struct 3 || view.isAppOfArity ``NTy.enum 5 ||
+          view.isAppOfArity ``NTy.vector 1 || view.isAppOfArity ``NTy.slice 1 ||
+          view.isAppOfArity ``NTy.array 2 || view.isAppOfArity ``NTy.table 2 ||
+          view.isAppOfArity ``NTy.sliceRef 1) then
+        (try whnfD view catch _ => pure view)
+      else pure view
+    let equivalence? : Option Name :=
+      if view.isAppOfArity ``NTy.struct 3 then some ``NTy.holds_struct
+      else if view.isAppOfArity ``NTy.enum 5 then some ``NTy.holds_enum
+      else if view.isAppOfArity ``NTy.vector 1 then some ``NTy.holds_vector
+      else if view.isAppOfArity ``NTy.slice 1 then some ``NTy.holds_slice
+      else if view.isAppOfArity ``NTy.array 2 then some ``NTy.holds_array
+      else if view.isAppOfArity ``NTy.table 2 then some ``NTy.holds_table
+      else if view.isAppOfArity ``NTy.sliceRef 1 then some ``NTy.holds_sliceRef
+      else none
+    let some equivalence := equivalence? | return [goal]
+    let elementwise := !(view.isAppOfArity ``NTy.struct 3 || view.isAppOfArity ``NTy.enum 5)
+    let read := mkAppN (mkConst equivalence) (#[carriers] ++ view.getAppArgs ++ #[value])
+    let opened ← (try goal.apply (← mkAppM ``Iff.mpr #[read]) catch _ => pure [goal])
+    if opened == [goal] then return [goal]
+    let mut found := []
+    for next in opened do
+      -- A declaration stays named where it was: the equivalence is stated at
+      -- the code the view spells, and the own clause of an encoding is read
+      -- at the declaration's descriptor (`nominalOperation`,
+      -- `VerexSL/Tests/NominalNormal.lean`).
+      let next ← if !declared || view == τ then pure next else
+        (try
+            next.change ((← instantiateMVars (← next.getType)).replace
+              fun part => if part == view then some τ else none)
+          catch _ => pure next)
+      -- A container's statement is elementwise: its binders introduced, the
+      -- element's own fact is opened as any other.
+      let next ← if !elementwise then pure next else
+        (try pure (← next.intros).2 catch _ => pure next)
+      found := found ++ (← openHoldsGoal next)
+    return found
+  -- A row of facts, and the conjunction a reading left: split, and open each
+  -- component's own fact.  No other goal is reduced here.
+  unless target.isAppOfArity ``HListPlain.Holds 3 || target.isAppOfArity ``variantPlain.Holds 4 ||
+      target.isAppOfArity ``And 2 do
+    return [goal]
+  let reduced ← (try whnfD target catch _ => pure target)
+  if reduced.isTrue then
+    goal.assign (mkConst ``True.intro)
+    return []
+  unless reduced.isAppOfArity ``And 2 do return [goal]
+  let parts ← (try
+      let stated ← if reduced == target then pure goal else goal.change reduced
+      stated.apply (mkConst ``And.intro)
+    catch _ => pure [goal])
+  if parts == [goal] then return [goal]
+  let mut found := []
+  for part in parts do
+    found := found ++ (← openHoldsGoal part)
+  return found
+
+@[inherit_doc openHoldsGoal]
+elab "verex_holds" : tactic => focusGoal do
+  if (← getGoals).isEmpty then return
+  let goal ← getMainGoal
+  unless (← goal.withContext do
+      pure ((← instantiateMVars (← goal.getType)).consumeMData.isAppOfArity ``NTy.Holds 3)) do
+    throwError "the goal states no value's data invariants"
+  let opened ← openHoldsGoal goal
+  -- No progress is a failure, not a step: the goal stands at a type the
+  -- opener does not read (a type parameter's, whose fact the normal form
+  -- reads), and a caller that treats this as a step would run it again.
+  if opened == [goal] then
+    throwError "the data invariants of this value are not read by the opener"
+  replaceMainGoal opened
+
 /-- A field of a case in a goal the destructuring of an earlier field left:
 splitting one field substitutes the case's value over the context, so the
 remaining fields of that case are declared again, under their names and with
@@ -6045,7 +6194,8 @@ private partial def destructureCarrier (goal : MVarId) (value : FVarId) :
       goals ← goals.flatMapM fun goal => do
         let some part ← fieldOf? goal part name | return #[goal]
         destructureCarrier goal part
-    return found ++ goals
+    -- The certificate the case exposed is the value's one fact from here on.
+    return found ++ (← goals.mapM foldCertificates)
 
 /-- Split the requested variant and its row, leaving variant-valued fields
 intact. Their cases are independent of the outer tag a proof is reading. -/
@@ -6073,7 +6223,7 @@ partial def destructureOuterVariant (goal : MVarId) (value : FVarId)
       goals ← goals.flatMapM fun goal => do
         let some part ← fieldOf? goal part name | return #[goal]
         destructureOuterVariant goal part inRow
-    return found ++ goals
+    return found ++ (← goals.mapM foldCertificates)
 
 /-- Whether a term reads which variant a value holds: its name or a
 payload projection, at the certified layer and at the plain layer, whose
@@ -8104,16 +8254,18 @@ def certifiedFields? (value : Lean.Expr) : TacticM (Option Lean.Expr) := do
   return some (← mkAppM ``And.right
     #[← mkExpectedTypeHint certificate certified])
 
-/-- A nominal certificate retained after its value was destructured. Read
-its own clauses and retain its fields' certificates as a separate conjunct. -/
+/-- A value's fact read to the parts it is of: the declaration's own
+clauses, and the facts of its fields or of its variant's row as a second
+conjunct, which the opener pushes back on its worklist
+(`NTy.holds_struct`, `doc/plan/one-spelling.md`, D1). -/
 private def retainedCertificateClauses? (type proof : Lean.Expr) :
-    TacticM (Option Lean.Expr) := do
-  let_expr NTy.deepHolds carriers τ value := type.consumeMData | return none
+    TacticM (Option (Lean.Expr × Lean.Expr)) := do
+  let_expr NTy.Holds carriers τ value := type.consumeMData | return none
   let view ← nativeTypeView τ
   let isStruct := view.isAppOfArity ``NTy.struct 3
   unless isStruct || view.isAppOfArity ``NTy.enum 5 do return none
   let equivalence := mkAppN
-    (mkConst (if isStruct then ``NTy.deepHolds_struct else ``NTy.deepHolds_enum))
+    (mkConst (if isStruct then ``NTy.holds_struct else ``NTy.holds_enum))
     (#[carriers] ++ view.getAppArgs ++ #[value])
   let_expr Iff held _ := ← inferType equivalence | return none
   let certificate ← mkAppM ``Iff.mp
@@ -8123,7 +8275,57 @@ private def retainedCertificateClauses? (type proof : Lean.Expr) :
   let own ← match ← certificateOwnClauses? (← inferType own) own with
     | some clauses => pure clauses
     | none => pure own
-  return some (← mkAppM ``And.intro #[own, fields])
+  return some (own, fields)
+
+/-- A row of facts split into one fact per component: the form the fold
+recurses to, so that a slot's certificate is its own fact
+(`HListPlain.Holds`).  A conjunct that is no fact of a value is returned as
+it stands, and an empty row gives nothing. -/
+private partial def rowFacts (proof : Lean.Expr) :
+    MetaM (Array (Lean.Expr × Lean.Expr)) := do
+  let type := (← instantiateMVars (← inferType proof)).consumeMData
+  if type.isAppOfArity ``NTy.Holds 3 then return #[(proof, type)]
+  let reduced ← (try whnfD type catch _ => pure type)
+  if reduced.isTrue then return #[]
+  unless reduced.isAppOfArity ``And 2 do return #[(proof, type)]
+  let hinted ← mkExpectedTypeHint proof reduced
+  return (← rowFacts (← mkAppM ``And.left #[hinted])) ++
+    (← rowFacts (← mkAppM ``And.right #[hinted]))
+
+/-- The facts a value's one fact is of, at an observed read of a container
+(`NTy.Holds.of_getElem?`): the element the context reads at a position, as
+the certificate of the container gives it.  A container's fact is never
+opened whole: it is instantiated where the leaf reads it
+(`doc/plan/one-spelling.md`, D1). -/
+private def observedElementFacts (τ proof : Lean.Expr) : MetaM (Array Lean.Expr) := do
+  let view ← (try nativeTypeView τ catch _ => pure τ)
+  let readings : Array Name :=
+    if view.isAppOfArity ``NTy.vector 1 then #[``NTy.Holds.of_getElem?]
+    else if view.isAppOfArity ``NTy.slice 1 then #[``NTy.Holds.of_getElem?_slice]
+    else if view.isAppOfArity ``NTy.array 2 then #[``NTy.Holds.of_getElem?_array]
+    else if view.isAppOfArity ``NTy.table 2 then
+      #[``NTy.Holds.of_getElem?_table_key, ``NTy.Holds.of_getElem?_table_value]
+    else if view.isAppOfArity ``NTy.sliceRef 1 then
+      #[``NTy.Holds.of_getElem?_current, ``NTy.Holds.of_getElem?_final]
+    else #[]
+  if readings.isEmpty then return #[]
+  let mut found := #[]
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail then continue
+    let type ← instantiateMVars decl.type
+    let some (_, lookup, read) := type.eq? | continue
+    unless lookup.consumeMData.isAppOfArity ``GetElem?.getElem? 7 do continue
+    unless read.consumeMData.isAppOfArity ``Option.some 2 do continue
+    for reading in readings do
+      let fact? ← observing? (withNewMCtxDepth do
+        let fact ← mkAppM reading #[proof, decl.toExpr]
+        let fact ← instantiateMVars fact
+        if fact.hasExprMVar then failure
+        unless ← isTypeCorrect fact do failure
+        pure fact)
+      let some fact := fact? | continue
+      found := found.push fact
+  return found
 
 /-- The declaration clauses of every certified value the leaf names
 (`certifiedClauses?`), asserted as facts: its locals, and the compound storage
@@ -8132,7 +8334,13 @@ declaration states no invariant contributes nothing: the selection leaves `True`
 step declines, so a unit without data invariants gains no hypothesis.  Each
 fact asserted is normalized where it stands, so that the deciders read it in
 the form they read every other fact; the normalization visits the new facts
-alone, and none is asserted where the unit states no invariant. -/
+alone, and none is asserted where the unit states no invariant.
+
+A value's fact is opened here and nowhere else, to a fixpoint: a hypothesis
+`NTy.Holds` is read to the declaration's clauses and to the facts of its
+fields, those to theirs, and a value whose fact was opened once is not
+opened again, so two certificates of one value leave one set of clauses
+(`doc/plan/one-spelling.md`, D1). -/
 def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
     (introduced : Option (Array Lean.Expr) := none) : TacticM Unit := focusGoal do
   if (← getGoals).isEmpty then return
@@ -8158,6 +8366,11 @@ def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
   -- looked for against a goal that is gone and would be lost.
   let stated ← IO.mkRef (#[] : Array Lean.Expr)
   let found ← IO.mkRef (#[] : Array (Option FVarId × Lean.Expr × Lean.Expr))
+  -- The facts still to open, and the plain values whose fact was opened:
+  -- a value is opened once, whichever certificate of it the context holds.
+  let pending ← IO.mkRef (#[] : Array (Option FVarId × Lean.Expr × Lean.Expr))
+  let opened ← IO.mkRef (#[] : Array Lean.Expr)
+  let hide ← IO.mkRef (#[] : Array FVarId)
   -- Splitting a certificate can already have exposed its selected nominal
   -- predicate. Read it once at this boundary, keeping the original proof
   -- as internal evidence instead of unfolding it at every normalization.
@@ -8165,50 +8378,110 @@ def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
     for decl in ← getLCtx do
       if decl.isImplementationDetail || decl.isLet then continue
       let type ← instantiateMVars decl.type
-      let observed? ← selectedOwnClauses? canonicalize type decl.toExpr
-      let observed? ← match observed? with
-        | some observed => pure (some observed)
-        | none => do
-            let some clauses ← retainedCertificateClauses? type decl.toExpr | pure none
-            let statement ← canonicalize
-              (← whnfR (← deltaExpand (← inferType clauses)
-                (fun name => (name.toString.splitOn "dataOwn.case").length != 1)))
-            pure (some (statement, ← mkExpectedTypeHint clauses statement))
-      let some (statement, proof) := observed? | continue
+      if type.consumeMData.isAppOfArity ``NTy.Holds 3 then
+        pending.modify (·.push (some decl.fvarId, decl.toExpr, type.consumeMData))
+        continue
+      let some (statement, proof) ← selectedOwnClauses? canonicalize type decl.toExpr | continue
       if statement == type || statement.isTrue then continue
       stated.modify (·.push statement)
       found.modify (·.push (some decl.fvarId, statement, proof))
+  -- A statement the leaf reads, recorded once: the declaration's clauses,
+  -- not the constant that holds them (the selection leaves
+  -- `<path>.dataOwn.case{i}` of the row, whose equation states the clauses,
+  -- `verex_own_encoded`).
+  let recordClauses (source? : Option FVarId) (clauses : Lean.Expr) : TacticM Unit := do
+    try
+      goal.withContext do
+        let statement ← canonicalize
+          (← whnfR (← deltaExpand (← instantiateMVars (← inferType clauses))
+            (fun name => (name.toString.splitOn "dataOwn.case").length != 1)))
+        if statement.isConstOf ``True then return
+        -- Redundancy is optional: compare only through reducible wrappers.
+        -- Opening nominal predicates here repeatedly unfolds unrelated
+        -- definitions before the leaf can use its already-stated facts.
+        if (← (← stated.get).anyM fun other => withReducible (isDefEq other statement)) then return
+        -- The step is taken at the entry of each path, so a fact the
+        -- context already states is not stated twice.
+        if ← (← getLCtx).anyM fun decl => do
+            if decl.isImplementationDetail then return false
+            withNewMCtxDepth (withReducible (isDefEq decl.type statement)) then
+          return
+        stated.modify (·.push statement)
+        if verex.solverDebug.get (← getOptions) then
+          IO.println s!"    certified clauses: {((toString (← ppExpr statement)).replace "\n" " ").take 400}"
+        found.modify (·.push (source?, statement, ← mkExpectedTypeHint clauses statement))
+    catch _ => pure ()
+  -- A whole certified value: its own clauses by its certificate, and its
+  -- fields' facts on the worklist, so that a nested declaration is opened.
   for value in values do
     let own ← (try goal.withContext (certifiedClauses? value)
       catch _ => pure none)
     let fields ← (try goal.withContext (certifiedFields? value)
       catch _ => pure none)
-    for clauses? in #[own, fields] do
-      let some clauses := clauses? | continue
-      try
+    if let some fields := fields then
+      let folded? ← (try goal.withContext do
+          let type ← instantiateMVars (← inferType fields)
+          if type.isAppOfArity ``HListPlain.deepHolds 3 then
+            pure (some (← mkAppM ``Iff.mpr
+              #[mkAppN (mkConst ``HListPlain.holds_iff) type.getAppArgs, fields]))
+          else if type.isAppOfArity ``variantPlain.deepHolds 4 then
+            pure (some (← mkAppM ``Iff.mpr
+              #[mkAppN (mkConst ``variantPlain.holds_iff) type.getAppArgs, fields]))
+          else pure none
+        catch _ => pure none)
+      if let some folded := folded? then
+        let components ← (try goal.withContext (rowFacts folded) catch _ => pure #[])
+        for (proof, type) in components do
+          pending.modify (·.push (none, proof, type))
+    if let some clauses := own then recordClauses none clauses
+    if verex.solverDebug.get (← getOptions) then
+      if own.isNone then
         goal.withContext do
-          -- The declaration's clauses, not the constant that holds them: the
-          -- selection leaves `<path>.dataOwn.case{i}` of the row, whose
-          -- equation states the clauses (`verex_own_encoded`).
-          let statement ← canonicalize
-            (← whnfR (← deltaExpand (← instantiateMVars (← inferType clauses))
-              (fun name => (name.toString.splitOn "dataOwn.case").length != 1)))
-          if statement.isConstOf ``True then return
-          -- Redundancy is optional: compare only through reducible wrappers.
-          -- Opening nominal predicates here repeatedly unfolds unrelated
-          -- definitions before the leaf can use its already-stated facts.
-          if (← (← stated.get).anyM fun other => withReducible (isDefEq other statement)) then return
-          -- The step is taken at the entry of each path, so a fact the
-          -- context already states is not stated twice.
-          if ← (← getLCtx).anyM fun decl => do
-              if decl.isImplementationDetail then return false
-              withNewMCtxDepth (withReducible (isDefEq decl.type statement)) then
-            return
-          stated.modify (·.push statement)
-          if verex.solverDebug.get (← getOptions) then
-            IO.println s!"    certified clauses: {((toString (← ppExpr statement)).replace "\n" " ").take 400}"
-          found.modify (·.push (none, statement, ← mkExpectedTypeHint clauses statement))
-      catch _ => pure ()
+          let type ← instantiateMVars (← inferType value)
+          if (← nominalCertificateView? (← whnfR type)).isSome then
+            IO.println s!"    no clauses of a certified value: \
+              {((toString (← ppExpr value)).replace "\n" " ").take 160}"
+  -- The worklist, to a fixpoint: a fact is read to the clauses of its
+  -- declaration and to the facts of its fields, each value once.
+  let mut round := 0
+  repeat
+    let queue ← pending.get
+    if queue.isEmpty then break
+    round := round + 1
+    if round > 32 then break
+    pending.set #[]
+    for (source?, proof, type) in queue do
+      let value := type.getArg! 2
+      if (← opened.get).any (· == value) then
+        if let some source := source? then hide.modify (·.push source)
+        continue
+      opened.modify (·.push value)
+      let read? ← (try goal.withContext (retainedCertificateClauses? type proof)
+        catch _ => pure none)
+      match read? with
+      | some (own, fields) =>
+          if let some source := source? then hide.modify (·.push source)
+          recordClauses none own
+          let components ← (try goal.withContext (rowFacts fields) catch _ => pure #[])
+          for (fieldProof, fieldType) in components do
+            if fieldType.isAppOfArity ``NTy.Holds 3 then
+              pending.modify (·.push (none, fieldProof, fieldType))
+            else
+              -- A variant's row at a variant the leaf has not split: kept as
+              -- it stands, for the split that follows to read.
+              recordClauses none fieldProof
+      | none =>
+          -- A container's fact is not opened: it is instantiated at the
+          -- reads the context states, and stays whole for the others.
+          let elements ← (try
+              goal.withContext (observedElementFacts (type.getArg! 1) proof)
+            catch _ => pure (#[] : Array Lean.Expr))
+          for fact in elements do
+            let factType ← (try
+                goal.withContext (instantiateMVars (← inferType fact))
+              catch _ => pure type)
+            if factType.consumeMData.isAppOfArity ``NTy.Holds 3 then
+              pending.modify (·.push (none, fact, factType.consumeMData))
   let mut current := goal
   let asserted ← IO.mkRef (#[] : Array FVarId)
   for (source?, statement, clauses) in ← found.get do
@@ -8220,7 +8493,20 @@ def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
             next.modifyLCtx (·.setKind source .implDetail)
           pure next
       catch _ => pure current)
+  -- A fact whose value was opened here is hidden: its clauses are the
+  -- context's, and a second name for one fact is what the fold removes.
+  for source in ← hide.get do
+    try current.modifyLCtx (·.setKind source .implDetail)
+    catch _ => pure ()
   replaceMainGoal [current]
+  if verex.solverDebug.get (← getOptions) then
+    current.withContext do
+      for decl in ← getLCtx do
+        if decl.isImplementationDetail then continue
+        let type ← instantiateMVars decl.type
+        if type.isAppOfArity ``NTy.deepHolds 3 || type.isAppOfArity ``HListPlain.deepHolds 3 ||
+            type.isAppOfArity ``variantPlain.deepHolds 4 then
+          IO.println s!"    unfolded certificate at a leaf: {decl.userName}"
   let facts ← asserted.get
   unless facts.isEmpty do
     normalizeContext (target := false) (select := (facts.contains ·))
@@ -8398,12 +8684,15 @@ private def plainTableWriteBack? (carrier : FVarId) (definition : FVarId)
   let some carriers := spelling.carriers? | return none
   let_expr NTy.table key value := ← whnfD table | return none
   let raw := mkFVar carrier
-  let certificate := mkApp3 (mkConst ``NTy.deepHolds) carriers table raw
+  -- The table's fact as the leaf holds it, folded (`NTy.Holds`), and the
+  -- certificate the write-back's law takes, its projection.
+  let certificate := mkApp3 (mkConst ``NTy.Holds) carriers table raw
   let mut held? := none
   for decl in ← getLCtx do
     if decl.isImplementationDetail || !(decl.type.containsFVar carrier) then continue
     if ← withDefault (withNewMCtxDepth (isDefEq decl.type certificate)) then
-      held? := some (mkFVar decl.fvarId)
+      held? := some (mkApp4 (mkConst ``NTy.Holds.deepHolds) carriers table raw
+        (mkFVar decl.fvarId))
       break
   let some held := held? | return none
   let inhabitable (τ : Lean.Expr) : MetaM Lean.Expr := do

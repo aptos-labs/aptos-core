@@ -823,6 +823,10 @@ private def atPoint (ctx : SolveContext) (point : ProgramPointKey) : SolveM Unit
     let mut next := #[]
     for goal in ← getGoals do
       setGoals [goal]
+      -- A parameter's clauses are facts only once the opener has read its
+      -- fact, which a hook's own tactics do not do (`verex_prepare` does;
+      -- `doc/plan/one-spelling.md`, D1).
+      evalTactic (← `(tactic| try verex_certified_clauses))
       withOptions (verex.keepObligationMarkers.set · true) do evalTactic hook
       next := next ++ (← getUnsolvedGoals).toArray
     setGoals next.toList
@@ -2029,7 +2033,7 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
           else if kind.isConstOf ``VerexIR.Proofs.Denote.CertifyKind.exit then
             pure Provenance.exitMutationEnd
           else throwError m!"a certifying step at the site {site} with an unknown kind {kind}"
-        pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_certifyingAt_intro) arguments,
+        pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_certifyingAt_intro_holds) arguments,
           #[arguments[arguments.size - 1]!], origin, site)
     | none =>
       let some (site, arguments, constructed) := check | return false
@@ -2082,6 +2086,13 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
             pure (type.isAppOf ``Sum)
           if abstractVariant then
             setGoals (← destructureOuterVariant holds value).toList
+      -- The obligation is the value's one fact: opened here, to the
+      -- declaration's clauses and its fields' facts, since no normalization
+      -- spells it (`openHoldsGoal`, `doc/plan/one-spelling.md`, D1).
+      let mut unfolded := #[]
+      for owed in ← getGoals do
+        unfolded := unfolded ++ (← openHoldsGoal owed).toArray
+      setGoals unfolded.toList
       normalizeGoals ctx
       -- A declaration's data invariant of the encoding of the value packed:
       -- the normal form of `Carriers.own` at a unit that states invariants
@@ -5313,7 +5324,12 @@ macro "verex_prepare" : tactic => `(tactic| verex_focus (
   all_goals (
     verex_defined_values
     (try verex_unname)
-    (try verex_prepare_leaf)
+    -- An owed data invariant read to the parts it is of, before the leaf is
+    -- prepared, so that the declaration's clauses are normalized as every
+    -- other statement of the leaf is (`openHoldsGoal`,
+    -- `doc/plan/one-spelling.md`, D1).
+    all_goals (try verex_holds)
+    all_goals (try verex_prepare_leaf)
     all_goals (try (verex_split_variants; all_goals (try verex_prepare_leaf)))
     all_goals verex_finish_prepare
     all_goals (try verex_name_maps))))
@@ -5331,6 +5347,7 @@ macro "verex_prepare" " only" : tactic => `(tactic| (
   all_goals verex_reduce_projections
   all_goals try verex_trivial
   all_goals verex_certified_clauses
+  all_goals (try verex_holds)
   all_goals verex_normalize_context
   all_goals verex_spec_forms
   all_goals verex_split_hypotheses

@@ -3077,7 +3077,7 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
           let referenceType := Contract.carrierType carriers (← quoteNTy (.ref referent))
           let valid ← withLocalDeclD `reference referenceType fun reference => do
             let current ← mkAppM ``Prod.fst #[reference]
-            let held := mkApp3 (mkConst ``NTy.deepHolds) carriers τ current
+            let held := mkApp3 (mkConst ``NTy.Holds) carriers τ current
             mkLambdaFVars #[reference] held
           frame := frame.push (← mkAppM ``Option.elim
             #[slots[slot]!, mkConst ``True, valid])

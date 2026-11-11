@@ -86,31 +86,46 @@ run_cmd do
 verify 0x42::nominal_resource_index::bounded_fee by
   on _ { }
 
--- Opening a certificate exposes the declaration's own predicate without
--- replacing the nominal descriptor at the encoding it emits.
+-- A certified value's fact at a descriptor-typed code reads to `True` --
+-- that is what its certificate says -- and the opener's equivalence of a
+-- plain row's fact emits the declaration's own predicate of an encoding at
+-- the code it is stated of, unreplaced (`doc/plan/one-spelling.md`, D1).
 run_cmd do
   let some unit := registeredUnit? (← getEnv) `«0x42».nominal_quotation
     | throwError "missing nominal quotation fixture"
   let name ← ensureUnitDefinition #["0x42", "nominal_quotation"] unit
   liftTermElabM <| withNominalUnit name do
-    let procs ← Simp.SimprocsArray.add #[] ``nominalDeepHolds false
+    let procs ← Simp.SimprocsArray.add #[] ``nominalHolds false
     let context ← Simp.mkContext { zeta := false, beta := false, iota := false, proj := false }
     for index in [0, 5] do
       let some schema := structNTy unit ⟨⟨0⟩, index⟩ | throwError "missing fixture schema"
       let owner ← quoteNTy (schema.subst (.cons .bool .nil))
       withLocalDeclD `family (mkConst ``Carriers) fun family =>
-        withLocalDeclD `row (mkApp2 (mkConst ``NTy.plain) family owner) fun row => do
-          let observed := mkApp3 (mkConst ``NTy.deepHolds) family owner row
+        withLocalDeclD `value (mkApp2 (mkConst ``NTy.carrier) family owner) fun value => do
+          let row ← mkAppM ``Subtype.val #[value]
+          let observed := mkApp3 (mkConst ``NTy.Holds) family owner row
           let (result, _) ← simp observed context procs
-          let some encoded := result.expr.find? (·.isAppOfArity ``NTy.plainEncode 3)
-            | throwError "certificate observation emitted no encoding"
-          unless encoded.getArg! 0 == family && encoded.getArg! 1 == owner &&
-              encoded.getArg! 2 == row do
-            throwError "certificate observation changed its encoding: {encoded}"
+          unless result.expr.isConstOf ``True do
+            throwError "a certified value's fact was not read: {result.expr}"
           let some proof := result.proof? | throwError "certificate observation has no proof"
           unless ← isTypeCorrect proof do throwError "certificate observation proof is ill typed"
           unless ← isDefEq (← inferType proof) (← mkEq observed result.expr) do
             throwError "certificate observation proof does not establish the emitted result"
+      withLocalDeclD `family (mkConst ``Carriers) fun family =>
+        withLocalDeclD `row (mkApp2 (mkConst ``NTy.plain) family owner) fun row => do
+          let view ← nativeTypeView owner
+          let equivalence := if view.isAppOfArity ``NTy.struct 3 then ``NTy.holds_struct
+            else ``NTy.holds_enum
+          let opened := mkAppN (mkConst equivalence)
+            (#[family] ++ view.getAppArgs ++ #[row])
+          let stated ← inferType opened
+          let some encoded := stated.find? (·.isAppOfArity ``NTy.plainEncode 3)
+            | throwError "the opener's equivalence emitted no encoding"
+          unless encoded.getArg! 0 == family && encoded.getArg! 1 == view &&
+              encoded.getArg! 2 == row do
+            throwError "the opener's equivalence changed its encoding: {encoded}"
+          unless ← isTypeCorrect opened do
+            throwError "the opener's equivalence is ill typed"
 
 -- Equal rows of certified nominal values give equality of the values, even
 -- when the simplifier runs at reducible transparency. Descriptor and carrier

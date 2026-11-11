@@ -4899,7 +4899,7 @@ what its certificate says (`NTy.deepHolds_struct_val`). -/
 
 /-- A reference's certificate: its prophecy's, the current being open while
 it is lent (`doc/designs/data-invariants.md`). -/
-@[simp, vir_denote_norm] theorem NTy.deepHolds_ref (referent : NTy)
+@[simp] theorem NTy.deepHolds_ref (referent : NTy)
     (value : (NTy.ref referent).plain) :
     NTy.deepHolds (.ref referent) value = NTy.deepHolds referent value.2 := rfl
 
@@ -4916,74 +4916,72 @@ theorem NTy.deepHolds_enum (source : StructHandle) (arguments : NRow) (names : L
 
 A value's certificate is the conjunction of the clauses of the declarations
 it reaches: at a type with no declaration under it there is nothing to
-state.  Registered as the solver's normal form, so that a certificate of a
-spelled-out type becomes the clauses of its parts
-(`doc/designs/data-invariants.md`). -/
+state.  In no simp set: the solver's normal form reads the fold
+(`NTy.Holds`), whose reading equations these state at the certificate
+(`doc/plan/one-spelling.md`, D1, `doc/designs/data-invariants.md`). -/
 
-attribute [vir_denote_norm] NTy.deepHolds_struct NTy.deepHolds_enum
-
-@[vir_denote_norm] theorem NTy.deepHolds_unit (value : (NTy.unit).plain) :
+theorem NTy.deepHolds_unit (value : (NTy.unit).plain) :
     NTy.deepHolds .unit value = True := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_bool (value : (NTy.bool).plain) :
+theorem NTy.deepHolds_bool (value : (NTy.bool).plain) :
     NTy.deepHolds .bool value = True := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_int (width : Nat) (signed : Bool)
+theorem NTy.deepHolds_int (width : Nat) (signed : Bool)
     (value : (NTy.int width signed).plain) :
     NTy.deepHolds (.int width signed) value = True := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_num (value : (NTy.num).plain) :
+theorem NTy.deepHolds_num (value : (NTy.num).plain) :
     NTy.deepHolds .num value = True := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_address (value : (NTy.address).plain) :
+theorem NTy.deepHolds_address (value : (NTy.address).plain) :
     NTy.deepHolds .address value = True := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_signer (value : (NTy.signer).plain) :
+theorem NTy.deepHolds_signer (value : (NTy.signer).plain) :
     NTy.deepHolds .signer value = True := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_string (value : (NTy.string).plain) :
+theorem NTy.deepHolds_string (value : (NTy.string).plain) :
     NTy.deepHolds .string value = True := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_bytes (value : (NTy.bytes).plain) :
+theorem NTy.deepHolds_bytes (value : (NTy.bytes).plain) :
     NTy.deepHolds .bytes value = True := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_function (parameters : NRow) (shared : Sharing)
+theorem NTy.deepHolds_function (parameters : NRow) (shared : Sharing)
     (results : NRow) (value : (NTy.function parameters shared results).plain) :
     NTy.deepHolds (.function parameters shared results) value = True := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_tuple (elements : NRow)
+theorem NTy.deepHolds_tuple (elements : NRow)
     (values : (NTy.tuple elements).plain) :
     NTy.deepHolds (.tuple elements) values = HListPlain.deepHolds elements values := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_vector (element : NTy)
+theorem NTy.deepHolds_vector (element : NTy)
     (vector : (NTy.vector element).plain) :
     NTy.deepHolds (.vector element) vector =
       ∀ value ∈ vector.values, NTy.deepHolds element value := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_slice (element : NTy)
+theorem NTy.deepHolds_slice (element : NTy)
     (vector : (NTy.slice element).plain) :
     NTy.deepHolds (.slice element) vector =
       ∀ value ∈ vector.values, NTy.deepHolds element value := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_array (element : NTy) (length : Nat)
+theorem NTy.deepHolds_array (element : NTy) (length : Nat)
     (array : (NTy.array element length).plain) :
     NTy.deepHolds (.array element length) array =
       ∀ value ∈ array.vector.values, NTy.deepHolds element value := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_sliceRef (element : NTy)
+theorem NTy.deepHolds_sliceRef (element : NTy)
     (value : (NTy.sliceRef element).plain) :
     NTy.deepHolds (.sliceRef element) value =
       ((∀ current ∈ value.currentVector.values, NTy.deepHolds element current) ∧
         (∀ final ∈ value.finalVector.values, NTy.deepHolds element final)) := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_table (key value : NTy)
+theorem NTy.deepHolds_table (key value : NTy)
     (entries : (NTy.table key value).plain) :
     NTy.deepHolds (.table key value) entries =
       ∀ entry ∈ entries.entries,
         NTy.deepHolds key entry.1 ∧ NTy.deepHolds value entry.2 := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_ghost (slot : NTy) (value : (NTy.ghost slot).plain) :
+theorem NTy.deepHolds_ghost (slot : NTy) (value : (NTy.ghost slot).plain) :
     NTy.deepHolds (.ghost slot) value = NTy.deepHolds slot value := rfl
-@[vir_denote_norm] theorem NTy.deepHolds_param (index : Nat) (value : (NTy.param index).plain) :
+theorem NTy.deepHolds_param (index : Nat) (value : (NTy.param index).plain) :
     NTy.deepHolds (.param index) value = (Carriers.lent index).holds value := rfl
 
-@[vir_denote_norm] theorem HListPlain.deepHolds_nil (values : HListPlain .nil) :
+theorem HListPlain.deepHolds_nil (values : HListPlain .nil) :
     HListPlain.deepHolds .nil values = True := rfl
-@[vir_denote_norm] theorem HListPlain.deepHolds_cons (τ : NTy) (rest : NRow)
+theorem HListPlain.deepHolds_cons (τ : NTy) (rest : NRow)
     (values : HListPlain (.cons τ rest)) :
     HListPlain.deepHolds (.cons τ rest) values =
       (NTy.deepHolds τ values.1 ∧ HListPlain.deepHolds rest values.2) := rfl
 
-@[vir_denote_norm] theorem variantPlain.deepHolds_inl (name : String) (names : List String)
+theorem variantPlain.deepHolds_inl (name : String) (names : List String)
     (fields : NRow) (rest : NRows) (values : HListPlain fields) :
     variantPlain.deepHolds (name :: names) (.cons fields rest) (.inl values) =
       HListPlain.deepHolds fields values := rfl
-@[vir_denote_norm] theorem variantPlain.deepHolds_inr (name : String) (names : List String)
+theorem variantPlain.deepHolds_inr (name : String) (names : List String)
     (fields : NRow) (rest : NRows) (value : variantPlain names rest) :
     variantPlain.deepHolds (name :: names) (.cons fields rest) (.inr value) =
       variantPlain.deepHolds names rest value := rfl
@@ -5524,9 +5522,11 @@ theorem variantPlain.holds_iff : (names : List String) → (rows : NRows) →
 
 /-! ### Reading the fold, constructor by constructor
 
-Deliberately in no simp set in this phase: a reading equation in the normal
-form would leave a leaf holding both names for one fact
-(`doc/plan/one-spelling.md`, D1). -/
+The solver's normal form: a fact of a spelled-out type becomes the facts of
+its parts, and a fact of a declaration stays folded until the opener reads
+it (`NTy.holds_struct`, `doc/plan/one-spelling.md`, D1).  The equations are
+registered below, after the opener's, so that a fact of a declaration is
+never spelled by a normalization. -/
 
 theorem NTy.holds_unit (value : (NTy.unit).plain) : NTy.Holds .unit value = True :=
   eq_true ⟨trivial⟩
@@ -5599,6 +5599,59 @@ theorem NTy.holds_enum (source : StructHandle) (arguments : NRow) (names : List 
         variantPlain.Holds names rows value) := by
   rw [NTy.holds_iff, NTy.deepHolds_enum, variantPlain.holds_iff]
 
+/-! ### From the certificate to the fold
+
+The bridge between the two names of one fact: the normal form folds what a
+producer states as a certificate, so that a leaf holds the fold alone
+(`doc/plan/one-spelling.md`, D1). -/
+
+/-- A plain value's certificate is its fact. -/
+theorem NTy.deepHolds_eq_holds (τ : NTy) (value : τ.plain) :
+    NTy.deepHolds τ value = NTy.Holds τ value :=
+  propext (NTy.holds_iff τ value).symm
+
+/-- A plain row's certificate is its row of facts
+(`NTy.deepHolds_eq_holds`). -/
+theorem HListPlain.deepHolds_eq_holds (row : NRow) (values : HListPlain row) :
+    HListPlain.deepHolds row values = HListPlain.Holds row values :=
+  propext (HListPlain.holds_iff row values).symm
+
+/-- A plain variant value's certificate is its fact
+(`NTy.deepHolds_eq_holds`). -/
+theorem variantPlain.deepHolds_eq_holds (names : List String) (rows : NRows)
+    (value : variantPlain names rows) :
+    variantPlain.deepHolds names rows value = variantPlain.Holds names rows value :=
+  propext (variantPlain.holds_iff names rows value).symm
+
+/-- A certified value's plain form holds its data invariants, as the fact a
+normal form closes (`NTy.holds_forget`). -/
+theorem NTy.holds_forget_eq (τ : NTy) (value : τ.carrier) :
+    NTy.Holds τ (NTy.forget τ value) = True :=
+  eq_true (NTy.holds_forget τ value)
+
+/-- A certified row's plain form holds the data invariants of its row
+(`NTy.holds_forget_eq`). -/
+theorem HList.holds_forget_eq (row : NRow) (values : HList row) :
+    HListPlain.Holds row (HList.forget row values) = True :=
+  eq_true (HList.holds_forget row values)
+
+/-- The row of a certified struct value holds the data invariants: that is
+what the value's certificate says, and the fold of
+`NTy.deepHolds_struct_val`.  Ahead of `NTy.holds_struct`, which would spell
+the clauses of a row that already carries them. -/
+theorem NTy.holds_struct_val (source : StructHandle) (arguments fields : NRow)
+    (value : (NTy.struct source arguments fields).carrier) :
+    NTy.Holds (.struct source arguments fields) value.val = True :=
+  eq_true ⟨value.property⟩
+
+/-- The value of a certified variant holds the data invariants
+(`NTy.holds_struct_val`). -/
+theorem NTy.holds_enum_val (source : StructHandle) (arguments : NRow) (names : List String)
+    (rows : NRows) (distinct : names.Nodup)
+    (value : (NTy.enum source arguments names rows distinct).carrier) :
+    NTy.Holds (.enum source arguments names rows distinct) value.val = True :=
+  eq_true ⟨value.property⟩
+
 /-! A container's fact is never opened whole: it is instantiated at an
 observed element. -/
 
@@ -5631,6 +5684,92 @@ theorem NTy.Holds.of_final {element : NTy} {reference : (NTy.sliceRef element).p
     (holds : NTy.Holds (.sliceRef element) reference) {value : element.plain}
     (member : value ∈ reference.finalVector.values) : NTy.Holds element value :=
   ⟨holds.deepHolds.2 value member⟩
+
+/-! A container's fact read elementwise, for the goal side alone: the
+opener's equation at a container, never a normal form, which would leave a
+leaf with a quantified fact where it has an element's
+(`doc/plan/one-spelling.md`, D1). -/
+
+theorem NTy.holds_vector (element : NTy) (vector : (NTy.vector element).plain) :
+    NTy.Holds (.vector element) vector ↔ ∀ value ∈ vector.values, NTy.Holds element value := by
+  simp only [NTy.holds_iff, NTy.deepHolds_vector]
+theorem NTy.holds_slice (element : NTy) (vector : (NTy.slice element).plain) :
+    NTy.Holds (.slice element) vector ↔ ∀ value ∈ vector.values, NTy.Holds element value := by
+  simp only [NTy.holds_iff, NTy.deepHolds_slice]
+theorem NTy.holds_array (element : NTy) (length : Nat)
+    (array : (NTy.array element length).plain) :
+    NTy.Holds (.array element length) array ↔
+      ∀ value ∈ array.vector.values, NTy.Holds element value := by
+  simp only [NTy.holds_iff, NTy.deepHolds_array]
+theorem NTy.holds_table (key value : NTy) (entries : (NTy.table key value).plain) :
+    NTy.Holds (.table key value) entries ↔
+      ∀ entry ∈ entries.entries, NTy.Holds key entry.1 ∧ NTy.Holds value entry.2 := by
+  simp only [NTy.holds_iff, NTy.deepHolds_table]
+theorem NTy.holds_sliceRef (element : NTy) (value : (NTy.sliceRef element).plain) :
+    NTy.Holds (.sliceRef element) value ↔
+      ((∀ current ∈ value.currentVector.values, NTy.Holds element current) ∧
+        (∀ final ∈ value.finalVector.values, NTy.Holds element final)) := by
+  simp only [NTy.holds_iff, NTy.deepHolds_sliceRef]
+
+/-! An element's fact at a read, which is the shape an observation of a
+container has: a position and the value read there
+(`NTy.Holds.of_mem`). -/
+
+theorem NTy.Holds.of_getElem? {element : NTy} {vector : (NTy.vector element).plain}
+    (holds : NTy.Holds (.vector element) vector) {index : Nat} {value : element.plain}
+    (read : vector.values[index]? = some value) : NTy.Holds element value :=
+  holds.of_mem (Array.mem_of_getElem? read)
+theorem NTy.Holds.of_getElem?_slice {element : NTy} {vector : (NTy.slice element).plain}
+    (holds : NTy.Holds (.slice element) vector) {index : Nat} {value : element.plain}
+    (read : vector.values[index]? = some value) : NTy.Holds element value :=
+  holds.of_mem_slice (Array.mem_of_getElem? read)
+theorem NTy.Holds.of_getElem?_array {element : NTy} {length : Nat}
+    {array : (NTy.array element length).plain}
+    (holds : NTy.Holds (.array element length) array) {index : Nat} {value : element.plain}
+    (read : array.vector.values[index]? = some value) : NTy.Holds element value :=
+  holds.of_mem_array (Array.mem_of_getElem? read)
+theorem NTy.Holds.of_getElem?_table_key {key value : NTy}
+    {entries : (NTy.table key value).plain}
+    (holds : NTy.Holds (.table key value) entries) {index : Nat}
+    {entry : key.plain × value.plain} (read : entries.entries[index]? = some entry) :
+    NTy.Holds key entry.1 :=
+  holds.of_mem_table_key (List.mem_of_getElem? read)
+theorem NTy.Holds.of_getElem?_table_value {key value : NTy}
+    {entries : (NTy.table key value).plain}
+    (holds : NTy.Holds (.table key value) entries) {index : Nat}
+    {entry : key.plain × value.plain} (read : entries.entries[index]? = some entry) :
+    NTy.Holds value entry.2 :=
+  holds.of_mem_table_value (List.mem_of_getElem? read)
+theorem NTy.Holds.of_getElem?_current {element : NTy}
+    {reference : (NTy.sliceRef element).plain}
+    (holds : NTy.Holds (.sliceRef element) reference) {index : Nat} {value : element.plain}
+    (read : reference.currentVector.values[index]? = some value) : NTy.Holds element value :=
+  holds.of_current (Array.mem_of_getElem? read)
+theorem NTy.Holds.of_getElem?_final {element : NTy}
+    {reference : (NTy.sliceRef element).plain}
+    (holds : NTy.Holds (.sliceRef element) reference) {index : Nat} {value : element.plain}
+    (read : reference.finalVector.values[index]? = some value) : NTy.Holds element value :=
+  holds.of_final (Array.mem_of_getElem? read)
+
+/-! ### The fold in the normal form
+
+What a producer states as a certificate is folded, and a fact of a spelled
+type is read to the facts of its parts.  Not here: `NTy.holds_struct`,
+`NTy.holds_enum` and the container equivalences, which the opener applies,
+and the binder equations below (`doc/plan/one-spelling.md`, D1). -/
+
+attribute [vir_denote_norm]
+  NTy.deepHolds_eq_holds HListPlain.deepHolds_eq_holds variantPlain.deepHolds_eq_holds
+  NTy.holds_unit NTy.holds_bool NTy.holds_int NTy.holds_num NTy.holds_address
+  NTy.holds_signer NTy.holds_string NTy.holds_bytes NTy.holds_char NTy.holds_function
+  NTy.holds_tuple NTy.holds_ref NTy.holds_ghost NTy.holds_observed NTy.holds_param
+  HListPlain.holds_nil HListPlain.holds_cons variantPlain.holds_inl variantPlain.holds_inr
+  NTy.holds_forget_eq HList.holds_forget_eq
+
+-- A certified value's row holds the invariants before the fold of a
+-- declaration's is read, as `NTy.deepHolds_struct_val` was read ahead of
+-- `NTy.deepHolds_struct`.
+attribute [vir_denote_norm high] NTy.holds_struct_val NTy.holds_enum_val
 
 /-! ### The binder equations
 
@@ -11080,6 +11219,21 @@ theorem variantPlain.deepHolds_of_certificateFree [Carriers] : (names : List Str
   | _ :: names, .cons _ rest, free, .inr later => by
       simp only [NRows.certificateFree, Bool.and_eq_true] at free
       exact variantPlain.deepHolds_of_certificateFree names rest free.2 later
+
+/-- Every plain value of a certificate-free type holds the data invariants
+of its type, as one fact (`NTy.deepHolds_of_certificateFree`). -/
+theorem NTy.holds_of_certificateFree [Carriers] (τ : NTy) (free : τ.certificateFree = true)
+    (value : τ.plain) : NTy.Holds τ value :=
+  ⟨NTy.deepHolds_of_certificateFree τ free value⟩
+
+/-- Every plain value of a variant declaration whose rows carry no
+certificate holds the data invariants of those rows
+(`variantPlain.deepHolds_of_certificateFree`). -/
+theorem variantPlain.holds_of_certificateFree [Carriers] (names : List String) (rows : NRows)
+    (free : rows.certificateFree = true) (value : variantPlain names rows) :
+    variantPlain.Holds names rows value :=
+  (variantPlain.holds_iff names rows value).mpr
+    (variantPlain.deepHolds_of_certificateFree names rows free value)
 
 /-- A component of a pair whose type is cast: the component cast along its
 factor's equation.  The proof a cast carries is immaterial — two proofs of

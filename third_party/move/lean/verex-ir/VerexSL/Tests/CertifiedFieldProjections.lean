@@ -214,16 +214,19 @@ verex module 0x42::certified_nested_fields where
   verify preserve_nominal
 
 /--
-error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+error: the specification clause `ensures result <= 10` is not established
+---
+error: (deterministic) timeout at `«tactic execution»`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 ---
-error: verex verification failed: the automatic verification of `nested` exceeded its budget of 25000 maxHeartbeats after deciding 2 leaves (stage interrupted); provide a proof in the module:
+error: verex verification failed: the automatic verification of `nested` exceeded its budget of 25000 maxHeartbeats; provide a proof in the module:
   verify nested by lean =>
     verex_obligations
     verex_on
+    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/

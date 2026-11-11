@@ -1293,15 +1293,19 @@ private def certifiedComponent? (goal : MVarId) (component : FVarId) (name : Nam
   -- The family's carriers as the equation spells them: a frame's are no
   -- instance the leaf could synthesize.
   let (carriers, τ) := (forgotten.getArg! 0, forgotten.getArg! 1)
-  let holds := mkAppN (mkConst ``NTy.deepHolds_of_forget_eq)
-    #[carriers, τ, certified, value, equation]
-  let holdsType := mkApp3 (mkConst ``NTy.deepHolds) carriers τ value
+  -- The value's fact as a leaf holds it, folded, and the certificate the
+  -- equation names, its projection (`doc/plan/one-spelling.md`, D1).
+  let holds := mkAppN (mkConst ``NTy.Holds.intro)
+    #[carriers, τ, value,
+      mkAppN (mkConst ``NTy.deepHolds_of_forget_eq) #[carriers, τ, certified, value, equation]]
+  let holdsType := mkApp3 (mkConst ``NTy.Holds) carriers τ value
   let (holdsVar, goal) ← (← goal.assert (name.appendAfter "Holds") holdsType holds).intro1P
   goal.withContext do
+  let certificate := mkApp4 (mkConst ``NTy.Holds.deepHolds) carriers τ value (.fvar holdsVar)
   let proof := mkAppN (mkConst ``NTy.eq_ofDeepHolds_of_forget_eq)
-    #[carriers, τ, certified, value, equation, .fvar holdsVar]
+    #[carriers, τ, certified, value, equation, certificate]
   let equalType ← mkEq certified
-    (mkApp4 (mkConst ``NTy.ofDeepHolds) carriers τ value (.fvar holdsVar))
+    (mkApp4 (mkConst ``NTy.ofDeepHolds) carriers τ value certificate)
   let (equal, goal) ← (← goal.assert name equalType proof).intro1P
   let goal ← goal.clear component
   return some (goal, equal)
@@ -1702,13 +1706,13 @@ private partial def certifiedEntries? (carriers row entries : Lean.Expr) :
     let entries := entries.consumeMData
     unless entries.isAppOfArity ``Prod.mk 4 do return none
     let (value, others) := (entries.getArg! 2, entries.getArg! 3)
-    let holds := mkApp3 (mkConst ``NTy.deepHolds) carriers τ value
+    let holds := mkApp3 (mkConst ``NTy.Holds) carriers τ value
     let certificate ← mkFreshExprSyntheticOpaqueMVar holds
     unless ← closesBy certificate.mvarId!
-        (← `(tactic| ((try simp only [vir_denote_norm]) <;> verex_leaf))) do
+        (← `(tactic| ((try simp only [vir_denote_norm]) <;> (try verex_holds) <;> verex_leaf))) do
       return none
     let head := mkApp4 (mkConst ``NTy.ofDeepHolds) carriers τ value
-      (← instantiateMVars certificate)
+      (mkApp4 (mkConst ``NTy.Holds.deepHolds) carriers τ value (← instantiateMVars certificate))
     let some tail ← spell rest others | return none
     return some (← mkAppOptM ``Prod.mk #[mkApp2 (mkConst ``NTy.carrier) carriers τ,
       mkApp2 (mkConst ``HList) carriers rest, head, tail])

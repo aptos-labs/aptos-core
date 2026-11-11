@@ -3791,6 +3791,11 @@ private def introductionTactic (m : Member) (stored : Contract.StoredInvariants)
   let steps := m.script?.any (·.steps)
   let arguments := mkIdent `verexArguments
   let withResult := m.script?.any fun script => readsResult script.tactic.raw
+  -- A parameter's certificate, which the pattern leaves spelled, folded to
+  -- the value's one fact where the pattern makes it: every other producer
+  -- states it inside a goal the walk normalizes
+  -- (`verex_fold_certificates`, `doc/plan/one-spelling.md`, D1).
+  let fold ← `(tactic| all_goals verex_fold_certificates)
   if readsStart then
     let destructure ← if steps then scopedArguments unit ns declaration compiled.params withResult
       else `(tactic| rcases $arguments:ident with $pattern:rcasesPat)
@@ -3798,16 +3803,20 @@ private def introductionTactic (m : Member) (stored : Contract.StoredInvariants)
       (intro $arguments:ident initialState $assumed:ident $permitted:ident
        have := VerexIR.Proofs.Denote.FunctionStart.intro $handleTerm $arguments
          initialState
-       $destructure:tactic))
+       $destructure:tactic
+       $fold:tactic))
     if steps then `(tactic| ($introduce:tactic; all_goals verex_scope_state initialState))
     else pure introduce
   else if steps then
     let introduce ← `(tactic|
       (intro $arguments:ident
        $(← scopedArguments unit ns declaration compiled.params withResult):tactic
-       all_goals intro initialState $assumed:ident $permitted:ident))
+       all_goals intro initialState $assumed:ident $permitted:ident
+       $fold:tactic))
     `(tactic| ($introduce:tactic; all_goals verex_scope_state initialState))
-  else `(tactic| rintro $pattern:rcasesPat initialState $assumed:ident $permitted:ident)
+  else `(tactic|
+    (rintro $pattern:rcasesPat initialState $assumed:ident $permitted:ident
+     $fold:tactic))
 
 /-- What a theorem assuming typing knows of its unit: global memory typed by
 its resource types, which the leaves keep, and, where the unit's readings
