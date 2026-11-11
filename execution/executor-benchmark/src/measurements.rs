@@ -154,6 +154,10 @@ struct ExecutionTimeMeasurement {
     block_end_assembly_groups: u64,
     /// Worker time per BlockSTMv2 phase: name, seconds, count.
     phases: Vec<(&'static str, f64, u64)>,
+    /// Contended lookups in MonoMove's instantiated-function cache, and their
+    /// wait time.
+    instantiation_contended: u64,
+    instantiation_wait: f64,
 }
 
 impl ExecutionTimeMeasurement {
@@ -194,6 +198,14 @@ impl ExecutionTimeMeasurement {
         let other_timer = |label: &str| OTHER_TIMERS.with_label_values(&[label]).get_sample_sum();
 
         Self {
+            instantiation_contended:
+                mono_move_aptos_transaction_executor::INSTANTIATION_LOCK_CONTENDED
+                    .0
+                    .load(Ordering::Relaxed),
+            instantiation_wait: mono_move_aptos_transaction_executor::INSTANTIATION_LOCK_WAIT_NANOS
+                .0
+                .load(Ordering::Relaxed) as f64
+                / 1e9,
             phases: aptos_block_executor::phase_times::snapshot(),
             per_txn_assembly_total: PER_TXN_ASSEMBLY_NANOS.load(Ordering::Relaxed) as f64 / 1e9,
             per_txn_assembly_groups: PER_TXN_ASSEMBLY_GROUPS.load(Ordering::Relaxed),
@@ -245,6 +257,8 @@ impl ExecutionTimeMeasurement {
             block_end_parallel_total: end.block_end_parallel_total - self.block_end_parallel_total,
             block_end_assembly_groups: end.block_end_assembly_groups
                 - self.block_end_assembly_groups,
+            instantiation_contended: end.instantiation_contended - self.instantiation_contended,
+            instantiation_wait: end.instantiation_wait - self.instantiation_wait,
             phases: end
                 .phases
                 .iter()
@@ -466,7 +480,8 @@ impl OverallMeasurement {
         info!(
             "{} group assembly ({:?}, {:?}): per_txn_cpu_us={:.4} per_txn_groups={:.4} \
              block_end_wall_us={:.4} block_end_serial_us={:.4} block_end_parallel_us={:.4} \
-             block_end_groups={:.4} poll_interval={} align_regions={} (per txn)",
+             block_end_groups={:.4} poll_interval={} align_regions={} \
+             instantiation_rwlock={} inst_contended={:.4} inst_wait_us={:.4} (per txn)",
             self.prefix,
             GroupAssembly::get(),
             AssemblyPass::get(),
@@ -478,6 +493,9 @@ impl OverallMeasurement {
             d.block_end_assembly_groups as f64 / num_txns,
             mono_move_aptos_transaction_executor::poll_interval(),
             u8::from(mono_move_aptos_transaction_executor::cache_aligned_regions()),
+            u8::from(mono_move_aptos_transaction_executor::instantiation_read_lock()),
+            d.instantiation_contended as f64 / num_txns,
+            per_txn_us(d.instantiation_wait),
         );
 
         let mut phases = String::new();

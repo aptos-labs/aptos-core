@@ -73,8 +73,9 @@ mod module_ids;
 use module_ids::ModuleIdInternerKey;
 mod loaded_module;
 pub use loaded_module::{
-    FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies,
-    ModuleSlot,
+    instantiation_read_lock, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
+    ModuleMandatoryDependencies, ModuleSlot, INSTANTIATION_LOCK_CONTENDED,
+    INSTANTIATION_LOCK_WAIT_NANOS,
 };
 mod module_cache;
 use module_cache::ModuleCache;

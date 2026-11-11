@@ -29,6 +29,9 @@ pub use group_assembly::{
     poll_interval, GroupAssembly, PER_TXN_ASSEMBLY_GROUPS, PER_TXN_ASSEMBLY_NANOS,
 };
 pub use mono_move_alloc::cache_aligned_regions;
+pub use mono_move_global_context::{
+    instantiation_read_lock, INSTANTIATION_LOCK_CONTENDED, INSTANTIATION_LOCK_WAIT_NANOS,
+};
 pub use natives::production_natives;
 pub use outcome::TxnOutcome;
 pub use providers::{check_group_key, decode_group_members, AptosDataProvider, GroupMembers};

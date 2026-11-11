@@ -19,10 +19,45 @@ use move_binary_format::{
     file_format::{FunctionAttribute, StructDefinitionIndex, Visibility},
 };
 use move_core_types::identifier::IdentStr;
-use parking_lot::Mutex;
+use parking_lot::RwLock;
 use shared_dsa::{Entry, UnorderedMap, UnorderedSet};
 use specializer::{FunctionIR, ModuleIR};
-use std::sync::{Arc, OnceLock};
+use std::{
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, OnceLock,
+    },
+    time::Instant,
+};
+
+/// Whether lookups in the instantiated-function cache take its read lock, so
+/// they never block each other, rather than its write lock. Set by
+/// `MONO_INSTANTIATION_RWLOCK=1`.
+//
+// TODO(cleanup): experiment flag.
+pub fn instantiation_read_lock() -> bool {
+    static FLAG: OnceLock<bool> = OnceLock::new();
+    *FLAG.get_or_init(|| std::env::var("MONO_INSTANTIATION_RWLOCK").is_ok_and(|v| v == "1"))
+}
+
+/// One counter per cache-line pair.
+#[repr(align(128))]
+pub struct PaddedCounter(pub AtomicU64);
+
+/// Lookups in the instantiated-function cache that found its lock taken.
+pub static INSTANTIATION_LOCK_CONTENDED: PaddedCounter = PaddedCounter(AtomicU64::new(0));
+
+/// Time those lookups spent waiting for the lock, summed over threads.
+pub static INSTANTIATION_LOCK_WAIT_NANOS: PaddedCounter = PaddedCounter(AtomicU64::new(0));
+
+fn record_contended_lookup(start: Instant) {
+    INSTANTIATION_LOCK_CONTENDED
+        .0
+        .fetch_add(1, Ordering::Relaxed);
+    INSTANTIATION_LOCK_WAIT_NANOS
+        .0
+        .fetch_add(start.elapsed().as_nanos() as u64, Ordering::Relaxed);
+}
 
 /// Stable cache slot for a loaded module. The slot's identifier is fixed at
 /// creation time (from the cache key), while the content may be empty until
@@ -183,7 +218,7 @@ pub struct LoadedModule {
     ///    runtime types the function was monomorphized for.
     // TODO(cleanup): revisit data structure used for actual monomorphized function storage.
     instantiated_functions:
-        Mutex<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
+        RwLock<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
     /// Maps the name of a group member defined in this module (a nominal type)
     /// to its group container type (also a nominal type). Built once when the
     /// module is loaded. If struct's or enum's name is not in the map, then it
@@ -243,7 +278,7 @@ impl LoadedModule {
             mandatory_dependencies,
             functions,
             function_indices,
-            instantiated_functions: Mutex::new(UnorderedMap::new()),
+            instantiated_functions: RwLock::new(UnorderedMap::new()),
             resource_group_members,
             randomness_annotated,
             public_pack_apis,
@@ -409,10 +444,28 @@ impl LoadedModule {
         name: InternedIdentifier,
         ty_args: InternedTypeList,
     ) -> Option<(FunctionPtr, Arc<[LoadedModuleSlot]>)> {
-        self.instantiated_functions
-            .lock()
-            .get(&(name, ty_args))
-            .map(|f| (f.function, f.mandatory_dependencies.clone()))
+        let lookup = |map: &UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>| {
+            map.get(&(name, ty_args))
+                .map(|f| (f.function, f.mandatory_dependencies.clone()))
+        };
+        let lock = &self.instantiated_functions;
+        if instantiation_read_lock() {
+            if let Some(map) = lock.try_read() {
+                return lookup(&map);
+            }
+            let start = Instant::now();
+            let map = lock.read();
+            record_contended_lookup(start);
+            lookup(&map)
+        } else {
+            if let Some(map) = lock.try_write() {
+                return lookup(&map);
+            }
+            let start = Instant::now();
+            let map = lock.write();
+            record_contended_lookup(start);
+            lookup(&map)
+        }
     }
 
     /// Inserts monomorphized function into instantiation cache, returning the
@@ -426,7 +479,7 @@ impl LoadedModule {
         function: Function,
         function_ms: Arc<[LoadedModuleSlot]>,
     ) -> FunctionPtr {
-        match self.instantiated_functions.lock().entry((name, ty_args)) {
+        match self.instantiated_functions.write().entry((name, ty_args)) {
             Entry::Occupied(e) => e.get().function,
             Entry::Vacant(e) => e.insert(FunctionSlot::new(function, function_ms)).function,
         }
@@ -479,7 +532,7 @@ impl Drop for LoadedModule {
             }
             false
         });
-        self.instantiated_functions.lock().for_each_value(|slot| {
+        self.instantiated_functions.write().for_each_value(|slot| {
             // SAFETY: see impl-level comment — no aliases at drop time.
             unsafe { slot.function.free_unchecked() };
         });

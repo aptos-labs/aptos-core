@@ -116,8 +116,12 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
     poll_env = ""
     poll = None
     align = False
+    rwlock = False
     for flag in flags:
-        if flag == "align":
+        if flag == "rwlock":
+            rwlock = True
+            poll_env += "MONO_INSTANTIATION_RWLOCK=1 "
+        elif flag == "align":
             align = True
             poll_env += "MONO_ALIGN_REGIONS=1 "
         elif flag.startswith("poll="):
@@ -190,6 +194,8 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
     if phases:
         for key, value in re.findall(r"(\w+)=" + NUMBER, phases[-1]):
             row["ph_" + key] = float(value)
+    if bool(row.get("instantiation_rwlock")) != rwlock:
+        raise ValueError(f"asked for {variant} but instantiation_rwlock={row.get('instantiation_rwlock')}")
     if bool(row.get("align_regions")) != align:
         raise ValueError(f"asked for {variant} but align_regions={row.get('align_regions')}")
     if poll is not None and row.get("poll_interval") != poll:
@@ -395,6 +401,8 @@ def phase_report(rows):
                         f"{median(vrows, 'ph_vm_nvcsw_n'):.3f}",
                         f"{median(vrows, 'ph_vm_nivcsw_n'):.3f}",
                         f"{median(vrows, 'tlb_per_txn'):.2f}",
+                        f"{median(vrows, 'inst_contended'):.2f}",
+                        f"{median(vrows, 'inst_wait_us'):.2f}",
                     ]
                 )
         lines.append(f"#### {workload}")
@@ -416,6 +424,8 @@ def phase_report(rows):
                     "vm nvcsw/txn",
                     "vm nivcsw/txn",
                     "tlb/txn",
+                    "inst contended/txn",
+                    "inst wait us",
                 ],
                 tablefmt="github",
             )

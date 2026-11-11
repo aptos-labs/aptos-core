@@ -4,9 +4,10 @@
 mod context;
 
 pub use context::{
-    struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, ArenaRef,
-    ExecutionGuard, FunctionIrLookup, FunctionSlot, GlobalContext, InternedType, InternedTypeList,
-    LoadedModule, LoadedModuleSlot, MaintenanceGuard, ModuleMandatoryDependencies, ModuleSlot,
-    ScriptHash, Type,
+    instantiation_read_lock, struct_info_at, try_as_primitive_type, view_name, view_type,
+    view_type_list, ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, GlobalContext,
+    InternedType, InternedTypeList, LoadedModule, LoadedModuleSlot, MaintenanceGuard,
+    ModuleMandatoryDependencies, ModuleSlot, ScriptHash, Type, INSTANTIATION_LOCK_CONTENDED,
+    INSTANTIATION_LOCK_WAIT_NANOS,
 };
 pub mod maintenance_config;
