@@ -799,7 +799,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "derivative",
  "fail",
- "hashbrown 0.14.3",
+ "hashbrown 0.17.1",
  "itertools 0.15.0",
  "mono-move-aptos-state-view-providers",
  "mono-move-aptos-transaction-executor",
@@ -1900,7 +1900,7 @@ dependencies = [
  "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
- "hashbrown 0.14.3",
+ "hashbrown 0.17.1",
  "move-core-types",
  "once_cell",
  "rayon",
@@ -3551,6 +3551,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "equivalent",
  "fail",
+ "hashbrown 0.17.1",
  "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
@@ -4207,7 +4208,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-environment",
  "aptos-vm-logging",
- "hashbrown 0.14.3",
+ "hashbrown 0.17.1",
  "move-binary-format",
  "move-bytecode-utils",
  "move-core-types",
@@ -5134,7 +5135,7 @@ dependencies = [
  "fail",
  "fixed",
  "fxhash",
- "hashbrown 0.14.3",
+ "hashbrown 0.17.1",
  "hex",
  "itertools 0.15.0",
  "jsonwebtoken 8.3.0",
@@ -10901,11 +10902,6 @@ name = "hashbrown"
 version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
-dependencies = [
- "ahash 0.8.12",
- "allocator-api2",
- "equivalent",
-]
 
 [[package]]
 name = "hashbrown"
@@ -10923,6 +10919,8 @@ version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
+ "allocator-api2",
+ "equivalent",
  "foldhash 0.2.0",
 ]
 
@@ -13434,7 +13432,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs 0.1.4",
- "hashbrown 0.14.3",
+ "hashbrown 0.17.1",
  "mono-move-alloc",
  "mono-move-core",
  "mono-move-global-context",
@@ -13739,7 +13737,7 @@ dependencies = [
  "bytes",
  "dearbitrary",
  "ethnum",
- "hashbrown 0.14.3",
+ "hashbrown 0.17.1",
  "hex",
  "num 0.4.1",
  "once_cell",
@@ -14370,7 +14368,7 @@ dependencies = [
  "claims",
  "fail",
  "fxhash",
- "hashbrown 0.14.3",
+ "hashbrown 0.17.1",
  "itertools 0.15.0",
  "lazy_static",
  "lru",
@@ -14429,7 +14427,7 @@ dependencies = [
  "crossbeam",
  "dashmap 7.0.0-rc2",
  "derivative",
- "hashbrown 0.14.3",
+ "hashbrown 0.17.1",
  "itertools 0.15.0",
  "mockall 0.15.0",
  "move-binary-format",

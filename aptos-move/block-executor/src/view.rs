@@ -8,7 +8,7 @@ use crate::types::{
         deserialize_to_delayed_field_id, deserialize_to_delayed_field_u128, mock_layout,
         serialize_from_delayed_field_id, serialize_from_delayed_field_u128,
     },
-    InputOutputKey,
+    InputOutputKeySet,
 };
 use crate::{
     captured_reads::{
@@ -1131,7 +1131,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     }
 
     #[cfg(test)]
-    fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+    fn get_read_summary(&self) -> InputOutputKeySet<T::Key, T::Tag> {
         match &self.latest_view {
             ViewState::Sync(state) => state.captured_reads.borrow().get_read_summary(),
             ViewState::Unsync(state) => state.read_set.borrow().get_read_summary(),
@@ -3199,8 +3199,14 @@ mod test {
             .unwrap()
             .is_some(),);
 
-        assert_eq!(views.latest_view_par.get_read_summary(), HashSet::new());
-        assert_eq!(views.latest_view_seq.get_read_summary(), HashSet::new());
+        assert_eq!(
+            views.latest_view_par.get_read_summary(),
+            InputOutputKeySet::default()
+        );
+        assert_eq!(
+            views.latest_view_seq.get_read_summary(),
+            InputOutputKeySet::default()
+        );
     }
 
     fn assert_fetch_eq<V: TransactionWrite>(

@@ -18,7 +18,7 @@ use aptos_block_executor::{
     task::{ExecutionStatus, ExecutorTask, LegacyTxnOutput, TxnOutput},
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
-    types::InputOutputKey,
+    types::InputOutputKeySet,
     Materializer,
 };
 use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
@@ -229,8 +229,8 @@ impl TxnOutput for TestOutput {
         0
     }
 
-    fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag>> {
-        HashSet::new()
+    fn get_write_summary(&self) -> InputOutputKeySet<StateKey, StructTag> {
+        InputOutputKeySet::default()
     }
 
     fn storage_keys_read(&self) -> impl Iterator<Item = &StateKey> {

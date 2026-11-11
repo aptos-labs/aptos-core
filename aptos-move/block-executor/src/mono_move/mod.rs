@@ -10,7 +10,7 @@ use crate::{
     executor_utilities::Materializer,
     single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
     task::{ExecutionStatus, TxnOutput},
-    types::InputOutputKey,
+    types::InputOutputKeySet,
 };
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_mvhashmap::{
@@ -180,9 +180,9 @@ impl TxnInput for MonoReads {
         false
     }
 
-    fn get_read_summary(&self) -> HashSet<InputOutputKey<Self::Key, Self::Tag>> {
+    fn get_read_summary(&self) -> InputOutputKeySet<Self::Key, Self::Tag> {
         // TODO(completeness): add parallel MonoMove support.
-        HashSet::new()
+        InputOutputKeySet::default()
     }
 }
 
@@ -353,9 +353,9 @@ impl TxnOutput for MonoTxnOutput {
         0
     }
 
-    fn get_write_summary(&self) -> HashSet<InputOutputKey<Self::Key, Self::Tag>> {
+    fn get_write_summary(&self) -> InputOutputKeySet<Self::Key, Self::Tag> {
         // TODO(completeness): support write summaries.
-        HashSet::new()
+        InputOutputKeySet::default()
     }
 
     fn storage_keys_read(&self) -> impl Iterator<Item = &Self::Key> {

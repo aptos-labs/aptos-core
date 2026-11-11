@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use hashbrown::DefaultHashBuilder;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::HashSet,
@@ -15,16 +16,16 @@ pub enum InputOutputKey<K, T> {
     DelayedField(DelayedFieldID),
 }
 
+/// Uses seeded foldhash, much cheaper than SipHash for these keys.
+pub type InputOutputKeySet<K, T> = HashSet<InputOutputKey<K, T>, DefaultHashBuilder>;
+
 pub struct ReadWriteSummary<K, T> {
-    pub reads: HashSet<InputOutputKey<K, T>>,
-    pub writes: HashSet<InputOutputKey<K, T>>,
+    pub reads: InputOutputKeySet<K, T>,
+    pub writes: InputOutputKeySet<K, T>,
 }
 
 impl<K: Eq + Hash, T: Eq + Hash> ReadWriteSummary<K, T> {
-    pub fn new(
-        reads: HashSet<InputOutputKey<K, T>>,
-        writes: HashSet<InputOutputKey<K, T>>,
-    ) -> Self {
+    pub fn new(reads: InputOutputKeySet<K, T>, writes: InputOutputKeySet<K, T>) -> Self {
         Self { reads, writes }
     }
 

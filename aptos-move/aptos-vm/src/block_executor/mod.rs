@@ -17,7 +17,7 @@ use aptos_block_executor::{
     },
     txn_commit_hook::TransactionCommitHook,
     txn_provider::TxnProvider,
-    types::InputOutputKey,
+    types::{InputOutputKey, InputOutputKeySet},
     Materializer,
 };
 use aptos_types::{
@@ -117,8 +117,8 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output.materialized_size()
     }
 
-    fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag>> {
-        let mut writes = HashSet::new();
+    fn get_write_summary(&self) -> InputOutputKeySet<StateKey, StructTag> {
+        let mut writes = InputOutputKeySet::default();
 
         for (state_key, write) in self.vm_output.resource_write_set() {
             match write {

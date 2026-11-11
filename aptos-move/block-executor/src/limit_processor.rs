@@ -361,8 +361,10 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{combinatorial_tests::types::KeyType, types::InputOutputKey};
-    use std::collections::HashSet;
+    use crate::{
+        combinatorial_tests::types::KeyType,
+        types::{InputOutputKey, InputOutputKeySet},
+    };
     // TODO: add tests for accumulate_fee_statement / compute_conflict_multiplier for different BlockGasLimitType configs
 
     const DEFAULT_COMPLEX_LIMIT: BlockGasLimitType = BlockGasLimitType::ComplexLimitV1 {
@@ -508,7 +510,7 @@ mod test {
         assert!(processor.should_end_block_parallel());
     }
 
-    fn to_map(reads: &[InputOutputKey<u64, u32>]) -> HashSet<InputOutputKey<KeyType<u64>, u32>> {
+    fn to_map(reads: &[InputOutputKey<u64, u32>]) -> InputOutputKeySet<KeyType<u64>, u32> {
         reads
             .iter()
             .map(|key| match key {

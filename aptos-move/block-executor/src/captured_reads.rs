@@ -3,7 +3,7 @@
 
 use crate::{
     code_cache_global::GlobalModuleCache,
-    types::InputOutputKey,
+    types::{InputOutputKey, InputOutputKeySet},
     view::{GroupReadResult, LatestView, ReadResult},
 };
 use anyhow::bail;
@@ -33,7 +33,7 @@ use aptos_types::{
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use derivative::Derivative;
-use hashbrown::Equivalent;
+use hashbrown::{DefaultHashBuilder, Equivalent};
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
@@ -523,8 +523,8 @@ pub enum CacheRead<T> {
 /// 'capture_read' will never be called with a read that can be resolved from the already
 /// captured variant (e.g. Size, Metadata, or exists if SizeAndMetadata is already captured).
 pub struct CapturedReads<T: Transaction, K, DC, VC, S> {
-    data_reads: HashMap<T::Key, DataRead<T::Value>>,
-    group_reads: HashMap<T::Key, GroupRead<T>>,
+    data_reads: HashMap<T::Key, DataRead<T::Value>, DefaultHashBuilder>,
+    group_reads: HashMap<T::Key, GroupRead<T>, DefaultHashBuilder>,
     delayed_field_reads: HashMap<DelayedFieldID, DelayedFieldRead>,
 
     module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S>>,
@@ -552,8 +552,8 @@ impl<T: Transaction, K, DC, VC, S> Default for CapturedReads<T, K, DC, VC, S> {
 impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
     pub(crate) fn new(blockstm_v2_incarnation: Option<Incarnation>) -> Self {
         Self {
-            data_reads: HashMap::new(),
-            group_reads: HashMap::new(),
+            data_reads: HashMap::default(),
+            group_reads: HashMap::default(),
             delayed_field_reads: HashMap::new(),
             module_reads: hashbrown::HashMap::new(),
             delayed_field_speculative_failure: false,
@@ -1118,8 +1118,8 @@ where
     K: Hash + Eq + Ord + Clone + WithAddress + WithName,
     VC: Deref<Target = Arc<DC>>,
 {
-    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
-        let mut ret = HashSet::new();
+    pub(crate) fn get_read_summary(&self) -> InputOutputKeySet<T::Key, T::Tag> {
+        let mut ret = InputOutputKeySet::default();
         for (key, read) in &self.data_reads {
             if let DataRead::Versioned(_, _, _) = read {
                 ret.insert(InputOutputKey::Resource(key.clone()));
@@ -1170,8 +1170,8 @@ where
         self.module_reads.insert(key);
     }
 
-    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
-        let mut ret = HashSet::new();
+    pub(crate) fn get_read_summary(&self) -> InputOutputKeySet<T::Key, T::Tag> {
+        let mut ret = InputOutputKeySet::default();
         for key in &self.resource_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
@@ -1260,7 +1260,7 @@ pub trait TxnInput: Send + Sync {
     fn is_incorrect_use(&self) -> bool;
 
     /// Keys read by this transaction.
-    fn get_read_summary(&self) -> HashSet<InputOutputKey<Self::Key, Self::Tag>>;
+    fn get_read_summary(&self) -> InputOutputKeySet<Self::Key, Self::Tag>;
 }
 
 /// The read set produced by the legacy Move VM path (captured via `LatestView`).
@@ -1335,7 +1335,7 @@ impl<T: Transaction> TxnInput for CapturedReadSet<T> {
         CapturedReads::is_incorrect_use(self)
     }
 
-    fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+    fn get_read_summary(&self) -> InputOutputKeySet<T::Key, T::Tag> {
         CapturedReads::get_read_summary(self)
     }
 }
@@ -1451,7 +1451,7 @@ impl<T: Transaction> TxnInput for LegacyReads<T> {
         }
     }
 
-    fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
+    fn get_read_summary(&self) -> InputOutputKeySet<T::Key, T::Tag> {
         match self {
             LegacyReads::Parallel(reads) => reads.get_read_summary(),
             LegacyReads::Sequential(reads) => reads.get_read_summary(),
