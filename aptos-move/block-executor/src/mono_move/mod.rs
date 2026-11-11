@@ -179,6 +179,11 @@ pub enum MonoTxnOutput {
         /// Writes that land inside a resource group, keyed by the group's own
         /// storage slot and tagged by the member's struct tag.
         group_writes: HashMap<InMemoryStorageKey, BTreeMap<StructTag, MonoValue>>,
+        /// For flat group members and group links in `resource_writes`, the
+        /// group they belong to, numbered in the order groups were first seen.
+        //
+        // TODO(cleanup): throwaway hook for the members-first write order.
+        write_groups: HashMap<InMemoryStorageKey, usize>,
     },
     /// Signals block executor that this transaction has to be skipped and
     /// retried later.
@@ -226,6 +231,8 @@ impl MonoTxnOutput {
     fn executed(outcome: TxnOutcome, skips_rest: bool) -> Self {
         let mut resource_writes = HashMap::new();
         let mut group_writes: HashMap<_, BTreeMap<_, _>> = HashMap::new();
+        let mut write_groups = HashMap::new();
+        let mut group_ordinals: HashMap<InMemoryStorageKey, usize> = HashMap::new();
 
         if let Some(effects) = committed_effects(&outcome) {
             let pin: Arc<dyn ReadPin> = effects.frozen_heap();
@@ -240,6 +247,10 @@ impl MonoTxnOutput {
                         resource_writes.insert(key.clone(), value);
                     },
                     Some(group_ty) if flat_members => {
+                        let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
+                        let next = group_ordinals.len();
+                        let ordinal = *group_ordinals.entry(group_key).or_insert(next);
+                        write_groups.insert(key.clone(), ordinal);
                         if GroupAssembly::get() == GroupAssembly::Chained {
                             links
                                 .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
@@ -262,6 +273,9 @@ impl MonoTxnOutput {
             // One link per group at the group's slot, holding this
             // transaction's changes to its members.
             for (group_key, changes) in links {
+                if let Some(ordinal) = group_ordinals.get(&group_key) {
+                    write_groups.insert(group_key.clone(), *ordinal);
+                }
                 resource_writes.insert(
                     group_key,
                     MonoValue::GroupLink(Arc::new(GroupLink::changes(changes))),
@@ -274,6 +288,7 @@ impl MonoTxnOutput {
             skips_rest,
             resource_writes,
             group_writes,
+            write_groups,
         }
     }
 
@@ -318,6 +333,13 @@ impl TxnOutput for MonoTxnOutput {
                 resource_writes, ..
             } => resource_writes.clone(),
             MonoTxnOutput::SkippedToRetry => HashMap::new(),
+        }
+    }
+
+    fn write_group_ordinal(&self, key: &Self::Key) -> Option<usize> {
+        match self {
+            MonoTxnOutput::Executed { write_groups, .. } => write_groups.get(key).copied(),
+            MonoTxnOutput::SkippedToRetry => None,
         }
     }
 

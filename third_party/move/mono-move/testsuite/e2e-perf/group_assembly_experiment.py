@@ -97,10 +97,15 @@ def component_tps(pattern, output, what):
 
 
 def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path):
-    mode, _, assembly_pass = variant.partition("/")
+    base, _, flag = variant.partition("+")
+    mode, _, assembly_pass = base.partition("/")
     assembly_pass = assembly_pass or "walk"
+    if flag not in ("", "members_first"):
+        raise ValueError(f"unknown variant flag {flag!r}")
+    members_first = flag == "members_first"
     output = execute_command(
         f"RUST_BACKTRACE=1 MONO_GROUP_ASSEMBLY={mode} GROUP_ASSEMBLY_PASS={assembly_pass} "
+        f"MONO_WRITE_MEMBERS_FIRST={int(members_first)} "
         f"{BUILD_FOLDER}/aptos-executor-benchmark "
         f"--block-executor-type aptos-vm-with-block-stm "
         f"--execution-threads {threads} --generate-then-execute --split-stages "
@@ -154,6 +159,8 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
     }
     for key, value in re.findall(r"(\w+)=" + NUMBER, assembly):
         row[key] = float(value)
+    if bool(row.get("members_first")) != members_first:
+        raise ValueError(f"asked for {variant} but members_first={row.get('members_first')}")
     return row
 
 

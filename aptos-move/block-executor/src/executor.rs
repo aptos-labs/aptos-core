@@ -90,6 +90,15 @@ where
 /// BlockSTM worker pool.
 static WORKER_POOL: Lazy<WorkerPool> = Lazy::new(WorkerPool::new);
 
+/// Whether BlockSTMv2 writes a transaction's resource-group members before
+/// its other keys, set by `MONO_WRITE_MEMBERS_FIRST=1`.
+//
+// TODO(cleanup): throwaway experiment flag.
+pub fn write_members_first() -> bool {
+    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *FLAG.get_or_init(|| std::env::var("MONO_WRITE_MEMBERS_FIRST").is_ok_and(|v| v == "1"))
+}
+
 pub struct BlockExecutor<T, E, S, L, TP, A> {
     config: BlockExecutorConfig,
     transaction_commit_hook: Option<L>,
@@ -162,6 +171,16 @@ where
         versioned_cache: &MVHashMap<E::Key, E::Tag, E::Value, DelayedFieldID>,
         abort_manager: &mut AbortManager,
     ) -> Result<(), PanicError> {
+        if write_members_first() {
+            return Self::process_resource_output_v2_members_first(
+                maybe_output,
+                idx_to_execute,
+                incarnation,
+                last_input_output,
+                versioned_cache,
+                abort_manager,
+            );
+        }
         // The order is reversed in BlockSTMv2 as opposed to V1, avoiding the necessity
         // to clone the previous keys.
 
@@ -205,6 +224,52 @@ where
             )?)?;
         }
 
+        Ok(())
+    }
+
+    /// Like `process_resource_output_v2`, but writes resource-group members
+    /// first, one group after another, then the other keys.
+    //
+    // TODO(cleanup): throwaway experiment for the flat-members abort gap.
+    fn process_resource_output_v2_members_first(
+        maybe_output: Option<&E::Output>,
+        idx_to_execute: TxnIndex,
+        incarnation: Incarnation,
+        last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
+        versioned_cache: &MVHashMap<E::Key, E::Tag, E::Value, DelayedFieldID>,
+        abort_manager: &mut AbortManager,
+    ) -> Result<(), PanicError> {
+        let resource_write_set =
+            maybe_output.map_or_else(HashMap::new, |output| output.resource_write_set());
+
+        // Clean up the writes of the previous incarnation that this one no
+        // longer makes.
+        last_input_output.for_each_resource_key_no_aggregator_v1(
+            idx_to_execute,
+            |prev_key_ref| {
+                if !resource_write_set.contains_key(prev_key_ref) {
+                    abort_manager.invalidate_dependencies(
+                        versioned_cache
+                            .data()
+                            .remove_v2::<_, false>(prev_key_ref, idx_to_execute)?,
+                    )?;
+                }
+                Ok(())
+            },
+        )?;
+
+        let mut writes = resource_write_set.into_iter().collect::<Vec<_>>();
+        if let Some(output) = maybe_output {
+            writes.sort_by_key(|(key, _)| output.write_group_ordinal(key).unwrap_or(usize::MAX));
+        }
+        for (key, value) in writes {
+            abort_manager.invalidate_dependencies(versioned_cache.data().write_v2::<false>(
+                key,
+                idx_to_execute,
+                incarnation,
+                value,
+            )?)?;
+        }
         Ok(())
     }
 
