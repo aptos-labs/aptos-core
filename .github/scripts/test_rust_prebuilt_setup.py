@@ -409,6 +409,24 @@ class PrebuiltSetupTests(unittest.TestCase):
                 self.assertNotEqual(self.run_phase("verify", **env).returncode, 0)
                 self.assert_no_exports()
 
+    def test_missing_linker_selects_setup_only_when_installation_is_allowed(self):
+        (self.home / "bin/ld.lld").unlink()
+        path = f"{self.home}/bin:{Path(sys.executable).parent}:/usr/bin:/bin"
+        result = self.run_phase(
+            "prepare", RUNNER_ENVIRONMENT="github-hosted", PATH=path
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            (self.root / "github-output").read_text(), "system-setup=true\n"
+        )
+        (self.root / "github-output").write_text("")
+        result = self.run_phase("prepare", PATH=path)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("compatible runner image", result.stderr)
+        self.assertEqual((self.root / "github-output").read_text(), "")
+        self.assertNotEqual(self.run_phase("verify", PATH=path).returncode, 0)
+        self.assert_no_exports()
+
     def test_native_rustup_profile_and_targets_are_reconciled(self):
         with (self.root / "rust-toolchain.toml").open("a") as stream:
             stream.write(

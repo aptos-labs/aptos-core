@@ -103,10 +103,16 @@ def verify_rust(selection):
 
 
 def llvm_matches():
+    rustc = output("rustc", "-vV")
+    try:
+        clang = output("clang", "--version")
+        linker = output("ld.lld", "--version")
+    except FileNotFoundError:
+        return False
     versions = [
-        re.search(r"^LLVM version: (\d+)\.", output("rustc", "-vV"), re.MULTILINE),
-        re.search(r"clang version (\d+)\.", output("clang", "--version")),
-        re.search(r"(?:^|\s)LLD (\d+)\.", output("ld.lld", "--version")),
+        re.search(r"^LLVM version: (\d+)\.", rustc, re.MULTILINE),
+        re.search(r"clang version (\d+)\.", clang),
+        re.search(r"(?:^|\s)LLD (\d+)\.", linker),
     ]
     return all(versions) and len({match[1] for match in versions}) == 1
 
