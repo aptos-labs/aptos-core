@@ -142,6 +142,14 @@ where
         self.speculative_failure.get()
     }
 
+    /// Whether Block-STM asks this incarnation to stop: the block halted, or
+    /// the incarnation was aborted.
+    pub(crate) fn interrupt_requested(&self) -> bool {
+        crate::phase_times::count(crate::phase_times::Phase::Poll);
+        self.scheduler
+            .interrupt_requested(self.txn_idx, self.incarnation)
+    }
+
     fn abort(&self, msg: impl ToString) -> ResourceProviderError {
         self.speculative_failure.set(true);
         ResourceProviderError::SpeculativeAbort(msg.to_string())

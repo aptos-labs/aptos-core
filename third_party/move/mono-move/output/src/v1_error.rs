@@ -260,14 +260,17 @@ pub fn fallback_info(err: &VMInternalError, equivalent: V1Equivalent) -> V1Error
     let status = match equivalent {
         V1Equivalent::Described(info) => return info,
         V1Equivalent::Verbatim(error) => return V1ErrorInfo::verbatim(error),
-        // Execution-range codes throughout, so the executor keeps the
-        // transaction and the fee it already charged.
+        // Execution-range codes, so the executor keeps the transaction and the
+        // fee it already charged. The one exception is an interrupt, which must
+        // never be kept.
         V1Equivalent::NoV1Failure => StatusCode::UNKNOWN_RUNTIME_STATUS,
         // TODO(correctness): multiple error kinds share `UNKNOWN_RUNTIME_STATUS`;
         // distinct codes would change committed transaction statuses.
         V1Equivalent::V1StatusUnknown => match err.kind() {
             ExecutionErrorKind::OutOfGas => StatusCode::OUT_OF_GAS,
             ExecutionErrorKind::LinkingError => StatusCode::LINKER_ERROR,
+            // V1's status for the same interrupt. It discards the transaction.
+            ExecutionErrorKind::Interrupted => StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
             ExecutionErrorKind::InvariantViolation
             | ExecutionErrorKind::RuntimeLimitExceeded
             | ExecutionErrorKind::InvalidOperation
@@ -520,6 +523,7 @@ fn primitive_name(ty: IntTy) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mono_move_core::InterruptedError;
     use move_binary_format::errors::PartialVMError;
     use move_core_types::{
         account_address::AccountAddress, ident_str, int256::I256, language_storage::ModuleId,
@@ -792,6 +796,16 @@ mod tests {
         };
         assert_eq!(info.status, StatusCode::OUT_OF_GAS);
         assert_eq!(info.message, V1Message::Absent);
+    }
+
+    /// An interrupt gets V1's speculative-abort status, which is never kept.
+    #[test]
+    fn interrupt_maps_to_speculative_abort() {
+        let err = VMInternalError::new(InterruptedError);
+        assert_eq!(
+            describe_or_fallback(&err).status,
+            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+        );
     }
 
     /// Stack overflow and loader errors omit execution state; heap exhaustion

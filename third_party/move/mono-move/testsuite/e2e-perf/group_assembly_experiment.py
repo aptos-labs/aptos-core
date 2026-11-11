@@ -97,15 +97,23 @@ def component_tps(pattern, output, what):
 
 
 def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path):
-    base, _, flag = variant.partition("+")
+    base, *flags = variant.split("+")
     mode, _, assembly_pass = base.partition("/")
     assembly_pass = assembly_pass or "walk"
-    if flag not in ("", "members_first"):
-        raise ValueError(f"unknown variant flag {flag!r}")
-    members_first = flag == "members_first"
+    members_first = False
+    poll_env = ""
+    poll = None
+    for flag in flags:
+        if flag == "members_first":
+            members_first = True
+        elif flag.startswith("poll="):
+            poll = int(flag[len("poll="):])
+            poll_env = f"MONO_POLL_INTERVAL={poll} "
+        else:
+            raise ValueError(f"unknown variant flag {flag!r}")
     output = execute_command(
         f"RUST_BACKTRACE=1 MONO_GROUP_ASSEMBLY={mode} GROUP_ASSEMBLY_PASS={assembly_pass} "
-        f"MONO_WRITE_MEMBERS_FIRST={int(members_first)} "
+        f"MONO_WRITE_MEMBERS_FIRST={int(members_first)} {poll_env}"
         f"{BUILD_FOLDER}/aptos-executor-benchmark "
         f"--block-executor-type aptos-vm-with-block-stm "
         f"--execution-threads {threads} --generate-then-execute --split-stages "
@@ -165,6 +173,8 @@ def replay(workload, threads, variant, recorded_db, checkpoint_dir, blocks_path)
             row["ph_" + key] = float(value)
     if bool(row.get("members_first")) != members_first:
         raise ValueError(f"asked for {variant} but members_first={row.get('members_first')}")
+    if poll is not None and row.get("poll_interval") != poll:
+        raise ValueError(f"asked for {variant} but poll_interval={row.get('poll_interval')}")
     return row
 
 
@@ -214,10 +224,12 @@ def build_report(rows, failures):
         "Microseconds per transaction, median over repeats. `exec` is the whole "
         "execution stage, `blk` is Block-STM plus output parsing (where block-end "
         "assembly runs), `inner` is Block-STM alone. Deltas are against "
-        f"`{BASELINE}`; negative is faster. `±` is the (max - min) / median spread."
+        "the first variant listed; negative is faster. `±` is the (max - min) / median spread."
     )
     lines.append("")
 
+    variants = variants_of(rows)
+    baseline = variants[0] if variants else BASELINE
     by_workload = {}
     for row in rows:
         by_workload.setdefault(row["workload"], []).append(row)
@@ -229,7 +241,7 @@ def build_report(rows, failures):
         lines.append("")
         if len(hashes) != 1:
             lines.append(f"**ROOT HASH MISMATCH**: {len(hashes)} distinct hashes across runs.")
-            for variant in VARIANTS:
+            for variant in variants:
                 vh = sorted({r["root_hash"][:16] for r in wrows if r["variant"] == variant})
                 lines.append(f"- {variant}: {', '.join(vh)}")
         else:
@@ -238,8 +250,8 @@ def build_report(rows, failures):
 
         table = []
         for threads in sorted({r["threads"] for r in wrows}):
-            base_rows = [r for r in wrows if r["threads"] == threads and r["variant"] == BASELINE]
-            for variant in VARIANTS:
+            base_rows = [r for r in wrows if r["threads"] == threads and r["variant"] == baseline]
+            for variant in variants:
                 vrows = [r for r in wrows if r["threads"] == threads and r["variant"] == variant]
                 if not vrows:
                     continue
@@ -247,7 +259,7 @@ def build_report(rows, failures):
                 def cell(key):
                     value = median(vrows, key)
                     text = f"{value:.2f} ±{spread(vrows, key):.0%}"
-                    if variant != BASELINE and base_rows:
+                    if variant != baseline and base_rows:
                         base = median(base_rows, key)
                         if base:
                             text += f" ({(value - base) / base:+.1%})"
@@ -313,11 +325,22 @@ PHASES = [
 ]
 
 
+def variants_of(rows):
+    """The variants in `rows`, in VARIANTS order when listed there."""
+    seen = []
+    for row in rows:
+        if row["variant"] not in seen:
+            seen.append(row["variant"])
+    listed = [v for v in VARIANTS if v in seen]
+    return listed + sorted(v for v in seen if v not in listed)
+
+
 def phase_report(rows):
     """Worker time per BlockSTMv2 phase, summed over workers, in us per txn."""
     rows = [r for r in rows if "ph_vm_first_us" in r and r["threads"] > 1]
     if not rows:
         return []
+    variants = variants_of(rows)
     lines = [
         "### Worker phases (BlockSTMv2, us per txn summed over workers)",
         "",
@@ -327,7 +350,7 @@ def phase_report(rows):
     for workload in sorted({r["workload"] for r in rows}):
         table = []
         for threads in sorted({r["threads"] for r in rows if r["workload"] == workload}):
-            for variant in VARIANTS:
+            for variant in variants:
                 vrows = [
                     r
                     for r in rows
@@ -345,6 +368,9 @@ def phase_report(rows):
                         f"{median(vrows, 'ph_vm_retry_n'):.3f}",
                         f"{median(vrows, 'ph_dependency_wait_n'):.3f}",
                         f"{median(vrows, 'ph_speculative_failure_n'):.3f}",
+                        f"{median(vrows, 'ph_poll_n'):.2f}",
+                        f"{median(vrows, 'ph_read_us'):.2f}",
+                        f"{median(vrows, 'ph_read_n'):.2f}",
                     ]
                 )
         lines.append(f"#### {workload}")
@@ -354,7 +380,7 @@ def phase_report(rows):
                 table,
                 headers=["T", "variant", "workers x inner", "phases"]
                 + PHASES
-                + ["retries/txn", "waits/txn", "spec fails/txn"],
+                + ["retries/txn", "waits/txn", "spec fails/txn", "polls/txn", "read us", "reads/txn"],
                 tablefmt="github",
             )
         )

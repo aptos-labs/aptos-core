@@ -241,6 +241,13 @@ pub trait ResourceProvider {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError>;
+
+    /// Whether the block executor asks the running transaction to stop, e.g.
+    /// because Block-STM aborted its incarnation. Polled by the interpreter
+    /// once per gas chunk when the meter has interrupt polling on.
+    fn interrupt_requested(&self) -> bool {
+        false
+    }
 }
 
 /// Empty storage with no resources.

@@ -272,6 +272,7 @@ fn classify_runtime_error(err: &VMInternalError, runtime_error: &RuntimeError) -
         ExecutionErrorKind::InvariantViolation
         | ExecutionErrorKind::OutOfGas
         | ExecutionErrorKind::LinkingError
+        | ExecutionErrorKind::Interrupted
         | ExecutionErrorKind::Placeholder => TestResult::Error(err.to_string()),
     }
 }

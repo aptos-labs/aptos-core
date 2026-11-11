@@ -247,11 +247,16 @@ impl<S: TStateView<Key = StateKey>> StorageBase<InMemoryStorageKey, StructTag>
 }
 
 impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMParallelProvider<'_, '_, S> {
+    fn interrupt_requested(&self) -> bool {
+        self.reader.interrupt_requested()
+    }
+
     fn get_resource(
         &self,
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError> {
+        let _timer = crate::phase_times::timer(crate::phase_times::Phase::Read);
         match group {
             None => self.reader.read_resource(self, key),
             Some(group_ty) => {

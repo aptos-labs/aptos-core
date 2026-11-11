@@ -3,7 +3,20 @@
 
 //! Experiment switch: where resource-group blobs are assembled.
 
+use mono_move_core::POLL_INTERVAL;
 use std::sync::{atomic::AtomicU64, OnceLock};
+
+/// Gas units between interrupt polls, `MONO_POLL_INTERVAL` or
+/// [`POLL_INTERVAL`] when unset. 0 turns polling off.
+pub fn poll_interval() -> u64 {
+    static INTERVAL: OnceLock<u64> = OnceLock::new();
+    *INTERVAL.get_or_init(|| match std::env::var("MONO_POLL_INTERVAL") {
+        Ok(value) => value
+            .parse()
+            .unwrap_or_else(|_| panic!("invalid MONO_POLL_INTERVAL {value:?}")),
+        Err(_) => POLL_INTERVAL,
+    })
+}
 
 /// Where a transaction's resource-group writes become group blobs, chosen by
 /// the `MONO_GROUP_ASSEMBLY` environment variable.

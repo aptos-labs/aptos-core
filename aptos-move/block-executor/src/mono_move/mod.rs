@@ -218,6 +218,8 @@ fn committed_effects(outcome: &TxnOutcome) -> Option<&SessionEffects> {
         //   should be handled at execution time!
         TxnOutcome::UnexpectedSystemTransactionFailure(_) => None,
         TxnOutcome::Panic(_) => None,
+        // Never stored: `execute` reports it as a speculative failure.
+        TxnOutcome::Interrupted { .. } => None,
     }
 }
 
@@ -423,6 +425,8 @@ impl TxnOutput for MonoTxnOutput {
                 TxnOutcome::ExecutedNoEffects(_) => FeeStatement::zero(),
                 TxnOutcome::UnexpectedSystemTransactionFailure(_) => FeeStatement::zero(),
                 TxnOutcome::Panic(_) => FeeStatement::zero(),
+                // Never stored: `execute` reports it as a speculative failure.
+                TxnOutcome::Interrupted { .. } => FeeStatement::zero(),
             },
             MonoTxnOutput::SkippedToRetry => FeeStatement::zero(),
         }
@@ -651,6 +655,14 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     ));
                 }
                 let (outcome, skips_rest) = result?;
+                // Like the legacy VM, an interrupted execution is a speculative
+                // failure and its effects are dropped.
+                if let TxnOutcome::Interrupted { .. } = &outcome {
+                    return Ok((
+                        ExecutionStatus::SpeculativeFailure,
+                        MonoReads::empty(Some(incarnation)),
+                    ));
+                }
                 let reads = match outcome.read_write_set() {
                     Some(rws) => MonoReads::from_read_write_set(rws, incarnation)?,
                     None => MonoReads::empty(Some(incarnation)),

@@ -30,9 +30,13 @@ pub enum Phase {
     DependencyWait,
     /// An execution that ended in a speculative failure; counted, not timed.
     SpeculativeFailure,
+    /// The interpreter polling for an interrupt; counted, not timed.
+    Poll,
+    /// A storage read through the parallel provider. Part of VM time.
+    Read,
 }
 
-pub const PHASES: [Phase; 9] = [
+pub const PHASES: [Phase; 11] = [
     Phase::CommitHooks,
     Phase::NextTask,
     Phase::VmFirst,
@@ -42,6 +46,8 @@ pub const PHASES: [Phase; 9] = [
     Phase::ModuleValidation,
     Phase::DependencyWait,
     Phase::SpeculativeFailure,
+    Phase::Poll,
+    Phase::Read,
 ];
 
 impl Phase {
@@ -56,6 +62,8 @@ impl Phase {
             Phase::ModuleValidation => "module_validation",
             Phase::DependencyWait => "dependency_wait",
             Phase::SpeculativeFailure => "speculative_failure",
+            Phase::Poll => "poll",
+            Phase::Read => "read",
         }
     }
 

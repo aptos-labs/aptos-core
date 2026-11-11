@@ -5,7 +5,7 @@
 
 use mono_move_core::{
     native::{NativeExtensions, NoNatives},
-    Function, GasMeter, NoModuleProvider, NoResourceProvider,
+    Function, GasMeter, NoModuleProvider, NoResourceProvider, ResourceProvider,
 };
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
@@ -23,6 +23,24 @@ pub fn with_test_interpreter<R>(
     extensions: NativeExtensions,
     f: impl for<'guard> FnOnce(&mut InterpreterContext<'guard>, &'guard Function) -> R,
 ) -> R {
+    with_test_interpreter_using(
+        entry,
+        GasMeter::new(gas_budget),
+        &NoResourceProvider,
+        extensions,
+        f,
+    )
+}
+
+/// [`with_test_interpreter`] with a given gas meter and resource provider.
+#[allow(dead_code)]
+pub fn with_test_interpreter_using<R>(
+    entry: &Function,
+    gas_meter: GasMeter,
+    resource_provider: &dyn ResourceProvider,
+    extensions: NativeExtensions,
+    f: impl for<'guard> FnOnce(&mut InterpreterContext<'guard>, &'guard Function) -> R,
+) -> R {
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx
         .try_execution_context(0)
@@ -35,13 +53,8 @@ pub fn with_test_interpreter<R>(
         &NoNatives,
     );
     mono_move_runtime::assert_verified(entry, &guard);
-    let mut interp = InterpreterContext::new(
-        loader,
-        GasMeter::new(gas_budget),
-        &NoResourceProvider,
-        &natives,
-    )
-    .with_extensions(extensions);
+    let mut interp = InterpreterContext::new(loader, gas_meter, resource_provider, &natives)
+        .with_extensions(extensions);
     f(&mut interp, entry)
 }
 
