@@ -1508,4 +1508,394 @@ theorem ensuresOf_generic_verified {unit : ValidatedUnit} [FunctionCarriers unit
   rw [NTy.toSkolem_ofSkolem_shape]
   exact (verified _ pre assumed permitted).1 value middle run
 
+/-! ## A behavior at a row
+
+A behavior of a *meaning at a row* (`AbortsOfMeaning`, `EnsuresOfMeaning`): what a clause
+states of entry values, of the run a proof knows rather than of a function
+value.  A function value an invocation meaning reads is the meaning at the
+value's own row (`abortsOfEntries_eq_abortsOfMeaning`); a value whose target a proof
+sees is the target's meaning at the target's full row, its captures entries of
+that row (`abortsOfMeaning_woven`), so a closure at any mask and the target named
+bare state one predicate
+(`doc/designs/higher-order-functions.md`, "Behavioral predicates"). -/
+
+section
+
+/-- A pair is a pair of its components, at types read as equal. -/
+theorem Denote.heq_pair {α β γ δ : Type} {left : α} {right : β} {left' : γ} {right' : δ}
+    (heads : HEq left left') (tails : HEq right right') :
+    HEq ((left, right) : α × β) ((left', right') : γ × δ) := by
+  cases heads
+  cases tails
+  rfl
+
+/-- A woven row names the final values the supplied arguments name: a capture
+holds no reference, so it names none. -/
+theorem Denote.Weave.finals_eq : {full captured supplied : NRow} →
+    (weave : Weave full captured supplied) → captured.refFree = true →
+    NRow.finals full = NRow.finals supplied
+  | _, _, _, .nil, _ => rfl
+  | _, _, _, .captured (τ := τ) rest, free => by
+      simp only [NRow.refFree, Bool.and_eq_true] at free
+      have inner := rest.finals_eq free.2
+      cases τ <;> first
+        | exact inner
+        | simp [NTy.refFree] at free
+  | _, _, _, .supplied (τ := τ) rest, free => by
+      have inner := rest.finals_eq free
+      cases τ <;> simp only [NRow.finals, inner]
+
+end
+
+section
+variable [Carriers]
+
+/-- The plain argument row of a target, woven from plain captures and plain
+supplied arguments: `Weave.compose` at the plain layer, which a site's
+constructor holds its captures at (`doc/designs/data-invariants.md`). -/
+def Denote.Weave.composePlain : {full captured supplied : NRow} → Weave full captured supplied →
+    HListPlain captured → HListPlain supplied → HListPlain full
+  | _, _, _, .nil, _, _ => ()
+  | _, _, _, .captured rest, captures, args => (captures.1, rest.composePlain captures.2 args)
+  | _, _, _, .supplied rest, captures, args => (args.1, rest.composePlain captures args.2)
+
+@[simp, vir_denote, vir_denote_norm] theorem Denote.Weave.composePlain_nil
+    (captures args : HListPlain .nil) : Weave.nil.composePlain captures args = () := rfl
+
+@[simp, vir_denote, vir_denote_norm] theorem Denote.Weave.composePlain_captured {τ : NTy}
+    {full captured supplied : NRow} (rest : Weave full captured supplied)
+    (captures : HListPlain (.cons τ captured)) (args : HListPlain supplied) :
+    (Weave.captured rest).composePlain captures args =
+      (captures.1, rest.composePlain captures.2 args) := rfl
+
+@[simp, vir_denote, vir_denote_norm] theorem Denote.Weave.composePlain_supplied {τ : NTy}
+    {full captured supplied : NRow} (rest : Weave full captured supplied)
+    (captures : HListPlain captured) (args : HListPlain (.cons τ supplied)) :
+    (Weave.supplied rest).composePlain captures args =
+      (args.1, rest.composePlain captures args.2) := rfl
+
+/-- A plain woven row determines its captures and its arguments. -/
+theorem Denote.Weave.composePlain_injective : {full captured supplied : NRow} →
+    (weave : Weave full captured supplied) →
+    {captures captures' : HListPlain captured} → {args args' : HListPlain supplied} →
+    weave.composePlain captures args = weave.composePlain captures' args' →
+      captures = captures' ∧ args = args'
+  | _, _, _, .nil, (), (), (), (), _ => ⟨rfl, rfl⟩
+  | _, _, _, .captured rest, (c, cs), (c', cs'), _, _, equal => by
+      have heads : c = c' := congrArg Prod.fst equal
+      obtain ⟨rests, argsEq⟩ := rest.composePlain_injective (congrArg Prod.snd equal)
+      have rests : cs = cs' := rests
+      exact ⟨by subst heads; subst rests; rfl, argsEq⟩
+  | _, _, _, .supplied rest, _, _, (a, as), (a', as'), equal => by
+      have heads : a = a' := congrArg Prod.fst equal
+      obtain ⟨capturesEq, rests⟩ := rest.composePlain_injective (congrArg Prod.snd equal)
+      have rests : as = as' := rests
+      exact ⟨capturesEq, by subst heads; subst rests; rfl⟩
+
+/-- Rows of equal values forget alike. -/
+theorem Denote.HList.heq_forget {row row' : NRow} (rows : row = row')
+    {values : HList row} {values' : HList row'} (same : HEq values values') :
+    HEq (HList.forget row values) (HList.forget row' values') := by
+  cases rows
+  cases same
+  rfl
+
+end
+
+section
+variable {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
+
+/-- Settling a woven row of reference-free captures is weaving the forgotten
+captures with the settled arguments. -/
+theorem Denote.Weave.settle_compose : {full captured supplied : NRow} →
+    (weave : Weave full captured supplied) → captured.refFree = true →
+    (captures : HList captured) → (args : HList supplied) →
+    HList.settle full (weave.compose captures args) =
+      weave.composePlain (HList.forget captured captures) (HList.settle supplied args)
+  | _, _, _, .nil, _, _, _ => rfl
+  | _, _, _, .captured (τ := τ) rest, free, captures, args => by
+      simp only [NRow.refFree, Bool.and_eq_true] at free
+      simp only [Weave.compose, HList.settle, HList.forget, Weave.composePlain,
+        NTy.settle_self_of_refFree τ free.1, rest.settle_compose free.2]
+  | _, _, _, .supplied rest, free, captures, args => by
+      simp only [Weave.compose, HList.settle, Weave.composePlain, rest.settle_compose free]
+
+/-- The final values a woven row names are the supplied arguments': a capture
+holds no reference (`Weave.finals_eq`). -/
+theorem Denote.HList.heq_finals_compose : {full captured supplied : NRow} →
+    (weave : Weave full captured supplied) → captured.refFree = true →
+    (captures : HList captured) → (args : HList supplied) →
+    HEq (HList.finals full (weave.compose captures args)) (HList.finals supplied args)
+  | _, _, _, .nil, _, _, _ => HEq.rfl
+  | _, _, _, .captured (τ := τ) rest, free, captures, args => by
+      simp only [NRow.refFree, Bool.and_eq_true] at free
+      have inner := HList.heq_finals_compose rest free.2 captures.2 args
+      cases τ <;> first
+        | exact inner
+        | simp [NTy.refFree] at free
+  | _, _, _, .supplied (τ := τ) rest, free, captures, args => by
+      have inner := HList.heq_finals_compose rest free captures args.2
+      cases τ <;> first
+        | exact inner
+        | exact Denote.heq_pair HEq.rfl inner
+
+/-- The final values a clause names of a woven row are the supplied
+arguments', certified (`HList.heq_finals_compose`). -/
+theorem Denote.Weave.finals_compose_iff {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (free : captured.refFree = true)
+    (captures : HList captured) (args : HList supplied)
+    {finals : HList (NRow.finals supplied)} {finals' : HList (NRow.finals full)}
+    (same : HEq finals' finals) :
+    (HList.finals full (weave.compose captures args) = finals') ↔
+      (HList.finals supplied args = finals) := by
+  have woven := HList.heq_finals_compose weave free captures args
+  constructor
+  · intro held
+    exact eq_of_heq ((woven.symm.trans (heq_of_eq held)).trans same)
+  · intro held
+    exact eq_of_heq ((woven.trans (heq_of_eq held)).trans same.symm)
+
+/-- And at the plain layer. -/
+theorem Denote.Weave.finals_compose_plain_iff {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (free : captured.refFree = true)
+    (captures : HList captured) (args : HList supplied)
+    {finals : HListPlain (NRow.finals supplied)} {finals' : HListPlain (NRow.finals full)}
+    (same : HEq finals' finals) :
+    (HList.forget (NRow.finals full) (HList.finals full (weave.compose captures args)) = finals') ↔
+      (HList.forget (NRow.finals supplied) (HList.finals supplied args) = finals) := by
+  have woven := HList.heq_forget (weave.finals_eq free)
+    (HList.heq_finals_compose weave free captures args)
+  constructor
+  · intro held
+    exact eq_of_heq ((woven.symm.trans (heq_of_eq held)).trans same)
+  · intro held
+    exact eq_of_heq ((woven.trans (heq_of_eq held)).trans same.symm)
+
+/-- `aborts_of` of a meaning at a row, as a clause states it: the run on
+arguments of the entry values `entries` aborts from `state`.  Of an invocation
+meaning at a function value (`abortsOfEntries_eq_abortsOfMeaning`) and of a known
+target's meaning at its full row alike. -/
+def AbortsOfMeaning (σs : NRow) (shape : ResultShape) (run : HList σs → Comp unit shape.carrier)
+    (entries : HListPlain σs) (state : Memory unit) : Prop :=
+  ∃ args, HList.settle σs args = entries ∧ CallAborts (run args) state
+
+/-- `ensures_of` of a meaning at a row, as a clause states it, at the plain
+layer: the run on arguments of the entry values `entries` runs from `pre` to
+`post`, its mutable references ending at the plain finals `finals` and its
+plain result `result` (`EnsuresOfPlain`). -/
+def EnsuresOfMeaning (σs : NRow) (shape : ResultShape) (run : HList σs → Comp unit shape.carrier)
+    (entries : HListPlain σs) (finals : HListPlain (NRow.finals σs)) (result : shape.plain)
+    (pre post : Memory unit) : Prop :=
+  ∃ (args : HList σs) (value : shape.carrier), HList.settle σs args = entries ∧
+    HList.forget (NRow.finals σs) (HList.finals σs args) = finals ∧
+    shape.forget value = result ∧ CallEnsures (run args) value pre post
+
+/-- `aborts_of` of a function value is its invocation meaning at the value,
+read at the value's own row. -/
+theorem abortsOfEntries_eq_abortsOfMeaning (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
+    (shape : ResultShape) (function : (NTy.function σs shared shape.row).carrier)
+    (entries : HListPlain σs) (state : Memory unit) :
+    AbortsOfEntries invoke σs shared shape function entries state =
+      AbortsOfMeaning σs shape (invoke σs shared shape function) entries state := rfl
+
+/-- `aborts_of` of a known target read directly is its call at the row. -/
+theorem atEntries_callAborts_eq_abortsOfMeaning {σs : NRow} {shape : ResultShape}
+    (run : HList σs → Comp unit shape.carrier) (entries : HListPlain σs)
+    (state : Memory unit) :
+    AtEntries σs (fun args => CallAborts (run args) state) entries =
+      AbortsOfMeaning σs shape run entries state := rfl
+
+/-- `ensures_of` of a function value, at the plain layer, is its invocation
+meaning at the value. -/
+theorem ensuresOfPlain_eq_ensuresOfMeaning (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
+    (shape : ResultShape) (function : (NTy.function σs shared shape.row).carrier)
+    (entries : HListPlain σs) (finals : HListPlain (NRow.finals σs)) (result : shape.plain)
+    (pre post : Memory unit) :
+    EnsuresOfPlain invoke σs shared shape function entries finals result pre post =
+      EnsuresOfMeaning σs shape (invoke σs shared shape function) entries finals result pre post := rfl
+
+/-- `ensures_of` of a known target read directly is its call at the row. -/
+theorem atEntryFinals_callEnsures_eq_ensuresOfMeaning {σs : NRow} {shape : ResultShape}
+    (run : HList σs → Comp unit shape.carrier) (entries : HListPlain σs)
+    (finals : HListPlain (NRow.finals σs)) (result : shape.plain) (pre post : Memory unit) :
+    (∃ (args : HList σs) (value : shape.carrier), HList.settle σs args = entries ∧
+        HList.forget (NRow.finals σs) (HList.finals σs args) = finals ∧
+        shape.forget value = result ∧ CallEnsures (run args) value pre post) =
+      EnsuresOfMeaning σs shape run entries finals result pre post := rfl
+
+/-- `aborts_of` of a meaning at a row, read at a row the captures of a weave
+fill in part, is that meaning at the woven entry values: the equation of a
+closure's behavior at its target, in the meaning and with no closure in it. -/
+theorem abortsOfMeaning_woven {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (free : captured.refFree = true) {shape : ResultShape}
+    (run : HList full → Comp unit shape.carrier) (captures : HList captured)
+    (entries : HListPlain supplied) (state : Memory unit) :
+    AbortsOfMeaning supplied shape (fun args => run (weave.compose captures args)) entries state =
+      AbortsOfMeaning full shape run (weave.composePlain (HList.forget captured captures) entries)
+        state := by
+  apply propext
+  constructor
+  · rintro ⟨args, settled, aborts⟩
+    exact ⟨weave.compose captures args, by rw [weave.settle_compose free, settled], aborts⟩
+  · rintro ⟨woven, settled, aborts⟩
+    have split := weave.compose_split woven
+    rw [← split, weave.settle_compose free] at settled
+    obtain ⟨capturesEq, argsEq⟩ := weave.composePlain_injective settled
+    have same := HList.forget_injective _ capturesEq
+    refine ⟨(weave.split woven).2, argsEq, ?_⟩
+    show CallAborts (run (weave.compose captures (weave.split woven).2)) state
+    rw [← same, split]
+    exact aborts
+
+/-- `ensures_of` of a meaning at a row, at the woven entry values
+(`abortsOfMeaning_woven`); the finals are the supplied arguments', a capture naming
+none (`Weave.finals_compose_plain_iff`). -/
+theorem ensuresOfMeaning_woven {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (free : captured.refFree = true) {shape : ResultShape}
+    (run : HList full → Comp unit shape.carrier) (captures : HList captured)
+    (entries : HListPlain supplied) {finals : HListPlain (NRow.finals supplied)}
+    {finals' : HListPlain (NRow.finals full)} (same : HEq finals' finals)
+    (result : shape.plain) (pre post : Memory unit) :
+    EnsuresOfMeaning supplied shape (fun args => run (weave.compose captures args)) entries finals
+        result pre post =
+      EnsuresOfMeaning full shape run (weave.composePlain (HList.forget captured captures) entries)
+        finals' result pre post := by
+  apply propext
+  constructor
+  · rintro ⟨args, value, settled, finalsEq, forgot, ensures⟩
+    refine ⟨weave.compose captures args, value, by rw [weave.settle_compose free, settled], ?_,
+      forgot, ensures⟩
+    exact (weave.finals_compose_plain_iff free captures args same).mpr finalsEq
+  · rintro ⟨woven, value, settled, finalsEq, forgot, ensures⟩
+    have split := weave.compose_split woven
+    rw [← split, weave.settle_compose free] at settled
+    obtain ⟨capturesEq, argsEq⟩ := weave.composePlain_injective settled
+    have captured := HList.forget_injective _ capturesEq
+    rw [← split, captured] at finalsEq ensures
+    refine ⟨(weave.split woven).2, value, argsEq, ?_, forgot, ensures⟩
+    exact (weave.finals_compose_plain_iff free captures (weave.split woven).2 same).mp finalsEq
+
+/-- Invoking a function value whose target, weave, and captures a proof sees
+is invoking the function value naming its target, at the woven arguments. -/
+theorem closureMeaning_closureOf_named {executable : ExecutableUnit unit} {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (free : captured.refFree = true) (typeInstantiation : Array (TypeId × TypeId))
+    (captures : HList captured) (shared : Sharing) (shape : ResultShape)
+    (function : (NTy.function supplied shared shape.row).carrier)
+    (closed : (Carriers.functions supplied shared shape.row).closure function =
+      closureOf handle weave.mask typeInstantiation captures)
+    {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
+    (naming : (Carriers.functions full named_shared shape.row).closure named =
+      closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
+    (args : HList supplied) :
+    closureMeaning executable supplied shared shape function args =
+      closureMeaning executable full named_shared shape named (weave.compose captures args) := by
+  simp only [closureMeaning, closed, naming,
+    closureRun_closureOf_woven executable handle weave free typeInstantiation captures shape args]
+
+/-- `aborts_of` as a clause states it (`AbortsOfEntries`) of a function value
+capturing values, as of the function value naming its target (`named`) at the
+woven entry values: the captures forgotten, the entry values supplied. -/
+theorem abortsOfEntries_closureOf_woven {executable : ExecutableUnit unit}
+    {handle : FunctionHandle} {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (free : captured.refFree = true)
+    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
+    (shared : Sharing) (shape : ResultShape)
+    (function : (NTy.function supplied shared shape.row).carrier)
+    (closed : (Carriers.functions supplied shared shape.row).closure function =
+      closureOf handle weave.mask typeInstantiation captures)
+    {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
+    (naming : (Carriers.functions full named_shared shape.row).closure named =
+      closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
+    (entries : HListPlain supplied) (state : Memory unit) :
+    AbortsOfEntries (closureMeaning executable) supplied shared shape function entries state =
+      AbortsOfEntries (closureMeaning executable) full named_shared shape named
+        (weave.composePlain (HList.forget captured captures) entries) state := by
+  rw [abortsOfEntries_eq_abortsOfMeaning, abortsOfEntries_eq_abortsOfMeaning,
+    show (closureMeaning executable supplied shared shape function) =
+        fun args => closureMeaning executable full named_shared shape named
+          (weave.compose captures args) from
+      funext fun args => closureMeaning_closureOf_named weave free typeInstantiation captures
+        shared shape function closed named naming args]
+  exact abortsOfMeaning_woven weave free _ captures entries state
+
+/-- `ensures_of` as a clause states it (`EnsuresOfEntries`) of a function
+value capturing values, as of the function value naming its target at the
+woven entry values; the two rows name the same final values
+(`Weave.finals_compose_iff`). -/
+theorem ensuresOfEntries_closureOf_woven {executable : ExecutableUnit unit}
+    {handle : FunctionHandle} {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (free : captured.refFree = true)
+    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
+    (shared : Sharing) (shape : ResultShape)
+    (function : (NTy.function supplied shared shape.row).carrier)
+    (closed : (Carriers.functions supplied shared shape.row).closure function =
+      closureOf handle weave.mask typeInstantiation captures)
+    {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
+    (naming : (Carriers.functions full named_shared shape.row).closure named =
+      closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
+    (entries : HListPlain supplied) {finals : HList (NRow.finals supplied)}
+    {finals' : HList (NRow.finals full)} (same : HEq finals' finals)
+    (result : shape.carrier) (pre post : Memory unit) :
+    EnsuresOfEntries (closureMeaning executable) supplied shared shape function entries finals
+        result pre post =
+      EnsuresOfEntries (closureMeaning executable) full named_shared shape named
+        (weave.composePlain (HList.forget captured captures) entries) finals' result pre post := by
+  have woven := fun args => closureMeaning_closureOf_named (executable := executable) weave free
+    typeInstantiation captures shared shape function closed named naming args
+  apply propext
+  constructor
+  · rintro ⟨args, settled, finalsEq, ensures⟩
+    refine ⟨weave.compose captures args, by rw [weave.settle_compose free, settled], ?_, ?_⟩
+    · exact (weave.finals_compose_iff free captures args same).mpr finalsEq
+    · unfold EnsuresOf at ensures
+      rw [woven args] at ensures
+      exact ensures
+  · rintro ⟨wovenArgs, settled, finalsEq, ensures⟩
+    have split := weave.compose_split wovenArgs
+    rw [← split, weave.settle_compose free] at settled
+    obtain ⟨capturesEq, argsEq⟩ := weave.composePlain_injective settled
+    have captured := HList.forget_injective _ capturesEq
+    rw [← split, captured] at finalsEq ensures
+    refine ⟨(weave.split wovenArgs).2, argsEq, ?_, ?_⟩
+    · exact (weave.finals_compose_iff free captures (weave.split wovenArgs).2 same).mp finalsEq
+    · unfold EnsuresOf at ensures
+      rw [← woven (weave.split wovenArgs).2] at ensures
+      exact ensures
+
+/-- `ensures_of` of a function value returning a mutable reference
+(`EnsuresOfSettled`), as of the function value naming its target at the woven
+entry values (`ensuresOfEntries_closureOf_woven`). -/
+theorem ensuresOfSettled_closureOf_woven {executable : ExecutableUnit unit}
+    {handle : FunctionHandle} {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (free : captured.refFree = true)
+    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
+    (shared : Sharing) (σ : NTy)
+    (function : (NTy.function supplied shared (ResultShape.one (.ref σ)).row).carrier)
+    (closed : (Carriers.functions supplied shared (ResultShape.one (.ref σ)).row).closure
+      function = closureOf handle weave.mask typeInstantiation captures)
+    {named_shared : Sharing}
+    (named : (NTy.function full named_shared (ResultShape.one (.ref σ)).row).carrier)
+    (naming : (Carriers.functions full named_shared (ResultShape.one (.ref σ)).row).closure
+      named = closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
+    (entries : HListPlain supplied) {finals : HList (NRow.finals supplied)}
+    {finals' : HList (NRow.finals full)} (same : HEq finals' finals)
+    (current : σ.plain) (pre post : Memory unit) :
+    EnsuresOfSettled (closureMeaning executable) supplied shared σ function entries finals
+        current pre post =
+      EnsuresOfSettled (closureMeaning executable) full named_shared σ named
+        (weave.composePlain (HList.forget captured captures) entries) finals' current
+        pre post := by
+  unfold EnsuresOfSettled
+  apply propext
+  constructor
+  · rintro ⟨prophecy, forgotten, ensures⟩
+    exact ⟨prophecy, forgotten, (ensuresOfEntries_closureOf_woven weave free typeInstantiation
+      captures shared _ function closed named naming entries same _ pre post) ▸ ensures⟩
+  · rintro ⟨prophecy, forgotten, ensures⟩
+    exact ⟨prophecy, forgotten, (ensuresOfEntries_closureOf_woven weave free typeInstantiation
+      captures shared _ function closed named naming entries same _ pre post).symm ▸ ensures⟩
+
+end
+
 end VerexIR.Proofs

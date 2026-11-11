@@ -890,11 +890,13 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
   -- The equations of a site without type arguments: its weave, its
   -- constructor's closure, the unit's check, its invocation, and the typing
   -- of the value naming its target.
+  let mut equipped : Array (Nat × SiteSpec × NRow) := #[]
   for site in sites, index in [0:sites.size] do
     unless site.key.typeInstantiation.isEmpty do continue
     let some (full, _) := closureSignature? unit site.key.function | continue
     unless closureTypingCheck unit site.key.function site.key.mask site.captured site.parameters
         site.results site.shared do continue
+    equipped := equipped.push (index, site, NRow.ofList full)
     let name (base : String) := family ++ Name.mkSimple s!"{base}{index}"
     let row ← rowIdent family site.captured
     let parameters ← rowIdent family site.parameters
@@ -971,6 +973,142 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
       unit := unitDefinition, constructor := name "site", construct := name "construct"
       closure := name "closure", invoke := invoke?, check := name "check", named := named?
       target := functionKey unit site.key.function, foreign := family ++ `foreign }
+  -- The behaviors a clause states of a site that captures, at the link set's
+  -- value naming its target: the captures woven into the entry values the
+  -- clause supplies (`abortsOfEntries_closureOf_woven`), so that the clause's
+  -- predicate of the closure and its predicate of the bare target are one
+  -- term (`doc/plan/one-spelling.md`, "A closure's behavior").  Generated
+  -- where the link set holds the target's mask-0 site at its full row, which
+  -- is the value a clause naming the target spells.
+  for (index, site, fullValue) in equipped do
+    if site.captured == .nil then continue
+    let mut naming? := none
+    for (other, otherSite, _) in equipped do
+      if naming?.isNone && otherSite.key.function == site.key.function &&
+          otherSite.key.mask == 0 && otherSite.captured == .nil &&
+          otherSite.parameters == fullValue && otherSite.results == site.results then
+        naming? := some (other, otherSite)
+    let some (named, namedSite) := naming? | continue
+    let shape? ← match site.results with
+      | .nil => some <$> `(VerexIR.Proofs.Denote.ResultShape.none)
+      | .cons τ .nil => some <$> `(VerexIR.Proofs.Denote.ResultShape.one $(← typeIdent family τ))
+      | _ => pure none
+    let some shape := shape? | continue
+    let row ← rowIdent family site.captured
+    let parameters ← rowIdent family site.parameters
+    let shared ← sharingIdent family site.shared
+    let fullRow ← rowIdent family fullValue
+    let namedShared ← sharingIdent family namedSite.shared
+    let ctor := rootIdent (family ++ Name.mkSimple s!"site{index}")
+    let closure := rootIdent (family ++ Name.mkSimple s!"closure{index}")
+    let weave := rootIdent (family ++ Name.mkSimple s!"weave{index}")
+    let namedCtor := rootIdent (family ++ Name.mkSimple s!"site{named}")
+    let namedClosure := rootIdent (family ++ Name.mkSimple s!"closure{named}")
+    let executable := mkIdent `executable
+    let captures := mkIdent `captures
+    let entries := mkIdent `entries
+    let finals := mkIdent `finals
+    let result := mkIdent `result
+    let state := mkIdent `state
+    let pre := mkIdent `pre
+    let post := mkIdent `post
+    let held := mkIdent `held
+    let certified := mkIdent `certified
+    let meaning ← `(@VerexIR.Proofs.Denote.closureMeaning $unitIdent _ $executable $runtimeFrame)
+    -- The captures the constructor holds are plain, and a site statement
+    -- quantifies a certified row, so the equation owes the captures'
+    -- invariants; a certificate-free row holds them by its types alone.
+    let certifying : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ←
+      if site.captured.certificateFree then pure #[]
+      else do
+        let binder ← `(Lean.Parser.Term.bracketedBinderF|
+          ($held : @VerexIR.Proofs.Denote.HListPlain.deepHolds $runtimeCarriers $row $captures))
+        pure #[⟨binder.raw⟩]
+    let heldTerm ← if site.captured.certificateFree then
+        `(@VerexIR.Proofs.Denote.HListPlain.deepHolds_of_certificateFree $runtimeCarriers $row
+          (by decide) $captures)
+      else `($held)
+    let woven ← `(@VerexIR.Proofs.Denote.Weave.composePlain $runtimeCarriers $fullRow $row
+      $parameters $weave $captures $entries)
+    let certifiedRow ← `(@VerexIR.Proofs.Denote.HListPlain.ofDeepHolds $runtimeCarriers $row
+      $captures $certified)
+    let prelude ← `(tactic|
+      have $certified:ident : @VerexIR.Proofs.Denote.HListPlain.deepHolds $runtimeCarriers $row
+        $captures := $heldTerm)
+    let forgetting ← `(tactic|
+      rw [← @VerexIR.Proofs.Denote.HListPlain.forget_ofDeepHolds $runtimeCarriers $row
+        $captures $certified])
+    elabCommand (← `(command|
+      @[vir_denote_norm] theorem $(rootIdent (family ++ Name.mkSimple s!"wovenAborts{index}")):ident
+          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
+          ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
+          ($captures : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $row)
+          $certifying*
+          ($entries : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $parameters)
+          ($state : @VerexIR.Proofs.Denote.Memory $unitIdent _) :
+          @VerexIR.Proofs.AbortsOfEntries $unitIdent _ $runtimeFrame $meaning $parameters
+              $shared $shape ($ctor $captures) $entries $state =
+            @VerexIR.Proofs.AbortsOfEntries $unitIdent _ $runtimeFrame $meaning $fullRow
+              $namedShared $shape ($namedCtor ()) $woven $state := by
+        letI : VerexIR.Proofs.Denote.Skolems $unitIdent := $runtimeFrame
+        $prelude:tactic
+        $forgetting:tactic
+        exact VerexIR.Proofs.abortsOfEntries_closureOf_woven (named_shared := $namedShared)
+          $weave (by decide) #[] $certifiedRow $shared $shape _ ($closure _) ($namedCtor ())
+          ($namedClosure ()) $entries $state))
+    elabCommand (← `(command|
+      @[vir_denote_norm] theorem $(rootIdent (family ++ Name.mkSimple s!"wovenEnsures{index}")):ident
+          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
+          ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
+          ($captures : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $row)
+          $certifying*
+          ($entries : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $parameters)
+          ($finals : @VerexIR.Proofs.Denote.HList $runtimeCarriers
+            (VerexIR.Proofs.Denote.NRow.finals $parameters))
+          ($result : @VerexIR.Proofs.Denote.ResultShape.carrier $runtimeCarriers $shape)
+          ($pre $post : @VerexIR.Proofs.Denote.Memory $unitIdent _) :
+          @VerexIR.Proofs.EnsuresOfEntries $unitIdent _ $runtimeFrame $meaning $parameters
+              $shared $shape ($ctor $captures) $entries $finals $result
+              $pre $post =
+            @VerexIR.Proofs.EnsuresOfEntries $unitIdent _ $runtimeFrame $meaning $fullRow
+              $namedShared $shape ($namedCtor ()) $woven $finals $result
+              $pre $post := by
+        letI : VerexIR.Proofs.Denote.Skolems $unitIdent := $runtimeFrame
+        $prelude:tactic
+        $forgetting:tactic
+        exact VerexIR.Proofs.ensuresOfEntries_closureOf_woven (named_shared := $namedShared)
+          (finals := $finals) (finals' := $finals) $weave (by decide) #[] $certifiedRow $shared
+          $shape _ ($closure _) ($namedCtor ()) ($namedClosure ()) $entries HEq.rfl
+          $result $pre $post))
+    -- A target returning a mutable reference: the clause reads the result as
+    -- its current value (`EnsuresOfSettled`).
+    if let .cons (.ref referent) .nil := site.results then
+      let σ ← typeIdent family referent
+      let current := mkIdent `current
+      elabCommand (← `(command|
+        @[vir_denote_norm] theorem
+            $(rootIdent (family ++ Name.mkSimple s!"wovenEnsuresSettled{index}")):ident
+            [VerexIR.Proofs.Denote.CarriersNonempty
+              (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
+            ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
+            ($captures : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $row)
+            $certifying*
+            ($entries : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $parameters)
+            ($finals : @VerexIR.Proofs.Denote.HList $runtimeCarriers
+              (VerexIR.Proofs.Denote.NRow.finals $parameters))
+            ($current : @VerexIR.Proofs.Denote.NTy.plain $runtimeCarriers $σ)
+            ($pre $post : @VerexIR.Proofs.Denote.Memory $unitIdent _) :
+            @VerexIR.Proofs.EnsuresOfSettled $unitIdent _ $runtimeFrame $meaning $parameters
+                $shared $σ ($ctor $captures) $entries $finals $current $pre $post =
+              @VerexIR.Proofs.EnsuresOfSettled $unitIdent _ $runtimeFrame $meaning $fullRow
+                $namedShared $σ ($namedCtor ()) $woven $finals $current $pre $post := by
+          letI : VerexIR.Proofs.Denote.Skolems $unitIdent := $runtimeFrame
+          $prelude:tactic
+          $forgetting:tactic
+          exact VerexIR.Proofs.ensuresOfSettled_closureOf_woven (named_shared := $namedShared)
+            (finals := $finals) (finals' := $finals) $weave (by decide) #[] $certifiedRow $shared
+            $σ _ ($closure _) ($namedCtor ()) ($namedClosure ()) $entries HEq.rfl
+            $current $pre $post))
 
 /-- Declare a unit's function values once, before its first theorem: the
 generated family where the link set has closure sites, the library's
