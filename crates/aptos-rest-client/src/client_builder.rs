@@ -105,6 +105,7 @@ impl ClientBuilder {
                 .unwrap(),
             base_url: self.base_url,
             version_path_base,
+            headers: HeaderMap::new(),
         }
     }
 }
