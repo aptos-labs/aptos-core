@@ -124,15 +124,19 @@ partial def quoteCarrier : (τ : NTy) → τ.groundCarrier → MetaM Lean.Expr
   | .tuple elements, value => quoteRowValue elements value
   | .struct _ _ _, _ => throwError "a literal of a struct type"
   | .enum _ _ _ _ _, _ => throwError "a literal of an enum type"
+  | .slice element, value
   | .vector element, value => do
       let carrier := mkApp (mkConst ``NTy.groundCarrier) (← quoteNTy element)
       let values ← mkArrayLit carrier (← value.values.toList.mapM (quoteCarrier element))
       let bounded ← mkDecideProof (← mkAppM ``LT.lt
         #[← mkAppM ``Array.size #[values], mkNatLit (2 ^ 64)])
       mkAppM ``VerexIR.SpecVector.mk #[values, bounded]
+  | .array _ _, _ => throwError "a literal of an array type"
+  | .sliceRef _, _ => throwError "a literal of a mutable slice-reference type"
   | .table _ _, _ => throwError "a literal of a map type"
   | .ref _, _ => throwError "a literal of a reference type"
   | .ghost _, _ => throwError "a literal of a ghost slot"
+  | .observed referent, value => quoteCarrier referent value
   | .int width signed, value => do
       let widthExpr := toExpr (VerexIR.IntWidth.bits width)
       let proposition ← mkAppM ``VerexIR.IntegerValueFits
@@ -153,8 +157,12 @@ partial def quoteCarrier : (τ : NTy) → τ.groundCarrier → MetaM Lean.Expr
   | .signer, value => return toExpr value
   | .string, value => return toExpr value
   | .bytes, value => return toExpr value
+  | .char, value => do
+      let valid ← mkEqRefl (mkConst ``Bool.true)
+      return mkApp2 (mkConst ``VerexIR.SpecChar.mk) (toExpr (value : VerexIR.SpecChar).val) valid
   | .param _, _ => throwError "a literal of a type parameter"
   | .function _ _ _, _ => throwError "a literal of a function type"
+  | .nominal _ _ _, _ => throwError "a literal of a recursive type"
 
 partial def quoteRowValue : (row : NRow) → @HList Carriers.ground row → MetaM Lean.Expr
   | .nil, _ => return mkConst ``Unit.unit
@@ -172,8 +180,20 @@ def quoteProj : {τ σ : NTy} → Proj τ σ → MetaM Lean.Expr
   | .vector τ, σ, .index position rest =>
       return mkAppN (mkConst ``Proj.index)
         #[← quoteNTy τ, ← quoteNTy σ, quotePlaceIndex position, ← quoteProj rest]
+  | .slice τ, σ, .sliceElement position rest =>
+      return mkAppN (mkConst ``Proj.sliceElement)
+        #[← quoteNTy τ, ← quoteNTy σ, quotePlaceIndex position, ← quoteProj rest]
+  | .sliceRef τ, σ, .sliceIndex position rest =>
+      return mkAppN (mkConst ``Proj.sliceIndex)
+        #[← quoteNTy τ, ← quoteNTy σ, quotePlaceIndex position, ← quoteProj rest]
   | .ref τ, σ, .deref rest =>
       return mkAppN (mkConst ``Proj.deref) #[← quoteNTy τ, ← quoteNTy σ, ← quoteProj rest]
+  | .array τ length, σ, .arrayIndex position rest =>
+      return mkAppN (mkConst ``Proj.arrayIndex)
+        #[← quoteNTy τ, ← quoteNTy σ, Lean.toExpr length, quotePlaceIndex position, ← quoteProj rest]
+  | .tuple elements, τ, @Proj.element _ σ _ x rest =>
+      return mkAppN (mkConst ``Proj.element) #[← quoteRow elements, ← quoteNTy σ, ← quoteNTy τ,
+        ← quoteVar x, ← quoteProj rest]
   | .struct source arguments fields, τ, @Proj.field _ _ _ σ _ x rest =>
       return mkAppN (mkConst ``Proj.field) #[Lean.toExpr source, ← quoteRow arguments,
         ← quoteRow fields, ← quoteNTy σ, ← quoteNTy τ, ← quoteVar x, ← quoteProj rest]
@@ -312,6 +332,37 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
       return mkAppN (mkConst ``Term.shift) #[unitExpr, shape, context, Lean.toExpr width,
         Lean.toExpr distanceWidth, Lean.toExpr site, Lean.toExpr left, Lean.toExpr failure, ← quoteTerm unitExpr value,
         ← quoteTerm unitExpr distance]
+  | .int width signed, @Term.shiftSigned _ _ _ _ distanceWidth _ distanceSigned site left failure value distance =>
+      return mkAppN (mkConst ``Term.shiftSigned) #[unitExpr, shape, context, Lean.toExpr width,
+        Lean.toExpr distanceWidth, Lean.toExpr signed, Lean.toExpr distanceSigned, Lean.toExpr site,
+        Lean.toExpr left, Lean.toExpr failure, ← quoteTerm unitExpr value, ← quoteTerm unitExpr distance]
+  | .int width signed, @Term.shiftUnchecked _ _ _ _ distanceWidth _ distanceSigned site left value distance =>
+      return mkAppN (mkConst ``Term.shiftUnchecked) #[unitExpr, shape, context, Lean.toExpr width,
+        Lean.toExpr distanceWidth, Lean.toExpr signed, Lean.toExpr distanceSigned, Lean.toExpr site,
+        Lean.toExpr left, ← quoteTerm unitExpr value, ← quoteTerm unitExpr distance]
+  | .int width signed, .divideUnchecked site modulo left right =>
+      return mkAppN (mkConst ``Term.divideUnchecked) #[unitExpr, shape, context, Lean.toExpr width,
+        Lean.toExpr signed, Lean.toExpr site, Lean.toExpr modulo, ← quoteTerm unitExpr left,
+        ← quoteTerm unitExpr right]
+  | .tuple (.cons (.int width signed) (.cons .bool .nil)), .overflowing op left right =>
+      return mkAppN (mkConst ``Term.overflowing) #[unitExpr, shape, context, Lean.toExpr width,
+        Lean.toExpr signed, Lean.toExpr op, ← quoteTerm unitExpr left, ← quoteTerm unitExpr right]
+  | .int width' signed', @Term.wrap _ _ _ width signed _ _ _ value =>
+      let nonzero ← mkDecideProof (mkNot (← mkEq (Lean.toExpr width') (Lean.toExpr (0 : Nat))))
+      return mkAppN (mkConst ``Term.wrap) #[unitExpr, shape, context, Lean.toExpr width,
+        Lean.toExpr signed, Lean.toExpr width', Lean.toExpr signed', nonzero, ← quoteTerm unitExpr value]
+  | .int 32 false, .charCode value =>
+      return mkAppN (mkConst ``Term.charCode) #[unitExpr, shape, context, ← quoteTerm unitExpr value]
+  | .char, @Term.charOf _ _ _ width signed site value =>
+      return mkAppN (mkConst ``Term.charOf) #[unitExpr, shape, context, Lean.toExpr width,
+        Lean.toExpr signed, Lean.toExpr site, ← quoteTerm unitExpr value]
+  | .char, @Term.charOfChecked _ _ _ width signed site failure value =>
+      return mkAppN (mkConst ``Term.charOfChecked) #[unitExpr, shape, context, Lean.toExpr width,
+        Lean.toExpr signed, Lean.toExpr site, Lean.toExpr failure, ← quoteTerm unitExpr value]
+  | .int 64 false, .stringLength value =>
+      return mkAppN (mkConst ``Term.stringLength) #[unitExpr, shape, context, ← quoteTerm unitExpr value]
+  | τ, .unreachable =>
+      return mkAppN (mkConst ``Term.unreachable) #[unitExpr, shape, context, ← toExpr τ]
   | .int width' signed', @Term.cast _ _ _ width signed _ _ site failure value =>
       return mkAppN (mkConst ``Term.cast) #[unitExpr, shape, context, Lean.toExpr width, Lean.toExpr signed,
         Lean.toExpr width', Lean.toExpr signed', Lean.toExpr site, Lean.toExpr failure, ← quoteTerm unitExpr value]
@@ -368,6 +419,10 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
       return mkAppN (mkConst ``Term.callGeneric) #[unitExpr, shape, context, σsExpr, σsExpr',
         Lean.toExpr site, Lean.toExpr handle, Lean.toExpr typeArgs, θExpr, shapeExpr, shapeExpr',
         resolved, ← quoteArgs unitExpr arguments]
+  | _, @Term.callInstance _ _ _ σs site handle typeArgs θ calleeShape arguments => do
+      return mkAppN (mkConst ``Term.callInstance) #[unitExpr, shape, context, ← quoteRow σs,
+        Lean.toExpr site, Lean.toExpr handle, Lean.toExpr typeArgs, ← quoteTypeArgs θ,
+        ← quoteShape calleeShape, ← quoteArgs unitExpr arguments]
   | _, @Term.closure _ _ _ full captured supplied handle weave results shared _ _ _ _ captures => do
       let (fullExpr, capturedExpr, suppliedExpr) :=
         (← quoteRow full, ← quoteRow captured, ← quoteRow supplied)
@@ -501,6 +556,12 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
   | .unit, @Term.mutate _ _ _ τ x value =>
       return mkAppN (mkConst ``Term.mutate) #[unitExpr, shape, context, ← toExpr τ, ← quoteVar x,
         ← quoteTerm unitExpr value]
+  | _, @Term.observe _ _ _ τ site value =>
+      return mkAppN (mkConst ``Term.observe) #[unitExpr, shape, context, ← toExpr τ,
+        Lean.toExpr site, ← quoteTerm unitExpr value]
+  | .ref σ, @Term.takeAt _ _ _ τ _ site mismatch x path =>
+      return mkAppN (mkConst ``Term.takeAt) #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
+        Lean.toExpr site, Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
   | σ, @Term.readPlace _ _ _ τ _ site mismatch x path =>
       return mkAppN (mkConst ``Term.readPlace) #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
         Lean.toExpr site, Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
@@ -529,9 +590,52 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
   | .ref τ, @Term.returned _ _ _ _ site reference =>
       return mkAppN (mkConst ``Term.returned) #[unitExpr, shape, context, ← toExpr τ,
         Lean.toExpr site, ← quoteTerm unitExpr reference]
+  -- `resolveAt` carries its site and lender as `resolve` does; a slice
+  -- reference's death certifies nothing (`NTy.carrier`, `.sliceRef`), so
+  -- `resolveSliceAt` stays without one.
+  | .unit, @Term.resolveAt _ _ _ τ σ site x path lender =>
+      return mkAppN (mkConst ``Term.resolveAt) #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
+        Lean.toExpr site, ← quoteVar x, ← quoteProj path, ← quoteLender lender]
+  | .vector τ, .sliceVector value =>
+      return mkAppN (mkConst ``Term.sliceVector)
+        #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr value]
+  | .slice τ, .vectorSlice value =>
+      return mkAppN (mkConst ``Term.vectorSlice)
+        #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr value]
+  | .slice τ, .sliceCurrent value =>
+      return mkAppN (mkConst ``Term.sliceCurrent)
+        #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr value]
+  | .sliceRef σ, @Term.borrowArraySlice _ _ _ τ _ length mismatch x path =>
+      return mkAppN (mkConst ``Term.borrowArraySlice)
+        #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ, Lean.toExpr length,
+          Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
+  | .sliceRef σ, @Term.borrowVectorSlice _ _ _ τ _ mismatch x path =>
+      return mkAppN (mkConst ``Term.borrowVectorSlice)
+        #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
+          Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
+  | .sliceRef σ, @Term.reborrowSlice _ _ _ τ _ mismatch x path =>
+      return mkAppN (mkConst ``Term.reborrowSlice)
+        #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
+          Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
+  | .sliceRef σ, @Term.takeSliceAt _ _ _ τ _ mismatch x path =>
+      return mkAppN (mkConst ``Term.takeSliceAt)
+        #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
+          Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
+  | .unit, @Term.resolveSliceAt _ _ _ τ σ x path =>
+      return mkAppN (mkConst ``Term.resolveSliceAt)
+        #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ, ← quoteVar x, ← quoteProj path]
   | .vector τ, .vectorLit count elements =>
       return mkAppN (mkConst ``Term.vectorLit) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr count,
         ← quoteArgs unitExpr elements]
+  | .vector τ, @Term.arrayVector _ _ _ _ length array =>
+      return mkAppN (mkConst ``Term.arrayVector) #[unitExpr, shape, context, ← toExpr τ,
+        Lean.toExpr length, ← quoteTerm unitExpr array]
+  | .array τ length, .arrayOf vector =>
+      return mkAppN (mkConst ``Term.arrayOf) #[unitExpr, shape, context, ← toExpr τ,
+        Lean.toExpr length, ← quoteTerm unitExpr vector]
+  | .vector τ, .repeatVector count value =>
+      return mkAppN (mkConst ``Term.repeatVector) #[unitExpr, shape, context, ← toExpr τ,
+        Lean.toExpr count, ← quoteTerm unitExpr value]
   | .int 64 false, @Term.length _ _ _ τ vector =>
       return mkAppN (mkConst ``Term.length) #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr vector]
   | .address, .signerAddress signer =>
@@ -643,9 +747,9 @@ arguments; and over its sites a path's decisions name, each by its kind (`abort`
 for a throw, `op` for an operation that may abort, `if`, `loop`,
 `invoke`, `match`). -/
 partial def _root_.VerexIR.Proofs.Denote.Term.foldNodes {α : Type}
-    (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α)
+    (visit : FunctionHandle → Array VerexIR.GenericArgument → Option TypeArgs → α → α)
     (atSite : String → Nat → α → α)
-    (atClosure : FunctionHandle → Nat → Array VerexIR.TypeUse → Option TypeArgs → α → α) {unit : ValidatedUnit}
+    (atClosure : FunctionHandle → Nat → Array VerexIR.GenericArgument → Option TypeArgs → α → α) {unit : ValidatedUnit}
     {ρ : ResultShape} :
     {Γ : NRow} → {τ : NTy} → Term unit ρ Γ τ → α → α
   | _, _, .checked site _ _ left right, found =>
@@ -659,6 +763,19 @@ partial def _root_.VerexIR.Proofs.Denote.Term.foldNodes {α : Type}
   | _, _, .bitwise _ left right, found => right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure found)
   | _, _, .shift site _ _ value distance, found =>
       distance.foldNodes visit atSite atClosure (value.foldNodes visit atSite atClosure (atSite "op" site found))
+  | _, _, .shiftSigned site _ _ value distance, found =>
+      distance.foldNodes visit atSite atClosure (value.foldNodes visit atSite atClosure (atSite "op" site found))
+  | _, _, .shiftUnchecked site _ value distance, found =>
+      distance.foldNodes visit atSite atClosure (value.foldNodes visit atSite atClosure (atSite "op" site found))
+  | _, _, .divideUnchecked site _ left right, found =>
+      right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure (atSite "op" site found))
+  | _, _, .overflowing _ left right, found => right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure found)
+  | _, _, .wrap _ value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .charCode value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .charOf site value, found => value.foldNodes visit atSite atClosure (atSite "op" site found)
+  | _, _, .charOfChecked site _ value, found => value.foldNodes visit atSite atClosure (atSite "op" site found)
+  | _, _, .stringLength value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .unreachable, found => found
   | _, _, .cast site _ value, found => value.foldNodes visit atSite atClosure (atSite "op" site found)
   | _, _, .ite site condition thenBranch elseBranch, found =>
       let found := match site with
@@ -680,6 +797,8 @@ partial def _root_.VerexIR.Proofs.Denote.Term.foldNodes {α : Type}
   | _, _, .call _ handle _ arguments, found => arguments.foldNodes visit atSite atClosure (visit handle #[] none found)
   | _, _, .callGeneric _ handle typeArgs θ _ _ _ arguments, found =>
       arguments.foldNodes visit atSite atClosure (visit handle typeArgs (some θ) found)
+  | _, _, .callInstance _ handle typeArgs θ _ arguments, found =>
+      arguments.foldNodes visit atSite atClosure (visit handle typeArgs (some θ) found)
   -- An invocation of a closure runs its target, whose theorem a proof uses.
   | _, _, .closure handle weave _ _ _ _ _ _ captures, found =>
       captures.foldNodes visit atSite atClosure
@@ -698,11 +817,18 @@ partial def _root_.VerexIR.Proofs.Denote.Term.foldNodes {α : Type}
   | _, _, .letRow _ value body, found => body.foldNodes visit atSite atClosure (value.foldNodes visit atSite atClosure found)
   | _, _, .letFields _ value body, found => body.foldNodes visit atSite atClosure (value.foldNodes visit atSite atClosure found)
   | _, _, .caseOf scrutinee arms, found => arms.foldNodes visit atSite atClosure (scrutinee.foldNodes visit atSite atClosure found)
+  | _, _, .sliceVector value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .vectorSlice value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .sliceCurrent value, found => value.foldNodes visit atSite atClosure found
   | _, _, .deref _ value, found => value.foldNodes visit atSite atClosure found
   | _, _, .copy value _, found => value.foldNodes visit atSite atClosure found
+  | _, _, .observe _ value, found => value.foldNodes visit atSite atClosure found
   | _, _, .mutate _ value, found => value.foldNodes visit atSite atClosure found
   | _, _, .writePlace _ _ _ _ value, found => value.foldNodes visit atSite atClosure found
   | _, _, .vectorLit _ elements, found => elements.foldNodes visit atSite atClosure found
+  | _, _, .arrayVector array, found => array.foldNodes visit atSite atClosure found
+  | _, _, .arrayOf vector, found => vector.foldNodes visit atSite atClosure found
+  | _, _, .repeatVector _ value, found => value.foldNodes visit atSite atClosure found
   | _, _, .length vector, found => vector.foldNodes visit atSite atClosure found
   | _, _, .signerAddress signer, found => signer.foldNodes visit atSite atClosure found
   | _, _, .index site vector position, found =>
@@ -747,18 +873,18 @@ partial def _root_.VerexIR.Proofs.Denote.Term.foldNodes {α : Type}
   | _, _, _, found => found
 
 partial def _root_.VerexIR.Proofs.Denote.Args.foldNodes {α : Type}
-    (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α)
+    (visit : FunctionHandle → Array VerexIR.GenericArgument → Option TypeArgs → α → α)
     (atSite : String → Nat → α → α)
-    (atClosure : FunctionHandle → Nat → Array VerexIR.TypeUse → Option TypeArgs → α → α) {unit : ValidatedUnit}
+    (atClosure : FunctionHandle → Nat → Array VerexIR.GenericArgument → Option TypeArgs → α → α) {unit : ValidatedUnit}
     {ρ : ResultShape} :
     {Γ σs : NRow} → Args unit ρ Γ σs → α → α
   | _, _, .nil, found => found
   | _, _, .cons head tail, found => tail.foldNodes visit atSite atClosure (head.foldNodes visit atSite atClosure found)
 
 partial def _root_.VerexIR.Proofs.Denote.Arms.foldNodes {α : Type}
-    (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α)
+    (visit : FunctionHandle → Array VerexIR.GenericArgument → Option TypeArgs → α → α)
     (atSite : String → Nat → α → α)
-    (atClosure : FunctionHandle → Nat → Array VerexIR.TypeUse → Option TypeArgs → α → α) {unit : ValidatedUnit}
+    (atClosure : FunctionHandle → Nat → Array VerexIR.GenericArgument → Option TypeArgs → α → α) {unit : ValidatedUnit}
     {ρ : ResultShape} :
     {Γ : NRow} → {σ τ : NTy} → Arms unit ρ Γ σ τ → α → α
   | _, _, _, .nil _, found => found
@@ -775,10 +901,15 @@ where
     | none => found
 end
 
+/-- Whether a callee's generic theorem does not transfer to type arguments, so a call at them
+is `Term.callInstance`, every other call with type arguments `Term.callGeneric`. -/
+def _root_.VerexIR.Proofs.Denote.TypeArgs.atInstance (θ : TypeArgs) (unit : ValidatedUnit)
+    (handle : FunctionHandle) : Bool := !transfersAt unit handle θ.1
+
 /-- Fold over the calls and decision sites of a term (`Term.foldNodes`
 without its closures). -/
 def _root_.VerexIR.Proofs.Denote.Term.foldCalls {α : Type}
-    (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α)
+    (visit : FunctionHandle → Array VerexIR.GenericArgument → Option TypeArgs → α → α)
     (atSite : String → Nat → α → α) {unit : ValidatedUnit} {ρ : ResultShape} {Γ : NRow}
     {τ : NTy} (term : Term unit ρ Γ τ) (found : α) : α :=
   term.foldNodes visit atSite (fun _ _ _ _ found => found) found
@@ -787,7 +918,24 @@ def _root_.VerexIR.Proofs.Denote.Term.foldCalls {α : Type}
 def _root_.VerexIR.Proofs.Denote.Term.callees {unit : ValidatedUnit} {ρ : ResultShape} {Γ : NRow}
     {τ : NTy}
     (term : Term unit ρ Γ τ) (found : Array FunctionHandle) : Array FunctionHandle :=
-  term.foldCalls (fun handle _ _ found => if found.contains handle then found else found.push handle)
+  term.foldCalls (fun handle _ θ found =>
+      if θ.any (·.atInstance unit handle) || found.contains handle then found else found.push handle)
+    (fun _ _ found => found)
+    found
+
+/-- The calls of a term at type arguments holding a mutable reference: each a callee
+compiled at them, which no other call of it shares. -/
+def _root_.VerexIR.Proofs.Denote.Term.instances {unit : ValidatedUnit} {ρ : ResultShape} {Γ : NRow}
+    {τ : NTy} (term : Term unit ρ Γ τ)
+    (found : Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs)) :
+    Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs) :=
+  term.foldCalls (fun handle typeArgs θ found => match θ with
+      | some θ =>
+          if θ.atInstance unit handle &&
+              !found.any (fun other => other.1 == handle && other.2.2.1 == θ.1) then
+            found.push (handle, typeArgs, θ)
+          else found
+      | none => found)
     (fun _ _ found => found)
     found
 
@@ -850,9 +998,12 @@ partial def _root_.VerexIR.Proofs.Denote.NTy.heldFunctionTypes (found : Array Fu
   | .tuple elements => elements.heldFunctionTypes found
   | .struct _ _ fields => fields.heldFunctionTypes found
   | .enum _ _ _ rows _ => rows.heldFunctionTypes found
-  | .vector element | .ghost element | .ref element => element.heldFunctionTypes found
+  | .vector element | .slice element | .array element _ | .sliceRef element | .ghost element
+  | .ref element | .observed element =>
+      element.heldFunctionTypes found
   | .table key value => value.heldFunctionTypes (key.heldFunctionTypes found)
-  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .param _ => found
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char | .param _
+  | .nominal _ _ _ => found
 
 partial def _root_.VerexIR.Proofs.Denote.NRow.heldFunctionTypes (found : Array FunctionType) :
     NRow → Array FunctionType
@@ -890,6 +1041,8 @@ private def instantiateIndexed? (ns : ValidatedNamespace) (positions : Std.HashM
           | _ => none
       | .tuple elements =>
           locate (.tuple (← elements.mapM (instantiateIndexed? ns positions instantiations fuel)))
+      | .slice element =>
+          locate (.slice (← instantiateIndexed? ns positions instantiations fuel element))
       | .vector element length =>
           locate (.vector (← instantiateIndexed? ns positions instantiations fuel element) length)
       | .typeDomain nested =>
@@ -979,7 +1132,7 @@ private def templateTarget? (unit : ValidatedUnit) (namespaceId : NamespaceId)
     | .typeArg value => some value
     | _ => none
   let θ := NRow.ofList (← typeArgs.mapM fun value => ntyOf unit namespaceId value.typeId)
-  guard θ.refFree
+  guard (transfersAt unit handle θ)
   if inhabitable : θ.inhabitable = true then
     return (handle, typeArgs.toArray, some ⟨θ, inhabitable⟩)
   else none
@@ -1117,16 +1270,21 @@ partial def displayType (unit : ValidatedUnit) : NTy → String
   | .signer => "signer"
   | .string => "string"
   | .bytes => "bytes"
+  | .char => "char"
   | .tuple elements => s!"({displayRow unit elements})"
-  | .struct source arguments _ | .enum source arguments _ _ _ =>
+  | .struct source arguments _ | .enum source arguments _ _ _ | .nominal source arguments _ =>
       let name := ((VerexIR.SemanticOperations.structName? unit source).map (·.name)).getD
         s!"struct#{source.namespaceId.index}.{source.structId}"
       if arguments == .nil then name else s!"{name}<{displayRow unit arguments}>"
+  | .sliceRef element => s!"&mut Slice<{displayType unit element}>"
+  | .slice element => s!"Slice<{displayType unit element}>"
   | .vector element => s!"vector<{displayType unit element}>"
+  | .array element length => s!"[{displayType unit element}; {length}]"
   | .table key value => s!"table<{displayType unit key}, {displayType unit value}>"
   | .ghost slot => s!"ghost<{displayType unit slot}>"
   | .ref referent => s!"&mut {displayType unit referent}"
   | .param index => s!"#{index}"
+  | .observed referent => s!"&{displayType unit referent}"
   | .function parameters shared results => displayFunctionType unit { parameters, shared, results }
 
 partial def displayRow (unit : ValidatedUnit) (row : NRow) : String :=
@@ -1159,11 +1317,20 @@ def quoteMutables {Γ : NRow} : Mutables Γ → MetaM Lean.Expr
   | @Mutables.cons _ τ x rest =>
       return mkAppN (mkConst ``Mutables.cons)
         #[← quoteRow Γ, ← quoteNTy τ, ← quoteVar x, ← quoteMutables rest]
+  | @Mutables.sliceAt _ τ σ x path rest =>
+      return mkAppN (mkConst ``Mutables.sliceAt)
+        #[← quoteRow Γ, ← quoteNTy τ, ← quoteNTy σ, ← quoteVar x, ← quoteProj path,
+          ← quoteMutables rest]
+  | @Mutables.at _ τ σ x path rest =>
+      return mkAppN (mkConst ``Mutables.at)
+        #[← quoteRow Γ, ← quoteNTy τ, ← quoteNTy σ, ← quoteVar x, ← quoteProj path,
+          ← quoteMutables rest]
 
 def quoteFunction {unit : ValidatedUnit} (unitExpr : Lean.Expr) (f : Function unit)
     (params locals frame frameEq body mutables exitSite : Lean.Expr) : MetaM Lean.Expr :=
   return mkAppN (mkConst ``Function.mk)
-    #[unitExpr, params, locals, frame, frameEq, ← quoteShape f.result, body, mutables, exitSite]
+    #[unitExpr, params, locals, frame, frameEq, ← quoteShape f.result, body, mutables, exitSite,
+      toExpr f.scopedMethods]
 
 /-! ## Names -/
 
@@ -1183,6 +1350,159 @@ def typedSemanticsVerifiedName (segments : Array String) (function : String) : N
 
 def verifiedName (segments : Array String) (function : String) : Name :=
   Name.str (Name.str (pathName segments) function) "verified"
+
+/-! ## Contracts at shapes
+
+A shape is a generic contract over its own variables, under a key of its own
+(`doc/designs/native-verification.md`, "Contracts at a shape"). -/
+
+/-- The key of a function's contract at its shape `index`. -/
+def shapeKey (function : String) (index : Nat) : String :=
+  s!"{function}.at_{index}"
+
+/-- The types of a shape, over its variables. -/
+def shapeArguments? (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (shape : VerexIR.ShapeContract) : Option TypeArgs := do
+  let ns ← unit.namespaces[namespaceId.index]?
+  let row ← shape.arguments.toList.mapM fun argument =>
+    ntyOf unit namespaceId (ns.typeId argument.typeId)
+  let row := NRow.ofList row
+  if inhabitable : row.inhabitable = true then some ⟨row, inhabitable⟩ else none
+
+mutual
+/-- What the variables of a shape's type take for the type to be `actual`,
+extending `found`. The whole match is checked by substitution
+(`matchShape?`), so what is not a variable's path need not be compared here. -/
+private partial def bindTypeShape :
+    NTy → NTy → Array (Nat × NTy) → Option (Array (Nat × NTy))
+  | .param index, actual, found => match found.find? (·.1 == index) with
+      | some (_, bound) => if bound == actual then some found else none
+      | none => some (found.push (index, actual))
+  | .tuple shape, .tuple actual, found => bindRowShape shape actual found
+  | .struct left shape _, .struct right actual _, found =>
+      if left == right then bindRowShape shape actual found else none
+  | .enum left shape _ _ _, .enum right actual _ _ _, found =>
+      if left == right then bindRowShape shape actual found else none
+  | .slice shape, .slice actual, found => bindTypeShape shape actual found
+  | .sliceRef shape, .sliceRef actual, found => bindTypeShape shape actual found
+  | .vector shape, .vector actual, found => bindTypeShape shape actual found
+  | .array shape length, .array actual size, found =>
+      if length == size then bindTypeShape shape actual found else none
+  | .table shapeKey shapeValue, .table actualKey actualValue, found => do
+      bindTypeShape shapeValue actualValue (← bindTypeShape shapeKey actualKey found)
+  | .ghost shape, .ghost actual, found => bindTypeShape shape actual found
+  | .ref shape, .ref actual, found => bindTypeShape shape actual found
+  | .function shapeParameters shared shapeResults, .function actualParameters shared' actualResults,
+      found => do
+      guard (shared == shared')
+      bindRowShape shapeResults actualResults
+        (← bindRowShape shapeParameters actualParameters found)
+  | shape, actual, found => if shape == actual then some found else none
+
+private partial def bindRowShape :
+    NRow → NRow → Array (Nat × NTy) → Option (Array (Nat × NTy))
+  | .nil, .nil, found => some found
+  | .cons shape shapes, .cons actual actuals, found => do
+      bindRowShape shapes actuals (← bindTypeShape shape actual found)
+  | _, _, _ => none
+end
+
+/-- The type arguments of a shape's variables for its types to be `θ`. A call's
+parameters are rigid here: `{T}` matches them and `{u32}` does not. -/
+def matchShape? (shape θ : TypeArgs) : Option TypeArgs := do
+  let found ← bindRowShape shape.1 θ.1 #[]
+  let sorted := found.qsort (·.1 < ·.1)
+  guard (sorted.zipIdx.all fun ((index, _), position) => index == position)
+  let row := NRow.ofList (sorted.toList.map (·.2))
+  guard (NRow.subst row shape.1 == θ.1)
+  if inhabitable : row.inhabitable = true then some ⟨row, inhabitable⟩ else none
+
+/-- The type arguments among a call's generic arguments. -/
+def typeUses (arguments : Array VerexIR.GenericArgument) : Array VerexIR.TypeUse :=
+  arguments.filterMap fun
+    | .typeArg argument => some argument
+    | _ => none
+
+/-- The shape of a function a call's type arguments match, with its index and
+its variables' type arguments. Validation keeps a function's shapes disjoint. -/
+def matchingShape? (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
+    (typeArgs : Array VerexIR.GenericArgument) (θ : TypeArgs) :
+    Option (Nat × VerexIR.ShapeContract × TypeArgs) :=
+  declaration.shapes.zipIdx.findSome? fun (shape, index) => do
+    let ns ← unit.namespaces[namespaceId.index]?
+    let spelled := shape.arguments.map fun argument => { argument with typeId := ns.typeId argument.typeId }
+    guard (VerexIR.Validation.shapeMatchesCall unit.tables.types spelled typeArgs)
+    let arguments ← shapeArguments? unit namespaceId shape
+    return (index, shape, ← matchShape? arguments θ)
+
+/-- A native's entry at a shape: the shape, with its index, its key names. -/
+def shapeOfEntry? (unit : ValidatedUnit) (handle : FunctionHandle) (key : String)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Option (Nat × VerexIR.ShapeContract) :=
+  declaration.shapes.zipIdx.findSome? fun (shape, index) =>
+    if shapeKey (functionKey unit handle) index == key then some (index, shape) else none
+
+/-- A type as a message states it: a parameter and a nominal type by name. -/
+private partial def typeText (unit : ValidatedUnit) (parameters : Array String)
+    (id : VerexIR.TypeId) : String :=
+  let row (ids : Array VerexIR.TypeId) : String :=
+    ", ".intercalate (ids.toList.map (typeText unit parameters))
+  match unit.tables.types[id.index]? with
+  | some (.typeParameter index) => parameters[index]?.getD s!"T{index}"
+  | some .unit => "Unit"
+  | some .bool => "Bool"
+  | some .character => "char"
+  | some .string => "String"
+  | some .address => "address"
+  | some .signer => "signer"
+  | some (.integer (.bits width) signed) => s!"{if signed then "i" else "u"}{width}"
+  | some (.integer .pointer signed) => if signed then "isize" else "usize"
+  | some (.integer .unbounded signed) => if signed then "Int" else "Nat"
+  | some (.tuple elements) => s!"({row elements})"
+  | some (.slice element) => s!"Slice<{typeText unit parameters element}>"
+  | some (.vector element none) => s!"vector<{typeText unit parameters element}>"
+  | some (.vector element (some length)) =>
+      s!"[{typeText unit parameters element}; {repr length}]"
+  | some (.reference { kind := .mutable, referent, .. }) => s!"&mut {typeText unit parameters referent}"
+  | some (.reference { referent, .. }) => s!"&{typeText unit parameters referent}"
+  | some (.nominal name arguments) =>
+      let nominal := ((unit.tables.names[name.index]?).map (·.name)).getD s!"#{name.index}"
+      let types := arguments.filterMap fun | .typeArg argument => some argument.typeId | _ => none
+      if types.isEmpty then nominal else s!"{nominal}<{row types}>"
+  | some type => (repr type).pretty
+  | none => s!"#{id.index}"
+
+/-- Type arguments as a message states them, `{u32} {T}`. -/
+def typeArgumentsText (unit : ValidatedUnit) (parameters : Array String)
+    (arguments : Array VerexIR.TypeUse) : String :=
+  " ".intercalate (arguments.toList.map fun argument =>
+    s!"\{{typeText unit parameters argument.typeId}}")
+
+/-- The shapes of a function, as a message lists them. -/
+def shapesText (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : String :=
+  ", ".intercalate (declaration.shapes.toList.map fun shape =>
+    let types := (declaration.signature.generics.zip shape.arguments).filterMap fun (binder, type) =>
+      if binder.kind == .typeArg then some { type with typeId := ns.typeId type.typeId } else none
+    s!"`{typeArgumentsText unit (shape.signature.generics.map (·.name)) types}`")
+
+/-- The location of a call of `callee` at the type arguments below an
+expression. -/
+partial def callLocation? (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (callee : FunctionHandle) (typeArgs : Array VerexIR.GenericArgument) (id : VerexIR.ExprId) :
+    Option VerexIR.LocId := do
+  let ns ← unit.namespaces[namespaceId.index]?
+  let expression ← ns.expressions[id.index]?
+  match expression.kind with
+  | .operation (.call (.function reference)) instantiations _ _ =>
+      if VerexIR.SemanticOperations.resolveFunction? unit namespaceId reference == some callee &&
+          (ns.genericArguments instantiations).map VerexIR.GenericArgument.eraseLoc ==
+            typeArgs.map VerexIR.GenericArgument.eraseLoc then
+        return expression.loc
+  | _ => pure ()
+  (VerexIR.Validation.expressionChildren expression.kind).findSome?
+    (callLocation? unit namespaceId callee typeArgs)
 
 /-! ## Contracts
 
@@ -1276,9 +1596,8 @@ def quoteNativeSignature (skolems : Lean.Expr) (params : NRow) (result : ResultS
 a callee through its denotation, since the value view of its contract
 cannot relate a later write through the result to the lender. -/
 def _root_.VerexIR.Proofs.Denote.ResultShape.returnsReference : ResultShape → Bool
-  | .one (.ref _) => true
-  | .one (.tuple elements) => elements.toList.any fun | .ref _ => true | _ => false
-  | _ => false
+  | .one τ => !τ.refFree
+  | .none => false
 
 /-- Whether a callee's contract stands for it at a call: always, unless it
 returns a mutable reference without its contract stating the reference's
@@ -1361,7 +1680,7 @@ def callsRequiring (unit : ValidatedUnit) (handle : FunctionHandle) : Bool :=
     | none => false
 
 /-- Whether a function is on a cycle of calls: a call of it reaches it again. -/
-private def onCallCycle (unit : ValidatedUnit) (handle : FunctionHandle) : Bool := Id.run do
+def onCallCycle (unit : ValidatedUnit) (handle : FunctionHandle) : Bool := Id.run do
   let mut reached : Array FunctionHandle := #[]
   let mut worklist := bodyCallees unit handle
   while let some next := worklist.back? do
@@ -1421,7 +1740,7 @@ def typedContractOf (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : Validate
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (params : NRow) (result : ResultShape)
     (nativeModel : Option NativeModel := none) (stored : Contract.StoredInvariants := {})
-    (own : Contract.DataOwn := {}) :
+    (own : Contract.DataOwn := {}) (atArguments : Option NRow := none) :
     MetaM Lean.Expr :=
   -- A contract is over a unit and a frame at it; one stating a behavioral
   -- predicate over an executable unit of it as well.
@@ -1437,7 +1756,7 @@ def typedContractOf (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : Validate
       buildContract unit ⟨namespaceIndex⟩ ns declaration signature
         (types := types) (typeInstantiation := typeInstantiation)
         (nativeModel := nativeModel) (executable := executable) (requiresMeaning := requiresMeaning)
-        (stored := stored) (own := own)
+        (stored := stored) (own := own) (atArguments := atArguments)
         (directContract := some (directContractOf unit stored own executable requiresMeaning #[]))
     -- One stating `requires_of` takes the table of declared preconditions
     -- at the unit, last.
@@ -1899,14 +2218,14 @@ def proofFile? (ns : ValidatedNamespace) : Option String :=
 /-- The proof a failed automatic verification asks for: the template of an
 authored proof, one alternative per leaf the solver left undecided, the
 others to cheap deciders only; `verex_prepare` shows a leaf in source form. -/
-def proofRequest (ns : ValidatedNamespace) (function : String) (leaves : Array String) :
+def proofRequest (ns : ValidatedNamespace) (target : String) (leaves : Array String) :
     MessageData :=
   let place := match proofFile? ns with
     | some path => m!"in `{path}`"
     | none => m!"in the module"
   let alternatives := leaves.foldl (init := m!"") fun text leaf =>
     text ++ m!"\n    | {leaf} => verex_prepare; sorry"
-  m!"provide a proof {place}:\n  verify {function} by lean =>\n    verex_obligations\n    \
+  m!"provide a proof {place}:\n  verify {target} by lean =>\n    verex_obligations\n    \
     verex_on{alternatives}\n    | _ => verex_decide\n  (`verex_prepare` states a leaf in source \
     form; `trace_state` after it shows the goal)"
 
@@ -1947,11 +2266,47 @@ private def logicalValue (τ : NTy) (value : Lean.Expr) : MetaM (Option Lean.Exp
   match τ with
   | .int _ _ | .num => return some (← mkAppM ``VerexIR.SpecInt.val #[value])
   | .bool | .address | .signer | .string | .param _ => return some value
-  | .unit | .bytes => return none
-  | .tuple _ | .struct _ _ _ | .enum _ _ _ _ _ | .vector _ | .table _ _ | .function _ _ _ =>
-      return some value
+  | .unit | .bytes | .char => return none
+  | .tuple _ | .struct _ _ _ | .enum _ _ _ _ _ | .vector _ | .slice _ | .array _ _ | .table _ _
+  | .function _ _ _ | .nominal _ _ _ => return some value
+  | .sliceRef _ => return some (← sliceReferenceContents value)
   | .ref referent => logicalValue referent (← mkAppM ``Prod.fst #[value])
   | .ghost slot => logicalValue slot value
+  | .observed referent => logicalValue referent value
+
+/-- The clause-level value of a native slot binder with what it holds at its prophecies:
+what `final` reads. -/
+private def logicalFinal (τ : NTy) (value : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  match τ with
+  | .ref _ | .sliceRef _ =>
+      logicalValue τ (← mkAppM ``NTy.viewed #[toExpr true, ← quoteNTy τ, value])
+  | _ =>
+      if τ.refFree then return ← logicalValue τ value
+      -- An aggregate holding references is viewed at the plain layer: its
+      -- certified view keeps them as they are (`NTy.viewed`).
+      let type ← quoteNTy τ
+      logicalValue τ (← mkAppM ``NTy.plainViewed
+        #[toExpr true, type, ← mkAppM ``NTy.forget #[type, value]])
+
+/-- The clause-level value of a local's binder. A shared view of a value holding
+references is read whole, what it holds as current, as a parameter's is. -/
+private def logicalLocal (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (ns : ValidatedNamespace) (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
+    (index : Nat) (τ : NTy) (value : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let rec seenThrough : Nat → VerexIR.TypeId → VerexIR.TypeId
+    | 0, id => id
+    | fuel + 1, id => match ns.tables.types[id.index]? with
+      | some (.reference inner) => seenThrough fuel inner.referent
+      | _ => id
+  let some localDecl := declaration.locals[index]? | return ← logicalValue τ value
+  let some (.reference { kind := .shared, referent, .. }) :=
+      ns.tables.types[(ns.typeId localDecl.type.typeId).index]?
+    | return ← logicalValue τ value
+  let referent := seenThrough ns.tables.types.size referent
+  let some whole := ntyOf unit namespaceId referent | return ← logicalValue τ value
+  unless whole != τ && whole.erase == τ do return ← logicalValue τ value
+  logicalValue whole (← mkAppM ``NTy.plainUnerase
+    #[← quoteNTy whole, ← mkAppM ``NTy.forget #[← quoteNTy τ, value]])
 
 /-- The locals a pattern binds. -/
 private partial def patternLocals (ns : ValidatedNamespace) (pattern : VerexIR.PatternId) :
@@ -2040,7 +2395,8 @@ private partial def placeRootLocal? (ns : ValidatedNamespace) (place : VerexIR.P
       (placeRootLocal? ns base fuel).map fun (root, _) => (root, true)
   | fuel + 1, some (.field base _ _) | fuel + 1, some (.ghostField base _ _)
   | fuel + 1, some (.index base _)
-  | fuel + 1, some (.subslice base ..) | fuel + 1, some (.downcast base _) =>
+  | fuel + 1, some (.subslice base ..) | fuel + 1, some (.unsize base)
+  | fuel + 1, some (.downcast base _) =>
       placeRootLocal? ns base fuel
 
 /-- The locals a loop body can change, each with whether the body only
@@ -2147,6 +2503,10 @@ private partial def calleeMayTouchStore (unit : ValidatedUnit) (callee : Functio
   | some (ns, declaration) =>
       if usedThroughContract unit callee ns declaration then
         declaration.contract.modifiesAll || !declaration.contract.modifies.isEmpty
+      -- A call of a native with shapes is through the contract of one of them.
+      else if declaration.body == .absent && !declaration.shapes.isEmpty then
+        declaration.shapes.any fun shape =>
+          shape.contract.modifiesAll || !shape.contract.modifies.isEmpty
       else match declaration.body with
         | .structured root => mayTouchStore unit callee.namespaceId root (visiting.push callee)
         | _ => true
@@ -2172,12 +2532,17 @@ def bodySpecifications (ns : ValidatedNamespace) (root : VerexIR.ExprId)
 
 /-- The names of the leaves owing a function's clauses, by the clauses' source
 ranges: each clause by its kind, numbered in source order among the clauses
-of that kind (`ensures_2`, `aborts_if_1`, `invariant_1`, `modifies_1`). -/
+of that kind (`ensures_2`, `aborts_if_1`, `invariant_1`, `modifies_1`; the
+failure clause by the spelling of the namespace's profile, `panics_if_1` for
+Rust), and the
+obligation of the failing paths no clause permits, which no number counts
+(`no panic`, `no abort`). -/
 def clauseNames (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
     Array (VerexIR.Proofs.ObligationRange × String) := Id.run do
   let kindName : VerexIR.ConditionKind → Option String
-    | .ensures => some "ensures" | .abortsIf => some "aborts_if"
+    | .ensures => some "ensures"
+    | .abortsIf => some (if ns.profile == some .rust then "panics_if" else "aborts_if")
     | .abortsWith => some "aborts_with" | .succeedsIf => some "succeeds_if"
     | .emits => some "emits" | .decreases => some "decreases"
     | .loopInvariant => some "invariant" | .assertion => some "assert"
@@ -2185,6 +2550,7 @@ def clauseNames (unit : ValidatedUnit) (ns : ValidatedNamespace)
     | _ => none
   let mut clauses : Array (String × VerexIR.Proofs.ObligationRange) := #[]
   for condition in declaration.contract.conditions do
+    if isImplicitNoPanic condition then continue
     if let some kind := kindName condition.kind then
       clauses := clauses.push (kind, Contract.locRange ns condition.loc)
   for target in declaration.contract.modifies do
@@ -2204,6 +2570,9 @@ def clauseNames (unit : ValidatedUnit) (ns : ValidatedNamespace)
     let index := counts.getD kind 0 + 1
     counts := counts.insert kind index
     names := names.push (range, s!"{kind}_{index}")
+  if let some name := Contract.noFailureKey? declaration then
+    let range := Contract.noFailureRange ns declaration
+    if range.startByte < range.endByte then names := names.push (range, name)
   return names
 
 /-- A function's preconditions, each by its number among them in source
@@ -2279,7 +2648,11 @@ def bodySites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
     let some expression := ns.expressions[id.index]? | continue
     if expression.kind matches .spec _ then continue
     let range := Contract.locRange ns expression.loc
-    match kinds[loopSite namespaceIndex id.index]?, expression.origin with
+    -- A loop is one whatever its site also names: the throw after a loop of a
+    -- value type, which never completes, is at its site.
+    let kind := if expression.kind matches .loop .. then some "loop"
+      else kinds[loopSite namespaceIndex id.index]?
+    match kind, expression.origin with
     | some "if", some (.matchArm site variant last) =>
         arms := arms.push (Contract.locRange ns site, id.index, variant, last)
     | some "abort", some (.matchMismatch _) => pure ()
@@ -2300,8 +2673,16 @@ def bodySites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
   let mut counts : Std.HashMap String Nat := {}
   let mut sites := #[]
   let mut numbered : Array (VerexIR.Proofs.ObligationRange × Nat) := #[]
+  let mut checks : Array (VerexIR.Proofs.ObligationRange × Nat) := #[]
   for (kind, range, index) in ordered do
+    -- A `v[i]` is one operation: its element read is the site of its check.
+    if (kindOf ⟨index⟩).any (· matches .operation (.primitive .index) ..) then
+      if let some (_, number) := checks.find? (·.1 == range) then
+        sites := sites.push (loopSite namespaceIndex index, kind, number, "")
+        continue
     let number := counts.getD kind 0 + 1
+    if (kindOf ⟨index⟩).any (· matches .operation (.primitive (.checkVectorIndex _)) ..) then
+      checks := checks.push (range, number)
     counts := counts.insert kind number
     if kind == "match" then numbered := numbered.push (range, number)
     -- A lowered match has no site of its own, only its arms'.
@@ -2316,6 +2697,128 @@ def bodySites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
     if let some (_, _, number, _) := sites.find? (·.1 == loopSite namespaceIndex loopIndex) then
       sites := sites.push (loopSite namespaceIndex header, "loopHeader", number, "")
   return sites
+
+/-- The source a rendering is elaborated from: its unit, and a source file's
+name as it is reported and read. -/
+structure RenderedSource where
+  unit : ValidatedUnit
+  display : String → String
+
+private initialize renderedSourceExtension : EnvExtension (Option RenderedSource) ←
+  registerEnvExtension (pure none)
+
+/-- What is elaborated next is a rendering of this source. -/
+def setRenderedSource (environment : Environment) (source : RenderedSource) : Environment :=
+  renderedSourceExtension.setState environment (some source)
+
+/-- The namespace path a validated namespace is declared at, without a
+Move address alias, which a rendering does not spell. -/
+def pathKey (ns : ValidatedNamespace) : Option (String × String) := do
+  let segments ← ns.tables.namespaces[ns.unitIdentity.index]? |>.map (·.segments)
+  return (← segments[0]?, ← segments.back?)
+
+/-- What tells a site a path may fail at apart in a body, in terms both a source
+and its rendering spell: a throw, an operation by its kind, a call by its callee. -/
+private inductive FailureShape where
+  | throw
+  | primitive (kind : Nat)
+  | global
+  | call (callee : Option String)
+  | invoke
+  deriving BEq
+
+/-- An expression's shape, where it has one. -/
+private def failureShape? (unit : ValidatedUnit) (namespaceIndex : Nat)
+    (expression : VerexIR.Expr) : Option FailureShape :=
+  match expression.kind with
+  | .throw_ .. => some .throw
+  | .operation (.primitive kind) .. => some (.primitive kind.ctorIdx)
+  | .operation (.global _) .. => some .global
+  | .operation (.call (.function reference)) .. =>
+      some <| .call <| (VerexIR.SemanticOperations.resolveFunction? unit ⟨namespaceIndex⟩ reference).bind
+        fun handle => (unit.namespaces[handle.namespaceId.index]?).bind fun calleeNs =>
+          (calleeNs.functions[handle.functionId.index]?).bind fun declaration =>
+            (calleeNs.nameOf declaration.name).map SpecTypes.scopedSpelling
+  | .operation (.call _) .. => some .invoke
+  | _ => none
+
+/-- The expressions of a body `keep` takes, in the order the body runs them,
+whatever temporaries hold their operands. -/
+partial def expressionsInOrder (ns : ValidatedNamespace)
+    (keep : VerexIR.ExprId → VerexIR.Expr → Bool) (id : VerexIR.ExprId)
+    (found : Array VerexIR.Expr) : Array VerexIR.Expr := Id.run do
+  let some expression := ns.expressions[id.index]? | return found
+  if expression.kind matches .spec _ then return found
+  let mut found := found
+  for child in VerexIR.Validation.expressionChildren expression.kind do
+    found := expressionsInOrder ns keep child found
+  return if keep id expression then found.push expression else found
+
+/-- The range in the source of each site a failing path names in a function of
+its rendering, by the site's location there: the two bodies run the sites of
+each shape in the same order. Bodies that do not correspond have none. -/
+private def renderedSiteOrigins (source : RenderedSource) (unit : ValidatedUnit)
+    (ns : ValidatedNamespace) (namespaceIndex : Nat)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) (root : VerexIR.ExprId)
+    (kinds : Std.HashMap Nat String) :
+    Array (VerexIR.LocId × VerexIR.Proofs.ObligationRange × Bool) :=
+  Id.run do
+  let name := (ns.nameOf declaration.name).map SpecTypes.scopedSpelling
+  let some sourceIndex := source.unit.namespaces.findIdx? (pathKey · == pathKey ns) | return #[]
+  let original := source.unit.namespaces[sourceIndex]!
+  let some function := original.functions.find? fun candidate =>
+      (original.nameOf candidate.name).map SpecTypes.scopedSpelling == name
+    | return #[]
+  let .structured sourceRoot := function.body | return #[]
+  let fails (id : VerexIR.ExprId) (expression : VerexIR.Expr) : Bool :=
+    (failureShape? unit namespaceIndex expression).isSome &&
+      (expression.kind matches .operation (.call _) .. ||
+        (kinds[loopSite namespaceIndex id.index]?).any fun kind =>
+          kind == "abort" || kind == "op" || kind == "invoke")
+  let rendered := expressionsInOrder ns fails root #[]
+  let shapes := rendered.filterMap (failureShape? unit namespaceIndex)
+  let sites := expressionsInOrder original (fun _ expression =>
+    (failureShape? source.unit sourceIndex expression).any shapes.contains) sourceRoot #[]
+  unless shapes == sites.filterMap (failureShape? source.unit sourceIndex) do return #[]
+  return rendered.zipWith (fun expression site =>
+    let (range, expanded) := Contract.siteRange original site.loc
+    (expression.loc, { range with file := source.display range.file }, expanded)) sites
+
+/-- The sites a failing path names, by the selector's words (`aborts at op 1`),
+each at its source range: in the source a rendering renders where this
+elaborates one, else its own; and whether a macro of another crate raised it. -/
+def failureSites (environment : Environment) (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (namespaceIndex : Nat) (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
+    (root : VerexIR.ExprId) (kinds : Std.HashMap Nat String)
+    (sites : Array (Nat × String × Nat × String)) (calls : Array (Nat × String × Nat × Nat)) :
+    Array (String × VerexIR.Proofs.ObligationRange × Bool) := Id.run do
+  let origins := match renderedSourceExtension.getState environment with
+    | some source => renderedSiteOrigins source unit ns namespaceIndex declaration root kinds
+    | none => #[]
+  let mut locations : Std.HashMap Nat VerexIR.LocId := {}
+  let mut pending := #[root]
+  let mut visited : Std.HashSet Nat := {}
+  while let some id := pending.back? do
+    pending := pending.pop
+    if visited.contains id.index then continue
+    visited := visited.insert id.index
+    let some expression := ns.expressions[id.index]? | continue
+    if expression.kind matches .spec _ then continue
+    locations := locations.insert (loopSite namespaceIndex id.index) expression.loc
+    pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
+  let located (site : Nat) (decision : VerexIR.Proofs.Denote.AbortSite) :=
+    (locations[site]?).map fun loc =>
+      let origin := (origins.find? (·.1 == loc)).map (·.2)
+      ((VerexIR.Proofs.Denote.Decision.aborts decision).text,
+        origin.getD (Contract.siteRange ns loc))
+  let bodyFailures := sites.filterMap fun (site, kind, number, _) =>
+    match kind with
+    | "abort" => located site (.abort number)
+    | "op" => located site (.op number)
+    | "invoke" => located site (.invoke number)
+    | _ => none
+  return bodyFailures ++ calls.filterMap fun (site, callee, number, overall) =>
+    located site (.call number callee overall)
 
 /-- The types a clause reads the locals of a function at: a reference local
 at its referent. -/
@@ -2460,6 +2963,19 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
                     #[mkAppN (mkConst ``Prod.snd [.zero, .zero]) #[plain, carrier], slot]
                 frame := frame.push
                   (← mkEq (← prophecyOf slots[index]!) (← prophecyOf entrySlots[index]!))
+            -- What an aggregate holds keeps its prophecies alike.
+            | some (_, true), τ =>
+                unless τ.refFree do
+                  -- At the plain layer: a certified aggregate's view keeps the
+                  -- references it holds as they are (`NTy.viewed`).
+                  let type ← quoteNTy τ
+                  let view ← withLocalDeclD `held (Contract.carrierType carriers type) fun held =>
+                    mkLambdaFVars #[held] (mkApp4 (mkConst ``NTy.plainViewed) carriers (toExpr true)
+                      type (mkApp3 (mkConst ``NTy.forget) carriers type held))
+                  let prophecyOf (slot : Lean.Expr) : MetaM Lean.Expr := do
+                    mkAppM ``Option.map #[view, slot]
+                  frame := frame.push
+                    (← mkEq (← prophecyOf slots[index]!) (← prophecyOf entrySlots[index]!))
             | _, _ => pure ()
         -- A local the body modifies whose type declares a data invariant the
         -- carriers do not hold keeps it across the iterations, as a clause
@@ -2493,6 +3009,8 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
                   | .ref referent => !referent.certificateFree
                   | _ => false)) then
             match row[slot]? with
+            | some (.sliceRef element) =>
+                if restated (.vector element) then some (slot, .vector element) else none
             | some (.ref referent) =>
                 -- The current of a loan straddling the loop is the one value
                 -- whose type does not carry its invariant while lent: the
@@ -2538,14 +3056,14 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
             else withEntry (binders.push none)
           else
             let mut locals : Array (Option Lean.Expr) := #[]
-            for (τ, binder) in row.toArray.zip binders do
+            for ((τ, binder), index) in (row.toArray.zip binders).zipIdx do
               locals := locals.push (← match binder with
-                | some binder => logicalValue τ binder
+                | some binder => logicalLocal unit namespaceId ns declaration index τ binder
                 | none => pure none)
             let mut entryLocals : Array (Option Lean.Expr) := #[]
-            for (τ, binder) in row.toArray.zip entryBinders do
+            for ((τ, binder), index) in (row.toArray.zip entryBinders).zipIdx do
               entryLocals := entryLocals.push (← match binder with
-                | some binder => logicalValue τ binder
+                | some binder => logicalLocal unit namespaceId ns declaration index τ binder
                 | none => pure none)
             -- A parameter read under `old` is its argument at the function's
             -- start; a local has no such value and is read at the loop's
@@ -2554,12 +3072,36 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
             for index in [0:row.length] do
               if oldReferenced.contains index then
                 match parameterTypes[index]? with
-                | some τ => oldLocals := oldLocals.push (← logicalValue τ startSlots[index]!)
+                | some τ =>
+                    let read ← logicalLocal unit namespaceId ns declaration index τ
+                      startSlots[index]!
+                    oldLocals := oldLocals.push read
                 | none => oldLocals := oldLocals.push entryLocals[index]!
               else oldLocals := oldLocals.push none
+            let readsFinal := block.conditions.any fun condition =>
+              condition.kind == .loopInvariant && Contract.mentionsFinal ns condition.expression
+            let mut finalLocals : Array (Option Lean.Expr) := #[]
+            let mut oldFinalLocals : Array (Option Lean.Expr) := #[]
+            if readsFinal then
+              for (index, τ, binder, entryBinder) in (List.range row.length).zip (row.zip
+                  (binders.toList.zip entryBinders.toList)) do
+                let viewed := (declaration.locals[index]?).any fun localDecl =>
+                  ns.tables.types[(ns.typeId localDecl.type.typeId).index]? matches
+                    some (.reference { kind := .shared, .. })
+                finalLocals := finalLocals.push (← match binder with
+                  | some binder => if viewed then pure none else logicalFinal τ binder
+                  | none => pure none)
+                oldFinalLocals := oldFinalLocals.push (← if oldReferenced.contains index then
+                    match parameterTypes[index]? with
+                    | some τ => logicalFinal τ startSlots[index]!
+                    | none => match entryBinder with
+                      | some entryBinder => logicalFinal τ entryBinder
+                      | none => pure none
+                  else pure none)
             translateLoopInvariants unit namespaceId ns block locals localTypes types
               (declaration.locals.map (·.name)) oldLocals startState
               dataInvariantSlots entryLocals (some initial) (some state) executable
+              (finalLocals := finalLocals) (oldFinalLocals := oldFinalLocals)
               (interpretation := interpretation)
         let authored ← authoredOver 0 #[] #[]
         -- The store the body leaves alone keeps its entry value; one it
@@ -2631,7 +3173,8 @@ private def anchorSite? (namespaceId : NamespaceId) (ns : ValidatedNamespace)
 /-- Assert the slots `referenced` of a row defined, each value bound under
 its local's name with `suffix`, and continue with the clause-level values
 of the bound slots. -/
-private def overDefined (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
+private def overDefined (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (ns : ValidatedNamespace) (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (row : List NTy) (slots : Array Lean.Expr) (referenced : Array Nat) (suffix : String)
     (k : Array (Option Lean.Expr) → TermElabM Lean.Expr) : TermElabM Lean.Expr :=
   let rec go (index : Nat) (values : Array (Option Lean.Expr)) : TermElabM Lean.Expr := do
@@ -2642,7 +3185,8 @@ private def overDefined (declaration : VerexIR.FunctionDecl VerexIR.Validation.F
           | none => Name.mkSimple s!"slot{index}{suffix}"
         let carrier ← mkAppM ``NTy.carrier #[← quoteNTy row[index]]
         withLocalDeclD name carrier fun binder => do
-          let inner ← go (index + 1) (values.push (← logicalValue row[index] binder))
+          let inner ← go (index + 1)
+            (values.push (← logicalLocal unit namespaceId ns declaration index row[index] binder))
           mkAppM ``Option.elim #[slots[index]!, mkConst ``False, ← mkLambdaFVars #[binder] inner]
       else go (index + 1) (values.push none)
     else k values
@@ -2708,7 +3252,8 @@ def assertionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId 
                 let oldLocals ← (Array.range row.length).mapM fun index =>
                   match parameterTypes[index]? with
                   | some τ => if oldReferenced.contains index then
-                      logicalValue τ startSlots[index]! else pure none
+                      logicalLocal unit namespaceId ns declaration index τ startSlots[index]!
+                    else pure none
                   | none => pure none
                 let rec overAnchors (index : Nat)
                     (labeled : Array (Nat × Array (Option Lean.Expr) × Lean.Expr)) :
@@ -2716,12 +3261,12 @@ def assertionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId 
                   if h : index < anchors.size then
                     let (label, _) := anchors[index]
                     let anchor := bound[index]!
-                    overDefined declaration row (← slotProjections (first anchor) row.length)
+                    overDefined unit namespaceId ns declaration row (← slotProjections (first anchor) row.length)
                       (oldLocalsAt ns asserted.expression (some label)) s!"_at{label}"
                       fun anchorLocals =>
                         overAnchors (index + 1) (labeled.push (label, anchorLocals, second anchor))
                   else
-                    overDefined declaration row (← slotProjections env row.length)
+                    overDefined unit namespaceId ns declaration row (← slotProjections env row.length)
                       (currentLocals ns asserted.expression) "" fun locals =>
                         translateLoopInvariants unit namespaceId ns
                           { block with conditions := #[asserted] } locals localTypes
@@ -2761,7 +3306,7 @@ def preconditionCondition (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceI
       let startSlots ← slotProjections start parameterTypes.length
       let locals ← (Array.range declaration.locals.size).mapM fun index =>
         match parameterTypes[index]? with
-        | some τ => logicalValue τ startSlots[index]!
+        | some τ => logicalLocal unit namespaceId ns declaration index τ startSlots[index]!
         | none => pure none
       mkLambdaFVars #[start, startState] (← Contract.startPrecondition unit namespaceId ns
         declaration locals localTypes types startState executable)
@@ -2833,9 +3378,10 @@ def assumptionTable (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Na
             let oldLocals ← (Array.range rowTypes.length).mapM fun index =>
               match parameterTypes[index]? with
               | some τ => if oldReferenced.contains index then
-                  logicalValue τ startSlots[index]! else pure none
+                  logicalLocal unit namespaceId ns declaration index τ startSlots[index]!
+                  else pure none
               | none => pure none
-            overDefined declaration rowTypes (← slotProjections env rowTypes.length)
+            overDefined unit namespaceId ns declaration rowTypes (← slotProjections env rowTypes.length)
               (currentLocals ns assumed.expression) "" fun locals =>
                 translateLoopInvariants unit namespaceId ns { block with conditions := #[assumed] }
                   locals localTypes types (declaration.locals.map (·.name)) oldLocals
@@ -2867,7 +3413,8 @@ def bodyExpressionIds (ns : ValidatedNamespace) (root : VerexIR.ExprId) :
 /-- An optional value of `resultType` over a row of locals, each local it
 reads bound to its value: none where one is undefined (`overDefined`, for a
 value). -/
-private def valueOverDefined (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
+private def valueOverDefined (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (ns : ValidatedNamespace) (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (row : List NTy) (slots : Array Lean.Expr) (referenced : Array Nat) (resultType : Lean.Expr)
     (k : Array (Option Lean.Expr) → TermElabM Lean.Expr) : TermElabM Lean.Expr :=
   let rec go (index : Nat) (values : Array (Option Lean.Expr)) : TermElabM Lean.Expr := do
@@ -2878,7 +3425,8 @@ private def valueOverDefined (declaration : VerexIR.FunctionDecl VerexIR.Validat
           | none => Name.mkSimple s!"slot{index}"
         let carrier ← mkAppM ``NTy.carrier #[← quoteNTy row[index]]
         withLocalDeclD name carrier fun binder => do
-          let inner ← go (index + 1) (values.push (← logicalValue row[index] binder))
+          let inner ← go (index + 1)
+            (values.push (← logicalLocal unit namespaceId ns declaration index row[index] binder))
           mkAppOptM ``Option.bind #[some carrier, some resultType, some slots[index]!,
             some (← mkLambdaFVars #[binder] inner)]
       else go (index + 1) (values.push none)
@@ -2963,7 +3511,7 @@ def ghostTables (unit : ValidatedUnit) (outer : Lean.Expr)
               let carrier ← mkAppM ``NTy.carrier #[τE]
               let value ← withLocalDeclD `env (← mkAppM ``HEnv #[← quoteRow row]) fun env =>
                 withLocalDeclD `state stateType fun state => do
-                  let body ← valueOverDefined declaration rowTypes
+                  let body ← valueOverDefined unit owner.namespaceId ns declaration rowTypes
                     (← slotProjections env rowTypes.length) (currentLocals ns condition.expression)
                     carrier fun locals => do
                       let written ← Contract.translateUpdateValue unit owner.namespaceId ns
@@ -3062,7 +3610,8 @@ def mutationConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Func
       if carries lender then
         sites := sites.push (loopSite namespaceId.index fact.expression.index, lender.index)
     else if view.writesGlobal fact then
-      if let some holder := fact.holders.find? carriesReferent then
+      -- The holders live on each death (`LoanDeath.holders`).
+      if let some holder := (fact.deaths.flatMap (·.holders)).find? carriesReferent then
         sites := sites.push (loopSite namespaceId.index fact.expression.index, holder.index)
   for id in bodyExpressionIds ns root do
     if let some { kind := .assign place _, .. } := ns.expressions[id.index]? then
@@ -3086,10 +3635,10 @@ def mutationConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Func
       withLocalDeclD `startState stateType fun startState =>
       withLocalDeclD `env envType fun env =>
       withLocalDeclD `state stateType fun state => do
-        let owed ← overDefined declaration row (← slotProjections env row.length) #[slot] ""
+        let owed ← overDefined unit namespaceId ns declaration row (← slotProjections env row.length) #[slot] ""
           fun locals => translateLoopInvariants unit namespaceId ns block locals localTypes
             types (declaration.locals.map (·.name)) #[] startState
-            ((row[slot]?.map fun | .ref referent => (slot, referent) | τ => (slot, τ)).toArray)
+            ((row[slot]?.map fun | .ref referent => (slot, referent) | .sliceRef element => (slot, .vector element) | τ => (slot, τ)).toArray)
             (state := some state) (executable := executable) (kind := .assertion)
         mkLambdaFVars #[start, startState, env, state] owed
     conditions := conditions.push (site, condition, readsUnit)

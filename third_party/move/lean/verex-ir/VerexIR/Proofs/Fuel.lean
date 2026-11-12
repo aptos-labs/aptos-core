@@ -86,6 +86,12 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                   by_cases arity_ne : arguments.size != declaration.signature.parameters.size
                   · simp [arity_ne, failAt] at h
                   · simp only [arity_ne] at h ⊢
+                    have scoped_eq : scopedArguments unit declaration arguments = true := by
+                      cases checked : scopedArguments unit declaration arguments with
+                      | true => rfl
+                      | false => simp [checked, failAt] at h
+                    simp only [scoped_eq, Bool.not_true, Bool.false_eq_true, ↓reduceIte,
+                      pure, Except.pure, bind, Except.bind] at h ⊢
                     cases provided_eq : BigStep.runtimeProvided unit handle declaration with
                     | true =>
                         simp only [provided_eq, ↓reduceIte] at h ⊢
@@ -504,7 +510,7 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                               rw [previous.values _ _ _ _ _ _ operands_eq]
                               simp only [operands_eq] at h
                               exact h
-                      | read place =>
+                      | read place | readDiscriminant place =>
                           dsimp only at h ⊢
                           cases operands_eq : Internal.evalValues fuel executable
                               namespaceId frame state arguments.toList with

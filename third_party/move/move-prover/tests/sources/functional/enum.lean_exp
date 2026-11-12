@@ -9,12 +9,139 @@ tests/sources/functional/enum.move:21:5: error: verex verification failed: the a
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/enum.move:17:9: error: the data invariant `invariant this.x > 20` does not hold where a mutation ends
 tests/sources/functional/enum.move:18:9: error: the data invariant `invariant this is Bar ==> this.z > 10` does not hold where a mutation ends
+tests/sources/functional/enum.move:31:5: error: verification failed with a residual obligation:
+case continues.continues.some.continues.continues.none
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+invariantHolds✝³ left✝³ :
+  dataOwn.case0 ⟨VerexIR.Proofs.Denote.NRow.nil, ⋯⟩
+    (Sum.inr (Sum.inl ({ val := 30, fits := ⋯ }, { val := 40, fits := ⋯ }, { val := 50, fits := ⋯ }, ())))
+left✝² :
+  (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds
+    ({ val := 30, fits := ⋯ }, { val := 40, fits := ⋯ }, { val := 50, fits := ⋯ }, ()).fst
+left✝¹ :
+  (VerexIR.Proofs.Denote.NTy.int 8 false).deepHolds
+    ({ val := 30, fits := ⋯ }, { val := 40, fits := ⋯ }, { val := 50, fits := ⋯ }, ()).snd.fst
+left✝ :
+  (VerexIR.Proofs.Denote.NTy.int 32 false).deepHolds
+    ({ val := 30, fits := ⋯ }, { val := 40, fits := ⋯ }, { val := 50, fits := ⋯ }, ()).snd.snd.fst
+right✝ :
+  VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil
+    ({ val := 30, fits := ⋯ }, { val := 40, fits := ⋯ }, { val := 50, fits := ⋯ }, ()).snd.snd.snd
+invariantHolds✝² : True
+verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons 0x815.m.unit.nominal.namespace.0.declaration✝¹⁻⁰
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).ref
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false).ref
+            VerexIR.Proofs.Denote.NRow.nil))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_9
+verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons 0x815.m.unit.nominal.namespace.0.declaration✝¹⁻⁰
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).ref
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false).ref
+            VerexIR.Proofs.Denote.NRow.nil))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_10
+value.tail.1 : 0x815.m.unit.nominal.namespace.0.declaration✝¹⁻⁰.carrier
+w✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).plain
+h✝ :
+  (match VerexIR.Proofs.Denote.Which.here.project? value.tail.1.val with
+    | some fields => some fields.fst
+    | none =>
+      Option.map VerexIR.Proofs.Denote.Var.here.selectPlain
+        (VerexIR.Proofs.Denote.Which.here.there.project? value.tail.1.val)) =
+    some w✝
+heq_2 :
+  (match VerexIR.Proofs.Denote.Which.here.project? value.tail.1.val with
+    | some fields => some (Sum.inl ({ val := 30, fits := ⋯ }, fields.snd))
+    | none =>
+      Option.map (fun fields => Sum.inr (Sum.inl ({ val := 30, fits := ⋯ }, fields.snd)))
+        (VerexIR.Proofs.Denote.Which.here.there.project? value.tail.1.val)) =
+    some value.tail.1.val
+invariantHolds✝¹ : dataOwn.case0 ⟨VerexIR.Proofs.Denote.NRow.nil, ⋯⟩ value.tail.1.val
+a✝ :
+  some (Sum.inr (Sum.inl ({ val := 30, fits := ⋯ }, { val := 40, fits := ⋯ }, { val := 50, fits := ⋯ }, ()))) =
+    some value.tail.1.val
+invariantHolds✝ : True
+verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons 0x815.m.unit.nominal.namespace.0.declaration✝¹⁻⁰
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).ref
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false).ref
+            VerexIR.Proofs.Denote.NRow.nil))))
+    (VerexIR.Proofs.Denote.NTy.int 8 false).ref.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun flow state =>
+    match flow with
+    | VerexIR.Proofs.Denote.Flow.value value env =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Flow.bind
+          (VerexIR.Proofs.Denote.letAt VerexIR.Proofs.Denote.Var.here.there.there value
+            (VerexIR.Proofs.Denote.Term.denoteIn (VerexIR.Proofs.Denote.closedMeanings executable✝ #[]).interpreterOps
+              (((VerexIR.Proofs.Denote.Term.resolve 1127 VerexIR.Proofs.Denote.Var.here.there.there
+                        (VerexIR.Proofs.Denote.Lender.place VerexIR.Proofs.Denote.Var.here
+                          (VerexIR.Proofs.Denote.Proj.variant
+                            (VerexIR.Proofs.Denote.Choices.cons VerexIR.Proofs.Denote.Which.here
+                              VerexIR.Proofs.Denote.Var.here.there
+                              (VerexIR.Proofs.Denote.Choices.cons VerexIR.Proofs.Denote.Which.here.there
+                                VerexIR.Proofs.Denote.Var.here.there VerexIR.Proofs.Denote.Choices.nil))
+                            VerexIR.Proofs.Denote.Proj.nil))).drop
+                    ((VerexIR.Proofs.Denote.Term.mutationEnd 1127).drop
+                      (VerexIR.Proofs.Denote.Term.lit () _proof_4))).drop
+                (VerexIR.Proofs.Denote.Term.let_ VerexIR.Proofs.Denote.Var.here.there.there.there
+                  (VerexIR.Proofs.Denote.Term.borrowPlace (some (VerexIR.ThrowKind.abort, #[14566554180833181697]))
+                    VerexIR.Proofs.Denote.Var.here
+                    (VerexIR.Proofs.Denote.Proj.variant
+                      (VerexIR.Proofs.Denote.Choices.cons VerexIR.Proofs.Denote.Which.here.there
+                        VerexIR.Proofs.Denote.Var.here.there.there VerexIR.Proofs.Denote.Choices.nil)
+                      VerexIR.Proofs.Denote.Proj.nil))
+                  ((VerexIR.Proofs.Denote.Term.mutate VerexIR.Proofs.Denote.Var.here.there.there.there
+                        (VerexIR.Proofs.Denote.Term.lit { val := 9, fits := ⋯ } _proof_3)).drop
+                    (VerexIR.Proofs.Denote.Term.lit () _proof_4))))
+              (VerexIR.Proofs.Denote.Var.here.there.there.set value env)))
+          fun v env =>
+          VerexIR.Proofs.Denote.Flow.bind
+            (VerexIR.Proofs.Denote.Term.denoteIn (VerexIR.Proofs.Denote.closedMeanings executable✝ #[]).interpreterOps
+              ((VerexIR.Proofs.Denote.Term.resolve 1175 VerexIR.Proofs.Denote.Var.here.there.there.there
+                    (VerexIR.Proofs.Denote.Lender.place VerexIR.Proofs.Denote.Var.here
+                      (VerexIR.Proofs.Denote.Proj.variant
+                        (VerexIR.Proofs.Denote.Choices.cons VerexIR.Proofs.Denote.Which.here.there
+                          VerexIR.Proofs.Denote.Var.here.there.there VerexIR.Proofs.Denote.Choices.nil)
+                        VerexIR.Proofs.Denote.Proj.nil))).drop
+                ((VerexIR.Proofs.Denote.Term.mutationEnd 1175).drop (VerexIR.Proofs.Denote.Term.lit () _proof_4)))
+              env)
+            fun x env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value v env))
+        verexContinuation✝¹ (fun failure => True) state
+    | VerexIR.Proofs.Denote.Flow.return_ result env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.return_ result env) state
+    | VerexIR.Proofs.Denote.Flow.break_ nest env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.break_ nest env) state
+    | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
+heq :
+  (match VerexIR.Proofs.Denote.Which.here.project? value.tail.1.val with
+    | some fields => some fields.snd.fst
+    | none =>
+      Option.map VerexIR.Proofs.Denote.Var.here.there.selectPlain
+        (VerexIR.Proofs.Denote.Which.here.there.project? value.tail.1.val)) =
+    none
+⊢ False
 tests/sources/functional/enum.move:31:5: error: verex verification failed: the automatic verification of `test_data_invariant` failed; provide a proof in `tests/sources/functional/enum.proof.lean`:
   verify test_data_invariant by lean =>
     verex_obligations
     verex_on
     | data_invariant_1 => verex_prepare; sorry
     | data_invariant_2 => verex_prepare; sorry
+    | leaf => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/enum.move:76:13: error: the assertion `_common_vector_1.x != _common_vector_2.x` does not hold

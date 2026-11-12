@@ -38,12 +38,12 @@ theorem readRuntimePlace?_within (shifted : StateRenamed ρ offset frontier insi
   exact base.within original
 
 theorem borrowRuntimePlaceAt?_mirror (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
-    {lexical : Nat} {referenceType : ReferenceType} {kind : BorrowKind} {frame frame' : RuntimeFrame}
+    {lexical : Nat} {referenceType : ReferenceType} {referentType : Ty} {kind : BorrowKind} {frame frame' : RuntimeFrame}
     (frame_within : frame.Within inside) {state' : RuntimeState} {place : RuntimePlace}
     {value : RuntimeValue}
-    (borrow : borrowRuntimePlaceAt? lexical referenceType kind frame state place =
+    (borrow : borrowRuntimePlaceAt? lexical referenceType referentType kind frame state place =
       some (frame', state', value)) :
-    ∃ state₂', borrowRuntimePlaceAt? lexical referenceType kind (frame.rename ρ) state₂ place =
+    ∃ state₂', borrowRuntimePlaceAt? lexical referenceType referentType kind (frame.rename ρ) state₂ place =
         some (frame'.rename ρ, state₂', value.rename ρ) ∧
       StateRenamed ρ offset frontier inside inert inert' state' state₂' ∧ frame'.Within inside ∧
       value.Within inside := by
@@ -57,10 +57,10 @@ theorem borrowRuntimePlaceAt?_mirror (shifted : StateRenamed ρ offset frontier 
       · cases borrow
       rw [if_neg ‹_›, read_rename]
       obtain ⟨read, read_eq, borrow⟩ := Option.bind_eq_some_iff.mp borrow
-      simp only [Option.some.injEq, Prod.mk.injEq] at borrow
-      obtain ⟨rfl, rfl, rfl⟩ := borrow
-      exact ⟨state₂, by rw [read_eq]; rfl, shifted, frame_within,
-        readRuntimePlace?_within shifted frame_within read_eq⟩
+      obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some borrow
+      refine ⟨state₂, ?_, shifted, frame_within, RuntimeValue.observe_within _ _⟩
+      rw [read_eq]
+      simp [RuntimeValue.view?_rename, RuntimeValue.view?_of_holeless holeless, RuntimeValue.rename_observe]
   | mutable =>
       simp only [Option.bind_eq_bind, Option.bind_some] at borrow ⊢
       split at borrow
@@ -68,6 +68,13 @@ theorem borrowRuntimePlaceAt?_mirror (shifted : StateRenamed ρ offset frontier 
       rw [if_neg ‹_›, read_rename]
       obtain ⟨read, read_eq, borrow⟩ := Option.bind_eq_some_iff.mp borrow
       rw [read_eq, Option.map_some, Option.bind_some]
+      have shapeRename : borrowStorageShape referentType (read.rename ρ) =
+          borrowStorageShape referentType read := by
+        cases referentType <;> cases read <;> simp [borrowStorageShape]
+      rw [shapeRename]
+      split at borrow
+      · cases borrow
+      rw [if_neg ‹_›]
       obtain ⟨⟨writtenFrame, writtenState⟩, write_eq, borrow⟩ := Option.bind_eq_some_iff.mp borrow
       have minted : StateRenamed ρ offset frontier inside inert inert'
           { state with nextLoan := state.nextLoan + 1 }
@@ -414,6 +421,35 @@ theorem evaluatePlaceOperation?_mirror
       obtain ⟨rfl, rfl, rfl⟩ := evaluate
       exact ⟨state₂, by simp [resolved_eq, read, current_eq], shifted, frame_within,
         readRuntimePlace?_within shifted frame_within current_eq⟩
+  | readDiscriminant place =>
+      simp only [evaluatePlaceOperation?, Array.isEmpty_map, Option.bind_eq_bind] at evaluate ⊢
+      split at evaluate
+      · cases evaluate
+      rw [if_neg ‹_›, resolve]
+      obtain ⟨resolved, resolved_eq, evaluate⟩ := Option.bind_eq_some_iff.mp evaluate
+      obtain ⟨current, current_eq, evaluate⟩ := Option.bind_eq_some_iff.mp evaluate
+      cases current <;> try cases evaluate
+      rename_i source variant fields
+      cases variant <;> try cases evaluate
+      rename_i variant
+      simp only at evaluate
+      obtain ⟨tag, tag_eq, evaluate⟩ := Option.bind_eq_some_iff.mp evaluate
+      obtain ⟨resultNode, node_eq, evaluate⟩ := Option.bind_eq_some_iff.mp evaluate
+      obtain ⟨integerType, integer_eq, evaluate⟩ := Option.bind_eq_some_iff.mp evaluate
+      cases checked_eq : checkedInteger .abort integerType tag with
+      | error failure => simp [checked_eq] at evaluate
+      | ok result =>
+          simp only [checked_eq, Option.some.injEq, Prod.mk.injEq] at evaluate
+          obtain ⟨rfl, rfl, rfl⟩ := evaluate
+          have result_eq : result = .integer tag := by
+            unfold checkedInteger at checked_eq
+            split at checked_eq
+            · split at checked_eq <;> simp_all
+            · cases checked_eq
+          subst result
+          exact ⟨state₂, by
+            simp [resolved_eq, read, current_eq, tag_eq, node_eq, integer_eq, checked_eq],
+            shifted, frame_within, by simp⟩
   | move place =>
       simp only [evaluatePlaceOperation?, Array.isEmpty_map, Option.bind_eq_bind] at evaluate ⊢
       split at evaluate
@@ -431,10 +467,20 @@ theorem evaluatePlaceOperation?_mirror
             rw [if_pos ‹_›]
             exact ⟨state₂, by simp [RuntimeFrame.rename, Array.map_setIfInBounds], shifted,
               frame_within.clearLocal _, current_within⟩
-          · simp only [Option.some.injEq, Prod.mk.injEq] at evaluate
-            obtain ⟨rfl, rfl, rfl⟩ := evaluate
-            rw [if_neg ‹_›]
-            exact ⟨state₂, rfl, shifted, frame_within, current_within⟩
+          · rw [if_neg ‹_›]
+            cases current with
+            | borrow loan held =>
+                simp only [Option.some.injEq, Prod.mk.injEq] at evaluate
+                obtain ⟨rfl, rfl, rfl⟩ := evaluate
+                obtain ⟨loan_within, -⟩ := (RuntimeValue.within_borrow _ _ _).mp current_within
+                obtain ⟨cleared₂, clear_eq, clearShifted, clearAbove⟩ :=
+                  clearBorrowValue_rename shifted frame_within loan_within
+                simp only [RuntimeValue.rename_borrow, clear_eq]
+                exact ⟨cleared₂, rfl, clearShifted, clearAbove, current_within⟩
+            | _ =>
+                simp only [Option.some.injEq, Prod.mk.injEq] at evaluate
+                obtain ⟨rfl, rfl, rfl⟩ := evaluate
+                exact ⟨state₂, by simp, shifted, frame_within, current_within⟩
       · cases evaluate
   | drop place =>
       simp only [evaluatePlaceOperation?, Array.isEmpty_map, Option.bind_eq_bind] at evaluate ⊢
@@ -499,9 +545,9 @@ theorem evaluatePlaceOperation?_mirror
               · have operand_within := arguments_within operand (by simp)
                 simp only [List.map_toArray, List.map_cons, List.map_nil]
                 rw [evaluatePlaceOperation?_sharedBorrow] at evaluate ⊢
-                simp only [Option.some.injEq, Prod.mk.injEq] at evaluate
-                obtain ⟨rfl, rfl, rfl⟩ := evaluate
-                exact ⟨state₂, rfl, shifted, frame_within, operand_within⟩
+                obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some evaluate
+                exact ⟨state₂, by simp [RuntimeValue.view?_rename, RuntimeValue.view?_of_holeless holeless, RuntimeValue.rename_observe], shifted,
+                  frame_within, RuntimeValue.observe_within _ _⟩
               · cases evaluate
           | mutable => cases evaluate
           | profile _ => cases evaluate
@@ -566,11 +612,10 @@ theorem evaluatePlaceOperation?_mirror
                       simp only [RuntimeValue.rename_borrow] at evaluate ⊢
                       split at evaluate
                       · cases evaluate
-                      · simp only [Option.some.injEq, Prod.mk.injEq] at evaluate
-                        obtain ⟨rfl, rfl, rfl⟩ := evaluate
+                      · obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some evaluate
                         rw [if_neg ‹_›]
-                        simp only [RuntimeValue.within_borrow] at operand_within
-                        exact ⟨state₂, rfl, shifted, frame_within, operand_within.2⟩
+                        exact ⟨state₂, by simp [RuntimeValue.view?_rename, RuntimeValue.view?_of_holeless holeless, RuntimeValue.rename_observe],
+                          shifted, frame_within, RuntimeValue.observe_within _ _⟩
                   | _ => cases evaluate
               | _ => cases evaluate
           · unfold evaluatePlaceOperation? at evaluate

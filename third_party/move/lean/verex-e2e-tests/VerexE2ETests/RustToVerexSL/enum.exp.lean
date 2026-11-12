@@ -11,6 +11,6 @@ verex namespace «enum» where
   fun first(value : u32) -> Choice := new Choice::First { 0 := value }
 
   fun select(value : Choice) -> u32 :=
-    match discriminant[Choice, isize](value) with
+    match core.readDiscriminant[isize](value) with
       | 4 => value.0
       | 9 => value.0

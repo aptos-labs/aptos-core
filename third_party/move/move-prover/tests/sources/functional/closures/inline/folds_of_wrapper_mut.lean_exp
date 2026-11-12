@@ -19,7 +19,12 @@ tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:64:5: error: 
             && _wp_m1 == 2` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:74:9: error: the specification clause `ensures ∀ (i in 0 .. a.length), a[i].value == 1` is not established
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:75:9: error: the specification clause `ensures ∀ (i in 0 .. b.length), b[i].value == 2` is not established
-tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:72:5: error: verex verification failed: the automatic verification of `set_both` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_wrapper_mut.proof.lean`:
+tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:72:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (1000000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:72:5: error: verex verification failed: the automatic verification of `set_both` exceeded its budget of 1000000 maxHeartbeats after deciding 2002 leaves (stage interrupted); provide a proof in `tests/sources/functional/closures/inline/folds_of_wrapper_mut.proof.lean`:
   verify set_both by lean =>
     verex_obligations
     verex_on

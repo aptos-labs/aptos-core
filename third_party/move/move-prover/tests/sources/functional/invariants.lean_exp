@@ -15,6 +15,14 @@ tests/sources/functional/invariants.move:112:5: error: verex verification failed
     | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/invariants.move:15:9: error: the data invariant `invariant greater_one(this.x)` does not hold where a mutation ends
+tests/sources/functional/invariants.move:125:5: error: verex verification failed: the automatic verification of `lifetime_invalid_R_2` failed; provide a proof in `tests/sources/functional/invariants.proof.lean`:
+  verify lifetime_invalid_R_2 by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/invariants.move:150:9: error: the data invariant `invariant y > 1` does not hold where a mutation ends
 tests/sources/functional/invariants.move:153:5: error: verex verification failed: the automatic verification of `lifetime_invalid_S_branching` failed; provide a proof in `tests/sources/functional/invariants.proof.lean`:
   verify lifetime_invalid_S_branching by lean =>

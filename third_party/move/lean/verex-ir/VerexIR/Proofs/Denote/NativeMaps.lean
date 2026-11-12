@@ -271,7 +271,8 @@ omit [Carriers] in
     @NTy.unread (Carriers.instantiate θ Θ) (CarriersNonempty.instantiate θ Θ) (.param index)
         inhabitable =
       @NTy.unread Θ Ξ ((NTy.param index).subst θ.1)
-        (NRow.getD_inhabitable θ.1 θ.inhabitable index (.param index) rfl) := rfl
+        ((NTy.inhabitable_unmark _).trans
+          (NRow.getD_inhabitable θ.1 θ.inhabitable index (.param index) rfl)) := rfl
 /-! The native equality of tables of scalar keys and values: the equality of
 their typed maps. -/
 
@@ -286,9 +287,11 @@ theorem NTy.equal_scalar (handles : Bool) : (τ : NTy) → τ.isScalar = true �
   | .signer, _, _, _ => by simp [NTy.equal, NTy.read]
   | .string, _, _, _ => by simp [NTy.equal, NTy.read]
   | .bytes, _, _, _ => by simp [NTy.equal, NTy.read]
+  | .char, _, _, _ => by simp [NTy.equal, NTy.read]
   | .tuple _, scalar, _, _ | .struct _ _ _, scalar, _, _ | .enum _ _ _ _ _, scalar, _, _
-  | .vector _, scalar, _, _ | .table _ _, scalar, _, _ | .ghost _, scalar, _, _
-  | .ref _, scalar, _, _ | .param _, scalar, _, _ | .function _ _ _, scalar, _, _ => by
+  | .vector _, scalar, _, _ | .slice _, scalar, _, _ | .array _ _, scalar, _, _ | .table _ _, scalar, _, _ | .ghost _, scalar, _, _
+  | .ref _, scalar, _, _ | .sliceRef _, scalar, _, _ | .param _, scalar, _, _ | .function _ _ _, scalar, _, _
+  | .nominal _ _ _, scalar, _, _ => by
       simp [NTy.isScalar] at scalar
 
 omit [Carriers] in
@@ -326,9 +329,11 @@ theorem NTy.read_injective : (τ : NTy) → Function.Injective (NTy.read τ)
       have := congrArg (Carriers.reads index).unread same
       simp only [NTy.read] at this
       rwa [(Carriers.reads index).unread_read, (Carriers.reads index).unread_read] at this
-  | .unit | .bool | .address | .signer | .string | .bytes | .tuple _ | .struct _ _ _
-  | .enum _ _ _ _ _ | .vector _ | .table _ _ | .ghost _ | .ref _ | .function _ _ _ =>
+  | .unit | .bool | .address | .signer | .string | .bytes | .char | .tuple _ | .struct _ _ _
+  | .enum _ _ _ _ _ | .vector _ | .slice _ | .array _ _ | .table _ _ | .ghost _ | .ref _ | .sliceRef _ | .function _ _ _
+  | .nominal _ _ _ =>
       fun _ _ same => same
+  | .observed referent => NTy.read_injective referent
 
 /-- Tables are equal as their typed maps are. -/
 theorem NTy.table_eq_iff (key value : NTy) (left right : (NTy.table key value).carrier) :
@@ -672,6 +677,8 @@ has named the argument (`NTy.readPlain_instantiate`). -/
     [CarriersNonempty Θ] (held) : NTy.readPlain .string held = fun value => value := rfl
 @[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_bytes [Θ : Carriers]
     [CarriersNonempty Θ] (held) : NTy.readPlain .bytes held = fun value => value := rfl
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_char [Θ : Carriers]
+    [CarriersNonempty Θ] (held) : NTy.readPlain .char held = fun value => value := rfl
 
 /-- A certified value's plain side reads as the value does: one value, one
 typed value, at either layer.  Forgetting keeps the encoding
@@ -963,6 +970,11 @@ private partial def resolvedType (carriers τ : Lean.Expr) :
     #[row, mkApp (mkConst ``TypeArgs.inhabitable) θ, index, parameter,
       ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
         (← mkEq (mkApp (mkConst ``NTy.inhabitable) parameter) (mkConst ``Bool.true))]
+  -- The substitution reads the entry with its mark dropped (`NTy.subst`),
+  -- which keeps its inhabitants (`NTy.inhabitable_unmark`).
+  let inhabitable ← mkAppM ``Eq.trans
+    #[mkApp (mkConst ``NTy.inhabitable_unmark) (mkApp3 (mkConst ``NRow.getD) row index parameter),
+      inhabitable]
   let (outerCarriers, outerType, outerInhabitable?, outerNonempty?) ← resolvedType outer resolved
   let resolvedNonempty := outerNonempty?.orElse fun _ =>
     if outerCarriers == outer then some nonempty else none

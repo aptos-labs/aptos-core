@@ -63,6 +63,7 @@ denotation and the solver.
 | Integers in carrier positions | the certified `SpecInt.val`, a certified literal `SpecInt.mk`, else the cut `SpecInt.ofInt`; a clause integer stored in a fixed-width field is defined only in range (`bindCuts`) |
 | Structs, tuples | rows (`HList`), `Var.select`, `Var.update`; a ghost slot is a row component of type `.ghost σ` |
 | Enums | injections, `variantName`, `Which.project?`, native `match`; ordering enums by `orderingChoice`; a variant field read totally takes the field type's inhabitant under another variant, and a field of a type without one (a function type) is bound by a match arm or a `let` of a Boolean clause to what `Choices.select?` holds, universally |
+| Characters, arrays | `SpecChar` by its `val`; `SpecArray` by its `vector`, the vector's reads and the fact of its length |
 | Vectors | `SpecVector` only: literals, `append`/`push` total under the length bound, `extract`, `set`, element quantifiers over `values` |
 | Maps | the owner is a row and the intrinsic roles act on its `SpecEntries` component wherever it sits; a table's typed map is `SpecMap.ofEntries keys values x`, and a map written back into a table reads back as itself where its length fits and its entries read back; `new` is the empty owner |
 | Equality and order | carrier equality after ghost erasure (`NTy.equal`, identity types by `holdsContents`); `NTy.order`, defined by recursion on the type and used by `Term.order` and the `.compare` primitive, with one theorem `NTy.order_encode` relating it to the order of encodings for the agreement |
@@ -182,7 +183,12 @@ error.
 One normal form over carriers: the equations of `NTy.equal`, `NTy.unread`,
 `NTy.order`, `SpecInt.val_ofInt` under its bounds, `BitOp.eval_*`,
 `Var.update`, and a map's definition in the context rewritten into its
-reads (`verex_subst_maps`). Typed maps are named by `verex_prepare typed`
+reads (`verex_subst_maps`). An overflowing operation's flag is the range
+condition of its exact result, as a checked operation's failure is
+(`ModularOp.overflows_unsigned_succ`, `ModularOp.overflows_signed_succ`); a
+cast's value is its operand's remainder at the width (`wrapInt_unsigned`,
+`wrapInt_signed`); a code point's validity is its range
+(`isUnicodeScalar_eq_true`). Typed maps are named by `verex_prepare typed`
 (`verex_name_maps`); position facts are `typedMapPositionFacts`. Cuts
 meet a named local through the chain of names that defines it
 (`cutNamedValue`).
@@ -273,6 +279,54 @@ theorem, interface or self hypothesis states (`specializationCertificates`,
   automatic normal form needs. A step proof's leaf respells it by an
   equation proved case by case on the value (`whichProjectFamily`); the
   automatic normal form keeps the callee's spelling.
+
+## Contracts at a shape
+
+A bodiless Rust function may have contracts at shapes of its generics instead of
+one over all of them (`ShapeContract`, `FunctionDecl.shapes`). A shape holds its
+types `S` over its own variables, and the function's signature, its locals and
+its contract at them, so that `FunctionDecl.atShape` is a declaration of its own:
+validation and `buildContract` treat it as a generic function's, under the key
+`f.at_k`. Validation also checks that the signature is the function's at `S` and
+that no two shapes of a function unify, by first-order unification with an occurs
+check over the type table, lifetimes ignored, on VIR types as a call matches. `S` has
+one entry per binder of the function, `Unit` as a placeholder at a lifetime's, which
+no carrier reads, as `θ` holds it there.
+
+Two shapes apart only in a pointer-width integer (`{usize}`, `{u64}`) are distinct
+to a call but one meaning at one carrier to the verifier, as a hypothesis is over
+every `typeInstantiation`. So they must state one contract: where a body calls either,
+the two typed contracts, source marks off, are compared (`verifyShapeSiblings`), and a
+difference is an error, as the hypotheses together would hold of no run. Any other pair
+of shapes the verifier's types do not tell apart is rejected as an overlap. The solver
+may then read a call at either through either.
+
+A call's type arguments `θ` choose the shape by one-way matching
+(`matchingShape?`), which gives `σ` for its variables, with `θ = S.subst σ`
+(`TypeArgs.atShape`), the caller's parameters rigid. The match also holds of the
+VIR types (`shapeMatchesCall`), so `{usize}` does not take a call at `u64`. Only the shapes a body's
+calls match enter its theorems, each as a hypothesis (`shapeBinder`, rebuilt by
+`shapeHypothesisType` for the audit), a function's other shapes staying unused:
+
+```text
+native_f.at_k : ∀ {Θ} {σ} {ti},
+  Satisfies (specializedMeaning (S.atShape σ) (propheticMeaning at the frame (S.atShape σ) Θ, ti))
+    ((f.at_k.typedContract at the frame σ Θ, ti).ofSkolem σ)
+```
+
+Both sides are read at the caller's types. They agree because `σs.subst (S.subst σ)`
+and `(σs.subst S).subst σ` compute to the same row for a closed `S` and signature,
+checked when the hypothesis elaborates. The statement is what a call needs, so no
+theorem relates the run at `S`'s frame to the run at the call's. SC1–SC3 apply
+with `f.at_k.typedContract` for the generic contract and `σ` for `θ`
+(`specializationCertificates`). SC4 differs only in where the satisfaction comes
+from: `shapeCall?` finds the certificate whose generic contract the hypothesis
+states and whose `S.atShape σ` is the call's `θ`, `satisfies_of_equivalent` gives
+the satisfaction of the specialized contract, and the call goes on from
+`wp_specialized`.
+
+A function value of a function with shapes is rejected, as is a call of one in a
+unit verified through its model, whose callees stand as meanings.
 
 ## Not changed
 

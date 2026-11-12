@@ -1,10 +1,816 @@
+VerexE2ETests/SourceVerify/generic_spec_vars.move:40:5: error: verification failed with a residual obligation:
+case continues.continues.continues.continues.continues.continues.continues.continues.right.left
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+Θ✝ : VerexIR.Proofs.Denote.Skolems unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+self_mint : VerexIR.Proofs.Denote.SelfFamily unit mint.params mint.shape
+value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted invariantHolds✝⁵ left✝¹⁰ : True
+left✝⁹ :
+  VerexIR.Proofs.Denote.NTy.num.deepHolds
+    {
+      val :=
+        ((Option.map
+                      (fun value =>
+                        VerexIR.Proofs.Denote.Skolems.ofRuntime
+                          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                            (VerexIR.Proofs.Denote.NTy.param 0))
+                          value)
+                      (initialState✝
+                        {
+                          type :=
+                            VerexIR.Proofs.Denote.Skolems.resolve
+                              (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                (VerexIR.Proofs.Denote.NTy.param 0)),
+                          arguments :=
+                            VerexIR.Proofs.Denote.NRow.cons
+                              (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                (VerexIR.Proofs.Denote.NTy.param 0))
+                              VerexIR.Proofs.Denote.NRow.nil }
+                        (VerexIR.StorageKey.address "0x0"))).getD
+                  ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                        (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant
+                    ⋯)).val.fst.val +
+          value.val,
+      fits := ⋯ }
+right✝³ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 35 (some value, ()) initialState✝
+invariantHolds✝⁴ invariantHolds✝³ left✝⁷ : True
+left✝⁶ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds value
+right✝² : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+invariantHolds✝² left✝⁴ : True
+left✝³ :
+  VerexIR.Proofs.Denote.NTy.num.deepHolds
+    {
+      val :=
+        ((Option.map
+                        (fun value =>
+                          VerexIR.Proofs.Denote.Skolems.ofRuntime
+                            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                              (VerexIR.Proofs.Denote.NTy.param 0))
+                            value)
+                        (initialState✝
+                          {
+                            type :=
+                              VerexIR.Proofs.Denote.Skolems.resolve
+                                (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                  (VerexIR.Proofs.Denote.NTy.param 0)),
+                            arguments :=
+                              VerexIR.Proofs.Denote.NRow.cons
+                                (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                  (VerexIR.Proofs.Denote.NTy.param 0))
+                                VerexIR.Proofs.Denote.NRow.nil }
+                          (VerexIR.StorageKey.address "0x0"))).getD
+                    ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                          (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant
+                      ⋯)).val.fst.val +
+            value.val +
+          value.val,
+      fits := ⋯ }
+right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+verexAnchor :
+  VerexIR.Proofs.Denote.AnchorSaved 35 (some value, ())
+    (initialState✝.set
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address "0x0")
+      (some
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+          ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds
+            ({
+                val :=
+                  ((Option.map
+                                (fun value =>
+                                  VerexIR.Proofs.Denote.Skolems.ofRuntime
+                                    (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                      (VerexIR.Proofs.Denote.NTy.param 0))
+                                    value)
+                                (initialState✝
+                                  {
+                                    type :=
+                                      VerexIR.Proofs.Denote.Skolems.resolve
+                                        (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                          (VerexIR.Proofs.Denote.NTy.param 0)),
+                                    arguments :=
+                                      VerexIR.Proofs.Denote.NRow.cons
+                                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                          (VerexIR.Proofs.Denote.NTy.param 0))
+                                        VerexIR.Proofs.Denote.NRow.nil }
+                                  (VerexIR.StorageKey.address "0x0"))).getD
+                            ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                  (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant
+                              ⋯)).val.fst.val +
+                    value.val,
+                fits := ⋯ },
+              ())
+            ⋯))))
+invariantHolds✝¹ invariantHolds✝ left✝¹ : True
+left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds value
+right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+key : VerexIR.StorageKey
+x✝ : ¬key = VerexIR.StorageKey.address "0x0"
+⊢ (initialState✝.set
+          {
+            type :=
+              VerexIR.Proofs.Denote.Skolems.resolve
+                (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+            arguments :=
+              VerexIR.Proofs.Denote.NRow.cons
+                (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                  (VerexIR.Proofs.Denote.NTy.param 0))
+                VerexIR.Proofs.Denote.NRow.nil }
+          (VerexIR.StorageKey.address "0x0")
+          (some
+            (VerexIR.Proofs.Denote.Skolems.toRuntime
+              (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+              ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                    (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds
+                ({
+                    val :=
+                      ((Option.map
+                                    (fun value =>
+                                      VerexIR.Proofs.Denote.Skolems.ofRuntime
+                                        (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                          (VerexIR.Proofs.Denote.NTy.param 0))
+                                        value)
+                                    (initialState✝
+                                      {
+                                        type :=
+                                          VerexIR.Proofs.Denote.Skolems.resolve
+                                            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                              (VerexIR.Proofs.Denote.NTy.param 0)),
+                                        arguments :=
+                                          VerexIR.Proofs.Denote.NRow.cons
+                                            (VerexIR.Proofs.Denote.NTy.argumentWith
+                                              VerexIR.Proofs.Denote.Skolems.argument
+                                              (VerexIR.Proofs.Denote.NTy.param 0))
+                                            VerexIR.Proofs.Denote.NRow.nil }
+                                      (VerexIR.StorageKey.address "0x0"))).getD
+                                ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                      (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant
+                                  ⋯)).val.fst.val +
+                        value.val,
+                    fits := ⋯ },
+                  ())
+                ⋯)))).set
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address "0x0")
+      (some
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+          ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds
+            ({
+                val :=
+                  ((Option.map
+                                  (fun value =>
+                                    VerexIR.Proofs.Denote.Skolems.ofRuntime
+                                      (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                        (VerexIR.Proofs.Denote.NTy.param 0))
+                                      value)
+                                  (initialState✝
+                                    {
+                                      type :=
+                                        VerexIR.Proofs.Denote.Skolems.resolve
+                                          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                            (VerexIR.Proofs.Denote.NTy.param 0)),
+                                      arguments :=
+                                        VerexIR.Proofs.Denote.NRow.cons
+                                          (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                            (VerexIR.Proofs.Denote.NTy.param 0))
+                                          VerexIR.Proofs.Denote.NRow.nil }
+                                    (VerexIR.StorageKey.address "0x0"))).getD
+                              ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                    (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant
+                                ⋯)).val.fst.val +
+                      value.val +
+                    value.val,
+                fits := ⋯ },
+              ())
+            ⋯)))
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      key =
+    initialState✝
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      key
+VerexE2ETests/SourceVerify/generic_spec_vars.move:42:9: error: the specification clause `ensures global<«Ghost$minted»<T> >(@0x0).v
+        == old(global<«Ghost$minted»<T> >(@0x0).v) + 2 * value` is not established
+VerexE2ETests/SourceVerify/generic_spec_vars.move:40:5: error: verex verification failed: the automatic verification of `mint_twice` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_spec_vars.proof.lean`:
+  verify mint_twice by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_spec_vars.move:49:5: error: verification failed with a residual obligation:
+case continues.continues.continues.continues.right.right.right
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+Θ✝ : VerexIR.Proofs.Denote.Skolems unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+self_mint : VerexIR.Proofs.Denote.SelfFamily unit mint.params mint.shape
+value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted invariantHolds✝² left✝³ : True
+left✝² :
+  VerexIR.Proofs.Denote.NTy.num.deepHolds
+    {
+      val :=
+        ((Option.map
+                      (fun value =>
+                        VerexIR.Proofs.Denote.Skolems.ofRuntime
+                          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                            0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+                          value)
+                      (initialState✝
+                        {
+                          type :=
+                            VerexIR.Proofs.Denote.Skolems.resolve
+                              (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+                          arguments :=
+                            VerexIR.Proofs.Denote.NRow.cons
+                              (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                (VerexIR.Proofs.Denote.NTy.param 0))
+                              VerexIR.Proofs.Denote.NRow.nil }
+                        (VerexIR.StorageKey.address "0x0"))).getD
+                  ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                        0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).inhabitant
+                    ⋯)).val.fst.val +
+          value.val,
+      fits := ⋯ }
+right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+verexAnchor : VerexIR.Proofs.Denote.AnchorSaved 35 (some value, ()) initialState✝
+invariantHolds✝¹ invariantHolds✝ left✝¹ : True
+left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds value
+right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+resource : VerexIR.Proofs.Denote.ResourceType
+x✝ :
+  ¬resource =
+      {
+        type :=
+          0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+            0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰,
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+            VerexIR.Proofs.Denote.NRow.nil }
+⊢ initialState✝.set
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address "0x0")
+      (some
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+            0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+          ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).ofDeepHolds
+            ({
+                val :=
+                  ((Option.map
+                                (fun value =>
+                                  VerexIR.Proofs.Denote.Skolems.ofRuntime
+                                    (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                      0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+                                    value)
+                                (initialState✝
+                                  {
+                                    type :=
+                                      VerexIR.Proofs.Denote.Skolems.resolve
+                                        (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                          0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+                                    arguments :=
+                                      VerexIR.Proofs.Denote.NRow.cons
+                                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                          (VerexIR.Proofs.Denote.NTy.param 0))
+                                        VerexIR.Proofs.Denote.NRow.nil }
+                                  (VerexIR.StorageKey.address "0x0"))).getD
+                            ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                  0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).inhabitant
+                              ⋯)).val.fst.val +
+                    value.val,
+                fits := ⋯ },
+              ())
+            ⋯)))
+      resource =
+    initialState✝ resource
+VerexE2ETests/SourceVerify/generic_spec_vars.move:49:5: error: verification failed with a residual obligation:
+case continues.continues.continues.continues.right.right.left
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+Θ✝ : VerexIR.Proofs.Denote.Skolems unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+self_mint : VerexIR.Proofs.Denote.SelfFamily unit mint.params mint.shape
+value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted invariantHolds✝² left✝³ : True
+left✝² :
+  VerexIR.Proofs.Denote.NTy.num.deepHolds
+    {
+      val :=
+        ((Option.map
+                      (fun value =>
+                        VerexIR.Proofs.Denote.Skolems.ofRuntime
+                          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                            0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+                          value)
+                      (initialState✝
+                        {
+                          type :=
+                            VerexIR.Proofs.Denote.Skolems.resolve
+                              (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+                          arguments :=
+                            VerexIR.Proofs.Denote.NRow.cons
+                              (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                (VerexIR.Proofs.Denote.NTy.param 0))
+                              VerexIR.Proofs.Denote.NRow.nil }
+                        (VerexIR.StorageKey.address "0x0"))).getD
+                  ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                        0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).inhabitant
+                    ⋯)).val.fst.val +
+          value.val,
+      fits := ⋯ }
+right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+verexAnchor : VerexIR.Proofs.Denote.AnchorSaved 35 (some value, ()) initialState✝
+invariantHolds✝¹ invariantHolds✝ left✝¹ : True
+left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds value
+right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+key : VerexIR.StorageKey
+x✝ : ¬key = VerexIR.StorageKey.address "0x0"
+⊢ initialState✝.set
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address "0x0")
+      (some
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+            0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+          ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).ofDeepHolds
+            ({
+                val :=
+                  ((Option.map
+                                (fun value =>
+                                  VerexIR.Proofs.Denote.Skolems.ofRuntime
+                                    (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                      0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+                                    value)
+                                (initialState✝
+                                  {
+                                    type :=
+                                      VerexIR.Proofs.Denote.Skolems.resolve
+                                        (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                          0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+                                    arguments :=
+                                      VerexIR.Proofs.Denote.NRow.cons
+                                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                          (VerexIR.Proofs.Denote.NTy.param 0))
+                                        VerexIR.Proofs.Denote.NRow.nil }
+                                  (VerexIR.StorageKey.address "0x0"))).getD
+                            ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                  0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).inhabitant
+                              ⋯)).val.fst.val +
+                    value.val,
+                fits := ⋯ },
+              ())
+            ⋯)))
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+            VerexIR.Proofs.Denote.NRow.nil }
+      key =
+    initialState✝
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+            VerexIR.Proofs.Denote.NRow.nil }
+      key
+VerexE2ETests/SourceVerify/generic_spec_vars.move:51:9: error: the specification clause `ensures global<«Ghost$minted»<A> >(@0x0).v
+        == old(global<«Ghost$minted»<A> >(@0x0).v) + value` is not established
+VerexE2ETests/SourceVerify/generic_spec_vars.move:52:9: error: the specification clause `ensures global<«Ghost$minted»<B> >(@0x0).v
+        == old(global<«Ghost$minted»<B> >(@0x0).v)` is not established
+VerexE2ETests/SourceVerify/generic_spec_vars.move:49:5: error: verex verification failed: the automatic verification of `mint_a` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_spec_vars.proof.lean`:
+  verify mint_a by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_spec_vars.move:59:5: error: verification failed with a residual obligation:
+case continues.continues.continues.continues.right.right
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+Θ✝ : VerexIR.Proofs.Denote.Skolems unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+self_mint : VerexIR.Proofs.Denote.SelfFamily unit mint.params mint.shape
+account : VerexIR.Proofs.Denote.NTy.address.carrier
+value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted invariantHolds✝² left✝³ : True
+left✝² :
+  VerexIR.Proofs.Denote.NTy.num.deepHolds
+    {
+      val :=
+        ((Option.map
+                      (fun value =>
+                        VerexIR.Proofs.Denote.Skolems.ofRuntime
+                          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                            0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+                          value)
+                      (initialState✝
+                        {
+                          type :=
+                            VerexIR.Proofs.Denote.Skolems.resolve
+                              (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+                          arguments :=
+                            VerexIR.Proofs.Denote.NRow.cons
+                              (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                (VerexIR.Proofs.Denote.NTy.param 0))
+                              VerexIR.Proofs.Denote.NRow.nil }
+                        (VerexIR.StorageKey.address "0x0"))).getD
+                  ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                        0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).inhabitant
+                    ⋯)).val.fst.val +
+          value.val,
+      fits := ⋯ }
+right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+verexAnchor : VerexIR.Proofs.Denote.AnchorSaved 35 (some value, ()) initialState✝
+invariantHolds✝¹ invariantHolds✝ left✝¹ : True
+left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds value
+right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+resource : VerexIR.Proofs.Denote.ResourceType
+x✝ :
+  ¬resource =
+      {
+        type :=
+          0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+            0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰,
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+            VerexIR.Proofs.Denote.NRow.nil }
+⊢ initialState✝.set
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address "0x0")
+      (some
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+            0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+          ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).ofDeepHolds
+            ({
+                val :=
+                  ((Option.map
+                                (fun value =>
+                                  VerexIR.Proofs.Denote.Skolems.ofRuntime
+                                    (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                      0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+                                    value)
+                                (initialState✝
+                                  {
+                                    type :=
+                                      VerexIR.Proofs.Denote.Skolems.resolve
+                                        (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                          0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+                                    arguments :=
+                                      VerexIR.Proofs.Denote.NRow.cons
+                                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                          (VerexIR.Proofs.Denote.NTy.param 0))
+                                        VerexIR.Proofs.Denote.NRow.nil }
+                                  (VerexIR.StorageKey.address "0x0"))).getD
+                            ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                  0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).inhabitant
+                              ⋯)).val.fst.val +
+                    value.val,
+                fits := ⋯ },
+              ())
+            ⋯)))
+      resource =
+    initialState✝ resource
+VerexE2ETests/SourceVerify/generic_spec_vars.move:59:5: error: verification failed with a residual obligation:
+case continues.continues.continues.continues.right.left
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+Θ✝ : VerexIR.Proofs.Denote.Skolems unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+self_mint : VerexIR.Proofs.Denote.SelfFamily unit mint.params mint.shape
+account : VerexIR.Proofs.Denote.NTy.address.carrier
+value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted invariantHolds✝² left✝³ : True
+left✝² :
+  VerexIR.Proofs.Denote.NTy.num.deepHolds
+    {
+      val :=
+        ((Option.map
+                      (fun value =>
+                        VerexIR.Proofs.Denote.Skolems.ofRuntime
+                          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                            0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+                          value)
+                      (initialState✝
+                        {
+                          type :=
+                            VerexIR.Proofs.Denote.Skolems.resolve
+                              (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+                          arguments :=
+                            VerexIR.Proofs.Denote.NRow.cons
+                              (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                (VerexIR.Proofs.Denote.NTy.param 0))
+                              VerexIR.Proofs.Denote.NRow.nil }
+                        (VerexIR.StorageKey.address "0x0"))).getD
+                  ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                        0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).inhabitant
+                    ⋯)).val.fst.val +
+          value.val,
+      fits := ⋯ }
+right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+verexAnchor : VerexIR.Proofs.Denote.AnchorSaved 35 (some value, ()) initialState✝
+invariantHolds✝¹ invariantHolds✝ left✝¹ : True
+left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds value
+right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+key : VerexIR.StorageKey
+x✝ : ¬key = VerexIR.StorageKey.address "0x0"
+⊢ initialState✝.set
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address "0x0")
+      (some
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+            0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+          ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).ofDeepHolds
+            ({
+                val :=
+                  ((Option.map
+                                (fun value =>
+                                  VerexIR.Proofs.Denote.Skolems.ofRuntime
+                                    (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                      0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+                                    value)
+                                (initialState✝
+                                  {
+                                    type :=
+                                      VerexIR.Proofs.Denote.Skolems.resolve
+                                        (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                          0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+                                    arguments :=
+                                      VerexIR.Proofs.Denote.NRow.cons
+                                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                          (VerexIR.Proofs.Denote.NTy.param 0))
+                                        VerexIR.Proofs.Denote.NRow.nil }
+                                  (VerexIR.StorageKey.address "0x0"))).getD
+                            ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                  0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰).inhabitant
+                              ⋯)).val.fst.val +
+                    value.val,
+                fits := ⋯ },
+              ())
+            ⋯)))
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+            VerexIR.Proofs.Denote.NRow.nil }
+      key =
+    initialState✝
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝²⁻⁰)
+            VerexIR.Proofs.Denote.NRow.nil }
+      key
+VerexE2ETests/SourceVerify/generic_spec_vars.move:59:5: error: verex verification failed: the automatic verification of `mint_keeps_registry` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_spec_vars.proof.lean`:
+  verify mint_keeps_registry by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_spec_vars.move:67:5: error: verification failed with a residual obligation:
+case continues.continues.continues.continues.right.left
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+Θ✝ : VerexIR.Proofs.Denote.Skolems unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+self_mint : VerexIR.Proofs.Denote.SelfFamily unit mint.params mint.shape
+value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted invariantHolds✝² left✝³ : True
+left✝² :
+  VerexIR.Proofs.Denote.NTy.num.deepHolds
+    {
+      val :=
+        ((Option.map
+                      (fun value =>
+                        VerexIR.Proofs.Denote.Skolems.ofRuntime
+                          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                            (VerexIR.Proofs.Denote.NTy.param 0))
+                          value)
+                      (initialState✝
+                        {
+                          type :=
+                            VerexIR.Proofs.Denote.Skolems.resolve
+                              (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                (VerexIR.Proofs.Denote.NTy.param 0)),
+                          arguments :=
+                            VerexIR.Proofs.Denote.NRow.cons
+                              (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                (VerexIR.Proofs.Denote.NTy.param 0))
+                              VerexIR.Proofs.Denote.NRow.nil }
+                        (VerexIR.StorageKey.address "0x0"))).getD
+                  ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                        (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant
+                    ⋯)).val.fst.val +
+          value.val,
+      fits := ⋯ }
+right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+verexAnchor : VerexIR.Proofs.Denote.AnchorSaved 35 (some value, ()) initialState✝
+invariantHolds✝¹ invariantHolds✝ left✝¹ : True
+left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds value
+right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+key : VerexIR.StorageKey
+x✝ : ¬key = VerexIR.StorageKey.address "0x0"
+⊢ initialState✝.set
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address "0x0")
+      (some
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+          ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds
+            ({
+                val :=
+                  ((Option.map
+                                (fun value =>
+                                  VerexIR.Proofs.Denote.Skolems.ofRuntime
+                                    (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                      (VerexIR.Proofs.Denote.NTy.param 0))
+                                    value)
+                                (initialState✝
+                                  {
+                                    type :=
+                                      VerexIR.Proofs.Denote.Skolems.resolve
+                                        (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                          (VerexIR.Proofs.Denote.NTy.param 0)),
+                                    arguments :=
+                                      VerexIR.Proofs.Denote.NRow.cons
+                                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                                          (VerexIR.Proofs.Denote.NTy.param 0))
+                                        VerexIR.Proofs.Denote.NRow.nil }
+                                  (VerexIR.StorageKey.address "0x0"))).getD
+                            ((0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰
+                                  (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant
+                              ⋯)).val.fst.val +
+                    value.val,
+                fits := ⋯ },
+              ())
+            ⋯)))
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      key =
+    initialState✝
+      {
+        type :=
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (0x42.generic_spec_vars.unit.nominal.namespace.0.declaration✝⁴⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      key
 VerexE2ETests/SourceVerify/generic_spec_vars.move:69:9: error: the specification clause `ensures global<«Ghost$minted»<T> >(@0x0).v
         == old(global<«Ghost$minted»<T> >(@0x0).v) + value + 1` is not established
 VerexE2ETests/SourceVerify/generic_spec_vars.move:67:5: error: verex verification failed: the automatic verification of `wrong_amount` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_spec_vars.proof.lean`:
   verify wrong_amount by lean =>
     verex_obligations
     verex_on
+    | leaf => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_spec_vars.move:91:9: error: the specification clause `ensures global<«Ghost$minted»<B> >(@0x0).v
+        == old(global<«Ghost$minted»<B> >(@0x0).v)` is not established
+VerexE2ETests/SourceVerify/generic_spec_vars.move:88:5: error: verex verification failed: the automatic verification of `count_twice` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_spec_vars.proof.lean`:
+  verify count_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/generic_spec_vars.move:103:9: error: the specification clause `ensures global<«Ghost$minted»<A> >(@0x0).v

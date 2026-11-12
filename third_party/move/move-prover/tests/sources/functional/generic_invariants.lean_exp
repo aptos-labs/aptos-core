@@ -1,4 +1,13 @@
 Move prover returns: exiting with verification errors
+tests/sources/functional/generic_invariants.move:34:5: error: the specification clause `invariant exists<Storage<u64, Bool> >(@0x22)
+        ==> global<Storage<u64, Bool> >(@0x22).x == 1` is not established
+tests/sources/functional/generic_invariants.move:53:5: error: verex verification failed: the automatic verification of `good` failed; provide a proof in the module:
+  verify good by lean =>
+    verex_obligations
+    verex_on
+    | module_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/generic_invariants.move:34:5: error: the module invariant `invariant exists<Storage<u64, Bool> >(@0x22)
         ==> global<Storage<u64, Bool> >(@0x22).x == 1` does not hold after a write of memory it reads
 tests/sources/functional/generic_invariants.move:39:5: error: the module invariant `invariant {Y} exists<Storage<u64, Y> >(@0x23)

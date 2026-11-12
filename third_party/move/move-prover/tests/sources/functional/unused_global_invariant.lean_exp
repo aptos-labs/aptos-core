@@ -1,1 +1,10 @@
+Move prover returns: exiting with verification errors
 tests/sources/functional/unused_global_invariant.move:1:1: info: `publish_r3` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/functional/unused_global_invariant.move:57:9: error: the module invariant `invariant [suspendable] exists<R3<u64> >(@0x2) ==> exists<R3<u64> >(@0x3)` does not hold after a call that writes memory it reads
+tests/sources/functional/unused_global_invariant.move:28:5: error: verex verification failed: the automatic verification of `call_publish_r3` failed; provide a proof in `tests/sources/functional/unused_global_invariant.proof.lean`:
+  verify call_publish_r3 by lean =>
+    verex_obligations
+    verex_on
+    | module_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

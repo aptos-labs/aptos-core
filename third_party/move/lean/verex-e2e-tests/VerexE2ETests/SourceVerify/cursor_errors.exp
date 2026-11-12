@@ -1,0 +1,97 @@
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:16:3: error: the specification clause `ensures a == 1` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:15:6: error: verex verification failed: the automatic verification of `cursor_false` failed; provide a proof in the module:
+  verify cursor_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:21:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:20:6: error: verex verification failed: the automatic verification of `cursor_vacuous` failed; provide a proof in the module:
+  verify cursor_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:31:3: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:30:6: error: verex verification failed: the automatic verification of `local_cursor_false` failed; provide a proof in the module:
+  verify local_cursor_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:36:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:35:6: error: verex verification failed: the automatic verification of `local_cursor_vacuous` failed; provide a proof in the module:
+  verify local_cursor_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:44:3: error: the specification clause `ensures a == old(a)` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:43:6: error: verex verification failed: the automatic verification of `transfer_write_false` failed; provide a proof in the module:
+  verify transfer_write_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:47:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:46:6: error: verex verification failed: the automatic verification of `transfer_write_vacuous` failed; provide a proof in the module:
+  verify transfer_write_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:53:3: error: the specification clause `ensures a == 3` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:52:6: error: verex verification failed: the automatic verification of `write_both_false` failed; provide a proof in the module:
+  verify write_both_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:56:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:55:6: error: verex verification failed: the automatic verification of `write_both_vacuous` failed; provide a proof in the module:
+  verify write_both_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:62:3: error: the specification clause `ensures a == old(a)` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:61:6: error: verex verification failed: the automatic verification of `step_direct_false` failed; provide a proof in the module:
+  verify step_direct_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:65:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:64:6: error: verex verification failed: the automatic verification of `step_direct_vacuous` failed; provide a proof in the module:
+  verify step_direct_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:71:3: error: the specification clause `ensures result == k` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:70:6: error: verex verification failed: the automatic verification of `other_field_between_false` failed; provide a proof in the module:
+  verify other_field_between_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:74:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cursor_errors.spec.lean:73:6: error: verex verification failed: the automatic verification of `other_field_between_vacuous` failed; provide a proof in the module:
+  verify other_field_between_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cursor_errors.rs:21:1: error: a shared view holds no prophecy: `final` reads what a mutable reference will hold

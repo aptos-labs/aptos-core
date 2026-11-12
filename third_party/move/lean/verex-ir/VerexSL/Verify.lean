@@ -514,16 +514,15 @@ private def withModuleNamespace (moduleNamespace : Name) (commands : CommandElab
     modify fun state => { state with scopes := state.scopes.drop 1 }
     popScope
 
-/-- The function items of a namespace command, in source order. -/
-private partial def functionItems (stx : Syntax) : Array Syntax :=
-  stx.getArgs.foldl (fun found child =>
-    if child.isOfKind ``verexFunctionItem then found.push child
-    else if child.isOfKind ``verexTheoremItem then found
-    else found ++ functionItems child) #[]
+/-- The function items of a namespace command with their scopes, in source
+order. -/
+private def functionItems (stx : Syntax) : Array (Array String × Syntax) :=
+  VerexSL.scopedItemsWhere (·.isOfKind ``verexFunctionItem) stx
 
-/-- The first identifier of a syntax tree. -/
-private partial def firstIdentifier? (stx : Syntax) : Option Syntax :=
-  if stx.isIdent then some stx else stx.getArgs.findSome? firstIdentifier?
+/-- The key of a declaration of the module, by its scope and its name, or the
+path a `verify` item names it by. -/
+private def scopedKey (scope : Array String) (segments : Array String) : String :=
+  "::".intercalate (scope ++ segments).toList
 
 /-- Whether a function's parameters or results, through a reference, its
 locals, through a mutable one, or the values it constructs carry data
@@ -751,26 +750,27 @@ private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource)
     ns.functions.toList.flatMap fun declaration => (functionLemmas ns declaration).toList
   let roots := (ownLemmas ++ appliedByFunctions).foldl (init := #[]) fun roots lemma =>
     if roots.contains lemma then roots else roots.push lemma
-  let lemmaItems := (lemmaItemsOf module.stx).filterMap fun item => do
+  let lemmaItems := (lemmaItemsOf module.stx).filterMap fun (scope, item) => do
     let identifier ← item.getArgs.find? (·.isIdent)
-    pure (identifier.getId.toString (escape := false), identifier)
+    pure (scopedKey scope #[identifier.getId.toString (escape := false)], identifier)
   inParsedFile module.file (verifyLemmas unit segments roots lemmaItems pathSyntax)
   let items := sources.flatMap fun source =>
-    (VerexSL.verificationItems source.stx).map (·, source.file)
-  let explicit := items.filterMap fun (item, _) =>
-    if item.isOfKind ``verexVerifyItem then item[1]?.map (·.getId.toString (escape := false))
+    (VerexSL.verificationItems source.stx).map fun (scope, item) => (scope, item, source.file)
+  let explicit := items.filterMap fun (scope, item, _) =>
+    if item.isOfKind ``verexVerifyItem then
+      item[1]?.map (scopedKey scope <| pathSegments ·)
     else none
   -- The explicit `verify` items, and the specified functions with a body
   -- that no explicit item names and whose specification does not set
   -- `pragma verify = false`, in source order.
-  let targets : Array VerificationTarget ← items.filterMapM fun (item, file) => do
+  let targets : Array VerificationTarget ← items.filterMapM fun (scope, item, file) => do
     if item.isOfKind ``verexVerifyItem then
-      let some identifier := item[1]? | return none
-      return some ⟨identifier.getId.toString (escape := false), identifier,
+      let some path := item[1]? | return none
+      return some ⟨scopedKey scope (pathSegments path), path,
         ← scriptOfOptional (item[2]?.getD .missing), true, demandedVerify item, file⟩
     return (do
       let identifier ← item.getArgs.find? (·.isIdent)
-      let function := identifier.getId.toString (escape := false)
+      let function := scopedKey scope #[identifier.getId.toString (escape := false)]
       if explicit.contains function then none
       let (namespaceIndex, ns, _, declaration) ← findFunction? unit function
       if declaration.body == .absent || statesNothing declaration.contract ||
@@ -783,9 +783,9 @@ private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource)
   -- intrinsic map role stands for the map model, as a native does: its body
   -- is not verified.
   let named := targets.map (·.function)
-  let targets := targets ++ (functionItems module.stx).filterMap fun item => do
-    let identifier ← firstIdentifier? item[4]
-    let function := identifier.getId.toString (escape := false)
+  let targets := targets ++ (functionItems module.stx).filterMap fun (scope, item) => do
+    let identifier ← item.getArgs.find? (·.isIdent)
+    let function := scopedKey scope #[identifier.getId.toString (escape := false)]
     if named.contains function then none
     let (namespaceIndex, ns, functionIndex, declaration) ← findFunction? unit function
     if declaration.body == .absent ||
@@ -824,15 +824,15 @@ private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource)
     return found.map (·, fileName)
   if targets.isEmpty && proofLemmas.isEmpty then return
   -- The expressions of the items' steps, lowered once for the module.
-  let stepped ← items.filterMapM fun (item, file) => do
+  let stepped ← items.filterMapM fun (scope, item, file) => do
     unless item.isOfKind ``verexVerifyItem do return none
-    let some identifier := item[1]? | return none
+    let some path := item[1]? | return none
     let optional := item[2]?.getD .missing
     let #[_, block] := optional.getArgs | return none
     let fileName ← match file with
       | some file => pure file.name
       | none => getFileName
-    return some (item, identifier.getId.toString (escape := false), block, fileName)
+    return some (item, scopedKey scope (pathSegments path), block, fileName)
   lowerStepExpressions invariantRelatedModules unit module.stx module.file stepped proofLemmas
   if targets.isEmpty then return
   stageLog s!"module {moduleNamespace}: verification start"

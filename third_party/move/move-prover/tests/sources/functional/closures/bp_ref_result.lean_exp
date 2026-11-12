@@ -1,9 +1,0 @@
-Move prover returns: exiting with verification errors
-tests/sources/functional/closures/bp_ref_result.move:44:9: error: the specification clause `ensures result == result_of<function[Fn(&S) -> &u64](get)>(s)` is not established
-tests/sources/functional/closures/bp_ref_result.move:43:5: error: verex verification failed: the automatic verification of `call_and_check` failed; provide a proof in `tests/sources/functional/closures/bp_ref_result.proof.lean`:
-  verify call_and_check by lean =>
-    verex_obligations
-    verex_on
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

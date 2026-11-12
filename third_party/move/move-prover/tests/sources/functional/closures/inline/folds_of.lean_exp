@@ -7,14 +7,6 @@ tests/sources/functional/closures/inline/folds_of.move:74:5: error: verex verifi
     | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/inline/folds_of.move:103:5: error: the loop invariant `acc
-        == «spec_fold$lambda$0»(v, with_state_anchor!(19, old(acc)), i)
-        && (∀ (_j_20 in 0 .. i),
-          !(«spec_fold$lambda$0»(
-            v, with_state_anchor!(19, old(acc)), _j_20
-          ).total
-            + v[_j_20]
-            > MAX_U64))` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of.move:111:9: error: the specification clause `ensures result
         == «spec_fold$lambda$0»(
           v, new NoAbilities { total := 0 }, v.length
@@ -23,21 +15,7 @@ tests/sources/functional/closures/inline/folds_of.move:109:5: error: verex verif
   verify sum_without_abilities by lean =>
     verex_obligations
     verex_on
-    | invariant_3_step => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/inline/folds_of.move:27:13: error: the loop invariant `acc
-        == «spec_fold$lambda$0»(v, with_state_anchor!(3, old(acc)), i)
-        && (∀ (_j_4 in 0 .. i),
-          !(«spec_fold$lambda$0»(v, with_state_anchor!(3, old(acc)), _j_4).total
-            + v[_j_4]
-            > MAX_U64))` is not preserved by an iteration
-tests/sources/functional/closures/inline/folds_of.move:123:5: error: verex verification failed: the automatic verification of `accumulate_into_parameter` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of.proof.lean`:
-  verify accumulate_into_parameter by lean =>
-    verex_obligations
-    verex_on
-    | invariant_3_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of.move:181:9: error: the specification clause `ensures result == spec_sum(v, v.length) + 1` is not established

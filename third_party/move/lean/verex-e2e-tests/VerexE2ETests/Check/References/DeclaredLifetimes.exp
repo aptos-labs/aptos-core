@@ -1,0 +1,40 @@
+VerexE2ETests/Check/References/DeclaredLifetimes.lean:39:4: error: the specification clause `ensures result.x == 2` is not established
+VerexE2ETests/Check/References/DeclaredLifetimes.lean:38:7: error: verex verification failed: the automatic verification of `write_other_false` failed; provide a proof in the module:
+  verify write_other_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/DeclaredLifetimes.lean:60:4: error: the specification clause `ensures result.y == b` is not established
+VerexE2ETests/Check/References/DeclaredLifetimes.lean:59:7: error: verex verification failed: the automatic verification of `read_other_false` failed; provide a proof in the module:
+  verify read_other_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/DeclaredLifetimes.lean:81:4: error: the specification clause `ensures result.y == 1` is not established
+VerexE2ETests/Check/References/DeclaredLifetimes.lean:80:7: error: verex verification failed: the automatic verification of `pair_write_shared_lender_false` failed; provide a proof in the module:
+  verify pair_write_shared_lender_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/DeclaredLifetimes.lean:104:4: error: the specification clause `ensures result.x == 1` is not established
+VerexE2ETests/Check/References/DeclaredLifetimes.lean:103:7: error: verex verification failed: the automatic verification of `pick_write_false` failed; provide a proof in the module:
+  verify pick_write_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/DeclaredLifetimes.lean:114:4: error: the specification clause `ensures result == x + 1` is not established
+VerexE2ETests/Check/References/DeclaredLifetimes.lean:113:7: error: verex verification failed: the automatic verification of `implied_false` failed; provide a proof in the module:
+  verify implied_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

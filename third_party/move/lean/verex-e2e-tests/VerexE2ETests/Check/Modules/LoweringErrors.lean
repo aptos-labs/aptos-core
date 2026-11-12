@@ -45,6 +45,30 @@ run_cmd do
       unless stage == "vir" && diagnostics.size == 1 &&
           diagnostics[0]!.code == code && diagnostics[0]!.primary.isSome do
         throwError "wrong VIR rejection for {name}: {repr diagnostics}"
+  -- Each profile spells the failure clause of its own exceptional outcome
+  -- (`doc/designs/rust-verification.md`, "Failure contract").
+  for (name, header, clause) in #[
+      ("move_panics_if", "verex module 0x42::", "panics_if false"),
+      ("rust_aborts_if", "verex namespace ", "aborts_if false"),
+      ("rust_aborts_with", "verex namespace ", "aborts_with 7")] do
+    let source := header ++ name ++ " where\n" ++
+      "  fun test(value : u64) -> u64 := value\n" ++
+      "  spec test where\n    " ++ clause ++ "\n"
+    let stx ← match Parser.runParserCategory env `command source with
+      | .ok stx => pure stx
+      | .error reason => throwError "failure-clause fixture did not parse: {reason}"
+    let parsed ← match compilationUnitOfSyntax stx "<failure clause>" with
+      | .ok parsed => pure parsed
+      | .error (_, reason) => throwError "failure-clause fixture did not elaborate: {reason}"
+    match compile parsed with
+    | .ok _ => throwError "the failure clause of the other profile was accepted: {name}"
+    | .error (.frontend diagnostics) =>
+      unless diagnostics.size == 1 &&
+          diagnostics[0]!.code == "VEREX-FAILURE-CLAUSE-PROFILE" &&
+          diagnostics[0]!.span.isSome do
+        throwError "wrong failure-clause rejection for {name}: {repr diagnostics}"
+    | .error (.vir diagnostics) =>
+      throwError "the failure clause of the other profile reached VIR: {repr diagnostics}"
   for body in ["value + continue test(value - 1)", "continue other(value)"] do
     let source := "verex module 0x42::bad_continue where\n" ++
       "  fun test(value : u64) -> u64 := " ++ body ++ "\n"

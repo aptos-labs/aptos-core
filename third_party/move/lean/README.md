@@ -51,10 +51,10 @@ verex-rust verify bounds.rs      # specifications in bounds.spec.lean
 |---|---|
 | [`verex-ir`](verex-ir/) | The shared typed VIR: RawUnit JSON import, validation, semantics, interpreter, proofs, the denotation-based verifier, and VerexSL. |
 | [`verex-move`](verex-move/) | The Move semantic profile and intrinsic registry, the Move exchange frontend (`VerexMove/Frontend`), and the XIR backend (`VerexMove/Xir`) through which compiler-v2 compiles `.lean` sources to Move bytecode. |
-| [`verex-rust`](verex-rust/) | The Rust semantic profile, source backend, and the Lean-owned import CLI over [`rust-exporter`](verex-rust/rust-exporter/), a standalone Rustc Public exporter of borrow-checked MIR. |
+| [`verex-rust`](verex-rust/) | The Rust semantic profile, source backend, and the Lean-owned import CLI over [`rust-exporter`](verex-rust/rust-exporter/), a standalone Rustc Public exporter of borrow-checked MIR. [`lib/`](verex-rust/lib/) is the standard-library specification library: VerexSL contracts and type models of `core` and `alloc`. |
 | [`verex-e2e-tests`](verex-e2e-tests/) | Move-to-VerexSL and Rust-to-VerexSL baselines, verification of Move and Rust sources, and the verification check fixtures under `VerexE2ETests/Check/`. |
 | [`scripts`](scripts/) | The smoke suite (`smoke.sh`), per-module package verification (`verify-modules.py`), single-target isolation (`isolate-target.py`), the baseline error delta after a `UB=1` run (`exp-error-delta.sh`), the Rust pipeline benchmark (`bench-rust-pipeline.sh`), and the verification benchmark driver (`verex-bench.py`). |
-| [`bench`](bench/) | The verification benchmark's problems (`problems.toml`) and a Move package written for them (`package/`). |
+| [`bench`](bench/) | The verification benchmark's problems (`problems.toml`), a Move package written for them (`package/`), and their Rust counterparts (`rust/`). |
 
 [`v0/`](v0/) holds the deprecated reference packages `move`, `move-model`,
 and `transpiler`; nothing links them. Documentation is under [`doc/`](doc/): designs, the plan
@@ -101,6 +101,7 @@ lake exe verex-move verify <file.move> --heartbeats 400 # default budget, thousa
 lake exe verex-move verify <package> --jobs 4            # targets proved at once per module
 cd ../verex-rust
 lake exe verex-rust verify <file.rs>                    # specifications in <file>.spec.lean
+lake exe verex-rust verify <Cargo.toml> --package <name> # a library crate, a .spec.lean per module file
 ```
 
 `verex-move verify` elaborates a package's targets one after another in one

@@ -15,11 +15,3 @@ tests/sources/functional/ghost_field.move:79:5: error: verex verification failed
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/ghost_field.move:90:9: error: the specification clause `ensures e.h == 9` is not established
-tests/sources/functional/ghost_field.move:89:5: error: verex verification failed: the automatic verification of `enum_update` failed; provide a proof in `tests/sources/functional/ghost_field.proof.lean`:
-  verify enum_update by lean =>
-    verex_obligations
-    verex_on
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

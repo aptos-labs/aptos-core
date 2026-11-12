@@ -278,7 +278,7 @@ variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
 /-- The refactored generic-call boundary has exactly the previous concrete
 transport on arguments and results, including all failure/undefined outcomes. -/
 theorem generic_call {ρ : ResultShape} {Γ σs σs' : NRow}
-    (site : Nat) (handle : FunctionHandle) (typeArgs : Array TypeUse) (θ : TypeArgs)
+    (site : Nat) (handle : FunctionHandle) (typeArgs : Array GenericArgument) (θ : TypeArgs)
     (shape shape' : ResultShape)
     (resolved : (NRow.subst θ.1 σs == σs' && shape.subst θ.1 == shape') = true)
     (arguments : Args unit ρ Γ σs') (env : HEnv Γ) :

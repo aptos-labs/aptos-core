@@ -128,6 +128,22 @@ theorem SpecInt.ofInt_eq_of_val {width : IntWidth} {signed : Bool} (default x : 
     {value : Int} (named : x.val = value) : SpecInt.ofInt default value = x := by
   rw [← named, SpecInt.ofInt_val]
 
+/-- A Unicode scalar value: the carrier of `char`, the value its code point. -/
+structure SpecChar where
+  val : Nat
+  valid : isUnicodeScalar val = true
+
+theorem SpecChar.ext : ∀ {a b : SpecChar}, a.val = b.val → a = b
+  | ⟨_, _⟩, ⟨_, _⟩, rfl => rfl
+
+theorem SpecChar.eq_iff_val (left right : SpecChar) : left = right ↔ left.val = right.val :=
+  ⟨fun same => same ▸ rfl, SpecChar.ext⟩
+
+instance : DecidableEq SpecChar := fun left right =>
+  decidable_of_iff (left.val = right.val) (SpecChar.eq_iff_val left right).symm
+
+instance : Inhabited SpecChar := ⟨⟨0, by decide⟩⟩
+
 /-! ## Certified Move vectors
 
 Move's native vector carries an unsigned-64 length bound.
@@ -136,6 +152,18 @@ The neutral runtime and non-Move native arrays remain unrestricted. -/
 structure SpecVector (α : Type) where
   values : Array α
   bounded : values.size < 2 ^ 64
+
+/-- A string's UTF-8 bytes. A string too long for a vector has none here: no value of
+a running program is. -/
+def stringBytes (text : String) : SpecVector (SpecInt (.bits 8) false) :=
+  let values := text.toUTF8.data.map fun byte =>
+    SpecInt.ofInt (width := .bits 8) (signed := false) (default := ⟨0, by decide⟩)
+      (Int.ofNat byte.toNat)
+  if bounded : values.size < 2 ^ 64 then ⟨values, bounded⟩ else ⟨#[], by decide⟩
+
+/-- A character's UTF-8 encoding. -/
+def charEncode (value : SpecChar) : SpecVector (SpecInt (.bits 8) false) :=
+  stringBytes (String.singleton (Char.ofNat value.val))
 
 /-- Rebuilding a vector's certificate preserves the vector itself. -/
 theorem SpecVector.eta (vector : SpecVector α) (bounded : vector.values.size < 2 ^ 64) :
@@ -148,6 +176,17 @@ theorem SpecVector.eta (vector : SpecVector α) (bounded : vector.values.size < 
   rfl
 
 instance : Inhabited (SpecVector α) := ⟨⟨#[], by change 0 < 2 ^ 64; decide⟩⟩
+
+/-- A fixed-length array: a vector with the fact of its length. -/
+structure SpecArray (α : Type) (length : Nat) where
+  vector : SpecVector α
+  size_eq : vector.values.size = length
+
+theorem SpecArray.ext {length : Nat} {a b : SpecArray α length} (h : a.vector = b.vector) : a = b := by
+  cases a
+  cases b
+  cases h
+  rfl
 
 /-- Vectors are equal exactly when their values are: the form a goal about
 vectors is decided in. -/

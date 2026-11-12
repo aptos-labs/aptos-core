@@ -434,6 +434,7 @@ private def withMutablyBorrowedLocals (expressionsBefore : Nat)
     | fuel + 1, some (.field base ..) => rootLocal? base fuel
     | fuel + 1, some (.index base _) => rootLocal? base fuel
     | fuel + 1, some (.subslice base ..) => rootLocal? base fuel
+    | fuel + 1, some (.unsize base) => rootLocal? base fuel
     | fuel + 1, some (.downcast base _) => rootLocal? base fuel
     | _, _ => none
   -- A value borrow's operand reaches the local it borrows through field and

@@ -170,6 +170,7 @@ theorem RuntimeValue.eq_of_orderPayload {rank : ValueRanks} (a b : RuntimeValue)
     rw [eq_of_compare h.1, RuntimeValue.eq_of_order h.2]
   case loanHole.loanHole => rw [eq_of_compare h]
   case ghost.ghost => rw [RuntimeValue.eq_of_order h]
+  case retired.retired => rfl
 termination_by sizeOf a + sizeOf b
 decreasing_by all_goals (simp_wf; (try simp only [sizeOf_array]); omega)
 
@@ -277,6 +278,7 @@ theorem RuntimeValue.orderPayload_isLE_trans (rank : ValueRanks)
   cases a <;> cases b <;> cases c <;> intro k1 k2 <;> simp only [RuntimeValue.kindRank] at k1 k2 <;>
     (try omega) <;> intro left right <;> simp only [RuntimeValue.orderPayload] at left right ⊢
   case unit.unit.unit => rfl
+  case retired.retired.retired => rfl
   case bool.bool.bool => exact Std.TransCmp.isLE_trans left right
   case character.character.character => exact Std.TransCmp.isLE_trans left right
   case integer.integer.integer => exact Std.TransCmp.isLE_trans left right
@@ -414,6 +416,10 @@ ordering itself, and on primitive values the order is the natural one. -/
 
 @[simp] theorem RuntimeValue.order_string (rank : ValueRanks) (a b : String) :
     RuntimeValue.order rank (.string a) (.string b) = compare a b := by
+  simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
+
+@[simp] theorem RuntimeValue.order_character (rank : ValueRanks) (a b : Nat) :
+    RuntimeValue.order rank (.character a) (.character b) = compare a b := by
   simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
 
 @[simp] theorem RuntimeValue.order_bytes (rank : ValueRanks) (a b : Array UInt8) :

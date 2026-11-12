@@ -63,6 +63,7 @@ private partial def ty (ns : VerexIR.Validation.ValidatedNamespace) (id : VerexI
   | .tuple elements => return .tuple (← elements.toList.mapM (ty ns))
   | .vector element none => return .vector (← ty ns element)
   | .vector _ (some _) => fail "fixed-length vector type cannot be projected as Move XAST"
+  | .slice _ => fail "slice type cannot be projected as Move XAST"
   | .range => return .range
   | .eventStore => return .eventStore
   | .typeDomain type => return .typeDomain (← ty ns type)
@@ -96,6 +97,7 @@ private def surfaceSyntax : Option VerexIR.SurfaceSyntax → Except String (Opti
   | none => pure none
   | some .receiverCall => pure (some .receiverCall)
   | some .indexNotation => pure (some .indexNotation)
+  | some .componentMove => fail "a mutable reference moved out of an aggregate has no Move XAST"
   | some (.extension value) =>
       fail s!"surface extension `{value.tag}` cannot be projected as Move XAST"
 
@@ -268,6 +270,8 @@ mutual
           (.call .index [] [base, index] (some .indexNotation)), resultType)
     | .subslice .. =>
         fail "subslice place borrows cannot be projected as Move XAST"
+    | .unsize _ =>
+        fail "unsize place borrows cannot be projected as Move XAST"
     | .downcast .. =>
         fail "enum-downcast place borrows cannot be projected as Move XAST"
 

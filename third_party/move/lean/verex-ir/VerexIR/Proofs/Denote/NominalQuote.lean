@@ -119,20 +119,33 @@ private def nominalArguments : NTy → NRow
   | .struct _ arguments _ | .enum _ arguments _ _ _ => arguments
   | _ => .nil
 
+/-- Whether a nominal type is its declaration's layout at its arguments, which the
+declaration's descriptor names. Two other layouts of the same declaration are
+written out: a shared view of a declaration holding a mutable reference
+(`NTy.erase`), and a declaration holding a shared view of a type argument that
+holds one, whose field erases after the substitution (`structNTyFuel` at the
+arguments), which substituting the descriptor's layout does not. -/
 private def validateNominal (unitName : Name) (unit : Validation.ValidatedUnit)
-    (source : StructHandle) (type : NTy) : MetaM Unit := do
+    (source : StructHandle) (type : NTy) : MetaM Bool := do
   let name := nominalDescriptorName unitName source
   let schema ← descriptorSchema unitName unit source
   let some cached := (nominalCache.getState (← getEnv)).descriptors.find? name
     | throwError "internal: missing descriptor schema {name}"
-  if cached.validated.any (· == type) then return
+  if cached.validated.any (· == type) then return true
   let arguments := nominalArguments type
-  unless arguments.toList.length == (nominalArguments schema).toList.length &&
-      schema.subst arguments == type do
+  unless arguments.toList.length == (nominalArguments schema).toList.length do
     throwError "internal: native layout does not match declaration {repr source} in {unitName}"
-  let cached := { cached with validated := cached.validated.push type }
-  modifyEnv fun env => nominalCache.modifyState env fun state =>
-    { state with descriptors := state.descriptors.insert name cached }
+  let declared := schema.subst arguments
+  if declared == type then
+    let cached := { cached with validated := cached.validated.push type }
+    modifyEnv fun env => nominalCache.modifyState env fun state =>
+      { state with descriptors := state.descriptors.insert name cached }
+    return true
+  if declared.erase == type then return false
+  let atArguments := structNTyFuel (unitTypes unit) unit arguments (typeFuel unit) source
+  unless atArguments == some type || atArguments.map (·.erase) == some type do
+    throwError "internal: native layout does not match declaration {repr source} in {unitName}"
+  return false
 
 mutual
 private partial def quoteNativeCore (parameter : Nat → MetaM Lean.Expr)
@@ -146,14 +159,15 @@ private partial def quoteNativeCore (parameter : Nat → MetaM Lean.Expr)
   | .signer => return mkConst ``NTy.signer
   | .string => return mkConst ``NTy.string
   | .bytes => return mkConst ``NTy.bytes
+  | .char => return mkConst ``NTy.char
   | .param index => parameter index
   | .struct source arguments fields =>
       if !expandRoot then
         if let some (unitName, unit) ← activeNominalUnit then
-          validateNominal unitName unit source type
-          let name ← ensureNominalDescriptor unitName unit source ancestors
-          return mkAppN (mkConst name)
-            (← arguments.toList.toArray.mapM (quoteNativeCore parameter false ancestors))
+          if ← validateNominal unitName unit source type then
+            let name ← ensureNominalDescriptor unitName unit source ancestors
+            return mkAppN (mkConst name)
+              (← arguments.toList.toArray.mapM (quoteNativeCore parameter false ancestors))
         else
           unless (← getOptions).getBool syntheticNativeTypesOption do
             throwError "native nominal quotation requires a defined unit scope"
@@ -163,10 +177,10 @@ private partial def quoteNativeCore (parameter : Nat → MetaM Lean.Expr)
   | .enum source arguments names rows _ =>
       if !expandRoot then
         if let some (unitName, unit) ← activeNominalUnit then
-          validateNominal unitName unit source type
-          let name ← ensureNominalDescriptor unitName unit source ancestors
-          return mkAppN (mkConst name)
-            (← arguments.toList.toArray.mapM (quoteNativeCore parameter false ancestors))
+          if ← validateNominal unitName unit source type then
+            let name ← ensureNominalDescriptor unitName unit source ancestors
+            return mkAppN (mkConst name)
+              (← arguments.toList.toArray.mapM (quoteNativeCore parameter false ancestors))
         else
           unless (← getOptions).getBool syntheticNativeTypesOption do
             throwError "native nominal quotation requires a defined unit scope"
@@ -181,8 +195,18 @@ private partial def quoteNativeCore (parameter : Nat → MetaM Lean.Expr)
       return mkApp2 (mkConst ``NTy.table)
         (← quoteNativeCore parameter false ancestors key) (← quoteNativeCore parameter false ancestors value)
   | .vector element => return mkApp (mkConst ``NTy.vector) (← quoteNativeCore parameter false ancestors element)
+  | .slice element => return mkApp (mkConst ``NTy.slice) (← quoteNativeCore parameter false ancestors element)
+  | .array element length =>
+      return mkApp2 (mkConst ``NTy.array) (← quoteNativeCore parameter false ancestors element) (toExpr length)
   | .ref element => return mkApp (mkConst ``NTy.ref) (← quoteNativeCore parameter false ancestors element)
+  | .sliceRef element =>
+      return mkApp (mkConst ``NTy.sliceRef) (← quoteNativeCore parameter false ancestors element)
   | .ghost element => return mkApp (mkConst ``NTy.ghost) (← quoteNativeCore parameter false ancestors element)
+  | .observed referent =>
+      return mkApp (mkConst ``NTy.observed) (← quoteNativeCore parameter false ancestors referent)
+  | .nominal source arguments productive =>
+      return mkApp3 (mkConst ``NTy.nominal) (quoteSource source)
+        (← quoteNativeRowCore parameter ancestors arguments) (toExpr productive)
   | .function parameters shared results =>
       return mkApp3 (mkConst ``NTy.function)
         (← quoteNativeRowCore parameter ancestors parameters) (quoteSharing shared)

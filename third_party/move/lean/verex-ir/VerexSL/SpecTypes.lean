@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexSL.Registry
+import VerexSL.Reserved
 import VerexIR.Proofs.Typed
 import VerexIR.Proofs.Denote.Attr
 
@@ -113,7 +114,7 @@ private partial def fieldRep? (unit : ValidatedUnit) (twinName : QualifiedName �
   | .signer => some .signer
   | .bytes => some .bytes
   | .unit => some .unit
-  | .vector element _ =>
+  | .vector element _ | .slice element =>
       some (.vector (← fieldRep? unit twinName supported element profile) (profile == some .move))
   | .typeParameter index => some (.parameter index)
   | .nominal name arguments => do
@@ -142,14 +143,25 @@ private partial def structSupported (unit : ValidatedUnit)
             (structSupported unit · (qualified :: visiting))
             type.typeId (unit.namespaces[namespaceIndex]?.bind (·.profile))).isSome
 
+/-- A declaration's name within its namespace: after the scopes it is in. -/
+def scopedSpelling (qualified : QualifiedName) : String :=
+  "::".intercalate (qualified.scope.push qualified.name).toList
+
+/-- A declaration's path within its namespace as VerexSL source spells it, each
+segment escaped where it must be. -/
+def scopedSource (qualified : QualifiedName) : String :=
+  "::".intercalate ((qualified.scope.push qualified.name).map fun segment =>
+    (Lean.Name.mkSimple segment).toStringWithToken (isToken := isReservedWord)).toList
+
 /-- The generated Lean name of a struct's twin under the registered path:
 its simple name, or, when the unit declares several structs of that name in
-different modules, its module's path and name. -/
+different modules or scopes, their path and its name. -/
 def twinName (segments : Array String) (unit : ValidatedUnit) (ambiguous : String → Bool)
     (qualified : QualifiedName) : Name :=
   let base := segments.foldl (fun name segment => Name.str name segment) .anonymous
   let owner := if ambiguous qualified.name then
-      ((unit.tables.namespaces[qualified.namespaceId.index]?).map (·.segments)).getD #[]
+      ((unit.tables.namespaces[qualified.namespaceId.index]?).map (·.segments)).getD #[] ++
+        qualified.scope
     else #[]
   Name.str (owner.foldl (fun name segment => Name.str name segment) base) qualified.name
 

@@ -57,6 +57,10 @@ private def internInstantiated (lifetimes : Array Lifetime)
           let (types, element) ← internInstantiated lifetimes instantiations fuel types element
           let node := Ty.vector element length
           pure (internType types node (· == node))
+      | .slice element => do
+          let (types, element) ← internInstantiated lifetimes instantiations fuel types element
+          let node := Ty.slice element
+          pure (internType types node (· == node))
       | .typeDomain nested => do
           let (types, nested) ← internInstantiated lifetimes instantiations fuel types nested
           let node := Ty.typeDomain nested

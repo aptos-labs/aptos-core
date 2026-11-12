@@ -174,6 +174,39 @@ spec max where
 The items are spliced into the rendered namespace, indented one level, so
 they may name every declaration of the crate.
 
+The standard library's contracts are VerexSL items too, in
+`verex-rust/lib/<crate>/*.spec.lean`: scopes, contracts and models, one to a
+line, nested by indentation. Those of the functions a unit declares are spliced
+into the namespace of their crate, each file with its lines kept, and each is a
+`native_f` hypothesis of the theorems reaching it; a contract at a shape comes only
+for a call naming what the shape names. A namespace follows those its spliced
+items name. A model (`@[model(vector T)] opaque struct Vec {T} {A} where`) is read by
+the import, which rewrites the raw unit before validation: every use of the type is
+the VIR type, the declaration is dropped, its scope stays a name, and what only the
+type reached goes with it. A model with fields (`@[model] struct Iter {a : lifetime}
+{T} where`, its fields deeper than it) instead puts them in the opaque declaration,
+which then states no destructor.
+
+A Rust file has no in-body specifications, so a `spec` block states a loop's
+invariants as a `loop k where` member ([`verex-sl.md`](verex-sl.md), "Function
+contracts"). The rendering keeps the imported body, lowering places the
+conditions in the loop, and a failed invariant is reported at its clause in
+the specification file. A number counts the rendering's loops, which are the
+ones with a back edge in rustc's MIR, in the rendering's order: rustc removes
+`loop { …; break; }` and `while false`, and `if !c { A } else { B }` renders
+as `if c then B else A`. The invariants name the loop's source locals; a local
+rustc removed or renamed is an error at the clause.
+
+`verex-rust verify <Cargo.toml> --package <name>`, with the other arguments
+of `import-crate`, verifies a package's library crate. The crate is one
+namespace and its modules are scopes of it ([`vir-design.md`](vir-design.md)).
+Each file of a module has its specification file beside it (`src/a.spec.lean`
+for `src/a.rs`, `src/lib.spec.lean` for the root), whose items are spliced as a
+reopened `mod a where` block, so they name the module's declarations bare. An
+inline `mod m { … }` has no file of its own: its specifications are a nested
+`mod m where` block in those of the file declaring it. The crate's source
+names are relative to its Cargo workspace root, where rustc reads them.
+
 A native without a specification is read as the Move Prover reads it: by
 the model its prelude or translator gives the native, when it gives one,
 and otherwise not at all; a call to an unknown native is rejected ("has
@@ -418,14 +451,37 @@ Loading a proof file costs the header's elaboration of the rendering and
 the lowering of the items' step expressions, which runs with the items
 skipped so that their errors show. The language server interprets Verex's
 metaprograms, which the command line runs compiled: `ordered_map.proof.lean`
-loads in about 21 s, all of it interpretation. Two improvements are open:
+loads in about 21 s, all of it interpretation.
 
-- **Compiled metaprograms in the server**: Lake's `precompileModules` for
-  `verex-ir`, so that the server loads native code; costs a shared library
-  per module at build time. Expected to bring a load to a few seconds.
-- **Asynchronous lowering**: elaborating each `verify` item's steps as its
-  own snapshot task makes the file usable item by item; it does not shorten
-  the load.
+**Compiled metaprograms in the server** were measured and not adopted.
+`precompileModules` on the `VerexIR` library alone builds, and `lake
+setup-file` then hands the server `libverex_x2dir_VerexIR.so`, which Lean loads
+as a plugin (the `plugins` key of the setup; the neighbouring `dynlibs` key
+stays empty). Loading `ordered_map.proof.lean` under
+`verex.skip_verify`, over one set of `.olean` files, with the plugin and
+without:
+
+| Path | Wall |
+|---|---:|
+| Interpreted | 28–33 s |
+| Native plugin | 9–12 s |
+
+A bare `lake env lean` passes no plugin, so it measures the interpreted path.
+The library cannot be precompiled as a whole: with `precompileModules` on both
+of the package's libraries the build fails where a precompiled `VerexSL`
+module's shared object wants `VerexIR`'s initializers, which it is not linked
+against (`symbol lookup error: … undefined symbol:
+initialize_verex_x2dir_VerexIR_Proofs_Denote_Solve_Base`). The cost is the C
+compilation a library otherwise never does: 194 s over 23 modules, the solver
+being most of it (`Solve.Base` 46 s, `Solve.Decide` 31 s); linking the shared
+libraries is 7.5 s over 148 modules. The threefold load stands against that
+build cost on every machine, and only for files that *run* the metaprograms —
+elaborating a module that defines them pays code generation, which this does not
+touch. See also `performance.md` ("Tried and rejected").
+
+**Asynchronous lowering** is open: elaborating each `verify` item's steps as its
+own snapshot task makes the file usable item by item; it does not shorten the
+load.
 
 Work repeated per item belongs once per module or namespace: the printing
 context of a namespace (`Print.PrintNamespace.of`) is prepared once per
@@ -497,6 +553,12 @@ natively, and a message is mapped by the first rule that applies:
    `spec` item, so a failed function's summary lands on the source's `spec`
    block.
 3. A position outside every aligned node stays in the generated file.
+
+A failed `no panic` or `no abort` names its failing site's source position in
+its text, so the verifier reads it while it elaborates: the driver hands it the
+source's unit, whose body runs the sites of each shape in the same order as the
+rendering's, whatever temporaries the rendering folds, where rule 2 stops at
+the first temporary. A body where they differ keeps the rendering's position.
 
 ## Budgets
 
