@@ -262,17 +262,16 @@ In the end, the transaction needs to:
 1. Charge gas for its writes.
 2. Make writes visible to other transactions.
 
-The issue in the current design is that `borrow_global_mut`/`move_to` may CoW the value, but because there is no dirty bit, it is not possible to check whether the resource has actually been modified.
+The issue in the current design is that `borrow_global_mut`/`move_to` may CoW the value, but because there is no dirty bit, whether the resource has actually been modified can only be found by comparing it with the value it was read from.
 While patterns like `let x = borrow_global_mut<T>(...); if (cond) { mutate(x); }` are not very common, they exist.
 
 The proposal is to support this gradually.
 
 ### Step 1
 
-Any `borrow_global_mut`/`move_to` is considered side-effecting and produces a write.
-
-Status: superseded. At session end, each copied-on-write resource is compared against its read value and is no longer a write when the two are equal. This is a full value comparison, not yet the compaction-time `memcmp` of Step 2.
-Unlike V1, which emits a modification for every resource written through a mutable borrow, MonoMove therefore emits no write for a resource stored back unchanged.
+At session end, each copied-on-write resource is compared with the value it was read from, and is a write only if the two differ.
+This is a full value comparison rather than the compaction-time `memcmp` of Step 2.
+Unlike V1, which emits a modification for every resource written through a mutable borrow, a resource stored back unchanged is not a write.
 
 ### Step 2
 
