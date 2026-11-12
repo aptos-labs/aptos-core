@@ -72,10 +72,6 @@ use std::{
     sync::Arc,
 };
 
-pub(crate) type MonoMockKey = KeyType<[u8; 32]>;
-type MonoMockTxn = MockTransaction<MonoMockKey, MockEvent>;
-type MonoMockCommitted = MockOutput<MonoMockKey, MockEvent>;
-
 /// A mock value's backing allocation: the value's length followed by its bytes.
 /// The real VM points into an arena and pins it; the mock pins a plain
 /// allocation, which puts the same discipline under test without a VM.
@@ -186,7 +182,7 @@ fn type_tag(ty: InternedType) -> u32 {
 }
 
 /// The key a group member lives under in the data map.
-fn member_key(group_key: &MonoMockKey, tag: u32) -> MonoMockKey {
+fn member_key(group_key: &KeyType<[u8; 32]>, tag: u32) -> KeyType<[u8; 32]> {
     let mut bytes = group_key.0.to_vec();
     bytes.extend_from_slice(&tag.to_le_bytes());
     KeyType(*HashValue::sha3_256_of(&bytes))
@@ -198,8 +194,12 @@ fn tag_bytes(tag: u32) -> Bytes {
 
 struct MockGroupCodec;
 
-impl GroupCodec<MonoMockKey> for MockGroupCodec {
-    fn member_key(&self, group_key: &MonoMockKey, member_ty: InternedType) -> MonoMockKey {
+impl GroupCodec<KeyType<[u8; 32]>> for MockGroupCodec {
+    fn member_key(
+        &self,
+        group_key: &KeyType<[u8; 32]>,
+        member_ty: InternedType,
+    ) -> KeyType<[u8; 32]> {
         member_key(group_key, type_tag(member_ty))
     }
 
@@ -225,11 +225,11 @@ pub(crate) struct ExecutedTxn {
     /// Resource reads first, then group reads, which is the order the baseline
     /// splits them in.
     read_results: Vec<Option<Vec<u8>>>,
-    resource_writes: HashMap<MonoMockKey, MonoValue>,
-    group_writes: HashMap<MonoMockKey, MockGroupWrite>,
+    resource_writes: HashMap<KeyType<[u8; 32]>, MonoValue>,
+    group_writes: HashMap<KeyType<[u8; 32]>, MockGroupWrite>,
     /// What Block-STM versions: the resource writes, each group member under
     /// its own key, and one link per written group.
-    versioned_writes: HashMap<MonoMockKey, MonoValue>,
+    versioned_writes: HashMap<KeyType<[u8; 32]>, MonoValue>,
     events: Vec<MockEvent>,
     gas: u64,
 }
@@ -266,10 +266,10 @@ impl MonoMockOutput {
 }
 
 impl TxnOutput for MonoMockOutput {
-    type CommittedOutput = MonoMockCommitted;
-    type Key = MonoMockKey;
+    type CommittedOutput = MockOutput<KeyType<[u8; 32]>, MockEvent>;
+    type Key = KeyType<[u8; 32]>;
     type Tag = ();
-    type Txn = MonoMockTxn;
+    type Txn = MockTransaction<KeyType<[u8; 32]>, MockEvent>;
     type Value = MonoValue;
 
     fn skip_output() -> Self {
@@ -364,7 +364,7 @@ impl TxnOutput for MonoMockOutput {
 /// The versions one incarnation observed, recorded as the mock replays a
 /// spec. The real VM keeps them in its read-write set instead.
 pub(crate) struct MockReads {
-    reads: HashMap<MonoMockKey, Version>,
+    reads: HashMap<KeyType<[u8; 32]>, Version>,
     incarnation: Incarnation,
     speculative_failure: bool,
 }
@@ -380,13 +380,13 @@ impl MockReads {
 }
 
 impl TxnInput for MockReads {
-    type Key = MonoMockKey;
+    type Key = KeyType<[u8; 32]>;
     type Tag = ();
     type Value = MonoValue;
 
     fn validate_data_reads(
         &self,
-        data_map: &VersionedData<MonoMockKey, MonoValue>,
+        data_map: &VersionedData<KeyType<[u8; 32]>, MonoValue>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         !self.speculative_failure
@@ -402,7 +402,7 @@ impl TxnInput for MockReads {
 
     fn validate_group_reads(
         &self,
-        _group_map: &VersionedGroupData<MonoMockKey, (), MonoValue>,
+        _group_map: &VersionedGroupData<KeyType<[u8; 32]>, (), MonoValue>,
         _idx_to_validate: TxnIndex,
     ) -> bool {
         !self.speculative_failure
@@ -448,7 +448,7 @@ impl TxnInput for MockReads {
         false
     }
 
-    fn get_read_summary(&self) -> HashSet<InputOutputKey<MonoMockKey, ()>> {
+    fn get_read_summary(&self) -> HashSet<InputOutputKey<KeyType<[u8; 32]>, ()>> {
         HashSet::new()
     }
 }
@@ -456,16 +456,16 @@ impl TxnInput for MockReads {
 /// Replays one incarnation, caching reads the way a VM caches them so that a key
 /// read twice observes one value and pins one version.
 struct MockSession<'a, S> {
-    reader: &'a ParallelReader<'a, MonoMockKey>,
+    reader: &'a ParallelReader<'a, KeyType<[u8; 32]>>,
     /// Pre-block state.
     base_view: &'a S,
     reads: MockReads,
-    cache: HashMap<MonoMockKey, Option<Vec<u8>>>,
+    cache: HashMap<KeyType<[u8; 32]>, Option<Vec<u8>>>,
 }
 
-impl<'a, S: TStateView<Key = MonoMockKey>> MockSession<'a, S> {
+impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
     fn new(
-        reader: &'a ParallelReader<'a, MonoMockKey>,
+        reader: &'a ParallelReader<'a, KeyType<[u8; 32]>>,
         base_view: &'a S,
         incarnation: Incarnation,
     ) -> Self {
@@ -479,7 +479,7 @@ impl<'a, S: TStateView<Key = MonoMockKey>> MockSession<'a, S> {
 
     fn get_pre_block_value(
         &self,
-        key: &MonoMockKey,
+        key: &KeyType<[u8; 32]>,
     ) -> Result<Option<StateValue>, ResourceProviderError> {
         self.base_view
             .get_state_value(key)
@@ -488,7 +488,7 @@ impl<'a, S: TStateView<Key = MonoMockKey>> MockSession<'a, S> {
 
     fn read_resource(
         &mut self,
-        key: &MonoMockKey,
+        key: &KeyType<[u8; 32]>,
     ) -> Result<Option<Vec<u8>>, ResourceProviderError> {
         self.read(key, |session| {
             session.reader.read_or_initialize(key, || {
@@ -502,7 +502,7 @@ impl<'a, S: TStateView<Key = MonoMockKey>> MockSession<'a, S> {
 
     fn read_group_member(
         &mut self,
-        group_key: &MonoMockKey,
+        group_key: &KeyType<[u8; 32]>,
         tag: u32,
     ) -> Result<Option<Vec<u8>>, ResourceProviderError> {
         let key = member_key(group_key, tag);
@@ -523,7 +523,7 @@ impl<'a, S: TStateView<Key = MonoMockKey>> MockSession<'a, S> {
 
     fn get_pre_block_group(
         &self,
-        group_key: &MonoMockKey,
+        group_key: &KeyType<[u8; 32]>,
     ) -> Result<GroupView, ResourceProviderError> {
         let Some(value) = self.get_pre_block_value(group_key)? else {
             return Ok(GroupView::new());
@@ -540,7 +540,7 @@ impl<'a, S: TStateView<Key = MonoMockKey>> MockSession<'a, S> {
     /// Serves a read from the cache, or through `read` on the first one.
     fn read(
         &mut self,
-        key: &MonoMockKey,
+        key: &KeyType<[u8; 32]>,
         read: impl FnOnce(&Self) -> Result<StorageRead, ResourceProviderError>,
     ) -> Result<Option<Vec<u8>>, ResourceProviderError> {
         if let Some(cached) = self.cache.get(key) {
@@ -556,7 +556,7 @@ impl<'a, S: TStateView<Key = MonoMockKey>> MockSession<'a, S> {
     /// Replays a spec: reads first, then the writes derived from them.
     fn run(
         &mut self,
-        behavior: &MockIncarnation<MonoMockKey, MockEvent>,
+        behavior: &MockIncarnation<KeyType<[u8; 32]>, MockEvent>,
     ) -> Result<ExecutedTxn, ResourceProviderError> {
         assert!(
             behavior.deltas.is_empty()
@@ -626,7 +626,7 @@ impl<'a, S: TStateView<Key = MonoMockKey>> MockSession<'a, S> {
     /// mock so both executors write the same groups for the same spec.
     fn group_member_op(
         &mut self,
-        group_key: &MonoMockKey,
+        group_key: &KeyType<[u8; 32]>,
         tag: u32,
         inner_op: &ValueType,
     ) -> Result<Option<ValueType>, ResourceProviderError> {
@@ -665,7 +665,7 @@ impl MonoMockExecutor {
         txn: ExecutedTxn,
         mode: ViewMode<'_, MockReads>,
         txn_idx: TxnIndex,
-    ) -> Result<MonoMockCommitted, PanicError> {
+    ) -> Result<MockOutput<KeyType<[u8; 32]>, MockEvent>, PanicError> {
         let ViewMode::Parallel { versioned_map, .. } = mode else {
             return Err(code_invariant_error(
                 "The MonoMove mock executor only runs in parallel",
@@ -753,10 +753,10 @@ impl MonoMockExecutor {
 impl SingleTransactionExecutor for MonoMockExecutor {
     type AuxiliaryInfo = AuxiliaryInfo;
     type Input = MockReads;
-    type Key = MonoMockKey;
+    type Key = KeyType<[u8; 32]>;
     type Output = MonoMockOutput;
     type Tag = ();
-    type Txn = MonoMockTxn;
+    type Txn = MockTransaction<KeyType<[u8; 32]>, MockEvent>;
     type Value = MonoValue;
 
     fn init(
@@ -859,15 +859,18 @@ impl SingleTransactionExecutor for MonoMockExecutor {
         _shared: SharedViewArgs<'_, S>,
         mode: ViewMode<'_, Self::Input>,
         txn_idx: TxnIndex,
-    ) -> Result<MonoMockCommitted, PanicOr<ResourceGroupSerializationError>> {
+    ) -> Result<MockOutput<KeyType<[u8; 32]>, MockEvent>, PanicOr<ResourceGroupSerializationError>>
+    {
         Ok(match output {
             MonoMockOutput::Executed(txn) => Self::committed_output(*txn, mode, txn_idx)?,
             MonoMockOutput::Retry { gas } => {
-                let mut retry = MonoMockCommitted::retry();
+                let mut retry = MockOutput::<KeyType<[u8; 32]>, MockEvent>::retry();
                 retry.total_gas = gas;
                 retry
             },
-            MonoMockOutput::Empty => MonoMockCommitted::empty_success_output(),
+            MonoMockOutput::Empty => {
+                MockOutput::<KeyType<[u8; 32]>, MockEvent>::empty_success_output()
+            },
         })
     }
 
