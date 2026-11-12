@@ -628,6 +628,12 @@ fn verify_snapshots(
                     state_value_in_db.as_ref(),
                 )
                 .unwrap();
+            assert_eq!(
+                db.get_state_value_with_version_at_checkpoint(state_key, snapshot_version)
+                    .unwrap()
+                    .map(|(_, value)| value),
+                *state_value,
+            );
         }
         cur_version = snapshot_version + 1;
     }
