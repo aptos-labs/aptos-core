@@ -21,9 +21,7 @@ use crate::{
     errors::ResourceGroupSerializationError,
     executor_utilities::Materializer,
     mono_move::{
-        group_chain::{
-            committed_member_value, encode_group, view_before, GroupCodec, GroupLink, GroupView,
-        },
+        group_chain::{committed_value, encode_group, unbuilt_links_before, GroupLink, GroupView},
         version_matches, MonoValue, ParallelReader,
     },
     single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
@@ -31,7 +29,6 @@ use crate::{
     types::InputOutputKey,
 };
 use aptos_aggregator::delayed_change::DelayedChange;
-use aptos_crypto::HashValue;
 use aptos_mvhashmap::{
     types::{Incarnation, MVDataError, MVDataOutput, TxnIndex},
     versioned_data::VersionedData,
@@ -53,12 +50,8 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use bytes::Bytes;
-use mono_move_core::{
-    storage::resource_provider::{ReadPin, ResourceProviderError, StorageRead, Version},
-    types::{
-        InternedType, Type, ADDRESS_TY, BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY, I64_TY, I8_TY,
-        SIGNER_TY, U128_TY, U16_TY, U256_TY, U32_TY, U64_TY, U8_TY,
-    },
+use mono_move_core::storage::resource_provider::{
+    ReadPin, ResourceProviderError, StorageRead, Version,
 };
 use mono_move_global_context::GlobalContext;
 use move_binary_format::CompiledModule;
@@ -80,7 +73,7 @@ struct MockBlob(Box<[u8]>);
 impl ReadPin for MockBlob {}
 
 /// Builds the in-memory value for `bytes`, pinned to a fresh allocation.
-fn mock_value(bytes: &[u8], kind: WriteOpKind) -> MonoValue {
+fn mock_value(bytes: &[u8], kind: WriteOpKind) -> MonoValue<MockKey> {
     let mut blob = Vec::with_capacity(8 + bytes.len());
     blob.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
     blob.extend_from_slice(bytes);
@@ -120,7 +113,7 @@ fn read_bytes(read: &StorageRead) -> Option<Vec<u8>> {
 }
 
 /// The in-memory value for a mock write.
-fn write_value(value: &ValueType) -> MonoValue {
+fn write_value(value: &ValueType) -> MonoValue<MockKey> {
     match value.bytes() {
         Some(bytes) => mock_value(bytes, value.write_op_kind()),
         None => MonoValue::Deletion,
@@ -129,7 +122,7 @@ fn write_value(value: &ValueType) -> MonoValue {
 
 /// The mock write a map value came from. Exact, because the mock never attaches
 /// metadata to a value inside a group.
-fn value_type(value: &MonoValue) -> Result<ValueType, PanicError> {
+fn value_type(value: &MonoValue<MockKey>) -> Result<ValueType, PanicError> {
     Ok(match value {
         MonoValue::Write { ptr, kind, .. } => ValueType::new(
             // SAFETY: the entry holding this pointer also holds its pin.
@@ -146,78 +139,66 @@ fn value_type(value: &MonoValue) -> Result<ValueType, PanicError> {
     })
 }
 
-static VECTOR_U8: Type = Type::Vector { elem: U8_TY };
-
-/// The member type standing in for each group tag the generator produces
-/// (`0..16`). The chained groups name members by type, and the mock has no
-/// types of its own.
-const TAG_TYPES: [InternedType; 16] = [
-    BOOL_TY,
-    U8_TY,
-    U16_TY,
-    U32_TY,
-    U64_TY,
-    U128_TY,
-    U256_TY,
-    I8_TY,
-    I16_TY,
-    I32_TY,
-    I64_TY,
-    I128_TY,
-    I256_TY,
-    ADDRESS_TY,
-    SIGNER_TY,
-    InternedType::from_static(&VECTOR_U8),
-];
-
-fn tag_type(tag: u32) -> InternedType {
-    TAG_TYPES[tag as usize]
+/// The mock's Block-STM key: a key of the generated specs, or one member of the
+/// group stored at such a key. Members are versioned under their own keys.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub(crate) enum MockKey {
+    Resource(KeyType<[u8; 32]>),
+    GroupMember(KeyType<[u8; 32]>, u32),
 }
 
-fn type_tag(ty: InternedType) -> u32 {
-    TAG_TYPES
-        .iter()
-        .position(|t| *t == ty)
-        .expect("Every mock member type stands for a tag") as u32
-}
-
-/// The key a group member lives under in the data map.
-fn member_key(group_key: &KeyType<[u8; 32]>, tag: u32) -> KeyType<[u8; 32]> {
-    let mut bytes = group_key.0.to_vec();
-    bytes.extend_from_slice(&tag.to_le_bytes());
-    KeyType(*HashValue::sha3_256_of(&bytes))
-}
-
+/// A group member's key in its group's view.
 fn tag_bytes(tag: u32) -> Bytes {
     bcs::to_bytes(&tag).expect("A u32 always serializes").into()
 }
 
-struct MockGroupCodec;
+/// What committed transaction `writer_idx` wrote to the group member at `key`:
+/// the member's key in the view, and its new bytes or [`None`] if it was
+/// deleted.
+fn member_change(
+    data: &VersionedData<MockKey, MonoValue<MockKey>>,
+    key: &MockKey,
+    writer_idx: TxnIndex,
+) -> Result<(Bytes, Option<Bytes>), PanicError> {
+    let tag = match key {
+        MockKey::GroupMember(_, tag) => tag_bytes(*tag),
+        MockKey::Resource(_) => return Err(code_invariant_error("A group link names a resource")),
+    };
+    let bytes = match committed_value(data, key, writer_idx)? {
+        // SAFETY: the value holds the pin for the allocation it points into.
+        MonoValue::Write { ptr, .. } => Some(unsafe { blob_bytes(ptr) }.into()),
+        MonoValue::Deletion => None,
+        MonoValue::GroupMetadata { .. } => {
+            return Err(code_invariant_error("A group member holds group metadata"))
+        },
+    };
+    Ok((tag, bytes))
+}
 
-impl GroupCodec<KeyType<[u8; 32]>> for MockGroupCodec {
-    fn member_key(
-        &self,
-        group_key: &KeyType<[u8; 32]>,
-        member_ty: InternedType,
-    ) -> KeyType<[u8; 32]> {
-        member_key(group_key, type_tag(member_ty))
+/// The view of `link`, which committed transaction `writer_idx` wrote, built
+/// on top of `prev` unless it is built already.
+fn build_committed_view(
+    data: &VersionedData<MockKey, MonoValue<MockKey>>,
+    link: &GroupLink<MockKey>,
+    prev: &GroupView,
+    writer_idx: TxnIndex,
+) -> Result<Arc<GroupView>, PanicError> {
+    if let Some(view) = link.view() {
+        return Ok(view.clone());
     }
-
-    fn tag_bytes(&self, member_ty: InternedType) -> Result<Bytes, PanicError> {
-        Ok(tag_bytes(type_tag(member_ty)))
-    }
-
-    fn serialize(&self, ptr: NonNull<u8>, _member_ty: InternedType) -> Result<Bytes, PanicError> {
-        // SAFETY: the caller holds the pin for the allocation `ptr` points into.
-        Ok(unsafe { blob_bytes(ptr) }.into())
-    }
+    let changes = link
+        .changes()
+        .iter()
+        .map(|key| member_change(data, key, writer_idx))
+        .collect::<Result<Vec<_>, PanicError>>()?;
+    Ok(link.build_view(prev, changes))
 }
 
 /// One transaction's writes to a group.
 struct MockGroupWrite {
     metadata: StateValueMetadata,
-    members: BTreeMap<u32, MonoValue>,
-    link: Arc<GroupLink>,
+    members: BTreeMap<u32, MonoValue<MockKey>>,
+    link: Arc<GroupLink<MockKey>>,
 }
 
 /// One incarnation's reads and writes, before materialization.
@@ -225,11 +206,11 @@ pub(crate) struct ExecutedTxn {
     /// Resource reads first, then group reads, which is the order the baseline
     /// splits them in.
     read_results: Vec<Option<Vec<u8>>>,
-    resource_writes: HashMap<KeyType<[u8; 32]>, MonoValue>,
+    resource_writes: HashMap<KeyType<[u8; 32]>, MonoValue<MockKey>>,
     group_writes: HashMap<KeyType<[u8; 32]>, MockGroupWrite>,
     /// What Block-STM versions: the resource writes, each group member under
     /// its own key, and one link per written group.
-    versioned_writes: HashMap<KeyType<[u8; 32]>, MonoValue>,
+    versioned_writes: HashMap<MockKey, MonoValue<MockKey>>,
     events: Vec<MockEvent>,
     gas: u64,
 }
@@ -267,10 +248,10 @@ impl MonoMockOutput {
 
 impl TxnOutput for MonoMockOutput {
     type CommittedOutput = MockOutput<KeyType<[u8; 32]>, MockEvent>;
-    type Key = KeyType<[u8; 32]>;
+    type Key = MockKey;
     type Tag = ();
     type Txn = MockTransaction<KeyType<[u8; 32]>, MockEvent>;
-    type Value = MonoValue;
+    type Value = MonoValue<MockKey>;
 
     fn skip_output() -> Self {
         MonoMockOutput::Retry { gas: 0 }
@@ -364,7 +345,7 @@ impl TxnOutput for MonoMockOutput {
 /// The versions one incarnation observed, recorded as the mock replays a
 /// spec. The real VM keeps them in its read-write set instead.
 pub(crate) struct MockReads {
-    reads: HashMap<KeyType<[u8; 32]>, Version>,
+    reads: HashMap<MockKey, Version>,
     incarnation: Incarnation,
     speculative_failure: bool,
 }
@@ -380,13 +361,13 @@ impl MockReads {
 }
 
 impl TxnInput for MockReads {
-    type Key = KeyType<[u8; 32]>;
+    type Key = MockKey;
     type Tag = ();
-    type Value = MonoValue;
+    type Value = MonoValue<MockKey>;
 
     fn validate_data_reads(
         &self,
-        data_map: &VersionedData<KeyType<[u8; 32]>, MonoValue>,
+        data_map: &VersionedData<MockKey, MonoValue<MockKey>>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         !self.speculative_failure
@@ -402,7 +383,7 @@ impl TxnInput for MockReads {
 
     fn validate_group_reads(
         &self,
-        _group_map: &VersionedGroupData<KeyType<[u8; 32]>, (), MonoValue>,
+        _group_map: &VersionedGroupData<MockKey, (), MonoValue<MockKey>>,
         _idx_to_validate: TxnIndex,
     ) -> bool {
         !self.speculative_failure
@@ -448,7 +429,7 @@ impl TxnInput for MockReads {
         false
     }
 
-    fn get_read_summary(&self) -> HashSet<InputOutputKey<KeyType<[u8; 32]>, ()>> {
+    fn get_read_summary(&self) -> HashSet<InputOutputKey<MockKey, ()>> {
         HashSet::new()
     }
 }
@@ -456,16 +437,16 @@ impl TxnInput for MockReads {
 /// Replays one incarnation, caching reads the way a VM caches them so that a key
 /// read twice observes one value and pins one version.
 struct MockSession<'a, S> {
-    reader: &'a ParallelReader<'a, KeyType<[u8; 32]>>,
+    reader: &'a ParallelReader<'a, MockKey>,
     /// Pre-block state.
     base_view: &'a S,
     reads: MockReads,
-    cache: HashMap<KeyType<[u8; 32]>, Option<Vec<u8>>>,
+    cache: HashMap<MockKey, Option<Vec<u8>>>,
 }
 
 impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
     fn new(
-        reader: &'a ParallelReader<'a, KeyType<[u8; 32]>>,
+        reader: &'a ParallelReader<'a, MockKey>,
         base_view: &'a S,
         incarnation: Incarnation,
     ) -> Self {
@@ -490,13 +471,15 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
         &mut self,
         key: &KeyType<[u8; 32]>,
     ) -> Result<Option<Vec<u8>>, ResourceProviderError> {
-        self.read(key, |session| {
-            session.reader.read_or_initialize(key, || {
-                Ok(match session.get_pre_block_value(key)? {
-                    Some(value) => mock_value(value.bytes(), WriteOpKind::Modification),
-                    None => MonoValue::Deletion,
+        self.read(&MockKey::Resource(*key), |session| {
+            session
+                .reader
+                .read_or_initialize(&MockKey::Resource(*key), || {
+                    Ok(match session.get_pre_block_value(key)? {
+                        Some(value) => mock_value(value.bytes(), WriteOpKind::Modification),
+                        None => MonoValue::Deletion,
+                    })
                 })
-            })
         })
     }
 
@@ -505,12 +488,12 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
         group_key: &KeyType<[u8; 32]>,
         tag: u32,
     ) -> Result<Option<Vec<u8>>, ResourceProviderError> {
-        let key = member_key(group_key, tag);
+        let key = MockKey::GroupMember(*group_key, tag);
         self.read(&key, |session| {
             session.reader.read_or_initialize(&key, || {
                 let group = session
                     .reader
-                    .get_or_initialize_pre_block_group(group_key, || {
+                    .get_or_initialize_pre_block_group(&MockKey::Resource(*group_key), || {
                         session.get_pre_block_group(group_key)
                     })?;
                 Ok(match group.get(&tag_bytes(tag)) {
@@ -540,7 +523,7 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
     /// Serves a read from the cache, or through `read` on the first one.
     fn read(
         &mut self,
-        key: &KeyType<[u8; 32]>,
+        key: &MockKey,
         read: impl FnOnce(&Self) -> Result<StorageRead, ResourceProviderError>,
     ) -> Result<Option<Vec<u8>>, ResourceProviderError> {
         if let Some(cached) = self.cache.get(key) {
@@ -582,7 +565,10 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
             .iter()
             .map(|(key, value, _)| (*key, write_value(value)))
             .collect::<HashMap<_, _>>();
-        let mut versioned_writes = resource_writes.clone();
+        let mut versioned_writes = resource_writes
+            .iter()
+            .map(|(key, value)| (MockKey::Resource(*key), value.clone()))
+            .collect::<HashMap<_, _>>();
 
         let mut group_writes = HashMap::new();
         for (group_key, metadata, inner_ops) in &behavior.group_writes {
@@ -592,16 +578,19 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
                     continue;
                 };
                 let value = write_value(&op);
-                versioned_writes.insert(member_key(group_key, *tag), value.clone());
+                versioned_writes.insert(MockKey::GroupMember(*group_key, *tag), value.clone());
                 members.insert(*tag, value);
             }
             if members.is_empty() {
                 continue;
             }
             let link = Arc::new(GroupLink::from_changes(
-                members.keys().map(|tag| tag_type(*tag)).collect(),
+                members
+                    .keys()
+                    .map(|tag| MockKey::GroupMember(*group_key, *tag))
+                    .collect(),
             ));
-            versioned_writes.insert(*group_key, MonoValue::GroupMetadata {
+            versioned_writes.insert(MockKey::Resource(*group_key), MonoValue::GroupMetadata {
                 group: link.clone(),
             });
             group_writes.insert(*group_key, MockGroupWrite {
@@ -690,10 +679,12 @@ impl MonoMockExecutor {
                 link,
             } = group_write;
             let data = versioned_map.data();
-            let prev = view_before(data, &MockGroupCodec, group_key, txn_idx)?;
-            let view = link.build_view(&MockGroupCodec, &prev, |member_ty| {
-                committed_member_value(data, &MockGroupCodec, group_key, member_ty, txn_idx)
-            })?;
+            let (mut prev, unbuilt) =
+                unbuilt_links_before(data, &MockKey::Resource(*group_key), txn_idx)?;
+            for (writer_idx, link) in unbuilt {
+                prev = build_committed_view(data, &link, &prev, writer_idx)?;
+            }
+            let view = build_committed_view(data, link, &prev, txn_idx)?;
             let assembled = view
                 .iter()
                 .map(|(tag, bytes)| {
@@ -753,11 +744,11 @@ impl MonoMockExecutor {
 impl SingleTransactionExecutor for MonoMockExecutor {
     type AuxiliaryInfo = AuxiliaryInfo;
     type Input = MockReads;
-    type Key = KeyType<[u8; 32]>;
+    type Key = MockKey;
     type Output = MonoMockOutput;
     type Tag = ();
     type Txn = MockTransaction<KeyType<[u8; 32]>, MockEvent>;
-    type Value = MonoValue;
+    type Value = MonoValue<MockKey>;
 
     fn init(
         _environment: &AptosEnvironment,
@@ -888,7 +879,7 @@ impl SingleTransactionExecutor for MonoMockExecutor {
         match txn {
             MockTransaction::Write { pre_writes, .. } => pre_writes
                 .iter()
-                .map(|(key, value)| (*key, write_value(value)))
+                .map(|(key, value)| (MockKey::Resource(*key), write_value(value)))
                 .collect(),
             MockTransaction::InterruptRequested
             | MockTransaction::SkipRest(_)
@@ -901,6 +892,11 @@ impl SingleTransactionExecutor for MonoMockExecutor {
         &self,
         key: Self::Key,
     ) -> Result<<Self::Txn as Transaction>::Key, PanicError> {
-        Ok(key)
+        match key {
+            MockKey::Resource(key) => Ok(key),
+            MockKey::GroupMember(..) => Err(code_invariant_error(
+                "A group member has no storage key of its own",
+            )),
+        }
     }
 }
