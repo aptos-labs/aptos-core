@@ -263,8 +263,12 @@ impl TxnInput for MonoReads {
     }
 
     fn is_incorrect_use(&self) -> bool {
-        // A read that cannot be served aborts the transaction speculatively, so
-        // a read set that reaches validation is always well formed.
+        // The legacy view records code invariant violations here because it
+        // cannot return them through the VM. MonoMove's providers return them as
+        // errors instead.
+        //
+        // TODO(correctness): such an error fails only the transaction, while the
+        // legacy path fails the block.
         false
     }
 
