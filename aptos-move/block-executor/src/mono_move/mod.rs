@@ -341,24 +341,16 @@ impl std::fmt::Debug for MonoTxnOutput {
     }
 }
 
-/// The frozen effects of a committed, executed transaction, or `None` for a
-/// discard or an empty-effects commit (both write nothing).
-fn committed_effects(outcome: &TxnOutcome) -> Option<&SessionEffects> {
-    match outcome {
-        TxnOutcome::Executed { effects, .. } => Some(effects),
-        TxnOutcome::Discarded { .. } => None,
-        TxnOutcome::ExecutedNoEffects(_) => None,
-        // TODO(correctness): Revisit this arm: unexpected system txn errors
-        //   should be handled at execution time!
-        TxnOutcome::UnexpectedSystemTransactionFailure(_) => None,
-        TxnOutcome::Panic(_) => None,
-    }
-}
-
 impl MonoTxnOutput {
     fn executed(outcome: Arc<TxnOutcome>, skips_rest: bool) -> Self {
+        let mut output = MonoTxnOutput::Executed {
+            outcome,
+            skips_rest,
+            group_metadata: vec![],
+        };
         let mut changed_groups: HashMap<_, Vec<_>> = HashMap::new();
-        for (key, _, group) in committed_effects(&outcome)
+        for (key, _, group) in output
+            .effects()
             .into_iter()
             .flat_map(|effects| effects.read_write_set().writes_unordered())
         {
@@ -369,23 +361,33 @@ impl MonoTxnOutput {
                     .push(key.clone());
             }
         }
-        let group_metadata = changed_groups
-            .into_iter()
-            .map(|(group_key, changed)| (group_key, Arc::new(GroupMetadata::from_changes(changed))))
-            .collect();
-
-        MonoTxnOutput::Executed {
-            outcome,
-            skips_rest,
-            group_metadata,
+        match &mut output {
+            MonoTxnOutput::Executed { group_metadata, .. } => {
+                *group_metadata = changed_groups
+                    .into_iter()
+                    .map(|(group_key, changes)| {
+                        (group_key, Arc::new(GroupMetadata::from_changes(changes)))
+                    })
+                    .collect();
+            },
+            MonoTxnOutput::SkippedToRetry => {},
         }
+        output
     }
 
     /// The frozen effects of a committed, executed transaction, or `None` for a
     /// discard, an empty-effects commit, or a skip (all write nothing).
     fn effects(&self) -> Option<&SessionEffects> {
         match self {
-            MonoTxnOutput::Executed { outcome, .. } => committed_effects(outcome),
+            MonoTxnOutput::Executed { outcome, .. } => match outcome.as_ref() {
+                TxnOutcome::Executed { effects, .. } => Some(effects),
+                TxnOutcome::Discarded { .. } => None,
+                TxnOutcome::ExecutedNoEffects(_) => None,
+                // TODO(correctness): Revisit this arm: unexpected system txn errors
+                //   should be handled at execution time!
+                TxnOutcome::UnexpectedSystemTransactionFailure(_) => None,
+                TxnOutcome::Panic(_) => None,
+            },
             MonoTxnOutput::SkippedToRetry => None,
         }
     }
