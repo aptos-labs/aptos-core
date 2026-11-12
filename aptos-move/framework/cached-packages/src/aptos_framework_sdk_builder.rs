@@ -454,6 +454,23 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
+    /// Publishes `GlobalConfig` on a chain whose genesis never ran this module's `init_module`.
+    ///
+    /// Genesis writes the framework's module bytes directly, which bypasses the VM flow that
+    /// auto-invokes `init_module`, and `vm_genesis::initialize_confidential_asset` compensates by
+    /// calling `init_module_for_devnet` only when the chain is neither mainnet nor testnet. A
+    /// network genesis'd under the mainnet or testnet chain ID therefore ends up with this module
+    /// published but no `GlobalConfig`, so every entry point here aborts with `MISSING_DATA`. There
+    /// is no other way to install it after genesis: `init_module` is not callable post-publish, and
+    /// the `V1`-to-`V2` upgrade in `set_emergency_paused` needs a `V1` to already exist.
+    ///
+    /// The resulting state matches what a fresh `init_module` would have produced on the same chain.
+    ///
+    /// No-op when `GlobalConfig` is already published, so a re-run or re-dispatched proposal is
+    /// safe. Never make this replace an existing config: rotating `extend_ref` would orphan every
+    /// `AssetConfig` object and every asset pool's primary store, stranding user balances.
+    ConfidentialAssetInitializeGlobalConfig {},
+
     /// Add `amount` of coins to the delegation pool `pool_address`.
     DelegationPoolAddStake {
         pool_address: AccountAddress,
@@ -1552,6 +1569,9 @@ impl EntryFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
+            ConfidentialAssetInitializeGlobalConfig {} => {
+                confidential_asset_initialize_global_config()
+            },
             DelegationPoolAddStake {
                 pool_address,
                 amount,
@@ -3197,6 +3217,36 @@ pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
         ),
         ident_str!("upgrade_supply").to_owned(),
         vec![coin_type],
+        vec![],
+    ))
+}
+
+/// Publishes `GlobalConfig` on a chain whose genesis never ran this module's `init_module`.
+///
+/// Genesis writes the framework's module bytes directly, which bypasses the VM flow that
+/// auto-invokes `init_module`, and `vm_genesis::initialize_confidential_asset` compensates by
+/// calling `init_module_for_devnet` only when the chain is neither mainnet nor testnet. A
+/// network genesis'd under the mainnet or testnet chain ID therefore ends up with this module
+/// published but no `GlobalConfig`, so every entry point here aborts with `MISSING_DATA`. There
+/// is no other way to install it after genesis: `init_module` is not callable post-publish, and
+/// the `V1`-to-`V2` upgrade in `set_emergency_paused` needs a `V1` to already exist.
+///
+/// The resulting state matches what a fresh `init_module` would have produced on the same chain.
+///
+/// No-op when `GlobalConfig` is already published, so a re-run or re-dispatched proposal is
+/// safe. Never make this replace an existing config: rotating `extend_ref` would orphan every
+/// `AssetConfig` object and every asset pool's primary store, stranding user balances.
+pub fn confidential_asset_initialize_global_config() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("confidential_asset").to_owned(),
+        ),
+        ident_str!("initialize_global_config").to_owned(),
+        vec![],
         vec![],
     ))
 }
@@ -6368,6 +6418,16 @@ mod decoder {
         }
     }
 
+    pub fn confidential_asset_initialize_global_config(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::ConfidentialAssetInitializeGlobalConfig {})
+        } else {
+            None
+        }
+    }
+
     pub fn delegation_pool_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolAddStake {
@@ -8044,6 +8104,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_upgrade_supply".to_string(),
             Box::new(decoder::coin_upgrade_supply),
+        );
+        map.insert(
+            "confidential_asset_initialize_global_config".to_string(),
+            Box::new(decoder::confidential_asset_initialize_global_config),
         );
         map.insert(
             "delegation_pool_add_stake".to_string(),
