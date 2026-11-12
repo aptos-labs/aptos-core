@@ -88,7 +88,7 @@ pub struct GroupLink {
     /// keys. Empty for the stored group.
     changed: Vec<InternedType>,
     /// The group's members after these changes. Set when the stored group is
-    /// provisioned, and built once for a transaction's link.
+    /// initialized, and built once for a transaction's link.
     view: OnceLock<Arc<GroupView>>,
     /// The group's members before these changes. Only set in sequential
     /// execution, where this link replaces the previous one at the group's
@@ -98,7 +98,7 @@ pub struct GroupLink {
 
 impl GroupLink {
     /// The link for the group as storage holds it.
-    pub(crate) fn stored(view: GroupView) -> Self {
+    pub(crate) fn from_storage(view: GroupView) -> Self {
         Self {
             changed: vec![],
             view: OnceLock::from(Arc::new(view)),
@@ -107,7 +107,7 @@ impl GroupLink {
     }
 
     /// The link for one transaction's changes to the group.
-    pub(crate) fn changed(changed: Vec<InternedType>) -> Self {
+    pub(crate) fn from_changes(changed: Vec<InternedType>) -> Self {
         Self {
             changed,
             view: OnceLock::new(),
@@ -126,14 +126,14 @@ impl GroupLink {
         self.prev.get()
     }
 
-    pub(crate) fn built_view(&self) -> Option<&Arc<GroupView>> {
+    pub(crate) fn view(&self) -> Option<&Arc<GroupView>> {
         self.view.get()
     }
 
     /// This link's view, built on top of `prev` if no one built it yet.
     /// `written` returns the value the link's transaction wrote for a member
     /// type.
-    pub(crate) fn view_on<K>(
+    pub(crate) fn build_view<K>(
         &self,
         codec: &impl GroupCodec<K>,
         prev: &GroupView,
@@ -169,7 +169,7 @@ impl GroupLink {
 /// Links below whose views are not built yet are built on the way.
 ///
 /// Only called at commit, when every entry below `txn_idx` is committed.
-pub(crate) fn view_below<K: Hash + Clone + Debug + Eq>(
+pub(crate) fn view_before<K: Hash + Clone + Debug + Eq>(
     data: &VersionedData<K, MonoValue>,
     codec: &impl GroupCodec<K>,
     group_key: &K,
@@ -180,7 +180,7 @@ pub(crate) fn view_below<K: Hash + Clone + Debug + Eq>(
     let mut view = loop {
         match data.fetch_data_no_record(group_key, idx) {
             Ok(MVDataOutput::Versioned(version, MonoValue::GroupMetadata { group: link })) => {
-                if let Some(view) = link.built_view() {
+                if let Some(view) = link.view() {
                     break view.clone();
                 }
                 match version {
@@ -211,7 +211,7 @@ pub(crate) fn view_below<K: Hash + Clone + Debug + Eq>(
         }
     };
     for (writer_idx, link) in unbuilt.into_iter().rev() {
-        view = link.view_on(codec, &view, |member_ty| {
+        view = link.build_view(codec, &view, |member_ty| {
             committed_member_value(data, codec, group_key, member_ty, writer_idx)
         })?;
     }
@@ -245,8 +245,8 @@ pub(crate) fn committed_member_value<K: Hash + Clone + Debug + Eq>(
 // creation time); the legacy VM's `WriteOpConverter` fills these.
 pub(crate) fn group_write(existed: bool, view: &GroupView) -> Result<WriteOp, PanicError> {
     Ok(match (existed, view.is_empty()) {
-        (false, false) => WriteOp::legacy_creation(encode(view)),
-        (true, false) => WriteOp::legacy_modification(encode(view)),
+        (false, false) => WriteOp::legacy_creation(encode_group(view)),
+        (true, false) => WriteOp::legacy_modification(encode_group(view)),
         (true, true) => WriteOp::legacy_deletion(),
         (false, true) => return Err(code_invariant_error("An empty group emitted a write")),
     })
@@ -270,7 +270,7 @@ pub(crate) fn tag_bytes(tag: &StructTag) -> Result<Bytes, PanicError> {
 
 /// BCS-encodes a group: the member count, then each entry's tag and
 /// length-prefixed bytes in key order.
-pub(crate) fn encode(view: &GroupView) -> Bytes {
+pub(crate) fn encode_group(view: &GroupView) -> Bytes {
     let len = uleb128_len(view.len())
         + view
             .iter()
@@ -320,6 +320,6 @@ mod tests {
             .iter()
             .map(|(tag, bytes)| (Bytes::from(bcs::to_bytes(tag).unwrap()), bytes.clone()))
             .collect::<GroupView>();
-        assert_eq!(encode(&view), bcs::to_bytes(&members).unwrap());
+        assert_eq!(encode_group(&view), bcs::to_bytes(&members).unwrap());
     }
 }
