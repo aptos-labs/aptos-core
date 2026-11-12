@@ -3,10 +3,7 @@
 
 //! Creates a `TransactionOutput` from a transaction's side effects.
 
-use crate::{
-    errors::MaterializationError,
-    providers::{AptosDataProvider, GroupMembers, MaterializedGroups},
-};
+use crate::{errors::MaterializationError, providers::AptosDataProvider};
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{
@@ -35,17 +32,21 @@ use std::{collections::BTreeMap, ptr::NonNull};
 pub(crate) fn executed_output(
     effects: &SessionEffects,
     layouts: &impl LayoutProvider,
-    provider: &dyn AptosDataProvider,
+    groups: Option<&dyn AptosDataProvider>,
     gas_used: u64,
     status: TransactionStatus,
     auxiliary_data: TransactionAuxiliaryData,
-) -> Result<(TransactionOutput, MaterializedGroups), MaterializationError> {
-    let (write_set, groups) =
-        drain_write_set(effects, layouts, provider).map_err(MaterializationError::new)?;
+) -> Result<TransactionOutput, MaterializationError> {
+    let write_set = drain_write_set(effects, layouts, groups).map_err(MaterializationError::new)?;
     let events = to_contract_events(effects, layouts)
         .map_err(|e| MaterializationError::new(vec![format!("event finalization failed: {e}")]))?;
-    let output = TransactionOutput::new(write_set, events, gas_used, status, auxiliary_data);
-    Ok((output, groups))
+    Ok(TransactionOutput::new(
+        write_set,
+        events,
+        gas_used,
+        status,
+        auxiliary_data,
+    ))
 }
 
 /// Creates the output of a discarded transaction: empty, carrying the reason.
@@ -78,7 +79,8 @@ pub(crate) fn empty_success_output(auxiliary_data: TransactionAuxiliaryData) -> 
 type MemberOp = Option<Bytes>;
 
 /// Drains the read-write set into a write set, serializing written values
-/// straight out of the effects' frozen heap.
+/// straight out of the effects' frozen heap. Resource-group members are merged
+/// into their groups' stored members from `groups`, or left out without it.
 ///
 /// SAFETY: this function needs to guarantee that its result (both the write set
 /// and the errors) are deterministic, not depending on the order of iteration of
@@ -94,15 +96,14 @@ type MemberOp = Option<Bytes>;
 fn drain_write_set(
     effects: &SessionEffects,
     layouts: &impl LayoutProvider,
-    provider: &dyn AptosDataProvider,
-) -> Result<(WriteSet, MaterializedGroups), Vec<String>> {
+    groups: Option<&dyn AptosDataProvider>,
+) -> Result<WriteSet, Vec<String>> {
     let mut writes: Vec<(StateKey, WriteOp)> = vec![];
     // Unordered on purpose: nothing below may depend on the order groups are
     // visited in (see the SAFETY note above). The inner map is ordered because
     // its keys are user-chosen struct tags and it merges into `GroupMembers`.
     let mut group_ops: UnorderedMap<InMemoryStorageKey, BTreeMap<StructTag, MemberOp>> =
         UnorderedMap::new();
-    let mut materialized_groups = MaterializedGroups::new();
     let mut failures: Vec<String> = vec![];
 
     // SAFETY: written pointers refer to live values in the effects' frozen
@@ -135,6 +136,8 @@ fn drain_write_set(
                 };
                 writes.push((state_key, op));
             },
+            // The caller assembles the groups.
+            Some(_) if groups.is_none() => {},
             Some(group_ty) => {
                 let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
                 let member_op = match class {
@@ -169,23 +172,21 @@ fn drain_write_set(
     }
 
     // Merge each group's member ops into its stored members and emit one write
-    // per group. The assembled members are returned so the caller can cache them
-    // without decoding the write op again.
+    // per group.
     //
     // Note on determinism: the groups are visited in an unspecified order.
     // `WriteSet::new` sorts the writes and `MaterializationError::new` sorts
     // the failures, so the order does not reach the result.
-    for (group_key, member_ops) in group_ops.into_iter_unordered() {
-        let merged = merge_group(provider, &group_key, member_ops).and_then(|(op, members)| {
-            let state_key = group_key.as_state_key().map_err(|e| format!("{e:#}"))?;
-            Ok((state_key, op, members))
-        });
-        match merged {
-            Ok((state_key, op, members)) => {
-                materialized_groups.insert(group_key, members);
-                writes.push((state_key, op));
-            },
-            Err(e) => failures.push(e),
+    if let Some(provider) = groups {
+        for (group_key, member_ops) in group_ops.into_iter_unordered() {
+            let merged = merge_group(provider, &group_key, member_ops).and_then(|op| {
+                let state_key = group_key.as_state_key().map_err(|e| format!("{e:#}"))?;
+                Ok((state_key, op))
+            });
+            match merged {
+                Ok(write) => writes.push(write),
+                Err(e) => failures.push(e),
+            }
         }
     }
 
@@ -194,13 +195,10 @@ fn drain_write_set(
     }
     // `WriteSet::new` collects into a `BTreeMap`, so we do not need to sort the
     // `writes` vector here.
-    let write_set =
-        WriteSet::new(writes).map_err(|e| vec![format!("failed to build the write set: {e:?}")])?;
-    Ok((write_set, materialized_groups))
+    WriteSet::new(writes).map_err(|e| vec![format!("failed to build the write set: {e:?}")])
 }
 
-/// Merges a group's member ops into a single write for the group's slot, and
-/// returns the assembled members (`None` when the group is now empty).
+/// Merges a group's member ops into a single write for the group's slot.
 ///
 /// The stored blob is canonical in struct-tag order.
 ///
@@ -213,7 +211,7 @@ fn merge_group(
     provider: &dyn AptosDataProvider,
     group_key: &InMemoryStorageKey,
     member_ops: BTreeMap<StructTag, MemberOp>,
-) -> Result<(WriteOp, Option<GroupMembers>), String> {
+) -> Result<WriteOp, String> {
     let old = provider
         .group_members(group_key)
         .map_err(|e| format!("failed to read the members of group {group_key:?}: {e:#}"))?;
@@ -232,12 +230,11 @@ fn merge_group(
         }
     }
     if members.is_empty() {
-        Ok((group_op(existed, None)?, None))
+        group_op(existed, None)
     } else {
         let blob = bcs::to_bytes(&members)
             .map_err(|e| format!("failed to encode the members of group {group_key:?}: {e}"))?;
-        let op = group_op(existed, Some(Bytes::from(blob)))?;
-        Ok((op, Some(members)))
+        group_op(existed, Some(Bytes::from(blob)))
     }
 }
 

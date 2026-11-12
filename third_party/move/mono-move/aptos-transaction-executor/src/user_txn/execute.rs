@@ -146,11 +146,9 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                     ResourceProviderError::Interrupted => DiscardReason::Interrupted,
                     ResourceProviderError::InvariantViolation(_)
                     | ResourceProviderError::SpeculativeAbort(_)
-                    | ResourceProviderError::VMInternal(_) => {
-                        DiscardReason::InvariantViolation(format!(
-                            "the approved script hashes are unreadable: {e}"
-                        ))
-                    },
+                    | ResourceProviderError::VMInternal(_) => DiscardReason::InvariantViolation(
+                        format!("the approved script hashes are unreadable: {e}"),
+                    ),
                 })?
         };
         PreExecutionChecker::new(
