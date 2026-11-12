@@ -1,0 +1,12 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `f` may modify: it is read from field `f` of `lp::Cb`, which declares no `modifies_of`/`reads_of`
+   ┌─ tests/sources/functional/closures/unframed_field_world_loop_param.move:17:36
+   │
+17 │         let before = other::get(); each(c.f, n); other::get() == before
+   │                                    ^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is read from field `f` of `lp::Cb`, which declares no `modifies_of`/`reads_of`
+   ┌─ tests/sources/functional/closures/unframed_field_world_loop_param.move:23:36
+   │
+23 │         let before = other::get(); once(c.f); other::get() == before
+   │                                    ^^^^^^^^^

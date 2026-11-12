@@ -275,6 +275,7 @@ impl MonoAnalysisProcessor {
         }
         analyzer.analyze_funs();
         analyzer.register_intrinsic_associated_types();
+        analyzer.add_unknown_fun_value_variants();
         if analyzer.selected_root.is_some() {
             analyzer.info.root_slices = analyzer.compute_root_slices();
         }
@@ -1560,7 +1561,11 @@ impl Analyzer<'_> {
             // Collect function-typed parameters for behavioral predicate support.
             // This enables the Boogie backend to generate parameter variants.
             for param in target.func_env.get_parameters() {
-                let param_ty = self.instantiate(&param.1);
+                // An immutable reference parameter is translated as its value.
+                let param_ty = match self.instantiate(&param.1) {
+                    Type::Reference(ReferenceKind::Immutable, inner) => *inner,
+                    ty => ty,
+                };
                 if let Type::Fun(fn_params, fn_results, _) = &param_ty {
                     let normalized_ty = self.normalize_fun_ty(param_ty.clone());
                     let fun_id = target
@@ -1578,6 +1583,18 @@ impl Analyzer<'_> {
                         .insert(info);
                     // Ensure the function type is also registered in fun_infos
                     self.info.fun_infos.entry(normalized_ty).or_default();
+                    // A `*` frame reaches the world memory.
+                    if target
+                        .func_env
+                        .get_fun_param_access_of()
+                        .iter()
+                        .any(|access| {
+                            access.fun_param == param.0
+                                && (access.frame_spec.modifies_all || access.frame_spec.reads_all)
+                        })
+                    {
+                        self.add_world_memory_type();
+                    }
                     self.analyze_function_spec(&fun_id);
                     // Add the param and result types to done_types
                     self.add_type(fn_params.as_ref());
@@ -2092,7 +2109,21 @@ impl Analyzer<'_> {
                     let fun_type = self.normalize_fun_ty(
                         self.instantiate(&self.env.get_node_type(target.node_id())),
                     );
+                    if self.env.fun_type_reaches_world(&fun_type) {
+                        self.add_world_memory_type();
+                    }
                     self.info.behavioral_fun_types.insert(fun_type);
+                }
+            }
+            if let ExpData::Call(_, ast::Operation::SpecFunction(mid, fid, _), _) = e {
+                let world = self.env.world_memory();
+                if world.is_some_and(|world| {
+                    self.env
+                        .get_spec_fun(mid.qualified(*fid))
+                        .used_memory
+                        .contains(&world)
+                }) {
+                    self.add_world_memory_type();
                 }
             }
             if let ExpData::Invoke(_, target, _) = e {
@@ -2298,14 +2329,19 @@ impl Analyzer<'_> {
                 .entry(normalized.clone())
                 .or_default()
                 .insert(info);
+            let mut world_reachable = true;
             for access in struct_env
                 .get_field_access_of()
                 .iter()
                 .filter(|access| access.fun_param == field.get_name())
             {
+                world_reachable = access.frame_spec.modifies_all || access.frame_spec.reads_all;
                 for memory in access.used_memory.iter().chain(&access.old_memory) {
                     self.add_type(&memory.clone().instantiate(targs).to_type());
                 }
+            }
+            if world_reachable {
+                self.add_world_memory_type();
             }
             // Ensure the function type is also registered in fun_infos
             self.info.fun_infos.entry(normalized).or_default();
@@ -2314,6 +2350,44 @@ impl Analyzer<'_> {
 
     // Utility functions
     // -----------------
+
+    /// Gives every function type a variant for a value of unknown origin, when the model has a
+    /// world memory. The variants of a function type's datatype are otherwise the closures the
+    /// program builds, its function-typed parameters and its function-typed fields, so a value
+    /// read from a container (`vector<|u64| u64>`), from a generic field, or returned by unknown
+    /// code would be one of those, and behave as one. The variant is registered as an unframed
+    /// field of the world memory's own struct, which has no such field and so no frame: it gets
+    /// the uninterpreted predicates and the world havoc of any unframed field.
+    fn add_unknown_fun_value_variants(&mut self) {
+        let Some(world) = self.env.world_memory() else {
+            return;
+        };
+        let fun_types: Vec<Type> = self.info.fun_infos.keys().cloned().collect();
+        if fun_types.is_empty() {
+            return;
+        }
+        self.add_world_memory_type();
+        for (idx, ty) in fun_types.into_iter().enumerate() {
+            // The constructor name comes from the struct and the field name, so the field name
+            // tells the function types apart.
+            let field_sym = self.env.symbol_pool().make(&format!("unknown{}", idx));
+            self.info
+                .fun_struct_field_infos
+                .entry(ty)
+                .or_default()
+                .insert(StructFieldInfo {
+                    struct_id: world.clone(),
+                    field_sym,
+                });
+        }
+    }
+
+    /// Registers the world memory (`GlobalEnv::world_memory`), if the model has one.
+    fn add_world_memory_type(&mut self) {
+        if let Some(world) = self.env.world_memory() {
+            self.add_type(&world.to_type());
+        }
+    }
 
     fn add_types_in_borrow_edge(&mut self, edge: &BorrowEdge) {
         match edge {

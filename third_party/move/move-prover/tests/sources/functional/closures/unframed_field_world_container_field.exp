@@ -1,0 +1,24 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_container_field.move:18:45
+   │
+18 │     spec run { pragma aborts_if_is_partial; ensures result; }
+   │                                             ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_container_field.move:12: run
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_container_field.move:13: run
+   =     at tests/sources/functional/closures/unframed_field_world_container_field.move:5: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_container_field.move:5: get
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_container_field.move:14: run
+   =         f = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_container_field.move:15: run
+   =     at tests/sources/functional/closures/unframed_field_world_container_field.move:16: run
+   =     at tests/sources/functional/closures/unframed_field_world_container_field.move:5: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_container_field.move:5: get
+   =     at tests/sources/functional/closures/unframed_field_world_container_field.move:12: run
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_container_field.move:18: run (spec)

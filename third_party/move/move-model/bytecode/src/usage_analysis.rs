@@ -24,7 +24,6 @@ use move_model::{
 };
 use paste::paste;
 use std::{
-    cell::OnceCell,
     collections::{BTreeMap, BTreeSet},
     fmt,
     fmt::Formatter,
@@ -746,26 +745,11 @@ fn own_call_effects(
 /// A function value a target stores in a dependency's own struct is outside both conditions;
 /// the check at the store relies on the field's frame, as for any stored parameter.
 fn has_unbounded_invoke(target: &FunctionTarget) -> bool {
-    let fun = target.func_env;
-    let params = fun.get_parameters();
     let code = target.get_bytecode();
-    let reassigned: BTreeSet<TempIndex> = code.iter().flat_map(|bc| bc.dests()).collect();
-    let all_uses_checked = OnceCell::new();
-    let bounded_param = |idx: TempIndex| {
-        idx < params.len()
-            && !reassigned.contains(&idx)
-            && params[idx].1.skip_reference().is_function()
-            && (fun.is_opaque()
-                || fun
-                    .get_fun_param_access_of()
-                    .iter()
-                    .any(|access| access.fun_param == params[idx].0)
-                || *all_uses_checked.get_or_init(|| all_callers_checked(fun)))
-    };
     code.iter().any(|bc| match bc {
-        Bytecode::Call(_, _, Operation::Invoke, srcs, _) => {
-            srcs.last().is_none_or(|operand| !bounded_param(*operand))
-        },
+        Bytecode::Call(_, _, Operation::Invoke, srcs, _) => srcs
+            .last()
+            .is_none_or(|operand| !invoke_operand_is_bounded_param(target, *operand)),
         _ => false,
     })
 }
@@ -839,6 +823,29 @@ fn no_dependency_uses_target(env: &GlobalEnv) -> bool {
     });
     env.set_extension(NoDependencyUsesTarget(answer));
     answer
+}
+
+/// Whether `operand` is a parameter of `target`'s function holding a function value (not a
+/// reference to one, which a write through it or a callee may redirect), never reassigned in
+/// its body, whose invocation is bounded (see [`has_unbounded_invoke`]): by its declared frame,
+/// in an opaque function by the frame left to the call site, or by the empty frame when every
+/// use of the function is checked. The loop analysis asks the same question of an invocation in
+/// a loop body, so both give one answer.
+pub fn invoke_operand_is_bounded_param(target: &FunctionTarget, operand: TempIndex) -> bool {
+    let fun = target.func_env;
+    let params = fun.get_parameters();
+    operand < params.len()
+        && !target
+            .get_bytecode()
+            .iter()
+            .any(|bc| bc.dests().contains(&operand))
+        && params[operand].1.is_function()
+        && (fun.is_opaque()
+            || fun
+                .get_fun_param_access_of()
+                .iter()
+                .any(|access| access.fun_param == params[operand].0)
+            || all_callers_checked(fun))
 }
 
 /// The closures built in `code` whose effects the prover can state, by the temporary each is

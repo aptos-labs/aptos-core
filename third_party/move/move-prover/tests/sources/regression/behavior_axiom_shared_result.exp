@@ -12,3 +12,15 @@ error: post-condition does not hold
    =     at tests/sources/regression/behavior_axiom_shared_result.move:19: shared_result
    =         result = <redacted>
    =     at tests/sources/regression/behavior_axiom_shared_result.move:24: shared_result (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavior_axiom_shared_result.move:42:9
+   │
+42 │         ensures result == true;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavior_axiom_shared_result.move:38: distinct_results
+   =         m = <redacted>
+   =     at tests/sources/regression/behavior_axiom_shared_result.move:39: distinct_results
+   =         result = <redacted>
+   =     at tests/sources/regression/behavior_axiom_shared_result.move:42: distinct_results (spec)

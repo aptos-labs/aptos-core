@@ -6452,8 +6452,22 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         let pre_label = self.forward_label_at(offset);
         let call_post = state.post;
 
+        // A function value nothing bounds reads the memory of its invocation, so its
+        // predicates are labeled with the invocation's pre-state. It introduces no post-state:
+        // the module's own resources are locked while the module runs (re-entry aborts at any
+        // access), and the analyzed function's later reads are of those.
+        let invokes_unknown = matches!(
+            self.target.get_bytecode().get(offset as usize),
+            Some(Bytecode::Call(_, _, Operation::Invoke, srcs, _))
+                if srcs.last().is_some_and(|operand| {
+                    move_stackless_bytecode::fat_loop::invoked_value_may_touch_world(
+                        &self.target,
+                        *operand,
+                    )
+                })
+        );
         // `aborts_of` has no post-state — aborts don't produce state.
-        let behavior_pre = changes_memory.then_some(pre_label);
+        let behavior_pre = (changes_memory || invokes_unknown).then_some(pre_label);
         // Source-level state ranges use an omitted post label for the ambient
         // function post-state.  A repeated `S..S` range is both redundant and
         // rejected as a cyclic label definition on reparse.  The same label can

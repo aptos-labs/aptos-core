@@ -427,9 +427,9 @@ fun Test::resource_with_old($t0|val: u64) {
      var $t8: u64
      var $t9: u64
      var $t10: &mut u64
-  0: assume Gt($t0, 0)
-  1: assume CanModify<0x42::Test::R>(0x0)
-  2: @0 := save_mem(Test::R)
+  0: @0 := save_mem(Test::R)
+  1: assume Gt($t0, 0)
+  2: assume CanModify<0x42::Test::R>(0x0)
   3: $t2 := 0x0
   4: $t3 := exists<0x42::Test::R>($t2)
   5: if ($t3) goto 10 else goto 6

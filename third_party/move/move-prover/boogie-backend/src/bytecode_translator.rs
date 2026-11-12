@@ -7,8 +7,8 @@
 
 use crate::{
     boogie_helpers::{
-        behavioral_old_memory_instantiated, boogie_address, boogie_address_blob,
-        boogie_behavioral_eval_fun_name, boogie_behavioral_fun_result_name,
+        behavioral_old_memory_instantiated, behavioral_target_memory, boogie_address,
+        boogie_address_blob, boogie_behavioral_eval_fun_name, boogie_behavioral_fun_result_name,
         boogie_behavioral_fun_spec_name, boogie_behavioral_result_fun_name,
         boogie_behavioral_spec_fun_name, boogie_byte_blob, boogie_closure_pack_name,
         boogie_constant_blob, boogie_debug_track_abort, boogie_debug_track_local,
@@ -23,12 +23,13 @@ use crate::{
         boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix, boogie_type,
         boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
         boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
-        boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr,
-        bv_flag_for_type, compute_evaluator_memory_union, field_bv_flag_global_state,
+        boogie_unread_memory_name, boogie_variant_field_update, boogie_well_formed_check,
+        boogie_well_formed_expr, bv_flag_for_type, compute_evaluator_memory_union,
+        compute_named_evaluator_memory_union, expand_world_memory, field_bv_flag_global_state,
         normalized_inst_id, EmittedEntities, TypeIdentToken,
     },
     options::BoogieOptions,
-    spec_translator::{LabelInfo, SpecTranslator},
+    spec_translator::{EvaluatorSlot, LabelInfo, SpecTranslator},
 };
 use codespan::LineIndex;
 use codespan_reporting::diagnostic::Severity;
@@ -70,8 +71,10 @@ use move_prover_bytecode_pipeline::{
     spec_instrumentation::{defined_state_labels, state_label_defining_fragment},
 };
 use move_stackless_bytecode::{
+    fat_loop,
     function_target::FunctionTarget,
     function_target_pipeline::{FunctionTargetsHolder, FunctionVariant, VerificationFlavor},
+    ghost_keep_analysis::ghost_kept_in,
     stackless_bytecode::{
         AbortAction, AttrId, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, IndexEdgeKind,
         Operation, PropKind,
@@ -79,7 +82,7 @@ use move_stackless_bytecode::{
     usage_analysis,
 };
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet},
 };
 
@@ -141,6 +144,8 @@ pub struct FunctionTranslator<'env> {
     parent: &'env BoogieTranslator<'env>,
     fun_target: &'env FunctionTarget<'env>,
     type_inst: &'env [Type],
+    /// The callee of the opaque call whose summary is being emitted, if any.
+    opaque_callee: Cell<Option<QualifiedId<FunId>>>,
 }
 
 pub struct StructTranslator<'env> {
@@ -730,6 +735,7 @@ impl<'env> BoogieTranslator<'env> {
                                 parent: self,
                                 fun_target,
                                 type_inst: &[],
+                                opaque_callee: Cell::new(None),
                             }
                             .translate();
                         }
@@ -782,6 +788,7 @@ impl<'env> BoogieTranslator<'env> {
                                     parent: self,
                                     fun_target,
                                     type_inst,
+                                    opaque_callee: Cell::new(None),
                                 }
                                 .translate();
                             }
@@ -815,6 +822,7 @@ impl<'env> BoogieTranslator<'env> {
                                 parent: self,
                                 fun_target,
                                 type_inst,
+                                opaque_callee: Cell::new(None),
                             }
                             .translate();
                         }
@@ -1127,11 +1135,18 @@ impl<'env> BoogieTranslator<'env> {
             fun_env.is_opaque() || !has_baseline
         });
         let needs_apply = mono_info.applied_fun_types.contains(fun_type);
+        // The variant for a value of unknown origin, which every function type has, needs its
+        // own uninterpreted predicates where the type is applied, but does not by itself call
+        // for the evaluators over the type's other variants.
+        let has_named_field = struct_field_infos
+            .iter()
+            .any(|info| !self.env.is_world_memory(&info.struct_id.to_qualified_id()));
         let needs_behavior = mono_info.behavioral_fun_types.contains(fun_type)
             || needs_apply
-                && (has_opaque_variant
-                    || !fun_param_infos.is_empty()
-                    || !struct_field_infos.is_empty());
+                && (has_opaque_variant || !fun_param_infos.is_empty() || has_named_field);
+        if !needs_behavior && needs_apply && !struct_field_infos.is_empty() {
+            self.generate_behavioral_spec_funs_for_struct_fields(fun_type, struct_field_infos);
+        }
         if needs_behavior {
             self.generate_behavioral_spec_funs_for_params(fun_type, fun_param_infos);
             self.generate_behavioral_spec_funs_for_struct_fields(fun_type, struct_field_infos);
@@ -1348,6 +1363,9 @@ impl<'env> BoogieTranslator<'env> {
             } else {
                 emitln!(self.writer, "call {}{}({});", call_prefix, fun_name, args);
             }
+            // Code the program names has run: a caller holding a re-entrancy lock turns its
+            // writes of the locked memory into aborts.
+            emitln!(self.writer, "$known_closure_ran := true;");
             if is_only {
                 // Single variant: no closing needed
             } else {
@@ -1444,9 +1462,10 @@ impl<'env> BoogieTranslator<'env> {
                 &params,
                 memory,
                 &frame_access,
-                // Trusts the declared parameter frame; a wildcard or undeclared one yields a
-                // memory-free carrier (#20936).
+                // Trusts the declared parameter frame; an undeclared one yields a memory-free
+                // carrier (#20936), a wildcard one takes every memory.
                 true,
+                false,
             );
             if is_only {
                 // Single variant: no outer block to close
@@ -1548,6 +1567,7 @@ impl<'env> BoogieTranslator<'env> {
                 // Trusts the declared field frame, which is neither enforced nor framed
                 // (#20797, #20934).
                 true,
+                is_unframed_field(self.env, info),
             );
             if is_only {
                 // Single variant: no outer block to close
@@ -1642,11 +1662,8 @@ impl<'env> BoogieTranslator<'env> {
             .expect("closure mask compose failed");
 
         // Build memory args (pre-state: both old and current slots use same variable)
-        let inst_used = spec_derivation::behavioral_target_memory(
-            self.env,
-            info.fun.to_qualified_id(),
-            &info.fun.inst,
-        );
+        let inst_used =
+            behavioral_target_memory(self.env, info.fun.to_qualified_id(), &info.fun.inst);
         let inst_old = behavioral_old_memory_instantiated(fun_env, &info.fun.inst);
         let fun_mem_args = self.build_spec_memory_args(&inst_used, &inst_old, &[], &None, None);
         let bp_args = fun_mem_args.iter().chain(bp_arg_list.iter()).join(", ");
@@ -1666,9 +1683,32 @@ impl<'env> BoogieTranslator<'env> {
         .then(|| boogie_behavioral_fun_spec_name(self.env, &info.fun, BehaviorKind::TransitionOf));
         let explicit_results = results.clone().flatten();
 
-        // Compute frame access for this closure
-        let frame_access_raw = derive_closure_frame_access(fun_env, &info.fun.inst);
-        let frame_access = self.closure_frame_to_apply_frame(&frame_access_raw, &bp_arg_list);
+        // Compute frame access for this closure. A target whose effects are not known (it runs
+        // a function value nothing bounds) may write every memory, whatever its frame says.
+        let effects_known = usage_analysis::call_effects(
+            self.env,
+            info.fun.to_qualified_id(),
+            &info.fun.inst,
+            &|callee| {
+                self.targets
+                    .get_data(&callee, &FunctionVariant::Baseline)
+                    .and_then(|data| {
+                        data.annotations
+                            .get::<usage_analysis::UsageState>()
+                            .cloned()
+                    })
+            },
+        )
+        .is_some();
+        let frame_access = if effects_known {
+            let frame_access_raw = derive_closure_frame_access(fun_env, &info.fun.inst);
+            self.closure_frame_to_apply_frame(&frame_access_raw, &bp_arg_list)
+        } else {
+            memory
+                .iter()
+                .map(|(mem, _)| (mem.clone(), ApplyFrameAccess::WritesAll))
+                .collect()
+        };
 
         // The target's abort condition, frame and ensures hold only under its `requires`.
         // When it fails, abort, memory and results are unknown.
@@ -1696,6 +1736,7 @@ impl<'env> BoogieTranslator<'env> {
             memory,
             &frame_access,
             self.closure_results_from_carrier(info),
+            false,
         );
         if guarded {
             self.writer.unindent();
@@ -1708,9 +1749,7 @@ impl<'env> BoogieTranslator<'env> {
                 params,
                 ResultSource::Fresh,
             );
-            for (_, mem_name) in memory {
-                emitln!(self.writer, "havoc {};", mem_name);
-            }
+            self.emit_apply_memory_havoc(memory);
             self.writer.unindent();
             emitln!(self.writer, "}");
         }
@@ -1745,6 +1784,41 @@ impl<'env> BoogieTranslator<'env> {
                 &info.fun.inst,
             )
             .is_empty()
+    }
+
+    /// Havocs `memory` in an `$apply` branch, keeping existence where
+    /// `havoc_keeps_existence` says so. The pre-havoc value goes to the `_$frame` local, which
+    /// the procedure declares for every memory; frame conditions emitted after this read the
+    /// same pre-havoc value. A spec variable no unknown code can reach an update of is not
+    /// havoced.
+    fn emit_apply_memory_havoc(&self, memory: &[(QualifiedInstId<StructId>, String)]) {
+        let memory = memory
+            .iter()
+            .filter(|(mem, _)| {
+                let qid = mem.to_qualified_id();
+                !self.env.get_struct(qid).is_ghost_memory()
+                    || self.env.ghost_updatable_by_unknown_code(&qid)
+            })
+            .cloned()
+            .collect_vec();
+        let memory = memory.as_slice();
+        let kept = memory
+            .iter()
+            .filter(|(mem, _)| havoc_keeps_existence(self.env, mem))
+            .collect_vec();
+        for (_, mem_name) in &kept {
+            emitln!(self.writer, "{}_$frame := {};", mem_name, mem_name);
+        }
+        for (_, mem_name) in memory {
+            emitln!(self.writer, "havoc {};", mem_name);
+        }
+        for (mem, mem_name) in kept {
+            emitln!(
+                self.writer,
+                "{}",
+                existence_kept_assumption(self.env, mem, &format!("{}_$frame", mem_name))
+            );
+        }
     }
 
     /// The function types of values reachable from a value of type `ty`, through references,
@@ -1903,6 +1977,7 @@ impl<'env> BoogieTranslator<'env> {
         memory: &[(QualifiedInstId<StructId>, String)],
         frame_access: &BTreeMap<QualifiedInstId<StructId>, ApplyFrameAccess>,
         results_from_carrier: bool,
+        pre_state_results: bool,
     ) {
         let env = self.env;
         let explicit_result_count = explicit_results.len();
@@ -1930,6 +2005,13 @@ impl<'env> BoogieTranslator<'env> {
             let pre_name = format!("{}_$pre", mem_name);
             emitln!(self.writer, "{} := {};", pre_name, mem_name);
             old_saves.insert(mem.clone(), pre_name);
+        }
+        // Pre-state-only predicates: results and ensures read the saved pre-state.
+        if pre_state_results {
+            for mem in used_memory {
+                let mem_name = boogie_resource_memory_name(env, mem, &None);
+                emitln!(self.writer, "{}_$pre := {};", mem_name, mem_name);
+            }
         }
 
         // Save memory for frame conditions before havoc.
@@ -1960,9 +2042,7 @@ impl<'env> BoogieTranslator<'env> {
         }
 
         // Havoc memory since the function could modify anything
-        for (_, mem_name) in memory {
-            emitln!(self.writer, "havoc {};", mem_name)
-        }
+        self.emit_apply_memory_havoc(memory);
 
         // Emit Reads constraints for memory types not in frame_access.
         // These are memory types that this variant provably doesn't modify,
@@ -2015,17 +2095,24 @@ impl<'env> BoogieTranslator<'env> {
         }
 
         // Build post-state args: old slots use saved pre-state, current slots use post-havoc
-        let post_mem_args = self.build_spec_memory_args(
-            used_memory,
-            old_memory,
-            &[],
-            &None,
-            if old_saves.is_empty() {
-                None
-            } else {
-                Some(&old_saves)
-            },
-        );
+        let post_mem_args = if pre_state_results {
+            used_memory
+                .iter()
+                .map(|mem| format!("{}_$pre", boogie_resource_memory_name(env, mem, &None)))
+                .collect()
+        } else {
+            self.build_spec_memory_args(
+                used_memory,
+                old_memory,
+                &[],
+                &None,
+                if old_saves.is_empty() {
+                    None
+                } else {
+                    Some(&old_saves)
+                },
+            )
+        };
         let result_bp_args = post_mem_args.iter().chain(data_args.iter()).join(", ");
 
         // Assign results using result_of function (now using post-state args)
@@ -2613,7 +2700,7 @@ impl<'env> BoogieTranslator<'env> {
                 union_old_memory,
             )
         } else {
-            vec![]
+            unframed_field_memory_args(env, union_old_memory)
         };
         let mut rhs_args = mem_args;
         rhs_args.push("f->n".to_string());
@@ -3009,14 +3096,17 @@ impl<'env> BoogieTranslator<'env> {
                 .get_field_access_of()
                 .iter()
                 .find(|decl| decl.fun_param == info.field_sym);
-            let mut rhs_args = access_decl.map_or_else(Vec::new, |decl| {
-                Self::build_evaluator_memory_args_for_access(
-                    env,
-                    decl,
-                    union_used_memory,
-                    union_old_memory,
-                )
-            });
+            let mut rhs_args = access_decl.map_or_else(
+                || unframed_field_memory_args(env, union_old_memory),
+                |decl| {
+                    Self::build_evaluator_memory_args_for_access(
+                        env,
+                        decl,
+                        union_used_memory,
+                        union_old_memory,
+                    )
+                },
+            );
             rhs_args.push("f->n".to_string());
             rhs_args.extend(param_args.iter().cloned());
             let rhs = format!(
@@ -3087,10 +3177,17 @@ impl<'env> BoogieTranslator<'env> {
     }
 
     /// Whether `e` applies a behavioral predicate to a function VALUE (not a
-    /// concrete closure) whose per-type evaluator takes memory arguments.
-    /// `inst` instantiates the enclosing closure target's type parameters.
-    fn behavior_over_stateful_fun_value(&self, e: &ExpData, inst: &[Type]) -> bool {
-        let ExpData::Call(_, AstOperation::Behavior(..), args) = e else {
+    /// concrete closure) whose per-type evaluator takes memory arguments not among
+    /// `used` (or old slots not among `old`), the enclosing evaluator's memory
+    /// parameters. `inst` instantiates the enclosing closure target's type parameters.
+    fn behavior_over_uncovered_fun_value(
+        &self,
+        e: &ExpData,
+        inst: &[Type],
+        used: &BTreeSet<QualifiedInstId<StructId>>,
+        old: &BTreeSet<QualifiedInstId<StructId>>,
+    ) -> bool {
+        let ExpData::Call(id, AstOperation::Behavior(..), args) = e else {
             return false;
         };
         let Some(fun_arg) = args.first() else {
@@ -3109,7 +3206,17 @@ impl<'env> BoogieTranslator<'env> {
         // so ask the same oracle the evaluator's own emitter uses.
         let ty = self.env.get_node_type(fun_arg.node_id()).instantiate(inst);
         let (union_used, union_old) = compute_evaluator_memory_union(self.env, &ty);
-        !union_used.is_empty() || !union_old.is_empty()
+        // Only a value that may touch any memory is admitted on coverage: there the outer
+        // evaluator receives the world memory, and with it every memory. Any other value with
+        // stateful targets stays rejected.
+        if !self.env.behavior_reaches_world(*id, fun_arg) {
+            // A value the program names: the memory of the named variants decides.
+            let (named_used, named_old) = compute_named_evaluator_memory_union(self.env, &ty);
+            return !named_used.is_empty() || !named_old.is_empty();
+        }
+        let used = expand_world_memory(self.env, used.clone());
+        let old = expand_world_memory(self.env, old.clone());
+        !union_used.is_subset(&used) || !union_old.is_subset(&old)
     }
 
     fn generate_concrete_result_of_function(
@@ -3201,15 +3308,27 @@ impl<'env> BoogieTranslator<'env> {
             // A behavioral reference to a captured function VALUE (not a
             // concrete closure) dispatches through the per-type evaluator,
             // whose memory parameterization is the union over that type's
-            // possible targets — state this function's own evaluator neither
-            // receives nor forwards. Until the evaluator encoding threads
-            // that union, reject the configuration when the union is
-            // non-empty rather than emitting state-dependent evaluators.
-            // Auxiliary expressions (e.g. `aborts_if .. with ..` codes) are
-            // scanned too, mirroring `compute_spec_memory_usage`.
+            // possible targets. Inside this function's own evaluator it takes
+            // this evaluator's memory parameters, so it is rejected only when
+            // that union is not covered by them (a memory, or an old slot, this
+            // evaluator neither receives nor forwards). Boogie enforces the
+            // forwarding too: a function body cannot name a global memory, so an
+            // uncovered memory fails to compile rather than verify. Auxiliary
+            // expressions (e.g. `aborts_if .. with ..` codes) are scanned too,
+            // mirroring `compute_spec_memory_usage`.
+            let inst_used =
+                behavioral_target_memory(self.env, info.fun.to_qualified_id(), &info.fun.inst);
+            let inst_old = behavioral_old_memory_instantiated(&fun_env, &info.fun.inst);
             let is_state_dependent = closure_spec.conditions.iter().any(|cond| {
                 cond.all_exps().any(|exp| {
-                    exp.any(&mut |e| self.behavior_over_stateful_fun_value(e, &info.fun.inst))
+                    exp.any(&mut |e| {
+                        self.behavior_over_uncovered_fun_value(
+                            e,
+                            &info.fun.inst,
+                            &inst_used,
+                            &inst_old,
+                        )
+                    })
                 })
             });
             if is_state_dependent {
@@ -3254,12 +3373,6 @@ impl<'env> BoogieTranslator<'env> {
             }
 
             // Get function's spec memory
-            let inst_used = spec_derivation::behavioral_target_memory(
-                self.env,
-                info.fun.to_qualified_id(),
-                &info.fun.inst,
-            );
-            let inst_old = behavioral_old_memory_instantiated(&fun_env, &info.fun.inst);
             let (mem_param_decls, mem_args) =
                 Self::build_memory_params(self.env, &inst_used, &inst_old);
 
@@ -3807,6 +3920,14 @@ impl<'env> BoogieTranslator<'env> {
         old_memory: &BTreeSet<QualifiedInstId<StructId>>,
         pre_state_only: bool,
     ) -> Option<(String, bool)> {
+        // State labels resolve as in a procedure: a memory a label's defining operations do not
+        // modify is the one of the label before it, ultimately this evaluator's pre-state slot.
+        let spec_exps: Vec<Exp> = closure_spec
+            .conditions
+            .iter()
+            .flat_map(|c| c.all_exps().cloned())
+            .collect();
+        let label_info = compute_label_info(self.env, type_inst, &spec_exps, &[]);
         let conditions: Vec<_> = closure_spec
             .conditions
             .iter()
@@ -3988,6 +4109,10 @@ impl<'env> BoogieTranslator<'env> {
                 let temp_writer = CodeWriter::new(self.env.internal_loc());
                 let mut temp_trans = SpecTranslator::new(&temp_writer, self.env, self.options);
                 temp_trans.share_collected_declarations(&self.spec_translator);
+                temp_trans.set_in_evaluator_body(matches!(
+                    kind,
+                    BehaviorKind::RequiresOf | BehaviorKind::AbortsOf
+                ));
                 temp_trans.set_current_fun_qid(
                     fun_env.get_qualified_id().instantiate(type_inst.to_vec()),
                 );
@@ -4003,6 +4128,7 @@ impl<'env> BoogieTranslator<'env> {
                             .collect(),
                     );
                 }
+                temp_trans.set_label_info(label_info.clone());
                 temp_trans.translate(&exp, type_inst);
                 temp_trans.clear_current_fun_qid();
                 let mut result = temp_writer.extract_result();
@@ -4076,11 +4202,30 @@ impl<'env> BoogieTranslator<'env> {
         // Entry/exit labels have already been normalized away by MemoryLabelInfo,
         // so all remaining labels are genuine intermediates.
         let temp_writer = CodeWriter::new(self.env.internal_loc());
-        let temp_trans = SpecTranslator::new(&temp_writer, self.env, self.options);
+        let mut temp_trans = SpecTranslator::new(&temp_writer, self.env, self.options);
+        temp_trans.set_label_info(label_info.clone());
+        temp_trans.set_in_evaluator_body(matches!(
+            kind,
+            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf
+        ));
+        // The same slot decision as the body translators (`evaluator_label_slot`), so the
+        // binders are exactly the labeled names the bodies use.
+        if is_two_state {
+            temp_trans.set_fun_old_memory(old_memory.clone());
+        }
         let mut all_labels = BTreeSet::new();
         for (_, exp) in &items {
             all_labels.extend(temp_trans.collect_intermediate_labels_from_exp(exp));
         }
+        let mut all_labels: BTreeSet<_> = all_labels
+            .into_iter()
+            .filter_map(
+                |(label, mem)| match temp_trans.evaluator_label_slot(label, &mem) {
+                    EvaluatorSlot::Labeled(resolved) => Some((resolved, mem)),
+                    EvaluatorSlot::Old | EvaluatorSlot::Current => None,
+                },
+            )
+            .collect();
         let result = if all_labels.is_empty() {
             joined
         } else {
@@ -4143,6 +4288,10 @@ impl<'env> BoogieTranslator<'env> {
                             let fw = CodeWriter::new(self.env.internal_loc());
                             let mut ft = SpecTranslator::new(&fw, self.env, self.options);
                             ft.share_collected_declarations(&self.spec_translator);
+                            ft.set_in_evaluator_body(matches!(
+                                kind,
+                                BehaviorKind::RequiresOf | BehaviorKind::AbortsOf
+                            ));
                             ft.set_current_fun_qid(
                                 fun_env.get_qualified_id().instantiate(type_inst.to_vec()),
                             );
@@ -4157,6 +4306,7 @@ impl<'env> BoogieTranslator<'env> {
                                         .collect(),
                                 );
                             }
+                            ft.set_label_info(label_info.clone());
                             ft.translate(&fragment, type_inst);
                             ft.clear_current_fun_qid();
                             let mut result = fw.extract_result();
@@ -4356,7 +4506,7 @@ impl<'env> BoogieTranslator<'env> {
         let mut union_old_memory = BTreeSet::new();
         for info in closure_infos {
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            union_used_memory.extend(spec_derivation::behavioral_target_memory(
+            union_used_memory.extend(behavioral_target_memory(
                 env,
                 info.fun.to_qualified_id(),
                 &info.fun.inst,
@@ -4369,6 +4519,15 @@ impl<'env> BoogieTranslator<'env> {
             union_old_memory.extend(old);
         }
         for info in struct_field_infos {
+            if is_unframed_field(env, info) {
+                // Two slots, so that a two-state evaluator call site supplies the
+                // pre-state the unframed predicates are taken at.
+                for qid in mono_analysis::get_info(env).all_memory_qids(env) {
+                    union_used_memory.insert(qid.clone());
+                    union_old_memory.insert(qid);
+                }
+                continue;
+            }
             let struct_env = env.get_struct_qid(info.struct_id.to_qualified_id());
             for access in struct_env.get_field_access_of() {
                 if access.fun_param == info.field_sym {
@@ -4399,8 +4558,7 @@ impl<'env> BoogieTranslator<'env> {
         fun_env: &FunctionEnv,
         inst: &[Type],
     ) -> Vec<String> {
-        let inst_used =
-            spec_derivation::behavioral_target_memory(env, fun_env.get_qualified_id(), inst);
+        let inst_used = behavioral_target_memory(env, fun_env.get_qualified_id(), inst);
         let inst_old = behavioral_old_memory_instantiated(fun_env, inst);
         let (_, args) = Self::build_memory_params(env, &inst_used, &inst_old);
         args
@@ -4420,16 +4578,26 @@ impl<'env> BoogieTranslator<'env> {
         for access in fun_env.get_fun_param_access_of() {
             if access.fun_param == param_sym {
                 // Instantiate with the function's type parameters
-                let used = access
+                let mut used: BTreeSet<_> = access
                     .used_memory
                     .iter()
                     .map(|m| m.clone().instantiate(&fun_qid.inst))
                     .collect();
-                let old = access
+                let mut old: BTreeSet<_> = access
                     .old_memory
                     .iter()
                     .map(|m| m.clone().instantiate(&fun_qid.inst))
                     .collect();
+                // A `*` frame reaches every memory, the world memory included, as a `*`
+                // field frame does.
+                if access.frame_spec.modifies_all || access.frame_spec.reads_all {
+                    for qid in mono_analysis::get_info(env).all_memory_qids(env) {
+                        used.insert(qid.clone());
+                        if access.frame_spec.modifies_all {
+                            old.insert(qid);
+                        }
+                    }
+                }
                 return (used, old);
             }
         }
@@ -4956,6 +5124,20 @@ impl<'env> BoogieTranslator<'env> {
                             cur: mem_name,
                         });
                     }
+                }
+            } else {
+                // Unframed: the pre-state of every translated memory, the world included.
+                let mono_info = mono_analysis::get_info(self.env);
+                for qid in mono_info.all_memory_qids(self.env) {
+                    let mem_name = boogie_resource_memory_name(self.env, &qid, &None);
+                    let se = self.env.get_struct_qid(qid.to_qualified_id());
+                    let mem_type = format!("$Memory {}", boogie_struct_name(&se, &qid.inst, false));
+                    mem_param_decls.push(format!("{}: {}", mem_name, mem_type));
+                    mem_args.push(mem_name.clone());
+                    slots.push(MemArgSlot {
+                        old: None,
+                        cur: mem_name,
+                    });
                 }
             }
 
@@ -6500,6 +6682,13 @@ impl StructTranslator<'_> {
             // `$Global`); `unique` gives pairwise distinctness across resource types.
             let memory_name = boogie_resource_memory_name(env, &qid, &None);
             emitln!(writer, "var {}: $Memory {};", memory_name, struct_name);
+            // The state passed for this memory where a predicate cannot read it.
+            emitln!(
+                writer,
+                "const {}: $Memory {};",
+                boogie_unread_memory_name(env, &qid),
+                struct_name
+            );
             emitln!(
                 writer,
                 "const unique {}: int;",
@@ -6678,6 +6867,84 @@ impl FunctionTranslator<'_> {
         self.fun_target
             .get_local_type(idx)
             .instantiate(self.type_inst)
+    }
+
+    /// The memories of the resources this function's module defines, which code run by a
+    /// function value or by a call into another module cannot write. The VM locks them while
+    /// the module is on the call stack: any code of the module reached from there runs as a
+    /// re-entry, and a re-entered module's resources cannot be accessed
+    /// (`reentrancy_checker.rs`, `check_resource_access`); other modules cannot access them at
+    /// all, and cannot call the module statically (dependencies are acyclic). Empty for a
+    /// module declaring a native, which may access the module's resources without that check
+    /// (`storage_slot`), and without the world memory, when nothing runs unknown code.
+    fn reentry_locked_memory(&self) -> Vec<QualifiedInstId<StructId>> {
+        let env = self.fun_target.global_env();
+        let module_env = self.fun_target.module_env();
+        let Some(world) = env.world_memory() else {
+            return vec![];
+        };
+        // An inline function runs in its caller's frame: its module need not be on the stack.
+        if module_env.get_functions().any(|fun| fun.is_native())
+            || self.fun_target.func_env.is_inline()
+        {
+            return vec![];
+        }
+        expand_world_memory(env, BTreeSet::from([world]))
+            .into_iter()
+            .filter(|mem| {
+                mem.module_id == module_env.get_id()
+                    && !env.is_world_memory(&mem.to_qualified_id())
+                    && !env.get_struct(mem.to_qualified_id()).is_ghost_memory()
+            })
+            .collect()
+    }
+
+    /// Whether a call to `callee` of another module may run code nothing bounds: its summary
+    /// says so, or it has none. Gates the restore for cost only; the fact holds at every call.
+    fn callee_may_reenter(&self, callee: QualifiedId<FunId>) -> bool {
+        let env = self.fun_target.global_env();
+        if callee.module_id == self.fun_target.module_env().get_id()
+            || env.get_function(callee).is_native()
+        {
+            return false;
+        }
+        self.parent
+            .targets
+            .get_data(&callee, &FunctionVariant::Baseline)
+            .and_then(|data| data.annotations.get::<usage_analysis::UsageState>())
+            .is_none_or(|usage| usage.unbounded_invoke || usage.invoke_frame_wildcard)
+    }
+
+    /// Whether `srcs` invokes a value that may run code nothing bounds (see
+    /// `fat_loop::invoked_value_may_touch_world`). A value with a declared frame keeps it.
+    fn invokes_unbounded_value(&self, srcs: &[TempIndex]) -> bool {
+        srcs.last().is_some_and(|operand| {
+            fat_loop::invoked_value_may_touch_world(self.fun_target, *operand)
+        })
+    }
+
+    /// Whether the locked memory is saved before `oper`: an invocation of a value that may run
+    /// unknown code, a call into another module that may, or the start of such an opaque call.
+    fn saves_locked_memory_at(&self, oper: &Operation, srcs: &[TempIndex]) -> bool {
+        match oper {
+            Operation::Invoke => self.invokes_unbounded_value(srcs),
+            Operation::Function(mid, fid, _) | Operation::OpaqueCallBegin(mid, fid, _) => {
+                self.callee_may_reenter(mid.qualified(*fid))
+            },
+            _ => false,
+        }
+    }
+
+    /// Whether the locked memory is unchanged after `oper` returns normally: its writes there
+    /// would have aborted.
+    fn restores_locked_memory_at(&self, oper: &Operation, srcs: &[TempIndex]) -> bool {
+        match oper {
+            Operation::Invoke => self.invokes_unbounded_value(srcs),
+            Operation::Function(mid, fid, _) | Operation::OpaqueCallEnd(mid, fid, _) => {
+                self.callee_may_reenter(mid.qualified(*fid))
+            },
+            _ => false,
+        }
     }
 
     /// Translates the given function.
@@ -6956,20 +7223,62 @@ impl FunctionTranslator<'_> {
             })
             .collect::<BTreeSet<_>>();
         let mut declared_mem_names: BTreeSet<String> = BTreeSet::new();
-        for (lab, mem) in &labels {
-            let mem = (*mem).clone().instantiate(self.type_inst);
-            let name = boogie_resource_memory_name(env, &mem, &Some(**lab));
-            if declared_mem_names.insert(name.clone()) {
+        let world_runs = world_havoc_runs(env, code);
+        let existence_saves = code
+            .iter()
+            .enumerate()
+            .filter(|(offset, _)| world_runs.contains(offset))
+            .filter_map(|(_, bc)| match bc {
+                Bytecode::Call(_, _, Operation::HavocGlobal(mid, sid, inst), _, _) => Some(
+                    mid.qualified_inst(*sid, inst.to_owned())
+                        .instantiate(self.type_inst),
+                ),
+                _ => None,
+            })
+            .flat_map(|mem| saved_memory_of(env, mem))
+            .filter(|mem| havoc_keeps_existence(env, mem))
+            .collect::<BTreeSet<_>>();
+        for mem in existence_saves {
+            emitln!(
+                writer,
+                "var {}: $Memory {};",
+                existence_saved_memory_name(env, &mem),
+                boogie_struct_name(&env.get_struct_qid(mem.to_qualified_id()), &mem.inst, false)
+            );
+        }
+        if code
+            .iter()
+            .any(|bc| matches!(bc, Bytecode::Call(_, _, oper, srcs, _) if self.saves_locked_memory_at(oper, srcs)))
+        {
+            for mem in self.reentry_locked_memory() {
                 emitln!(
                     writer,
                     "var {}: $Memory {};",
-                    name,
+                    reentry_saved_memory_name(env, &mem),
                     boogie_struct_name(
                         &env.get_struct_qid(mem.to_qualified_id()),
                         &mem.inst,
                         false
                     )
                 );
+            }
+        }
+        for (lab, mem) in &labels {
+            let mem = (*mem).clone().instantiate(self.type_inst);
+            for mem in saved_memory_of(env, mem) {
+                let name = boogie_resource_memory_name(env, &mem, &Some(**lab));
+                if declared_mem_names.insert(name.clone()) {
+                    emitln!(
+                        writer,
+                        "var {}: $Memory {};",
+                        name,
+                        boogie_struct_name(
+                            &env.get_struct_qid(mem.to_qualified_id()),
+                            &mem.inst,
+                            false
+                        )
+                    );
+                }
             }
         }
 
@@ -7010,8 +7319,13 @@ impl FunctionTranslator<'_> {
         // Generate bytecode
         emitln!(writer, "\n// bytecode translation starts here");
         let mut last_tracked_loc = None;
-        for bytecode in code.iter() {
-            self.translate_bytecode(&mut last_tracked_loc, bytecode);
+        let world_runs = world_havoc_runs(env, code);
+        for (offset, bytecode) in code.iter().enumerate() {
+            self.translate_bytecode(
+                &mut last_tracked_loc,
+                bytecode,
+                world_runs.contains(&offset),
+            );
         }
 
         writer.unindent();
@@ -7051,11 +7365,7 @@ impl FunctionTranslator<'_> {
                         };
                     if let Some((inst, mid, fid)) = closure_info {
                         let closure_fun_env = env.get_function(mid.qualified(fid));
-                        for memory in spec_derivation::behavioral_target_memory(
-                            env,
-                            mid.qualified(fid),
-                            &inst,
-                        ) {
+                        for memory in behavioral_target_memory(env, mid.qualified(fid), &inst) {
                             for label in range.labels() {
                                 result.insert((label, memory.clone()));
                             }
@@ -7111,7 +7421,7 @@ impl FunctionTranslator<'_> {
                         // function is declared here as well. The call
                         // translator resolves the same summary and emits a
                         // labeled memory argument for it.
-                        for mem in fun.used_memory_instantiated(&inst) {
+                        for mem in expand_world_memory(env, fun.used_memory_instantiated(&inst)) {
                             for label in range.labels() {
                                 result.insert((label, mem.clone()));
                             }
@@ -7158,105 +7468,7 @@ impl FunctionTranslator<'_> {
         code: &[Bytecode],
         env: &GlobalEnv,
     ) -> BTreeMap<MemoryLabel, LabelInfo> {
-        use move_model::ast::BehaviorKind;
-        let mut label_info: BTreeMap<MemoryLabel, LabelInfo> = BTreeMap::new();
-
-        for exp in all_exps {
-            exp.visit_pre_order(&mut |e| {
-                if let ExpData::Call(node_id, op, args) = e {
-                    match op {
-                        AstOperation::SpecPublish(range)
-                        | AstOperation::SpecRemove(range)
-                        | AstOperation::SpecUpdate(range) => {
-                            if let Some(post_label) = range.post {
-                                let node_inst = env.get_node_instantiation(*node_id);
-                                let node_inst = Type::instantiate_slice(&node_inst, self.type_inst);
-                                let (mid, sid, inst) = node_inst[0].require_struct();
-                                let mem = mid.qualified_inst(sid, inst.to_owned());
-                                let info = label_info.entry(post_label).or_default();
-                                info.modified_types.insert(mem);
-                                info.pre = info.pre.or(range.pre);
-                            }
-                        },
-                        AstOperation::Behavior(
-                            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf,
-                            range,
-                        ) => {
-                            if let Some(post_label) = range.post {
-                                // Resolve closure to get callee's modifies
-                                let closure_info: Option<(
-                                    Vec<Type>,
-                                    move_model::model::ModuleId,
-                                    FunId,
-                                )> = match args.first().map(|a| a.as_ref()) {
-                                    Some(ExpData::Call(
-                                        closure_id,
-                                        AstOperation::Closure(mid, fid, _),
-                                        _,
-                                    )) => {
-                                        let inst = env.get_node_instantiation(*closure_id);
-                                        let inst = Type::instantiate_slice(&inst, self.type_inst);
-                                        Some((inst, *mid, *fid))
-                                    },
-                                    Some(ExpData::Temporary(_, idx)) => find_closure_for_temp(
-                                        code, *idx,
-                                    )
-                                    .map(|(mid, fid, types, _)| {
-                                        let inst = Type::instantiate_slice(&types, self.type_inst);
-                                        (inst, mid, fid)
-                                    }),
-                                    _ => None,
-                                };
-                                if let Some((inst, mid, fid)) = closure_info {
-                                    let callee = env.get_function(mid.qualified(fid));
-                                    let info = label_info.entry(post_label).or_default();
-                                    // Add callee's modifies targets as modified types
-                                    for mem in callee.get_modify_targets().keys() {
-                                        let mem_inst =
-                                            mem.module_id.qualified_inst(mem.id, inst.clone());
-                                        info.modified_types.insert(mem_inst);
-                                    }
-                                    info.pre = info.pre.or(range.pre);
-                                } else if let Some(fun_arg) = args.first() {
-                                    // Runtime function value: use the evaluator
-                                    // memory union from MonoInfo to determine
-                                    // which memories could be modified.
-                                    let fun_type = env.get_node_type(fun_arg.node_id());
-                                    let fun_type = fun_type.instantiate(self.type_inst);
-                                    let (_, old) = compute_evaluator_memory_union(env, &fun_type);
-                                    // Only create an entry if there are actually
-                                    // modified memories. An empty entry would change
-                                    // label resolution from "preserve as-is" (SaveMem
-                                    // snapshot) to "walk back" mode, which is incorrect
-                                    // for pure functions that don't modify resources.
-                                    if !old.is_empty() {
-                                        let info = label_info.entry(post_label).or_default();
-                                        info.modified_types.extend(old);
-                                        info.pre = info.pre.or(range.pre);
-                                    }
-                                }
-                            }
-                        },
-                        AstOperation::SpecFunction(mid, fid, range) => {
-                            if let Some(post_label) = range.post {
-                                let inst = env.get_node_instantiation(*node_id);
-                                let inst = Type::instantiate_slice(&inst, self.type_inst);
-                                let module = env.get_module(*mid);
-                                let sfun = module.get_spec_fun(*fid);
-                                let info = label_info.entry(post_label).or_default();
-                                for mem in &sfun.old_memory {
-                                    info.modified_types.insert(mem.clone().instantiate(&inst));
-                                }
-                                info.pre = info.pre.or(range.pre);
-                            }
-                        },
-                        _ => {},
-                    }
-                }
-                true
-            });
-        }
-        label_info
+        compute_label_info(env, self.type_inst, all_exps, code)
     }
 
     /// Declare Boogie variables for behavior state labels found in spec conditions
@@ -7380,6 +7592,7 @@ impl FunctionTranslator<'_> {
         &self,
         last_tracked_loc: &mut Option<(Loc, LineIndex)>,
         bytecode: &Bytecode,
+        in_world_havoc: bool,
     ) {
         use Bytecode::*;
 
@@ -7447,10 +7660,12 @@ impl FunctionTranslator<'_> {
         // Translate the bytecode instruction.
         match bytecode {
             SaveMem(_, label, mem) => {
-                let mem = &mem.to_owned().instantiate(self.type_inst);
-                let snapshot = boogie_resource_memory_name(env, mem, &Some(*label));
-                let current = boogie_resource_memory_name(env, mem, &None);
-                emitln!(writer, "{} := {};", snapshot, current);
+                let mem = mem.to_owned().instantiate(self.type_inst);
+                for mem in saved_memory_of(env, mem) {
+                    let snapshot = boogie_resource_memory_name(env, &mem, &Some(*label));
+                    let current = boogie_resource_memory_name(env, &mem, &None);
+                    emitln!(writer, "{} := {};", snapshot, current);
+                }
             },
             SaveSpecVar(_, _label, _var) => {
                 panic!("spec var snapshot NYI")
@@ -7582,6 +7797,17 @@ impl FunctionTranslator<'_> {
             },
             Call(_, dests, oper, srcs, aa) => {
                 use Operation::*;
+                if self.saves_locked_memory_at(oper, srcs) {
+                    emitln!(writer, "$known_closure_ran := false;");
+                    for mem in self.reentry_locked_memory() {
+                        emitln!(
+                            writer,
+                            "{} := {};",
+                            reentry_saved_memory_name(env, &mem),
+                            boogie_resource_memory_name(env, &mem, &None)
+                        );
+                    }
+                }
                 match oper {
                     TestVariant(mid, sid, variant, inst) => {
                         let inst = &self.inst_slice(inst);
@@ -7608,8 +7834,12 @@ impl FunctionTranslator<'_> {
                     UnpackRef | UnpackRefDeep | PackRef | PackRefDeep => {
                         // No effect
                     },
-                    OpaqueCallBegin(..) | OpaqueCallEnd(..) => {
-                        // These are just markers.  There is no generated code.
+                    OpaqueCallBegin(mid, fid, _) => {
+                        // A marker without generated code.
+                        self.opaque_callee.set(Some(mid.qualified(*fid)));
+                    },
+                    OpaqueCallEnd(..) => {
+                        self.opaque_callee.set(None);
                     },
                     WriteBack(node, edge) => {
                         self.translate_write_back(node, edge, srcs[0]);
@@ -8253,11 +8483,33 @@ impl FunctionTranslator<'_> {
                         let mem = mid
                             .qualified_inst(*sid, inst.to_owned())
                             .instantiate(self.type_inst);
-                        emitln!(
-                            writer,
-                            "havoc {};",
-                            boogie_resource_memory_name(env, &mem, &None)
-                        );
+                        // A havoc of the world memory havocs every memory except spec variables
+                        // unknown code cannot update: no updater it can reach, or only updaters of this
+                        // function's module, on the stack, that re-entry aborts (`ghost_kept_in`).
+                        // Not in the summary of an opaque callee of this module that reaches an
+                        // updater by a plain call, which is no re-entry.
+                        let callee_updates = |qid: &QualifiedId<StructId>| {
+                            self.opaque_callee.get().is_some_and(|callee| {
+                                callee.module_id == self.fun_target.module_env().get_id()
+                                    && env.may_update_ghost_statically(callee, qid)
+                            })
+                        };
+                        let world = env.is_world_memory(&mem.to_qualified_id());
+                        // An inline function runs in its caller's frame: no module is known to be
+                        // on the stack.
+                        let root_module = (!self.fun_target.func_env.is_inline())
+                            .then(|| self.fun_target.module_env().get_id());
+                        for mem in saved_memory_of(env, mem).into_iter().filter(|mem| {
+                            let qid = mem.to_qualified_id();
+                            !world
+                                || !(env.get_struct(qid).is_ghost_memory()
+                                    && (!env.ghost_updatable_by_unknown_code(&qid)
+                                        || root_module.is_some_and(|m| {
+                                            ghost_kept_in(env, &qid, m) && !callee_updates(&qid)
+                                        })))
+                        }) {
+                            emit_memory_havoc(writer, env, &mem, in_world_havoc);
+                        }
                     },
                     Havoc(HavocKind::MutationValue) => {
                         let ty = &self.get_local_type(dests[0]);
@@ -8820,6 +9072,29 @@ impl FunctionTranslator<'_> {
                     },
                     Vector => unimplemented!("vector"),
                 }
+                // A function the program names that wrote the locked memory aborted at that
+                // write. Unknown code that did is covered by its own abort and the assumption
+                // below.
+                let restores_locked = self.restores_locked_memory_at(oper, srcs);
+                let locked_unchanged = || {
+                    self.reentry_locked_memory()
+                        .iter()
+                        .map(|mem| {
+                            format!(
+                                "{} == {}",
+                                boogie_resource_memory_name(env, mem, &None),
+                                reentry_saved_memory_name(env, mem)
+                            )
+                        })
+                        .join(" && ")
+                };
+                if restores_locked && aa.is_some() && !self.reentry_locked_memory().is_empty() {
+                    emitln!(
+                        writer,
+                        "if (!$abort_flag && $known_closure_ran && !({})) {{ $abort_flag := true; havoc $abort_code; }}",
+                        locked_unchanged()
+                    );
+                }
                 if let Some(AbortAction(target, code)) = aa {
                     emitln!(writer, "if ($abort_flag) {");
                     writer.indent();
@@ -8844,6 +9119,17 @@ impl FunctionTranslator<'_> {
                     emitln!(writer, "goto L{};", target.as_usize());
                     writer.unindent();
                     emitln!(writer, "}");
+                }
+                // Only reached on a normal return. Assumed rather than assigned, so that the
+                // state the call's predicates were assumed over is this one.
+                if restores_locked && !self.reentry_locked_memory().is_empty() {
+                    // Without an abort edge the write stays as modeled: no assumption then.
+                    let guard = if aa.is_some() {
+                        ""
+                    } else {
+                        "$known_closure_ran || "
+                    };
+                    emitln!(writer, "assume {}({});", guard, locked_unchanged());
                 }
             },
             Abort(_, src, _) => {
@@ -9766,7 +10052,7 @@ fn derive_closure_frame_access(
     inst: &[Type],
 ) -> BTreeMap<QualifiedInstId<StructId>, FrameAccessKind> {
     let mut result = BTreeMap::new();
-    let mut all_memory = spec_derivation::behavioral_target_memory(
+    let mut all_memory = behavioral_target_memory(
         closure_fun.module_env.env,
         closure_fun.get_qualified_id(),
         inst,
@@ -9925,11 +10211,133 @@ fn local_var_exp_to_boogie_str(
     }
 }
 
+/// Whether a function-typed field has no `reads_of`/`modifies_of` declaration. Its value may
+/// read and write any memory, including state no root translates (the world memory), and its
+/// predicates are functions of the invocation's whole pre-state. This differs from the
+/// wildcard encoding, whose result and ensures predicates take `(old, cur)` pairs.
+fn is_unframed_field(env: &GlobalEnv, info: &StructFieldInfo) -> bool {
+    env.get_struct_qid(info.struct_id.to_qualified_id())
+        .get_field_access_of()
+        .iter()
+        .all(|a| a.fun_param != info.field_sym)
+}
+
+/// Whether a havoc of `mem` keeps the addresses where it exists: no code can remove it
+/// (`GlobalEnv::existence_is_monotone`). Only applied when the world memory exists, i.e. where
+/// unknown code may run; elsewhere the havocs stay as before.
+fn havoc_keeps_existence(env: &GlobalEnv, mem: &QualifiedInstId<StructId>) -> bool {
+    env.world_memory().is_some() && env.existence_is_monotone(&mem.to_qualified_id())
+}
+
+/// The offsets of the memory havocs that run where unknown code may have run: every memory
+/// havoc of a maximal run of havocs and assumptions that contains a havoc of the world memory
+/// (an opaque call's frame havocs and the re-havoc of accessed memory around it, the
+/// per-memory havocs at a loop head).
+fn world_havoc_runs(env: &GlobalEnv, code: &[Bytecode]) -> BTreeSet<usize> {
+    let mut runs = BTreeSet::new();
+    let mut group: Vec<usize> = vec![];
+    let mut has_world = false;
+    for (offset, bc) in code.iter().enumerate() {
+        match bc {
+            Bytecode::Call(_, _, Operation::HavocGlobal(mid, sid, _), _, _) => {
+                has_world |= env.is_world_memory(&mid.qualified(*sid));
+                group.push(offset);
+            },
+            Bytecode::Call(_, _, Operation::Havoc(_), _, _)
+            | Bytecode::Prop(_, PropKind::Assume, _) => {},
+            _ => {
+                if has_world {
+                    runs.extend(group.iter().copied());
+                }
+                group.clear();
+                has_world = false;
+            },
+        }
+    }
+    if has_world {
+        runs.extend(group);
+    }
+    runs
+}
+
+/// The local holding `mem` across a havoc that keeps its existence (`havoc_keeps_existence`).
+fn existence_saved_memory_name(env: &GlobalEnv, mem: &QualifiedInstId<StructId>) -> String {
+    format!("{}#exists", boogie_resource_memory_name(env, mem, &None))
+}
+
+/// The assumption after a havoc of `mem` whose pre-havoc value is in `saved`: every address
+/// where it existed still has it (the value may change).
+fn existence_kept_assumption(
+    env: &GlobalEnv,
+    mem: &QualifiedInstId<StructId>,
+    saved: &str,
+) -> String {
+    let name = boogie_resource_memory_name(env, mem, &None);
+    format!(
+        "assume (forall $$a: int :: {{$ResourceExists({}, $$a)}} $ResourceExists({}, $$a) ==> $ResourceExists({}, $$a));",
+        name, saved, name
+    )
+}
+
+/// Havocs `mem`, keeping its existence where `havoc_keeps_existence` says so.
+/// Only inside a world havoc run (`world_havoc_runs`); other havocs stay as before.
+fn emit_memory_havoc(
+    writer: &CodeWriter,
+    env: &GlobalEnv,
+    mem: &QualifiedInstId<StructId>,
+    in_world_havoc: bool,
+) {
+    let name = boogie_resource_memory_name(env, mem, &None);
+    if in_world_havoc && havoc_keeps_existence(env, mem) {
+        let saved = existence_saved_memory_name(env, mem);
+        emitln!(writer, "{} := {};", saved, name);
+        emitln!(writer, "havoc {};", name);
+        emitln!(writer, "{}", existence_kept_assumption(env, mem, &saved));
+    } else {
+        emitln!(writer, "havoc {};", name);
+    }
+}
+
+/// The local holding `mem` across a call that cannot write it (`reentry_locked_memory`).
+fn reentry_saved_memory_name(env: &GlobalEnv, mem: &QualifiedInstId<StructId>) -> String {
+    format!("{}#reentry", boogie_resource_memory_name(env, mem, &None))
+}
+
+/// The memories a `SaveMem` or `HavocGlobal` of `mem` covers: every translated memory for the
+/// world memory, which stands for all of them (the pipeline, which runs before mono, cannot
+/// name them); otherwise `mem`.
+fn saved_memory_of(
+    env: &GlobalEnv,
+    mem: QualifiedInstId<StructId>,
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    expand_world_memory(env, BTreeSet::from([mem]))
+}
+
+/// Arguments a per-type evaluator passes to an unframed field's predicates: the pre-state
+/// slot of every translated memory.
+fn unframed_field_memory_args(
+    env: &GlobalEnv,
+    union_old: &BTreeSet<QualifiedInstId<StructId>>,
+) -> Vec<String> {
+    mono_analysis::get_info(env)
+        .all_memory_qids(env)
+        .iter()
+        .map(|mem| {
+            let name = boogie_resource_memory_name(env, mem, &None);
+            if union_old.contains(mem) {
+                format!("old_{}", name)
+            } else {
+                name
+            }
+        })
+        .collect()
+}
+
 /// Derive frame access for a struct field variant in the apply procedure.
 ///
 /// Uses `reads_of`/`modifies_of` declarations from the struct spec block.
-/// If no declaration exists for the field, the function is assumed pure (empty map —
-/// all memory preserved). `data_args` provides the Boogie argument strings; the first
+/// If no declaration exists for the field, every translated memory (the world memory
+/// included) is `WritesAll`. `data_args` provides the Boogie argument strings; the first
 /// element is `fun->n` (instance discriminator), followed by the actual parameters.
 fn derive_struct_field_frame_access(
     env: &GlobalEnv,
@@ -9945,8 +10353,14 @@ fn derive_struct_field_frame_access(
     let access_decl = field_access.iter().find(|a| a.fun_param == field_sym);
     match access_decl {
         None => {
-            // No declaration: assume pure (no memory access)
-            (BTreeSet::new(), BTreeSet::new(), BTreeMap::new())
+            // No declaration: may read and write every memory, the world included. The
+            // predicates take the pre-state only (no `old` slots).
+            let used_memory = mono_analysis::get_info(env).all_memory_qids(env);
+            let result = used_memory
+                .iter()
+                .map(|mem| (mem.clone(), ApplyFrameAccess::WritesAll))
+                .collect();
+            (used_memory, BTreeSet::new(), result)
         },
         Some(decl) => {
             let mut used_memory = decl.used_memory.clone();
@@ -10195,4 +10609,113 @@ pub fn has_native_equality(env: &GlobalEnv, options: &BoogieOptions, ty: &Type) 
         | Type::Error
         | Type::Var(_) => true,
     }
+}
+
+/// Per state label of `all_exps`, the label before it and the memories its defining operations
+/// modify (see `LabelInfo`). `code` resolves closures bound to temporaries.
+pub(crate) fn compute_label_info(
+    env: &GlobalEnv,
+    type_inst: &[Type],
+    all_exps: &[Exp],
+    code: &[Bytecode],
+) -> BTreeMap<MemoryLabel, LabelInfo> {
+    use move_model::ast::BehaviorKind;
+    let mut label_info: BTreeMap<MemoryLabel, LabelInfo> = BTreeMap::new();
+
+    for exp in all_exps {
+        exp.visit_pre_order(&mut |e| {
+            if let ExpData::Call(node_id, op, args) = e {
+                match op {
+                    AstOperation::SpecPublish(range)
+                    | AstOperation::SpecRemove(range)
+                    | AstOperation::SpecUpdate(range) => {
+                        if let Some(post_label) = range.post {
+                            let node_inst = env.get_node_instantiation(*node_id);
+                            let node_inst = Type::instantiate_slice(&node_inst, type_inst);
+                            let (mid, sid, inst) = node_inst[0].require_struct();
+                            let mem = mid.qualified_inst(sid, inst.to_owned());
+                            let info = label_info.entry(post_label).or_default();
+                            info.modified_types.insert(mem);
+                            info.pre = info.pre.or(range.pre);
+                        }
+                    },
+                    AstOperation::Behavior(
+                        BehaviorKind::EnsuresOf | BehaviorKind::ResultOf,
+                        range,
+                    ) => {
+                        if let Some(post_label) = range.post {
+                            // Resolve closure to get callee's modifies
+                            let closure_info: Option<(
+                                Vec<Type>,
+                                move_model::model::ModuleId,
+                                FunId,
+                            )> = match args.first().map(|a| a.as_ref()) {
+                                Some(ExpData::Call(
+                                    closure_id,
+                                    AstOperation::Closure(mid, fid, _),
+                                    _,
+                                )) => {
+                                    let inst = env.get_node_instantiation(*closure_id);
+                                    let inst = Type::instantiate_slice(&inst, type_inst);
+                                    Some((inst, *mid, *fid))
+                                },
+                                Some(ExpData::Temporary(_, idx)) => {
+                                    find_closure_for_temp(code, *idx).map(|(mid, fid, types, _)| {
+                                        let inst = Type::instantiate_slice(&types, type_inst);
+                                        (inst, mid, fid)
+                                    })
+                                },
+                                _ => None,
+                            };
+                            if let Some((inst, mid, fid)) = closure_info {
+                                let callee = env.get_function(mid.qualified(fid));
+                                let info = label_info.entry(post_label).or_default();
+                                // Add callee's modifies targets as modified types
+                                for mem in callee.get_modify_targets().keys() {
+                                    let mem_inst =
+                                        mem.module_id.qualified_inst(mem.id, inst.clone());
+                                    info.modified_types.insert(mem_inst);
+                                }
+                                info.pre = info.pre.or(range.pre);
+                            } else if let Some(fun_arg) = args.first() {
+                                // Runtime function value: use the evaluator
+                                // memory union from MonoInfo to determine
+                                // which memories could be modified.
+                                let fun_type = env.get_node_type(fun_arg.node_id());
+                                let fun_type = fun_type.instantiate(type_inst);
+                                let (_, old) = compute_evaluator_memory_union(env, &fun_type);
+                                // Only create an entry if there are actually
+                                // modified memories. An empty entry would change
+                                // label resolution from "preserve as-is" (SaveMem
+                                // snapshot) to "walk back" mode, which is incorrect
+                                // for pure functions that don't modify resources.
+                                if !old.is_empty() {
+                                    let info = label_info.entry(post_label).or_default();
+                                    info.modified_types.extend(old);
+                                    info.pre = info.pre.or(range.pre);
+                                }
+                            }
+                        }
+                    },
+                    AstOperation::SpecFunction(mid, fid, range) => {
+                        if let Some(post_label) = range.post {
+                            let inst = env.get_node_instantiation(*node_id);
+                            let inst = Type::instantiate_slice(&inst, type_inst);
+                            let module = env.get_module(*mid);
+                            let sfun = module.get_spec_fun(*fid);
+                            let info = label_info.entry(post_label).or_default();
+                            info.modified_types.extend(expand_world_memory(
+                                env,
+                                sfun.old_memory_instantiated(&inst),
+                            ));
+                            info.pre = info.pre.or(range.pre);
+                        }
+                    },
+                    _ => {},
+                }
+            }
+            true
+        });
+    }
+    label_info
 }

@@ -7,16 +7,17 @@
 
 use crate::{
     boogie_helpers::{
-        behavioral_old_memory_instantiated, boogie_address, boogie_address_blob,
-        boogie_behavioral_eval_fun_name, boogie_behavioral_fun_result_name, boogie_byte_blob,
-        boogie_choice_fun_name, boogie_closure_pack_name, boogie_declare_global,
+        behavioral_old_memory_instantiated, behavioral_target_memory, boogie_address,
+        boogie_address_blob, boogie_behavioral_eval_fun_name, boogie_behavioral_fun_result_name,
+        boogie_byte_blob, boogie_choice_fun_name, boogie_closure_pack_name, boogie_declare_global,
         boogie_equality_for_type, boogie_field_sel, boogie_field_update, boogie_inst_suffix,
         boogie_modifies_memory_name, boogie_num_type_base, boogie_reflection_type_info,
         boogie_reflection_type_is_struct, boogie_reflection_type_name, boogie_resource_memory_name,
         boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name,
-        boogie_type, boogie_type_for_struct_field, boogie_type_suffix, boogie_value_blob,
-        boogie_variant_field_update, boogie_well_formed_expr, bv_flag_for_type,
-        compute_evaluator_memory_union, EmittedEntities, MAX_TUPLE_SIZE,
+        boogie_type, boogie_type_for_struct_field, boogie_type_suffix, boogie_unread_memory_name,
+        boogie_value_blob, boogie_variant_field_update, boogie_well_formed_expr, bv_flag_for_type,
+        compute_evaluator_memory_union, compute_named_evaluator_memory_union, expand_world_memory,
+        EmittedEntities, MAX_TUPLE_SIZE,
     },
     bytecode_translator::has_native_equality,
     inline_functions::InlineFunctions,
@@ -39,7 +40,6 @@ use move_model::{
         QualifiedId, QualifiedInstId, SpecFunId, SpecVarId, StructEnv, StructId,
     },
     pragmas::{INTRINSIC_TYPE_MAP, WEIGHT_PROP},
-    spec_derivation,
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
     well_known::{self, TYPE_INFO_SPEC, TYPE_NAME_GET_SPEC, TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT},
@@ -82,6 +82,12 @@ pub struct SpecTranslator<'env> {
     in_old_context: RefCell<bool>,
     /// The set of old-context memory for the spec fun currently being translated (if any).
     fun_old_memory: Option<BTreeSet<QualifiedInstId<StructId>>>,
+    /// Whether a behavioral evaluator body (a Boogie function over a function's specification)
+    /// is being translated: labeled memory resolves to its parameters or to bound states
+    /// (`evaluator_label_slot`), never to `old(..)`.
+    in_evaluator_body: bool,
+    /// Whether that evaluator's memory parameter is the entry state (`set_in_evaluator_body`).
+    evaluator_param_is_entry: bool,
     /// Whether a spec fun body is being translated. Memory is then a function
     /// parameter, never a global: a pre-state reference is the `old_` parameter
     /// of a two-state spec fun, or the ordinary parameter of a one-state one.
@@ -195,6 +201,8 @@ impl<'env> SpecTranslator<'env> {
             qid_count: Default::default(),
             in_old_context: RefCell::new(false),
             fun_old_memory: None,
+            in_evaluator_body: false,
+            evaluator_param_is_entry: false,
             in_spec_fun_body: false,
             fun_mut_params: BTreeSet::new(),
             lifted_choice_infos: Default::default(),
@@ -251,7 +259,7 @@ impl<'env> SpecTranslator<'env> {
     /// If the type is modified at this label, returns Some(label).
     /// Otherwise, walks back through the chain via pre-states until finding where
     /// the type was modified, or returns None (old/entry state).
-    fn resolve_label_for_memory(
+    pub(crate) fn resolve_label_for_memory(
         &self,
         label: MemoryLabel,
         memory: &QualifiedInstId<StructId>,
@@ -291,6 +299,39 @@ impl<'env> SpecTranslator<'env> {
     /// Sets the old-memory context for translating spec function bodies that use old().
     pub fn set_fun_old_memory(&mut self, memory: BTreeSet<QualifiedInstId<StructId>>) {
         self.fun_old_memory = Some(memory);
+    }
+
+    /// Marks this translator as translating a behavioral evaluator body.
+    /// `param_is_entry` says whether the evaluator's memory parameter is the entry state: true
+    /// for a one-state predicate about the entry state (`requires_of`, `aborts_of`), false for
+    /// `ensures_of`, whose memory parameter is the post-state.
+    pub fn set_in_evaluator_body(&mut self, param_is_entry: bool) {
+        self.in_evaluator_body = true;
+        self.evaluator_param_is_entry = param_is_entry;
+    }
+
+    /// Where a labeled memory reference lands in an evaluator body (a Boogie function, which
+    /// cannot name a global or use `old(..)`). A label the memory is modified at, or that walks
+    /// back to one, is an intermediate state the evaluator binds. One that walks back to the
+    /// entry state is the `old_` parameter when the evaluator carries it; in an evaluator whose
+    /// memory parameter is the entry state (`requires_of`, `aborts_of`) it is that parameter;
+    /// otherwise (the pre-state slot is missing, or the memory parameter is the post-state of
+    /// an `ensures_of` evaluator) it keeps the label, bound as an unconstrained state (as before
+    /// labels were resolved here), which is sound and merely weak. The same decision serves the body
+    /// and the binder collection, so every name the body uses is bound.
+    pub(crate) fn evaluator_label_slot(
+        &self,
+        label: MemoryLabel,
+        memory: &QualifiedInstId<StructId>,
+    ) -> EvaluatorSlot {
+        match self.resolve_label_for_memory(label, memory) {
+            Some(resolved) => EvaluatorSlot::Labeled(resolved),
+            None => match &self.fun_old_memory {
+                Some(old) if old.contains(memory) => EvaluatorSlot::Old,
+                None if self.evaluator_param_is_entry => EvaluatorSlot::Current,
+                _ => EvaluatorSlot::Labeled(label),
+            },
+        }
     }
 
     /// Sets the mutable parameter names for old-context translation.
@@ -766,34 +807,35 @@ impl SpecTranslator<'_> {
             vec![]
         };
         let result_type = boogie_type(self.env, &self.inst(&fun.result_type), bv_flag_result);
-        let old_memory = fun.old_memory_instantiated(&self.type_inst);
+        let old_memory =
+            expand_world_memory(self.env, fun.old_memory_instantiated(&self.type_inst));
         // it is possible that the spec fun may refer to the same memory after monomorphization,
         // (e.g., one via concrete type and the other via type parameter being instantiated).
         // In this case, we mark the other parameter as unused
         let mut mem_inst_seen = BTreeSet::new();
-        let mem_params = fun
-            .used_memory_instantiated(&self.type_inst)
-            .iter()
-            .flat_map(|memory| {
-                let struct_env = &self.env.get_struct_qid(memory.to_qualified_id());
-                let mem_type = format!(
-                    "$Memory {}",
-                    boogie_struct_name(struct_env, &memory.inst, false)
-                );
-                let name = boogie_resource_memory_name(self.env, memory, &None);
-                let is_dup = !mem_inst_seen.insert(memory.clone());
-                let prefix = if is_dup { "__unused_" } else { "" };
-                if fun.uses_old && old_memory.contains(memory) {
-                    // Dual params for resources accessed in old() context
-                    vec![
-                        format!("{}old_{}: {}", prefix, name, mem_type),
-                        format!("{}{}: {}", prefix, name, mem_type),
-                    ]
-                } else {
-                    vec![format!("{}{}: {}", prefix, name, mem_type)]
-                }
-            })
-            .collect_vec();
+        let mem_params =
+            expand_world_memory(self.env, fun.used_memory_instantiated(&self.type_inst))
+                .iter()
+                .flat_map(|memory| {
+                    let struct_env = &self.env.get_struct_qid(memory.to_qualified_id());
+                    let mem_type = format!(
+                        "$Memory {}",
+                        boogie_struct_name(struct_env, &memory.inst, false)
+                    );
+                    let name = boogie_resource_memory_name(self.env, memory, &None);
+                    let is_dup = !mem_inst_seen.insert(memory.clone());
+                    let prefix = if is_dup { "__unused_" } else { "" };
+                    if fun.uses_old && old_memory.contains(memory) {
+                        // Dual params for resources accessed in old() context
+                        vec![
+                            format!("{}old_{}: {}", prefix, name, mem_type),
+                            format!("{}{}: {}", prefix, name, mem_type),
+                        ]
+                    } else {
+                        vec![format!("{}{}: {}", prefix, name, mem_type)]
+                    }
+                })
+                .collect_vec();
         let params = fun
             .params
             .iter()
@@ -2711,6 +2753,42 @@ impl SpecTranslator<'_> {
         }
     }
 
+    /// The argument for `memory` at `label` when the predicate cannot read the world memory
+    /// there. The specification translation saves, under each label, the memory a predicate
+    /// reads at it (`ExpData::behavior_target_memory`): the world memory when the predicate is
+    /// over a value that may touch any memory, the declared frame for a framed parameter or
+    /// field, the target's memory for a closure. The evaluator of the function type takes every
+    /// memory any of its variants reads, the world memory included since every function type
+    /// has a variant of unknown origin. So when the world memory was not saved under the label,
+    /// the predicate is not over such a value, and a memory that was not saved either is one it
+    /// does not read: any state serves, and the current one is passed. `None` when the state
+    /// was saved, and in function bodies, where memory is a parameter.
+    fn unread_memory_arg(
+        &self,
+        memory: &QualifiedInstId<StructId>,
+        label: Option<MemoryLabel>,
+    ) -> Option<String> {
+        if self.in_spec_fun_body || self.in_evaluator_body || self.fun_old_memory.is_some() {
+            return None;
+        }
+        let world = self.env.world_memory()?;
+        let label = label?;
+        let declared = self.declared_mem_names.borrow();
+        let saved = |mem: &QualifiedInstId<StructId>| {
+            let resolved = if self.label_info.borrow().is_empty() {
+                Some(label)
+            } else {
+                self.resolve_label_for_memory(label, mem)
+            };
+            // A label that resolves to the entry state names the global, always declared.
+            resolved.is_none_or(|l| {
+                declared.contains(&boogie_resource_memory_name(self.env, mem, &Some(l)))
+            })
+        };
+        (!saved(&world) && !saved(memory))
+            .then(|| boogie_resource_memory_name(self.env, memory, &None))
+    }
+
     /// Emit memory arguments for an evaluator call by computing the memory union
     /// from all closure and param variants of the given function type.
     fn emit_evaluator_memory_args(
@@ -2737,11 +2815,35 @@ impl SpecTranslator<'_> {
             | BehaviorKind::WriteOf(_)
             | BehaviorKind::TransitionOf => post,
         };
+        // A predicate over a parameter with a declared frame reads the memory of the variants
+        // the program names; the evaluator takes more, for the variant of unknown origin.
+        let named = self
+            .env
+            .behavior_is_param_framed(node_id)
+            .then(|| compute_named_evaluator_memory_union(self.env, fun_type));
         let mut first = true;
         for memory in &union_used_memory {
+            if named
+                .as_ref()
+                .is_some_and(|(used, old)| !used.contains(memory) && !old.contains(memory))
+            {
+                if !first {
+                    emit!(self.writer, ", ");
+                }
+                first = false;
+                let unread = boogie_unread_memory_name(self.env, memory);
+                if uses_old && union_old_memory.contains(memory) {
+                    emit!(self.writer, "{}, {}", unread, unread);
+                } else {
+                    emit!(self.writer, &unread);
+                }
+                continue;
+            }
             if uses_old && union_old_memory.contains(memory) {
                 // Check that the pre-state memory reference will be declared.
-                if !self.in_spec_fun_body && !self.check_name_declared(node_id, kind, *pre, memory)
+                if !self.in_spec_fun_body
+                    && self.unread_memory_arg(memory, *pre).is_none()
+                    && !self.check_name_declared(node_id, kind, *pre, memory)
                 {
                     return !first;
                 }
@@ -2751,11 +2853,13 @@ impl SpecTranslator<'_> {
                 first = false;
                 let pre_name = self
                     .spec_fun_body_memory_arg(memory, kind, true, *pre)
+                    .or_else(|| self.unread_memory_arg(memory, *pre))
                     .unwrap_or_else(|| self.resolve_memory_name(memory, *pre));
                 emit!(self.writer, &pre_name);
                 emit!(self.writer, ", ");
                 let current_name = self
                     .spec_fun_body_memory_arg(memory, kind, false, *current)
+                    .or_else(|| self.unread_memory_arg(memory, *current))
                     .unwrap_or_else(|| self.resolve_memory_name(memory, *current));
                 emit!(self.writer, &current_name);
             } else {
@@ -2765,6 +2869,7 @@ impl SpecTranslator<'_> {
                 first = false;
                 let mem_name = self
                     .spec_fun_body_memory_arg(memory, kind, false, *current)
+                    .or_else(|| self.unread_memory_arg(memory, *current))
                     .unwrap_or_else(|| self.resolve_memory_name(memory, *current));
                 emit!(self.writer, &mem_name);
             }
@@ -3003,11 +3108,8 @@ impl SpecTranslator<'_> {
         let pre = range.pre;
         let post = range.post;
         let fun_env = self.env.get_function(fun_qid.to_qualified_id());
-        let used_memory = spec_derivation::behavioral_target_memory(
-            self.env,
-            fun_qid.to_qualified_id(),
-            &fun_qid.inst,
-        );
+        let used_memory =
+            behavioral_target_memory(self.env, fun_qid.to_qualified_id(), &fun_qid.inst);
         let old_memory = behavioral_old_memory_instantiated(&fun_env, &fun_qid.inst);
         let uses_old = !old_memory.is_empty();
         let current = match kind {
@@ -3116,8 +3218,15 @@ impl SpecTranslator<'_> {
             BehaviorKind::WriteOf(_) => "write_of",
             BehaviorKind::TransitionOf => "transition",
         };
-        let struct_env = self.env.get_struct_qid(memory.to_qualified_id());
-        let mem_display = struct_env.get_full_name_with_address().to_string();
+        // The world memory is hosted in some module but belongs to none.
+        let mem_display = if self.env.is_world_memory(&memory.to_qualified_id()) {
+            "$World".to_string()
+        } else {
+            self.env
+                .get_struct_qid(memory.to_qualified_id())
+                .get_full_name_with_address()
+                .to_string()
+        };
         self.env.error(
             &loc,
             &format!(
@@ -3379,8 +3488,8 @@ impl SpecTranslator<'_> {
         // to pre (for calls inside old() context).
         let effective_label = range.post.or(range.pre);
         if fun_decl.uses_old {
-            let inst_old = fun_decl.old_memory_instantiated(inst);
-            let inst_used = fun_decl.used_memory_instantiated(inst);
+            let inst_old = expand_world_memory(self.env, fun_decl.old_memory_instantiated(inst));
+            let inst_used = expand_world_memory(self.env, fun_decl.used_memory_instantiated(inst));
             for memory in &inst_used {
                 if inst_old.contains(memory) {
                     // Old-context resource: pass pre-state then post-state.
@@ -3415,7 +3524,7 @@ impl SpecTranslator<'_> {
                 }
             }
         } else {
-            for memory in fun_decl.used_memory_instantiated(inst) {
+            for memory in expand_world_memory(self.env, fun_decl.used_memory_instantiated(inst)) {
                 maybe_comma();
                 let mem_name = self.resolve_memory_name(&memory, effective_label);
                 emit!(self.writer, &mem_name);
@@ -3894,7 +4003,7 @@ impl SpecTranslator<'_> {
                         let inst = Type::instantiate_slice(&inst, type_inst);
                         let module = env.get_module(*mid);
                         let fun = module.get_spec_fun(*fid);
-                        for mem in fun.used_memory_instantiated(&inst) {
+                        for mem in expand_world_memory(env, fun.used_memory_instantiated(&inst)) {
                             for label in range.labels() {
                                 result.insert((label, mem.clone()));
                             }
@@ -3911,11 +4020,7 @@ impl SpecTranslator<'_> {
                             let inst = env.get_node_instantiation(*closure_id);
                             let inst = Type::instantiate_slice(&inst, type_inst);
                             let fun_env = env.get_function(mid.qualified(*fid));
-                            for mem in spec_derivation::behavioral_target_memory(
-                                env,
-                                mid.qualified(*fid),
-                                &inst,
-                            ) {
+                            for mem in behavioral_target_memory(env, mid.qualified(*fid), &inst) {
                                 for label in range.labels() {
                                     result.insert((label, mem.clone()));
                                 }
@@ -3930,7 +4035,13 @@ impl SpecTranslator<'_> {
                             // evaluator of its type, which reads this memory union.
                             let fun_type =
                                 env.get_node_type(fun_arg.node_id()).instantiate(type_inst);
-                            let (used, old) = compute_evaluator_memory_union(env, &fun_type);
+                            // A predicate over a parameter with a declared frame reads the
+                            // named variants' memory only (`emit_evaluator_memory_args`).
+                            let (used, old) = if env.behavior_is_param_framed(*node_id) {
+                                compute_named_evaluator_memory_union(env, &fun_type)
+                            } else {
+                                compute_evaluator_memory_union(env, &fun_type)
+                            };
                             for mem in used.iter().chain(old.iter()) {
                                 for label in range.labels() {
                                     result.insert((label, mem.clone()));
@@ -3958,6 +4069,24 @@ impl SpecTranslator<'_> {
         label: Option<MemoryLabel>,
         in_old_context: bool,
     ) -> String {
+        if let Some(l) = label {
+            // An evaluator body: labels resolve to its parameters or to bound states, never to
+            // `old(..)`, which Boogie rejects in a function.
+            if self.in_evaluator_body && !self.label_info.borrow().is_empty() {
+                return match self.evaluator_label_slot(l, memory) {
+                    EvaluatorSlot::Labeled(resolved) => {
+                        boogie_resource_memory_name(self.env, memory, &Some(resolved))
+                    },
+                    EvaluatorSlot::Old => {
+                        format!(
+                            "old_{}",
+                            boogie_resource_memory_name(self.env, memory, &None)
+                        )
+                    },
+                    EvaluatorSlot::Current => boogie_resource_memory_name(self.env, memory, &None),
+                };
+            }
+        }
         let resolved = match label {
             Some(l) if !self.label_info.borrow().is_empty() => {
                 self.resolve_label_for_memory(l, memory)
@@ -5772,4 +5901,15 @@ mod tests {
             Some("move.spec_fun.27.0x1::module::spec_fun.1")
         );
     }
+}
+
+/// Where a labeled memory reference lands in an evaluator body (`SpecTranslator::evaluator_label_slot`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum EvaluatorSlot {
+    /// The `old_` memory parameter (the entry state the evaluator carries).
+    Old,
+    /// The memory parameter (the single state of a one-state evaluator).
+    Current,
+    /// An intermediate state the evaluator binds under this label.
+    Labeled(MemoryLabel),
 }

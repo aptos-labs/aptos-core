@@ -1,0 +1,11 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_ghost_escaped_updater.move:42:26
+   │
+42 │     spec keeps_escaped { ensures 0x42::eu::g == old(0x42::eu::g); }
+   │                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_escaped_updater.move:41: keeps_escaped
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_escaped_updater.move:41: keeps_escaped
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_escaped_updater.move:42: keeps_escaped (spec)
