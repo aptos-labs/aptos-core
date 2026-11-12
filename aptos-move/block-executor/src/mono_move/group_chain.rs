@@ -1,14 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Resource groups assembled at commit from a chain of links at each group's
-//! own slot.
+//! Resource groups assembled at commit from the chain of metadata entries at
+//! each group's own slot.
 //!
 //! Group members live in the data map under their own keys. A transaction that
-//! writes members of a group also writes one link at the group's slot, naming
-//! the members it changed. The slot's base entry holds the stored group. A
-//! transaction's group is then the previous link's view plus its own changes,
-//! so nothing tracks which members a group has.
+//! writes members of a group also writes one metadata entry at the group's
+//! slot, naming the members it changed. The slot's base entry holds the stored
+//! group. A transaction's group is then the previous entry's view plus its own
+//! changes, so nothing tracks which members a group has.
 
 use crate::mono_move::MonoValue;
 use aptos_mvhashmap::{
@@ -36,22 +36,22 @@ pub(crate) type GroupView = BTreeMap<Bytes, Bytes>;
 
 /// One entry at a group's slot: the stored group, or one transaction's changes
 /// to it.
-pub struct GroupLink<K> {
-    /// The keys of the members the transaction that wrote this link changed.
+pub struct GroupMetadata<K> {
+    /// The keys of the members the transaction that wrote this entry changed.
     /// Their new values are that transaction's entries under these keys.
     /// Empty for the stored group.
     changes: Vec<K>,
     /// The group's members after these changes. Set when the stored group is
-    /// initialized, and built once for a transaction's link.
+    /// initialized, and built once for a transaction's entry.
     view: OnceLock<Arc<GroupView>>,
     /// The group's members before these changes. Only set in sequential
-    /// execution, where this link replaces the previous one at the group's
+    /// execution, where this entry replaces the previous one at the group's
     /// slot before it is materialized.
     prev: OnceLock<Arc<GroupView>>,
 }
 
-impl<K> GroupLink<K> {
-    /// The link for the group as storage holds it.
+impl<K> GroupMetadata<K> {
+    /// The metadata for the group as storage holds it.
     pub(crate) fn from_storage(view: GroupView) -> Self {
         Self {
             changes: vec![],
@@ -60,7 +60,7 @@ impl<K> GroupLink<K> {
         }
     }
 
-    /// The link for one transaction's changes to the group.
+    /// The metadata for one transaction's changes to the group.
     pub(crate) fn from_changes(changes: Vec<K>) -> Self {
         Self {
             changes,
@@ -73,11 +73,11 @@ impl<K> GroupLink<K> {
         &self.changes
     }
 
-    /// Records the group's members before this link's changes.
+    /// Records the group's members before this entry's changes.
     pub(crate) fn set_prev(&self, prev: Arc<GroupView>) -> Result<(), PanicError> {
         self.prev
             .set(prev)
-            .map_err(|_| code_invariant_error("A group link's previous view was set twice"))
+            .map_err(|_| code_invariant_error("Group metadata's previous view was set twice"))
     }
 
     pub(crate) fn prev(&self) -> Option<&Arc<GroupView>> {
@@ -88,7 +88,7 @@ impl<K> GroupLink<K> {
         self.view.get()
     }
 
-    /// This link's view: `prev` with `changes` applied, each a member's key in
+    /// This entry's view: `prev` with `changes` applied, each a member's key in
     /// the view and its new bytes, or [`None`] if it was deleted.
     pub(crate) fn build_view(
         &self,
@@ -108,39 +108,41 @@ impl<K> GroupLink<K> {
     }
 }
 
-/// The latest built view of the group before `txn_idx`, and the links between
-/// it and `txn_idx` whose views are not built yet, lowest first, each with the
-/// index of the transaction that wrote it.
+/// The latest built view of the group before `txn_idx`, and the metadata
+/// entries between it and `txn_idx` whose views are not built yet, lowest
+/// first, each with the index of the transaction that wrote it.
 ///
 /// Only called at commit, when every entry below `txn_idx` is committed.
 #[allow(clippy::type_complexity)]
-pub(crate) fn unbuilt_links_before<K: Hash + Clone + Debug + Eq + Send + Sync>(
+pub(crate) fn unbuilt_metadata_before<K: Hash + Clone + Debug + Eq + Send + Sync>(
     data: &VersionedData<K, MonoValue<K>>,
     group_key: &K,
     txn_idx: TxnIndex,
-) -> Result<(Arc<GroupView>, Vec<(TxnIndex, Arc<GroupLink<K>>)>), PanicError> {
+) -> Result<(Arc<GroupView>, Vec<(TxnIndex, Arc<GroupMetadata<K>>)>), PanicError> {
     let mut unbuilt = vec![];
     let mut idx = txn_idx;
     loop {
         match data.fetch_data_no_record(group_key, idx) {
-            Ok(MVDataOutput::Versioned(version, MonoValue::GroupMetadata { group: link })) => {
-                if let Some(view) = link.view() {
+            Ok(MVDataOutput::Versioned(version, MonoValue::GroupMetadata { group: metadata })) => {
+                if let Some(view) = metadata.view() {
                     unbuilt.reverse();
                     return Ok((view.clone(), unbuilt));
                 }
                 match version {
                     Ok((writer_idx, _)) => {
-                        unbuilt.push((writer_idx, link));
+                        unbuilt.push((writer_idx, metadata));
                         idx = writer_idx;
                     },
                     Err(_) => {
-                        return Err(code_invariant_error("The stored group's link has no view"))
+                        return Err(code_invariant_error(
+                            "The stored group's metadata has no view",
+                        ))
                     },
                 }
             },
             Ok(MVDataOutput::Versioned(_, MonoValue::Write { .. } | MonoValue::Deletion)) => {
                 return Err(code_invariant_error(format!(
-                    "Group slot {group_key:?} holds a value that is not a link"
+                    "Group slot {group_key:?} holds a value that is not group metadata"
                 )))
             },
             Err(MVDataError::Uninitialized) => {
@@ -150,7 +152,7 @@ pub(crate) fn unbuilt_links_before<K: Hash + Clone + Debug + Eq + Send + Sync>(
             },
             Err(MVDataError::Dependency(dep_idx)) => {
                 return Err(code_invariant_error(format!(
-                    "Group {group_key:?} has an uncommitted link at {dep_idx} at commit"
+                    "Group {group_key:?} has uncommitted metadata at {dep_idx} at commit"
                 )))
             },
         }

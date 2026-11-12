@@ -37,7 +37,7 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use group_chain::{
-    committed_value, group_write, member_tag, unbuilt_links_before, GroupLink, GroupView,
+    committed_value, group_write, member_tag, unbuilt_metadata_before, GroupMetadata, GroupView,
 };
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
@@ -82,7 +82,7 @@ pub enum MonoValue<K = InMemoryStorageKey> {
     //
     // TODO(completeness): add state value metadata and size here.
     GroupMetadata {
-        group: Arc<GroupLink<K>>,
+        group: Arc<GroupMetadata<K>>,
     },
 }
 
@@ -311,9 +311,9 @@ pub enum MonoTxnOutput {
         /// Whether this transaction emitted a reconfiguration (new-epoch) event,
         /// after which the block executor skips the remaining transactions.
         skips_rest: bool,
-        /// One link per resource group this transaction wrote a member of,
+        /// One metadata entry per resource group this transaction wrote a member of,
         /// built once so that every caller shares it.
-        group_links: Vec<(InMemoryStorageKey, Arc<GroupLink<InMemoryStorageKey>>)>,
+        group_metadata: Vec<(InMemoryStorageKey, Arc<GroupMetadata<InMemoryStorageKey>>)>,
     },
     /// Signals block executor that this transaction has to be skipped and
     /// retried later.
@@ -374,15 +374,15 @@ impl MonoTxnOutput {
                     .push(key.clone());
             }
         }
-        let group_links = changed_groups
+        let group_metadata = changed_groups
             .into_iter()
-            .map(|(group_key, changed)| (group_key, Arc::new(GroupLink::from_changes(changed))))
+            .map(|(group_key, changed)| (group_key, Arc::new(GroupMetadata::from_changes(changed))))
             .collect();
 
         MonoTxnOutput::Executed {
             outcome,
             skips_rest,
-            group_links,
+            group_metadata,
         }
     }
 
@@ -395,11 +395,11 @@ impl MonoTxnOutput {
         }
     }
 
-    /// The links of the resource groups this transaction wrote, keyed by group
+    /// The metadata of the resource groups this transaction wrote, keyed by group
     /// slot.
-    fn group_links(&self) -> &[(InMemoryStorageKey, Arc<GroupLink<InMemoryStorageKey>>)] {
+    fn group_metadata(&self) -> &[(InMemoryStorageKey, Arc<GroupMetadata<InMemoryStorageKey>>)] {
         match self {
-            MonoTxnOutput::Executed { group_links, .. } => group_links,
+            MonoTxnOutput::Executed { group_metadata, .. } => group_metadata,
             MonoTxnOutput::SkippedToRetry => &[],
         }
     }
@@ -442,9 +442,9 @@ impl TxnOutput for MonoTxnOutput {
                 };
                 (key.clone(), value)
             })
-            .chain(self.group_links().iter().map(|(group_key, link)| {
+            .chain(self.group_metadata().iter().map(|(group_key, metadata)| {
                 let value = MonoValue::GroupMetadata {
-                    group: link.clone(),
+                    group: metadata.clone(),
                 };
                 (group_key.clone(), value)
             }))
@@ -482,7 +482,7 @@ impl TxnOutput for MonoTxnOutput {
         }) {
             callback(key)?;
         }
-        for (group_key, _) in self.group_links() {
+        for (group_key, _) in self.group_metadata() {
             callback(group_key)?;
         }
         Ok(())
@@ -580,37 +580,37 @@ fn member_change(
     Ok((tag, bytes))
 }
 
-/// The view of `link`, which committed transaction `writer_idx` wrote, built
-/// on top of `prev` unless it is built already.
+/// The view of `metadata`, which committed transaction `writer_idx` wrote,
+/// built on top of `prev` unless it is built already.
 fn build_committed_view(
     guard: &ExecutionGuard<'_>,
     data: &VersionedData<InMemoryStorageKey, MonoValue>,
-    link: &GroupLink<InMemoryStorageKey>,
+    metadata: &GroupMetadata<InMemoryStorageKey>,
     prev: &GroupView,
     writer_idx: TxnIndex,
 ) -> Result<Arc<GroupView>, PanicError> {
-    if let Some(view) = link.view() {
+    if let Some(view) = metadata.view() {
         return Ok(view.clone());
     }
-    let changes = link
+    let changes = metadata
         .changes()
         .iter()
         .map(|key| member_change(guard, key, &committed_value(data, key, writer_idx)?))
         .collect::<Result<Vec<_>, PanicError>>()?;
-    Ok(link.build_view(prev, changes))
+    Ok(metadata.build_view(prev, changes))
 }
 
 /// The group's view just before `txn_idx`. Builds the views of the committed
-/// links below it that are not built yet.
+/// metadata entries below it that are not built yet.
 fn view_before(
     guard: &ExecutionGuard<'_>,
     data: &VersionedData<InMemoryStorageKey, MonoValue>,
     group_key: &InMemoryStorageKey,
     txn_idx: TxnIndex,
 ) -> Result<Arc<GroupView>, PanicError> {
-    let (mut view, unbuilt) = unbuilt_links_before(data, group_key, txn_idx)?;
-    for (writer_idx, link) in unbuilt {
-        view = build_committed_view(guard, data, &link, &view, writer_idx)?;
+    let (mut view, unbuilt) = unbuilt_metadata_before(data, group_key, txn_idx)?;
+    for (writer_idx, metadata) in unbuilt {
+        view = build_committed_view(guard, data, &metadata, &view, writer_idx)?;
     }
     Ok(view)
 }
@@ -789,10 +789,11 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
 
         let output = MonoTxnOutput::executed(outcome, skips_rest);
         // Sequential execution applies this transaction's writes before it is
-        // materialized, replacing the previous link at each group's slot. That
-        // link's view is already built, so this transaction's link keeps it.
+        // materialized, replacing the previous metadata at each group's slot.
+        // That entry's view is already built, so this transaction's entry keeps
+        // it.
         if let Some(unsync_map) = unsync_map {
-            for (group_key, link) in output.group_links() {
+            for (group_key, metadata) in output.group_metadata() {
                 let prev = match unsync_map.fetch_data(group_key) {
                     Some(MonoValue::GroupMetadata { group }) => group.view().cloned(),
                     Some(MonoValue::Write { .. } | MonoValue::Deletion) | None => None,
@@ -802,7 +803,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                         "Group {group_key:?} was written before it was read"
                     ))
                 })?;
-                link.set_prev(prev)?;
+                metadata.set_prev(prev)?;
             }
         }
 
@@ -820,12 +821,12 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         <Self::Output as TxnOutput>::CommittedOutput,
         PanicOr<ResourceGroupSerializationError>,
     > {
-        let (outcome, links) = match output {
+        let (outcome, group_metadata) = match output {
             MonoTxnOutput::Executed {
                 outcome,
-                group_links,
+                group_metadata,
                 ..
-            } => (outcome, group_links),
+            } => (outcome, group_metadata),
             // A skipped output renders to an empty, kept-success transaction.
             MonoTxnOutput::SkippedToRetry => {
                 return Ok(TransactionOutput::new_success_with_write_set(
@@ -848,21 +849,21 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             |e| PanicOr::CodeInvariantError(format!("Failed to materialize outputs: {e}"));
 
         // Group members are left out: their groups are assembled below from
-        // the links this transaction wrote.
+        // the metadata entries this transaction wrote.
         let partial = outcome
             .materialize_partial(&guard, features, auxiliary_data)
             .map_err(materialization_failed)?;
 
-        let mut group_writes = Vec::with_capacity(links.len());
-        for (group_key, link) in &links {
+        let mut group_writes = Vec::with_capacity(group_metadata.len());
+        for (group_key, metadata) in &group_metadata {
             let (prev, view) = match &mode {
                 ViewMode::Sequential { unsync_map, .. } => {
-                    let prev = link.prev().cloned().ok_or_else(|| {
-                        code_invariant_error("A sequential group link has no previous view")
+                    let prev = metadata.prev().cloned().ok_or_else(|| {
+                        code_invariant_error("Sequential group metadata has no previous view")
                     })?;
                     // Sequential execution applied this transaction's writes
                     // before materializing it, and no later one has run yet.
-                    let changes = link
+                    let changes = metadata
                         .changes()
                         .iter()
                         .map(|key| {
@@ -874,13 +875,13 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                             member_change(&guard, key, &value)
                         })
                         .collect::<Result<Vec<_>, PanicError>>()?;
-                    let view = link.build_view(&prev, changes);
+                    let view = metadata.build_view(&prev, changes);
                     (prev, view)
                 },
                 ViewMode::Parallel { versioned_map, .. } => {
                     let data = versioned_map.data();
                     let prev = view_before(&guard, data, group_key, txn_idx)?;
-                    let view = build_committed_view(&guard, data, link, &prev, txn_idx)?;
+                    let view = build_committed_view(&guard, data, metadata, &prev, txn_idx)?;
                     (prev, view)
                 },
             };

@@ -7,7 +7,7 @@
 
 use crate::{
     mono_move::{
-        group_chain::{member_tag, tag_bytes, GroupLink, GroupView},
+        group_chain::{member_tag, tag_bytes, GroupMetadata, GroupView},
         MonoValue,
     },
     scheduler_wrapper::SchedulerWrapper,
@@ -106,9 +106,9 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
     /// which is where the map holds it.
     ///
     /// A member no transaction wrote in this block is looked up in the view at
-    /// the group's slot. That is the link of the latest materialized writer, or
-    /// the stored group's link, so its view is the group as this transaction
-    /// sees it.
+    /// the group's slot. That is the metadata of the latest materialized
+    /// writer, or of the stored group, so its view is the group as this
+    /// transaction sees it.
     fn read_group_member(
         &self,
         key: &InMemoryStorageKey,
@@ -117,27 +117,27 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         if let Some(value) = self.unsync_map.fetch_data(key) {
             return value.as_storage_read(None);
         }
-        let link = match self.unsync_map.fetch_data(group_key) {
-            Some(MonoValue::GroupMetadata { group: link }) => link,
+        let metadata = match self.unsync_map.fetch_data(group_key) {
+            Some(MonoValue::GroupMetadata { group: metadata }) => metadata,
             Some(MonoValue::Write { .. } | MonoValue::Deletion) => {
                 return Err(invariant_violation(
-                    "A group slot holds a value that is not a link",
+                    "A group slot holds a value that is not group metadata",
                 ))
             },
             None => {
-                let link = Arc::new(GroupLink::from_storage(
+                let metadata = Arc::new(GroupMetadata::from_storage(
                     self.get_pre_block_group(group_key)?,
                 ));
                 self.unsync_map
                     .set_base_value(group_key.clone(), MonoValue::GroupMetadata {
-                        group: link.clone(),
+                        group: metadata.clone(),
                     });
-                link
+                metadata
             },
         };
-        let view = link
+        let view = metadata
             .view()
-            .ok_or_else(|| invariant_violation("The group slot's link has no view"))?;
+            .ok_or_else(|| invariant_violation("The group slot's metadata has no view"))?;
         let tag = member_tag(key.value_ty()).map_err(invariant_violation)?;
         match view.get(&tag) {
             Some(blob) => self.cache_existing_value(key, blob),
@@ -302,7 +302,7 @@ impl<'a, K: Hash + Clone + Eq + Debug + Send + Sync> ParallelReader<'a, K> {
 
     /// The stored group's view, initializing the group's slot with `init` on
     /// the block's first read of the group. Reading the slot at index 0 sees
-    /// only its base entry, never a transaction's link, so this records
+    /// only its base entry, never a transaction's metadata, so this records
     /// nothing.
     pub(crate) fn get_or_initialize_pre_block_group(
         &self,
@@ -312,25 +312,24 @@ impl<'a, K: Hash + Clone + Eq + Debug + Send + Sync> ParallelReader<'a, K> {
         let data = self.versioned_map.data();
         loop {
             match data.fetch_data_no_record(group_key, 0) {
-                Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata { group: link })) => {
-                    return link
-                        .view()
-                        .cloned()
-                        .ok_or_else(|| invariant_violation("The stored group's link has no view"));
+                Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata { group: metadata })) => {
+                    return metadata.view().cloned().ok_or_else(|| {
+                        invariant_violation("The stored group's metadata has no view")
+                    });
                 },
                 Ok(MVDataOutput::Versioned(_, MonoValue::Write { .. } | MonoValue::Deletion)) => {
                     return Err(invariant_violation(
-                        "A group slot's base entry is not a link",
+                        "A group slot's base entry is not group metadata",
                     ))
                 },
                 Err(MVDataError::Uninitialized) => {
-                    let link = GroupLink::from_storage(init()?);
+                    let metadata = GroupMetadata::from_storage(init()?);
                     // Another worker may be initializing the same group from the
-                    // same storage, so whichever link is already there stands.
+                    // same storage, so whichever metadata is already there stands.
                     data.set_base_value(
                         group_key.clone(),
                         MonoValue::GroupMetadata {
-                            group: Arc::new(link),
+                            group: Arc::new(metadata),
                         },
                         |_, _| {},
                     );
