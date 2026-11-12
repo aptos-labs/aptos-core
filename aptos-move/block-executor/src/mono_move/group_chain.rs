@@ -21,6 +21,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
+use mono_move_core::GroupSize;
 use std::{
     collections::BTreeMap,
     fmt::Debug,
@@ -50,6 +51,10 @@ impl GroupView {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    pub(crate) fn size(&self) -> GroupSize {
+        GroupSize::from_members(self.0.iter().map(|(tag, bytes)| (tag.len(), bytes.len())))
     }
 
     /// Each member's tag encoding and bytes, in key order.
@@ -88,13 +93,7 @@ impl GroupView {
     /// BCS-encodes the group: the member count, then each entry's tag and
     /// length-prefixed bytes in key order.
     pub(crate) fn encode(&self) -> Bytes {
-        let len = uleb128_len(self.0.len())
-            + self
-                .0
-                .iter()
-                .map(|(tag, bytes)| tag.len() + uleb128_len(bytes.len()) + bytes.len())
-                .sum::<usize>();
-        let mut out = Vec::with_capacity(len);
+        let mut out = Vec::with_capacity(self.size().bcs_size());
         write_uleb128(&mut out, self.0.len());
         for (tag, bytes) in &self.0 {
             out.extend_from_slice(tag);
@@ -122,6 +121,11 @@ pub struct GroupMetadata<K> {
     /// Their new values are that transaction's entries under these keys.
     /// Empty for the stored group.
     changes: Vec<K>,
+    /// The group's size before these changes, as the transaction that wrote
+    /// this entry read it.
+    size_before: GroupSize,
+    /// The group's size after these changes.
+    size: GroupSize,
     /// The group's members after these changes. Built when the stored group is
     /// initialized, or once for a transaction's entry.
     current: Mutex<GroupViewState>,
@@ -139,18 +143,24 @@ pub struct GroupMetadata<K> {
 impl<K> GroupMetadata<K> {
     /// The metadata for the group as storage holds it.
     pub(crate) fn from_storage(view: GroupView) -> Self {
+        let size = view.size();
         Self {
             changes: vec![],
+            size_before: size,
+            size,
             current: Mutex::new(GroupViewState::Built(Arc::new(view))),
             pending_post_commits: AtomicU8::new(0),
             before: OnceLock::new(),
         }
     }
 
-    /// The metadata for one transaction's changes to the group.
-    pub(crate) fn from_changes(changes: Vec<K>) -> Self {
+    /// The metadata for one transaction's changes to the group, which take its
+    /// size from `size_before` to `size`.
+    pub(crate) fn from_changes(changes: Vec<K>, size_before: GroupSize, size: GroupSize) -> Self {
         Self {
             changes,
+            size_before,
+            size,
             current: Mutex::new(GroupViewState::None),
             pending_post_commits: AtomicU8::new(2),
             before: OnceLock::new(),
@@ -159,6 +169,14 @@ impl<K> GroupMetadata<K> {
 
     pub(crate) fn changes(&self) -> &[K] {
         &self.changes
+    }
+
+    pub(crate) fn size_before(&self) -> GroupSize {
+        self.size_before
+    }
+
+    pub(crate) fn size(&self) -> GroupSize {
+        self.size
     }
 
     /// Records the group's members before this entry's changes.
@@ -287,6 +305,23 @@ pub(crate) fn finish_group_post_commit<K: Hash + Clone + Debug + Eq + Send + Syn
     Ok(())
 }
 
+/// Whether the group's size just before `idx` is still the size `metadata` was
+/// built on.
+pub(crate) fn validate_size_before<K: Hash + Clone + Debug + Eq + Send + Sync>(
+    data: &VersionedData<K, MonoValue<K>>,
+    group_key: &K,
+    idx: TxnIndex,
+    metadata: &GroupMetadata<K>,
+) -> bool {
+    match data.fetch_data_no_record(group_key, idx) {
+        Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata { group })) => {
+            group.size() == metadata.size_before()
+        },
+        Ok(MVDataOutput::Versioned(_, MonoValue::Write { .. } | MonoValue::Deletion))
+        | Err(MVDataError::Uninitialized | MVDataError::Dependency(_)) => false,
+    }
+}
+
 /// The latest metadata entry at the group's slot below `idx`, with its
 /// version.
 ///
@@ -328,15 +363,6 @@ pub(crate) fn committed_value<K: Hash + Clone + Debug + Eq + Send + Sync>(
             "Transaction {writer_idx} has no committed write at {key:?}"
         ))),
     }
-}
-
-fn uleb128_len(mut value: usize) -> usize {
-    let mut len = 1;
-    while value >= 0x80 {
-        value >>= 7;
-        len += 1;
-    }
-    len
 }
 
 fn write_uleb128(out: &mut Vec<u8>, mut value: usize) {
@@ -391,7 +417,12 @@ mod tests {
             |_, _| {},
         );
         let [first, second, third] = [1, 3, 5].map(|idx| {
-            let metadata = Arc::new(GroupMetadata::from_changes(vec![idx]));
+            // Sizes are not under test here.
+            let metadata = Arc::new(GroupMetadata::from_changes(
+                vec![idx],
+                GroupSize::default(),
+                GroupSize::default(),
+            ));
             data.write(0, idx, 0, MonoValue::GroupMetadata {
                 group: metadata.clone(),
             })
@@ -437,5 +468,35 @@ mod tests {
                 .map(|(tag, bytes)| (Bytes::from(bcs::to_bytes(tag).unwrap()), bytes.clone())),
         );
         assert_eq!(view.encode(), bcs::to_bytes(&members).unwrap());
+        assert_eq!(view.size().bcs_size(), view.encode().len());
+    }
+
+    #[test]
+    fn size_follows_member_changes() {
+        let view = GroupView::new([
+            (tag(1), Bytes::from(vec![7; 200])),
+            (tag(2), Bytes::from(vec![1, 2])),
+        ]);
+        // Member 1 is modified, member 2 is deleted and member 3 is created.
+        let changed = view.with_changes([
+            (tag(1), Some(Bytes::from(vec![7; 3]))),
+            (tag(2), None),
+            (tag(3), Some(Bytes::new())),
+        ]);
+
+        let tag_len = tag(1).len();
+        let mut size = view.size();
+        size.remove_member(tag_len, 200).unwrap();
+        size.add_member(tag_len, 3).unwrap();
+        size.remove_member(tag_len, 2).unwrap();
+        size.add_member(tag_len, 0).unwrap();
+        assert_eq!(size, changed.size());
+        assert_eq!(size.bcs_size(), changed.encode().len());
+
+        // A group cannot lose a member it does not hold, and an empty group is
+        // not stored.
+        let mut empty = GroupSize::default();
+        assert!(empty.remove_member(tag_len, 0).is_none());
+        assert_eq!(empty.bcs_size(), 0);
     }
 }

@@ -16,12 +16,12 @@ use mono_move_core::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
     },
     types::InternedType,
-    ReadPin,
+    GroupSize,
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::SegmentedArena;
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
-use std::{cell::RefCell, collections::HashMap, ptr::NonNull, sync::Arc};
+use std::{cell::RefCell, collections::HashMap};
 
 /// Serves the resources `lookup` finds, looking each up by the struct tag of
 /// its interned type and materializing it on first access. Table items are
@@ -36,7 +36,7 @@ struct Materialized {
     /// Holds decoded values and is never reset. Each storage read pins the
     /// segment its value is in, keeping it alive while the value is in use.
     arena: SegmentedArena,
-    cache: HashMap<InMemoryStorageKey, (NonNull<u8>, Arc<dyn ReadPin>)>,
+    cache: HashMap<InMemoryStorageKey, StorageRead>,
 }
 
 impl<'guard, 'ctx, L> LazyResourceProvider<'guard, 'ctx, L>
@@ -58,15 +58,7 @@ where
 
     /// The value already materialized for `key`, if any.
     fn cached(&self, key: &InMemoryStorageKey) -> Option<StorageRead> {
-        self.materialized
-            .borrow()
-            .cache
-            .get(key)
-            .map(|(ptr, pin)| StorageRead::ExternalHeap {
-                ptr: *ptr,
-                version: None,
-                pin: pin.clone(),
-            })
+        self.materialized.borrow().cache.get(key).cloned()
     }
 
     /// Materializes `blob` as a value of type `ty` and caches it under `key`.
@@ -78,12 +70,14 @@ where
     ) -> Result<StorageRead, ResourceProviderError> {
         let mut materialized = self.materialized.borrow_mut();
         let (ptr, pin) = materialized.arena.deserialize(self.guard, ty, blob)?;
-        materialized.cache.insert(key.clone(), (ptr, pin.clone()));
-        Ok(StorageRead::ExternalHeap {
+        let read = StorageRead::ExternalHeap {
             ptr,
+            bcs_size: blob.len(),
             version: None,
             pin,
-        })
+        };
+        materialized.cache.insert(key.clone(), read.clone());
+        Ok(read)
     }
 }
 
@@ -119,5 +113,13 @@ where
                 Ok(StorageRead::DoesNotExist { version: None })
             },
         }
+    }
+
+    fn get_resource_group_size(
+        &self,
+        _group_key: &InMemoryStorageKey,
+    ) -> Result<GroupSize, ResourceProviderError> {
+        // Groups are not served, so every group is empty.
+        Ok(GroupSize::default())
     }
 }
