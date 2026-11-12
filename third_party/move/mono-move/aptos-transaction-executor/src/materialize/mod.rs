@@ -7,7 +7,7 @@
 mod txn_output;
 mod vm_status;
 
-pub use txn_output::PartialOutput;
+pub use txn_output::TransactionOutputWithoutGroups;
 pub(crate) use txn_output::{
     discarded_output, empty_success_output, executed_output, group_writes,
 };

@@ -5,7 +5,7 @@ use crate::{
     errors::{
         DiscardReason, ExecutionStatus, MaterializationError, NoEffectsReason, SystemTxnFailure,
     },
-    materialize::{self, PartialOutput},
+    materialize::{self, TransactionOutputWithoutGroups},
     providers::AptosDataProvider,
 };
 use aptos_types::{
@@ -109,18 +109,18 @@ impl TxnOutcome {
             | TxnOutcome::Panic(_)
             | TxnOutcome::ExecutedNoEffects(_) => vec![],
         };
-        self.materialize_partial(layouts, features, auxiliary_data)?
+        self.materialize_without_groups(layouts, features, auxiliary_data)?
             .with_group_writes(group_writes)
     }
 
     /// Like [`Self::materialize`], but leaves out resource groups: the caller
     /// assembles their writes and completes the output with them.
-    pub fn materialize_partial(
+    pub fn materialize_without_groups(
         &self,
         layouts: &impl LayoutProvider,
         features: &Features,
         auxiliary_data: TransactionAuxiliaryData,
-    ) -> Result<PartialOutput, MaterializationError> {
+    ) -> Result<TransactionOutputWithoutGroups, MaterializationError> {
         match self {
             TxnOutcome::Discarded { reason, .. } => Ok(materialize::discarded_output(
                 materialize::discard_to_vm_status(reason).status_code(),

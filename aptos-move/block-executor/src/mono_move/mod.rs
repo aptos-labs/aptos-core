@@ -856,7 +856,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         // Group members are left out: their groups are assembled below from
         // the metadata entries this transaction wrote.
         let partial = outcome
-            .materialize_partial(&guard, features, auxiliary_data)
+            .materialize_without_groups(&guard, features, auxiliary_data)
             .map_err(materialization_failed)?;
 
         let mut group_writes = Vec::with_capacity(group_metadata.len());
