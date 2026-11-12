@@ -29,7 +29,9 @@
 //! copy.
 //!
 //! Once no rollback can follow, [`ResourceReadWriteSet::drop_unchanged_writes`]
-//! demotes every copy that still equals its read.
+//! demotes every copy that still equals its read, and
+//! [`ResourceReadWriteSet::compute_write_sizes`] records the serialized size of
+//! each value still written and of each resource group written.
 //!
 //! # Checkpoints and the checkpoint counter
 //!
@@ -60,12 +62,14 @@ use crate::{
     heap::RootScanner,
     invariant_violation,
     value_cmp::equals,
+    value_conv::bcs::serialized_size,
 };
 use hashbrown::{hash_map::EntryRef, HashMap};
 use mono_move_core::{
+    nominal_tag,
     storage::resource_provider::{InMemoryStorageKey, Version},
     types::InternedType,
-    LayoutProvider, ResourceProvider, StorageRead, VMResult,
+    GroupSize, LayoutProvider, ResourceProvider, StorageRead, VMResult,
 };
 use std::ptr::NonNull;
 
@@ -108,19 +112,38 @@ impl StorageWrite {
 pub struct Entry {
     pub read: StorageRead,
     pub write: StorageWrite,
+    /// Size of the BCS encoding of the value `write` holds. Zero until the
+    /// session ends.
+    pub write_bcs_size: usize,
     /// Extra metadata for this entry: the resource-group container this entry
     /// belongs to. [`None`] means this is not a resource group member. Used to
     /// place the write and to fetch the read from the right storage slot.
     pub group: Option<InternedType>,
 }
 
+/// A resource group whose members the transaction touched.
+#[derive(Default)]
+pub struct GroupEntry {
+    /// The keys of the members touched. Narrowed to the members written when
+    /// the session ends.
+    pub members: Vec<InMemoryStorageKey>,
+    /// The group's size before the transaction. Zero until the session ends.
+    pub size_before: GroupSize,
+    /// The group's size after the transaction's writes. [`None`] until the
+    /// session ends, or if the written members' sizes do not add up to
+    /// `size_before`, which only reads inconsistent with each other cause.
+    pub size: Option<GroupSize>,
+}
+
 /// The write an [`Entry`] contributes to the write set, by its `(read, write)`
 /// pair.
 pub enum WriteClass {
-    /// Did not exist before, now does. Carries the value pointer to serialize.
-    Creation(NonNull<u8>),
-    /// Existed before, now modified. Carries the value pointer to serialize.
-    Modification(NonNull<u8>),
+    /// Did not exist before, now does. Carries the value pointer to serialize
+    /// and the size of its BCS encoding.
+    Creation { ptr: NonNull<u8>, bcs_size: usize },
+    /// Existed before, now modified. Carries the value pointer to serialize
+    /// and the size of its BCS encoding.
+    Modification { ptr: NonNull<u8>, bcs_size: usize },
     /// Existed before, now moved out.
     Deletion,
 }
@@ -157,10 +180,13 @@ impl Entry {
     pub fn write_class(&self) -> Option<WriteClass> {
         match self.write {
             StorageWrite::NotModified => None,
-            StorageWrite::LocalHeap { ptr, .. } => Some(match self.read {
-                StorageRead::DoesNotExist { .. } => WriteClass::Creation(ptr),
-                StorageRead::ExternalHeap { .. } => WriteClass::Modification(ptr),
-            }),
+            StorageWrite::LocalHeap { ptr, .. } => {
+                let bcs_size = self.write_bcs_size;
+                Some(match self.read {
+                    StorageRead::DoesNotExist { .. } => WriteClass::Creation { ptr, bcs_size },
+                    StorageRead::ExternalHeap { .. } => WriteClass::Modification { ptr, bcs_size },
+                })
+            },
             StorageWrite::Deleted { .. } => match self.read {
                 // Published and then removed in the same transaction: the
                 // on-chain slot never existed, so this is not a write.
@@ -243,14 +269,12 @@ pub struct ResourceReadWriteSet {
     // which only clones the key on a miss.
     #[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
     entries: HashMap<InMemoryStorageKey, Entry>,
-    /// The keys of the members of each resource group this transaction
-    /// touched, by the group's own key. Narrowed to the members it wrote when
-    /// the session ends.
+    /// Each resource group this transaction touched, by the group's own key.
     //
     // A hash map for the same reasons as `entries`. Each member is recorded
     // once, when its entry is created.
     #[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
-    groups: HashMap<InMemoryStorageKey, Vec<InMemoryStorageKey>>,
+    groups: HashMap<InMemoryStorageKey, GroupEntry>,
     /// Undo log of writes originating from older epochs. Used for rolling back
     /// to older checkpoints.
     journal: Vec<JournalEntry>,
@@ -516,30 +540,58 @@ impl ResourceReadWriteSet {
         Ok(())
     }
 
+    /// Records the size of the BCS encoding of every written value, and the
+    /// size of every written resource group before and after its writes, as
+    /// `provider` serves the size before.
+    ///
+    /// Terminal: a later mutation would make the sizes stale.
+    ///
+    /// TODO(metering): refactor this pass so it includes metadata calculation.
+    ///
+    /// # Safety
+    ///
+    /// Every entry's pointers hold initialized values of the type at its key.
+    pub(crate) unsafe fn compute_write_sizes<T: LayoutProvider + ?Sized>(
+        &mut self,
+        layouts: &T,
+        provider: &dyn ResourceProvider,
+    ) -> VMResult<()> {
+        for (key, entry) in self.entries.iter_mut() {
+            if let StorageWrite::LocalHeap { ptr, .. } = entry.write {
+                // SAFETY: forwarded from this function's contract.
+                entry.write_bcs_size =
+                    unsafe { serialized_size(layouts, ptr.as_ptr(), key.value_ty()) }?;
+            }
+        }
+        for (group_key, group) in self.groups.iter_mut() {
+            group.size_before = provider.get_resource_group_size(group_key)?;
+            group.size = group_size_after_writes(&self.entries, group.size_before, &group.members)?;
+        }
+        Ok(())
+    }
+
     /// Keeps, for each resource group, only the members this transaction
     /// wrote, and drops the groups it wrote none of.
     fn retain_written_group_members(&mut self) {
         let entries = &self.entries;
-        self.groups.retain(|_, members| {
-            members.retain(|key| {
+        self.groups.retain(|_, group| {
+            group.members.retain(|key| {
                 entries
                     .get(key)
                     .is_some_and(|entry| entry.write_class().is_some())
             });
-            !members.is_empty()
+            !group.members.is_empty()
         });
     }
 
     /// Yields each resource group this transaction wrote, by the group's own
-    /// key, with the keys of the members it wrote. Exact once the session
-    /// ended; before that it also holds members that were only read. Callers
-    /// must not depend on the order.
+    /// key. Exact once the session ended; before that it also holds members
+    /// that were only read, and no sizes. Callers must not depend on the
+    /// order.
     pub fn written_groups_unordered(
         &self,
-    ) -> impl Iterator<Item = (&InMemoryStorageKey, &[InMemoryStorageKey])> {
-        self.groups
-            .iter()
-            .map(|(group_key, members)| (group_key, members.as_slice()))
+    ) -> impl Iterator<Item = (&InMemoryStorageKey, &GroupEntry)> {
+        self.groups.iter()
     }
 
     /// Yields every key the transaction read, with the version it observed and
@@ -638,13 +690,58 @@ impl ResourceReadWriteSet {
     }
 }
 
+/// The size of a group of size `size` once the writes to `members` apply:
+/// each member's size as read is counted out, and its size as written is
+/// counted in. [`None`] if the sizes do not add up.
+// The hash map is `ResourceReadWriteSet::entries`; see the rationale there.
+#[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
+fn group_size_after_writes(
+    entries: &HashMap<InMemoryStorageKey, Entry>,
+    mut size: GroupSize,
+    members: &[InMemoryStorageKey],
+) -> VMResult<Option<GroupSize>> {
+    for key in members {
+        let Some(entry) = entries.get(key) else {
+            invariant_violation!(Unreachable(format!(
+                "group member at {} has no entry",
+                key.address()
+            )));
+        };
+        let tag_len = match nominal_tag(key.value_ty()).map(|tag| bcs::serialized_size(&tag)) {
+            Ok(Ok(tag_len)) => tag_len,
+            Ok(Err(err)) => invariant_violation!(Unreachable(format!(
+                "failed to size a group member's tag: {err}"
+            ))),
+            Err(err) => {
+                invariant_violation!(Unreachable(format!("group member has no tag: {err:#}")))
+            },
+        };
+        if let Some(before) = entry.read.bcs_size() {
+            if size.remove_member(tag_len, before).is_none() {
+                return Ok(None);
+            }
+        }
+        match entry.write_class() {
+            Some(
+                WriteClass::Creation { bcs_size, .. } | WriteClass::Modification { bcs_size, .. },
+            ) => {
+                if size.add_member(tag_len, bcs_size).is_none() {
+                    return Ok(None);
+                }
+            },
+            Some(WriteClass::Deletion) | None => {},
+        }
+    }
+    Ok(Some(size))
+}
+
 /// Looks up the resource entry, materializing it as a read and recording in
 /// the read-set.
 // The hash map is `ResourceReadWriteSet::entries`; see the rationale there.
 #[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
 fn get_or_create_resource_entry<'a>(
     entries: &'a mut HashMap<InMemoryStorageKey, Entry>,
-    groups: &mut HashMap<InMemoryStorageKey, Vec<InMemoryStorageKey>>,
+    groups: &mut HashMap<InMemoryStorageKey, GroupEntry>,
     provider: &dyn ResourceProvider,
     key: &InMemoryStorageKey,
     group: Option<InternedType>,
@@ -670,11 +767,13 @@ fn get_or_create_resource_entry<'a>(
                 groups
                     .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
                     .or_default()
+                    .members
                     .push(key.clone());
             }
             Ok(entry.insert(Entry {
                 read,
                 write: StorageWrite::NotModified,
+                write_bcs_size: 0,
                 group,
             }))
         },
@@ -750,6 +849,7 @@ mod tests {
     fn ext_read(ptr: NonNull<u8>) -> StorageRead {
         StorageRead::ExternalHeap {
             ptr,
+            bcs_size: 0,
             version: None,
             pin: Arc::new(TestPin),
         }
@@ -789,12 +889,20 @@ mod tests {
                 None => dne(),
             })
         }
+
+        fn get_resource_group_size(
+            &self,
+            _group_key: &InMemoryStorageKey,
+        ) -> Result<GroupSize, ResourceProviderError> {
+            Ok(GroupSize::default())
+        }
     }
 
     fn entry(read: StorageRead, write: StorageWrite) -> Entry {
         Entry {
             read,
             write,
+            write_bcs_size: 0,
             group: None,
         }
     }
@@ -989,7 +1097,7 @@ mod tests {
         rws.retain_written_group_members();
         let groups = rws
             .written_groups_unordered()
-            .map(|(group_key, members)| (group_key.clone(), members.to_vec()))
+            .map(|(group_key, group)| (group_key.clone(), group.members.clone()))
             .collect::<Vec<_>>();
         assert_eq!(groups, vec![(
             InMemoryStorageKey::resource_group(addr(1), group),
@@ -1231,12 +1339,12 @@ mod tests {
         // Published this txn -> Creation.
         assert!(matches!(
             class_of(dne(), local()),
-            Some(WriteClass::Creation(_))
+            Some(WriteClass::Creation { .. })
         ));
         // Pre-existing + local write -> Modification.
         assert!(matches!(
             class_of(ext(), local()),
-            Some(WriteClass::Modification(_))
+            Some(WriteClass::Modification { .. })
         ));
         // Pre-existing + deleted -> Deletion.
         assert!(matches!(
@@ -1293,6 +1401,41 @@ mod tests {
     }
 
     #[test]
+    fn write_sizes_cover_creations_and_modifications() {
+        let value = 7u64;
+        let mut rws = ResourceReadWriteSet::new();
+        for (key, read) in [(key_a(1), dne()), (key_a(2), ext_read(u64_ptr(&value)))] {
+            rws.entries.insert(
+                key,
+                entry(read, StorageWrite::LocalHeap {
+                    ptr: u64_ptr(&value),
+                    epoch: 0,
+                }),
+            );
+        }
+        rws.entries.insert(
+            key_a(3),
+            entry(ext_read(u64_ptr(&value)), StorageWrite::Deleted {
+                epoch: 0,
+            }),
+        );
+
+        let layouts = ValueLayoutTable::new();
+        // SAFETY: every pointer holds a live `u64`, which is `TY_A`.
+        unsafe { rws.compute_write_sizes(&layouts, &Provider::empty()) }.unwrap();
+        let mut sizes = rws
+            .writes_unordered()
+            .map(|(_, class, _)| match class {
+                WriteClass::Creation { bcs_size, .. }
+                | WriteClass::Modification { bcs_size, .. } => Some(bcs_size),
+                WriteClass::Deletion => None,
+            })
+            .collect::<Vec<_>>();
+        sizes.sort();
+        assert_eq!(sizes, vec![None, Some(8), Some(8)]);
+    }
+
+    #[test]
     fn pruning_fails_on_a_comparison_it_cannot_decide() {
         // Both sides hold the same value, so only the missing layout can fail.
         assert!(writes_after_pruning(&key_c(1), &7, &7).is_err());
@@ -1329,6 +1472,7 @@ mod tests {
         rws.entries.insert(k_ext.clone(), Entry {
             read: ext_read(ext),
             write: StorageWrite::NotModified,
+            write_bcs_size: 0,
             group: None,
         });
         rws.entries.insert(k_local.clone(), Entry {
@@ -1337,6 +1481,7 @@ mod tests {
                 ptr: local,
                 epoch: 0,
             },
+            write_bcs_size: 0,
             group: None,
         });
 

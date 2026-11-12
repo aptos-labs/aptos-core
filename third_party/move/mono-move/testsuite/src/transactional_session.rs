@@ -534,8 +534,8 @@ pub(crate) fn resource_changes(
                 .map_err(RunError::from)
         };
         let op = match class {
-            WriteClass::Creation(ptr) => Op::New(written(ptr)?),
-            WriteClass::Modification(ptr) => Op::Modify(written(ptr)?),
+            WriteClass::Creation { ptr, .. } => Op::New(written(ptr)?),
+            WriteClass::Modification { ptr, .. } => Op::Modify(written(ptr)?),
             WriteClass::Deletion => Op::Delete,
         };
         Ok((*address, tag, op))

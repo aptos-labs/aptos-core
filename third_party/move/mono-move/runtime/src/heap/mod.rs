@@ -1605,7 +1605,7 @@ mod tests {
             .writes_unordered()
             .next()
             .expect("the resource is a write");
-        let WriteClass::Creation(moved) = class else {
+        let WriteClass::Creation { ptr: moved, .. } = class else {
             panic!("a `move_to` of a fresh resource is a creation");
         };
         assert_ne!(moved, live);

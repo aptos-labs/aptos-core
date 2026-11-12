@@ -13,6 +13,7 @@ use crate::{
     types::InputOutputKey,
 };
 use aptos_aggregator::delayed_change::DelayedChange;
+use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
         Incarnation, MVDataError, MVDataOutput, StorageVersion, TxnIndex, Version as MVVersion,
@@ -34,10 +35,12 @@ use aptos_types::{
     write_set::{WriteOpKind, WriteSet},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
+use aptos_vm_logging::{alert, prelude::*};
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use group_chain::{
-    committed_value, finish_group_post_commit, unbuilt_metadata_before, GroupMetadata, GroupView,
+    committed_value, finish_group_post_commit, unbuilt_metadata_before, validate_size_before,
+    GroupMetadata, GroupView,
 };
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
@@ -75,6 +78,8 @@ use provider::{BlockSTMParallelProvider, BlockSTMSequentialProvider};
 pub enum MonoValue<K = InMemoryStorageKey> {
     Write {
         ptr: NonNull<u8>,
+        /// Size of the value's BCS encoding.
+        bcs_size: usize,
         kind: WriteOpKind,
         /// Pins the allocation backing the pointer. As long as we hold the pin,
         /// using the pointer is safe.
@@ -84,7 +89,7 @@ pub enum MonoValue<K = InMemoryStorageKey> {
     /// Group write metadata and cache. Group members live as their own
     /// writes/deletions under their keys.
     //
-    // TODO(completeness): add state value metadata and size here.
+    // TODO(completeness): add state value metadata here.
     GroupMetadata {
         group: Arc<GroupMetadata<K>>,
     },
@@ -101,8 +106,11 @@ impl<K> MonoValue<K> {
     /// Sequential execution does not speculate, so it passes [`None`].
     fn as_storage_read(&self, version: Version) -> Result<StorageRead, ResourceProviderError> {
         Ok(match self {
-            MonoValue::Write { ptr, pin, .. } => StorageRead::ExternalHeap {
+            MonoValue::Write {
+                ptr, bcs_size, pin, ..
+            } => StorageRead::ExternalHeap {
                 ptr: *ptr,
+                bcs_size: *bcs_size,
                 version,
                 pin: pin.clone(),
             },
@@ -118,28 +126,36 @@ impl<K> MonoValue<K> {
 }
 
 impl<K: Clone + Send + Sync> SpeculativeValue for MonoValue<K> {
-    fn eq_value(&self, _other: &Self) -> bool {
-        // False here only forces re-validation, so safe to use.
-        // TODO(perf): carry layouts so that structs can be validated as a single memcmp?
-        false
+    fn eq_value(&self, other: &Self) -> bool {
+        match (self, other) {
+            // A group's slot is only read for the group's size.
+            (MonoValue::GroupMetadata { group }, MonoValue::GroupMetadata { group: other }) => {
+                group.size() == other.size()
+            },
+            // False here only forces re-validation, so safe to use.
+            // TODO(perf): carry layouts so that structs can be validated as a single memcmp?
+            (MonoValue::GroupMetadata { .. }, MonoValue::Write { .. } | MonoValue::Deletion)
+            | (
+                MonoValue::Write { .. } | MonoValue::Deletion,
+                MonoValue::Write { .. } | MonoValue::Deletion | MonoValue::GroupMetadata { .. },
+            ) => false,
+        }
     }
 
     fn eq_metadata(&self, _other: &Self) -> bool {
         // Block-STM only compares metadata on its resource-group path, which
         // MonoMove does not use: group members and metadata are written as
         // plain data.
-        //
-        // TODO(completeness): once group metadata carries the group's size, it
-        // is validated together with resource writes.
         false
     }
 
     fn bytes_len(&self) -> Option<usize> {
         // TODO(cleanup): this is only used for memory logging, revisit.
         match self {
-            // A heap value's serialized size is unknown until materialization.
-            MonoValue::Write { .. } => None,
+            MonoValue::Write { bcs_size, .. } => Some(*bcs_size),
             MonoValue::Deletion => None,
+            // Members are counted under their own keys, so the group's size
+            // would count them twice.
             MonoValue::GroupMetadata { .. } => None,
         }
     }
@@ -147,8 +163,18 @@ impl<K: Clone + Send + Sync> SpeculativeValue for MonoValue<K> {
     fn write_op_kind(&self) -> WriteOpKind {
         match self {
             MonoValue::Write { kind, .. } => kind.clone(),
-            // TODO(completeness): store write op kind for group metadata?
-            MonoValue::GroupMetadata { .. } => WriteOpKind::Modification,
+            // A group with no members is not stored, so an empty group after
+            // the changes is a deletion, and an empty group before them is a
+            // creation.
+            MonoValue::GroupMetadata { group } => {
+                if group.size().bcs_size() == 0 {
+                    WriteOpKind::Deletion
+                } else if group.size_before().bcs_size() == 0 {
+                    WriteOpKind::Creation
+                } else {
+                    WriteOpKind::Modification
+                }
+            },
             MonoValue::Deletion => WriteOpKind::Deletion,
         }
     }
@@ -161,6 +187,9 @@ pub struct MonoReads {
     /// collected: sequential execution, or a parallel execution that has
     /// nothing left to commit.
     outcome: Option<Arc<TxnOutcome>>,
+    /// The metadata of the resource groups the transaction wrote. Each was
+    /// built on a read of its group's size.
+    group_metadata: Vec<(InMemoryStorageKey, Arc<GroupMetadata<InMemoryStorageKey>>)>,
     /// The incarnation these reads were captured at, for BlockSTMv2. [`None`]
     /// only under sequential execution, which does not validate.
     incarnation: Option<Incarnation>,
@@ -176,9 +205,14 @@ unsafe impl Send for MonoReads {}
 unsafe impl Sync for MonoReads {}
 
 impl MonoReads {
-    pub(crate) fn new(outcome: Arc<TxnOutcome>, incarnation: Incarnation) -> Self {
+    pub(crate) fn new(
+        outcome: Arc<TxnOutcome>,
+        group_metadata: Vec<(InMemoryStorageKey, Arc<GroupMetadata<InMemoryStorageKey>>)>,
+        incarnation: Incarnation,
+    ) -> Self {
         Self {
             outcome: Some(outcome),
+            group_metadata,
             incarnation: Some(incarnation),
             speculative_failure: false,
         }
@@ -188,6 +222,7 @@ impl MonoReads {
     pub(crate) fn empty(incarnation: Option<Incarnation>) -> Self {
         Self {
             outcome: None,
+            group_metadata: vec![],
             incarnation,
             speculative_failure: false,
         }
@@ -236,6 +271,8 @@ impl TxnInput for MonoReads {
                 Err(MVDataError::Uninitialized) => false,
                 Err(MVDataError::Dependency(_)) => false,
             }
+        }) && self.group_metadata.iter().all(|(group_key, metadata)| {
+            validate_size_before(data_map, group_key, idx_to_validate, metadata)
         })
     }
 
@@ -343,7 +380,10 @@ impl std::fmt::Debug for MonoTxnOutput {
 }
 
 impl MonoTxnOutput {
-    fn executed(outcome: Arc<TxnOutcome>, skips_rest: bool) -> Self {
+    /// The output of an executed transaction, or [`None`] if the size of a
+    /// group it wrote does not add up, which only inconsistent speculative
+    /// reads cause.
+    fn executed(outcome: Arc<TxnOutcome>, skips_rest: bool) -> Option<Self> {
         let mut output = MonoTxnOutput::Executed {
             outcome,
             skips_rest,
@@ -353,16 +393,20 @@ impl MonoTxnOutput {
             .effects()
             .into_iter()
             .flat_map(|effects| effects.read_write_set().written_groups_unordered())
-            .map(|(group_key, members)| {
-                let metadata = GroupMetadata::from_changes(members.to_vec());
-                (group_key.clone(), Arc::new(metadata))
+            .map(|(group_key, group)| {
+                let metadata = GroupMetadata::from_changes(
+                    group.members.clone(),
+                    group.size_before,
+                    group.size?,
+                );
+                Some((group_key.clone(), Arc::new(metadata)))
             })
-            .collect();
+            .collect::<Option<Vec<_>>>()?;
         match &mut output {
             MonoTxnOutput::Executed { group_metadata, .. } => *group_metadata = written_groups,
             MonoTxnOutput::SkippedToRetry => {},
         }
-        output
+        Some(output)
     }
 
     /// The frozen effects of a committed, executed transaction, or `None` for a
@@ -415,13 +459,15 @@ impl TxnOutput for MonoTxnOutput {
             .writes_unordered()
             .map(|(key, class, _group)| {
                 let value = match class {
-                    WriteClass::Creation(ptr) => MonoValue::Write {
+                    WriteClass::Creation { ptr, bcs_size } => MonoValue::Write {
                         ptr,
+                        bcs_size,
                         kind: WriteOpKind::Creation,
                         pin: pin.clone(),
                     },
-                    WriteClass::Modification(ptr) => MonoValue::Write {
+                    WriteClass::Modification { ptr, bcs_size } => MonoValue::Write {
                         ptr,
+                        bcs_size,
                         kind: WriteOpKind::Modification,
                         pin: pin.clone(),
                     },
@@ -785,14 +831,23 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         // both vouch for that.
         #[allow(clippy::arc_with_non_send_sync)]
         let outcome = Arc::new(outcome);
+        let Some(output) = MonoTxnOutput::executed(outcome.clone(), skips_rest) else {
+            // The transaction read a group and its members at different
+            // versions, so its group sizes are wrong and it must re-execute.
+            return Ok((
+                ExecutionStatus::SpeculativeFailure,
+                MonoReads::empty(incarnation),
+            ));
+        };
         let reads = match incarnation {
-            Some(incarnation) => MonoReads::new(outcome.clone(), incarnation),
+            Some(incarnation) => {
+                MonoReads::new(outcome, output.group_metadata().to_vec(), incarnation)
+            },
             // Sequential execution never validates, so the read set is not
             // collected.
             None => MonoReads::empty(None),
         };
 
-        let output = MonoTxnOutput::executed(outcome, skips_rest);
         // Sequential execution applies this transaction's writes before it is
         // materialized, replacing the previous metadata at each group's slot.
         // That entry's view is already built, so this transaction's entry keeps
@@ -891,6 +946,14 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     (prev, view)
                 },
             };
+            if view.size() != metadata.size() {
+                alert!(
+                    "Resource group {group_key:?} has size {:?}, recorded size {:?}",
+                    view.size(),
+                    metadata.size(),
+                );
+                return Err(PanicOr::Or(ResourceGroupSerializationError));
+            }
             let state_key = group_key
                 .as_state_key()
                 .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))?;

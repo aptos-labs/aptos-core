@@ -1030,7 +1030,7 @@ impl<'guard> InterpreterContext<'guard> {
             gas_meter: _,
             natives: _,
             extensions,
-            resource_provider: _,
+            resource_provider,
             registers: _,
             stack,
             heap,
@@ -1054,6 +1054,8 @@ impl<'guard> InterpreterContext<'guard> {
         // SAFETY: every read-write-set entry holds initialized values of the
         // type at its key, and no rollback can follow the session's end.
         unsafe { read_write_set.drop_unchanged_writes(guard) }?;
+        // SAFETY: as above, and nothing mutates a written value from here on.
+        unsafe { read_write_set.compute_write_sizes(guard, resource_provider) }?;
         // TODO(perf): the undo journal and checkpoints are dead from here on,
         // but the read-write set keeps them for as long as the effects live,
         // which Block-STM extends to the end of the block. Clear them here.
