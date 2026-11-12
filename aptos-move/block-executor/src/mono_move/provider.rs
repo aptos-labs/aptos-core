@@ -220,26 +220,6 @@ fn invariant_violation(msg: impl ToString) -> ResourceProviderError {
     ResourceProviderError::InvariantViolation(msg.to_string())
 }
 
-/// Pre-block state, served by whichever provider owns the connection to it.
-/// The speculative read loops call back into this when the multi-version map
-/// has nothing at a slot yet.
-pub(crate) trait StorageBase<K> {
-    /// The value stored at `key` before the block, already materialized, or
-    /// [`None`] if the slot is empty.
-    fn get_pre_block_resource(&self, key: &K) -> Result<Option<MonoValue>, ResourceProviderError>;
-
-    /// The members of the group stored at `group_key` before the block, in the
-    /// encoding storage holds them in. Empty if no group is stored there.
-    fn get_pre_block_group(&self, group_key: &K) -> Result<GroupView, ResourceProviderError>;
-
-    /// Materializes a stored group member, whose type `key` names.
-    fn materialize_group_member(
-        &self,
-        key: &K,
-        blob: &Bytes,
-    ) -> Result<MonoValue, ResourceProviderError>;
-}
-
 /// Reads the multi-version map on behalf of one incarnation of one transaction,
 /// waiting out the dependencies it runs into.
 pub(crate) struct ParallelReader<'a, K> {
@@ -291,45 +271,12 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
         }
     }
 
-    /// Reads the value in its own storage slot, initializing the pre-block
-    /// value first if this is the block's first read of it.
-    pub(crate) fn read_resource(
-        &self,
-        base: &dyn StorageBase<K>,
-        key: &K,
-    ) -> Result<StorageRead, ResourceProviderError> {
-        self.read_or_initialize(key, || {
-            Ok(base
-                .get_pre_block_resource(key)?
-                .unwrap_or(MonoValue::Deletion))
-        })
-    }
-
-    /// Reads one member of a resource group. `key` names the member's own slot,
-    /// which is where the multi-version map holds it; `group_key` and `tag`
-    /// locate its pre-block value in the stored group.
-    pub(crate) fn read_group_member(
-        &self,
-        base: &dyn StorageBase<K>,
-        key: &K,
-        group_key: &K,
-        tag: impl Fn() -> Result<Bytes, ResourceProviderError>,
-    ) -> Result<StorageRead, ResourceProviderError> {
-        self.read_or_initialize(key, || {
-            let view = self.get_or_initialize_pre_block_group(base, group_key)?;
-            match view.get(&tag()?) {
-                Some(blob) => base.materialize_group_member(key, blob),
-                None => Ok(MonoValue::Deletion),
-            }
-        })
-    }
-
-    /// Reads the data map at `key`, initializing it with `base_value` if this
-    /// is the block's first read of it.
-    fn read_or_initialize(
+    /// Reads the data map at `key`, initializing it with `init` if this is the
+    /// block's first read of it.
+    pub(crate) fn read_or_initialize(
         &self,
         key: &K,
-        base_value: impl Fn() -> Result<MonoValue, ResourceProviderError>,
+        init: impl Fn() -> Result<MonoValue, ResourceProviderError>,
     ) -> Result<StorageRead, ResourceProviderError> {
         let data = self.versioned_map.data();
         loop {
@@ -343,7 +290,7 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
                     return value.as_storage_read(to_mono_version(version))
                 },
                 Err(MVDataError::Uninitialized) => {
-                    let value = base_value()?;
+                    let value = init()?;
                     // Another worker may be initializing the same slot from the
                     // same storage, so whichever value is already there stands.
                     data.set_base_value(key.clone(), value, |_, _| {});
@@ -353,13 +300,14 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
         }
     }
 
-    /// The stored group's view, initializing the group's slot with it on the
-    /// block's first read of the group. Reading the slot at index 0 sees only
-    /// its base entry, never a transaction's link, so this records nothing.
-    fn get_or_initialize_pre_block_group(
+    /// The stored group's view, initializing the group's slot with `init` on
+    /// the block's first read of the group. Reading the slot at index 0 sees
+    /// only its base entry, never a transaction's link, so this records
+    /// nothing.
+    pub(crate) fn get_or_initialize_pre_block_group(
         &self,
-        base: &dyn StorageBase<K>,
         group_key: &K,
+        init: impl Fn() -> Result<GroupView, ResourceProviderError>,
     ) -> Result<Arc<GroupView>, ResourceProviderError> {
         let data = self.versioned_map.data();
         loop {
@@ -376,7 +324,7 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
                     ))
                 },
                 Err(MVDataError::Uninitialized) => {
-                    let link = GroupLink::from_storage(base.get_pre_block_group(group_key)?);
+                    let link = GroupLink::from_storage(init()?);
                     // Another worker may be initializing the same group from the
                     // same storage, so whichever link is already there stands.
                     data.set_base_value(
@@ -453,20 +401,21 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
             .map_err(|e| invariant_violation(format!("Storage read failed: {e}")))?
             .map(|value| value.bytes().clone()))
     }
-}
 
-impl<S: TStateView<Key = StateKey>> StorageBase<InMemoryStorageKey>
-    for BlockSTMParallelProvider<'_, '_, S>
-{
+    /// The value stored at `key` before the block, or a deletion for an empty
+    /// slot.
     fn get_pre_block_resource(
         &self,
         key: &InMemoryStorageKey,
-    ) -> Result<Option<MonoValue>, ResourceProviderError> {
-        self.get_pre_block_value(key)?
-            .map(|blob| deserialize_value(self.guard, self.arena, key.value_ty(), &blob))
-            .transpose()
+    ) -> Result<MonoValue, ResourceProviderError> {
+        match self.get_pre_block_value(key)? {
+            Some(blob) => deserialize_value(self.guard, self.arena, key.value_ty(), &blob),
+            None => Ok(MonoValue::Deletion),
+        }
     }
 
+    /// The members of the group stored at `group_key` before the block. Empty
+    /// if no group is stored there.
     fn get_pre_block_group(
         &self,
         group_key: &InMemoryStorageKey,
@@ -475,14 +424,6 @@ impl<S: TStateView<Key = StateKey>> StorageBase<InMemoryStorageKey>
             Some(blob) => decode_group_view(&blob),
             None => Ok(GroupView::new()),
         }
-    }
-
-    fn materialize_group_member(
-        &self,
-        key: &InMemoryStorageKey,
-        blob: &Bytes,
-    ) -> Result<MonoValue, ResourceProviderError> {
-        deserialize_value(self.guard, self.arena, key.value_ty(), blob)
     }
 }
 
@@ -493,13 +434,25 @@ impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMParallelProvide
         group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError> {
         match group {
-            None => self.reader.read_resource(self, key),
+            None => self
+                .reader
+                .read_or_initialize(key, || self.get_pre_block_resource(key)),
             Some(group_ty) => {
                 let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
-                // The tag is only needed to initialize the member from the
-                // stored group, on the block's first read of it.
-                let tag = || member_tag(key.value_ty()).map_err(invariant_violation);
-                self.reader.read_group_member(self, key, &group_key, tag)
+                self.reader.read_or_initialize(key, || {
+                    let group = self
+                        .reader
+                        .get_or_initialize_pre_block_group(&group_key, || {
+                            self.get_pre_block_group(&group_key)
+                        })?;
+                    let tag = member_tag(key.value_ty()).map_err(invariant_violation)?;
+                    match group.get(&tag) {
+                        Some(blob) => {
+                            deserialize_value(self.guard, self.arena, key.value_ty(), blob)
+                        },
+                        None => Ok(MonoValue::Deletion),
+                    }
+                })
             },
         }
     }

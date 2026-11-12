@@ -24,7 +24,7 @@ use crate::{
         group_chain::{
             committed_member_value, encode_group, view_before, GroupCodec, GroupLink, GroupView,
         },
-        version_matches, MonoValue, ParallelReader, StorageBase,
+        version_matches, MonoValue, ParallelReader,
     },
     single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
     task::{ExecutionStatus, TxnOutput},
@@ -210,52 +210,6 @@ impl GroupCodec<MonoMockKey> for MockGroupCodec {
     fn serialize(&self, ptr: NonNull<u8>, _member_ty: InternedType) -> Result<Bytes, PanicError> {
         // SAFETY: the caller holds the pin for the allocation `ptr` points into.
         Ok(unsafe { blob_bytes(ptr) }.into())
-    }
-}
-
-/// The pre-block state, as MonoMove's read loops ask for it.
-struct MockStorageBase<'a, S> {
-    base_view: &'a S,
-}
-
-impl<S: TStateView<Key = MonoMockKey>> StorageBase<MonoMockKey> for MockStorageBase<'_, S> {
-    fn get_pre_block_resource(
-        &self,
-        key: &MonoMockKey,
-    ) -> Result<Option<MonoValue>, ResourceProviderError> {
-        Ok(self
-            .base_view
-            .get_state_value(key)
-            .map_err(|e| ResourceProviderError::InvariantViolation(format!("{e:?}")))?
-            .map(|value| mock_value(value.bytes(), WriteOpKind::Modification)))
-    }
-
-    fn get_pre_block_group(
-        &self,
-        group_key: &MonoMockKey,
-    ) -> Result<GroupView, ResourceProviderError> {
-        let Some(value) = self
-            .base_view
-            .get_state_value(group_key)
-            .map_err(|e| ResourceProviderError::InvariantViolation(format!("{e:?}")))?
-        else {
-            return Ok(GroupView::new());
-        };
-        let members: BTreeMap<u32, Bytes> = bcs::from_bytes(value.bytes()).map_err(|e| {
-            ResourceProviderError::InvariantViolation(format!("Stored group failed to decode: {e}"))
-        })?;
-        Ok(members
-            .into_iter()
-            .map(|(tag, bytes)| (tag_bytes(tag), bytes))
-            .collect())
-    }
-
-    fn materialize_group_member(
-        &self,
-        _key: &MonoMockKey,
-        blob: &Bytes,
-    ) -> Result<MonoValue, ResourceProviderError> {
-        Ok(mock_value(blob, WriteOpKind::Modification))
     }
 }
 
@@ -501,25 +455,35 @@ impl TxnInput for MockReads {
 
 /// Replays one incarnation, caching reads the way a VM caches them so that a key
 /// read twice observes one value and pins one version.
-struct MockSession<'a> {
+struct MockSession<'a, S> {
     reader: &'a ParallelReader<'a, MonoMockKey>,
-    base: &'a dyn StorageBase<MonoMockKey>,
+    /// Pre-block state.
+    base_view: &'a S,
     reads: MockReads,
     cache: HashMap<MonoMockKey, Option<Vec<u8>>>,
 }
 
-impl<'a> MockSession<'a> {
+impl<'a, S: TStateView<Key = MonoMockKey>> MockSession<'a, S> {
     fn new(
         reader: &'a ParallelReader<'a, MonoMockKey>,
-        base: &'a dyn StorageBase<MonoMockKey>,
+        base_view: &'a S,
         incarnation: Incarnation,
     ) -> Self {
         Self {
             reader,
-            base,
+            base_view,
             reads: MockReads::new(incarnation),
             cache: HashMap::new(),
         }
+    }
+
+    fn get_pre_block_value(
+        &self,
+        key: &MonoMockKey,
+    ) -> Result<Option<StateValue>, ResourceProviderError> {
+        self.base_view
+            .get_state_value(key)
+            .map_err(|e| ResourceProviderError::InvariantViolation(format!("{e:?}")))
     }
 
     fn read_resource(
@@ -527,7 +491,12 @@ impl<'a> MockSession<'a> {
         key: &MonoMockKey,
     ) -> Result<Option<Vec<u8>>, ResourceProviderError> {
         self.read(key, |session| {
-            session.reader.read_resource(session.base, key)
+            session.reader.read_or_initialize(key, || {
+                Ok(match session.get_pre_block_value(key)? {
+                    Some(value) => mock_value(value.bytes(), WriteOpKind::Modification),
+                    None => MonoValue::Deletion,
+                })
+            })
         })
     }
 
@@ -538,10 +507,34 @@ impl<'a> MockSession<'a> {
     ) -> Result<Option<Vec<u8>>, ResourceProviderError> {
         let key = member_key(group_key, tag);
         self.read(&key, |session| {
-            session
-                .reader
-                .read_group_member(session.base, &key, group_key, || Ok(tag_bytes(tag)))
+            session.reader.read_or_initialize(&key, || {
+                let group = session
+                    .reader
+                    .get_or_initialize_pre_block_group(group_key, || {
+                        session.get_pre_block_group(group_key)
+                    })?;
+                Ok(match group.get(&tag_bytes(tag)) {
+                    Some(blob) => mock_value(blob, WriteOpKind::Modification),
+                    None => MonoValue::Deletion,
+                })
+            })
         })
+    }
+
+    fn get_pre_block_group(
+        &self,
+        group_key: &MonoMockKey,
+    ) -> Result<GroupView, ResourceProviderError> {
+        let Some(value) = self.get_pre_block_value(group_key)? else {
+            return Ok(GroupView::new());
+        };
+        let members: BTreeMap<u32, Bytes> = bcs::from_bytes(value.bytes()).map_err(|e| {
+            ResourceProviderError::InvariantViolation(format!("Stored group failed to decode: {e}"))
+        })?;
+        Ok(members
+            .into_iter()
+            .map(|(tag, bytes)| (tag_bytes(tag), bytes))
+            .collect())
     }
 
     /// Serves a read from the cache, or through `read` on the first one.
@@ -837,10 +830,7 @@ impl SingleTransactionExecutor for MonoMockExecutor {
         };
 
         let reader = ParallelReader::new(versioned_map, scheduler, txn_idx, incarnation);
-        let base = MockStorageBase {
-            base_view: shared.base_view,
-        };
-        let mut session = MockSession::new(&reader, &base, incarnation);
+        let mut session = MockSession::new(&reader, shared.base_view, incarnation);
         let executed = session.run(behavior);
 
         if reader.speculative_failure() {
