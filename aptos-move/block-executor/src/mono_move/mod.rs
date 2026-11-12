@@ -52,7 +52,9 @@ use provider::{BlockSTMParallelProvider, BlockSTMSequentialProvider};
 /// and tag types.
 #[cfg(test)]
 pub(crate) use provider::{ParallelReader, StorageBase};
-pub use reads::{MonoReads, ReadSet, SessionReads};
+#[cfg(test)]
+pub(crate) use reads::version_matches;
+pub use reads::MonoReads;
 
 /// An in-memory write produced by MonoMove transaction execution. This write
 /// can be later converted to storage format if needed.
@@ -132,7 +134,9 @@ fn written_value(class: WriteClass, pin: &Arc<dyn ReadPin>) -> MonoValue {
 /// converted to storage output representation after commit.
 pub enum MonoTxnOutput {
     Executed {
-        outcome: TxnOutcome,
+        /// Shared with the transaction's read set, which validates from the
+        /// outcome's read-write set.
+        outcome: Arc<TxnOutcome>,
         /// Whether this transaction emitted a reconfiguration (new-epoch) event,
         /// after which the block executor skips the remaining transactions.
         skips_rest: bool,
@@ -167,7 +171,7 @@ impl std::fmt::Debug for MonoTxnOutput {
 /// discard or an empty-effects commit (both write nothing).
 fn committed_effects(outcome: &TxnOutcome) -> Option<&SessionEffects> {
     match outcome {
-        TxnOutcome::Executed { effects, .. } => Some(effects.as_ref()),
+        TxnOutcome::Executed { effects, .. } => Some(effects),
         TxnOutcome::Discarded { .. } => None,
         TxnOutcome::ExecutedNoEffects(_) => None,
         // TODO(correctness): Revisit this arm: unexpected system txn errors
@@ -177,10 +181,19 @@ fn committed_effects(outcome: &TxnOutcome) -> Option<&SessionEffects> {
     }
 }
 
+/// Wraps an outcome so the output and the read set can share it.
+//
+// The outcome is neither `Send` nor `Sync`; the output and the read set that
+// share it vouch for that.
+#[allow(clippy::arc_with_non_send_sync)]
+fn shared_outcome(outcome: TxnOutcome) -> Arc<TxnOutcome> {
+    Arc::new(outcome)
+}
+
 impl MonoTxnOutput {
     /// Collects the transaction's writes. The block executor reads them back
     /// several times per commit, so the effects are walked once here.
-    fn executed(outcome: TxnOutcome, skips_rest: bool) -> Self {
+    fn executed(outcome: Arc<TxnOutcome>, skips_rest: bool) -> Self {
         let mut resource_writes = HashMap::new();
 
         if let Some(effects) = committed_effects(&outcome) {
@@ -302,7 +315,7 @@ impl TxnOutput for MonoTxnOutput {
 
     fn fee_statement(&self) -> FeeStatement {
         match self {
-            MonoTxnOutput::Executed { outcome, .. } => match outcome {
+            MonoTxnOutput::Executed { outcome, .. } => match outcome.as_ref() {
                 TxnOutcome::Executed { fee_statement, .. } => *fee_statement,
                 TxnOutcome::Discarded { .. } => FeeStatement::zero(),
                 TxnOutcome::ExecutedNoEffects(_) => FeeStatement::zero(),
@@ -478,6 +491,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 );
                 let (outcome, skips_rest) =
                     self.run(&guard, shared.base_view, &provider, txn, auxiliary_info)?;
+                let outcome = shared_outcome(outcome);
                 // Sequential execution never validates, so the read set is
                 // not collected.
                 (
@@ -513,10 +527,8 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     ));
                 }
                 let (outcome, skips_rest) = result?;
-                let reads = match outcome.effects() {
-                    Some(effects) => MonoReads::new(SessionReads(effects.clone()), incarnation),
-                    None => MonoReads::empty(Some(incarnation)),
-                };
+                let outcome = shared_outcome(outcome);
+                let reads = MonoReads::new(outcome.clone(), incarnation);
                 (outcome, skips_rest, reads, None)
             },
         };

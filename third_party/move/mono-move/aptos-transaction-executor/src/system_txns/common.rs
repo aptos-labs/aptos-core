@@ -8,7 +8,7 @@ use crate::{
     errors::{call_result, ExecutionStatus, MoveExecutionFailure},
     executor::AptosTransactionExecutor,
     natives::extensions_with,
-    outcome::{self, TxnOutcome},
+    outcome::TxnOutcome,
 };
 use aptos_types::{
     block_metadata::BlockMetadata,
@@ -101,7 +101,7 @@ pub(super) fn system_txn_outcome(interp: InterpreterContext<'_>) -> TxnOutcome {
         Ok(effects) => TxnOutcome::Executed {
             status: ExecutionStatus::Success,
             fee_statement: FeeStatement::zero(),
-            effects: outcome::shared(effects),
+            effects,
         },
         Err(e) => TxnOutcome::Panic(e),
     }

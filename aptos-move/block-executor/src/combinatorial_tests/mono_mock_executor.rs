@@ -12,6 +12,8 @@
 //! MonoMove, so a spec carrying any of them is rejected.
 
 use crate::{
+    captured_reads::TxnInput,
+    code_cache_global::GlobalModuleCache,
     combinatorial_tests::{
         mock_executor::{mock_fee_statement, MockEvent, MockOutput},
         types::{KeyType, MockIncarnation, MockTransaction, ValueType, RESERVED_TAG},
@@ -22,7 +24,7 @@ use crate::{
         group_chain::{
             committed_member_value, encode, view_below, GroupCodec, GroupLink, GroupView,
         },
-        MonoReads, MonoValue, ParallelReader, ReadSet, StorageBase,
+        version_matches, MonoValue, ParallelReader, StorageBase,
     },
     single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
     task::{ExecutionStatus, TxnOutput},
@@ -30,7 +32,12 @@ use crate::{
 };
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_crypto::HashValue;
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::{
+    types::{Incarnation, MVDataError, MVDataOutput, TxnIndex},
+    versioned_data::VersionedData,
+    versioned_delayed_fields::TVersionedDelayedFieldView,
+    versioned_group_data::VersionedGroupData,
+};
 use aptos_types::{
     block_executor::output::CommittedTransactionOutput,
     error::{code_invariant_error, PanicError, PanicOr},
@@ -40,6 +47,7 @@ use aptos_types::{
         TStateView,
     },
     transaction::{AuxiliaryInfo, BlockExecutableTransaction as Transaction},
+    vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOpKind},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -53,11 +61,13 @@ use mono_move_core::{
     },
 };
 use mono_move_global_context::GlobalContext;
+use move_binary_format::CompiledModule;
 use move_core_types::language_storage::ModuleId;
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_vm_runtime::Module;
+use move_vm_types::{code::SyncModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
 use once_cell::sync::OnceCell;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     ptr::NonNull,
     sync::Arc,
 };
@@ -391,16 +401,95 @@ impl TxnOutput for MonoMockOutput {
     }
 }
 
-/// The versions one incarnation observed. The real VM records them in its
-/// read-write set; the mock records them as it replays a spec.
-#[derive(Default)]
-pub(crate) struct MockReads(HashMap<MonoMockKey, Version>);
+/// The versions one incarnation observed, recorded as the mock replays a
+/// spec. The real VM keeps them in its read-write set instead.
+pub(crate) struct MockReads {
+    reads: HashMap<MonoMockKey, Version>,
+    incarnation: Incarnation,
+    speculative_failure: bool,
+}
 
-impl ReadSet for MockReads {
+impl MockReads {
+    fn new(incarnation: Incarnation) -> Self {
+        Self {
+            reads: HashMap::new(),
+            incarnation,
+            speculative_failure: false,
+        }
+    }
+}
+
+impl TxnInput for MockReads {
     type Key = MonoMockKey;
+    type Tag = ();
+    type Value = MonoValue;
 
-    fn reads(&self) -> impl Iterator<Item = (&MonoMockKey, Version)> {
-        self.0.iter().map(|(key, version)| (key, *version))
+    fn validate_data_reads(
+        &self,
+        data_map: &VersionedData<MonoMockKey, MonoValue>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        !self.speculative_failure
+            && self.reads.iter().all(|(key, recorded)| {
+                match data_map.fetch_data_no_record(key, idx_to_validate) {
+                    Ok(MVDataOutput::Versioned(observed, _)) => {
+                        version_matches(*recorded, observed)
+                    },
+                    Err(MVDataError::Uninitialized | MVDataError::Dependency(_)) => false,
+                }
+            })
+    }
+
+    fn validate_group_reads(
+        &self,
+        _group_map: &VersionedGroupData<MonoMockKey, (), MonoValue>,
+        _idx_to_validate: TxnIndex,
+    ) -> bool {
+        !self.speculative_failure
+    }
+
+    fn validate_delayed_field_reads(
+        &self,
+        _delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
+        _idx_to_validate: TxnIndex,
+    ) -> Result<bool, PanicError> {
+        Ok(true)
+    }
+
+    fn legacy_validate_module_reads(
+        &self,
+        _global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        _per_block_module_cache: &SyncModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+            Option<TxnIndex>,
+        >,
+        _maybe_updated_module_keys: Option<&BTreeSet<ModuleId>>,
+    ) -> bool {
+        true
+    }
+
+    fn record_delayed_field_application_failure(&mut self) {
+        self.speculative_failure = true;
+    }
+
+    fn incarnation(&self) -> Option<Incarnation> {
+        Some(self.incarnation)
+    }
+
+    fn is_incorrect_use(&self) -> bool {
+        false
+    }
+
+    fn get_read_summary(&self) -> HashSet<InputOutputKey<MonoMockKey, ()>> {
+        HashSet::new()
     }
 }
 
@@ -417,11 +506,12 @@ impl<'a> MockSession<'a> {
     fn new(
         reader: &'a ParallelReader<'a, MonoMockKey>,
         base: &'a dyn StorageBase<MonoMockKey>,
+        incarnation: Incarnation,
     ) -> Self {
         Self {
             reader,
             base,
-            reads: MockReads::default(),
+            reads: MockReads::new(incarnation),
             cache: HashMap::new(),
         }
     }
@@ -458,7 +548,7 @@ impl<'a> MockSession<'a> {
             return Ok(cached.clone());
         }
         let read = read(self)?;
-        self.reads.0.insert(*key, read.version());
+        self.reads.reads.insert(*key, read.version());
         let bytes = read_bytes(&read);
         self.cache.insert(*key, bytes.clone());
         Ok(bytes)
@@ -572,7 +662,7 @@ impl MonoMockExecutor {
     /// transactions before it left.
     fn committed_output(
         txn: ExecutedTxn,
-        mode: ViewMode<'_, MonoReads<MockReads>>,
+        mode: ViewMode<'_, MockReads>,
         txn_idx: TxnIndex,
     ) -> Result<MonoMockCommitted, PanicError> {
         let ViewMode::Parallel { versioned_map, .. } = mode else {
@@ -661,7 +751,7 @@ impl MonoMockExecutor {
 
 impl SingleTransactionExecutor for MonoMockExecutor {
     type AuxiliaryInfo = AuxiliaryInfo;
-    type Input = MonoReads<MockReads>;
+    type Input = MockReads;
     type Key = MonoMockKey;
     type Output = MonoMockOutput;
     type Tag = ();
@@ -713,13 +803,13 @@ impl SingleTransactionExecutor for MonoMockExecutor {
                         output: MonoMockOutput::Retry { gas: *gas },
                         skips_rest: true,
                     },
-                    MonoReads::empty(Some(incarnation)),
+                    MockReads::new(incarnation),
                 ))
             },
             MockTransaction::Abort => {
                 return Ok((
                     ExecutionStatus::Aborted(txn_idx.to_string()),
-                    MonoReads::empty(Some(incarnation)),
+                    MockReads::new(incarnation),
                 ))
             },
             MockTransaction::StateCheckpoint => {
@@ -728,7 +818,7 @@ impl SingleTransactionExecutor for MonoMockExecutor {
                         output: MonoMockOutput::Empty,
                         skips_rest: false,
                     },
-                    MonoReads::empty(Some(incarnation)),
+                    MockReads::new(incarnation),
                 ))
             },
             MockTransaction::InterruptRequested => {
@@ -742,7 +832,7 @@ impl SingleTransactionExecutor for MonoMockExecutor {
         let base = MockStorageBase {
             base_view: shared.base_view,
         };
-        let mut session = MockSession::new(&reader, &base);
+        let mut session = MockSession::new(&reader, &base, incarnation);
         let executed = session.run(behavior);
 
         if reader.speculative_failure() {
@@ -750,7 +840,7 @@ impl SingleTransactionExecutor for MonoMockExecutor {
             // commit.
             return Ok((
                 ExecutionStatus::SpeculativeFailure,
-                MonoReads::empty(Some(incarnation)),
+                MockReads::new(incarnation),
             ));
         }
         let executed = executed.map_err(|e| code_invariant_error(format!("{e}")))?;
@@ -760,7 +850,7 @@ impl SingleTransactionExecutor for MonoMockExecutor {
                 output: MonoMockOutput::Executed(Box::new(executed)),
                 skips_rest: false,
             },
-            MonoReads::new(session.reads, incarnation),
+            session.reads,
         ))
     }
 

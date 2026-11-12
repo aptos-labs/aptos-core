@@ -16,7 +16,7 @@ use crate::{
     errors::{call_result, DiscardReason, ExecutionStage, ExecutionStatus, MoveExecutionFailure},
     executor::AptosTransactionExecutor,
     natives::extensions_with,
-    outcome::{self, TxnOutcome},
+    outcome::TxnOutcome,
     providers::read_config,
 };
 use aptos_types::{
@@ -86,11 +86,11 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             (Ok((status, fee_statement)), Ok(effects)) => TxnOutcome::Executed {
                 status,
                 fee_statement,
-                effects: outcome::shared(effects),
+                effects,
             },
             (Err(reason), Ok(effects)) => TxnOutcome::Discarded {
                 reason,
-                effects: Some(outcome::shared(effects)),
+                effects: Some(effects),
             },
         }
     }
