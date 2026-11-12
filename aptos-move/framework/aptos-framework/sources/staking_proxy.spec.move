@@ -47,7 +47,6 @@ spec aptos_framework::staking_proxy {
     /// Aborts if conditions of SetStakePoolOperator are not met
     spec set_operator(owner: &signer, old_operator: address, new_operator: address) {
         pragma verify = false;
-        pragma aborts_if_is_partial;
         // TODO: Can't verify due to timeout (>1000)
         // TODO: Can't verify `set_vesting_contract_operator` and `set_staking_contract_operator`
         include SetStakePoolOperator;
@@ -60,7 +59,6 @@ spec aptos_framework::staking_proxy {
         // modifies stake pool memory, and the conditions below need loop invariants
         // that cannot be attached to the inline `for_each_ref` loop.
         pragma verify = false;
-        pragma aborts_if_is_partial;
         include SetStakingContractVoter;
         include SetStakePoolVoterAbortsIf;
     }
@@ -71,7 +69,6 @@ spec aptos_framework::staking_proxy {
     }
 
     spec set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
-        pragma aborts_if_is_partial;
         pragma verify = false;
         // TODO: Verify timeout and can't verify `staking_contract::switch_operator`.
         include SetStakingContractOperator;

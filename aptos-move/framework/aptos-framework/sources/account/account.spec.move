@@ -258,6 +258,7 @@ spec aptos_framework::account {
     }
 
     spec rotate_authentication_key_from_public_key(account: &signer, scheme: u8, new_public_key_bytes: vector<u8>) {
+        // Partial: `single_key` and `multi_key` have no abort specification for public key deserialization.
         pragma aborts_if_is_partial;
         let addr = signer::address_of(account);
         aborts_if !exists<Account>(addr);
@@ -273,7 +274,6 @@ spec aptos_framework::account {
     spec fun spec_assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: RotationProofChallenge): vector<u8>;
 
     spec assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
-        pragma verify = false;
         pragma opaque;
         include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf;
         ensures [abstract] result == spec_assert_valid_rotation_proof_signature_and_get_auth_key(scheme, public_key_bytes, signature, challenge);
@@ -313,8 +313,7 @@ spec aptos_framework::account {
         cap_rotate_key: vector<u8>,
         cap_update_table: vector<u8>,
     ) {
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
-        pragma aborts_if_is_partial;
+        include SeqNumProofReplayProtectedAbortsIf;
         let addr = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr };
         /// [high-level-req-5.1]
@@ -381,7 +380,7 @@ spec aptos_framework::account {
         new_public_key_bytes: vector<u8>,
         cap_update_table: vector<u8>
     ) {
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
+        include SeqNumProofReplayProtectedAbortsIf;
         aborts_if !exists<Account>(rotation_cap_offerer_address);
         let delegate_address = signer::address_of(delegate_signer);
         let offerer_account_resource = global<Account>(rotation_cap_offerer_address);
@@ -435,7 +434,7 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address,
     ) {
-        pragma aborts_if_is_partial;
+        include SeqNumProofReplayProtectedAbortsIf;
         let source_address = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr: source_address };
         let current_auth_key_bytes = spec_get_authentication_key(source_address);
@@ -459,6 +458,24 @@ spec aptos_framework::account {
             current_auth_key_bytes !=
                 multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
 
+        // The proof must be a valid signature of the account owner over the offer challenge.
+        let proof_challenge = RotationCapabilityOfferProofChallengeV2 {
+            chain_id: global<chain_id::ChainId>(@aptos_framework).id,
+            sequence_number: if (exists<Account>(source_address)) global<Account>(source_address).sequence_number else 0,
+            source_address,
+            recipient_address,
+        };
+        aborts_if account_scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
+            ed25519::Signature { bytes: rotation_capability_sig_bytes },
+            ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
+            proof_challenge
+        );
+        aborts_if account_scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
+            multi_ed25519::Signature { bytes: rotation_capability_sig_bytes },
+            multi_ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
+            proof_challenge
+        );
+
         /// [high-level-req-7.1]
         modifies global<Account>(source_address);
         let post offer_for = global<Account>(source_address).rotation_capability_offer.for;
@@ -474,8 +491,7 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address
     ) {
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
-        pragma aborts_if_is_partial;
+        include SeqNumProofReplayProtectedAbortsIf;
         let source_address = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr: source_address };
         let current_auth_key_bytes = spec_get_authentication_key(source_address);
@@ -497,6 +513,23 @@ spec aptos_framework::account {
         aborts_if account_scheme == MULTI_ED25519_SCHEME &&
             current_auth_key_bytes !=
                 multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
+
+        // The proof must be a valid signature of the account owner over the offer challenge.
+        let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: if (exists<Account>(source_address)) global<Account>(source_address).sequence_number else 0,
+            source_address,
+            recipient_address,
+        };
+        aborts_if account_scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
+            ed25519::Signature { bytes: signer_capability_sig_bytes },
+            ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
+            proof_challenge
+        );
+        aborts_if account_scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
+            multi_ed25519::Signature { bytes: signer_capability_sig_bytes },
+            multi_ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
+            proof_challenge
+        );
 
         /// [high-level-req-7.2]
         modifies global<Account>(source_address);
@@ -596,7 +629,6 @@ spec aptos_framework::account {
     /// The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address
     spec create_resource_address(source: &address, seed: vector<u8>): address {
         pragma opaque;
-        pragma aborts_if_is_strict = false;
         // This function should not abort assuming the result of `sha3_256` is deserializable into an address.
         aborts_if [abstract] false;
         ensures [abstract] result == spec_create_resource_address(source, seed);
@@ -606,13 +638,14 @@ spec aptos_framework::account {
     spec fun spec_create_resource_address(source: address, seed: vector<u8>): address;
 
     spec create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
-        pragma aborts_if_is_partial;
         let source_addr = signer::address_of(source);
         let resource_addr = spec_create_resource_address(source_addr, seed);
 
+        // A resource account can only be created once.
+        aborts_if exists<Account>(resource_addr);
+        include EnsureResourceExistsAbortsIf { addr: resource_addr };
         aborts_if len(ZERO_AUTH_KEY) != 32;
-        include spec_exists_at(resource_addr) ==> CreateResourceAccountAbortsIf;
-        include !spec_exists_at(resource_addr) ==> CreateAccountAbortsIf {addr: resource_addr};
+        modifies global<Account>(resource_addr);
 
         ensures signer::address_of(result_1) == resource_addr;
         let post offer_for = global<Account>(resource_addr).signer_capability_offer.for;
@@ -658,6 +691,9 @@ spec aptos_framework::account {
         ensures exists<Account>(addr);
         /// [high-level-req-11]
         ensures global<Account>(addr).guid_creation_num == pre_gcn + 1;
+        // Only the GUID counter of an existing account changes.
+        ensures account_exists_pre ==> global<Account>(addr)
+            == update_field(old(global<Account>(addr)), guid_creation_num, pre_gcn + 1);
         ensures result == guid::GUID { id: guid::ID { creation_num: pre_gcn, addr } };
     }
 
@@ -674,8 +710,18 @@ spec aptos_framework::account {
         modifies global<Account>(addr);
         ensures exists<Account>(addr);
         ensures global<Account>(addr).guid_creation_num == pre_gcn + 1;
+        // Only the GUID counter of an existing account changes.
+        ensures account_exists_pre ==> global<Account>(addr)
+            == update_field(old(global<Account>(addr)), guid_creation_num, pre_gcn + 1);
         ensures result.counter == 0;
         ensures result.guid == guid::GUID { id: guid::ID { creation_num: pre_gcn, addr } };
+    }
+
+    /// Sequence-number-based proofs are replayable in orderless and multisig payload transactions.
+    spec schema SeqNumProofReplayProtectedAbortsIf {
+        use aptos_framework::transaction_context;
+        aborts_if transaction_context::spec_is_orderless_txn()
+            || transaction_context::spec_is_multisig_payload_txn();
     }
 
     spec schema EnsureResourceExistsAbortsIf {
@@ -776,8 +822,6 @@ spec aptos_framework::account {
         signed_message_bytes: vector<u8>,
         message: T,
     ) {
-        pragma aborts_if_is_partial;
-
         modifies global<Account>(account);
         aborts_if !spec_exists_at(account);
         let auth_key = spec_get_authentication_key(account);
@@ -793,7 +837,29 @@ spec aptos_framework::account {
         include account_scheme == ED25519_SCHEME ==> ed25519::NewSignatureFromBytesAbortsIf { bytes: signed_message_bytes };
         include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: signed_message_bytes };
 
+        // The signed message embeds the type info of `T`, which requires `T` to be a struct.
+        aborts_if (account_scheme == ED25519_SCHEME || account_scheme == MULTI_ED25519_SCHEME)
+            && !aptos_std::type_info::spec_is_struct<T>();
+        aborts_if account_scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
+            ed25519::Signature { bytes: signed_message_bytes },
+            ed25519::UnvalidatedPublicKey { bytes: account_public_key },
+            message
+        );
+        aborts_if account_scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
+            multi_ed25519::Signature { bytes: signed_message_bytes },
+            multi_ed25519::UnvalidatedPublicKey { bytes: account_public_key },
+            message
+        );
+
         aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
+    }
+
+    spec upsert_encrypted_dk(account: &signer, ciphertext: vector<u8>) {
+        let addr = signer::address_of(account);
+        aborts_if len(ciphertext) > MAX_ENCRYPTED_DK_BYTES;
+        modifies global<EncryptedDK>(addr);
+        ensures exists<EncryptedDK>(addr);
+        ensures global<EncryptedDK>(addr).ciphertext == ciphertext;
     }
 
     spec set_originating_address(_account: &signer) {
@@ -801,10 +867,12 @@ spec aptos_framework::account {
     }
 
     spec upsert_ed25519_backup_key_on_keyless_account {
+        // Not verified: depends on `single_key` and `multi_key` deserialization, which is not specified.
         pragma verify = false;
     }
 
     spec upsert_ed25519_backup_key_and_encrypt_dk {
+        // Not verified: calls `upsert_ed25519_backup_key_on_keyless_account`.
         pragma verify = false;
     }
 }

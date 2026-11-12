@@ -65,7 +65,6 @@ spec aptos_framework::object {
     }
 
     spec create_object(owner_address: address): ConstructorRef {
-        pragma aborts_if_is_partial;
 
         let unique_address = transaction_context::spec_generate_unique_address();
         aborts_if exists<ObjectCore>(unique_address);
@@ -89,7 +88,6 @@ spec aptos_framework::object {
     }
 
     spec create_sticky_object(owner_address: address): ConstructorRef {
-        pragma aborts_if_is_partial;
 
         let unique_address = transaction_context::spec_generate_unique_address();
         aborts_if exists<ObjectCore>(unique_address);
@@ -450,8 +448,9 @@ spec aptos_framework::object {
         object: address,
         to: address,
     ) {
+        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
+        // `ObjectCore` on the chain) are not specified.
         pragma aborts_if_is_partial;
-        // TODO: Verify the link list loop in verify_ungated_and_descendant
         let owner_address = signer::address_of(owner);
         aborts_if !exists<ObjectCore>(object);
         aborts_if !global<ObjectCore>(object).allow_ungated_transfer;
@@ -462,8 +461,9 @@ spec aptos_framework::object {
         object: Object<T>,
         to: address,
     ) {
+        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
+        // `ObjectCore` on the chain) are not specified.
         pragma aborts_if_is_partial;
-        // TODO: Verify the link list loop in verify_ungated_and_descendant
         let owner_address = signer::address_of(owner);
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
@@ -475,8 +475,9 @@ spec aptos_framework::object {
         object: address,
         to: address,
     ) {
+        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
+        // `ObjectCore` on the chain) are not specified.
         pragma aborts_if_is_partial;
-        // TODO: Verify the link list loop in verify_ungated_and_descendant
         let owner_address = signer::address_of(owner);
         aborts_if !exists<ObjectCore>(object);
         aborts_if !global<ObjectCore>(object).allow_ungated_transfer;
@@ -487,8 +488,9 @@ spec aptos_framework::object {
         object: Object<O>,
         to: Object<T>,
     ) {
+        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
+        // `ObjectCore` on the chain) are not specified.
         pragma aborts_if_is_partial;
-        // TODO: Verify the link list loop in verify_ungated_and_descendant
         let owner_address = signer::address_of(owner);
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
@@ -496,16 +498,15 @@ spec aptos_framework::object {
     }
 
     spec burn<T: key>(owner: &signer, object: Object<T>) {
-        pragma aborts_if_is_partial;
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
         aborts_if owner(object) != signer::address_of(owner);
+        aborts_if exists<TombStone>(object_address);
         ensures exists<TombStone>(object_address);
         ensures is_owner(object, signer::address_of(owner));
     }
 
     spec burn_object_with_transfer<T: key>(owner: &signer, object: Object<T>) {
-        pragma aborts_if_is_partial;
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
         aborts_if owner(object) != signer::address_of(owner);
@@ -513,18 +514,21 @@ spec aptos_framework::object {
     }
 
     spec unburn<T: key>(original_owner: &signer, object: Object<T>) {
-        pragma aborts_if_is_partial;
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
         aborts_if !is_burnt(object);
         let tomb_stone = borrow_global<TombStone>(object_address);
         let original_owner_address = signer::address_of(original_owner);
         let object_current_owner = borrow_global<ObjectCore>(object_address).owner;
+        // Only the current owner, or the original owner of an object held by the burn address, can unburn.
+        aborts_if object_current_owner != original_owner_address && object_current_owner != BURN_ADDRESS;
         aborts_if object_current_owner != original_owner_address && tomb_stone.original_owner != original_owner_address;
+        ensures !exists<TombStone>(object_address);
     }
 
     spec verify_ungated_and_descendant(owner: address, destination: address) {
-        // TODO: Verify the link list loop in verify_ungated_and_descendant
+        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
+        // `ObjectCore` on the chain) are not specified.
         pragma aborts_if_is_partial;
         pragma unroll = MAXIMUM_OBJECT_NESTING;
         aborts_if !exists<ObjectCore>(destination);
@@ -563,6 +567,8 @@ spec aptos_framework::object {
     }
 
     spec owns<T: key>(object: Object<T>, owner: address): bool {
+        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
+        // `ObjectCore` on the chain) are not specified.
         pragma aborts_if_is_partial;
         let current_address_0 = object.inner;
         let object_0 = global<ObjectCore>(current_address_0);
@@ -572,7 +578,6 @@ spec aptos_framework::object {
     }
 
     spec root_owner<T: key>(self: Object<T>): address {
-        pragma aborts_if_is_partial;
     }
 
     // Helper function

@@ -118,11 +118,6 @@ spec aptos_framework::gas_schedule {
         include config_buffer::OnNewEpochApply<GasScheduleV2>;
     }
 
-    spec set_storage_gas_config(aptos_framework: &signer, config: storage_gas::StorageGasConfig) {
-        include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
-        aborts_if !exists<storage_gas::StorageGasConfig>(@aptos_framework);
-    }
-
     spec set_storage_gas_config_for_next_epoch(aptos_framework: &signer, config: storage_gas::StorageGasConfig) {
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         aborts_if !exists<storage_gas::StorageGasConfig>(@aptos_framework);

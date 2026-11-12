@@ -573,9 +573,11 @@ spec aptos_framework::staking_contract {
 
         let staker_address = signer::address_of(staker);
         let account = global<account::Account>(staker_address);
+        // Creating the `Store` allocates nine event handles on the staker account.
+        include !exists<Store>(staker_address) ==>
+            account::NewEventHandleAbortsIf { account: staker };
         aborts_if !exists<Store>(staker_address)
-            && !exists<account::Account>(staker_address);
-        aborts_if !exists<Store>(staker_address)
+            && exists<account::Account>(staker_address)
             && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
         /// [high-level-req-1]
         ensures exists<Store>(staker_address);
@@ -620,14 +622,8 @@ spec aptos_framework::staking_contract {
         contract_creation_seed: vector<u8>;
 
         // postconditions account::create_resource_account()
-        let acc = global<account::Account>(resource_addr);
-        aborts_if exists<account::Account>(resource_addr)
-            && (
-                std::option::is_some(acc.signer_capability_offer.for)
-                    || acc.sequence_number != (0 as u64)
-            );
-        aborts_if !exists<account::Account>(resource_addr)
-            && len(bcs::to_bytes(resource_addr)) != 32;
+        aborts_if exists<account::Account>(resource_addr);
+        include account::EnsureResourceExistsAbortsIf { addr: resource_addr };
         aborts_if len(account::ZERO_AUTH_KEY) != 32;
 
         // postconditions stake::initialize_stake_owner()
@@ -637,8 +633,5 @@ spec aptos_framework::staking_contract {
             && !contains(allowed.accounts, resource_addr);
         aborts_if exists<stake::StakePool>(resource_addr);
         aborts_if exists<stake::OwnerCapability>(resource_addr);
-        // 12 is the times that calls 'events::guids'
-        aborts_if exists<account::Account>(resource_addr)
-            && acc.guid_creation_num + 12 >= account::MAX_GUID_CREATION_NUM;
     }
 }

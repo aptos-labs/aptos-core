@@ -420,7 +420,6 @@ spec aptos_framework::vesting {
         new_beneficiary: address,
     ) {
         pragma verify_duration_estimate = 300;
-        pragma aborts_if_is_partial;
         aborts_if !account::spec_exists_at(new_beneficiary);
         include VerifyAdminAbortsIf;
         let post vesting_contract = global<VestingContract>(contract_address);
@@ -453,7 +452,6 @@ spec aptos_framework::vesting {
         role: String,
         role_holder: address,
     ) {
-        pragma aborts_if_is_partial;
         include SetManagementRoleAbortsIf;
     }
 
@@ -462,7 +460,6 @@ spec aptos_framework::vesting {
         contract_address: address,
         beneficiary_resetter: address,
     ) {
-        pragma aborts_if_is_partial;
         aborts_if !std::string::spec_internal_check_utf8(ROLE_BENEFICIARY_RESETTER);
         include SetManagementRoleAbortsIf;
     }
@@ -514,13 +511,11 @@ spec aptos_framework::vesting {
         let ea = account::spec_exists_at(resource_addr);
         include if (ea) account::CreateResourceAccountAbortsIf else account::CreateAccountAbortsIf {addr: resource_addr};
 
-        let acc = global<account::Account>(resource_addr);
         let post post_acc = global<account::Account>(resource_addr);
-        aborts_if !exists<coin::CoinStore<AptosCoin>>(resource_addr) && !aptos_std::type_info::spec_is_struct<AptosCoin>();
-        aborts_if !exists<coin::CoinStore<AptosCoin>>(resource_addr) && ea && acc.guid_creation_num + 2 > MAX_U64;
-        aborts_if !exists<coin::CoinStore<AptosCoin>>(resource_addr) && ea && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-        ensures exists<account::Account>(resource_addr) && post_acc.authentication_key == account::ZERO_AUTH_KEY &&
-                exists<coin::CoinStore<AptosCoin>>(resource_addr);
+        // `coin::register` only checks that the coin is initialized.
+        aborts_if !aptos_std::type_info::spec_is_struct<AptosCoin>();
+        aborts_if !exists<coin::CoinInfo<AptosCoin>>(@aptos_framework);
+        ensures exists<account::Account>(resource_addr) && post_acc.authentication_key == account::ZERO_AUTH_KEY;
         ensures signer::address_of(result_1) == resource_addr;
         ensures result_2.account == resource_addr;
     }

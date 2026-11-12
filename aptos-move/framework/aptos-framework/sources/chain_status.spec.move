@@ -30,7 +30,6 @@ spec aptos_framework::chain_status {
     spec set_genesis_end(aptos_framework: &signer) {
         use std::signer;
         pragma opaque;
-        pragma verify = true;
         pragma delegate_invariants_to_caller;
         modifies global<GenesisEndMarker>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
