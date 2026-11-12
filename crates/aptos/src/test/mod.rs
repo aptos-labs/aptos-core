@@ -53,11 +53,11 @@ use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
 use aptos_move_cli::{
-    ArgWithType, ArgWithTypeVec, ChunkedPublishOption, CompilePackage, DownloadPackage,
-    EntryFunctionArguments, FrameworkPackageArgs, IncludedArtifacts, IncludedArtifactsArgs,
-    InitPackage, LargePackagesModuleOption, MemberId, MoveEnv, MovePackageOptions, MoveVm,
-    OverrideSizeCheckOption, PublishPackage, RunFunction, RunScript, ScriptFunctionArguments,
-    TestPackage, TypeArgVec,
+    ArgWithType, ArgWithTypeVec, ChunkedPublishOption, CompilePackage, CompilePackageOutput,
+    DownloadPackage, EntryFunctionArguments, FrameworkPackageArgs, IncludedArtifacts,
+    IncludedArtifactsArgs, InitPackage, LargePackagesModuleOption, MemberId, MoveEnv,
+    MovePackageOptions, MoveVm, OverrideSizeCheckOption, PublishPackage, RunFunction, RunScript,
+    ScriptFunctionArguments, TestPackage, TypeArgVec,
 };
 use aptos_rest_client::{
     aptos_api_types::{MoveStructTag, MoveType},
@@ -838,11 +838,12 @@ impl CliTestFramework {
         &self,
         account_strs: BTreeMap<&str, &str>,
         included_artifacts: Option<IncludedArtifacts>,
-    ) -> CliTypedResult<Vec<String>> {
+    ) -> CliTypedResult<CompilePackageOutput> {
         CompilePackage {
             move_options: self.move_options(account_strs),
             save_metadata: false,
             fetch_deps_only: false,
+            to_hex: false,
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
