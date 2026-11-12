@@ -29,7 +29,6 @@ use mono_move_core::{
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::SegmentedArena;
-use move_core_types::language_storage::StructTag;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 
 /// Provides access to resources and resource groups during parallel execution.
@@ -37,7 +36,7 @@ pub(crate) struct BlockSTMParallelProvider<'a, 'ctx, S> {
     guard: &'a ExecutionGuard<'ctx>,
     /// Base storage layer, pre-block state.
     base_view: &'a S,
-    reader: ParallelReader<'a, InMemoryStorageKey, StructTag>,
+    reader: ParallelReader<'a, InMemoryStorageKey>,
     /// Where values read from the base storage layer are materialized.
     arena: &'a SegmentedArena,
 }
@@ -47,7 +46,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
     pub(crate) fn new(
         guard: &'a ExecutionGuard<'ctx>,
         base_view: &'a S,
-        versioned_map: &'a MVHashMap<InMemoryStorageKey, StructTag, MonoValue, DelayedFieldID>,
+        versioned_map: &'a MVHashMap<InMemoryStorageKey, (), MonoValue, DelayedFieldID>,
         scheduler: SchedulerWrapper<'a>,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
@@ -81,7 +80,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
     }
 }
 
-impl<S: TStateView<Key = StateKey>> StorageBase<InMemoryStorageKey, StructTag>
+impl<S: TStateView<Key = StateKey>> StorageBase<InMemoryStorageKey>
     for BlockSTMParallelProvider<'_, '_, S>
 {
     fn resource(
