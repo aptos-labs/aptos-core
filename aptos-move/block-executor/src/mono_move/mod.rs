@@ -99,8 +99,12 @@ impl SpeculativeValue for MonoValue {
     }
 
     fn eq_metadata(&self, _other: &Self) -> bool {
-        // MonoMove versions no group metadata. False here only forces
-        // re-validation, so safe to use.
+        // Block-STM only compares metadata on its resource-group path, which
+        // MonoMove does not use: group members and links are written as plain
+        // data.
+        //
+        // TODO(completeness): once group links carry metadata such as the
+        // group's size, it is validated together with resource writes.
         false
     }
 
