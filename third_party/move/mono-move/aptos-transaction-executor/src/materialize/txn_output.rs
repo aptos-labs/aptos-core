@@ -31,7 +31,7 @@ use std::{collections::BTreeMap, ptr::NonNull};
 
 /// A transaction's output without its resource-group writes. The caller
 /// completes it with them.
-pub struct PartialOutput {
+pub struct TransactionOutputWithoutGroups {
     writes: Vec<(StateKey, WriteOp)>,
     events: Vec<ContractEvent>,
     gas_used: u64,
@@ -39,7 +39,7 @@ pub struct PartialOutput {
     auxiliary_data: TransactionAuxiliaryData,
 }
 
-impl PartialOutput {
+impl TransactionOutputWithoutGroups {
     /// Completes the output with one write per resource group the transaction
     /// changed.
     pub fn with_group_writes(
@@ -70,11 +70,11 @@ pub(crate) fn executed_output(
     gas_used: u64,
     status: TransactionStatus,
     auxiliary_data: TransactionAuxiliaryData,
-) -> Result<PartialOutput, MaterializationError> {
+) -> Result<TransactionOutputWithoutGroups, MaterializationError> {
     let writes = resource_writes(effects, layouts).map_err(MaterializationError::new)?;
     let events = to_contract_events(effects, layouts)
         .map_err(|e| MaterializationError::new(vec![format!("event finalization failed: {e}")]))?;
-    Ok(PartialOutput {
+    Ok(TransactionOutputWithoutGroups {
         writes,
         events,
         gas_used,
@@ -87,13 +87,15 @@ pub(crate) fn executed_output(
 pub(crate) fn discarded_output(
     status_code: StatusCode,
     auxiliary_data: TransactionAuxiliaryData,
-) -> PartialOutput {
+) -> TransactionOutputWithoutGroups {
     empty_output(TransactionStatus::Discard(status_code), auxiliary_data)
 }
 
 /// Creates the committed empty output: successful, no writes, no events, no
 /// fee.
-pub(crate) fn empty_success_output(auxiliary_data: TransactionAuxiliaryData) -> PartialOutput {
+pub(crate) fn empty_success_output(
+    auxiliary_data: TransactionAuxiliaryData,
+) -> TransactionOutputWithoutGroups {
     empty_output(
         TransactionStatus::Keep(ExecutionStatus::Success),
         auxiliary_data,
@@ -103,8 +105,8 @@ pub(crate) fn empty_success_output(auxiliary_data: TransactionAuxiliaryData) -> 
 fn empty_output(
     status: TransactionStatus,
     auxiliary_data: TransactionAuxiliaryData,
-) -> PartialOutput {
-    PartialOutput {
+) -> TransactionOutputWithoutGroups {
+    TransactionOutputWithoutGroups {
         writes: vec![],
         events: vec![],
         gas_used: 0,
