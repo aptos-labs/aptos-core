@@ -22,7 +22,7 @@ use crate::{
     executor_utilities::Materializer,
     mono_move::{
         group_chain::{
-            committed_member_value, encode, view_below, GroupCodec, GroupLink, GroupView,
+            committed_member_value, encode_group, view_before, GroupCodec, GroupLink, GroupView,
         },
         version_matches, MonoValue, ParallelReader, StorageBase,
     },
@@ -219,7 +219,10 @@ struct MockStorageBase<'a, S> {
 }
 
 impl<S: TStateView<Key = MonoMockKey>> StorageBase<MonoMockKey> for MockStorageBase<'_, S> {
-    fn resource(&self, key: &MonoMockKey) -> Result<Option<MonoValue>, ResourceProviderError> {
+    fn get_pre_block_resource(
+        &self,
+        key: &MonoMockKey,
+    ) -> Result<Option<MonoValue>, ResourceProviderError> {
         Ok(self
             .base_view
             .get_state_value(key)
@@ -227,7 +230,10 @@ impl<S: TStateView<Key = MonoMockKey>> StorageBase<MonoMockKey> for MockStorageB
             .map(|value| mock_value(value.bytes(), WriteOpKind::Modification)))
     }
 
-    fn group_view(&self, group_key: &MonoMockKey) -> Result<GroupView, ResourceProviderError> {
+    fn get_pre_block_group(
+        &self,
+        group_key: &MonoMockKey,
+    ) -> Result<GroupView, ResourceProviderError> {
         let Some(value) = self
             .base_view
             .get_state_value(group_key)
@@ -244,7 +250,7 @@ impl<S: TStateView<Key = MonoMockKey>> StorageBase<MonoMockKey> for MockStorageB
             .collect())
     }
 
-    fn materialize_member(
+    fn materialize_group_member(
         &self,
         _key: &MonoMockKey,
         blob: &Bytes,
@@ -599,7 +605,7 @@ impl<'a> MockSession<'a> {
             if members.is_empty() {
                 continue;
             }
-            let link = Arc::new(GroupLink::changed(
+            let link = Arc::new(GroupLink::from_changes(
                 members.keys().map(|tag| tag_type(*tag)).collect(),
             ));
             versioned_writes.insert(*group_key, MonoValue::GroupMetadata {
@@ -691,8 +697,8 @@ impl MonoMockExecutor {
                 link,
             } = group_write;
             let data = versioned_map.data();
-            let prev = view_below(data, &MockGroupCodec, group_key, txn_idx)?;
-            let view = link.view_on(&MockGroupCodec, &prev, |member_ty| {
+            let prev = view_before(data, &MockGroupCodec, group_key, txn_idx)?;
+            let view = link.build_view(&MockGroupCodec, &prev, |member_ty| {
                 committed_member_value(data, &MockGroupCodec, group_key, member_ty, txn_idx)
             })?;
             let assembled = view
@@ -723,7 +729,7 @@ impl MonoMockExecutor {
                 patched.insert(
                     *group_key,
                     ValueType::new(
-                        Some(encode(&view)),
+                        Some(encode_group(&view)),
                         metadata.clone(),
                         WriteOpKind::Modification,
                     ),

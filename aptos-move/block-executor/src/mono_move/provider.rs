@@ -4,10 +4,6 @@
 //! The resource providers backing MonoMove execution on Block-STM: one over the
 //! unsync map for sequential execution, one over the multi-version map for
 //! parallel execution. Both are created once per transaction.
-//!
-//! The speculative read loops live in [`ParallelReader`] rather than in the
-//! parallel provider so that the combinatorial tests can drive them with their
-//! own key type.
 
 use crate::{
     mono_move::{
@@ -74,8 +70,8 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         key: &InMemoryStorageKey,
         blob: &[u8],
     ) -> Result<StorageRead, ResourceProviderError> {
-        let value = self.materialized_value(key, blob)?;
-        let read = storage_read(&value, None)?;
+        let value = self.deserialize_value(key, blob)?;
+        let read = value.as_storage_read(None)?;
         self.unsync_map.set_base_value(key.clone(), value);
         Ok(read)
     }
@@ -89,7 +85,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
 
     /// The group's stored members, decoded from the base view. Empty if no
     /// group is stored there.
-    fn stored_group_view(
+    fn get_pre_block_group(
         &self,
         group_key: &InMemoryStorageKey,
     ) -> Result<GroupView, ResourceProviderError> {
@@ -119,7 +115,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         group_key: &InMemoryStorageKey,
     ) -> Result<StorageRead, ResourceProviderError> {
         if let Some(value) = self.unsync_map.fetch_data(key) {
-            return storage_read(&value, None);
+            return value.as_storage_read(None);
         }
         let link = match self.unsync_map.fetch_data(group_key) {
             Some(MonoValue::GroupMetadata { group: link }) => link,
@@ -129,7 +125,9 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
                 ))
             },
             None => {
-                let link = Arc::new(GroupLink::stored(self.stored_group_view(group_key)?));
+                let link = Arc::new(GroupLink::from_storage(
+                    self.get_pre_block_group(group_key)?,
+                ));
                 self.unsync_map
                     .set_base_value(group_key.clone(), MonoValue::GroupMetadata {
                         group: link.clone(),
@@ -138,7 +136,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
             },
         };
         let view = link
-            .built_view()
+            .view()
             .ok_or_else(|| invariant_violation("The group slot's link has no view"))?;
         let tag = member_tag(key.value_ty()).map_err(invariant_violation)?;
         match view.get(&tag) {
@@ -147,13 +145,14 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         }
     }
 
-    /// Materializes a stored group member, whose type `key` names.
-    fn materialized_value(
+    /// Deserializes a stored value of the type `key` names into this worker's
+    /// arena.
+    fn deserialize_value(
         &self,
         key: &InMemoryStorageKey,
         blob: &[u8],
     ) -> Result<MonoValue, ResourceProviderError> {
-        materialized_value(self.guard, self.arena, key.value_ty(), blob)
+        deserialize_value(self.guard, self.arena, key.value_ty(), blob)
     }
 }
 
@@ -168,7 +167,7 @@ impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMSequentialProvi
                 // If there is a value already in the map, it is most-up-to-date
                 // modification, and we return it.
                 if let Some(value) = self.unsync_map.fetch_data(key) {
-                    return storage_read(&value, None);
+                    return value.as_storage_read(None);
                 }
 
                 // Otherwise, need to fetch from base view.
@@ -191,8 +190,9 @@ impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMSequentialProvi
     }
 }
 
-/// Materializes a stored blob into the in-memory value for a slot of type `ty`.
-fn materialized_value(
+/// Deserializes a stored blob into the in-memory value for a slot of type
+/// `ty`.
+fn deserialize_value(
     guard: &ExecutionGuard<'_>,
     arena: &SegmentedArena,
     ty: InternedType,
@@ -205,23 +205,6 @@ fn materialized_value(
         // modification; an empty slot is stored as `MonoValue::Deletion`.
         kind: WriteOpKind::Modification,
         pin,
-    })
-}
-
-/// Serves a value one of the maps holds at a slot as a read at `version`.
-/// Sequential execution does not speculate, so it passes [`None`].
-fn storage_read(value: &MonoValue, version: Version) -> Result<StorageRead, ResourceProviderError> {
-    Ok(match value {
-        MonoValue::Write { ptr, pin, .. } => StorageRead::ExternalHeap {
-            ptr: *ptr,
-            version,
-            pin: pin.clone(),
-        },
-        MonoValue::Deletion => StorageRead::DoesNotExist { version },
-        // A group's own slot is only read at commit, never by a transaction.
-        MonoValue::GroupMetadata { .. } => {
-            return Err(invariant_violation("A group link served as a read"))
-        },
     })
 }
 
@@ -243,15 +226,18 @@ fn invariant_violation(msg: impl ToString) -> ResourceProviderError {
 pub(crate) trait StorageBase<K> {
     /// The value stored at `key` before the block, already materialized, or
     /// [`None`] if the slot is empty.
-    fn resource(&self, key: &K) -> Result<Option<MonoValue>, ResourceProviderError>;
+    fn get_pre_block_resource(&self, key: &K) -> Result<Option<MonoValue>, ResourceProviderError>;
 
     /// The members of the group stored at `group_key` before the block, in the
     /// encoding storage holds them in. Empty if no group is stored there.
-    fn group_view(&self, group_key: &K) -> Result<GroupView, ResourceProviderError>;
+    fn get_pre_block_group(&self, group_key: &K) -> Result<GroupView, ResourceProviderError>;
 
     /// Materializes a stored group member, whose type `key` names.
-    fn materialize_member(&self, key: &K, blob: &Bytes)
-        -> Result<MonoValue, ResourceProviderError>;
+    fn materialize_group_member(
+        &self,
+        key: &K,
+        blob: &Bytes,
+    ) -> Result<MonoValue, ResourceProviderError>;
 }
 
 /// Reads the multi-version map on behalf of one incarnation of one transaction,
@@ -305,15 +291,17 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
         }
     }
 
-    /// Reads the value in its own storage slot, provisioning the pre-block
+    /// Reads the value in its own storage slot, initializing the pre-block
     /// value first if this is the block's first read of it.
     pub(crate) fn read_resource(
         &self,
         base: &dyn StorageBase<K>,
         key: &K,
     ) -> Result<StorageRead, ResourceProviderError> {
-        self.read_data(key, || {
-            Ok(base.resource(key)?.unwrap_or(MonoValue::Deletion))
+        self.read_or_initialize(key, || {
+            Ok(base
+                .get_pre_block_resource(key)?
+                .unwrap_or(MonoValue::Deletion))
         })
     }
 
@@ -327,18 +315,18 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
         group_key: &K,
         tag: impl Fn() -> Result<Bytes, ResourceProviderError>,
     ) -> Result<StorageRead, ResourceProviderError> {
-        self.read_data(key, || {
-            let view = self.stored_group_view(base, group_key)?;
+        self.read_or_initialize(key, || {
+            let view = self.get_or_initialize_pre_block_group(base, group_key)?;
             match view.get(&tag()?) {
-                Some(blob) => base.materialize_member(key, blob),
+                Some(blob) => base.materialize_group_member(key, blob),
                 None => Ok(MonoValue::Deletion),
             }
         })
     }
 
-    /// Reads the data map at `key`, provisioning it with `base_value` if this
+    /// Reads the data map at `key`, initializing it with `base_value` if this
     /// is the block's first read of it.
-    fn read_data(
+    fn read_or_initialize(
         &self,
         key: &K,
         base_value: impl Fn() -> Result<MonoValue, ResourceProviderError>,
@@ -352,11 +340,11 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
             };
             match read {
                 Ok(MVDataOutput::Versioned(version, value)) => {
-                    return storage_read(&value, mono_version(version))
+                    return value.as_storage_read(to_mono_version(version))
                 },
                 Err(MVDataError::Uninitialized) => {
                     let value = base_value()?;
-                    // Another worker may be provisioning the same slot from the
+                    // Another worker may be initializing the same slot from the
                     // same storage, so whichever value is already there stands.
                     data.set_base_value(key.clone(), value, |_, _| {});
                 },
@@ -365,10 +353,10 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
         }
     }
 
-    /// The stored group's view, provisioning the group's slot with it on the
+    /// The stored group's view, initializing the group's slot with it on the
     /// block's first read of the group. Reading the slot at index 0 sees only
     /// its base entry, never a transaction's link, so this records nothing.
-    fn stored_group_view(
+    fn get_or_initialize_pre_block_group(
         &self,
         base: &dyn StorageBase<K>,
         group_key: &K,
@@ -378,7 +366,7 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
             match data.fetch_data_no_record(group_key, 0) {
                 Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata { group: link })) => {
                     return link
-                        .built_view()
+                        .view()
                         .cloned()
                         .ok_or_else(|| invariant_violation("The stored group's link has no view"));
                 },
@@ -388,8 +376,8 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
                     ))
                 },
                 Err(MVDataError::Uninitialized) => {
-                    let link = GroupLink::stored(base.group_view(group_key)?);
-                    // Another worker may be provisioning the same group from the
+                    let link = GroupLink::from_storage(base.get_pre_block_group(group_key)?);
+                    // Another worker may be initializing the same group from the
                     // same storage, so whichever link is already there stands.
                     data.set_base_value(
                         group_key.clone(),
@@ -411,7 +399,7 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
 
 /// Block-STM's version of a read, as MonoMove records it. The pre-block state
 /// is [`None`] on both sides.
-fn mono_version(version: MVVersion) -> Version {
+fn to_mono_version(version: MVVersion) -> Version {
     version.ok()
 }
 
@@ -452,7 +440,10 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
 
     /// The bytes stored at `key` before the block, or [`None`] for an empty
     /// slot.
-    fn base_bytes(&self, key: &InMemoryStorageKey) -> Result<Option<Bytes>, ResourceProviderError> {
+    fn get_pre_block_value(
+        &self,
+        key: &InMemoryStorageKey,
+    ) -> Result<Option<Bytes>, ResourceProviderError> {
         let state_key = key
             .as_state_key()
             .map_err(|e| invariant_violation(format!("{e:#}")))?;
@@ -467,31 +458,31 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
 impl<S: TStateView<Key = StateKey>> StorageBase<InMemoryStorageKey>
     for BlockSTMParallelProvider<'_, '_, S>
 {
-    fn resource(
+    fn get_pre_block_resource(
         &self,
         key: &InMemoryStorageKey,
     ) -> Result<Option<MonoValue>, ResourceProviderError> {
-        self.base_bytes(key)?
-            .map(|blob| materialized_value(self.guard, self.arena, key.value_ty(), &blob))
+        self.get_pre_block_value(key)?
+            .map(|blob| deserialize_value(self.guard, self.arena, key.value_ty(), &blob))
             .transpose()
     }
 
-    fn group_view(
+    fn get_pre_block_group(
         &self,
         group_key: &InMemoryStorageKey,
     ) -> Result<GroupView, ResourceProviderError> {
-        match self.base_bytes(group_key)? {
+        match self.get_pre_block_value(group_key)? {
             Some(blob) => decode_group_view(&blob),
             None => Ok(GroupView::new()),
         }
     }
 
-    fn materialize_member(
+    fn materialize_group_member(
         &self,
         key: &InMemoryStorageKey,
         blob: &Bytes,
     ) -> Result<MonoValue, ResourceProviderError> {
-        materialized_value(self.guard, self.arena, key.value_ty(), blob)
+        deserialize_value(self.guard, self.arena, key.value_ty(), blob)
     }
 }
 
@@ -505,7 +496,7 @@ impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMParallelProvide
             None => self.reader.read_resource(self, key),
             Some(group_ty) => {
                 let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
-                // The tag is only needed to provision the member from the
+                // The tag is only needed to initialize the member from the
                 // stored group, on the block's first read of it.
                 let tag = || member_tag(key.value_ty()).map_err(invariant_violation);
                 self.reader.read_group_member(self, key, &group_key, tag)

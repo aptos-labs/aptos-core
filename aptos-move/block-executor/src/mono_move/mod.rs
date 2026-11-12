@@ -36,14 +36,14 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
 use group_chain::{
-    committed_member_value, group_write, view_below, GroupCodec, GroupLink, MonoGroupCodec,
+    committed_member_value, group_write, view_before, GroupCodec, GroupLink, MonoGroupCodec,
 };
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
     production_natives, AptosTransactionExecutor, DiscardReason, TxnOutcome,
 };
 use mono_move_core::storage::resource_provider::{
-    InMemoryStorageKey, ReadPin, ResourceProvider, Version,
+    InMemoryStorageKey, ReadPin, ResourceProvider, ResourceProviderError, StorageRead, Version,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_runtime::{SegmentedArena, SessionEffects, WriteClass};
@@ -61,8 +61,6 @@ pub(crate) mod group_chain;
 mod provider;
 
 use provider::{BlockSTMParallelProvider, BlockSTMSequentialProvider};
-/// The combinatorial tests drive the speculative read loops with their own key
-/// and tag types.
 #[cfg(test)]
 pub(crate) use provider::{ParallelReader, StorageBase};
 
@@ -78,11 +76,10 @@ pub enum MonoValue {
         pin: Arc<dyn ReadPin>,
     },
     Deletion,
-    /// The value at a resource group's own slot: the group as storage holds
-    /// it, or one transaction's changes to it. The group's members live under
-    /// their own keys.
+    /// Group write metadata and cache. Group members live as their own
+    /// writes/deletions under their keys.
     //
-    // TODO(completeness): add state value metadata here.
+    // TODO(completeness): add state value metadata and size here.
     GroupMetadata {
         group: Arc<GroupLink>,
     },
@@ -93,6 +90,27 @@ pub enum MonoValue {
 // so it is safe to dereference this pointer and share between threads.
 unsafe impl Send for MonoValue {}
 unsafe impl Sync for MonoValue {}
+
+impl MonoValue {
+    /// Serves the value a map holds at a slot as a read at `version`.
+    /// Sequential execution does not speculate, so it passes [`None`].
+    fn as_storage_read(&self, version: Version) -> Result<StorageRead, ResourceProviderError> {
+        Ok(match self {
+            MonoValue::Write { ptr, pin, .. } => StorageRead::ExternalHeap {
+                ptr: *ptr,
+                version,
+                pin: pin.clone(),
+            },
+            MonoValue::Deletion => StorageRead::DoesNotExist { version },
+            // A group's own slot is only read at commit, never by a transaction.
+            MonoValue::GroupMetadata { .. } => {
+                return Err(ResourceProviderError::InvariantViolation(
+                    "Group metadata served as a read".to_string(),
+                ))
+            },
+        })
+    }
+}
 
 impl SpeculativeValue for MonoValue {
     fn eq_value(&self, _other: &Self) -> bool {
@@ -124,6 +142,7 @@ impl SpeculativeValue for MonoValue {
     fn write_op_kind(&self) -> WriteOpKind {
         match self {
             MonoValue::Write { kind, .. } => kind.clone(),
+            // TODO(completeness): store write op kind for group metadata?
             MonoValue::GroupMetadata { .. } => WriteOpKind::Modification,
             MonoValue::Deletion => WriteOpKind::Deletion,
         }
@@ -204,7 +223,7 @@ impl TxnInput for MonoReads {
             .all(|(key, recorded, _group)| {
                 match data_map.fetch_data_no_record(key, idx_to_validate) {
                     Ok(MVDataOutput::Versioned(observed, _)) => version_matches(recorded, observed),
-                    // A base value this transaction provisioned cannot
+                    // A base value this transaction initialized cannot
                     // disappear, so this only happens if the entry was never
                     // there. Either way the recorded version is no longer
                     // backed by the map.
@@ -356,7 +375,7 @@ impl MonoTxnOutput {
         }
         let group_links = changed_groups
             .into_iter()
-            .map(|(group_key, changed)| (group_key, Arc::new(GroupLink::changed(changed))))
+            .map(|(group_key, changed)| (group_key, Arc::new(GroupLink::from_changes(changed))))
             .collect();
 
         MonoTxnOutput::Executed {
@@ -711,7 +730,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         if let Some(unsync_map) = unsync_map {
             for (group_key, link) in output.group_links() {
                 let prev = match unsync_map.fetch_data(group_key) {
-                    Some(MonoValue::GroupMetadata { group }) => group.built_view().cloned(),
+                    Some(MonoValue::GroupMetadata { group }) => group.view().cloned(),
                     Some(MonoValue::Write { .. } | MonoValue::Deletion) | None => None,
                 }
                 .ok_or_else(|| {
@@ -780,7 +799,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     })?;
                     // Sequential execution applied this transaction's writes
                     // before materializing it, and no later one has run yet.
-                    let view = link.view_on(&codec, &prev, |member_ty| {
+                    let view = link.build_view(&codec, &prev, |member_ty| {
                         unsync_map
                             .fetch_data(&codec.member_key(group_key, member_ty))
                             .ok_or_else(|| {
@@ -794,8 +813,8 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 },
                 ViewMode::Parallel { versioned_map, .. } => {
                     let data = versioned_map.data();
-                    let prev = view_below(data, &codec, group_key, txn_idx)?;
-                    let view = link.view_on(&codec, &prev, |member_ty| {
+                    let prev = view_before(data, &codec, group_key, txn_idx)?;
+                    let view = link.build_view(&codec, &prev, |member_ty| {
                         committed_member_value(data, &codec, group_key, member_ty, txn_idx)
                     })?;
                     (prev, view)
