@@ -1,0 +1,12 @@
+---
+remote_endpoint: ~
+name: "init-confidential-asset"
+proposals:
+  - name: step_1_init_confidential_asset_global_config
+    metadata:
+      title: "Initialize Confidential Asset Global Config"
+      description: "Publish confidential_asset::GlobalConfig on chains whose genesis skipped init_module. No-op if it is already published."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/discussions/663"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/init_confidential_asset_global_config.move

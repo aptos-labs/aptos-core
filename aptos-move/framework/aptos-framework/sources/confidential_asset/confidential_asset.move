@@ -339,6 +339,15 @@ module aptos_framework::confidential_asset {
         // no modular wraparound on pending balances nor transferred amounts
         assert!(pend_balance_upper_bound <= MAX_NUM_BITS_IN_SCALAR_FIELD);
 
+        publish_global_config(deployer);
+    }
+
+    /// Publishes a fresh `GlobalConfig` under `deployer`. Shared by `init_module` and by the
+    /// governance-only `initialize_global_config`, so the two can never construct divergent state.
+    ///
+    /// Caller must ensure `GlobalConfig` is not already published: `extend_ref` owns every
+    /// `AssetConfig` object and every asset pool's primary store, so replacing it would orphan them.
+    fun publish_global_config(deployer: &signer) {
         let deployer_address = signer::address_of(deployer);
         let chain_id = chain_id::get();
         move_to(
@@ -830,6 +839,31 @@ module aptos_framework::confidential_asset {
     //     SECURITY-SENSITIVE public governance functions      //
     //       (bugs here could lead to loss of privacy)         //
     // ======================================================= //
+
+    /// Publishes `GlobalConfig` on a chain whose genesis never ran this module's `init_module`.
+    ///
+    /// Genesis writes the framework's module bytes directly, which bypasses the VM flow that
+    /// auto-invokes `init_module`, and `vm_genesis::initialize_confidential_asset` compensates by
+    /// calling `init_module_for_devnet` only when the chain is neither mainnet nor testnet. A
+    /// network genesis'd under the mainnet or testnet chain ID therefore ends up with this module
+    /// published but no `GlobalConfig`, so every entry point here aborts with `MISSING_DATA`. There
+    /// is no other way to install it after genesis: `init_module` is not callable post-publish, and
+    /// the `V1`-to-`V2` upgrade in `set_emergency_paused` needs a `V1` to already exist.
+    ///
+    /// The resulting state matches what a fresh `init_module` would have produced on the same chain.
+    ///
+    /// No-op when `GlobalConfig` is already published, so a re-run or re-dispatched proposal is
+    /// safe. Never make this replace an existing config: rotating `extend_ref` would orphan every
+    /// `AssetConfig` object and every asset pool's primary store, stranding user balances.
+    public entry fun initialize_global_config(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
+        if (exists<GlobalConfig>(@aptos_framework)) {
+            return
+        };
+
+        publish_global_config(aptos_framework);
+    }
 
     /// Enables or disables the allow list for confidential transfers.
     public fun set_allow_listing(aptos_framework: &signer, enabled: bool) acquires GlobalConfig {
