@@ -348,28 +348,17 @@ impl MonoTxnOutput {
             skips_rest,
             group_metadata: vec![],
         };
-        let mut changed_groups: HashMap<_, Vec<_>> = HashMap::new();
-        for (key, _, group) in output
+        let written_groups = output
             .effects()
             .into_iter()
-            .flat_map(|effects| effects.read_write_set().writes_unordered())
-        {
-            if let Some(group_ty) = group {
-                changed_groups
-                    .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
-                    .or_default()
-                    .push(key.clone());
-            }
-        }
+            .flat_map(|effects| effects.read_write_set().written_groups_unordered())
+            .map(|(group_key, members)| {
+                let metadata = GroupMetadata::from_changes(members.to_vec());
+                (group_key.clone(), Arc::new(metadata))
+            })
+            .collect();
         match &mut output {
-            MonoTxnOutput::Executed { group_metadata, .. } => {
-                *group_metadata = changed_groups
-                    .into_iter()
-                    .map(|(group_key, changes)| {
-                        (group_key, Arc::new(GroupMetadata::from_changes(changes)))
-                    })
-                    .collect();
-            },
+            MonoTxnOutput::Executed { group_metadata, .. } => *group_metadata = written_groups,
             MonoTxnOutput::SkippedToRetry => {},
         }
         output

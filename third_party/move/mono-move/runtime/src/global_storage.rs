@@ -243,6 +243,14 @@ pub struct ResourceReadWriteSet {
     // which only clones the key on a miss.
     #[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
     entries: HashMap<InMemoryStorageKey, Entry>,
+    /// The keys of the members of each resource group this transaction
+    /// touched, by the group's own key. Narrowed to the members it wrote when
+    /// the session ends.
+    //
+    // A hash map for the same reasons as `entries`. Each member is recorded
+    // once, when its entry is created.
+    #[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
+    groups: HashMap<InMemoryStorageKey, Vec<InMemoryStorageKey>>,
     /// Undo log of writes originating from older epochs. Used for rolling back
     /// to older checkpoints.
     journal: Vec<JournalEntry>,
@@ -264,7 +272,16 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<bool, RuntimeError> {
-        Ok(get_or_create_resource_entry(&mut self.entries, provider, key, group)?.exists())
+        Ok(
+            get_or_create_resource_entry(
+                &mut self.entries,
+                &mut self.groups,
+                provider,
+                key,
+                group,
+            )?
+            .exists(),
+        )
     }
 
     /// Returns the pointer to the resource, or `None` if it does not exist or
@@ -275,7 +292,16 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<Option<NonNull<u8>>, RuntimeError> {
-        Ok(get_or_create_resource_entry(&mut self.entries, provider, key, group)?.as_ptr())
+        Ok(
+            get_or_create_resource_entry(
+                &mut self.entries,
+                &mut self.groups,
+                provider,
+                key,
+                group,
+            )?
+            .as_ptr(),
+        )
     }
 
     /// Returns the pointer to the resource. Returns an error if the resource
@@ -286,7 +312,7 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<NonNull<u8>, RuntimeError> {
-        get_or_create_resource_entry(&mut self.entries, provider, key, group)?
+        get_or_create_resource_entry(&mut self.entries, &mut self.groups, provider, key, group)?
             .as_ptr()
             .ok_or_else(|| RuntimeError::ResourceDoesNotExist {
                 op: GlobalStorageOp::BorrowGlobal,
@@ -307,7 +333,7 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<EntryPtr, RuntimeError> {
-        get_or_create_resource_entry(&mut self.entries, provider, key, group)?
+        get_or_create_resource_entry(&mut self.entries, &mut self.groups, provider, key, group)?
             .as_ptr_mut(self.current_epoch)
             .ok_or_else(|| RuntimeError::ResourceDoesNotExist {
                 op: GlobalStorageOp::BorrowGlobalMut,
@@ -351,7 +377,13 @@ impl ResourceReadWriteSet {
         group: Option<InternedType>,
         ptr: NonNull<u8>,
     ) -> Result<(), RuntimeError> {
-        let entry = get_or_create_resource_entry(&mut self.entries, provider, key, group)?;
+        let entry = get_or_create_resource_entry(
+            &mut self.entries,
+            &mut self.groups,
+            provider,
+            key,
+            group,
+        )?;
         if entry.exists() {
             return Err(RuntimeError::ResourceAlreadyExists {
                 addr: key.address(),
@@ -378,7 +410,13 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<EntryPtr, RuntimeError> {
-        let entry = get_or_create_resource_entry(&mut self.entries, provider, key, group)?;
+        let entry = get_or_create_resource_entry(
+            &mut self.entries,
+            &mut self.groups,
+            provider,
+            key,
+            group,
+        )?;
         let ptr = entry.as_ptr_mut(self.current_epoch).ok_or_else(|| {
             RuntimeError::ResourceDoesNotExist {
                 op: GlobalStorageOp::MoveFrom,
@@ -445,7 +483,7 @@ impl ResourceReadWriteSet {
 
     /// Demotes to `NotModified` every local copy that still equals the value
     /// it was copied from, so a mutable borrow that changed nothing is not a
-    /// write.
+    /// write, then narrows each resource group to the members written.
     ///
     /// Terminal: it discards state the undo journal would need, so no rollback
     /// may follow.
@@ -474,7 +512,34 @@ impl ResourceReadWriteSet {
                 entry.write = StorageWrite::NotModified;
             }
         }
+        self.retain_written_group_members();
         Ok(())
+    }
+
+    /// Keeps, for each resource group, only the members this transaction
+    /// wrote, and drops the groups it wrote none of.
+    fn retain_written_group_members(&mut self) {
+        let entries = &self.entries;
+        self.groups.retain(|_, members| {
+            members.retain(|key| {
+                entries
+                    .get(key)
+                    .is_some_and(|entry| entry.write_class().is_some())
+            });
+            !members.is_empty()
+        });
+    }
+
+    /// Yields each resource group this transaction wrote, by the group's own
+    /// key, with the keys of the members it wrote. Exact once the session
+    /// ended; before that it also holds members that were only read. Callers
+    /// must not depend on the order.
+    pub fn written_groups_unordered(
+        &self,
+    ) -> impl Iterator<Item = (&InMemoryStorageKey, &[InMemoryStorageKey])> {
+        self.groups
+            .iter()
+            .map(|(group_key, members)| (group_key, members.as_slice()))
     }
 
     /// Yields every key the transaction read, with the version it observed and
@@ -579,6 +644,7 @@ impl ResourceReadWriteSet {
 #[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
 fn get_or_create_resource_entry<'a>(
     entries: &'a mut HashMap<InMemoryStorageKey, Entry>,
+    groups: &mut HashMap<InMemoryStorageKey, Vec<InMemoryStorageKey>>,
     provider: &dyn ResourceProvider,
     key: &InMemoryStorageKey,
     group: Option<InternedType>,
@@ -600,6 +666,12 @@ fn get_or_create_resource_entry<'a>(
         },
         EntryRef::Vacant(entry) => {
             let read = provider.get_resource(key, group)?;
+            if let Some(group_ty) = group {
+                groups
+                    .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
+                    .or_default()
+                    .push(key.clone());
+            }
             Ok(entry.insert(Entry {
                 read,
                 write: StorageWrite::NotModified,
@@ -898,6 +970,31 @@ mod tests {
             rws.try_borrow_global_mut(&provider, &k, None),
             Ok(EntryPtr::Writable(p)) if p == local
         ));
+    }
+
+    #[test]
+    fn groups_keep_only_written_members() {
+        // Any interned type stands in for the group's container type.
+        static GROUP_TY: Type = Type::U8;
+        let group = GlobalArenaPtr::from_static(&GROUP_TY);
+        let provider = Provider::empty();
+        let mut rws = ResourceReadWriteSet::new();
+        // At address 1, one member is only read and another is published.
+        rws.exists(&provider, &key_a(1), Some(group)).unwrap();
+        rws.move_to(&provider, &key_b(1), Some(group), fake_ptr(0x70))
+            .unwrap();
+        // At address 2, the group is only read.
+        rws.exists(&provider, &key_a(2), Some(group)).unwrap();
+
+        rws.retain_written_group_members();
+        let groups = rws
+            .written_groups_unordered()
+            .map(|(group_key, members)| (group_key.clone(), members.to_vec()))
+            .collect::<Vec<_>>();
+        assert_eq!(groups, vec![(
+            InMemoryStorageKey::resource_group(addr(1), group),
+            vec![key_b(1)]
+        )]);
     }
 
     #[test]
