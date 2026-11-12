@@ -21,7 +21,9 @@ use crate::{
     errors::ResourceGroupSerializationError,
     executor_utilities::Materializer,
     mono_move::{
-        group_chain::{committed_value, encode_group, unbuilt_links_before, GroupLink, GroupView},
+        group_chain::{
+            committed_value, encode_group, unbuilt_metadata_before, GroupMetadata, GroupView,
+        },
         version_matches, MonoValue, ParallelReader,
     },
     single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
@@ -134,7 +136,7 @@ fn value_type(value: &MonoValue<MockKey>) -> Result<ValueType, PanicError> {
             ValueType::new(None, StateValueMetadata::none(), WriteOpKind::Deletion)
         },
         MonoValue::GroupMetadata { .. } => {
-            return Err(code_invariant_error("A group link is not a mock write"))
+            return Err(code_invariant_error("A group metadata is not a mock write"))
         },
     })
 }
@@ -162,7 +164,9 @@ fn member_change(
 ) -> Result<(Bytes, Option<Bytes>), PanicError> {
     let tag = match key {
         MockKey::GroupMember(_, tag) => tag_bytes(*tag),
-        MockKey::Resource(_) => return Err(code_invariant_error("A group link names a resource")),
+        MockKey::Resource(_) => {
+            return Err(code_invariant_error("A group metadata names a resource"))
+        },
     };
     let bytes = match committed_value(data, key, writer_idx)? {
         // SAFETY: the value holds the pin for the allocation it points into.
@@ -175,30 +179,30 @@ fn member_change(
     Ok((tag, bytes))
 }
 
-/// The view of `link`, which committed transaction `writer_idx` wrote, built
-/// on top of `prev` unless it is built already.
+/// The view of `metadata`, which committed transaction `writer_idx` wrote,
+/// built on top of `prev` unless it is built already.
 fn build_committed_view(
     data: &VersionedData<MockKey, MonoValue<MockKey>>,
-    link: &GroupLink<MockKey>,
+    metadata: &GroupMetadata<MockKey>,
     prev: &GroupView,
     writer_idx: TxnIndex,
 ) -> Result<Arc<GroupView>, PanicError> {
-    if let Some(view) = link.view() {
+    if let Some(view) = metadata.view() {
         return Ok(view.clone());
     }
-    let changes = link
+    let changes = metadata
         .changes()
         .iter()
         .map(|key| member_change(data, key, writer_idx))
         .collect::<Result<Vec<_>, PanicError>>()?;
-    Ok(link.build_view(prev, changes))
+    Ok(metadata.build_view(prev, changes))
 }
 
 /// One transaction's writes to a group.
 struct MockGroupWrite {
     metadata: StateValueMetadata,
     members: BTreeMap<u32, MonoValue<MockKey>>,
-    link: Arc<GroupLink<MockKey>>,
+    group_metadata: Arc<GroupMetadata<MockKey>>,
 }
 
 /// One incarnation's reads and writes, before materialization.
@@ -209,7 +213,7 @@ pub(crate) struct ExecutedTxn {
     resource_writes: HashMap<KeyType<[u8; 32]>, MonoValue<MockKey>>,
     group_writes: HashMap<KeyType<[u8; 32]>, MockGroupWrite>,
     /// What Block-STM versions: the resource writes, each group member under
-    /// its own key, and one link per written group.
+    /// its own key, and one metadata entry per written group.
     versioned_writes: HashMap<MockKey, MonoValue<MockKey>>,
     events: Vec<MockEvent>,
     gas: u64,
@@ -584,19 +588,19 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
             if members.is_empty() {
                 continue;
             }
-            let link = Arc::new(GroupLink::from_changes(
+            let group_metadata = Arc::new(GroupMetadata::from_changes(
                 members
                     .keys()
                     .map(|tag| MockKey::GroupMember(*group_key, *tag))
                     .collect(),
             ));
             versioned_writes.insert(MockKey::Resource(*group_key), MonoValue::GroupMetadata {
-                group: link.clone(),
+                group: group_metadata.clone(),
             });
             group_writes.insert(*group_key, MockGroupWrite {
                 metadata: metadata.clone(),
                 members,
-                link,
+                group_metadata,
             });
         }
 
@@ -676,15 +680,15 @@ impl MonoMockExecutor {
             let MockGroupWrite {
                 metadata,
                 members,
-                link,
+                group_metadata,
             } = group_write;
             let data = versioned_map.data();
             let (mut prev, unbuilt) =
-                unbuilt_links_before(data, &MockKey::Resource(*group_key), txn_idx)?;
-            for (writer_idx, link) in unbuilt {
-                prev = build_committed_view(data, &link, &prev, writer_idx)?;
+                unbuilt_metadata_before(data, &MockKey::Resource(*group_key), txn_idx)?;
+            for (writer_idx, unbuilt_metadata) in unbuilt {
+                prev = build_committed_view(data, &unbuilt_metadata, &prev, writer_idx)?;
             }
-            let view = build_committed_view(data, link, &prev, txn_idx)?;
+            let view = build_committed_view(data, group_metadata, &prev, txn_idx)?;
             let assembled = view
                 .iter()
                 .map(|(tag, bytes)| {
