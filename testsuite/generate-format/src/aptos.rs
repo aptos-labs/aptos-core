@@ -105,6 +105,7 @@ pub fn get_registry() -> Result<Registry> {
     trace_crypto_values(&mut tracer, &mut samples)?;
     tracer.trace_value(&mut samples, &event::EventKey::random())?;
     tracer.trace_value(&mut samples, &write_set::WriteOp::legacy_deletion())?;
+    crate::trace_type_tags(&mut tracer, &mut samples)?;
 
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
@@ -130,6 +131,10 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<write_set::Extension>(&samples)?;
     tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
     tracer.trace_type::<transaction::MultisigTransactionPayload>(&samples)?;
+    tracer.trace_type::<transaction::block_epilogue::BlockEndInfo>(&samples)?;
+    tracer.trace_type::<transaction::block_epilogue::FeeDistribution>(&samples)?;
+    tracer.trace_type::<transaction::RequestedMultipliers>(&samples)?;
+    tracer.trace_type::<aptos_types::keyless::ZKP>(&samples)?;
 
     tracer.trace_type::<transaction::authenticator::AccountAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AbstractAuthenticator>(&samples)?;
@@ -141,9 +146,6 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<aptos_types::keyless::EphemeralCertificate>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
     tracer.trace_type::<write_set::WriteSet>(&samples)?;
-
-    // aliases within StructTag
-    tracer.ignore_aliases("StructTag", &["type_params"])?;
 
     tracer.registry()
 }
