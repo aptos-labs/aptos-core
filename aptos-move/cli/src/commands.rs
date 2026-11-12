@@ -412,6 +412,10 @@ pub struct CompilePackage {
     #[clap(long)]
     pub fetch_deps_only: bool,
 
+    /// Output the compiled bytecode of each module in hex encoding
+    #[clap(long)]
+    pub bytecode_hex: bool,
+
     #[clap(flatten)]
     pub included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -442,10 +446,18 @@ impl CliCommand<Vec<String>> for CompilePackage {
             BuiltPackage::prepare_resolution_graph(&mut w.clone(), package_path, config)?;
             return Ok(vec![]);
         }
+        let bytecode_hex = self.bytecode_hex;
         let pack = BuiltPackage::build_to(&w, self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         if self.save_metadata {
             pack.extract_metadata_and_save()?;
+        }
+        if bytecode_hex {
+            let results: Vec<String> = pack
+                .module_code_iter()
+                .map(|(name, code)| format!("{}:{}", name, hex::encode(code)))
+                .collect();
+            return Ok(results);
         }
         let ids = pack
             .modules()
