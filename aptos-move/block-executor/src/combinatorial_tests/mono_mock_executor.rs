@@ -22,8 +22,8 @@ use crate::{
     executor_utilities::Materializer,
     mono_move::{
         group_chain::{
-            committed_value, finish_group_post_commit, unbuilt_metadata_before, GroupMetadata,
-            GroupView,
+            committed_value, finish_group_post_commit, unbuilt_metadata_before,
+            validate_size_before, GroupMetadata, GroupView,
         },
         version_matches, MonoValue, ParallelReader,
     },
@@ -85,6 +85,7 @@ fn mock_value(bytes: &[u8], kind: WriteOpKind) -> MonoValue<MockKey> {
     let ptr = NonNull::new(blob.0.as_ptr().cast_mut()).expect("A boxed slice is never null");
     MonoValue::Write {
         ptr,
+        bcs_size: bytes.len(),
         kind,
         pin: blob,
     }
@@ -351,6 +352,9 @@ impl TxnOutput for MonoMockOutput {
 /// spec. The real VM keeps them in its read-write set instead.
 pub(crate) struct MockReads {
     reads: HashMap<MockKey, Version>,
+    /// The metadata of the groups the incarnation wrote, each built on a read
+    /// of its group's size.
+    group_metadata: Vec<(MockKey, Arc<GroupMetadata<MockKey>>)>,
     incarnation: Incarnation,
     speculative_failure: bool,
 }
@@ -359,6 +363,7 @@ impl MockReads {
     fn new(incarnation: Incarnation) -> Self {
         Self {
             reads: HashMap::new(),
+            group_metadata: vec![],
             incarnation,
             speculative_failure: false,
         }
@@ -383,6 +388,9 @@ impl TxnInput for MockReads {
                     },
                     Err(MVDataError::Uninitialized | MVDataError::Dependency(_)) => false,
                 }
+            })
+            && self.group_metadata.iter().all(|(group_key, metadata)| {
+                validate_size_before(data_map, group_key, idx_to_validate, metadata)
             })
     }
 
@@ -590,13 +598,45 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
             if members.is_empty() {
                 continue;
             }
+            let group_slot = MockKey::Resource(*group_key);
+            let size_before = self
+                .reader
+                .read_group_size(&group_slot, || self.get_pre_block_group(group_key))?;
+            let mut size = size_before;
+            // Only reads that are inconsistent with each other make the sizes
+            // not add up.
+            let inconsistent = || {
+                ResourceProviderError::SpeculativeAbort(
+                    "A group's size is inconsistent with its members".to_string(),
+                )
+            };
+            for (tag, value) in &members {
+                let tag_len = tag_bytes(*tag).len();
+                // `group_member_op` read every written member, so each is cached.
+                if let Some(Some(before)) = self.cache.get(&MockKey::GroupMember(*group_key, *tag))
+                {
+                    size.remove_member(tag_len, before.len())
+                        .ok_or_else(inconsistent)?;
+                }
+                match value {
+                    MonoValue::Write { bcs_size, .. } => size
+                        .add_member(tag_len, *bcs_size)
+                        .ok_or_else(inconsistent)?,
+                    MonoValue::Deletion | MonoValue::GroupMetadata { .. } => {},
+                }
+            }
             let group_metadata = Arc::new(GroupMetadata::from_changes(
                 members
                     .keys()
                     .map(|tag| MockKey::GroupMember(*group_key, *tag))
                     .collect(),
+                size_before,
+                size,
             ));
-            versioned_writes.insert(MockKey::Resource(*group_key), MonoValue::GroupMetadata {
+            self.reads
+                .group_metadata
+                .push((group_slot, group_metadata.clone()));
+            versioned_writes.insert(group_slot, MonoValue::GroupMetadata {
                 group: group_metadata.clone(),
             });
             group_writes.insert(*group_key, MockGroupWrite {
@@ -697,6 +737,13 @@ impl MonoMockExecutor {
                 txn_idx,
                 group_metadata,
             )?;
+            if view.size() != group_metadata.size() {
+                return Err(code_invariant_error(format!(
+                    "Group has size {:?}, recorded size {:?}",
+                    view.size(),
+                    group_metadata.size()
+                )));
+            }
             let assembled = view
                 .iter()
                 .map(|(tag, bytes)| {
@@ -836,9 +883,11 @@ impl SingleTransactionExecutor for MonoMockExecutor {
         let mut session = MockSession::new(&reader, shared.base_view, incarnation);
         let executed = session.run(behavior);
 
-        if reader.speculative_failure() {
-            // A read could not be served, so whatever came out of it must not
-            // commit.
+        if reader.speculative_failure()
+            || matches!(executed, Err(ResourceProviderError::SpeculativeAbort(_)))
+        {
+            // A read could not be served, or the sizes read do not add up, so
+            // whatever came out of it must not commit.
             return Ok((
                 ExecutionStatus::SpeculativeFailure,
                 MockReads::new(incarnation),

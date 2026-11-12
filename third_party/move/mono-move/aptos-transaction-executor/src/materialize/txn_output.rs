@@ -159,10 +159,10 @@ fn resource_writes(
         // SAFETY: written pointers refer to live values in the effects' frozen
         // heap, `layouts` describes their interned types, and no GC runs here.
         let op = match class {
-            WriteClass::Creation(ptr) => {
+            WriteClass::Creation { ptr, .. } => {
                 WriteOp::legacy_creation(unsafe { written_bytes(layouts, ptr, key.value_ty()) }?)
             },
-            WriteClass::Modification(ptr) => WriteOp::legacy_modification(unsafe {
+            WriteClass::Modification { ptr, .. } => WriteOp::legacy_modification(unsafe {
                 written_bytes(layouts, ptr, key.value_ty())
             }?),
             WriteClass::Deletion => WriteOp::legacy_deletion(),
@@ -224,7 +224,7 @@ pub(crate) fn group_writes(
         // SAFETY: written pointers refer to live values in the effects' frozen
         // heap, `layouts` describes their interned types, and no GC runs here.
         let member_op = match class {
-            WriteClass::Creation(ptr) | WriteClass::Modification(ptr) => {
+            WriteClass::Creation { ptr, .. } | WriteClass::Modification { ptr, .. } => {
                 Some(unsafe { written_bytes(layouts, ptr, key.value_ty()) }?)
             },
             WriteClass::Deletion => None,
