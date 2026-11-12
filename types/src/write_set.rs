@@ -947,11 +947,6 @@ impl WriteSet {
         self.native_collaterals().is_some_and(|m| !m.is_empty())
     }
 
-    /// Adds or replaces the value write at `key`.
-    pub fn insert_value_write(&mut self, key: StateKey, op: WriteOp) {
-        self.value_writes_mut().insert((key, op));
-    }
-
     /// Install the native-collateral bucket. BCS encodes `extensions` in insertion order, so
     /// the collateral extension always follows the position extension when both are present.
     pub fn add_native_collateral(

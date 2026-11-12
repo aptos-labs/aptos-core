@@ -53,7 +53,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
             .execute_transaction(&txn, &aux_info)
             .materialize(
                 &guard,
-                Some(&data_provider),
+                &data_provider,
                 env.features(),
                 TransactionAuxiliaryData::default(),
             )

@@ -5,7 +5,7 @@ use crate::{
     errors::{
         DiscardReason, ExecutionStatus, MaterializationError, NoEffectsReason, SystemTxnFailure,
     },
-    materialize,
+    materialize::{self, PartialOutput},
     providers::AptosDataProvider,
 };
 use aptos_types::{
@@ -84,26 +84,43 @@ impl TxnOutcome {
     }
 
     /// Forces the outcome into a `TransactionOutput`: converts the status,
-    /// serializes writes, and finalizes events. Fails only if the effects
-    /// cannot be converted to storage formats, e.g. BCS serialized, which is
-    /// abnormal — unlike a discard, which is a normal outcome carried in the
-    /// output's status. `layouts` must describe the written and event values'
-    /// interned types.
-    ///
-    /// With `groups`, resource-group members are merged into their groups'
-    /// stored members, which `groups` supplies, and each group gets one write.
-    /// Without it, group members are left out of the write set, and the caller
-    /// assembles the groups.
+    /// serializes writes (merging resource-group members), and finalizes
+    /// events. Fails only if the effects cannot be converted to storage
+    /// formats, e.g. BCS serialized, which is abnormal — unlike a discard,
+    /// which is a normal outcome carried in the output's status. `layouts`
+    /// must describe the written and event values' interned types, and
+    /// `provider` supplies resource-group pre-state for member merges.
     //
     // TODO(perf): this is only intended for compatibility and testing, and
     // the block coordinator should eventually handle the effects directly.
     pub fn materialize(
         self,
         layouts: &impl LayoutProvider,
-        groups: Option<&dyn AptosDataProvider>,
+        provider: &dyn AptosDataProvider,
         features: &Features,
         auxiliary_data: TransactionAuxiliaryData,
     ) -> Result<TransactionOutput, MaterializationError> {
+        let group_writes = match &self {
+            TxnOutcome::Executed { effects, .. } => {
+                materialize::group_writes(effects, layouts, provider)?
+            },
+            TxnOutcome::Discarded { .. }
+            | TxnOutcome::UnexpectedSystemTransactionFailure(_)
+            | TxnOutcome::Panic(_)
+            | TxnOutcome::ExecutedNoEffects(_) => vec![],
+        };
+        self.materialize_partial(layouts, features, auxiliary_data)?
+            .with_group_writes(group_writes)
+    }
+
+    /// Like [`Self::materialize`], but leaves out resource groups: the caller
+    /// assembles their writes and completes the output with them.
+    pub fn materialize_partial(
+        self,
+        layouts: &impl LayoutProvider,
+        features: &Features,
+        auxiliary_data: TransactionAuxiliaryData,
+    ) -> Result<PartialOutput, MaterializationError> {
         match self {
             TxnOutcome::Discarded { reason, .. } => Ok(materialize::discarded_output(
                 materialize::discard_to_vm_status(reason).status_code(),
@@ -135,7 +152,6 @@ impl TxnOutcome {
                 materialize::executed_output(
                     &effects,
                     layouts,
-                    groups,
                     fee_statement.gas_used(),
                     txn_status,
                     auxiliary_data,

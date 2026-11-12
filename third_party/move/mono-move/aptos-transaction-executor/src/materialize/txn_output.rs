@@ -5,6 +5,7 @@
 
 use crate::{errors::MaterializationError, providers::AptosDataProvider};
 use aptos_types::{
+    contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
@@ -28,63 +29,113 @@ use std::{collections::BTreeMap, ptr::NonNull};
 // TODO(security): pin providers so that execution and materialization use
 // identical layout and data providers.
 
-/// Creates the output of an executed transaction from its effects.
-pub(crate) fn executed_output(
-    effects: &SessionEffects,
-    layouts: &impl LayoutProvider,
-    groups: Option<&dyn AptosDataProvider>,
+/// A transaction's output without its resource-group writes. The caller
+/// completes it with them.
+pub struct PartialOutput {
+    writes: Vec<(StateKey, WriteOp)>,
+    events: Vec<ContractEvent>,
     gas_used: u64,
     status: TransactionStatus,
     auxiliary_data: TransactionAuxiliaryData,
-) -> Result<TransactionOutput, MaterializationError> {
-    let write_set = drain_write_set(effects, layouts, groups).map_err(MaterializationError::new)?;
+}
+
+impl PartialOutput {
+    /// Completes the output with one write per resource group the transaction
+    /// changed.
+    pub fn with_group_writes(
+        self,
+        group_writes: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    ) -> Result<TransactionOutput, MaterializationError> {
+        // `WriteSet::new` collects into a `BTreeMap`, so the order of the writes
+        // does not reach the result.
+        let write_set =
+            WriteSet::new(self.writes.into_iter().chain(group_writes)).map_err(|e| {
+                MaterializationError::new(vec![format!("failed to build the write set: {e:?}")])
+            })?;
+        Ok(TransactionOutput::new(
+            write_set,
+            self.events,
+            self.gas_used,
+            self.status,
+            self.auxiliary_data,
+        ))
+    }
+}
+
+/// Creates the output of an executed transaction from its effects, except for
+/// its resource groups.
+pub(crate) fn executed_output(
+    effects: &SessionEffects,
+    layouts: &impl LayoutProvider,
+    gas_used: u64,
+    status: TransactionStatus,
+    auxiliary_data: TransactionAuxiliaryData,
+) -> Result<PartialOutput, MaterializationError> {
+    let writes = resource_writes(effects, layouts).map_err(MaterializationError::new)?;
     let events = to_contract_events(effects, layouts)
         .map_err(|e| MaterializationError::new(vec![format!("event finalization failed: {e}")]))?;
-    Ok(TransactionOutput::new(
-        write_set,
+    Ok(PartialOutput {
+        writes,
         events,
         gas_used,
         status,
         auxiliary_data,
-    ))
+    })
 }
 
 /// Creates the output of a discarded transaction: empty, carrying the reason.
 pub(crate) fn discarded_output(
     status_code: StatusCode,
     auxiliary_data: TransactionAuxiliaryData,
-) -> TransactionOutput {
-    TransactionOutput::new(
-        WriteSet::default(),
-        vec![],
-        0,
-        TransactionStatus::Discard(status_code),
-        auxiliary_data,
-    )
+) -> PartialOutput {
+    empty_output(TransactionStatus::Discard(status_code), auxiliary_data)
 }
 
 /// Creates the committed empty output: successful, no writes, no events, no
 /// fee.
-pub(crate) fn empty_success_output(auxiliary_data: TransactionAuxiliaryData) -> TransactionOutput {
-    TransactionOutput::new(
-        WriteSet::default(),
-        vec![],
-        0,
+pub(crate) fn empty_success_output(auxiliary_data: TransactionAuxiliaryData) -> PartialOutput {
+    empty_output(
         TransactionStatus::Keep(ExecutionStatus::Success),
         auxiliary_data,
     )
 }
 
+fn empty_output(
+    status: TransactionStatus,
+    auxiliary_data: TransactionAuxiliaryData,
+) -> PartialOutput {
+    PartialOutput {
+        writes: vec![],
+        events: vec![],
+        gas_used: 0,
+        status,
+        auxiliary_data,
+    }
+}
+
 /// One member's new state within a resource group: new bytes or removal.
 type MemberOp = Option<Bytes>;
 
-/// Drains the read-write set into a write set, serializing written values
-/// straight out of the effects' frozen heap. Resource-group members are merged
-/// into their groups' stored members from `groups`, or left out without it.
+/// Serializes a written value straight out of the effects' frozen heap.
 ///
-/// SAFETY: this function needs to guarantee that its result (both the write set
-/// and the errors) are deterministic, not depending on the order of iteration of
-/// any data structures.
+/// SAFETY: `ptr` must point to a live value of type `ty` in the effects' frozen
+/// heap, `layouts` must describe `ty`, and no GC may run meanwhile.
+unsafe fn written_bytes(
+    layouts: &impl LayoutProvider,
+    ptr: NonNull<u8>,
+    ty: InternedType,
+) -> Result<Bytes, String> {
+    // SAFETY: forwarded from this function's contract.
+    let blob = unsafe { serialize(layouts, ptr.as_ptr(), ty) }
+        .map_err(|e| format!("failed to serialize written value: {e}"))?;
+    Ok(Bytes::from(blob))
+}
+
+/// Converts every write outside a resource group into a write op.
+///
+/// SAFETY: this function needs to guarantee that its result (both the writes
+/// and the errors) are deterministic, not depending on the order of iteration
+/// of any data structures.
 //
 // Only entries whose value changed reach this point: at the end of the
 // session, a copied-on-write value that still equals the value it was read
@@ -93,109 +144,123 @@ type MemberOp = Option<Bytes>;
 // reference, or moved out and back), even when its bytes are unchanged.
 //
 // TODO(metering): writes are not charged IO gas or storage fees.
-fn drain_write_set(
+fn resource_writes(
     effects: &SessionEffects,
     layouts: &impl LayoutProvider,
-    groups: Option<&dyn AptosDataProvider>,
-) -> Result<WriteSet, Vec<String>> {
-    let mut writes: Vec<(StateKey, WriteOp)> = vec![];
+) -> Result<Vec<(StateKey, WriteOp)>, Vec<String>> {
+    let convert = |key: &InMemoryStorageKey, class: WriteClass| -> Result<_, String> {
+        let state_key = key.as_state_key().map_err(|e| format!("{e:#}"))?;
+        // TODO(correctness): ops carry no `StateValueMetadata` (slot deposits,
+        // refunds, creation time); the legacy VM's `WriteOpConverter` fills
+        // these.
+        //
+        // SAFETY: written pointers refer to live values in the effects' frozen
+        // heap, `layouts` describes their interned types, and no GC runs here.
+        let op = match class {
+            WriteClass::Creation(ptr) => {
+                WriteOp::legacy_creation(unsafe { written_bytes(layouts, ptr, key.value_ty()) }?)
+            },
+            WriteClass::Modification(ptr) => WriteOp::legacy_modification(unsafe {
+                written_bytes(layouts, ptr, key.value_ty())
+            }?),
+            WriteClass::Deletion => WriteOp::legacy_deletion(),
+        };
+        Ok((state_key, op))
+    };
+    // Note on determinism: the read-write set iterates in an unspecified order,
+    // so nothing here may depend on it. The caller's `WriteSet::new` sorts the
+    // writes and `MaterializationError::new` sorts the failures.
+    //
+    // TODO(correctness): consider sorting the keys first to ensure determinism. This
+    // cannot currently be done because keys contain `InternedType`, which is
+    // basically a pointer and does not implement `Ord`.
+    //
+    // TODO(perf): currently we collect all errors and sort them to ensure determinism.
+    // We should however revisit the design later and see if we want to switch to an alternative approach.
+    //   - What if you want to fail fast on error?
+    //   - Are we concerned about too many writes here?
+    let mut writes = vec![];
+    let mut failures = vec![];
+    for (key, class, group) in effects.read_write_set().writes_unordered() {
+        if group.is_some() {
+            continue;
+        }
+        match convert(key, class) {
+            Ok(write) => writes.push(write),
+            Err(e) => failures.push(e),
+        }
+    }
+    if failures.is_empty() {
+        Ok(writes)
+    } else {
+        Err(failures)
+    }
+}
+
+/// Merges the transaction's resource-group member writes into the groups'
+/// stored members, which `provider` supplies, and returns one write per group.
+///
+/// SAFETY: this function needs to guarantee that its result (both the writes
+/// and the errors) are deterministic, not depending on the order of iteration
+/// of any data structures.
+pub(crate) fn group_writes(
+    effects: &SessionEffects,
+    layouts: &impl LayoutProvider,
+    provider: &dyn AptosDataProvider,
+) -> Result<Vec<(StateKey, WriteOp)>, MaterializationError> {
     // Unordered on purpose: nothing below may depend on the order groups are
     // visited in (see the SAFETY note above). The inner map is ordered because
     // its keys are user-chosen struct tags and it merges into `GroupMembers`.
     let mut group_ops: UnorderedMap<InMemoryStorageKey, BTreeMap<StructTag, MemberOp>> =
         UnorderedMap::new();
-    let mut failures: Vec<String> = vec![];
+    let mut failures = vec![];
 
-    // SAFETY: written pointers refer to live values in the effects' frozen
-    // heap, `layouts` describes their interned types, and no GC runs during the
-    // drain.
-    let written_bytes = |ptr: NonNull<u8>, ty: InternedType| -> Result<Bytes, String> {
-        // SAFETY: forwarded from this function's contract.
-        let blob = unsafe { serialize(layouts, ptr.as_ptr(), ty) }
-            .map_err(|e| format!("failed to serialize written value: {e}"))?;
-        Ok(Bytes::from(blob))
-    };
-    let mut convert = |key: &InMemoryStorageKey,
+    let mut collect = |key: &InMemoryStorageKey,
                        class: WriteClass,
-                       group: Option<InternedType>|
+                       group_ty: InternedType|
      -> Result<(), String> {
-        match group {
-            None => {
-                let state_key = key.as_state_key().map_err(|e| format!("{e:#}"))?;
-                // TODO(correctness): ops carry no `StateValueMetadata` (slot
-                // deposits, refunds, creation time); the legacy VM's
-                // `WriteOpConverter` fills these.
-                let op = match class {
-                    WriteClass::Creation(ptr) => {
-                        WriteOp::legacy_creation(written_bytes(ptr, key.value_ty())?)
-                    },
-                    WriteClass::Modification(ptr) => {
-                        WriteOp::legacy_modification(written_bytes(ptr, key.value_ty())?)
-                    },
-                    WriteClass::Deletion => WriteOp::legacy_deletion(),
-                };
-                writes.push((state_key, op));
+        // SAFETY: written pointers refer to live values in the effects' frozen
+        // heap, `layouts` describes their interned types, and no GC runs here.
+        let member_op = match class {
+            WriteClass::Creation(ptr) | WriteClass::Modification(ptr) => {
+                Some(unsafe { written_bytes(layouts, ptr, key.value_ty()) }?)
             },
-            // The caller assembles the groups.
-            Some(_) if groups.is_none() => {},
-            Some(group_ty) => {
-                let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
-                let member_op = match class {
-                    WriteClass::Creation(ptr) | WriteClass::Modification(ptr) => {
-                        Some(written_bytes(ptr, key.value_ty())?)
-                    },
-                    WriteClass::Deletion => None,
-                };
-                let member_tag = nominal_tag(key.value_ty()).map_err(|e| format!("{e:#}"))?;
-                group_ops
-                    .entry(group_key)
-                    .or_default()
-                    .insert(member_tag, member_op);
-            },
-        }
+            WriteClass::Deletion => None,
+        };
+        let member_tag = nominal_tag(key.value_ty()).map_err(|e| format!("{e:#}"))?;
+        group_ops
+            .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
+            .or_default()
+            .insert(member_tag, member_op);
         Ok(())
     };
-    // Note on determinism: the read-write set iterates in an unspecified order,
-    // so nothing here may depend on it.
-    //
-    // TODO(correctness): consider sorting the keys first to ensure determinism. This
-    // cannot currently be done because keys contain `InternedType`, which is
-    // basically a pointer and does not implement `Ord`.
     for (key, class, group) in effects.read_write_set().writes_unordered() {
-        // TODO(perf): currently we collect all errors and sort them to ensure determinism.
-        // We should however revisit the design later and see if we want to switch to an alternative approach.
-        //   - What if you want to fail fast on error?
-        //   - Are we concerned about too many writes here?
-        if let Err(e) = convert(key, class, group) {
-            failures.push(e);
-        }
-    }
-
-    // Merge each group's member ops into its stored members and emit one write
-    // per group.
-    //
-    // Note on determinism: the groups are visited in an unspecified order.
-    // `WriteSet::new` sorts the writes and `MaterializationError::new` sorts
-    // the failures, so the order does not reach the result.
-    if let Some(provider) = groups {
-        for (group_key, member_ops) in group_ops.into_iter_unordered() {
-            let merged = merge_group(provider, &group_key, member_ops).and_then(|op| {
-                let state_key = group_key.as_state_key().map_err(|e| format!("{e:#}"))?;
-                Ok((state_key, op))
-            });
-            match merged {
-                Ok(write) => writes.push(write),
-                Err(e) => failures.push(e),
+        if let Some(group_ty) = group {
+            if let Err(e) = collect(key, class, group_ty) {
+                failures.push(e);
             }
         }
     }
 
-    if !failures.is_empty() {
-        return Err(failures);
+    // Note on determinism: the groups are visited in an unspecified order. The
+    // caller's `WriteSet::new` sorts the writes and `MaterializationError::new`
+    // sorts the failures, so the order does not reach the result.
+    let mut writes = vec![];
+    for (group_key, member_ops) in group_ops.into_iter_unordered() {
+        let merged = merge_group(provider, &group_key, member_ops).and_then(|op| {
+            let state_key = group_key.as_state_key().map_err(|e| format!("{e:#}"))?;
+            Ok((state_key, op))
+        });
+        match merged {
+            Ok(write) => writes.push(write),
+            Err(e) => failures.push(e),
+        }
     }
-    // `WriteSet::new` collects into a `BTreeMap`, so we do not need to sort the
-    // `writes` vector here.
-    WriteSet::new(writes).map_err(|e| vec![format!("failed to build the write set: {e:?}")])
+    if failures.is_empty() {
+        Ok(writes)
+    } else {
+        Err(MaterializationError::new(failures))
+    }
 }
 
 /// Merges a group's member ops into a single write for the group's slot.

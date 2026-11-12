@@ -580,11 +580,12 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
 
         // Group members are left out: their groups are assembled below from
         // the links this transaction wrote.
-        let mut output = outcome
-            .materialize(&guard, None, features, auxiliary_data)
+        let partial = outcome
+            .materialize_partial(&guard, features, auxiliary_data)
             .map_err(materialization_failed)?;
 
         let codec = MonoGroupCodec { guard: &guard };
+        let mut group_writes = Vec::with_capacity(links.len());
         for (group_key, link) in &links {
             let (prev, view) = match &mode {
                 ViewMode::Sequential { unsync_map, .. } => {
@@ -617,11 +618,11 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             let state_key = group_key
                 .as_state_key()
                 .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))?;
-            output
-                .write_set_mut()
-                .insert_value_write(state_key, group_write(!prev.is_empty(), &view)?);
+            group_writes.push((state_key, group_write(!prev.is_empty(), &view)?));
         }
-        Ok(output)
+        partial
+            .with_group_writes(group_writes)
+            .map_err(materialization_failed)
     }
 
     fn check_materialization<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(

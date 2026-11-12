@@ -116,7 +116,7 @@ fn execute_v2_in<S: StateView>(
     run(&executor)
         .materialize(
             guard,
-            Some(&data_provider),
+            &data_provider,
             env.features(),
             TransactionAuxiliaryData::default(),
         )
