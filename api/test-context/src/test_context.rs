@@ -445,8 +445,9 @@ impl TestContext {
     }
 
     pub fn latest_state_view(&self) -> DbStateView {
+        let ledger_info = self.get_latest_ledger_info();
         self.context
-            .state_view_at_version(self.get_latest_ledger_info().version())
+            .state_view_at_version(ledger_info.version(), &ledger_info)
             .unwrap()
     }
 

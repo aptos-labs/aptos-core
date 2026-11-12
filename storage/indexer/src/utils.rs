@@ -18,6 +18,8 @@ pub struct PrefixedStateValueIterator<'a> {
     main_db: Arc<dyn DbReader>,
     key_prefix: StateKeyPrefix,
     desired_version: Version, // state values before the version
+    /// Whether `desired_version` is a block end, which allows cheaper reads.
+    at_checkpoint: bool,
     is_finished: bool,
 }
 
@@ -28,6 +30,7 @@ impl<'a> PrefixedStateValueIterator<'a> {
         key_prefix: StateKeyPrefix,
         first_key: Option<StateKey>,
         desired_version: Version,
+        at_checkpoint: bool,
     ) -> Result<Self> {
         let mut read_opt = ReadOptions::default();
         read_opt.set_total_order_seek(true);
@@ -42,6 +45,7 @@ impl<'a> PrefixedStateValueIterator<'a> {
             main_db: main_db_reader,
             key_prefix,
             desired_version,
+            at_checkpoint,
             is_finished: false,
         })
     }
@@ -57,10 +61,14 @@ impl<'a> PrefixedStateValueIterator<'a> {
                 return Ok(None);
             }
 
-            match self
-                .main_db
-                .get_state_value_by_version(&state_key, self.desired_version)?
-            {
+            let state_value = if self.at_checkpoint {
+                self.main_db
+                    .get_state_value_at_checkpoint(&state_key, self.desired_version)?
+            } else {
+                self.main_db
+                    .get_state_value_by_version(&state_key, self.desired_version)?
+            };
+            match state_value {
                 Some(state_value) => {
                     return Ok(Some((state_key, state_value)));
                 },

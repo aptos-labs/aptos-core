@@ -52,11 +52,13 @@ pub trait IndexerReader: Send + Sync {
         ledger_version: Version,
     ) -> Result<AccountOrderedTransactionsWithProof>;
 
+    /// `at_checkpoint`: whether `version` is a block end, which allows cheaper reads.
     fn get_prefixed_state_value_iterator(
         &self,
         key_prefix: &StateKeyPrefix,
         cursor: Option<&StateKey>,
         version: Version,
+        at_checkpoint: bool,
     ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
 
     fn get_latest_internal_indexer_ledger_version(&self) -> Result<Option<Version>>;
