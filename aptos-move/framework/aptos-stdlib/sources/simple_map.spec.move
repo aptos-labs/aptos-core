@@ -72,15 +72,15 @@ spec aptos_std::simple_map {
     }
 
     spec find {
-        pragma verify=false;
+        pragma verify = false;
     }
 
     spec keys {
-        pragma verify=false;
+        pragma verify = false;
     }
 
     spec values {
-        pragma verify=false;
+        pragma verify = false;
     }
 
     spec new<Key: store, Value: store>(): SimpleMap<Key, Value> {

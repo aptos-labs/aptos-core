@@ -31,6 +31,7 @@ spec aptos_framework::dkg {
     }
 
     spec last_completed_session(): Option<DKGSessionState> {
+        pragma opaque;
         aborts_if false;
         ensures result == if (exists<DKGState>(@aptos_framework)) {
             global<DKGState>(@aptos_framework).last_completed
@@ -40,6 +41,7 @@ spec aptos_framework::dkg {
     }
 
     spec is_session_started(epoch: u64): bool {
+        pragma opaque;
         aborts_if false;
         ensures result == spec_is_session_started(epoch);
     }
@@ -74,11 +76,24 @@ spec aptos_framework::dkg {
 
     spec try_clear_incomplete_session(fx: &signer) {
         use std::signer;
+        pragma opaque;
         let addr = signer::address_of(fx);
         aborts_if addr != @aptos_framework;
+        modifies global<DKGState>(@aptos_framework);
+        ensures exists<DKGState>(@aptos_framework) == old(exists<DKGState>(@aptos_framework));
+        ensures exists<DKGState>(@aptos_framework) ==>
+            option::is_none(global<DKGState>(@aptos_framework).in_progress)
+            && global<DKGState>(@aptos_framework).last_completed
+                == old(global<DKGState>(@aptos_framework).last_completed);
     }
 
     spec incomplete_session(): Option<DKGSessionState> {
+        pragma opaque;
         aborts_if false;
+        ensures result == if (exists<DKGState>(@aptos_framework)) {
+            global<DKGState>(@aptos_framework).in_progress
+        } else {
+            option::spec_none()
+        };
     }
 }

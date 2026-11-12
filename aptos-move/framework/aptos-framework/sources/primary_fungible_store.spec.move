@@ -157,4 +157,107 @@ spec aptos_framework::primary_fungible_store {
         ensures object::object_address(result) == store_addr;
     }
 
+    spec create_primary_store<T: key>(owner_addr: address, metadata: Object<T>): Object<FungibleStore> {
+        let metadata_addr = metadata.inner;
+        let store_addr = object::spec_create_user_derived_object_address(
+            owner_addr, global<DeriveRefPod>(metadata_addr).metadata_derive_ref.self
+        );
+        aborts_if !exists<object::ObjectCore>(metadata_addr) || !exists<Metadata>(metadata_addr);
+        aborts_if !exists<DeriveRefPod>(metadata_addr);
+        aborts_if exists<object::ObjectCore>(store_addr);
+        aborts_if exists<object::Untransferable>(store_addr);
+        aborts_if exists<FungibleStore>(store_addr);
+        aborts_if std::features::spec_is_enabled(std::features::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
+            && exists<fungible_asset::ConcurrentFungibleBalance>(store_addr);
+        ensures result.inner == store_addr;
+        ensures global<object::ObjectCore>(store_addr).owner == owner_addr;
+        ensures !global<object::ObjectCore>(store_addr).allow_ungated_transfer;
+    }
+
+    spec withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64): FungibleAsset {
+        // Partial: the abort conditions of store creation, unburning, the ownership check and a
+        // withdraw hook are not specified.
+        pragma aborts_if_is_partial;
+        let store_addr = spec_primary_store_address(signer::address_of(owner), metadata);
+        let existing = exists<FungibleStore>(store_addr);
+        let store = global<FungibleStore>(store_addr);
+        aborts_if existing && store.frozen;
+        aborts_if existing && fungible_asset::spec_store_no_withdraw_hook(store_addr)
+            && fungible_asset::spec_balance(store_addr) < amount;
+        ensures existing && fungible_asset::spec_store_no_withdraw_hook(store_addr) ==>
+            fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) - amount
+            && result == FungibleAsset { metadata: store.metadata, amount };
+    }
+
+    spec deposit(owner: address, fa: FungibleAsset) {
+        // Partial: the abort conditions of store creation and a deposit hook are not specified.
+        pragma aborts_if_is_partial;
+        let store_addr = spec_primary_store_address(owner, fa.metadata);
+        let existing = exists<FungibleStore>(store_addr);
+        let store = global<FungibleStore>(store_addr);
+        aborts_if existing && store.frozen;
+        aborts_if existing && fungible_asset::spec_store_no_deposit_hook(store_addr)
+            && fa.metadata != store.metadata;
+        ensures existing && fungible_asset::spec_store_no_deposit_hook(store_addr) ==>
+            fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) + fa.amount;
+    }
+
+    /// Both stores exist and the transfer runs without withdraw or deposit hooks.
+    spec fun spec_is_plain_transfer(from: address, to: address): bool {
+        exists<FungibleStore>(from) && exists<FungibleStore>(to)
+            && fungible_asset::spec_store_no_withdraw_hook(from) && fungible_asset::spec_store_no_deposit_hook(to)
+    }
+
+    /// If `plain`, `amount` moves from the store at `from` to the store at `to`; a self-transfer changes nothing.
+    spec schema PlainTransferBalances {
+        from: address;
+        to: address;
+        amount: u64;
+        plain: bool;
+        ensures plain && from != to ==>
+            fungible_asset::spec_balance(from) == old(fungible_asset::spec_balance(from)) - amount
+            && fungible_asset::spec_balance(to) == old(fungible_asset::spec_balance(to)) + amount;
+        ensures plain && from == to ==>
+            fungible_asset::spec_balance(from) == old(fungible_asset::spec_balance(from));
+    }
+
+    /// Moves `amount` between the primary stores of `sender` and `recipient`.
+    spec schema PrimaryTransfer<T> {
+        sender: &signer;
+        metadata: Object<T>;
+        recipient: address;
+        amount: u64;
+        let from = spec_primary_store_address(signer::address_of(sender), metadata);
+        let to = spec_primary_store_address(recipient, metadata);
+        let plain = spec_is_plain_transfer(from, to);
+        aborts_if exists<FungibleStore>(from) && global<FungibleStore>(from).frozen;
+        // A withdraw hook runs before the deposit check and may change the recipient's frozen flag.
+        aborts_if exists<FungibleStore>(from) && exists<FungibleStore>(to)
+            && fungible_asset::spec_store_no_withdraw_hook(from) && global<FungibleStore>(to).frozen;
+        aborts_if plain && fungible_asset::spec_balance(from) < amount;
+        include PlainTransferBalances { from, to, amount, plain };
+    }
+
+    spec transfer<T: key>(sender: &signer, metadata: Object<T>, recipient: address, amount: u64) {
+        // Partial: the abort conditions of store creation, unburning, the ownership check and the
+        // dispatch hooks are not specified.
+        pragma aborts_if_is_partial;
+        include PrimaryTransfer<T>;
+    }
+
+    spec transfer_assert_minimum_deposit<T: key>(
+        sender: &signer,
+        metadata: Object<T>,
+        recipient: address,
+        amount: u64,
+        expected: u64,
+    ) {
+        // Partial: the abort conditions of store creation, unburning, the ownership check and the
+        // dispatch hooks are not specified.
+        pragma aborts_if_is_partial;
+        let from = spec_primary_store_address(signer::address_of(sender), metadata);
+        let to = spec_primary_store_address(recipient, metadata);
+        include PrimaryTransfer<T>;
+        aborts_if spec_is_plain_transfer(from, to) && from != to && amount < expected;
+    }
 }

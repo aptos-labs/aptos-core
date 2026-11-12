@@ -82,7 +82,6 @@ spec aptos_framework::code {
     }
 
     spec publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) {
-        pragma aborts_if_is_partial;
         let addr = signer::address_of(owner);
         modifies global<PackageRegistry>(addr);
         aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
@@ -92,7 +91,6 @@ spec aptos_framework::code {
     }
 
     spec check_upgradability(old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>) {
-        pragma aborts_if_is_partial;
         aborts_if old_pack.upgrade_policy.policy >= upgrade_policy_immutable().policy;
         aborts_if !can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy);
     }
@@ -104,9 +102,18 @@ spec aptos_framework::code {
         ensures [abstract] forall i in 0..len(result): result[i] == pack.modules[i].name;
     }
 
-    spec freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) {
-        pragma aborts_if_is_partial;
+    /// The deserialized package must not use the arbitrary upgrade policy.
+    spec publish_package_to_object(
+        owner: &signer,
+        code_object: &signer,
+        metadata_serialized: vector<u8>,
+        code: vector<vector<u8>>
+    ) {
+        let pack = util::spec_from_bytes<PackageMetadata>(metadata_serialized);
+        aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
+    }
 
+    spec freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) {
         let code_object_addr = code_object.inner;
         aborts_if !exists<object::ObjectCore>(code_object_addr);
         aborts_if !exists<PackageRegistry>(code_object_addr);

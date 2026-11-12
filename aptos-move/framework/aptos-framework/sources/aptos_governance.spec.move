@@ -37,6 +37,7 @@ spec aptos_framework::aptos_governance {
         signer_address: address,
         signer_cap: SignerCapability,
     ) {
+        pragma verify = true;
         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
         aborts_if !system_addresses::is_framework_reserved_address(signer_address);
 
@@ -59,8 +60,8 @@ spec aptos_framework::aptos_governance {
         voting_duration_secs: u64,
     ) {
         use aptos_std::type_info::Self;
-        pragma aborts_if_is_partial;
 
+        pragma verify = true;
         let addr = signer::address_of(aptos_framework);
         let register_account = global<account::Account>(addr);
 
@@ -85,6 +86,7 @@ spec aptos_framework::aptos_governance {
     spec initialize_partial_voting(
         aptos_framework: &signer,
     ) {
+        pragma verify = true;
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if exists<VotingRecordsV2>(@aptos_framework);
@@ -157,14 +159,17 @@ spec aptos_framework::aptos_governance {
     }
 
     spec get_voting_duration_secs(): u64 {
+        pragma verify = true;
         include AbortsIfNotGovernanceConfig;
     }
 
     spec get_min_voting_threshold(): u128 {
+        pragma verify = true;
         include AbortsIfNotGovernanceConfig;
     }
 
     spec get_required_proposer_stake(): u64 {
+        pragma verify = true;
         include AbortsIfNotGovernanceConfig;
     }
 
@@ -173,6 +178,7 @@ spec aptos_framework::aptos_governance {
     }
 
     spec has_entirely_voted(stake_pool: address, proposal_id: u64): bool {
+        pragma verify = true;
         aborts_if !exists<VotingRecords>(@aptos_framework);
     }
 
@@ -484,6 +490,7 @@ spec aptos_framework::aptos_governance {
     spec add_approved_script_hash(proposal_id: u64) {
         use aptos_framework::chain_status;
 
+        pragma verify = true;
         requires chain_status::is_operating();
         include AddApprovedScriptHash;
     }
@@ -491,6 +498,7 @@ spec aptos_framework::aptos_governance {
     spec add_approved_script_hash_script(proposal_id: u64) {
         use aptos_framework::chain_status;
 
+        pragma verify = true;
         requires chain_status::is_operating();
         include AddApprovedScriptHash;
     }
@@ -522,6 +530,7 @@ spec aptos_framework::aptos_governance {
     spec resolve(proposal_id: u64, signer_address: address): signer {
         use aptos_framework::chain_status;
 
+        pragma verify = true;
         requires chain_status::is_operating();
 
         // verify voting::resolve
@@ -557,11 +566,11 @@ spec aptos_framework::aptos_governance {
 
     /// Address @aptos_framework must exist ApprovedExecutionHashes and GovernanceProposal.
     spec remove_approved_hash(proposal_id: u64) {
+        pragma verify = true;
         aborts_if !exists<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         aborts_if !exists<ApprovedExecutionHashes>(@aptos_framework);
         let voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         aborts_if !table::spec_contains(voting_forum.proposals, proposal_id);
-        aborts_if !exists<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
         aborts_if !proposal.is_resolved;
         let post approved_hashes = global<ApprovedExecutionHashes>(@aptos_framework).hashes;
@@ -589,6 +598,7 @@ spec aptos_framework::aptos_governance {
     /// signer must exist in MintCapStore.
     /// Address @aptos_framework must exist GovernanceResponsbility.
     spec get_signer_testnet_only(core_resources: &signer, signer_address: address): signer {
+        pragma verify = true;
         aborts_if signer::address_of(core_resources) != @core_resources;
         aborts_if !exists<aptos_coin::MintCapStore>(signer::address_of(core_resources));
         include GetSignerAbortsIf;
@@ -598,6 +608,7 @@ spec aptos_framework::aptos_governance {
     /// limit addition overflow.
     /// pool_address must exist in StakePool.
     spec get_voting_power(pool_address: address): u64 {
+        pragma verify = true;
         include GetVotingPowerAbortsIf;
 
         let staking_config = global<staking_config::StakingConfig>(@aptos_framework);
@@ -703,6 +714,7 @@ spec aptos_framework::aptos_governance {
     }
 
     spec get_signer(signer_address: address): signer {
+        pragma verify = true;
         include GetSignerAbortsIf;
     }
 
@@ -715,6 +727,7 @@ spec aptos_framework::aptos_governance {
     }
 
     spec create_proposal_metadata(metadata_location: vector<u8>, metadata_hash: vector<u8>): SimpleMap<String, vector<u8>> {
+        pragma verify = true;
         include CreateProposalMetadataAbortsIf;
     }
 
@@ -742,6 +755,7 @@ spec aptos_framework::aptos_governance {
 
     spec resolve_multi_step_proposal(proposal_id: u64, signer_address: address, next_execution_hash: vector<u8>): signer {
         use aptos_framework::chain_status;
+        pragma verify = true;
         requires chain_status::is_operating();
 
         // verify voting::resolve_proposal_v2
@@ -817,10 +831,12 @@ spec aptos_framework::aptos_governance {
     }
 
     spec assert_voting_initialization() {
+        pragma verify = true;
         include VotingInitializationAbortIfs;
     }
 
     spec assert_proposal_expiration(stake_pool: address, proposal_id: u64) {
+        pragma verify = true;
         include VotingInitializationAbortIfs;
         include voting::AbortsIfNotContainProposalID<GovernanceProposal>{voting_forum_address: @aptos_framework};
         let proposal_expiration = voting::spec_get_proposal_expiration_secs<GovernanceProposal>(@aptos_framework, proposal_id);

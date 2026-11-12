@@ -49,10 +49,24 @@ spec aptos_framework::reconfiguration_state {
             type_info::type_name<StateInactive>() == variant.type_name;
     }
 
+    /// Finishing a reconfiguration requires one to be in progress, unless the state is not yet initialized.
+    spec on_reconfig_finish {
+        pragma opaque;
+        modifies global<State>(@aptos_framework);
+        aborts_if exists<State>(@aptos_framework)
+            && copyable_any::type_name(global<State>(@aptos_framework).variant).bytes
+                != b"0x1::reconfiguration_state::StateActive";
+        ensures exists<State>(@aptos_framework) == old(exists<State>(@aptos_framework));
+        ensures exists<State>(@aptos_framework) ==>
+            copyable_any::type_name(global<State>(@aptos_framework).variant).bytes
+                == b"0x1::reconfiguration_state::StateInactive";
+    }
+
     spec on_reconfig_start {
         use aptos_std::from_bcs;
         use aptos_std::type_info;
         use std::bcs;
+        pragma opaque;
         aborts_if false;
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         let state = Any {
@@ -63,6 +77,14 @@ spec aptos_framework::reconfiguration_state {
         };
         let pre_state = global<State>(@aptos_framework);
         let post post_state = global<State>(@aptos_framework);
+        modifies global<State>(@aptos_framework);
+        // An initialized state is active afterwards; an already active one is left alone.
+        ensures exists<State>(@aptos_framework) == old(exists<State>(@aptos_framework));
+        ensures exists<State>(@aptos_framework) ==>
+            copyable_any::type_name(post_state.variant).bytes
+                == b"0x1::reconfiguration_state::StateActive";
+        ensures (old(exists<State>(@aptos_framework)) && copyable_any::type_name(pre_state.variant).bytes
+            == b"0x1::reconfiguration_state::StateActive") ==> post_state == pre_state;
         ensures (exists<State>(@aptos_framework) && copyable_any::type_name(pre_state.variant).bytes
             == b"0x1::reconfiguration_state::StateInactive") ==> copyable_any::type_name(post_state.variant).bytes
             == b"0x1::reconfiguration_state::StateActive";
@@ -73,7 +95,9 @@ spec aptos_framework::reconfiguration_state {
     }
 
     spec start_time_secs(): u64 {
+        pragma opaque;
         include StartTimeSecsAbortsIf;
+        ensures result == spec_start_time_secs();
     }
 
     spec fun spec_start_time_secs(): u64 {
