@@ -98,7 +98,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
             .map_err(|e| invariant_violation(format!("Group read failed: {e}")))?
         {
             Some(value) => decode_group_view(value.bytes()),
-            None => Ok(GroupView::new()),
+            None => Ok(GroupView::default()),
         }
     }
 
@@ -136,7 +136,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
             },
         };
         let view = metadata
-            .view()
+            .current()
             .ok_or_else(|| invariant_violation("The group slot's metadata has no view"))?;
         let tag = member_tag(key.value_ty()).map_err(invariant_violation)?;
         match view.get(&tag) {
@@ -210,10 +210,11 @@ fn deserialize_value(
 
 /// Decodes a stored group's blob into its view.
 fn decode_group_view(blob: &[u8]) -> Result<GroupView, ResourceProviderError> {
-    decode_group_members(blob)?
+    let members = decode_group_members(blob)?
         .into_iter()
         .map(|(tag, bytes)| Ok((tag_bytes(&tag).map_err(invariant_violation)?, bytes)))
-        .collect()
+        .collect::<Result<Vec<_>, ResourceProviderError>>()?;
+    Ok(GroupView::new(members))
 }
 
 fn invariant_violation(msg: impl ToString) -> ResourceProviderError {
@@ -313,7 +314,7 @@ impl<'a, K: Hash + Clone + Eq + Debug + Send + Sync> ParallelReader<'a, K> {
         loop {
             match data.fetch_data_no_record(group_key, 0) {
                 Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata { group: metadata })) => {
-                    return metadata.view().cloned().ok_or_else(|| {
+                    return metadata.current().cloned().ok_or_else(|| {
                         invariant_violation("The stored group's metadata has no view")
                     });
                 },
@@ -421,7 +422,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
     ) -> Result<GroupView, ResourceProviderError> {
         match self.get_pre_block_value(group_key)? {
             Some(blob) => decode_group_view(&blob),
-            None => Ok(GroupView::new()),
+            None => Ok(GroupView::default()),
         }
     }
 }

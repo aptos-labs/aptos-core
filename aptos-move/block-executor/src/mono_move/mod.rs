@@ -36,9 +36,7 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
-use group_chain::{
-    committed_value, group_write, unbuilt_metadata_before, GroupMetadata, GroupView,
-};
+use group_chain::{committed_value, unbuilt_metadata_before, GroupMetadata, GroupView};
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
     production_natives, AptosTransactionExecutor, DiscardReason, TxnOutcome,
@@ -609,7 +607,7 @@ fn build_committed_view(
     prev: &GroupView,
     writer_idx: TxnIndex,
 ) -> Result<Arc<GroupView>, PanicError> {
-    if let Some(view) = metadata.view() {
+    if let Some(view) = metadata.current() {
         return Ok(view.clone());
     }
     let changes = metadata
@@ -815,7 +813,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         if let Some(unsync_map) = unsync_map {
             for (group_key, metadata) in output.group_metadata() {
                 let prev = match unsync_map.fetch_data(group_key) {
-                    Some(MonoValue::GroupMetadata { group }) => group.view().cloned(),
+                    Some(MonoValue::GroupMetadata { group }) => group.current().cloned(),
                     Some(MonoValue::Write { .. } | MonoValue::Deletion) | None => None,
                 }
                 .ok_or_else(|| {
@@ -823,7 +821,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                         "Group {group_key:?} was written before it was read"
                     ))
                 })?;
-                metadata.set_prev(prev)?;
+                metadata.set_before(prev)?;
             }
         }
 
@@ -878,7 +876,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         for (group_key, metadata) in &group_metadata {
             let (prev, view) = match &mode {
                 ViewMode::Sequential { unsync_map, .. } => {
-                    let prev = metadata.prev().cloned().ok_or_else(|| {
+                    let prev = metadata.before().cloned().ok_or_else(|| {
                         code_invariant_error("Sequential group metadata has no previous view")
                     })?;
                     // Sequential execution applied this transaction's writes
@@ -908,7 +906,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             let state_key = group_key
                 .as_state_key()
                 .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))?;
-            group_writes.push((state_key, group_write(!prev.is_empty(), &view)?));
+            group_writes.push((state_key, view.write_op(!prev.is_empty())?));
         }
         partial
             .with_group_writes(group_writes)
