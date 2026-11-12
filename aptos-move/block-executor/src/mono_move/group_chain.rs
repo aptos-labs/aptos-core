@@ -30,7 +30,76 @@ use std::{
 /// A group's members, keyed by the BCS encoding of their tags. Byte order on
 /// the keys is the order BCS writes map entries in, so encoding is a
 /// concatenation.
-pub(crate) type GroupView = BTreeMap<Bytes, Bytes>;
+#[derive(Clone, Default)]
+pub(crate) struct GroupView(BTreeMap<Bytes, Bytes>);
+
+impl GroupView {
+    /// The view of `members`, each a tag's BCS encoding and the member's bytes.
+    pub(crate) fn new(members: impl IntoIterator<Item = (Bytes, Bytes)>) -> Self {
+        Self(members.into_iter().collect())
+    }
+
+    /// The bytes of the member whose tag encodes to `tag`.
+    pub(crate) fn get(&self, tag: &[u8]) -> Option<&Bytes> {
+        self.0.get(tag)
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Each member's tag encoding and bytes, in key order.
+    #[cfg(test)]
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&Bytes, &Bytes)> {
+        self.0.iter()
+    }
+
+    /// This view with `changes` applied, each a member's tag encoding and its
+    /// new bytes, or [`None`] if it was deleted.
+    fn with_changes(&self, changes: impl IntoIterator<Item = (Bytes, Option<Bytes>)>) -> Self {
+        let mut members = self.0.clone();
+        for (tag, bytes) in changes {
+            match bytes {
+                Some(bytes) => members.insert(tag, bytes),
+                None => members.remove(&tag),
+            };
+        }
+        Self(members)
+    }
+
+    /// The write for the group's slot: creation, modification or deletion by
+    /// whether the group existed before and has members now.
+    //
+    // TODO(correctness): ops carry no `StateValueMetadata` (slot deposits,
+    // refunds, creation time); the legacy VM's `WriteOpConverter` fills these.
+    pub(crate) fn write_op(&self, existed: bool) -> Result<WriteOp, PanicError> {
+        Ok(match (existed, self.is_empty()) {
+            (false, false) => WriteOp::legacy_creation(self.encode()),
+            (true, false) => WriteOp::legacy_modification(self.encode()),
+            (true, true) => WriteOp::legacy_deletion(),
+            (false, true) => return Err(code_invariant_error("An empty group emitted a write")),
+        })
+    }
+
+    /// BCS-encodes the group: the member count, then each entry's tag and
+    /// length-prefixed bytes in key order.
+    pub(crate) fn encode(&self) -> Bytes {
+        let len = uleb128_len(self.0.len())
+            + self
+                .0
+                .iter()
+                .map(|(tag, bytes)| tag.len() + uleb128_len(bytes.len()) + bytes.len())
+                .sum::<usize>();
+        let mut out = Vec::with_capacity(len);
+        write_uleb128(&mut out, self.0.len());
+        for (tag, bytes) in &self.0 {
+            out.extend_from_slice(tag);
+            write_uleb128(&mut out, bytes.len());
+            out.extend_from_slice(bytes);
+        }
+        Bytes::from(out)
+    }
+}
 
 /// One entry at a group's slot: the stored group, or one transaction's changes
 /// to it.
@@ -41,11 +110,11 @@ pub struct GroupMetadata<K> {
     changes: Vec<K>,
     /// The group's members after these changes. Set when the stored group is
     /// initialized, and built once for a transaction's entry.
-    view: OnceLock<Arc<GroupView>>,
+    current: OnceLock<Arc<GroupView>>,
     /// The group's members before these changes. Only set in sequential
     /// execution, where this entry replaces the previous one at the group's
     /// slot before it is materialized.
-    prev: OnceLock<Arc<GroupView>>,
+    before: OnceLock<Arc<GroupView>>,
 }
 
 impl<K> GroupMetadata<K> {
@@ -53,8 +122,8 @@ impl<K> GroupMetadata<K> {
     pub(crate) fn from_storage(view: GroupView) -> Self {
         Self {
             changes: vec![],
-            view: OnceLock::from(Arc::new(view)),
-            prev: OnceLock::new(),
+            current: OnceLock::from(Arc::new(view)),
+            before: OnceLock::new(),
         }
     }
 
@@ -62,8 +131,8 @@ impl<K> GroupMetadata<K> {
     pub(crate) fn from_changes(changes: Vec<K>) -> Self {
         Self {
             changes,
-            view: OnceLock::new(),
-            prev: OnceLock::new(),
+            current: OnceLock::new(),
+            before: OnceLock::new(),
         }
     }
 
@@ -72,18 +141,18 @@ impl<K> GroupMetadata<K> {
     }
 
     /// Records the group's members before this entry's changes.
-    pub(crate) fn set_prev(&self, prev: Arc<GroupView>) -> Result<(), PanicError> {
-        self.prev
-            .set(prev)
-            .map_err(|_| code_invariant_error("Group metadata's previous view was set twice"))
+    pub(crate) fn set_before(&self, before: Arc<GroupView>) -> Result<(), PanicError> {
+        self.before
+            .set(before)
+            .map_err(|_| code_invariant_error("Group metadata's before view was set twice"))
     }
 
-    pub(crate) fn prev(&self) -> Option<&Arc<GroupView>> {
-        self.prev.get()
+    pub(crate) fn before(&self) -> Option<&Arc<GroupView>> {
+        self.before.get()
     }
 
-    pub(crate) fn view(&self) -> Option<&Arc<GroupView>> {
-        self.view.get()
+    pub(crate) fn current(&self) -> Option<&Arc<GroupView>> {
+        self.current.get()
     }
 
     /// This entry's view: `prev` with `changes` applied, each a member's key in
@@ -93,16 +162,10 @@ impl<K> GroupMetadata<K> {
         prev: &GroupView,
         changes: impl IntoIterator<Item = (Bytes, Option<Bytes>)>,
     ) -> Arc<GroupView> {
-        let mut view = prev.clone();
-        for (tag, bytes) in changes {
-            match bytes {
-                Some(bytes) => view.insert(tag, bytes),
-                None => view.remove(&tag),
-            };
-        }
+        let view = prev.with_changes(changes);
         // Another worker may have built the same view meanwhile. Whichever
         // landed first stands, and both are equal.
-        self.view.get_or_init(|| Arc::new(view)).clone()
+        self.current.get_or_init(|| Arc::new(view)).clone()
     }
 }
 
@@ -122,7 +185,7 @@ pub(crate) fn unbuilt_metadata_before<K: Hash + Clone + Debug + Eq + Send + Sync
     loop {
         match data.fetch_data_no_record(group_key, idx) {
             Ok(MVDataOutput::Versioned(version, MonoValue::GroupMetadata { group: metadata })) => {
-                if let Some(view) = metadata.view() {
+                if let Some(view) = metadata.current() {
                     unbuilt.reverse();
                     return Ok((view.clone(), unbuilt));
                 }
@@ -173,38 +236,6 @@ pub(crate) fn committed_value<K: Hash + Clone + Debug + Eq + Send + Sync>(
     }
 }
 
-/// The write for a group's slot: creation, modification or deletion by whether
-/// the group existed before and has members after.
-//
-// TODO(correctness): ops carry no `StateValueMetadata` (slot deposits, refunds,
-// creation time); the legacy VM's `WriteOpConverter` fills these.
-pub(crate) fn group_write(existed: bool, view: &GroupView) -> Result<WriteOp, PanicError> {
-    Ok(match (existed, view.is_empty()) {
-        (false, false) => WriteOp::legacy_creation(encode_group(view)),
-        (true, false) => WriteOp::legacy_modification(encode_group(view)),
-        (true, true) => WriteOp::legacy_deletion(),
-        (false, true) => return Err(code_invariant_error("An empty group emitted a write")),
-    })
-}
-
-/// BCS-encodes a group: the member count, then each entry's tag and
-/// length-prefixed bytes in key order.
-pub(crate) fn encode_group(view: &GroupView) -> Bytes {
-    let len = uleb128_len(view.len())
-        + view
-            .iter()
-            .map(|(tag, bytes)| tag.len() + uleb128_len(bytes.len()) + bytes.len())
-            .sum::<usize>();
-    let mut out = Vec::with_capacity(len);
-    write_uleb128(&mut out, view.len());
-    for (tag, bytes) in view {
-        out.extend_from_slice(tag);
-        write_uleb128(&mut out, bytes.len());
-        out.extend_from_slice(bytes);
-    }
-    Bytes::from(out)
-}
-
 fn uleb128_len(mut value: usize) -> usize {
     let mut len = 1;
     while value >= 0x80 {
@@ -235,10 +266,11 @@ mod tests {
             (256, Bytes::from(vec![1, 2])),
             (2, Bytes::new()),
         ]);
-        let view = members
-            .iter()
-            .map(|(tag, bytes)| (Bytes::from(bcs::to_bytes(tag).unwrap()), bytes.clone()))
-            .collect::<GroupView>();
-        assert_eq!(encode_group(&view), bcs::to_bytes(&members).unwrap());
+        let view = GroupView::new(
+            members
+                .iter()
+                .map(|(tag, bytes)| (Bytes::from(bcs::to_bytes(tag).unwrap()), bytes.clone())),
+        );
+        assert_eq!(view.encode(), bcs::to_bytes(&members).unwrap());
     }
 }
