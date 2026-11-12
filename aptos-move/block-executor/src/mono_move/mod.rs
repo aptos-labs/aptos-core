@@ -78,11 +78,14 @@ pub enum MonoValue {
         pin: Arc<dyn ReadPin>,
     },
     Deletion,
-    /// An entry at a resource group's own slot: the stored group, or one
-    /// transaction's changes to it. Group members live under their own keys.
+    /// The value at a resource group's own slot: the group as storage holds
+    /// it, or one transaction's changes to it. The group's members live under
+    /// their own keys.
     //
     // TODO(completeness): add state value metadata here.
-    GroupLink(Arc<GroupLink>),
+    GroupMetadata {
+        group: Arc<GroupLink>,
+    },
 }
 
 // SAFETY: The value stores the pointer to the immutable value in a frozen,
@@ -100,11 +103,11 @@ impl SpeculativeValue for MonoValue {
 
     fn eq_metadata(&self, _other: &Self) -> bool {
         // Block-STM only compares metadata on its resource-group path, which
-        // MonoMove does not use: group members and links are written as plain
-        // data.
+        // MonoMove does not use: group members and metadata are written as
+        // plain data.
         //
-        // TODO(completeness): once group links carry metadata such as the
-        // group's size, it is validated together with resource writes.
+        // TODO(completeness): once group metadata carries the group's size, it
+        // is validated together with resource writes.
         false
     }
 
@@ -114,14 +117,14 @@ impl SpeculativeValue for MonoValue {
             // A heap value's serialized size is unknown until materialization.
             MonoValue::Write { .. } => None,
             MonoValue::Deletion => None,
-            MonoValue::GroupLink(_) => None,
+            MonoValue::GroupMetadata { .. } => None,
         }
     }
 
     fn write_op_kind(&self) -> WriteOpKind {
         match self {
             MonoValue::Write { kind, .. } => kind.clone(),
-            MonoValue::GroupLink(_) => WriteOpKind::Modification,
+            MonoValue::GroupMetadata { .. } => WriteOpKind::Modification,
             MonoValue::Deletion => WriteOpKind::Deletion,
         }
     }
@@ -278,23 +281,6 @@ impl TxnInput for MonoReads {
     }
 }
 
-/// Builds the map value for a write, pinned to the heap it lives in.
-fn written_value(class: WriteClass, pin: &Arc<dyn ReadPin>) -> MonoValue {
-    match class {
-        WriteClass::Creation(ptr) => MonoValue::Write {
-            ptr,
-            kind: WriteOpKind::Creation,
-            pin: pin.clone(),
-        },
-        WriteClass::Modification(ptr) => MonoValue::Write {
-            ptr,
-            kind: WriteOpKind::Modification,
-            pin: pin.clone(),
-        },
-        WriteClass::Deletion => MonoValue::Deletion,
-    }
-}
-
 /// The VM's [`TxnOutcome`] is kept during speculative execution. It is only
 /// converted to storage output representation after commit.
 pub enum MonoTxnOutput {
@@ -305,10 +291,9 @@ pub enum MonoTxnOutput {
         /// Whether this transaction emitted a reconfiguration (new-epoch) event,
         /// after which the block executor skips the remaining transactions.
         skips_rest: bool,
-        /// Writes keyed by their own storage slot. Resource-group members
-        /// are keyed like plain resources, and each group with a written
-        /// member also gets a [`MonoValue::GroupLink`] at its own slot.
-        resource_writes: HashMap<InMemoryStorageKey, MonoValue>,
+        /// One link per resource group this transaction wrote a member of,
+        /// built once so that every caller shares it.
+        group_links: Vec<(InMemoryStorageKey, Arc<GroupLink>)>,
     },
     /// Signals block executor that this transaction has to be skipped and
     /// retried later.
@@ -332,6 +317,15 @@ impl std::fmt::Debug for MonoTxnOutput {
     }
 }
 
+/// Wraps an outcome so the output and the read set can share it.
+//
+// The outcome is neither `Send` nor `Sync`; the output and the read set that
+// share it vouch for that.
+#[allow(clippy::arc_with_non_send_sync)]
+fn shared_outcome(outcome: TxnOutcome) -> Arc<TxnOutcome> {
+    Arc::new(outcome)
+}
+
 /// The frozen effects of a committed, executed transaction, or `None` for a
 /// discard or an empty-effects commit (both write nothing).
 fn committed_effects(outcome: &TxnOutcome) -> Option<&SessionEffects> {
@@ -346,63 +340,48 @@ fn committed_effects(outcome: &TxnOutcome) -> Option<&SessionEffects> {
     }
 }
 
-/// Wraps an outcome so the output and the read set can share it.
-//
-// The outcome is neither `Send` nor `Sync`; the output and the read set that
-// share it vouch for that.
-#[allow(clippy::arc_with_non_send_sync)]
-fn shared_outcome(outcome: TxnOutcome) -> Arc<TxnOutcome> {
-    Arc::new(outcome)
-}
-
 impl MonoTxnOutput {
-    /// Collects the transaction's writes. The block executor reads them back
-    /// several times per commit, so the effects are walked once here.
     fn executed(outcome: Arc<TxnOutcome>, skips_rest: bool) -> Self {
-        let mut resource_writes = HashMap::new();
-
-        if let Some(effects) = committed_effects(&outcome) {
-            let pin: Arc<dyn ReadPin> = effects.frozen_heap();
-            let mut changed_groups: HashMap<_, Vec<_>> = HashMap::new();
-            for (key, class, group) in effects.read_write_set().writes_unordered() {
-                if let Some(group_ty) = group {
-                    changed_groups
-                        .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
-                        .or_default()
-                        .push(key.value_ty());
-                }
-                resource_writes.insert(key.clone(), written_value(class, &pin));
-            }
-            for (group_key, changed) in changed_groups {
-                resource_writes.insert(
-                    group_key,
-                    MonoValue::GroupLink(Arc::new(GroupLink::changed(changed))),
-                );
+        let mut changed_groups: HashMap<_, Vec<_>> = HashMap::new();
+        for (key, _, group) in committed_effects(&outcome)
+            .into_iter()
+            .flat_map(|effects| effects.read_write_set().writes_unordered())
+        {
+            if let Some(group_ty) = group {
+                changed_groups
+                    .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
+                    .or_default()
+                    .push(key.value_ty());
             }
         }
+        let group_links = changed_groups
+            .into_iter()
+            .map(|(group_key, changed)| (group_key, Arc::new(GroupLink::changed(changed))))
+            .collect();
 
         MonoTxnOutput::Executed {
             outcome,
             skips_rest,
-            resource_writes,
+            group_links,
         }
     }
 
-    /// The group links this transaction wrote, keyed by group slot.
-    fn group_links(&self) -> Vec<(InMemoryStorageKey, Arc<GroupLink>)> {
-        let MonoTxnOutput::Executed {
-            resource_writes, ..
-        } = self
-        else {
-            return vec![];
-        };
-        resource_writes
-            .iter()
-            .filter_map(|(key, value)| match value {
-                MonoValue::GroupLink(link) => Some((key.clone(), link.clone())),
-                MonoValue::Write { .. } | MonoValue::Deletion => None,
-            })
-            .collect()
+    /// The frozen effects of a committed, executed transaction, or `None` for a
+    /// discard, an empty-effects commit, or a skip (all write nothing).
+    fn effects(&self) -> Option<&SessionEffects> {
+        match self {
+            MonoTxnOutput::Executed { outcome, .. } => committed_effects(outcome),
+            MonoTxnOutput::SkippedToRetry => None,
+        }
+    }
+
+    /// The links of the resource groups this transaction wrote, keyed by group
+    /// slot.
+    fn group_links(&self) -> &[(InMemoryStorageKey, Arc<GroupLink>)] {
+        match self {
+            MonoTxnOutput::Executed { group_links, .. } => group_links,
+            MonoTxnOutput::SkippedToRetry => &[],
+        }
     }
 }
 
@@ -419,12 +398,37 @@ impl TxnOutput for MonoTxnOutput {
     }
 
     fn resource_write_set(&self) -> HashMap<Self::Key, Self::Value> {
-        match self {
-            MonoTxnOutput::Executed {
-                resource_writes, ..
-            } => resource_writes.clone(),
-            MonoTxnOutput::SkippedToRetry => HashMap::new(),
-        }
+        let Some(effects) = self.effects() else {
+            return HashMap::new();
+        };
+
+        let pin: Arc<dyn ReadPin> = effects.frozen_heap();
+        effects
+            .read_write_set()
+            .writes_unordered()
+            .map(|(key, class, _group)| {
+                let value = match class {
+                    WriteClass::Creation(ptr) => MonoValue::Write {
+                        ptr,
+                        kind: WriteOpKind::Creation,
+                        pin: pin.clone(),
+                    },
+                    WriteClass::Modification(ptr) => MonoValue::Write {
+                        ptr,
+                        kind: WriteOpKind::Modification,
+                        pin: pin.clone(),
+                    },
+                    WriteClass::Deletion => MonoValue::Deletion,
+                };
+                (key.clone(), value)
+            })
+            .chain(self.group_links().iter().map(|(group_key, link)| {
+                let value = MonoValue::GroupMetadata {
+                    group: link.clone(),
+                };
+                (group_key.clone(), value)
+            }))
+            .collect()
     }
 
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
@@ -450,14 +454,16 @@ impl TxnOutput for MonoTxnOutput {
         &self,
         callback: &mut dyn FnMut(&Self::Key) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
-        let MonoTxnOutput::Executed {
-            resource_writes, ..
-        } = self
-        else {
-            return Ok(());
-        };
-        for key in resource_writes.keys() {
+        for key in self.effects().into_iter().flat_map(|effects| {
+            effects
+                .read_write_set()
+                .writes_unordered()
+                .map(|(key, _, _)| key)
+        }) {
             callback(key)?;
+        }
+        for (group_key, _) in self.group_links() {
+            callback(group_key)?;
         }
         Ok(())
     }
@@ -704,8 +710,8 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         // link's view is already built, so this transaction's link keeps it.
         if let Some(unsync_map) = unsync_map {
             for (group_key, link) in output.group_links() {
-                let prev = match unsync_map.fetch_data(&group_key) {
-                    Some(MonoValue::GroupLink(prev)) => prev.built_view().cloned(),
+                let prev = match unsync_map.fetch_data(group_key) {
+                    Some(MonoValue::GroupMetadata { group }) => group.built_view().cloned(),
                     Some(MonoValue::Write { .. } | MonoValue::Deletion) | None => None,
                 }
                 .ok_or_else(|| {
@@ -731,9 +737,12 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         <Self::Output as TxnOutput>::CommittedOutput,
         PanicOr<ResourceGroupSerializationError>,
     > {
-        let links = output.group_links();
-        let outcome = match output {
-            MonoTxnOutput::Executed { outcome, .. } => outcome,
+        let (outcome, links) = match output {
+            MonoTxnOutput::Executed {
+                outcome,
+                group_links,
+                ..
+            } => (outcome, group_links),
             // A skipped output renders to an empty, kept-success transaction.
             MonoTxnOutput::SkippedToRetry => {
                 return Ok(TransactionOutput::new_success_with_write_set(

@@ -144,7 +144,7 @@ fn value_type(value: &MonoValue) -> Result<ValueType, PanicError> {
         MonoValue::Deletion => {
             ValueType::new(None, StateValueMetadata::none(), WriteOpKind::Deletion)
         },
-        MonoValue::GroupLink(_) => {
+        MonoValue::GroupMetadata { .. } => {
             return Err(code_invariant_error("A group link is not a mock write"))
         },
     })
@@ -602,7 +602,9 @@ impl<'a> MockSession<'a> {
             let link = Arc::new(GroupLink::changed(
                 members.keys().map(|tag| tag_type(*tag)).collect(),
             ));
-            versioned_writes.insert(*group_key, MonoValue::GroupLink(link.clone()));
+            versioned_writes.insert(*group_key, MonoValue::GroupMetadata {
+                group: link.clone(),
+            });
             group_writes.insert(*group_key, MockGroupWrite {
                 metadata: metadata.clone(),
                 members,

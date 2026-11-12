@@ -122,7 +122,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
             return storage_read(&value, None);
         }
         let link = match self.unsync_map.fetch_data(group_key) {
-            Some(MonoValue::GroupLink(link)) => link,
+            Some(MonoValue::GroupMetadata { group: link }) => link,
             Some(MonoValue::Write { .. } | MonoValue::Deletion) => {
                 return Err(invariant_violation(
                     "A group slot holds a value that is not a link",
@@ -131,7 +131,9 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
             None => {
                 let link = Arc::new(GroupLink::stored(self.stored_group_view(group_key)?));
                 self.unsync_map
-                    .set_base_value(group_key.clone(), MonoValue::GroupLink(link.clone()));
+                    .set_base_value(group_key.clone(), MonoValue::GroupMetadata {
+                        group: link.clone(),
+                    });
                 link
             },
         };
@@ -217,7 +219,7 @@ fn storage_read(value: &MonoValue, version: Version) -> Result<StorageRead, Reso
         },
         MonoValue::Deletion => StorageRead::DoesNotExist { version },
         // A group's own slot is only read at commit, never by a transaction.
-        MonoValue::GroupLink(_) => {
+        MonoValue::GroupMetadata { .. } => {
             return Err(invariant_violation("A group link served as a read"))
         },
     })
@@ -374,7 +376,7 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
         let data = self.versioned_map.data();
         loop {
             match data.fetch_data_no_record(group_key, 0) {
-                Ok(MVDataOutput::Versioned(_, MonoValue::GroupLink(link))) => {
+                Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata { group: link })) => {
                     return link
                         .built_view()
                         .cloned()
@@ -391,7 +393,9 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
                     // same storage, so whichever link is already there stands.
                     data.set_base_value(
                         group_key.clone(),
-                        MonoValue::GroupLink(Arc::new(link)),
+                        MonoValue::GroupMetadata {
+                            group: Arc::new(link),
+                        },
                         |_, _| {},
                     );
                 },

@@ -152,7 +152,7 @@ impl GroupLink {
                 MonoValue::Deletion => {
                     view.remove(&tag);
                 },
-                MonoValue::GroupLink(_) => {
+                MonoValue::GroupMetadata { .. } => {
                     return Err(code_invariant_error(
                         "A group member's written value is a group link",
                     ))
@@ -179,7 +179,7 @@ pub(crate) fn view_below<K: Hash + Clone + Debug + Eq>(
     let mut idx = txn_idx;
     let mut view = loop {
         match data.fetch_data_no_record(group_key, idx) {
-            Ok(MVDataOutput::Versioned(version, MonoValue::GroupLink(link))) => {
+            Ok(MVDataOutput::Versioned(version, MonoValue::GroupMetadata { group: link })) => {
                 if let Some(view) = link.built_view() {
                     break view.clone();
                 }
