@@ -1054,6 +1054,9 @@ impl<'guard> InterpreterContext<'guard> {
         // SAFETY: every read-write-set entry holds initialized values of the
         // type at its key, and no rollback can follow the session's end.
         unsafe { read_write_set.drop_unchanged_writes(guard) }?;
+        // TODO(perf): the undo journal and checkpoints are dead from here on,
+        // but the read-write set keeps them for as long as the effects live,
+        // which Block-STM extends to the end of the block. Clear them here.
 
         // TODO(perf): the evacuated region is never returned to the pool. It
         // outlives the session inside an `Arc<FrozenHeap>`, so returning it

@@ -20,11 +20,10 @@ use mono_move_core::{
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::SegmentedArena;
-use move_core_types::language_storage::StructTag;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::sync::Arc;
 
-type MonoUnsyncMap = UnsyncMap<InMemoryStorageKey, StructTag, MonoValue, DelayedFieldID>;
+type MonoUnsyncMap = UnsyncMap<InMemoryStorageKey, (), MonoValue, DelayedFieldID>;
 
 /// Provides access to resources and resource groups.
 pub(crate) struct BlockSTMSequentialProvider<'a, 'ctx, S> {

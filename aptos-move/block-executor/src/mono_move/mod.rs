@@ -35,7 +35,7 @@ use mono_move_aptos_transaction_executor::{
 use mono_move_core::storage::resource_provider::{InMemoryStorageKey, ReadPin, ResourceProvider};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_runtime::{SegmentedArena, SessionEffects, WriteClass};
-use move_core_types::language_storage::{ModuleId, StructTag};
+use move_core_types::language_storage::ModuleId;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -52,7 +52,7 @@ use provider::{BlockSTMParallelProvider, BlockSTMSequentialProvider};
 /// and tag types.
 #[cfg(test)]
 pub(crate) use provider::{ParallelReader, StorageBase};
-pub use reads::MonoReads;
+pub use reads::{MonoReads, ReadSet, SessionReads};
 
 /// An in-memory write produced by MonoMove transaction execution. This write
 /// can be later converted to storage format if needed.
@@ -167,7 +167,7 @@ impl std::fmt::Debug for MonoTxnOutput {
 /// discard or an empty-effects commit (both write nothing).
 fn committed_effects(outcome: &TxnOutcome) -> Option<&SessionEffects> {
     match outcome {
-        TxnOutcome::Executed { effects, .. } => Some(effects),
+        TxnOutcome::Executed { effects, .. } => Some(effects.as_ref()),
         TxnOutcome::Discarded { .. } => None,
         TxnOutcome::ExecutedNoEffects(_) => None,
         // TODO(correctness): Revisit this arm: unexpected system txn errors
@@ -231,9 +231,8 @@ impl MonoTxnOutput {
 impl TxnOutput for MonoTxnOutput {
     type CommittedOutput = TransactionOutput;
     type Key = InMemoryStorageKey;
-    // TODO(perf): can use InternedType here, but current trait requires ordering
-    // and serialize.
-    type Tag = StructTag;
+    // Group members are versioned as plain resources, so there are no tags.
+    type Tag = ();
     type Txn = SignatureVerifiedTransaction;
     type Value = MonoValue;
 
@@ -437,10 +436,10 @@ impl MonoTransactionExecutor {
 
 impl SingleTransactionExecutor for MonoTransactionExecutor {
     type AuxiliaryInfo = AuxiliaryInfo;
-    type Input = MonoReads<InMemoryStorageKey, StructTag>;
+    type Input = MonoReads;
     type Key = InMemoryStorageKey;
     type Output = MonoTxnOutput;
-    type Tag = StructTag;
+    type Tag = ();
     type Txn = SignatureVerifiedTransaction;
     type Value = MonoValue;
 
@@ -514,8 +513,8 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     ));
                 }
                 let (outcome, skips_rest) = result?;
-                let reads = match outcome.read_write_set() {
-                    Some(rws) => MonoReads::from_read_write_set(rws, incarnation),
+                let reads = match outcome.effects() {
+                    Some(effects) => MonoReads::new(SessionReads(effects.clone()), incarnation),
                     None => MonoReads::empty(Some(incarnation)),
                 };
                 (outcome, skips_rest, reads, None)

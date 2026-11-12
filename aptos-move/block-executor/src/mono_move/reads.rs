@@ -3,9 +3,9 @@
 
 //! MonoMove's Block-STM read set.
 //!
-//! MonoMove records its reads inside the VM, in the transaction's
-//! [`ResourceReadWriteSet`], so this type is built once at the end of execution
-//! rather than being filled in as the reads happen.
+//! MonoMove records its reads inside the VM, in the session's
+//! [`ResourceReadWriteSet`](mono_move_runtime::ResourceReadWriteSet). The read
+//! set validates straight from it, so the reads keep the values they observed.
 
 use crate::{
     captured_reads::TxnInput, code_cache_global::GlobalModuleCache, mono_move::MonoValue,
@@ -21,77 +21,74 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{error::PanicError, vm::modules::AptosModuleExtension};
 use mono_move_core::storage::resource_provider::{InMemoryStorageKey, Version};
-use mono_move_runtime::ResourceReadWriteSet;
+use mono_move_runtime::SessionEffects;
 use move_binary_format::CompiledModule;
-use move_core_types::language_storage::{ModuleId, StructTag};
+use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::Module;
 use move_vm_types::{code::SyncModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
-use serde::Serialize;
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashSet},
     fmt::Debug,
     hash::Hash,
-    marker::PhantomData,
+    sync::Arc,
 };
 
-/// The versions a MonoMove transaction observed. Resource-group members are
-/// read under their own keys, like any other resource, so `T` only names the
-/// tag type Block-STM's group interface expects.
-pub struct MonoReads<K, T> {
-    data_reads: HashMap<K, Version>,
+/// The keys a transaction read, each with the version it observed.
+pub trait ReadSet: Send + Sync {
+    type Key: Send + Sync + Clone + Hash + Eq + Debug + 'static;
+
+    fn reads(&self) -> impl Iterator<Item = (&Self::Key, Version)>;
+}
+
+/// The reads of a finished MonoMove session.
+pub struct SessionReads(pub(crate) Arc<SessionEffects>);
+
+// SAFETY: the effects only point into frozen heaps, which are never mutated
+// again and which the effects and their reads pin. Their keys hold interned
+// types from the global arena, which outlives the block.
+unsafe impl Send for SessionReads {}
+unsafe impl Sync for SessionReads {}
+
+impl ReadSet for SessionReads {
+    type Key = InMemoryStorageKey;
+
+    fn reads(&self) -> impl Iterator<Item = (&InMemoryStorageKey, Version)> {
+        self.0
+            .read_write_set()
+            .reads_unordered()
+            .map(|(key, version, _group)| (key, version))
+    }
+}
+
+/// A MonoMove transaction's read set, as Block-STM validates it.
+pub struct MonoReads<R = SessionReads> {
+    /// [`None`] for a transaction whose reads were never collected: sequential
+    /// execution, or a parallel execution that has nothing left to commit.
+    reads: Option<R>,
     /// The incarnation these reads were captured at, for BlockSTMv2. [`None`]
     /// only under sequential execution, which does not validate.
     incarnation: Option<Incarnation>,
     /// Set when the transaction is known not to be committable regardless of
     /// what it read. Fails validation unconditionally.
     speculative_failure: bool,
-    _tag: PhantomData<T>,
 }
 
-impl<K, T> Default for MonoReads<K, T> {
-    fn default() -> Self {
+impl<R> MonoReads<R> {
+    pub(crate) fn new(reads: R, incarnation: Incarnation) -> Self {
         Self {
-            data_reads: HashMap::new(),
-            incarnation: None,
+            reads: Some(reads),
+            incarnation: Some(incarnation),
             speculative_failure: false,
-            _tag: PhantomData,
         }
     }
-}
 
-impl<K, T> MonoReads<K, T> {
-    /// A read set that validates trivially, for a transaction whose reads were
-    /// never collected: sequential execution, or a parallel execution that has
-    /// nothing left to commit.
+    /// A read set that validates trivially.
     pub(crate) fn empty(incarnation: Option<Incarnation>) -> Self {
         Self {
+            reads: None,
             incarnation,
-            ..Default::default()
+            speculative_failure: false,
         }
-    }
-}
-
-impl<K: Eq + Hash, T> MonoReads<K, T> {
-    /// Records a read of a value in its own storage slot.
-    pub(crate) fn record_data_read(&mut self, key: K, version: Version) {
-        self.data_reads.insert(key, version);
-    }
-}
-
-impl MonoReads<InMemoryStorageKey, StructTag> {
-    /// Collects the versions a finished transaction observed.
-    pub(crate) fn from_read_write_set(
-        rws: &ResourceReadWriteSet,
-        incarnation: Incarnation,
-    ) -> Self {
-        let mut reads = Self {
-            incarnation: Some(incarnation),
-            ..Default::default()
-        };
-        for (key, version, _group) in rws.reads_unordered() {
-            reads.record_data_read(key.clone(), version);
-        }
-        reads
     }
 }
 
@@ -105,13 +102,11 @@ fn version_matches(recorded: Version, observed: MVVersion) -> bool {
     }
 }
 
-impl<K, T> TxnInput for MonoReads<K, T>
-where
-    K: Send + Sync + Clone + Hash + Eq + Debug + 'static,
-    T: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + Serialize + 'static,
-{
-    type Key = K;
-    type Tag = T;
+impl<R: ReadSet> TxnInput for MonoReads<R> {
+    type Key = R::Key;
+    // MonoMove versions group members as plain resources, so Block-STM's group
+    // tags are never used.
+    type Tag = ();
     type Value = MonoValue;
 
     fn validate_data_reads(
@@ -122,9 +117,12 @@ where
         if self.speculative_failure {
             return false;
         }
-        self.data_reads.iter().all(|(key, recorded)| {
+        let Some(reads) = &self.reads else {
+            return true;
+        };
+        reads.reads().all(|(key, recorded)| {
             match data_map.fetch_data_no_record(key, idx_to_validate) {
-                Ok(MVDataOutput::Versioned(observed, _)) => version_matches(*recorded, observed),
+                Ok(MVDataOutput::Versioned(observed, _)) => version_matches(recorded, observed),
                 // A base value this transaction provisioned cannot disappear, so
                 // this only happens if the entry was never there. Either way the
                 // recorded version is no longer backed by the map.
@@ -206,8 +204,8 @@ mod tests {
     fn speculative_failure_fails_validation() {
         // BlockSTMv1 marks a doomed transaction this way and then relies on
         // validation to fail so the transaction re-executes.
-        let map = MVHashMap::<u32, u32, MonoValue, DelayedFieldID>::new();
-        let mut reads = MonoReads::<u32, u32>::empty(Some(0));
+        let map = MVHashMap::<InMemoryStorageKey, (), MonoValue, DelayedFieldID>::new();
+        let mut reads = MonoReads::<SessionReads>::empty(Some(0));
         assert!(reads.validate_data_reads(map.data(), 0));
         assert!(reads.validate_group_reads(map.group_data(), 0));
 

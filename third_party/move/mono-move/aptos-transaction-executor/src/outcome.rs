@@ -14,7 +14,8 @@ use aptos_types::{
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
 };
 use mono_move_core::{value_layout::LayoutProvider, VMInternalError, VMResult};
-use mono_move_runtime::{ResourceReadWriteSet, SessionEffects};
+use mono_move_runtime::SessionEffects;
+use std::sync::Arc;
 
 /// The outcome of one transaction, not yet materialized into a write set.
 /// Intended to be consumed by the block coordinator for efficient handling.
@@ -24,7 +25,7 @@ pub enum TxnOutcome {
     Discarded {
         reason: DiscardReason,
         /// `None` when the transaction was rejected before a session existed.
-        effects: Option<SessionEffects>,
+        effects: Option<Arc<SessionEffects>>,
     },
     /// A system transaction failed unexpectedly: there is no per-transaction
     /// output, and the whole block must be aborted.
@@ -46,7 +47,7 @@ pub enum TxnOutcome {
     Executed {
         status: ExecutionStatus,
         fee_statement: FeeStatement,
-        effects: SessionEffects,
+        effects: Arc<SessionEffects>,
     },
 }
 
@@ -55,15 +56,14 @@ impl TxnOutcome {
         matches!(self, TxnOutcome::Discarded { .. })
     }
 
-    /// The global storage the transaction touched, present whenever it opened a
+    /// The session's effects, present whenever the transaction opened a
     /// session. Only [`Self::Executed`] turns its writes into output; every
-    /// other variant keeps this solely so its reads can be validated.
-    pub fn read_write_set(&self) -> Option<&ResourceReadWriteSet> {
+    /// other variant keeps them solely so its reads can be validated. Shared,
+    /// so a block coordinator can keep the reads after the outcome is consumed.
+    pub fn effects(&self) -> Option<&Arc<SessionEffects>> {
         match self {
-            TxnOutcome::Executed { effects, .. } => Some(effects.read_write_set()),
-            TxnOutcome::Discarded { effects, .. } => {
-                effects.as_ref().map(SessionEffects::read_write_set)
-            },
+            TxnOutcome::Executed { effects, .. } => Some(effects),
+            TxnOutcome::Discarded { effects, .. } => effects.as_ref(),
             // Nothing to commit or to validate.
             TxnOutcome::ExecutedNoEffects(_) => None,
             // The block is aborted, so there is nothing left to validate.
@@ -143,4 +143,13 @@ impl TxnOutcome {
             },
         }
     }
+}
+
+/// Wraps a finished session's effects so they can be shared.
+//
+// The effects hold raw pointers into frozen heaps and are not `Send` or `Sync`.
+// A block coordinator that shares them across threads vouches for that itself.
+#[allow(clippy::arc_with_non_send_sync)]
+pub(crate) fn shared(effects: SessionEffects) -> Arc<SessionEffects> {
+    Arc::new(effects)
 }

@@ -35,7 +35,6 @@ use mono_move_runtime::SegmentedArena;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 pub(crate) use parallel::BlockSTMParallelProvider;
 pub(crate) use sequential::BlockSTMSequentialProvider;
-use serde::Serialize;
 use std::{cell::Cell, fmt::Debug, hash::Hash, sync::Arc};
 
 /// Materializes a stored blob into the in-memory value for a slot of type `ty`.
@@ -90,7 +89,7 @@ pub(crate) fn invariant_violation(msg: impl ToString) -> ResourceProviderError {
 /// Pre-block state, served by whichever provider owns the connection to it.
 /// The speculative read loops call back into this when the multi-version map
 /// has nothing at a slot yet.
-pub(crate) trait StorageBase<K, T> {
+pub(crate) trait StorageBase<K> {
     /// The value stored at `key` before the block, already materialized, or
     /// [`None`] if the slot is empty.
     fn resource(&self, key: &K) -> Result<Option<MonoValue>, ResourceProviderError>;
@@ -106,8 +105,8 @@ pub(crate) trait StorageBase<K, T> {
 
 /// Reads the multi-version map on behalf of one incarnation of one transaction,
 /// waiting out the dependencies it runs into.
-pub(crate) struct ParallelReader<'a, K, T> {
-    versioned_map: &'a MVHashMap<K, T, MonoValue, DelayedFieldID>,
+pub(crate) struct ParallelReader<'a, K> {
+    versioned_map: &'a MVHashMap<K, (), MonoValue, DelayedFieldID>,
     scheduler: SchedulerWrapper<'a>,
     txn_idx: TxnIndex,
     incarnation: Incarnation,
@@ -116,13 +115,9 @@ pub(crate) struct ParallelReader<'a, K, T> {
     speculative_failure: Cell<bool>,
 }
 
-impl<'a, K, T> ParallelReader<'a, K, T>
-where
-    K: Hash + Clone + Eq + Debug,
-    T: Hash + Clone + Eq + Debug + Serialize,
-{
+impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
     pub(crate) fn new(
-        versioned_map: &'a MVHashMap<K, T, MonoValue, DelayedFieldID>,
+        versioned_map: &'a MVHashMap<K, (), MonoValue, DelayedFieldID>,
         scheduler: SchedulerWrapper<'a>,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
@@ -163,7 +158,7 @@ where
     /// value first if this is the block's first read of it.
     pub(crate) fn read_resource(
         &self,
-        base: &dyn StorageBase<K, T>,
+        base: &dyn StorageBase<K>,
         key: &K,
     ) -> Result<StorageRead, ResourceProviderError> {
         self.read_data(key, || {
@@ -176,7 +171,7 @@ where
     /// locate its pre-block value in the stored group.
     pub(crate) fn read_group_member(
         &self,
-        base: &dyn StorageBase<K, T>,
+        base: &dyn StorageBase<K>,
         key: &K,
         group_key: &K,
         tag: impl Fn() -> Result<Bytes, ResourceProviderError>,
@@ -224,7 +219,7 @@ where
     /// its base entry, never a transaction's link, so this records nothing.
     fn stored_group_view(
         &self,
-        base: &dyn StorageBase<K, T>,
+        base: &dyn StorageBase<K>,
         group_key: &K,
     ) -> Result<Arc<GroupView>, ResourceProviderError> {
         let data = self.versioned_map.data();
