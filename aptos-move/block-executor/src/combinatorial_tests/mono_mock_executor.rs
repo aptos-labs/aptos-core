@@ -21,9 +21,7 @@ use crate::{
     errors::ResourceGroupSerializationError,
     executor_utilities::Materializer,
     mono_move::{
-        group_chain::{
-            committed_value, encode_group, unbuilt_metadata_before, GroupMetadata, GroupView,
-        },
+        group_chain::{committed_value, unbuilt_metadata_before, GroupMetadata, GroupView},
         version_matches, MonoValue, ParallelReader,
     },
     single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
@@ -187,7 +185,7 @@ fn build_committed_view(
     prev: &GroupView,
     writer_idx: TxnIndex,
 ) -> Result<Arc<GroupView>, PanicError> {
-    if let Some(view) = metadata.view() {
+    if let Some(view) = metadata.current() {
         return Ok(view.clone());
     }
     let changes = metadata
@@ -513,15 +511,16 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
         group_key: &KeyType<[u8; 32]>,
     ) -> Result<GroupView, ResourceProviderError> {
         let Some(value) = self.get_pre_block_value(group_key)? else {
-            return Ok(GroupView::new());
+            return Ok(GroupView::default());
         };
         let members: BTreeMap<u32, Bytes> = bcs::from_bytes(value.bytes()).map_err(|e| {
             ResourceProviderError::InvariantViolation(format!("Stored group failed to decode: {e}"))
         })?;
-        Ok(members
-            .into_iter()
-            .map(|(tag, bytes)| (tag_bytes(tag), bytes))
-            .collect())
+        Ok(GroupView::new(
+            members
+                .into_iter()
+                .map(|(tag, bytes)| (tag_bytes(tag), bytes)),
+        ))
     }
 
     /// Serves a read from the cache, or through `read` on the first one.
@@ -717,7 +716,7 @@ impl MonoMockExecutor {
                 patched.insert(
                     *group_key,
                     ValueType::new(
-                        Some(encode_group(&view)),
+                        Some(view.encode()),
                         metadata.clone(),
                         WriteOpKind::Modification,
                     ),
