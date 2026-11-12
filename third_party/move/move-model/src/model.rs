@@ -18,10 +18,11 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, Exp, ExpData,
-        FrameSpec, FriendDecl, FunParamAccessOf, GlobalInvariant, LemmaDecl, LemmaId, MemoryLabel,
-        ModuleName, Operation, PropertyBag, PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo,
-        SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value, VisitorPosition,
+        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, Condition,
+        ConditionKind, Exp, ExpData, FrameSpec, FriendDecl, FunParamAccessOf, GlobalInvariant,
+        LemmaDecl, LemmaId, MemoryLabel, ModuleName, Operation, PropertyBag, PropertyValue,
+        ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl,
+        Value, VisitorPosition,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -100,6 +101,29 @@ pub const SCRIPT_BYTECODE_FUN_NAME: &str = "<SELF>";
 
 /// A prefix used for structs which are backing specification ("ghost") memory.
 pub const GHOST_MEMORY_PREFIX: &str = "Ghost$";
+
+/// Name of the synthetic memory standing for state outside a verification root.
+pub const WORLD_MEMORY_NAME: &str = "World$";
+
+/// Environment extension holding the world memory (see `GlobalEnv::add_world_memory`).
+pub struct WorldMemory {
+    pub qid: QualifiedId<StructId>,
+}
+
+/// Environment extension holding the behavioral predicates of function specifications whose
+/// target is a parameter of the specified function without a `*` frame (see
+/// `GlobalEnv::behavior_reaches_world`).
+struct ParamFramedBehaviors(BTreeSet<NodeId>);
+
+/// Environment extension caching, per module, the structs `GlobalEnv::existence_is_monotone`
+/// holds for.
+#[derive(Default)]
+struct MonotoneExistence(RefCell<BTreeMap<ModuleId, BTreeSet<StructId>>>);
+
+/// Environment extension caching, per spec variable, its updaters unknown code can reach
+/// (`GlobalEnv::ghost_updaters_reachable_by_unknown_code`); `None` when unknown.
+#[allow(clippy::type_complexity)]
+struct UnknownCodeGhosts(Option<BTreeMap<QualifiedId<StructId>, BTreeSet<QualifiedId<FunId>>>>);
 
 /// A marker in the source-map name of a local which identifies it as compiler-generated.
 pub const TEMPORARY_LOCAL_MARKER: &str = "tmp#$";
@@ -2337,6 +2361,454 @@ impl GlobalEnv {
         }
     }
 
+    /// The memory standing for all state outside the translated memory of a verification
+    /// root, if it was created (see `add_world_memory`). The Boogie backend reads a snapshot,
+    /// havoc or memory parameter of it as one of every memory it translates, itself included.
+    pub fn world_memory(&self) -> Option<QualifiedInstId<StructId>> {
+        self.get_extension::<WorldMemory>()
+            .map(|w| w.qid.instantiate(vec![]))
+    }
+
+    /// Whether `mem` is the world memory.
+    pub fn is_world_memory(&self, mem: &QualifiedId<StructId>) -> bool {
+        self.get_extension::<WorldMemory>()
+            .is_some_and(|w| w.qid == *mem)
+    }
+
+    /// Whether code unknown code can run may update spec variable `mem` (a ghost memory): some
+    /// function it can reach updates it in a specification. Unknown code enters the non-private
+    /// functions, closure targets and inline functions (whose updates land in their callers),
+    /// and reaches what they use. Conservatively true for every spec variable when a reached
+    /// function has no call information.
+    pub fn ghost_updatable_by_unknown_code(&self, mem: &QualifiedId<StructId>) -> bool {
+        self.ghost_updaters_reachable_by_unknown_code(mem)
+            .is_none_or(|updaters| !updaters.is_empty())
+    }
+
+    /// The functions unknown code can reach that update spec variable `mem` (see
+    /// `ghost_updatable_by_unknown_code`); `None` when a reached function has no call
+    /// information.
+    pub fn ghost_updaters_reachable_by_unknown_code(
+        &self,
+        mem: &QualifiedId<StructId>,
+    ) -> Option<BTreeSet<QualifiedId<FunId>>> {
+        if !self.has_extension::<UnknownCodeGhosts>() {
+            self.set_extension(UnknownCodeGhosts(self.unknown_code_ghosts()));
+        }
+        self.get_extension::<UnknownCodeGhosts>()
+            .expect("extension set above")
+            .0
+            .as_ref()
+            .map(|ghosts| ghosts.get(mem).cloned().unwrap_or_default())
+    }
+
+    /// Whether `fun`, or a function it calls directly or indirectly, updates spec variable `mem`
+    /// in a specification. Conservatively true without call information.
+    pub fn may_update_ghost_statically(
+        &self,
+        fun: QualifiedId<FunId>,
+        mem: &QualifiedId<StructId>,
+    ) -> bool {
+        let mut todo = vec![fun];
+        let mut reached = BTreeSet::new();
+        while let Some(qid) = todo.pop() {
+            if !reached.insert(qid) {
+                continue;
+            }
+            let fun = self.get_function(qid);
+            let spec = fun.get_spec();
+            let updates = spec
+                .conditions
+                .iter()
+                .chain(spec.on_impl.values().flat_map(|s| s.conditions.iter()))
+                .any(|cond| {
+                    cond.kind == ConditionKind::Update
+                        && cond
+                            .additional_exps
+                            .first()
+                            .and_then(|exp| exp.extract_ghost_mem_access(self))
+                            .is_some_and(|(m, _, _)| m.to_qualified_id() == *mem)
+                });
+            drop(spec);
+            if updates {
+                return true;
+            }
+            match fun.get_called_functions() {
+                Some(called) => todo.extend(called.iter().copied()),
+                None if fun.is_native() => {},
+                None => return true,
+            }
+        }
+        false
+    }
+
+    /// Per spec variable, its updaters unknown code can reach; `None` when unknown.
+    fn unknown_code_ghosts(
+        &self,
+    ) -> Option<BTreeMap<QualifiedId<StructId>, BTreeSet<QualifiedId<FunId>>>> {
+        let mut todo = vec![];
+        for module in self.get_modules() {
+            for fun in module.get_functions() {
+                if fun.visibility() != Visibility::Private || fun.is_inline() {
+                    todo.push(fun.get_qualified_id());
+                }
+                // Every closure target escapes to whoever receives the value, whether or not the
+                // packing function also calls it; without a body, every function it uses. Uses
+                // that are not calls (closures of the compiled code) count too.
+                if let (Some(used), Some(called)) =
+                    (fun.get_used_functions(), fun.get_called_functions())
+                {
+                    todo.extend(used.difference(called).copied());
+                }
+                match fun.get_def() {
+                    Some(def) => def.visit_pre_order(&mut |e| {
+                        if let ExpData::Call(_, Operation::Closure(mid, fid, _), _) = e {
+                            todo.push(mid.qualified(*fid));
+                        }
+                        true
+                    }),
+                    None => match fun.get_used_functions() {
+                        Some(used) => todo.extend(used.iter().copied()),
+                        None if fun.is_native() => {},
+                        None => return None,
+                    },
+                }
+            }
+        }
+        let mut reached = BTreeSet::new();
+        let mut ghosts: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+        while let Some(qid) = todo.pop() {
+            if !reached.insert(qid) {
+                continue;
+            }
+            let fun = self.get_function(qid);
+            if fun.is_lemma() {
+                continue;
+            }
+            let spec = fun.get_spec();
+            let conditions = spec
+                .conditions
+                .iter()
+                .chain(spec.on_impl.values().flat_map(|s| s.conditions.iter()));
+            let mut updates: Vec<Condition> = conditions.cloned().collect();
+            drop(spec);
+            // An inline function's body specs land in its callers' `on_impl` only once it is
+            // inlined; unknown code may inline it, so read them from its definition.
+            if fun.is_inline() {
+                let Some(def) = fun.get_def() else {
+                    return None;
+                };
+                def.visit_pre_order(&mut |e| {
+                    if let ExpData::SpecBlock(_, block) = e {
+                        updates.extend(block.conditions.iter().cloned());
+                    }
+                    true
+                });
+            }
+            for cond in &updates {
+                if cond.kind == ConditionKind::Update {
+                    if let Some((mem, _, _)) = cond
+                        .additional_exps
+                        .first()
+                        .and_then(|exp| exp.extract_ghost_mem_access(self))
+                    {
+                        ghosts.entry(mem.to_qualified_id()).or_default().insert(qid);
+                    }
+                }
+            }
+            match fun.get_used_functions() {
+                Some(used) => todo.extend(used.iter().copied()),
+                None if fun.is_native() => {},
+                None => return None,
+            }
+        }
+        Some(ghosts)
+    }
+
+    /// Whether a resource of struct `mem`, once it exists at an address, exists there forever,
+    /// whatever code runs: its module contains no `move_from` of it (in any instantiation) and
+    /// declares no native function. Only the defining module can remove a resource (the
+    /// bytecode verifier rejects `move_from` of another module's struct, and an inline
+    /// function is checked after inlining into its caller), so a scan of that module's own
+    /// bytecode covers every friend, package and public function another module could call to
+    /// remove it. A native of the module may access its storage without that check
+    /// (`storage_slot`), so any native disqualifies the module. False without compiled code,
+    /// for spec variables and for the world memory. Cached per module.
+    pub fn existence_is_monotone(&self, mem: &QualifiedId<StructId>) -> bool {
+        if self.is_world_memory(mem) || self.get_struct_qid(*mem).is_ghost_memory() {
+            return false;
+        }
+        if !self.has_extension::<MonotoneExistence>() {
+            self.set_extension(MonotoneExistence::default());
+        }
+        let cache = self
+            .get_extension::<MonotoneExistence>()
+            .expect("extension set above");
+        if let Some(structs) = cache.0.borrow().get(&mem.module_id) {
+            return structs.contains(&mem.id);
+        }
+        let structs = self.get_module(mem.module_id).never_removed_structs();
+        let result = structs.contains(&mem.id);
+        cache.0.borrow_mut().insert(mem.module_id, structs);
+        result
+    }
+
+    /// Whether a value of function type `ty` of unknown origin may touch any memory: any
+    /// function type does, once the program has a world memory. A function value can sit
+    /// behind a container, a type argument, a function signature or another function value's
+    /// result, none of which can declare a frame, so no set of declared types bounds the types
+    /// an unknown value may have. Its behavioral predicates are then functions of every memory,
+    /// the world memory included.
+    pub fn fun_type_reaches_world(&self, ty: &Type) -> bool {
+        self.has_extension::<WorldMemory>() && ty.skip_reference().is_function()
+    }
+
+    /// Whether the behavioral predicate `id` is over a parameter of the specified function
+    /// whose frame is not `*`: it ranges over that frame only, whatever memory the evaluator of
+    /// its function type takes.
+    pub fn behavior_is_param_framed(&self, id: NodeId) -> bool {
+        self.get_extension::<ParamFramedBehaviors>()
+            .is_some_and(|framed| framed.0.contains(&id))
+    }
+
+    /// Whether the behavioral predicate `id`, over the function value `target`, ranges over the
+    /// world memory. Over a parameter of the specified function, only the parameter's own frame
+    /// decides: a `*` frame does (its type is a reaching type); a declared frame does not, nor does
+    /// an undeclared one, whose frame the call site supplies by havocing the argument's footprint.
+    /// Any other value goes by its type (`fun_type_reaches_world`).
+    pub fn behavior_reaches_world(&self, id: NodeId, target: &ExpData) -> bool {
+        !self
+            .get_extension::<ParamFramedBehaviors>()
+            .is_some_and(|framed| framed.0.contains(&id))
+            && self.fun_type_reaches_world(&self.get_node_type(target.node_id()))
+    }
+
+    /// The behavioral predicates in function specifications whose target is a parameter of the
+    /// specified function without a `*` frame.
+    fn param_framed_behaviors(&self) -> BTreeSet<NodeId> {
+        let mut result = BTreeSet::new();
+        for module_env in self.get_modules() {
+            for fun_env in module_env.get_functions() {
+                let params = fun_env.get_parameters();
+                let star = |param: Symbol| {
+                    fun_env.get_fun_param_access_of().iter().any(|a| {
+                        a.fun_param == param
+                            && (a.frame_spec.modifies_all || a.frame_spec.reads_all)
+                    })
+                };
+                for cond in &fun_env.get_spec().conditions {
+                    for exp in cond.all_exps() {
+                        exp.visit_pre_order(&mut |e| {
+                            if let ExpData::Call(id, Operation::Behavior(..), args) = e {
+                                if let Some(ExpData::Temporary(_, idx)) =
+                                    args.first().map(|a| a.as_ref())
+                                {
+                                    if params.get(*idx).is_some_and(|p| !star(p.0)) {
+                                        result.insert(*id);
+                                    }
+                                }
+                            }
+                            true
+                        });
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    /// Creates the world memory when some function value may touch state no verification
+    /// root translates: the program has a function-typed field, a function value in a
+    /// function signature, or a function type in the type of an expression of a function body
+    /// or in a type argument there (a generic field instantiated with a function type). See
+    /// `add_world_memory`.
+    pub fn add_world_memory_if_needed(&mut self) {
+        let mut has_fun_values = false;
+        for module_env in self.get_modules() {
+            for struct_env in module_env.get_structs() {
+                for field in struct_env.get_fields() {
+                    has_fun_values |=
+                        contains_fun_type(self, &field.get_type(), &mut BTreeSet::new());
+                }
+            }
+            for fun_env in module_env.get_functions() {
+                for Parameter(_, ty, _) in fun_env.get_parameters() {
+                    has_fun_values |= contains_fun_type(self, &ty, &mut BTreeSet::new());
+                }
+                if !has_fun_values {
+                    if let Some(def) = fun_env.get_def() {
+                        def.visit_pre_order(&mut |e| {
+                            let id = e.node_id();
+                            has_fun_values |= self
+                                .get_node_type_opt(id)
+                                .into_iter()
+                                .chain(self.get_node_instantiation_opt(id).into_iter().flatten())
+                                .any(|ty| contains_fun_type(self, &ty, &mut BTreeSet::new()));
+                            !has_fun_values
+                        });
+                    }
+                }
+                for ty in fun_env.get_result_type().flatten() {
+                    has_fun_values |= contains_fun_type(self, &ty, &mut BTreeSet::new());
+                }
+            }
+        }
+        if !has_fun_values {
+            return;
+        }
+        if self.add_world_memory().is_some() {
+            let framed = self.param_framed_behaviors();
+            self.set_extension(ParamFramedBehaviors(framed));
+            self.add_world_memory_to_specs();
+        }
+    }
+
+    /// Adds the world memory to the memory of every specification function, and of every
+    /// function specification, that applies a behavioral predicate to a function value which
+    /// may touch it (`fun_type_reaches_world`), directly or through a specification function.
+    /// The memory of specifications is computed when the model is built, before the world
+    /// memory exists.
+    fn add_world_memory_to_specs(&mut self) {
+        let Some(world) = self.world_memory() else {
+            return;
+        };
+        let spec_funs: Vec<QualifiedId<SpecFunId>> = self
+            .get_modules()
+            .flat_map(|m| {
+                let mid = m.get_id();
+                m.get_spec_funs()
+                    .map(move |(id, _)| mid.qualified(*id))
+                    .collect_vec()
+            })
+            .collect();
+        loop {
+            let mut updates = vec![];
+            for qid in &spec_funs {
+                let decl = self.get_spec_fun(*qid);
+                let Some(body) = &decl.body else {
+                    continue;
+                };
+                let used = !decl.used_memory.contains(&world)
+                    && body.directly_used_memory(self).contains(&world);
+                let old = !decl.old_memory.contains(&world)
+                    && (body.directly_old_memory(self).contains(&world)
+                        || body.any(&mut |e| match e {
+                            ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) => self
+                                .get_spec_fun(mid.qualified(*fid))
+                                .old_memory
+                                .contains(&world),
+                            _ => false,
+                        }));
+                if used || old {
+                    updates.push((*qid, used, old));
+                }
+            }
+            if updates.is_empty() {
+                break;
+            }
+            for (qid, used, old) in updates {
+                let decl = self
+                    .get_module_data_mut(qid.module_id)
+                    .spec_funs
+                    .get_mut(&qid.id)
+                    .expect("spec fun");
+                if used || old {
+                    decl.used_memory.insert(world.clone());
+                }
+                if old {
+                    decl.old_memory.insert(world.clone());
+                    decl.uses_old = true;
+                }
+            }
+        }
+        for module_env in self.get_modules() {
+            for fun_env in module_env.get_functions() {
+                let spec = fun_env.get_spec();
+                let mut used = false;
+                let mut old = false;
+                for cond in &spec.conditions {
+                    for exp in cond.all_exps() {
+                        used |= exp.directly_used_memory(self).contains(&world);
+                        old |= exp.directly_old_memory(self).contains(&world);
+                    }
+                }
+                drop(spec);
+                if used || old {
+                    fun_env
+                        .data
+                        .spec_used_memory
+                        .borrow_mut()
+                        .insert(world.clone());
+                }
+                if old {
+                    fun_env
+                        .data
+                        .spec_old_memory
+                        .borrow_mut()
+                        .insert(world.clone());
+                    fun_env.data.spec_uses_old.set(true);
+                }
+            }
+        }
+    }
+
+    /// Creates the world memory. It has no Move counterpart: code never accesses it, and
+    /// it is havoced wherever code the root cannot see may run. It is hosted in the module
+    /// with the least name, so that the host does not depend on the order modules are
+    /// loaded in; the Boogie backend gives it a name of its own.
+    pub fn add_world_memory(&mut self) -> Option<QualifiedId<StructId>> {
+        if let Some(w) = self.get_extension::<WorldMemory>() {
+            return Some(w.qid);
+        }
+        let host = self
+            .get_modules()
+            .min_by_key(|m| {
+                let name = m.get_name();
+                (
+                    name.addr().clone(),
+                    name.name().display(self.symbol_pool()).to_string(),
+                )
+            })?
+            .get_id();
+        let loc = self.internal_loc();
+        let name = self.symbol_pool.make(WORLD_MEMORY_NAME);
+        let field_name = self.symbol_pool.make("v");
+        let mut field_data = BTreeMap::new();
+        field_data.insert(FieldId::new(field_name), FieldData {
+            name: field_name,
+            loc: loc.clone(),
+            offset: 0,
+            variant: None,
+            ty: Type::Primitive(crate::ty::PrimitiveType::Num),
+            is_ghost: false,
+            init: None,
+        });
+        let data = StructData {
+            name,
+            loc,
+            def_idx: None,
+            attributes: Default::default(),
+            type_params: vec![],
+            abilities: AbilitySet::ALL,
+            spec_var_opt: None,
+            field_data,
+            ghost_field_data: BTreeMap::new(),
+            variants: None,
+            spec: RefCell::new(Spec::default()),
+            field_access_of: vec![],
+            is_native: false,
+            visibility: Visibility::Private,
+            has_package_visibility: false,
+            is_empty_struct: false,
+            users: BTreeSet::new(),
+        };
+        let sid = StructId::new(name);
+        self.get_module_data_mut(host).struct_data.insert(sid, data);
+        let qid = host.qualified(sid);
+        self.set_extension(WorldMemory { qid });
+        Some(qid)
+    }
+
     /// Finds a module by name and returns an environment for it.
     pub fn find_module(&self, name: &ModuleName) -> Option<ModuleEnv<'_>> {
         for module_data in &self.module_data {
@@ -3951,6 +4423,48 @@ impl<'env> ModuleEnv<'env> {
             module_env: self,
             data,
         }
+    }
+
+    /// The structs of this module no code removes from storage (see
+    /// `GlobalEnv::existence_is_monotone`): none when the module declares a native or its
+    /// compiled code is missing, otherwise those no `MoveFrom`/`MoveFromGeneric` names.
+    fn never_removed_structs(&self) -> BTreeSet<StructId> {
+        let Some(module) = self.data.compiled_module.as_ref() else {
+            return BTreeSet::new();
+        };
+        let mut removed = BTreeSet::new();
+        for fun in self.get_functions() {
+            if fun.is_native() {
+                return BTreeSet::new();
+            }
+            // A lemma is spec-only; its definition index is synthetic.
+            if fun.is_inline() || fun.is_lemma() {
+                continue;
+            }
+            let Some(def) = fun
+                .get_def_idx()
+                .and_then(|idx| module.function_defs().get(idx.0 as usize))
+            else {
+                return BTreeSet::new();
+            };
+            let code = def.code.as_ref().map_or(&[][..], |code| &code.code[..]);
+            for bc in code {
+                match bc {
+                    Bytecode::MoveFrom(idx) => {
+                        removed.insert(self.get_struct_id(*idx));
+                    },
+                    Bytecode::MoveFromGeneric(idx) => {
+                        removed
+                            .insert(self.get_struct_id(module.struct_instantiation_at(*idx).def));
+                    },
+                    _ => {},
+                }
+            }
+        }
+        self.get_structs()
+            .map(|s| s.get_id())
+            .filter(|id| !removed.contains(id))
+            .collect()
     }
 
     /// Gets the number of functions in this module.
@@ -6163,6 +6677,7 @@ impl<'env> FunctionEnv<'env> {
                 .iter()
                 .all(|access| access.fun_param != param)
             && self.is_pragma_false(VERIFY_PRAGMA)
+            // The world memory counts: it stands for every translated resource.
             && self.get_spec_used_memory().is_empty()
             && self.get_spec_generic_used_memory().is_empty()
             && self.get_spec_old_memory().is_empty()
@@ -6376,8 +6891,9 @@ impl<'env> FunctionEnv<'env> {
                         },
                         // Behavioral predicate over a concrete closure target:
                         // its evaluator is defined over the target's memory.
-                        ExpData::Call(_, Operation::Behavior(kind, _), args) => {
-                            if let Some(target) = ExpData::behavior_target_memory(env, *kind, args)
+                        ExpData::Call(id, Operation::Behavior(kind, _), args) => {
+                            if let Some(target) =
+                                ExpData::behavior_target_memory(env, *id, *kind, args)
                             {
                                 used.extend(target.used);
                                 generic_used.extend(target.generic_used);
@@ -7108,5 +7624,26 @@ impl FunctionSize {
             code_size,
             num_locals,
         }
+    }
+}
+
+/// Whether a value of type `ty` holds a function value, directly or through a reference,
+/// vector, tuple or struct field.
+fn contains_fun_type(env: &GlobalEnv, ty: &Type, seen: &mut BTreeSet<Type>) -> bool {
+    if !seen.insert(ty.clone()) {
+        return false;
+    }
+    match ty {
+        Type::Fun(..) => true,
+        Type::Reference(_, elem) | Type::Vector(elem) => contains_fun_type(env, elem, seen),
+        Type::Tuple(elems) => elems.iter().any(|elem| contains_fun_type(env, elem, seen)),
+        Type::Struct(mid, sid, inst) => {
+            inst.iter().any(|ty| contains_fun_type(env, ty, seen))
+                || env
+                    .get_struct(mid.qualified(*sid))
+                    .get_fields()
+                    .any(|field| contains_fun_type(env, &field.get_type(), seen))
+        },
+        _ => false,
     }
 }

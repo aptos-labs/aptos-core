@@ -608,8 +608,13 @@ impl LoopAnalysisProcessor {
                         // loop-exit path does not retain pre-loop memory; the
                         // frame is re-established by user loop invariants
                         if !options.for_interpretation {
-                            for mem in &loop_info.spec_info().mem_targets {
-                                let mem = mem.clone();
+                            // The world memory first: its havoc covers every memory, so the
+                            // well-formedness re-assumed below must come after it.
+                            let env = builder.global_env();
+                            let mut mems: Vec<_> =
+                                loop_info.spec_info().mem_targets.iter().cloned().collect();
+                            mems.sort_by_key(|mem| !env.is_world_memory(&mem.to_qualified_id()));
+                            for mem in mems {
                                 builder.emit_with(|attr_id| {
                                     Bytecode::Call(
                                         attr_id,

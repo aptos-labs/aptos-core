@@ -557,6 +557,8 @@ impl FatLoopBuilder<'_> {
                 mems.insert(mem);
             }
         };
+        // Whether the body may run a function value nothing bounds, which may touch any memory.
+        let mut touches_world = false;
         let fat_loop_body: BTreeSet<_> = sub_loops
             .iter()
             .flat_map(|l| l.loop_body.iter())
@@ -652,6 +654,7 @@ impl FatLoopBuilder<'_> {
                                 add(mem.clone());
                             }
                         }
+                        touches_world |= usage.unbounded_invoke || usage.invoke_frame_wildcard;
                     },
                     Operation::Invoke => {
                         // Direct invocation in the current function body:
@@ -662,11 +665,11 @@ impl FatLoopBuilder<'_> {
                         // which have no per-Invoke type to filter against
                         // — they've already been resolved in the callee's
                         // analysis).
+                        let operand = *srcs.last().expect("invoke has a function operand");
                         let self_usage = usage_analysis::get_memory_usage(func_target);
-                        let invoked_ty = func_target
-                            .get_local_type(*srcs.last().expect("invoke has a function operand"))
-                            .skip_reference()
-                            .clone();
+                        let invoked_ty =
+                            func_target.get_local_type(operand).skip_reference().clone();
+                        touches_world |= invoked_value_may_touch_world(func_target, operand);
                         let invoked_norm = matches!(invoked_ty, Type::Fun(..))
                             .then(|| invoked_ty.clone().normalize_fun());
                         let type_may_match = |ty: &Type| {
@@ -738,12 +741,16 @@ impl FatLoopBuilder<'_> {
                                 add(mem.clone());
                             }
                         }
+                        touches_world |= wildcard_here;
                         // The function under processing is held out of the
                         // targets holder, so its own Closure ops must be
                         // scanned explicitly.
                         let current_id = func_target.func_env.get_qualified_id();
                         let mut closure_mems = vec![];
                         let mut closure_widen = false;
+                        // A closure whose target runs a function value nothing bounds, or
+                        // has no summary, may touch any memory.
+                        let mut closure_world = false;
                         let mut scan_closures =
                             |creator_target: &FunctionTarget<'_>, creator_is_current: bool| {
                                 for bc in creator_target.get_bytecode() {
@@ -773,6 +780,7 @@ impl FatLoopBuilder<'_> {
                                     } else {
                                         if !targets.has_target(&callee, &FunctionVariant::Baseline)
                                         {
+                                            closure_world = true;
                                             continue;
                                         }
                                         usage_analysis::get_memory_usage(
@@ -780,6 +788,8 @@ impl FatLoopBuilder<'_> {
                                                 .get_target(&callee, &FunctionVariant::Baseline),
                                         )
                                     };
+                                    closure_world |= callee_usage.unbounded_invoke
+                                        || callee_usage.invoke_frame_wildcard;
                                     // The closed-over callee may itself
                                     // invoke a function value transitively
                                     // — its `invoke_frame` carries those
@@ -815,6 +825,7 @@ impl FatLoopBuilder<'_> {
                         for mem in closure_mems {
                             add(mem);
                         }
+                        touches_world |= closure_world;
                         // Foreign-context closure memory (open types the
                         // creator's context can't express here) widens to
                         // the current function's accessed footprint —
@@ -827,6 +838,20 @@ impl FatLoopBuilder<'_> {
                     },
                     _ => {},
                 }
+            }
+        }
+        // The world memory stands for every memory (see `GlobalEnv::world_memory`); the
+        // accessed footprint is added as well so that its well-formedness is re-assumed.
+        if touches_world {
+            for mem in usage_analysis::get_memory_usage(func_target)
+                .accessed
+                .all
+                .iter()
+            {
+                add(mem.clone());
+            }
+            if let Some(world) = env.world_memory() {
+                add(world);
             }
         }
         mems
@@ -925,4 +950,109 @@ impl FatLoopBuilder<'_> {
         }
         results
     }
+}
+
+/// Whether the function value invoked through `operand` may touch any memory (see
+/// `GlobalEnv::world_memory`): it may be read from a field without a frame or with a `*` one,
+/// or it has an origin other than a closure, a bounded parameter or a framed field. A parameter
+/// is bounded as the usage analysis says (`invoke_operand_is_bounded_param`); a parameter that is
+/// a reference to a function value is not. A local that is borrowed mutably may be rewritten and
+/// has no known origin.
+pub fn invoked_value_may_touch_world(target: &FunctionTarget, operand: TempIndex) -> bool {
+    let env = target.global_env();
+    let code = target.get_bytecode();
+    let param_count = target.get_parameter_count();
+    let field_reaches_world =
+        |mid: &move_model::model::ModuleId,
+         sid: &StructId,
+         offset: usize,
+         variant: Option<move_model::symbol::Symbol>| {
+            let struct_env = env.get_struct(mid.qualified(*sid));
+            let name = struct_env
+                .get_field_by_offset_optional_variant(variant, offset)
+                .get_name();
+            struct_env
+                .get_field_access_of()
+                .iter()
+                .find(|access| access.fun_param == name)
+                .is_none_or(|access| access.frame_spec.modifies_all || access.frame_spec.reads_all)
+        };
+    let world_exists = env.world_memory().is_some();
+    let mut visited = BTreeSet::new();
+    let mut todo = vec![operand];
+    while let Some(t) = todo.pop() {
+        if !visited.insert(t) {
+            continue;
+        }
+        // A local a mutable reference may rewrite has no origin this walk can see.
+        let mutably_borrowed = code.iter().any(|bc| {
+            matches!(bc, Bytecode::Call(_, dests, Operation::BorrowLoc, srcs, _)
+                if srcs[0] == t && target.get_local_type(dests[0]).is_mutable_reference())
+        });
+        if world_exists && mutably_borrowed {
+            return true;
+        }
+        // A parameter is bounded as the usage analysis says.
+        if world_exists
+            && t < param_count
+            && target.get_local_type(t).skip_reference().is_function()
+            && !usage_analysis::invoke_operand_is_bounded_param(target, t)
+        {
+            return true;
+        }
+        let mut defined = t < param_count;
+        for bc in code {
+            if !bc.dests().contains(&t) {
+                continue;
+            }
+            defined = true;
+            match bc {
+                Bytecode::Assign(_, _, src, _) => todo.push(*src),
+                Bytecode::Call(_, dests, op, srcs, _) => match op {
+                    Operation::Havoc(_) | Operation::Closure(..) => {},
+                    Operation::FreezeRef(_) | Operation::ReadRef | Operation::BorrowLoc => {
+                        todo.push(srcs[0])
+                    },
+                    Operation::GetField(mid, sid, _, offset)
+                    | Operation::BorrowField(mid, sid, _, offset) => {
+                        if field_reaches_world(mid, sid, *offset, None) {
+                            return true;
+                        }
+                    },
+                    Operation::GetVariantField(mid, sid, variants, _, offset)
+                    | Operation::BorrowVariantField(mid, sid, variants, _, offset) => {
+                        if field_reaches_world(mid, sid, *offset, variants.first().copied()) {
+                            return true;
+                        }
+                    },
+                    Operation::Unpack(mid, sid, _) => {
+                        let pos = dests.iter().position(|d| *d == t).unwrap_or_default();
+                        if field_reaches_world(mid, sid, pos, None) {
+                            return true;
+                        }
+                    },
+                    Operation::UnpackVariant(mid, sid, variant, _) => {
+                        let pos = dests.iter().position(|d| *d == t).unwrap_or_default();
+                        if field_reaches_world(mid, sid, pos, Some(*variant)) {
+                            return true;
+                        }
+                    },
+                    _ => {
+                        if env.fun_type_reaches_world(target.get_local_type(t)) {
+                            return true;
+                        }
+                    },
+                },
+                _ => {
+                    if env.fun_type_reaches_world(target.get_local_type(t)) {
+                        return true;
+                    }
+                },
+            }
+        }
+        if !defined && env.fun_type_reaches_world(target.get_local_type(t)) {
+            return true;
+        }
+    }
+    false
 }

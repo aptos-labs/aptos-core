@@ -245,6 +245,9 @@ fn run_move_prover_with_model_v2_internal<W: WriteColor>(
     // from there.
     env.set_extension(options.prover.clone());
 
+    // Function values may touch state no verification root translates.
+    env.add_world_memory_if_needed();
+
     // Populate initial number operation state for each function and struct based on the pragma
     create_init_num_operation_state(env);
 

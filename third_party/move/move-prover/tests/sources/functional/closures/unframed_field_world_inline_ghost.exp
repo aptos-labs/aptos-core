@@ -1,0 +1,58 @@
+Move prover returns: exiting with verification errors
+error: spec variable update value is out of the variable type's value domain
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_ghost.move:17:16
+   │
+17 │         spec { update counter = counter + 1; };
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:15: bump
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:16: bump
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:17: bump
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_ghost.move:23:35
+   │
+23 │     spec run_ctl { pragma opaque; ensures global<O::R>(@0x42) == old(global<O::R>(@0x42)); }
+   │                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:22: run_ctl
+   =         c = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:13: get
+   =         c = <redacted>
+   =         result = <redacted>
+   =         g = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:23: run_ctl (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_ghost.move:27:33
+   │
+27 │     spec run_g { pragma opaque; ensures counter == old(counter); }
+   │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:26: run_g
+   =         c = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:13: get
+   =         c = <redacted>
+   =         result = <redacted>
+   =         g = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:27: run_g (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_ghost.move:32:34
+   │
+32 │     spec run_gn { pragma opaque; ensures counter == old(counter); }
+   │                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:31: run_gn
+   =         c = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:13: get
+   =         c = <redacted>
+   =         result = <redacted>
+   =         g = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost.move:32: run_gn (spec)

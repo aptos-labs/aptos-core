@@ -1,0 +1,11 @@
+warning: opaque call to `el::t` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+   ┌─ tests/sources/functional/closures/unframed_field_world_evaluator_label_entry.move:26:5
+   │
+26 │ ╭     spec t {
+27 │ │         pragma opaque;
+28 │ │         aborts_if exists<S>(signer::address_of(s));
+29 │ │         aborts_if S1 |~ aborts_of<c.f>(x);
+30 │ │         ensures ..S1 |~ publish<S>(signer::address_of(s), S { v: x });
+31 │ │         ensures result == (S1.. |~ result_of<c.f>(x));
+32 │ │     }
+   │ ╰─────^

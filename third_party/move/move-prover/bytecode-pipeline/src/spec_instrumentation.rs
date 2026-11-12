@@ -643,6 +643,13 @@ struct Instrumenter<'a> {
     mem_info: &'a BTreeSet<QualifiedInstId<StructId>>,
     /// Transitive memory effects of opaque callees in the original bytecode.
     opaque_callee_modifies: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedInstId<StructId>>>,
+    /// Opaque callees that may run a function value nothing bounds (`unbounded_invoke`,
+    /// `invoke_frame_wildcard`, or no usage summary): a call may touch any memory.
+    world_havoc_callees: BTreeSet<QualifiedId<FunId>>,
+    /// The memory this function accesses, re-assumed well-formed after a world havoc.
+    accessed_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Whether this function may run a function value nothing bounds.
+    runs_unknown_code: bool,
     /// Resource types explicitly framed by opaque callees before call-site type
     /// substitution.
     opaque_callee_framed_memory: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedInstId<StructId>>>,
@@ -689,10 +696,11 @@ impl<'a> Instrumenter<'a> {
                 }
                 let callee = fun_env.module_env.env.get_function(qid);
                 let target = targets.get_target(&callee, &FunctionVariant::Baseline);
-                (usage_analysis::get_memory_usage(&target)
-                    .accessed
-                    .all
-                    .is_empty()
+                let callee_usage = usage_analysis::get_memory_usage(&target);
+                // A function value nothing bounds may read any memory.
+                (callee_usage.accessed.all.is_empty()
+                    && !callee_usage.unbounded_invoke
+                    && !callee_usage.invoke_frame_wildcard
                     && callee.get_spec_used_memory().is_empty()
                     && callee.get_spec_generic_used_memory().is_empty()
                     && callee.get_parameters().iter().all(|p| {
@@ -734,6 +742,29 @@ impl<'a> Instrumenter<'a> {
                 _ => None,
             })
             .collect();
+        let world_havoc_callees = data
+            .code
+            .iter()
+            .filter_map(|bc| match bc {
+                Bytecode::Call(_, _, Operation::Function(mid, fid, _), _, _) => {
+                    let qid = mid.qualified(*fid);
+                    let callee = fun_env.module_env.env.get_function(qid);
+                    (callee.is_opaque()
+                        && usage.get(&qid).is_none_or(|callee_usage| {
+                            callee_usage.unbounded_invoke || callee_usage.invoke_frame_wildcard
+                        }))
+                    .then_some(qid)
+                },
+                _ => None,
+            })
+            .collect();
+        let runs_unknown_code = usage
+            .get(&fun_env.get_qualified_id())
+            .is_none_or(|own| own.unbounded_invoke || own.invoke_frame_wildcard);
+        let accessed_memory = usage
+            .get(&fun_env.get_qualified_id())
+            .map(|own| own.accessed.all.iter().cloned().collect())
+            .unwrap_or_default();
         let opaque_callee_framed_memory = data
             .code
             .iter()
@@ -880,6 +911,9 @@ impl<'a> Instrumenter<'a> {
             can_abort: false,
             mem_info: &mem_info,
             opaque_callee_modifies,
+            world_havoc_callees,
+            accessed_memory,
+            runs_unknown_code,
             opaque_callee_framed_memory,
             memory_free_callees,
             opaque_closure_modifies,
@@ -951,6 +985,39 @@ impl<'a> Instrumenter<'a> {
         // Extract and clear current code
         let old_code = std::mem::take(&mut self.builder.data.code);
 
+        // Inject the entry state saves: for the verification variant those its post-conditions
+        // need, otherwise those of inlined specs that use "old" values. For inline properties,
+        // only the function-entry scoped saves are emitted here; saves registered under an
+        // anchor label are emitted at the matching `SaveStateAnchor` marker. They precede the
+        // `let` bindings, which may read memory saved under an entry label.
+        self.builder
+            .set_loc(self.builder.fun_env.get_loc().at_start());
+        let mut saved_mems = BTreeSet::new();
+        let mut saved_vars = BTreeSet::new();
+        if self.is_verified() {
+            for translated_spec in
+                std::iter::once(spec).chain(inlined_props.values().map(|(s, _)| s))
+            {
+                self.emit_state_saves(translated_spec, None, &mut saved_mems, &mut saved_vars);
+            }
+            // Every function type has a variant of unknown origin, so a predicate over any
+            // function value takes the world memory: its saves are needed wherever memory is saved.
+            if self.runs_unknown_code || self.builder.global_env().world_memory().is_some() {
+                self.emit_world_saves(spec, &mut saved_mems);
+            }
+        } else {
+            assert!(
+                verification_analysis::get_info(&FunctionTarget::new(
+                    self.builder.fun_env,
+                    &self.builder.data
+                ))
+                .inlined
+            );
+            for translated_spec in inlined_props.values().map(|(s, _)| s) {
+                self.emit_state_saves(translated_spec, None, &mut saved_mems, &mut saved_vars);
+            }
+        }
+
         // Emit `let` bindings.
         self.emit_lets(spec, false, self.self_is_bv_internal);
 
@@ -991,33 +1058,6 @@ impl<'a> Instrumenter<'a> {
                     exp,
                     exp.call_args()[0].to_owned(),
                 );
-            }
-
-            // For the verification variant, we generate post-conditions. Inject any state
-            // save instructions needed for this. For inline properties, only the
-            // function-entry scoped saves are emitted here; saves registered under an
-            // anchor label are emitted at the matching `SaveStateAnchor` marker.
-            let mut saved_mems = BTreeSet::new();
-            let mut saved_vars = BTreeSet::new();
-            for translated_spec in
-                std::iter::once(spec).chain(inlined_props.values().map(|(s, _)| s))
-            {
-                self.emit_state_saves(translated_spec, None, &mut saved_mems, &mut saved_vars);
-            }
-        } else {
-            // The inlined variant may have an inlined spec that used "old" values - these need to
-            // be saved in both cases
-            assert!(
-                verification_analysis::get_info(&FunctionTarget::new(
-                    self.builder.fun_env,
-                    &self.builder.data
-                ))
-                .inlined
-            );
-            let mut saved_mems = BTreeSet::new();
-            let mut saved_vars = BTreeSet::new();
-            for translated_spec in inlined_props.values().map(|(s, _)| s) {
-                self.emit_state_saves(translated_spec, None, &mut saved_mems, &mut saved_vars);
             }
         }
 
@@ -1367,6 +1407,11 @@ impl<'a> Instrumenter<'a> {
             // ensures conditions reference these saved labels (e.g., global[@0] maps to
             // a SaveMem'd memory). They must be initialized before the label defines
             // and abort condition evaluation — on BOTH the abort and success paths.
+            if self.world_havoc_callees.contains(&mid.qualified(fid))
+                || self.builder.global_env().world_memory().is_some()
+            {
+                add_world_saves(self.builder.global_env(), &mut callee_spec);
+            }
             for (mem, label) in std::mem::take(&mut callee_spec.saved_memory) {
                 self.builder.emit_with(|id| SaveMem(id, label, mem));
             }
@@ -1481,6 +1526,12 @@ impl<'a> Instrumenter<'a> {
                 }
             }
             self.emit_global_havocs(arg_writes);
+
+            // A callee running a function value nothing bounds may touch any memory, whatever
+            // its `modifies` frame says: callers never rely on that frame.
+            if self.world_havoc_callees.contains(&callee_qid) {
+                self.emit_world_havoc();
+            }
 
             // Havoc all &mut parameters, their post-value are to be determined by the post
             // conditions.
@@ -1778,6 +1829,31 @@ impl<'a> Instrumenter<'a> {
                 .unwrap_or_default(),
         };
         self.emit_save_for_old(&saved_params);
+    }
+
+    /// Saves the world memory under every function-entry label `translated_spec` saves memory
+    /// under (see `add_world_saves`).
+    fn emit_world_saves(
+        &mut self,
+        translated_spec: &TranslatedSpec,
+        saved_mems: &mut BTreeSet<(QualifiedInstId<StructId>, MemoryLabel)>,
+    ) {
+        let Some(world) = self.builder.global_env().world_memory() else {
+            return;
+        };
+        let labels: BTreeSet<MemoryLabel> = translated_spec
+            .saved_memory
+            .iter()
+            .map(|(_, label)| *label)
+            .filter(|label| !translated_spec.anchors.contains(label))
+            .collect();
+        for label in labels {
+            if saved_mems.insert((world.clone(), label)) {
+                let mem = world.clone();
+                self.builder
+                    .emit_with(|attr_id| Bytecode::SaveMem(attr_id, label, mem));
+            }
+        }
     }
 
     fn emit_save_for_old(&mut self, vars: &BTreeMap<TempIndex, TempIndex>) {
@@ -2926,6 +3002,27 @@ impl<'a> Instrumenter<'a> {
         };
         self.builder
             .emit_with(|id| Bytecode::Call(id, dests, opaque_op, srcs, aa));
+    }
+
+    /// Havocs the world memory, which the backend expands to every memory, then the memory
+    /// this function accesses again, to re-assume its well-formedness.
+    fn emit_world_havoc(&mut self) {
+        let env = self.builder.global_env();
+        if let Some(world) = env.world_memory() {
+            let op = Operation::HavocGlobal(world.module_id, world.id, vec![]);
+            self.builder
+                .emit_with(|id| Bytecode::Call(id, vec![], op, vec![], None));
+        }
+        let accessed = self
+            .accessed_memory
+            .iter()
+            .filter(|mem| {
+                let qid = mem.to_qualified_id();
+                !env.is_world_memory(&qid)
+            })
+            .cloned()
+            .collect_vec();
+        self.emit_global_havocs(accessed);
     }
 
     fn emit_global_havocs(
@@ -4511,5 +4608,20 @@ fn check_reads_completeness(
                 ),
             )
         }
+    }
+}
+
+/// Saves the world memory under every label `spec` saves memory under. A state label of a
+/// function that runs unknown code resolves a memory its defining operation does not modify to
+/// the label before it, so a behavioral predicate over a function value of unknown target, which
+/// ranges over the world memory, reads the world memory saved there. A label saving no memory
+/// gets none; a predicate resolving to it is reported as reading an unsaved state.
+fn add_world_saves(env: &GlobalEnv, spec: &mut TranslatedSpec) {
+    let Some(world) = env.world_memory() else {
+        return;
+    };
+    let labels: BTreeSet<MemoryLabel> = spec.saved_memory.iter().map(|(_, l)| *l).collect();
+    for label in labels {
+        spec.saved_memory.insert((world.clone(), label));
     }
 }

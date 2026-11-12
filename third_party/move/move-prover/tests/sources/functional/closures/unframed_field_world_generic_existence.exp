@@ -1,0 +1,18 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_generic_existence.move:51:9
+   │
+51 │         ensures result;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_generic_existence.move:45: removed_u64
+   =     at tests/sources/functional/closures/unframed_field_world_generic_existence.move:50: removed_u64 (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_generic_existence.move:45: removed_u64
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_generic_existence.move:46: removed_u64
+   =     at tests/sources/functional/closures/unframed_field_world_generic_existence.move:47: removed_u64
+   =     at tests/sources/functional/closures/unframed_field_world_generic_existence.move:16: has
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_generic_existence.move:45: removed_u64
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_generic_existence.move:51: removed_u64 (spec)

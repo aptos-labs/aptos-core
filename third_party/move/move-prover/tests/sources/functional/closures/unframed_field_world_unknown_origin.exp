@@ -1,0 +1,119 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_unknown_origin.move:21:45
+   │
+21 │     spec run { pragma aborts_if_is_partial; ensures result; }
+   │                                             ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:15: run
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:16: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:17: run
+   =         f = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:18: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:19: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:15: run
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:21: run (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_unknown_origin.move:31:45
+   │
+31 │     spec run { pragma aborts_if_is_partial; ensures result; }
+   │                                             ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:25: run
+   =         mk = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:26: run
+   =         g = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:27: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:28: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:29: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:25: run
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:31: run (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_unknown_origin.move:44:45
+   │
+44 │     spec run { pragma aborts_if_is_partial; ensures result; }
+   │                                             ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:38: run
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:39: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:40: run
+   =         g = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:41: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:42: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:38: run
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:44: run (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_unknown_origin.move:62:45
+   │
+62 │     spec run { pragma aborts_if_is_partial; ensures result; }
+   │                                             ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:56: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:57: run
+   =         g = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:58: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:59: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:60: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:56: run
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:62: run (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_unknown_origin.move:75:45
+   │
+75 │     spec run { pragma aborts_if_is_partial; ensures result; }
+   │                                             ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:69: run
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:70: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:71: run
+   =         g = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:72: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:73: run
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:9: get
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:69: run
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_unknown_origin.move:75: run (spec)

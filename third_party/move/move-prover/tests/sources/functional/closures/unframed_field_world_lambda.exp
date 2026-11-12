@@ -1,0 +1,16 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_lambda.move:12:23
+   │
+12 │     spec via_lambda { ensures result_1 == result_2; }
+   │                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_lambda.move:7: via_lambda
+   =         c = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_lambda.move:9: via_lambda
+   =         h = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_lambda.move:10: via_lambda
+   =         result_1 = <redacted>
+   =         result_2 = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_lambda.move:12: via_lambda (spec)

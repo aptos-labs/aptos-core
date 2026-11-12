@@ -16,7 +16,7 @@ error: abort not covered by any of the `aborts_if` clauses
    ┌─ tests/sources/functional/closures/behavioral_congruence.move:66:5
    │
 64 │           (cb.f)(Info { n: x.n + 1, id: x.id })
-   │           ------------------------------------- abort happened here with code 0x10
+   │           ------------------------------------- abort happened here with code 0x14
 65 │       }
 66 │ ╭     spec field_bumped {
 67 │ │         aborts_if x.n + 1 > MAX_U64;

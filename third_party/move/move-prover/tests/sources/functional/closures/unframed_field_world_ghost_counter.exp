@@ -1,0 +1,21 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_ghost_counter.move:22:24
+   │
+22 │     spec keeps_draws { ensures draws == old(draws); }
+   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_counter.move:21: keeps_draws
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_counter.move:22: keeps_draws (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_ghost_counter.move:26:31
+   │
+26 │     spec keeps_draws_opaque { ensures draws == old(draws); }
+   │                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_counter.move:25: keeps_draws_opaque
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_counter.move:25: keeps_draws_opaque
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_counter.move:26: keeps_draws_opaque (spec)

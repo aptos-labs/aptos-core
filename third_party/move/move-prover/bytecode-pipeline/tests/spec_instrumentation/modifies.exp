@@ -185,8 +185,8 @@ public fun A::mutate_at($t0|addr: address) {
      var $t3: num
      var $t4: u64
      var $t5: &mut u64
-  0: assume CanModify<0x0::A::S>($t0)
-  1: @0 := save_mem(A::S)
+  0: @0 := save_mem(A::S)
+  1: assume CanModify<0x0::A::S>($t0)
      # VC: caller does not have permission to modify `A::S` at given address at tests/spec_instrumentation/modifies.move:18:17+26
   2: assert CanModify<0x0::A::S>($t0)
   3: $t2 := borrow_global<0x0::A::S>($t0) on_abort goto 12 with $t3

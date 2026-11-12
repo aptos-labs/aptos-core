@@ -112,6 +112,10 @@ spec aptos_framework::genesis {
     spec initialize_validator {
     }
 
+    spec create_account {
+        pragma opaque;
+    }
+
     spec create_accounts {
         pragma opaque;
     }

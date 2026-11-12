@@ -65,7 +65,12 @@ spec aptos_framework::coin {
         global aggregate_supply<CoinType>: num;
         // TODO: `migrate_coin_store_to_fungible_store` migrates in an inline `for_each`
         // loop; the schema needs a loop invariant that cannot be attached there.
-        apply TotalSupplyTracked<CoinType> to *<CoinType> except initialize, initialize_internal, initialize_with_parallelizable_supply, migrate_coin_store_to_fungible_store;
+        // `is_balance_at_least` and `deposit_with_signer`: across a dispatchable fungible asset
+        // hook, which may run any code including this module's public supply updaters, the
+        // relation between the supply spec variables and `CoinInfo.supply` cannot be
+        // re-established; this module's own functions keep it, and burn, deposit, withdraw and
+        // transfer are not verified at all.
+        apply TotalSupplyTracked<CoinType> to *<CoinType> except initialize, initialize_internal, initialize_with_parallelizable_supply, migrate_coin_store_to_fungible_store, is_balance_at_least, deposit_with_signer;
         // TODO(fa_migration)
         // apply TotalSupplyNoChange<CoinType> to *<CoinType> except mint,
         //     burn, burn_from, initialize, initialize_internal, initialize_with_parallelizable_supply;

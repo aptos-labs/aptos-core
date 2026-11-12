@@ -1,0 +1,55 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:24:40
+   │
+24 │     spec keeps_inline { pragma opaque; ensures locked == old(locked); }
+   │                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:23: keeps_inline
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:23: keeps_inline
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:24: keeps_inline (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:28:27
+   │
+28 │     spec keeps_inline_t { ensures locked == old(locked); }
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:27: keeps_inline_t
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:27: keeps_inline_t
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:28: keeps_inline_t (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:32:46
+   │
+32 │     spec keeps_inline_false { pragma opaque; ensures false; }
+   │                                              ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:31: keeps_inline_false
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:31: keeps_inline_false
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:32: keeps_inline_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:53:18
+   │
+53 │     spec keeps { ensures free == old(free); }
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:52: keeps
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:52: keeps
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:53: keeps (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:57:40
+   │
+57 │     spec keeps_inline { pragma opaque; ensures free == old(free); }
+   │                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:56: keeps_inline
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:56: keeps_inline
+   =     at tests/sources/functional/closures/unframed_field_world_inline_ghost_xmod.move:57: keeps_inline (spec)
