@@ -41,7 +41,7 @@ use aptos_types::{
     },
     state_store::{
         state_key::{inner::StateKeyInner, prefix::StateKeyPrefix, StateKey},
-        TStateView,
+        MoveResourceExt, TStateView,
     },
     transaction::{
         block_epilogue::BlockEndInfo,
@@ -182,7 +182,7 @@ impl Context {
             self.get_latest_ledger_info_and_verify_lookup_version(requested_ledger_version)?;
 
         let state_view = self
-            .state_view_at_version(requested_ledger_version)
+            .state_view_at_version(requested_ledger_version, &latest_ledger_info)
             .map_err(|err| {
                 E::internal_with_code(err, AptosErrorCode::InternalError, &latest_ledger_info)
             })?;
@@ -190,8 +190,17 @@ impl Context {
         Ok((latest_ledger_info, requested_ledger_version, state_view))
     }
 
-    pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
-        Ok(self.db.state_view_at_version(Some(version))?)
+    /// `latest_ledger_info` is the ledger info `version` was checked against.
+    pub fn state_view_at_version(
+        &self,
+        version: Version,
+        latest_ledger_info: &LedgerInfo,
+    ) -> Result<DbStateView> {
+        Ok(if is_known_block_end(version, latest_ledger_info) {
+            self.db.state_view_at_checkpoint(Some(version))?
+        } else {
+            self.db.state_view_at_version(Some(version))?
+        })
     }
 
     pub fn chain_id(&self) -> ChainId {
@@ -385,7 +394,7 @@ impl Context {
                         self.get_oldest_version_and_block_height()?;
 
                     let encryption_key_hex = self
-                        .get_encryption_key(latest_version)
+                        .get_encryption_key(block_end_version)
                         .unwrap_or(None)
                         .map(hex::encode);
 
@@ -419,20 +428,27 @@ impl Context {
         Ok(self.db.get_latest_ledger_info()?)
     }
 
+    /// `version` must be the latest ledger version.
     pub fn get_encryption_key(&self, version: Version) -> Result<Option<Vec<u8>>> {
         if !self.node_config.api.allow_encrypted_txns_submission {
             return Ok(None);
         }
         use aptos_types::decryption::PerEpochEncryptionKeyResource;
-        let resource: Option<PerEpochEncryptionKeyResource> =
-            self.get_resource(AccountAddress::ONE, version)?;
+        let resource = PerEpochEncryptionKeyResource::fetch_move_resource(
+            &self.db.state_view_at_checkpoint(Some(version))?,
+            &AccountAddress::ONE,
+        )?;
         Ok(resource.and_then(|r| r.encryption_key))
     }
 
-    pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
+    pub fn get_state_value(
+        &self,
+        state_key: &StateKey,
+        version: u64,
+        latest_ledger_info: &LedgerInfo,
+    ) -> Result<Option<Vec<u8>>> {
         Ok(self
-            .db
-            .state_view_at_version(Some(version))?
+            .state_view_at_version(version, latest_ledger_info)?
             .get_state_value_bytes(state_key)?
             .map(|val| val.to_vec()))
     }
@@ -443,7 +459,7 @@ impl Context {
         version: u64,
         ledger_info: &LedgerInfo,
     ) -> Result<Option<Vec<u8>>, E> {
-        self.get_state_value(state_key, version)
+        self.get_state_value(state_key, version, ledger_info)
             .context("Failed to retrieve state value")
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
     }
@@ -452,8 +468,13 @@ impl Context {
         &self,
         address: AccountAddress,
         version: Version,
+        latest_ledger_info: &LedgerInfo,
     ) -> Result<Option<T>> {
-        let bytes_opt = self.get_state_value(&StateKey::resource_typed::<T>(&address)?, version)?;
+        let bytes_opt = self.get_state_value(
+            &StateKey::resource_typed::<T>(&address)?,
+            version,
+            latest_ledger_info,
+        )?;
         bytes_opt
             .map(|bytes| bcs::from_bytes(&bytes))
             .transpose()
@@ -466,7 +487,7 @@ impl Context {
         version: Version,
         latest_ledger_info: &LedgerInfo,
     ) -> Result<Option<T>, E> {
-        self.get_resource(address, version)
+        self.get_resource(address, version, latest_ledger_info)
             .context("Failed to read account resource.")
             .map_err(|err| {
                 E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
@@ -498,6 +519,7 @@ impl Context {
         address: AccountAddress,
         prev_state_key: Option<&StateKey>,
         version: u64,
+        latest_ledger_info: &LedgerInfo,
         limit: u64,
     ) -> Result<(Vec<(StructTag, Vec<u8>)>, Option<StateKey>)> {
         let account_iter = self
@@ -508,6 +530,7 @@ impl Context {
                 &StateKeyPrefix::from(address),
                 prev_state_key,
                 version,
+                is_known_block_end(version, latest_ledger_info),
             )?;
         // TODO: Consider rewriting this to consider resource groups:
         // * If a resource group is found, expand
@@ -544,7 +567,7 @@ impl Context {
             .collect::<Result<Vec<(StructTag, Vec<u8>)>>>()?;
 
         // We should be able to do an unwrap here, otherwise the above db read would fail.
-        let state_view = self.state_view_at_version(version)?;
+        let state_view = self.state_view_at_version(version, latest_ledger_info)?;
         let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
 
         // Extract resources from resource groups and flatten into all resources
@@ -578,6 +601,7 @@ impl Context {
         address: AccountAddress,
         prev_state_key: Option<&StateKey>,
         version: u64,
+        latest_ledger_info: &LedgerInfo,
         limit: u64,
     ) -> Result<(Vec<(ModuleId, Vec<u8>)>, Option<StateKey>)> {
         let account_iter = self
@@ -588,6 +612,7 @@ impl Context {
                 &StateKeyPrefix::from(address),
                 prev_state_key,
                 version,
+                is_known_block_end(version, latest_ledger_info),
             )?;
         let mut module_iter = account_iter
             .filter_map(|res| match res {
@@ -1479,7 +1504,7 @@ impl Context {
             // Retrieve the gas schedule from storage and parse it accordingly
             let state_view = self
                 .db
-                .state_view_at_version(Some(ledger_info.version()))
+                .state_view_at_checkpoint(Some(ledger_info.version()))
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
@@ -1553,7 +1578,7 @@ impl Context {
             // Retrieve the execution config from storage and parse it accordingly
             let state_view = self
                 .db
-                .state_view_at_version(Some(ledger_info.version()))
+                .state_view_at_checkpoint(Some(ledger_info.version()))
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
@@ -1609,6 +1634,12 @@ impl Context {
     pub fn simulate_txn_stats(&self) -> &FunctionStats {
         &self.simulate_txn_stats
     }
+}
+
+/// The latest ledger version is always a block end, which allows cheaper state reads. Other block
+/// ends would need a lookup.
+fn is_known_block_end(version: Version, latest_ledger_info: &LedgerInfo) -> bool {
+    version == latest_ledger_info.version()
 }
 
 pub struct GasScheduleCache {

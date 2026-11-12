@@ -308,7 +308,7 @@ impl EventSubscriptionService {
         version: Version,
     ) -> Result<OnChainConfigPayload<DbBackedOnChainConfig>, Error> {
         let db_state_view = &reader
-            .state_view_at_version(Some(version))
+            .state_view_at_checkpoint(Some(version))
             .map_err(|error| {
                 Error::UnexpectedErrorEncountered(format!(
                     "Failed to create account state view {:?}",
@@ -409,6 +409,7 @@ impl ReconfigSubscription {
 #[derive(Clone)]
 pub struct DbBackedOnChainConfig {
     pub reader: Arc<dyn DbReader>,
+    /// Must be a block end.
     pub version: Version,
 }
 
@@ -422,7 +423,7 @@ impl OnChainConfigProvider for DbBackedOnChainConfig {
     fn get<T: OnChainConfig>(&self) -> Result<T> {
         let bytes = self
             .reader
-            .get_state_value_by_version(&StateKey::on_chain_config::<T>()?, self.version)?
+            .get_state_value_at_checkpoint(&StateKey::on_chain_config::<T>()?, self.version)?
             .ok_or_else(|| {
                 anyhow!(
                     "no config {} found in aptos root account state",
