@@ -24,17 +24,17 @@ deriving instance Remap for
   MemoryRange, TraceKind, BehaviorKind, SpecOperation, Operation, Place, QuantifierKind,
   MatchArm, QuantifierBinder, ConditionKind, Condition, Frame, SpecBlock, ExprKind, ExprOrigin, Expr,
   PatternKind, Pattern, BinderKind, GenericBinder, Parameter, LocalDecl, Signature,
-  ParameterFrame, FunctionContract, ConstantDecl, FieldDecl, VariantDecl, GhostFieldDecl, StructDecl, FunctionDecl,
+  ParameterFrame, FunctionContract, ConstantDecl, FieldDecl, VariantDecl, GhostFieldDecl, StructDecl, ShapeContract, FunctionDecl,
   AssociatedItemKind, AssociatedItemDecl, TraitDecl, AssociatedItemValue,
   AssociatedItemBinding, ImplDecl, SpecFunctionDecl, LemmaDecl, SpecVarDecl, NamespaceInvariant,
-  IntrinsicBinding, IntrinsicDecl, Namespace
+  IntrinsicBinding, IntrinsicDecl, ScopeKind, ScopeDecl, Namespace
 
 namespace Validation
 
 deriving instance Remap for
   Severity, RelatedLocation, Diagnostic, OwnedDiagnostic, FunctionBody, StructurizedBlock,
   StructurizedEdge, StructurizedRegionKind, StructurizedRegion, StructurizationWitness,
-  InitializationCertificate, ReferenceParameterFact, LoanDeath, CheckedLoanFact,
+  InitializationCertificate, ReferenceParameterFact, LoanProjection, LoanDeath, CheckedLoanFact,
   LifetimeRelationFact, BorrowCertificate, ValidatedNamespaceInterface
 
 /-- A namespace's body identifiers as unit identifiers (its links). -/

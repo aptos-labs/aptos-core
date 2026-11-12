@@ -1,5 +1,13 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/invariants_resources.move:3:1: info: `get` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/functional/invariants_resources.move:23:9: error: the specification clause `ensures result > 0` is not established
+tests/sources/functional/invariants_resources.move:22:5: error: verex verification failed: the automatic verification of `get` failed; provide a proof in `tests/sources/functional/invariants_resources.proof.lean`:
+  verify get by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/invariants_resources.move:3:1: info: `get_invalid` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/invariants_resources.move:31:9: error: the specification clause `ensures result < 1` is not established
 tests/sources/functional/invariants_resources.move:30:5: error: verex verification failed: the automatic verification of `get_invalid` failed; provide a proof in `tests/sources/functional/invariants_resources.proof.lean`:

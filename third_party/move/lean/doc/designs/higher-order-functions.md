@@ -78,6 +78,36 @@ captures to have their parameter types. Closures compare as the VM compares
 them, by qualified function name first; the runtime reads names through the
 unit, not handle indexes.
 
+### Scoped Rust method receivers
+
+Generic borrowed-to-consuming adapters need an explicit receiver-scope
+requirement. `scoped_method_evidence = i`, alongside `method_evidence = i`,
+requires that dictionary parameter `i` cannot let its receiver borrow escape.
+It is an obligation, not evidence that an arbitrary callable has this property.
+
+The borrow checker derives a receiver receipt by tracking receiver-dependent
+values through aliases, reborrows, aggregates and calls. A returned dependency
+or a write into externally owned storage prevents a receipt, including a write
+from a call returning unit. Calls through a scoped dictionary may end only the
+receiver's private loan; incoming loans and loans lent by other arguments remain.
+Unknown or recursive dependent calls are conservatively refused.
+The analysis shares callee summaries and memoizes expression results within
+each fixed-point pass. A changed set of receiver-dependent locals starts a new
+expression table, so shared expression graphs do not duplicate traversal or
+reuse results from an earlier taint state.
+
+Supplying a dictionary requires a checked literal or an unmodified scoped
+parameter. A literal must have a receiver receipt and satisfy every scoped
+requirement captured by its target. This bounded slice rejects open dictionary
+requirements and unsupported provenance instead of inferring scope from the
+structural function type. The public `ReceiverScopedMethod` contract exposes the
+same checked refinement, which is preserved through generic frame substitution.
+Function entry checks the refinement too, so externally supplied runtime
+closures cannot bypass the requirement. Ordinary `Fn`/`FnMut` dictionaries only
+acquire it when a consuming adaptation needs it.
+Functions without scoped requirements retain the original denotation directly;
+the empty requirement list needs no guard in their generated proof goals.
+
 ## Runtime
 
 `closureValue` evaluates the captures and builds the closure with its mask
@@ -499,8 +529,8 @@ proof carries. No theorem shape changes, and no call owes coherence.
 `Coherent` speaks of the types the frame reads, as the runtime reads them:
 the types it requires (`requiredAt`, the resource types of its storage
 operations and the type arguments of its calls and closures, closed under
-its calls) and its type parameters, each read at its node through the
-instantiation. The runtime instantiation maps only the types static typing
+its calls), read at the frame's types for its parameters (`frameNty`), and its
+type parameters, each read at its node through the instantiation. The runtime instantiation maps only the types static typing
 interns, exactly the required ones, so a clause over every type of the
 namespace would fail at real frames. Over the required types and the
 parameters, coherence holds at the runtime frame, and a coherent caller's
@@ -724,22 +754,27 @@ should be derived data of the target.
 
 ## Function values of tuple-returning functions
 
-A function type states its results as a row (`|&T|(K, &V)` has the results `K`
-and `&V`, each with a sharing mark), a function declares one tuple-typed result,
-and a `ResultShape` is none or one type, so a target's one-element row of a tuple
-never equals the row of the type. Such a function is therefore not carried as a
-closure target; a function value of one is refused at its construction: "a
-function value of `f` is not supported: `f` returns a tuple" (`closureTargetRefusal`),
-naming a reference it holds. Calling it directly is unaffected. Move allows these
-values, so this is a gap of Verex, not a rule of the language.
+A function value uses the same result representation as its target and the
+runtime: no value for a unit result, otherwise one value. A tuple remains one
+native tuple in the result row, represented by `ResultShape.one (.tuple ...)`.
+Invocation and generic contract transport use that same packed value.
+The source `ensures_of` predicate still lists the tuple elements separately;
+contract translation packs those values into the native tuple. Tuple results
+therefore need no additional result-shape case.
 
-A target stating a shared reference below the top level of a parameter or result
-is, besides, not a closure target at all (`closureSignature?` is `none`): the
-native type erases the reference, so no sharing mark records it, and `TypedAs`
-could not read it without losing `TypedAs.unique`.
+Keeping tuples packed matters for generic results. Substituting `(u64, Bool)` for
+`R` in a callback returning `R` preserves the row's arity, so the generic theorem
+and the concrete callback have the same type. It also distinguishes `(T,)` from
+`T`, and preserves nested tuples. Flattening tuple results would require a
+separate account of arity-changing substitution and these distinctions.
 
-Open: results as rows, where `ResultShape` gains a row case, a function's
-tuple result reads as its elements with their marks, and the refusal goes.
+This does not introduce sharing marks inside a tuple. A target stating a shared
+reference below the top level of a parameter or result remains outside
+`closureSignature?`: the native type erases the reference there, so no sharing
+mark records it, and `TypedAs` could not read it without losing `TypedAs.unique`.
+An invocation returning a tuple containing mutable loans remains subject to the
+existing aggregate-reference restrictions. Supporting those cases needs a
+representation of sharing and loan transfer within the returned aggregate.
 
 ## Non-goals
 

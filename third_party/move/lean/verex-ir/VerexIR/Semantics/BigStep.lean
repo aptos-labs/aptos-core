@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexIR.Semantics.Operations
+import VerexIR.Semantics.ScopedMethods
 import VerexIR.Semantics.TableRoles
 
 /-!
@@ -84,12 +85,13 @@ mutual
       RuntimeState → Control → Prop where
     | node (namespaceId frame state exprId startFrame startState nodeFrame nodeState control
         finalFrame finalState)
-        (before_eq : settleLoans (loanDeathsAt unit namespaceId exprId).before frame state =
-          (startFrame, startState))
+        (before_eq : settleDeaths unit namespaceId (loanDeathsAt unit namespaceId exprId).before
+          (deadPlacesAt unit namespaceId exprId).before frame state = (startFrame, startState))
         (node_step : EvalNodeWith executable callee namespaceId startFrame startState exprId
           nodeFrame nodeState control)
-        (after_eq : settleAfter (loanDeathsAt unit namespaceId exprId).after control
-          nodeFrame nodeState = (finalFrame, finalState)) :
+        (after_eq : settleAfter unit namespaceId (loanDeathsAt unit namespaceId exprId).after
+          (deadPlacesAt unit namespaceId exprId).after control nodeFrame nodeState =
+          (finalFrame, finalState)) :
         EvalExprWith executable callee namespaceId frame state exprId finalFrame finalState control
 
   /-- Big-step evaluation of one node, the loan deaths at it aside. A loop
@@ -874,6 +876,7 @@ inductive EvalFunction {unit : ValidatedUnit} (executable : ExecutableUnit unit)
       finalState control outcome)
       (namespace_eq : unit.namespaces[handle.namespaceId.index]? = some ns)
       (declaration_eq : ns.functions[handle.functionId.index]? = some declaration)
+      (scoped_eq : scopedArguments unit declaration arguments = true)
       (provided_eq : runtimeProvided unit handle declaration = false)
       (frame_eq : initialFrame? declaration arguments typeInstantiation = some frame)
       (body_eq : declaration.body = .structured root)
@@ -888,6 +891,7 @@ inductive EvalFunction {unit : ValidatedUnit} (executable : ExecutableUnit unit)
       (namespace_eq : unit.namespaces[handle.namespaceId.index]? = some ns)
       (declaration_eq : ns.functions[handle.functionId.index]? = some declaration)
       (arity_eq : arguments.size = declaration.signature.parameters.size)
+      (scoped_eq : scopedArguments unit declaration arguments = true)
       (provided_eq : runtimeProvided unit handle declaration = true)
       (native_eq : nativeCall executable handle typeInstantiation initialState arguments =
         some (finalState, outcome))
@@ -947,6 +951,7 @@ def EvalFunctionWith {unit : ValidatedUnit} (executable : ExecutableUnit unit)
   (∃ ns declaration frame root finalFrame evaluatedState control,
     unit.namespaces[handle.namespaceId.index]? = some ns ∧
     ns.functions[handle.functionId.index]? = some declaration ∧
+    scopedArguments unit declaration arguments = true ∧
     runtimeProvided unit handle declaration = false ∧
     initialFrame? declaration arguments typeInstantiation = some frame ∧
     declaration.body = .structured root ∧
@@ -960,6 +965,7 @@ def EvalFunctionWith {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     unit.namespaces[handle.namespaceId.index]? = some ns ∧
     ns.functions[handle.functionId.index]? = some declaration ∧
     arguments.size = declaration.signature.parameters.size ∧
+    scopedArguments unit declaration arguments = true ∧
     runtimeProvided unit handle declaration = true ∧
     nativeCall executable handle typeInstantiation initialState arguments = some (finalState, outcome) ∧
     outcome.holeFree = true)
@@ -975,17 +981,17 @@ theorem EvalFunction_iff {unit : ValidatedUnit} (executable : ExecutableUnit uni
   constructor
   · intro step
     cases step
-    · exact .inl ⟨_, _, _, _, _, _, _, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩
-    · exact .inr ⟨_, _, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩
+    · exact .inl ⟨_, _, _, _, _, _, _, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩
+    · exact .inr ⟨_, _, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩
   · rintro (⟨ns, declaration, frame, root, finalFrame, evaluatedState, control,
-      namespace_eq, declaration_eq, provided_eq, frame_eq, body_eq, body_step, outcome_eq,
+      namespace_eq, declaration_eq, scoped_eq, provided_eq, frame_eq, body_eq, body_step, outcome_eq,
       hole_free, finalize_eq⟩ | ⟨ns, declaration, namespace_eq, declaration_eq, arity_eq,
-      provided_eq, native_eq, hole_free⟩)
+      scoped_eq, provided_eq, native_eq, hole_free⟩)
     · exact .body handle typeInstantiation initialState arguments ns declaration frame root finalFrame
-        evaluatedState finalState control outcome namespace_eq declaration_eq provided_eq
+        evaluatedState finalState control outcome namespace_eq declaration_eq scoped_eq provided_eq
         frame_eq body_eq body_step outcome_eq hole_free finalize_eq
     · exact .native handle typeInstantiation initialState arguments ns declaration finalState outcome
-        namespace_eq declaration_eq arity_eq provided_eq native_eq hole_free
+        namespace_eq declaration_eq arity_eq scoped_eq provided_eq native_eq hole_free
 
 
 /-- A source-independent function meaning over the declarative relation. -/

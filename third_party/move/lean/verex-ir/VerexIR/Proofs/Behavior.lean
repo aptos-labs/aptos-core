@@ -34,6 +34,10 @@ variable [Carriers]
 prophecy, as the reference's death leaves it (`Term.resolve`). -/
 def Denote.ResultShape.Settled : (shape : ResultShape) → shape.carrier → Prop
   | .one (.ref referent), value => value.1 = NTy.forget referent value.2
+  -- A slice reference's carrier keeps both readings certified
+  -- (`NTy.carrier`, `.sliceRef`), so the settled comparison is between two
+  -- values of one type and needs no `forget`.
+  | .one (.sliceRef _), value => value.currentVector = value.finalVector
   | _, _ => True
 
 /-- A value with a mutable reference's prophecy replaced by its entry value:
@@ -57,15 +61,28 @@ def Denote.NTy.settle : (τ : NTy) → τ.carrier → τ.plain
   | .enum source arguments names rows distinct, value =>
       NTy.forget (.enum source arguments names rows distinct) value
   | .vector element, value => NTy.forget (.vector element) value
+  | .slice element, value => NTy.forget (.slice element) value
+  | .array element length, value => NTy.forget (.array element length) value
+  -- A slice reference's carrier is homogeneous, so its settled form is the
+  -- pair settled at the current, forgotten to the plain layer.
+  | .sliceRef element, value =>
+      NTy.forget (.sliceRef element) (SpecSliceRef.ofArrays value.current value.current)
+  | .char, value => value
   | .table key value', value => NTy.forget (.table key value') value
   | .ghost slot, value => NTy.forget (.ghost slot) value
   | .param index, value => NTy.forget (.param index) value
+  | .nominal source arguments productive, value =>
+      NTy.forget (.nominal source arguments productive) value
+  -- A substitution's marked entry stands for a reference-free type, as a
+  -- parameter does: settling only forgets its certificates.
+  | .observed referent, value => NTy.forget (.observed referent) value
   | .function _ _ _, value => value
 
 /-- A plain value with a mutable reference's prophecy replaced by its
 entry value: a settled value settled again. -/
 def Denote.NTy.settlePlain : (τ : NTy) → τ.plain → τ.plain
   | .ref _, value => (value.1, value.1)
+  | .sliceRef _, value => SpecSliceRef.ofArrays value.current value.current
   | .unit, value => value
   | .bool, value => value
   | .int _ _, value => value
@@ -74,14 +91,21 @@ def Denote.NTy.settlePlain : (τ : NTy) → τ.plain → τ.plain
   | .signer, value => value
   | .string, value => value
   | .bytes, value => value
+  | .char, value => value
   | .tuple _, value => value
   | .struct _ _ _, value => value
   | .enum _ _ _ _ _, value => value
   | .vector _, value => value
+  | .slice _, value => value
+  | .array _ _, value => value
   | .table _ _, value => value
   | .ghost _, value => value
   | .param _, value => value
   | .function _ _ _, value => value
+  | .nominal _ _ _, value => value
+  -- A substitution's marked entry stands for a reference-free type, as a
+  -- parameter does: settling leaves its value.
+  | .observed _, value => value
 
 /-- A row of arguments, each settled. -/
 def Denote.HList.settle : (row : NRow) → HList row → HListPlain row
@@ -98,11 +122,17 @@ row of final values a clause names of them (`ensures_of`). -/
 def Denote.NRow.finals : NRow → NRow
   | .nil => .nil
   | .cons (.ref σ) rest => .cons σ (NRow.finals rest)
+  -- A mutable slice reference's final value is its contents at the loan's
+  -- death, read as a slice: the operand `ensures_of` names of it
+  -- (`doc/designs/higher-order-functions.md`, tuple-returning callbacks).
+  | .cons (.sliceRef element) rest => .cons (.slice element) (NRow.finals rest)
   | .cons .unit rest | .cons .bool rest | .cons (.int _ _) rest | .cons .num rest
   | .cons .address rest | .cons .signer rest | .cons .string rest | .cons .bytes rest
-  | .cons (.tuple _) rest | .cons (.struct _ _ _) rest | .cons (.enum _ _ _ _ _) rest
-  | .cons (.vector _) rest | .cons (.table _ _) rest | .cons (.ghost _) rest
-  | .cons (.param _) rest | .cons (.function _ _ _) rest => NRow.finals rest
+  | .cons .char rest | .cons (.tuple _) rest | .cons (.struct _ _ _) rest
+  | .cons (.enum _ _ _ _ _) rest | .cons (.vector _) rest | .cons (.slice _) rest
+  | .cons (.array _ _) rest | .cons (.table _ _) rest | .cons (.ghost _) rest
+  | .cons (.param _) rest | .cons (.function _ _ _) rest | .cons (.nominal _ _ _) rest
+  | .cons (.observed _) rest => NRow.finals rest
 
 /-- The prophecies a row of arguments holds, in the order of its mutable
 references: the final values a clause names of them, which settling forgets
@@ -111,7 +141,13 @@ them, so that the row of finals reduces with the row. -/
 def Denote.HList.finals : (row : NRow) → HList row → HList (NRow.finals row)
   | .nil, _ => ()
   | .cons (.ref _) rest, values => (values.1.2, HList.finals rest values.2)
+  | .cons (.sliceRef _) rest, values => (values.1.finalVector, HList.finals rest values.2)
   | .cons .unit rest, values => HList.finals rest values.2
+  | .cons .char rest, values => HList.finals rest values.2
+  | .cons (.slice _) rest, values => HList.finals rest values.2
+  | .cons (.array _ _) rest, values => HList.finals rest values.2
+  | .cons (.nominal _ _ _) rest, values => HList.finals rest values.2
+  | .cons (.observed _) rest, values => HList.finals rest values.2
   | .cons .bool rest, values => HList.finals rest values.2
   | .cons (.int _ _) rest, values => HList.finals rest values.2
   | .cons .num rest, values => HList.finals rest values.2
@@ -386,7 +422,7 @@ resolutions. -/
 theorem Skolems.resolve_function (parameters : NRow) (shared : Sharing) (results : NRow) :
     Θ.resolve (.function parameters shared results) =
       .function parameters.resolved shared results.resolved := by
-  rw [Θ.resolve_eq, NRow.resolved_eq_substWith, NRow.resolved_eq_substWith]
+  rw [Θ.resolve_eq_type, NRow.resolved_eq_substWith, NRow.resolved_eq_substWith]
   rfl
 
 /-- A function value at the frame as the base frame holds it. -/
@@ -974,17 +1010,28 @@ theorem Denote.NTy.settle_ofSkolem [Θ : Carriers] [@CarriersNonempty Θ] (θ : 
     NTy.settle (τ.subst θ.1) (NTy.ofSkolem θ τ value) =
       NTy.plainOfSkolem θ τ (@NTy.settle (Carriers.instantiate θ Θ) τ value)
   | .param index, value => by
-      rw [NTy.settle_self_of_refFree _ (NRow.getD_refFree θ.1 free index _ rfl),
+      rw [NTy.settle_self_of_refFree _
+          ((NTy.refFree_unmark _).trans (NRow.getD_refFree θ.1 free index (.param index) rfl)),
         (NTy.forget_ofSkolem θ (.param index) value).symm]
       rfl
   | .ref _, _ | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _
-  | .string, _ | .bytes, _ | .function _ _ _, _ => rfl
+  | .string, _ | .bytes, _ | .char, _ | .function _ _ _, _ => rfl
   | .tuple elements, value => (NTy.forget_ofSkolem θ (.tuple elements) value).symm
   | .struct source arguments fields, value =>
       (NTy.forget_ofSkolem θ (.struct source arguments fields) value).symm
   | .enum source arguments names rows distinct, value =>
       (NTy.forget_ofSkolem θ (.enum source arguments names rows distinct) value).symm
   | .vector element, value => (NTy.forget_ofSkolem θ (.vector element) value).symm
+  | .slice element, value => (NTy.forget_ofSkolem θ (.slice element) value).symm
+  | .array element length, value => (NTy.forget_ofSkolem θ (.array element length) value).symm
+  -- Settling a slice reference forgets the pair settled at its current,
+  -- the composition `NTy.forget_ofSkolem` gives at `.sliceRef`.
+  | .sliceRef element, value =>
+      (NTy.forget_ofSkolem θ (.sliceRef element)
+        (SpecSliceRef.ofArrays value.current value.current)).symm
+  | .nominal source arguments productive, value =>
+      (NTy.forget_ofSkolem θ (.nominal source arguments productive) value).symm
+  | .observed referent, value => (NTy.forget_ofSkolem θ (.observed referent) value).symm
   | .table key values, value => (NTy.forget_ofSkolem θ (.table key values) value).symm
   | .ghost slot, value => (NTy.forget_ofSkolem θ (.ghost slot) value).symm
 
@@ -1002,9 +1049,14 @@ theorem Denote.HList.settle_ofSkolem [Θ : Carriers] [@CarriersNonempty Θ] (θ 
       rw [NTy.settle_ofSkolem θ free τ, HList.settle_ofSkolem θ free rest]
 
 /-- A value without a reference is settled. -/
-theorem Denote.ResultShape.settled_one_of_refFree [Carriers] (τ : NTy) (free : τ.refFree = true)
-    (value : τ.carrier) : (ResultShape.one τ).Settled value := by
-  cases τ <;> first | trivial | simp [NTy.refFree] at free
+theorem Denote.ResultShape.settled_one_of_refFree [Carriers] : (τ : NTy) → τ.refFree = true →
+    (value : τ.carrier) → (ResultShape.one τ).Settled value
+  | .ref _, free, _ | .sliceRef _, free, _ => by simp [NTy.refFree] at free
+  | .unit, _, _ | .bool, _, _ | .int _ _, _, _ | .num, _, _ | .address, _, _ | .signer, _, _
+  | .string, _, _ | .bytes, _, _ | .char, _, _ | .tuple _, _, _ | .struct _ _ _, _, _
+  | .enum _ _ _ _ _, _, _ | .vector _, _, _ | .slice _, _, _ | .array _ _, _, _
+  | .table _ _, _, _ | .ghost _, _, _ | .param _, _, _ | .function _ _ _, _, _
+  | .nominal _ _ _, _, _ | .observed _, _, _ => trivial
 
 /-- A result is settled in either view alike. -/
 theorem Denote.ResultShape.settled_ofSkolem [Θ : Carriers] [@CarriersNonempty Θ] (θ : TypeArgs)
@@ -1025,12 +1077,23 @@ theorem Denote.ResultShape.settled_ofSkolem [Θ : Carriers] [@CarriersNonempty �
       · intro same; rw [same]
   | .one (.param index), value => by
       have settled := ResultShape.settled_one_of_refFree ((NTy.param index).subst θ.1)
-        (NRow.getD_refFree θ.1 free index _ rfl) (ResultShape.ofSkolem θ (.one (.param index)) value)
+        ((NTy.refFree_unmark _).trans (NRow.getD_refFree θ.1 free index (.param index) rfl))
+        (ResultShape.ofSkolem θ (.one (.param index)) value)
       exact ⟨fun _ => trivial, fun _ => settled⟩
+  | .one (.sliceRef τ), value => by
+      change NTy.ofSkolem θ (.vector τ) value.currentVector =
+          NTy.ofSkolem θ (.vector τ) value.finalVector ↔
+        value.currentVector = value.finalVector
+      constructor
+      · intro same
+        have := congrArg (NTy.toSkolem θ (.vector τ)) same
+        rwa [NTy.toSkolem_ofSkolem, NTy.toSkolem_ofSkolem] at this
+      · intro same; rw [same]
   | .one .unit, _ | .one .bool, _ | .one (.int _ _), _ | .one .num, _ | .one .address, _
-  | .one .signer, _ | .one .string, _ | .one .bytes, _ | .one (.tuple _), _
-  | .one (.struct _ _ _), _ | .one (.enum _ _ _ _ _), _ | .one (.vector _), _
-  | .one (.table _ _), _ | .one (.ghost _), _ | .one (.function _ _ _), _ => Iff.rfl
+  | .one .signer, _ | .one .string, _ | .one .bytes, _ | .one .char, _ | .one (.tuple _), _
+  | .one (.struct _ _ _), _ | .one (.enum _ _ _ _ _), _ | .one (.vector _), _ | .one (.array _ _), _
+  | .one (.slice _), _ | .one (.table _ _), _ | .one (.ghost _), _ | .one (.function _ _ _), _
+  | .one (.nominal _ _ _), _ | .one (.observed _), _ => Iff.rfl
 
 /-- A result encodes alike in either view. -/
 theorem Denote.resultCodec_encode_ofSkolem [Θ : Carriers] [@CarriersNonempty Θ] (θ : TypeArgs) :
@@ -1253,5 +1316,45 @@ theorem forall_ok_unit_self_of_wp {σ ε : Type} {action : Spec σ ε Unit}
 attribute [vir_denote_norm] Denote.NTy.refFree Denote.NRow.refFree Denote.NRows.refFree
 attribute [vir_denote_norm] Denote.ResultShape.Settled Denote.NTy.settle Denote.HList.settle
   Denote.NTy.settlePlain Denote.HListPlain.settle
+
+/-- A generic closure's verified target applies at the induced frame, with
+captured dictionaries woven into its ordinary arguments. -/
+theorem ensuresOf_generic_verified {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Θ : Skolems unit]
+    (θ : TypeArgs) (free : θ.1.refFree = true) {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (capturedFree : captured.refFree = true)
+    (shape : ResultShape) (handle : FunctionHandle) (outer : Array (TypeId × TypeId))
+    (typeArgs : Array GenericArgument)
+    (coherent : @Coherent unit _ (Skolems.instantiate θ Θ) handle
+      (frameInstantiation unit handle outer typeArgs))
+    (captures : HList (NRow.subst θ.1 captured)) (shared : Sharing)
+    (typed : SiteTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
+      handle weave.mask (frameInstantiation unit handle outer typeArgs) (NRow.subst θ.1 captured))
+    (args : HList (NRow.subst θ.1 supplied))
+    {result : (shape.subst θ.1).carrier} {pre post : Memory unit}
+    {contract : Contract (Memory unit) Failure
+      (@HList (Skolems.instantiate θ Θ).toCarriers full)
+      (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)}
+    (verified : Satisfies
+      (@propheticMeaning unit _ executable (Skolems.instantiate θ Θ)
+        (frameInstantiation unit handle outer typeArgs) handle full shape) contract)
+    (ensures : EnsuresOf (closureMeaning executable) (NRow.subst θ.1 supplied) shared
+      (shape.subst θ.1) (functionOfGeneric unit outer typeArgs θ weave shape shared handle captures typed)
+      args result pre post)
+    (assumed : contract.assumes (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre)
+    (permitted : contract.requires (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre) :
+    (¬contract.mayAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre →
+      contract.ensures (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
+        (ResultShape.toSkolem θ shape result) post) ∧
+    contract.frame (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
+      (ResultShape.toSkolem θ shape result) post ∧
+    ¬contract.mustAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre := by
+  unfold EnsuresOf at ensures
+  rw [closureMeaning_closureOfGeneric executable θ free weave capturedFree shape handle outer typeArgs coherent] at ensures
+  rcases ensures with ⟨value, middle, run, same, state⟩
+  subst post
+  subst result
+  rw [NTy.toSkolem_ofSkolem_shape]
+  exact (verified _ pre assumed permitted).1 value middle run
 
 end VerexIR.Proofs

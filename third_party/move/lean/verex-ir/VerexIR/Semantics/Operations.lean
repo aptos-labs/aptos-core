@@ -216,7 +216,7 @@ def constValue? : ConstValue → Option RuntimeValue
       constValue? element
   | .tuple elements => .tuple <$> elements.attach.mapM fun ⟨element, _⟩ =>
       constValue? element
-  | .profile _ => none
+  | .profile _ | .opaque _ => none
 
 /-- Reify a closed runtime value for a pure profile operation. References,
 nominal data, and closures are intentionally excluded from this boundary. -/
@@ -232,7 +232,7 @@ def RuntimeValue.toConst? : RuntimeValue → Option ConstValue
       RuntimeValue.toConst? element
   | .tuple elements => .tuple <$> elements.attach.mapM fun ⟨element, _⟩ =>
       RuntimeValue.toConst? element
-  | .signer .. | .nominal .. | .ghost .. | .closure .. | .borrow .. | .loanHole .. => none
+  | .retired | .signer .. | .nominal .. | .ghost .. | .closure .. | .borrow .. | .loanHole .. => none
 
 /-- The ghost fields of a nominal declaration, whose slots follow its
 declared fields in its values (`doc/designs/ghost-fields.md`). -/
@@ -1484,7 +1484,7 @@ by name, where a lambda would have no rewrite identity. -/
 
 /-- The borrow `loan` at a node, retired to a unit. -/
 @[simp] def borrowClear? (loan : Nat) : RuntimeValue → Option RuntimeValue
-  | .borrow instance_ _ => if instance_ == loan then some .unit else none
+  | .borrow instance_ _ => if instance_ == loan then some .retired else none
   | _ => none
 
 /-- Replace the hole of `loan` by `replacement`; `none` when the hole is not
@@ -2368,7 +2368,7 @@ theorem clearBorrowValue_local (frame : RuntimeFrame) (state : RuntimeState)
       (value.bind (rewriteFirst (borrowClear? loan))).isSome) = some slot.index)
     (read : frame.locals[slot.index]? = some (some (.borrow loan current))) :
     clearBorrowValue frame state loan =
-      ({ frame with locals := frame.locals.set! slot.index (some .unit) }, state) := by
+      ({ frame with locals := frame.locals.set! slot.index (some .retired) }, state) := by
   simp [clearBorrowValue, indexOfFrom_eq_findIdx?, found, read,
     rewriteFirst, borrowClear?]
 
@@ -2529,7 +2529,7 @@ mutual
   with its export. The returned values themselves are never changed. -/
   def maskReturnedBorrows (loans : Array Nat) (value : RuntimeValue) : RuntimeValue :=
     match value with
-    | .borrow loan _ => if loans.contains loan then .unit else value
+    | .borrow loan _ => if loans.contains loan then .retired else value
     | .vector elements => .vector (maskReturnedBorrowList loans elements.toList).toArray
     | .tuple elements => .tuple (maskReturnedBorrowList loans elements.toList).toArray
     | .nominal source variant fields =>
@@ -2538,7 +2538,7 @@ mutual
         .closure function mask instantiation (maskReturnedBorrowList loans captures.toList).toArray
     | .ghost contents => .ghost (maskReturnedBorrows loans contents)
     | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ |
-        .string _ | .bytes _ | .loanHole _ => value
+        .string _ | .bytes _ | .loanHole _ | .retired => value
   termination_by sizeOf value
   decreasing_by
     all_goals simp_wf
@@ -3292,7 +3292,12 @@ mutual
           -- dereferencing one is its base; any other dereference projects
           -- into a live mutable borrow.
           if sharedDereference unit ns.unitIdentity placeId then
-            resolvePlaceFuel? unit ns frame state fuel base
+            -- Under a shared view it reads what a mutable reference refers to,
+            -- which a live borrow is not, nor what a retired one left: validation
+            -- rules out reading a holder after its loan's death.
+            let resolved ← resolvePlaceFuel? unit ns frame state fuel base
+            let value ← readRuntimePlace? frame state resolved
+            if value.live then none else some { resolved with writable := false }
           else
           let basePlace ← resolvePlaceFuel? unit ns frame state fuel base
           let .borrow _ _ ← readRuntimePlace? frame state basePlace | none
@@ -3327,6 +3332,10 @@ mutual
           let basePlace ← resolvePlaceFuel? unit ns frame state fuel base
           some { basePlace with
             projections := basePlace.projections.push (.subslice start stop fromEnd) }
+      | .unsize base => do
+          let basePlace ← resolvePlaceFuel? unit ns frame state fuel base
+          let .vector _ ← readRuntimePlace? frame state basePlace | none
+          some basePlace
       | .downcast base variant =>
           let basePlace ← resolvePlaceFuel? unit ns frame state fuel base
           let .nominal _ (some actual) _ ← readRuntimePlace? frame state basePlace | none
@@ -3542,7 +3551,7 @@ def placeVariantMismatchFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace)
               | _, _ => false
       -- Every variant holds the ghost slots: only the base may mismatch.
       | some (.deref base) | some (.ghostField base ..) | some (.index base _) |
-          some (.subslice base ..) =>
+          some (.subslice base ..) | some (.unsize base) =>
           (resolvePlaceFuel? unit ns frame state fuel base).isNone &&
             placeVariantMismatchFuel? unit ns frame state fuel base
       | some (.localVar _) | none => false
@@ -3559,7 +3568,7 @@ def variantMismatch? (unit : ValidatedUnit) (ns : ValidatedNamespace) (operation
             | some choices => !choices.any (·.1 == variant)
             | none => false
       | _, _ => false
-  | .copy place | .read place | .move place | .borrow _ place | .write place | .drop place =>
+  | .copy place | .read place | .readDiscriminant place | .move place | .borrow _ place | .write place | .drop place =>
       placeVariantMismatchFuel? unit ns frame state (2 * ns.places.size + 3) place
   | _ => false
 
@@ -3945,11 +3954,19 @@ theorem registerReturnedLoan_some_singleBorrow
           (⟨lexical⟩, loan) } := by
   simp [registerReturnedLoan, outermostBorrows, borrowEntry?, collectPruned]
 
+/-- Forming a mutable slice reference requires sequence storage. Other
+referent types retain their existing loan-chain representation. No extent is
+checked here: its preservation is enforced by the slice loan's storage type. -/
+def borrowStorageShape (referent : Ty) (value : RuntimeValue) : Bool :=
+  match referent with
+  | .slice _ => (value matches .vector _)
+  | _ => true
+
 /-- Borrow a resolved place after lowering has selected the lexical loan
 identity.  This is the native location operation: it contains no unit,
 namespace, expression, certificate, or arena lookup. -/
 def borrowRuntimePlaceAt? (lexical : Nat) (referenceType : ReferenceType)
-    (kind : BorrowKind)
+    (referentType : Ty) (kind : BorrowKind)
     (frame : RuntimeFrame) (state : RuntimeState) (place : RuntimePlace) :
     Option (RuntimeFrame × RuntimeState × RuntimeValue) := do
   let expectedKind ← match kind with
@@ -3961,9 +3978,11 @@ def borrowRuntimePlaceAt? (lexical : Nat) (referenceType : ReferenceType)
   match expectedKind with
   | .shared =>
       -- A shared reference is the observed value: certified exclusivity
-      -- erases the wrapper, and no loan instance is minted.
-      some (frame, state, value)
+      -- erases the wrapper, no loan instance is minted, and what it holds of a
+      -- mutable reference is what that refers to: a callee holds no borrow.
+      value.view?.map (frame, state, ·)
   | .mutable => do
+      if !borrowStorageShape referentType value then none else
       let loanInstance := state.nextLoan
       let state := { state with nextLoan := loanInstance + 1 }
       let (frame, state) ← writeRuntimePlace? frame state place (.loanHole loanInstance)
@@ -3993,8 +4012,9 @@ def borrowRuntimePlace? (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (!place.writable && expectedKind == .mutable) then none else
   let value ← readRuntimePlace? frame state place
   match expectedKind with
-  | .shared => some (frame, state, value)
+  | .shared => value.view?.map (frame, state, ·)
   | .mutable => do
+      if !borrowStorageShape (ns.tables.types[referenceType.referent.index]?.getD .unit) value then none else
       let loanInstance := state.nextLoan
       let state := { state with nextLoan := loanInstance + 1 }
       let lexical ← certificateLoanId? unit ns.unitIdentity site
@@ -4016,7 +4036,7 @@ theorem borrowRuntimePlace?_immutable_at (unit : ValidatedUnit)
     (lexical : Nat) (frame : RuntimeFrame) (state : RuntimeState)
     (place : RuntimePlace) :
     borrowRuntimePlace? unit ns site referenceType .immutable frame state place =
-      borrowRuntimePlaceAt? lexical referenceType .immutable frame state place := rfl
+      borrowRuntimePlaceAt? lexical referenceType .unit .immutable frame state place := rfl
 
 theorem borrowRuntimePlace?_mutable_at (unit : ValidatedUnit)
     (ns : ValidatedNamespace) (site : ExprId) (referenceType : ReferenceType)
@@ -4024,32 +4044,35 @@ theorem borrowRuntimePlace?_mutable_at (unit : ValidatedUnit)
     (place : RuntimePlace)
     (loan_eq : certificateLoanId? unit ns.unitIdentity site = some lexical) :
     borrowRuntimePlace? unit ns site referenceType .mutable frame state place =
-      borrowRuntimePlaceAt? lexical referenceType .mutable frame state place := by
+      borrowRuntimePlaceAt? lexical referenceType
+        (ns.tables.types[referenceType.referent.index]?.getD .unit) .mutable frame state place := by
   simp [borrowRuntimePlace?, borrowRuntimePlaceAt?, loan_eq]
 
 /-- A shared borrow of a native global location, once lowering/proof-side
 storage splitting has established the slot contents.  The theorem removes
 all residual place reads from the denotation proof. -/
 theorem borrowRuntimePlaceAt?_global_immutable_of_lookup
-    (lexical : Nat) (referenceType : ReferenceType)
+    (lexical : Nat) (referenceType : ReferenceType) (referentType : Ty)
     (frame : RuntimeFrame) (state : RuntimeState) (key : GlobalKey)
     (value : RuntimeValue) (kind_eq : referenceType.kind = .shared)
     (lookup_eq : state.globals.lookup key = some value) :
-    borrowRuntimePlaceAt? lexical referenceType .immutable frame state
+    borrowRuntimePlaceAt? lexical referenceType referentType .immutable frame state
         { root := .global key } =
-      some (frame, state, value) := by
+      value.view?.map (frame, state, ·) := by
   simp [borrowRuntimePlaceAt?, readRuntimePlace?, readRoot?,
-    readProjections?, kind_eq, lookup_eq] <;> rfl
+    readProjections?, kind_eq, lookup_eq]
+  exact fun different => absurd different (by decide)
 
 /-- A mutable borrow of a native global location, once the selected slot is
 known to be present.  The result is the keyed hole write and loan registry
 update directly—not a search through global storage. -/
 theorem borrowRuntimePlaceAt?_global_mutable_of_lookup
-    (lexical : Nat) (referenceType : ReferenceType)
+    (lexical : Nat) (referenceType : ReferenceType) (referentType : Ty)
     (frame : RuntimeFrame) (state : RuntimeState) (key : GlobalKey)
     (value : RuntimeValue) (kind_eq : referenceType.kind = .mutable)
-    (lookup_eq : state.globals.lookup key = some value) :
-    borrowRuntimePlaceAt? lexical referenceType .mutable frame state
+    (lookup_eq : state.globals.lookup key = some value)
+    (shape : borrowStorageShape referentType value = true) :
+    borrowRuntimePlaceAt? lexical referenceType referentType .mutable frame state
         { root := .global key } =
       some
         ({ frame with
@@ -4064,7 +4087,7 @@ theorem borrowRuntimePlaceAt?_global_mutable_of_lookup
            nextLoan := state.nextLoan + 1 },
          .borrow state.nextLoan value) := by
   simp [borrowRuntimePlaceAt?, readRuntimePlace?, readRoot?,
-    readProjections?, writeRuntimePlace?, writeRoot?, kind_eq, lookup_eq] <;> rfl
+    readProjections?, writeRuntimePlace?, writeRoot?, kind_eq, lookup_eq, shape] <;> rfl
 
 /-- Result of a global-storage primitive. Missing resources and duplicate
 publication are language-level aborts rather than interpreter failures. -/
@@ -4142,12 +4165,12 @@ def containsGlobalAt? (namespaceId : NamespaceId) (typeId : TypeId)
   some (.value frame state (.bool (globalExists state namespaceId typeId key)))
 
 def borrowGlobalAt? (namespaceId : NamespaceId) (typeId : TypeId)
-    (referenceType : ReferenceType) (lexicalLoan : Nat) (kind : BorrowKind)
+    (referenceType : ReferenceType) (referentType : Ty) (lexicalLoan : Nat) (kind : BorrowKind)
     (arguments : Array RuntimeValue) (frame : RuntimeFrame)
     (state : RuntimeState) : Option GlobalOperationResult :=
   borrowGlobalUsing? namespaceId typeId
     (fun frame state place =>
-      borrowRuntimePlaceAt? lexicalLoan referenceType kind frame state place)
+      borrowRuntimePlaceAt? lexicalLoan referenceType referentType kind frame state place)
     arguments frame state
 
 def takeGlobalAt? (namespaceId : NamespaceId) (typeId : TypeId)
@@ -4286,7 +4309,7 @@ def freezeBorrow? (resultType : ReferenceType) (arguments : Array RuntimeValue)
     Option (RuntimeFrame × RuntimeState × RuntimeValue) := do
   let #[.borrow _ current] := arguments | none
   if resultType.kind != .shared then none else
-  some (frame, state, current)
+  current.view?.map (frame, state, ·)
 
 def mutateBorrow? (arguments : Array RuntimeValue)
     (frame : RuntimeFrame) (state : RuntimeState) :
@@ -4324,12 +4347,52 @@ def settleLoans (loans : Array LoanId) (frame : RuntimeFrame) (state : RuntimeSt
               applyWriteBack frame state loanInstance current
           | none => (frame, state)
 
-/-- End the loans anchored after a node once it produced a value; control
-leaving the node abruptly skips them. -/
-def settleAfter (loans : Array LoanId) (control : Control) (frame : RuntimeFrame)
+/-- What a value holds along a holder's path. -/
+def heldAt? (unit : ValidatedUnit) (ns : ValidatedNamespace) :
+    RuntimeValue → List LoanProjection → Option RuntimeValue
+  | value, [] => some value
+  | .borrow _ current, .dereference :: rest => heldAt? unit ns current rest
+  | .nominal source variant fields, .field name :: rest => do
+      let fieldName ← sourceFieldName? ns name
+      let index ← handleFieldIndex? unit source variant fieldName
+      heldAt? unit ns (← fields[index]?) rest
+  | value@(.nominal ..), .downcast _ :: rest => heldAt? unit ns value rest
+  | .vector elements, .index (some index) :: rest
+  | .tuple elements, .index (some index) :: rest => do
+      heldAt? unit ns (← elements[index]?) rest
+  | _, _ :: _ => none
+
+/-- A place dying alone: the reference it holds meets its lender, and the loan goes on
+through what took it. -/
+def retirePlace (unit : ValidatedUnit) (ns : ValidatedNamespace) (frame : RuntimeFrame)
+    (state : RuntimeState) (place : LocalId × List LoanProjection) :
+    RuntimeFrame × RuntimeState :=
+  match (frame.locals[place.1.index]?).bind id |>.bind (heldAt? unit ns · place.2) with
+  | some (.borrow loan _) =>
+      match findBorrowValue? frame state loan with
+      | some current =>
+          let (frame, state) := clearBorrowValue frame state loan
+          applyWriteBack frame state loan current
+      | none => (frame, state)
+  | _ => (frame, state)
+
+/-- End the loans anchored at a node, then what the places dying there alone hold. -/
+def settleDeaths (unit : ValidatedUnit) (namespaceId : NamespaceId) (loans : Array LoanId)
+    (places : Array (LocalId × List LoanProjection)) (frame : RuntimeFrame)
+    (state : RuntimeState) : RuntimeFrame × RuntimeState :=
+  let settled := settleLoans loans frame state
+  match unit.namespaces[namespaceId.index]? with
+  | some ns => places.foldl (fun (pair : RuntimeFrame × RuntimeState) place =>
+      retirePlace unit ns pair.1 pair.2 place) settled
+  | none => settled
+
+/-- End the deaths anchored after a node once it produced a value; control leaving the
+node abruptly skips them. -/
+def settleAfter (unit : ValidatedUnit) (namespaceId : NamespaceId) (loans : Array LoanId)
+    (places : Array (LocalId × List LoanProjection)) (control : Control) (frame : RuntimeFrame)
     (state : RuntimeState) : RuntimeFrame × RuntimeState :=
   match control with
-  | .value _ => settleLoans loans frame state
+  | .value _ => settleDeaths unit namespaceId loans places frame state
   | _ => (frame, state)
 
 /-- End a returned scalar reborrow at its recorded death: remove the
@@ -4346,7 +4409,7 @@ theorem settleLoans_returnedReborrow_zero
           activeLoans := #[(⟨0⟩, loan)]
           loanLocations }
         state =
-        ({ locals := #[some (.borrow outerLoan current), some .unit]
+        ({ locals := #[some (.borrow outerLoan current), some .retired]
            activeLoans := #[]
            loanLocations },
          state) := by
@@ -4375,7 +4438,7 @@ theorem settleLoans_returnedProjectedReborrow_zero
           loanLocations }
         state =
         ({ locals := #[some (.borrow outerLoan
-              (.nominal name none #[current, .integer right])), some .unit]
+              (.nominal name none #[current, .integer right])), some .retired]
            activeLoans := #[]
            loanLocations },
          state) := by
@@ -4406,7 +4469,7 @@ theorem settleLoans_returnedGlobalProjection_zero
           globalLoans := (loan, key) :: rest
           nextLoan
           pending } =
-        ({ locals := #[some (.address address), some .unit]
+        ({ locals := #[some (.address address), some .retired]
            activeLoans := #[] },
          { globals := (globals.insert key
                (.nominal name none #[.loanHole loan, .integer right])).insert key
@@ -4453,7 +4516,7 @@ theorem settleLoans_twoReturnedReborrows
         state =
         ({ locals := #[some (.borrow leftOuter (.integer left)),
               some (.borrow rightOuter (.integer right)),
-              some .unit, some .unit]
+              some .retired, some .retired]
            activeLoans := #[]
            loanLocations :=
              #[(leftOuter,
@@ -4506,7 +4569,7 @@ theorem settleLoans_globalBorrowThirdLocal
           nextLoan
           pending } =
         ({ locals := #[some (.address address), some (.integer argument),
-              some .unit]
+              some .retired]
            activeLoans := #[]
            loanLocations := #[(loan, { root := .global key })] },
          { globals := (globals.insert key (.loanHole loan)).insert key
@@ -4551,7 +4614,7 @@ theorem settleLoans_focusedGlobalNominal
           nextLoan
           pending } =
         ({ locals := #[some (.address address), some (.integer amount),
-              some .unit, some .unit]
+              some .retired, some .retired]
            activeLoans := #[]
            loanLocations := #[(loan, { root := .global key }),
              (loan + 1,
@@ -4614,7 +4677,7 @@ theorem settleLoans_focusedGlobalNominalSaved
           nextLoan
           pending } =
         ({ locals := #[some (.address address), some (.integer amount),
-              some .unit, some (.integer saved), some .unit]
+              some .retired, some (.integer saved), some .retired]
            activeLoans := #[]
            loanLocations := #[(loan, { root := .global key }),
              (loan + 1,
@@ -4665,6 +4728,15 @@ def evaluatePlaceOperation? (unit : ValidatedUnit) (ns : ValidatedNamespace)
       let resolved ← resolvePlace? unit ns frame state place
       let value ← readRuntimePlace? frame state resolved
       some (frame, state, value)
+  | .readDiscriminant place =>
+      if !arguments.isEmpty then none else
+      let resolved ← resolvePlace? unit ns frame state place
+      let .nominal source (some variant) _ ← readRuntimePlace? frame state resolved | none
+      let tag ← variantDiscriminant? unit source variant
+      let resultNode ← ns.tables.types[resultType.index]?
+      let integerType ← resolveTargetIntegerType? (targetPointerWidth? unit) resultNode
+      let .ok value := checkedInteger .abort integerType tag | none
+      some (frame, state, value)
   | .move place =>
       if !arguments.isEmpty then none else
       let resolved ← resolvePlace? unit ns frame state place
@@ -4677,8 +4749,13 @@ def evaluatePlaceOperation? (unit : ValidatedUnit) (ns : ValidatedNamespace)
         -- Prepared projected consumption is restricted to owned local indexes,
         -- subslices, and fields, optionally qualified by an enum downcast.
         -- The initialization certificate makes the retained aggregate field
-        -- observationally inaccessible until it is rewritten.
-        some (frame, state, value)
+        -- observationally inaccessible until it is rewritten. A moved reference is the
+        -- loan's only holder: its component is cleared, since a borrow is found by id.
+        match value with
+        | .borrow loan _ =>
+            let (frame, state) := clearBorrowValue frame state loan
+            some (frame, state, value)
+        | _ => some (frame, state, value)
   | .borrow kind place =>
       if !arguments.isEmpty then none else
       let .reference referenceType ← ns.tables.types[resultType.index]? | none
@@ -4701,7 +4778,7 @@ def evaluatePlaceOperation? (unit : ValidatedUnit) (ns : ValidatedNamespace)
       -- A shared borrow of a computed value is that value: a shared
       -- reference is the value it observes.
       let #[value] := arguments | none
-      some (frame, state, value)
+      value.view?.map (frame, state, ·)
   | .reference .dereference =>
       -- A shared reference is the observed value itself, so dereferencing
       -- one reads it; any other dereference observes a live mutable
@@ -4815,6 +4892,9 @@ theorem placeVariantMismatchFuel?_resolve (unit : ValidatedUnit) (ns : Validated
           | subslice base _ _ _ =>
               simp only [Bool.and_eq_true, Option.isNone_iff_eq_none] at mismatch
               simp [mismatch.1]
+          | unsize base =>
+              simp only [Bool.and_eq_true, Option.isNone_iff_eq_none] at mismatch
+              simp [mismatch.1]
 
 
 /-- An operation whose variant-field access mismatches fails. -/
@@ -4829,6 +4909,7 @@ theorem variantMismatch?_evaluate_none {unit : ValidatedUnit} {ns : ValidatedNam
   cases operation with
   | copy place => simp [variantMismatch?] at mismatch; simp [evaluatePlaceOperation?, resolve place mismatch]
   | read place => simp [variantMismatch?] at mismatch; simp [evaluatePlaceOperation?, resolve place mismatch]
+  | readDiscriminant place => simp [variantMismatch?] at mismatch; simp [evaluatePlaceOperation?, resolve place mismatch]
   | move place => simp [variantMismatch?] at mismatch; simp [evaluatePlaceOperation?, resolve place mismatch]
   | borrow kind place =>
       simp [variantMismatch?] at mismatch
@@ -4888,7 +4969,7 @@ theorem evaluatePlaceOperation?_sharedBorrow (unit : ValidatedUnit) (ns : Valida
     (resultType : TypeId) (site : ExprId) (value : RuntimeValue) (frame : RuntimeFrame)
     (state : RuntimeState) :
     evaluatePlaceOperation? unit ns resultType site (.reference (.borrow .immutable)) #[value]
-      frame state = some (frame, state, value) := rfl
+      frame state = value.view?.map (frame, state, ·) := rfl
 
 theorem evaluatePlaceOperation?_freeze (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (resultType : TypeId) (site : ExprId) (explicit : Bool) (value : RuntimeValue)
@@ -4903,7 +4984,8 @@ theorem evaluatePlaceOperation?_freeze (unit : ValidatedUnit) (ns : ValidatedNam
 theorem freezeBorrow?_single (resultType : ReferenceType) (value : RuntimeValue)
     (frame : RuntimeFrame) (state : RuntimeState) :
     freezeBorrow? resultType #[value] frame state = match value with
-      | .borrow _ current => if resultType.kind != .shared then none else some (frame, state, current)
+      | .borrow _ current =>
+          if resultType.kind != .shared then none else current.view?.map (frame, state, ·)
       | _ => none := by
   cases value <;> rfl
 

@@ -1,0 +1,32 @@
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:61:4: error: the specification clause `ensures (value is None) ==> result == 6` is not established
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:60:7: error: verex verification failed: the automatic verification of `false_ensures` failed; provide a proof in the module:
+  verify false_ensures by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:63:44: error: `at_bool` calls `shape_call_lib::unwrap_u32` at `{Bool}`, which matches no contract of it; its shapes are `{u32}`
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:68:58: error: `at_parameter` calls `shape_call_lib::unwrap_u32` at `{T}`, which matches no contract of it; its shapes are `{u32}`
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:73:56: error: `second_apart` calls `shape_call_lib::second` at `{u32} {Bool}`, which matches no contract of it; its shapes are `{A} {A}`
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:77:61: error: `second_parameters` calls `shape_call_lib::second` at `{T} {U}`, which matches no contract of it; its shapes are `{A} {A}`
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:82:7: error: `apart`: the contracts at two shapes apart only in a pointer-width integer differ: the verifier's types do not tell those apart, so they must state one contract
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:40:4: error: the precondition `requires _2 < 10` of `shape_call_lib::index.at_0` does not hold at this call
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:88:7: error: verex verification failed: the automatic verification of `position_too_far` failed; provide a proof in the module:
+  verify position_too_far by lean =>
+    verex_obligations
+    verex_on
+    | requires_1_of_index_at_0 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:93:4: error: `other_output` calls `shape_call_lib::index` at `{u32} {usize} {Bool} {Bool}`, which matches no contract of it; its shapes are `{T} {usize} {A} {T}`
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:99:4: error: `other_index` calls `shape_call_lib::index` at `{u32} {u32} {Bool} {u32}`, which matches no contract of it; its shapes are `{T} {usize} {A} {T}`
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:105:4: error: `u64_index` calls `shape_call_lib::index` at `{u32} {u64} {Bool} {u32}`, which matches no contract of it; its shapes are `{T} {usize} {A} {T}`
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:112:4: error: the specification clause `ensures result == other + 1` is not established
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:111:7: error: verex verification failed: the automatic verification of `pick_other` failed; provide a proof in the module:
+  verify pick_other by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

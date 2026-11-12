@@ -13,7 +13,7 @@ account : VerexIR.Proofs.Denote.NTy.signer.carrier
 a : VerexIR.Proofs.Denote.NTy.address.carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
-verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 2210 (some account, some a, none, none, ()) initialState✝
+verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 1274 (some account, some a, none, none, ()) initialState✝
 val✝ : 0x42.TestResources.unit.nominal.namespace.0.declaration✝⁻⁰.carrier
 heq✝ :
   initialState✝
@@ -25,7 +25,7 @@ invariantHolds✝² invariantHolds✝¹ left✝¹ : True
 left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds val✝.val.fst
 right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil val✝.val.snd
 verexAnchor :
-  VerexIR.Proofs.Denote.AnchorSaved 2555 (some account, some a, some val✝, some val✝.val.fst, ())
+  VerexIR.Proofs.Denote.AnchorSaved 1539 (some account, some a, some val✝, some val✝.val.fst, ())
     (initialState✝.set
       { type := 0x42.TestResources.unit.nominal.namespace.0.declaration✝⁻⁰,
         arguments := VerexIR.Proofs.Denote.NRow.nil }

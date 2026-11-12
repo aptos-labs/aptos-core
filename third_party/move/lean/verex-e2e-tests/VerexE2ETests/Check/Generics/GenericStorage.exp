@@ -1,3 +1,158 @@
 `publish_generic` uses concrete verification: Given interpretation does not yet support storage interpretation
 `has_generic` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/Check/Generics/GenericStorage.lean:41:4: error: the specification clause `ensures result == exists<Vault<u64> >(address)` is not established
+VerexE2ETests/Check/Generics/GenericStorage.lean:40:7: error: verex verification failed: the automatic verification of `has_u64_vault` failed; provide a proof in the module:
+  verify has_u64_vault by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 `take_generic` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/Check/Generics/GenericStorage.lean:83:7: error: verification failed with a residual obligation:
+case continues.none.continues.right.right.right
+account : VerexIR.Proofs.Denote.NTy.signer.carrier
+value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory «0x42».generic_storage.unit
+assumed : True
+permitted :
+  initialState✝
+      { type := 0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.int 64 false))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account) =
+    none
+verexStart :
+  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 0 } }
+    (account, value, ()) initialState✝
+calleeRequires :
+  VerexIR.Proofs.Obligation "VerexE2ETests/Check/Generics/GenericStorage.lean" 654 698
+    ¬(initialState✝
+            (VerexIR.Proofs.Denote.Skolems.resource
+              (0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false))
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
+            (VerexIR.StorageKey.address account)).isSome =
+        true
+invariantHolds✝¹ left✝¹ : True
+left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds value
+right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+verexAnchor : VerexIR.Proofs.Denote.AnchorSaved 9 (some account, some value, ()) initialState✝
+heq :
+  initialState✝
+      { type := 0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account) =
+    none
+invariantHolds✝ : True
+resource : VerexIR.Proofs.Denote.ResourceType
+x✝ :
+  ¬resource =
+      { type := 0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil }
+⊢ initialState✝.set
+      { type := 0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account)
+      (some
+        ((0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰
+              (VerexIR.Proofs.Denote.NTy.int 64 false)).ofDeepHolds
+          (value, ()) ⋯))
+      resource =
+    initialState✝ resource
+VerexE2ETests/Check/Generics/GenericStorage.lean:83:7: error: verification failed with a residual obligation:
+case continues.none.continues.right.right.left
+account : VerexIR.Proofs.Denote.NTy.signer.carrier
+value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory «0x42».generic_storage.unit
+assumed : True
+permitted :
+  initialState✝
+      { type := 0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.int 64 false))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account) =
+    none
+verexStart :
+  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 0 } }
+    (account, value, ()) initialState✝
+calleeRequires :
+  VerexIR.Proofs.Obligation "VerexE2ETests/Check/Generics/GenericStorage.lean" 654 698
+    ¬(initialState✝
+            (VerexIR.Proofs.Denote.Skolems.resource
+              (0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false))
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
+            (VerexIR.StorageKey.address account)).isSome =
+        true
+invariantHolds✝¹ left✝¹ : True
+left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds value
+right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+verexAnchor : VerexIR.Proofs.Denote.AnchorSaved 9 (some account, some value, ()) initialState✝
+heq :
+  initialState✝
+      { type := 0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account) =
+    none
+invariantHolds✝ : True
+key : VerexIR.StorageKey
+x✝ : ¬key = VerexIR.StorageKey.address account
+⊢ initialState✝.set
+      { type := 0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account)
+      (some
+        ((0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰
+              (VerexIR.Proofs.Denote.NTy.int 64 false)).ofDeepHolds
+          (value, ()) ⋯))
+      { type := 0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.int 64 false))
+            VerexIR.Proofs.Denote.NRow.nil }
+      key =
+    initialState✝
+      { type := 0x42.generic_storage.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false),
+        arguments :=
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+              (VerexIR.Proofs.Denote.NTy.int 64 false))
+            VerexIR.Proofs.Denote.NRow.nil }
+      key
+VerexE2ETests/Check/Generics/GenericStorage.lean:87:4: error: the specification clause `aborts_if false` is not established
+VerexE2ETests/Check/Generics/GenericStorage.lean:83:7: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (35000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+VerexE2ETests/Check/Generics/GenericStorage.lean:83:7: error: verex verification failed: the automatic verification of `publish_u64` exceeded its budget of 35000 maxHeartbeats after deciding 3 leaves (stage interrupted); provide a proof in the module:
+  verify publish_u64 by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

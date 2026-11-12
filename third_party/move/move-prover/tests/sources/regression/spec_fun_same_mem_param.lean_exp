@@ -1,1 +1,10 @@
+Move prover returns: exiting with verification errors
 tests/sources/regression/spec_fun_same_mem_param.move:18:1: info: `is_xdx` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/regression/spec_fun_same_mem_param.move:36:9: error: the specification clause `ensures result == spec_is_xdx::<T>()` is not established
+tests/sources/regression/spec_fun_same_mem_param.move:34:5: error: verex verification failed: the automatic verification of `is_xdx` failed; provide a proof in the module:
+  verify is_xdx by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

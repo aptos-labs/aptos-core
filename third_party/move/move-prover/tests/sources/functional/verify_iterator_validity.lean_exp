@@ -47,12 +47,15 @@ tests/sources/functional/verify_iterator_validity.move:272:5: error: verex verif
     | requires_1_of_iter_borrow => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:60:9: error: the precondition `requires spec_iter_valid(self, t)` of `0x42::iter_table::iter_borrow_mut` does not hold at this call
-tests/sources/functional/verify_iterator_validity.move:281:5: error: verex verification failed: the automatic verification of `stale_borrow_mut_fails` failed; provide a proof in the module:
+tests/sources/functional/verify_iterator_validity.move:281:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (1000000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/verify_iterator_validity.move:281:5: error: verex verification failed: the automatic verification of `stale_borrow_mut_fails` exceeded its budget of 1000000 maxHeartbeats after deciding 4 leaves (stage interrupted); provide a proof in the module:
   verify stale_borrow_mut_fails by lean =>
     verex_obligations
     verex_on
-    | requires_1_of_iter_borrow_mut => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_iterator_validity.move:81:9: error: the precondition `requires spec_iter_valid(self, _t)` of `0x42::iter_table::iter_borrow` does not hold at this call

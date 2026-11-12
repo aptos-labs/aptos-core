@@ -28,7 +28,7 @@
 //! in `--print(...)`. Unknown tokens or an empty section list cause the
 //! test to fail at parse time.
 //!
-//! ## `// RUN: execute <addr>::<module>::<func> [--args <v1>, <v2>, ...] [--heap-size <n>]`
+//! ## `// RUN: execute <addr>::<module>::<func> [--args <v1>, <v2>, ...] [--heap-size <n>] [--commit]`
 //!
 //! Invokes `<func>` in the given module on both VMs. Arguments are
 //! comma-separated decimal literals, parsed according to the function's
@@ -39,8 +39,17 @@
 //!
 //! `--heap-size <n>` sets the MonoMove heap to `n` bytes (default otherwise).
 //! A small heap forces garbage collection under allocation pressure. The V1
-//! VM has no heap-size knob and ignores it. Modifiers may appear in
-//! any order.
+//! VM has no heap-size knob and ignores it.
+//!
+//! `--commit` makes the step a transaction whose global-storage writes are
+//! part of its output and outlive it. On success, the output gains a
+//! `writes:` segment listing each write as `create`, `modify`, or `delete`
+//! with its resource type, address, and bytes (or `writes: none`, or
+//! `writes: error: <message>` if they could not be collected). The writes
+//! are then committed to the storage both VMs read in later steps: V1's when
+//! V1 ran, MonoMove's otherwise. Without it, the step's writes are discarded.
+//!
+//! Modifiers may appear in any order.
 //!
 //! ## `// CHECK-GC-COUNT: <n>`
 //!
@@ -151,6 +160,9 @@ pub enum Step {
         /// default. A small heap forces GC under allocation pressure. Has no
         /// effect on the V1 VM.
         heap_size: Option<usize>,
+        /// Whether the step's writes are rendered and committed
+        /// (`--commit`).
+        commit: bool,
         checks: Vec<Check>,
     },
 }
@@ -277,6 +289,7 @@ fn parse_execute_step(line: &str) -> anyhow::Result<Step> {
 
     let mut args = vec![];
     let mut heap_size = None;
+    let mut commit = false;
     // Each modifier is `--<flag> <value>`. Split on the ` --` boundary (not bare
     // `--`) so a value containing `--` is not shredded, and match the flag name
     // as a whole token so a typo like `--heap-size9` is rejected rather than
@@ -302,6 +315,12 @@ fn parse_execute_step(line: &str) -> anyhow::Result<Step> {
                             .map_err(|err| anyhow!("invalid --heap-size {:?}: {}", value, err))?,
                     );
                 },
+                "commit" => {
+                    if !value.is_empty() {
+                        bail!("--commit takes no value, got {:?}", value);
+                    }
+                    commit = true;
+                },
                 other => bail!("Unknown execute modifier: --{}", other),
             }
         }
@@ -325,6 +344,7 @@ fn parse_execute_step(line: &str) -> anyhow::Result<Step> {
         function_name,
         args,
         heap_size,
+        commit,
         checks: vec![],
     })
 }

@@ -3,6 +3,7 @@
 
 import VerexSL.Contract.Clauses
 import VerexIR.Proofs.Denote.GivenOwn
+import VerexIR.Proofs.ReceiverScoped
 
 /-!
 # Generated contracts from VIR specifications
@@ -50,6 +51,7 @@ private structure Slot where
   kind : SlotKind := .plain
   physical : IrTy
   nty : VerexIR.Proofs.Denote.NTy
+  clauseDomain : Domain
 
 private def slotOf (context : Context) (name : Name) (typeId : TypeId)
     (allowReference : Bool := false) : MetaM Slot := do
@@ -59,14 +61,31 @@ private def slotOf (context : Context) (name : Name) (typeId : TypeId)
     | .reference reference => do
         unless allowReference do
           throwError "a result of reference type is not supported in generated contracts"
-        let some referent := context.unit.tables.types[reference.referent.index]?
-          | throwError "reference referent type {reference.referent.index} is out of range"
+        -- A shared reference holds what it refers to, through any reference there.
+        let rec seenThrough : Nat → TypeId → TypeId
+          | 0, id => id
+          | fuel + 1, id => match context.unit.tables.types[id.index]? with
+            | some (.reference inner) => seenThrough fuel inner.referent
+            | _ => id
+        let referentId := if reference.kind == .shared then
+            seenThrough context.unit.tables.types.size reference.referent
+          else reference.referent
+        let some referent := context.unit.tables.types[referentId.index]?
+          | throwError "reference referent type {referentId.index} is out of range"
         let kind := match reference.kind with
           | .shared => SlotKind.sharedRef
           | .mutable => SlotKind.mutableRef
-        pure (kind, referent, reference.referent)
+        pure (kind, referent, referentId)
     | declared => pure (SlotKind.plain, declared, typeId)
-  return { name, kind, physical, nty := ← context.nativeType physicalId }
+  let some clauseType := context.unit.tables.types[(specTypeId context.unit typeId).index]?
+    | throwError "a clause slot has an unknown referent type"
+  -- Preserve nested loan carriers here. `nativeType` intentionally sees through
+  -- all references for clause expressions, which is too early for this slot.
+  let some nty := context.ntyOf? physicalId
+    | throwError "a clause slot has no native carrier"
+  let nty := match nty with | .slice element => .vector element | other => other
+  return { name, kind, physical, nty
+           clauseDomain := domainOf clauseType }
 
 private def disjunction (parts : Array Lean.Expr) : MetaM Lean.Expr := do
   match parts.toList with
@@ -248,6 +267,33 @@ private def pragmaEnabled (contract : VerexIR.FunctionContract) (name : String) 
     | .assign pragmaName (.constant (.bool true)) _ => pragmaName == name
     | _ => false
 
+/-- Whether `aborts_if_is_strict` is in effect for a function, by its contract
+or its module. -/
+private def abortsStrictly (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Bool :=
+  pragmaEnabled declaration.contract "aborts_if_is_strict" || declaration.pragmas.any fun
+    | .assign name (.constant (.bool true)) _ => name == "aborts_if_is_strict"
+    | _ => false
+
+/-- The key of the obligation a function's failing paths owe where no clause
+permits them, shared by the profiles (`doc/plan/proof-language.md`, "Obligation
+addressing"): Rust's implicit clause, or a strict Move function's `False`. -/
+def noFailureKey? (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Option String :=
+  let states (kind : VerexIR.ConditionKind) := declaration.contract.conditions.any fun condition =>
+    condition.kind == kind && !isImplicitNoPanic condition
+  if states .abortsIf then none
+  else if declaration.contract.conditions.any isImplicitNoPanic then some "no panic"
+  else if !states .abortsWith && abortsStrictly declaration && declaration.body != .absent then
+    some "no abort"
+  else none
+
+/-- Where that obligation is located: the function's `spec` item, or the
+function where it has none. -/
+def noFailureRange (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : ObligationRange :=
+  locRange ns (declaration.contract.loc.getD declaration.loc)
+
 /-- The expressions a function's verification reads: the conditions of its
 contract and its body. -/
 private def functionRoots (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
@@ -307,7 +353,7 @@ where
     | 0 => false
     | fuel + 1 => match unit.tables.types[typeId.index]? with
       | some (.typeParameter _) | none => false
-      | some (.vector element _) | some (.typeDomain element) => go element fuel
+      | some (.vector element _) | some (.slice element) | some (.typeDomain element) => go element fuel
       | some (.reference reference) => go reference.referent fuel
       | some (.tuple elements) => elements.all (go · fuel)
       | some (.function arguments result _) => arguments.all (go · fuel) && go result fuel
@@ -369,9 +415,12 @@ def frameUses (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
               .specification (.remove _) | .specification (.update _) =>
               if let some (some resource) := inner[0]? then
                 unless memory.contains resource do memory := memory.push resource
-                if operation matches .global (.borrow .mutable) | .global .take |
-                    .global .publish | .specification (.publish _) |
-                    .specification (.remove _) | .specification (.update _) then
+                let writes := match operation with
+                  | .global kind => kind.writesMemory
+                  | .specification (.publish _) | .specification (.remove _) |
+                      .specification (.update _) => true
+                  | _ => false
+                if writes then
                   unless written.contains resource do written := written.push resource
           | .specification (.functionCall reference _) =>
               if let some typeArguments := inner.mapM (fun argument => argument) then
@@ -487,6 +536,7 @@ private partial def unifyInstance (unit : ValidatedUnit) (pattern : ScopedType) 
           | (.typeArg left, .typeArg right) =>
               unifyInstance unit (within left.typeId) right.typeId binding fuel
           | _ => some binding
+    | some (.slice element), some (.slice element')
     | some (.vector element _), some (.vector element' _) =>
         unifyInstance unit (within element) element' binding fuel
     | _, _ => if patternId == actual && scope.isNone then some binding else none
@@ -592,8 +642,8 @@ private def reachFrom (unit : ValidatedUnit) (roots : List (VerexIR.NamespaceId 
   let ((reached, resources), complete) := reachFold unit roots (false, #[])
     fun (reached, resources) operation instantiations =>
       let counts := match operation with
-        | .global (.borrow .mutable) | .global .take | .global .publish => true
-        | .global _ | .specification (.global _) | .specification (.publish _) |
+        | .global kind => kind.writesMemory || !writes
+        | .specification (.global _) | .specification (.publish _) |
             .specification (.remove _) | .specification (.update _) => !writes
         | _ => false
       if !counts then (reached, resources) else
@@ -621,7 +671,7 @@ private def qualifiedName? (unit : ValidatedUnit) (reference : VerexIR.Qualified
     Option String := do
   let path ← unit.tables.namespaces[reference.namespaceId.index]?
   let qualified ← unit.tables.names[reference.name.index]?
-  some ("::".intercalate (path.segments.toList ++ [qualified.name]))
+  some ("::".intercalate (path.segments.toList ++ [SpecTypes.scopedSpelling qualified]))
 
 /-- The functions of `names` a function applies, in code or in a
 specification, at any depth (`reachFold`); past the walk's bound, all of
@@ -853,7 +903,11 @@ private def invariantModifiedResources (ns : ValidatedNamespace)
 private def groupConditions (ns : ValidatedNamespace)
     (conditions : Array VerexIR.Condition) : MetaM ClauseGroups := do
   let mut groups : ClauseGroups := {}
+  -- The implicit `False` adds nothing beside a clause permitting a panic.
+  let statesAborts := conditions.any fun condition =>
+    condition.kind == .abortsIf && !isImplicitNoPanic condition
   for condition in conditions do
+    if statesAborts && isImplicitNoPanic condition then continue
     let range := conditionRange ns condition
     match condition.kind with
     | .requires => groups := { groups with
@@ -970,7 +1024,10 @@ private partial def carriesInvariant (unit : ValidatedUnit) (ty : IrTy)
     (arguments : Array Scoped) (depth : Nat) : Bool :=
   if depth > 16 then false else
   match ty with
-  | .vector element _ => match Scoped.resolve unit arguments element with
+  | .reference reference => match Scoped.resolve unit arguments reference.referent with
+      | some (referent, scope) => carriesInvariant unit referent scope (depth + 1)
+      | none => false
+  | .vector element _ | .slice element => match Scoped.resolve unit arguments element with
       | some (elementType, scope) => carriesInvariant unit elementType scope (depth + 1)
       | none => false
   | .tuple elements => elements.any fun element =>
@@ -1004,7 +1061,8 @@ private partial def carriesMatchingInvariant (unit : ValidatedUnit) (needed : Sp
     | some (elementType, scope) => carriesMatchingInvariant unit needed elementType scope (depth + 1)
     | none => false
   match ty with
-  | .vector elementId _ => element elementId
+  | .reference reference => element reference.referent
+  | .vector elementId _ | .slice elementId => element elementId
   | .tuple elements => elements.any element
   | .nominal _ uses => match nominalDeclaration? unit ty with
       | some (handle, owner, declaration) =>
@@ -1304,6 +1362,20 @@ private def variantFieldType? (τ : VerexIR.Proofs.Denote.NTy) (variant : String
   let row ← VerexIR.Proofs.Denote.NRows.variant? names rows variant
   row.toList[index]?
 
+/-- The current value and the prophecy of a native reference to `referent`.
+The current is plain, open while the loan lives; the prophecy is certified
+in a certified value and plain in a plain one, such as the current of a
+reference holding this one (`NTy.carrier`, `NTy.plain`). -/
+private def heldReferenceParts (carriers referent value : Lean.Expr) :
+    MetaM (Lean.Expr × Lean.Expr) := do
+  let holder := (← instantiateMVars (← inferType value)).consumeMData
+  let plain := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plain) carriers referent
+  let prophecy := if holder.isAppOf ``VerexIR.Proofs.Denote.NTy.plain ||
+      holder.isAppOf ``VerexIR.Proofs.Denote.NTy.plainOf then plain
+    else mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) carriers referent
+  return (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) plain prophecy value,
+    mkApp3 (mkConst ``Prod.snd [Level.zero, Level.zero]) plain prophecy value)
+
 /-- The data invariants of a native value of a type, at any depth, as the
 Move Prover assumes them: the type's declared invariants; for an intrinsic
 map, its discipline's validity and the invariants of its values; the
@@ -1340,6 +1412,27 @@ private partial def deepInvariantTerms (context : Context)
     return #[(mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.deepHolds) carriers quoted value, range)]
   if ty matches .typeParameter _ then return ← whole τ value fallback
   match ty, τ with
+  | .reference reference, _ =>
+      let some (referent, scope) := Scoped.resolve context.unit arguments reference.referent
+        | throwError "an invariant-bearing reference has an unresolved referent"
+      -- A holder's current referent is observed at each end of its outer loan.
+      -- Shared references erase native loan wrappers, leaving this value directly.
+      match τ with
+      | .ref inner =>
+          let (current, _) ← heldReferenceParts carriers (← quoteNTy inner) value
+          -- No carrier certifies it: the type of a held reference carries its
+          -- prophecy's invariants only (`NTy.deepHolds`), and no slot names it
+          -- for `Term.assumeCurrent`. Its declarations state theirs here.
+          deepInvariantTerms context #[] referent scope inner current (depth + 1)
+            fallback includePlainDeep
+      | .sliceRef element =>
+          deepInvariantTerms context carried referent scope (.vector element)
+            (← sliceReferenceContents value) (depth + 1) fallback includePlainDeep
+      | _ =>
+          deepInvariantTerms context carried referent scope τ value (depth + 1)
+            fallback includePlainDeep
+  | .slice element, .slice elementType
+  | .slice element, .vector elementType
   | .vector element _, .vector elementType =>
       let some (elementIr, scope) := Scoped.resolve context.unit arguments element
         | return ← whole τ value fallback
@@ -1552,9 +1645,10 @@ private def declaredOpaqueSpec? (unit : ValidatedUnit) (path : List String) (nam
 
 /-- Whether a physical type is a byte vector, `Vector<u8>`. -/
 private def isByteVector (unit : ValidatedUnit) (ty : IrTy) : Bool :=
-  if let .vector element _ := ty then
-    unit.tables.types[element.index]? == some (.integer (.bits 8) false)
-  else false
+  match ty with
+  | .vector element _ | .slice element =>
+      unit.tables.types[element.index]? == some (.integer (.bits 8) false)
+  | _ => false
 
 /-- Whether the unit declares the native at a qualified name. -/
 private def declaresNative (unit : ValidatedUnit) (qualified : String) : Bool := Id.run do
@@ -1584,7 +1678,7 @@ private def opaqueApplication (context : Context) (name : String) (typeArguments
         | throwError "internal: an uninterpreted value of a native type without the type"
       let carriers ← context.carriers
       let τ ← quoteNTy nty
-      let carrier := plainType carriers τ
+      let carrier := plainWorkerType carriers τ
       let inhabitant := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainInhabitant)
         carriers τ (← inhabitableProof τ)
       let inhabited := mkApp2 (mkConst ``Inhabited.mk [1]) carrier inhabitant
@@ -2244,10 +2338,11 @@ def translateLoopInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.Namesp
     (state : Option Lean.Expr := none) (executable : Option Lean.Expr := none)
     (kind : VerexIR.ConditionKind := .loopInvariant)
     (labeledAnchors : Array (Nat × Array (Option Lean.Expr) × Lean.Expr) := #[])
+    (finalLocals oldFinalLocals : Array (Option Lean.Expr) := #[])
     (interpretation : Option TranslationFrame := none) : MetaM Lean.Expr := do
   let context : Context := {
     unit, namespaceId, ns, locals, oldLocals, localTypes, localNames, results := #[],
-    types, state, oldState := some oldState,
+    finalLocals, oldFinalLocals, types, state, oldState := some oldState,
     anchorLocals := entryLocals, anchorState := entryState, labeledAnchors, executable, interpretation }
   let mut clauses ← block.conditions.filterMapM fun condition => do
     if condition.kind != kind then return none
@@ -2397,29 +2492,66 @@ structure NativeSignature where
 
 /-- Whether a quoted native type is a mutable reference. -/
 private def isReferenceType (ty : Lean.Expr) : Bool :=
-  ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.ref 1
+  ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.ref 1 ||
+    ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1
 
 /-- The current value and the prophecy of a native reference to `referent`. -/
-private def referencePartsAt (carriers referent value : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
-  -- The current of a mutable reference is plain, open while the loan lives;
-  -- the prophecy is certified (`NTy.carrier (.ref σ) = σ.plain × σ.carrier`,
-  -- `doc/designs/data-invariants.md`).
-  let plain := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plain) carriers referent
-  let carrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) carriers referent
-  return (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) plain carrier value,
-    mkApp3 (mkConst ``Prod.snd [Level.zero, Level.zero]) plain carrier value)
+private def referencePartsAt (carriers referent value : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) :=
+  heldReferenceParts carriers referent value
 
-private def referenceParts (skolems referent value : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
-  referencePartsAt (← frameCarriers skolems) referent value
+/-- The current value and the prophecy of a native reference of type `type`: a
+mutable slice's two readings (`sliceReferenceContents`), or a reference's. -/
+private def referenceParts (carriers type value : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
+  if type.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1 then
+    return (← sliceReferenceContents value, ← sliceReferenceContents value true)
+  referencePartsAt carriers type.appArg! value
 
 /-- The equation a returned mutable reference's value view rests on: its
 prophecy is its current value, as the reference's death leaves it
 (`ResultShape.Settled`).  The current is plain and the prophecy certified,
 so the prophecy is read with its certificates forgotten
 (`doc/designs/data-invariants.md`). -/
-private def settledReference (carriers referent current prophecy : Lean.Expr) :
+private def settledReference (carriers referent current prophecy : Lean.Expr)
+    (slice : Bool := false) : MetaM Lean.Expr := do
+  -- A slice reference keeps both readings certified (`NTy.carrier`,
+  -- `.sliceRef`), so its settled equation compares them directly; a
+  -- reference's current is plain, so its prophecy is read forgotten.
+  if slice then mkEq current prophecy
+  else mkEq current (← plainValueOf carriers referent prophecy)
+
+/-- The type a reference's prophecy is read at: its referent, and the vector
+of a mutable slice's elements, which its contents are read as
+(`sliceReferenceContents`). -/
+private def settledReferent (type : Lean.Expr) : Lean.Expr :=
+  if type.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1 then
+    mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.vector) type.appArg!
+  else type.appArg!
+
+/-- A native value holding references as a clause reads it at entry, or with
+`prophecies` at exit (`NTy.viewed`). -/
+private def viewedNative (carriers : Lean.Expr) (prophecies : Bool) (ty value : Lean.Expr) :
     MetaM Lean.Expr := do
-  mkEq current (← plainValueOf carriers referent prophecy)
+  return mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.viewed) carriers
+    (toExpr prophecies) ty value
+
+/-- A certified value holding references as a clause reads it, at the plain
+layer: a certified aggregate keeps the references it holds as they are
+(`NTy.viewed`), since settling one inside the certificate would owe a new
+one, so its row is forgotten first and viewed there (`NTy.plainViewed`). -/
+private def plainViewedNative (carriers : Lean.Expr) (prophecies : Bool) (ty value : Lean.Expr) :
+    Lean.Expr :=
+  mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.plainViewed) carriers (toExpr prophecies) ty
+    (mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.forget) carriers ty value)
+
+/-- Clause locals see through a chain of references. Keep the native carrier
+separately for invariants; projecting a nested holder does not settle its loan. -/
+private def clauseReferent (carriers : Lean.Expr) :
+    VerexIR.Proofs.Denote.NTy → Lean.Expr → MetaM Lean.Expr
+  | .sliceRef _, value => sliceReferenceContents value
+  | .ref referent, value => do
+      let (current, _) ← referencePartsAt carriers (← quoteNTy referent) value
+      clauseReferent carriers referent current
+  | _, value => pure value
 
 /-- The clause binders of the parameters, read off the native arguments.  A
 mutable reference's entry is its current value and its exit its prophecy. -/
@@ -2432,11 +2564,34 @@ private def parameterBinders (carriers : Lean.Expr) (slots : Array Slot) (types 
     let domain := domainOf slot.physical
     match slot.kind with
     | .mutableRef =>
-        let (current, prophecy) ← referencePartsAt carriers ty.appArg! value
-        return { entry := ← domain.binderOfNative current, entryNative := current
-                 exit := some (← domain.binderOfNative prophecy), exitNative := some prophecy }
-    | .plain | .sharedRef =>
-        return { entry := ← domain.binderOfNative value, entryNative := value }
+        let (current, prophecy) ← referenceParts carriers ty value
+        -- A referent holding references is read at each end of this loan: what
+        -- it holds keeps its own loans.
+        let (current, prophecy) ← if slot.nty.refFree then pure (current, prophecy) else
+          -- The current is plain and the prophecy certified, each viewed at its layer.
+          pure (mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.plainViewed) carriers
+              (toExpr false) (← quoteNTy slot.nty) current,
+            ← viewedNative carriers false (← quoteNTy slot.nty) prophecy)
+        return {
+          entry := ← slot.clauseDomain.binderOfNative (← clauseReferent carriers slot.nty current)
+          entryNative := current
+          exit := some (← slot.clauseDomain.binderOfNative (← clauseReferent carriers slot.nty prophecy))
+          exitNative := some prophecy }
+    | .plain =>
+        if slot.nty.refFree then
+          return { entry := ← domain.binderOfNative value, entryNative := value }
+        -- A value holding references is read through them, compositionally.
+        let entry := plainViewedNative carriers false ty value
+        let exit := plainViewedNative carriers true ty value
+        return { entry := ← domain.binderOfNative entry, entryNative := entry
+                 exit := some (← domain.binderOfNative exit), exitNative := some exit }
+    | .sharedRef =>
+        if slot.nty.refFree then
+          return { entry := ← domain.binderOfNative value, entryNative := value }
+        -- A shared view holds no loan: a clause reads what it holds as current.
+        let entry := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainUnerase)
+          carriers (← quoteNTy slot.nty) (← plainValueOf carriers (← quoteNTy slot.nty.erase) value)
+        return { entry := ← domain.binderOfNative entry, entryNative := entry }
 
 /-- Whether the expression tree at `root` reads a returned reference's final
 value. -/
@@ -2487,12 +2642,10 @@ def buildDeclaredRequires (unit : ValidatedUnit) (namespaceId : VerexIR.Namespac
             fun (((parameter, nty), nativeValue), index) => (parameter, nty, nativeValue, index) do
         let some ty := unit.tables.types[(specTypeId unit (ns.typeId parameter.typeUse.typeId)).index]?
           | throwError "a parameter has an unknown type"
-        let current ← match nty with
-          | .ref referent =>
-              -- The current of a mutable reference, which a precondition
-              -- reads of it, is plain (`referenceParts`).
-              (·.1) <$> referenceParts frame (← quoteNTy referent) nativeValue
-          | _ => pure nativeValue
+        -- The current of a mutable reference, which a precondition reads of
+        -- it, is plain (`referenceParts`); a chain of references is read
+        -- through to what it holds (`clauseReferent`).
+        let current ← clauseReferent carriers nty nativeValue
         locals := locals.set! index (some (← (domainOf ty).binderOfNative current))
       let context : Context :=
         { unit, namespaceId, ns, locals, localTypes
@@ -2684,14 +2837,27 @@ private def resultBinders (unit : ValidatedUnit) (slots : Array Slot)
   | [slot], some ty =>
       let domain := domainOf slot.physical
       if slot.kind == .mutableRef then
-        let (current, prophecy) ← referencePartsAt signature.frame.carriers ty.appArg! result
-        let final ← domain.binderOfNative prophecy
-        return (#[{ entry := ← domain.binderOfNative current, entryNative := current
+        let (current, prophecy) ← referenceParts signature.frame.carriers ty result
+        let final ← slot.clauseDomain.binderOfNative
+          (← clauseReferent signature.frame.carriers slot.nty prophecy)
+        return (#[{ entry := ← slot.clauseDomain.binderOfNative
+                      (← clauseReferent signature.frame.carriers slot.nty current), entryNative := current
                     exit := some final, exitNative := some prophecy }],
-          #[← settledReference signature.frame.carriers ty.appArg! current prophecy], #[some final], #[])
+          #[← settledReference signature.frame.carriers (settledReferent ty) current prophecy
+            (slice := ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1)],
+          #[some final], #[])
       let .tuple elements := slot.physical
-        | return (#[{ entry := ← domain.binderOfNative result, entryNative := result }], #[],
-            #[none], #[])
+        | if slot.nty.refFree then
+            return (#[{ entry := ← domain.binderOfNative result, entryNative := result }], #[],
+              #[none], #[])
+          -- A value holding references: read at its current values, each
+          -- reference's prophecy being its current value.
+          let current := plainViewedNative signature.frame.carriers false ty result
+          let prophecy := plainViewedNative signature.frame.carriers true ty result
+          -- The prophecy view is the result with each reference it holds at
+          -- its final value: what `final` of a projection of the result reads.
+          return (#[{ entry := ← domain.binderOfNative current, entryNative := current }],
+            #[← mkEq prophecy current], #[some (← domain.binderOfNative prophecy)], #[])
       -- A Move tuple: each component's binder, a returned reference's its
       -- current value, and its final value its prophecy.
       let values ← rowComponentsAt signature.frame.carriers result signature.resultComponentTypes
@@ -2704,10 +2870,11 @@ private def resultBinders (unit : ValidatedUnit) (slots : Array Slot)
           (signature.resultComponentTypes.zip values).zip elements do
         let componentDomain ← signatureDomain unit element "a result component"
         if isReferenceType componentType then
-          let (current, prophecy) ← referencePartsAt signature.frame.carriers componentType.appArg! value
+          let (current, prophecy) ← referenceParts signature.frame.carriers componentType value
           components := components.push (← componentDomain.binderOfNative current)
           premises := premises.push
-            (← settledReference signature.frame.carriers componentType.appArg! current prophecy)
+            (← settledReference signature.frame.carriers (settledReferent componentType) current prophecy
+              (slice := componentType.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1))
           finals := finals.push (some (← componentDomain.binderOfNative prophecy))
         else
           components := components.push (← componentDomain.binderOfNative value)
@@ -2875,24 +3042,42 @@ private def orderResult (context : Context)
   equateNative (← context.carriers) (← quoteNTy resultSlot.nty) resultBinders.entryNative
     (← orderingTerm context resultSlot.physical order)
 
-/-- Locate one function of a registered unit by its key: its name in the
-unit's module, or its path-qualified name in another namespace. -/
+/-- A function's own name, after the scopes of its namespace it is in. -/
+private def functionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
+  let qualified? : Option VerexIR.QualifiedName := do
+    let ns ← unit.namespaces[handle.namespaceId.index]?
+    let declaration ← ns.functions[handle.functionId.index]?
+    ns.nameOf declaration.name
+  (qualified?.map fun name => "::".intercalate (name.scope.push name.name).toList).getD ""
+
+/-- A function's path-qualified name, in every namespace. -/
+def qualifiedFunctionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
+  let path := (unit.tables.namespaces[handle.namespaceId.index]?.map (·.segments)).getD #[]
+  "::".intercalate (path.push (functionName unit handle)).toList
+
+/-- A function's name relative to a unit: its name in the unit's module,
+namespace 0, by its scopes there, and its path-qualified name in another
+namespace. -/
+def functionKey (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
+  if handle.namespaceId.index == 0 then functionName unit handle
+  else qualifiedFunctionName unit handle
+
+/-- Locate one function of a registered unit by its key, or its path-qualified
+name in the unit's module. -/
 def findFunction? (unit : ValidatedUnit) (key : String) :
     Option (Nat × ValidatedNamespace × Nat ×
       VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) := do
-  let parts := (key.splitOn "::").toArray
-  let path := parts.pop
-  let name := parts.back?.getD key
+  -- A scope's segment may hold `::`, a function's name does not.
+  let name := (key.splitOn "::").getLast?.getD key
   for h : namespaceIndex in [0:unit.namespaces.size] do
     let ns := unit.namespaces[namespaceIndex]
-    let owned := if path.isEmpty then namespaceIndex == 0 else
-      unit.tables.namespaces[ns.unitIdentity.index]?.map (·.segments) == some path
-    unless owned do continue
     for h : index in [0:ns.functions.size] do
       let declaration := ns.functions[index]
       if let some qualified := ns.nameOf declaration.name then
         if qualified.name == name then
-          return (namespaceIndex, ns, index, declaration)
+          let handle : VerexIR.FunctionHandle := { namespaceId := ⟨namespaceIndex⟩, functionId := ⟨index⟩ }
+          if functionKey unit handle == key || qualifiedFunctionName unit handle == key then
+            return (namespaceIndex, ns, index, declaration)
   none
 
 /-- A byte vector literal of a text, as a clause's `b"…"` denotes one. -/
@@ -3052,7 +3237,8 @@ def representationRead? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     | fuel + 1, some (.field base reference _) | fuel + 1, some (.ghostField base reference _) =>
         owner? reference <|> placeOwner? base fuel
     | fuel + 1, some (.deref base) | fuel + 1, some (.index base _)
-    | fuel + 1, some (.subslice base ..) | fuel + 1, some (.downcast base _) =>
+    | fuel + 1, some (.subslice base ..) | fuel + 1, some (.unsize base)
+    | fuel + 1, some (.downcast base _) =>
         placeOwner? base fuel
   let mut pending := #[root]
   let mut visited : Array Nat := #[]
@@ -3067,7 +3253,7 @@ def representationRead? (unit : ValidatedUnit) (ns : ValidatedNamespace)
         | .data (.select reference _) | .data (.selectGhost reference _)
         | .data (.selectVariants reference _) | .data (.testVariants reference _)
         | .data (.discriminant reference) | .data (.updateField reference _) => owner? reference
-        | .move place | .copy place | .borrow _ place | .read place | .write place
+        | .move place | .copy place | .borrow _ place | .read place | .readDiscriminant place | .write place
         | .drop place => placeOwner? place ns.places.size
         | _ => none
       if let some owner := read then return some owner
@@ -3623,8 +3809,14 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (own : DataOwn := {})
     (directContract : Option (VerexIR.FunctionHandle → Lean.Expr → Option Lean.Expr →
       MetaM DirectContract) := none)
-    (typeArgumentTypes : Array (Option VerexIR.Proofs.Denote.NTy) := #[]) :
+    (typeArgumentTypes : Array (Option VerexIR.Proofs.Denote.NTy) := #[])
+    -- Read the declarations at these arguments rather than substituting their
+    -- native readings (`Context.readAtArguments`).
+    (atArguments : Option VerexIR.Proofs.Denote.NRow := none) :
     MetaM Lean.Expr := do
+  let typeArgumentTypes :=
+    atArguments.map (fun row => row.toList.toArray.map some) |>.getD typeArgumentTypes
+  let readAtArguments := atArguments.isSome
   let uses := frameUses unit namespaceId declaration
   -- The data invariants of stored resources hold of the memory a function
   -- reaches, at entry and at exit, as the Move Prover assumes them at entry
@@ -3671,18 +3863,17 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   -- value of the model's uninterpreted function at its arguments, so two
   -- calls at equal arguments agree and a clause naming the function speaks
   -- about the same value.
-  let isStrict := pragmaEnabled declaration.contract "aborts_if_is_strict" ||
-    inEffect "aborts_if_is_strict" || nativeModel.isSome || mapRole.isSome
+  let isStrict := abortsStrictly declaration || nativeModel.isSome || mapRole.isSome
   let parameterSlots ← declaration.signature.parameters.mapIdxM fun index parameter =>
     slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
              locals := #[], results := #[], types := types,
-             typeInstantiation := typeInstantiation, typeArgumentTypes }
+             typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments }
       (Name.mkSimple (if parameter.name.isEmpty then s!"argument{index}" else parameter.name))
       (ns.typeId parameter.typeUse.typeId) (allowReference := true)
   let resultSlots ← declaration.signature.results.mapIdxM fun index result =>
     slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
              locals := #[], results := #[], types := types,
-             typeInstantiation := typeInstantiation, typeArgumentTypes }
+             typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments }
       (Name.mkSimple (if declaration.signature.results.size == 1 then "result"
         else s!"result{index}"))
       (ns.typeId result.typeId) (allowReference := true)
@@ -3709,7 +3900,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   let labelDefinitions := stateDefinitions ns declaration.contract
   let contextOf (state : Lean.Expr) (bound : Array SlotBinders) : Context :=
     { unit, namespaceId, ns, interpretation := some signature.frame
-      types := types, typeInstantiation := typeInstantiation, typeArgumentTypes
+      types := types, typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments
       locals := padLocals (bound.map fun binders => some binders.entry)
       localTypes := functionLocalTypes
       localNames := declaration.locals.map (·.name)
@@ -3754,7 +3945,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
             resultBinders unit resultSlots signature result
           let context : Context :=
             { unit, namespaceId, ns, interpretation := some signature.frame
-              types := types, typeInstantiation := typeInstantiation, typeArgumentTypes
+              types := types, typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments
               locals := padLocals (parameterBound.map fun binders => some binders.current)
               localTypes := functionLocalTypes
               localNames := declaration.locals.map (·.name)
@@ -3848,7 +4039,9 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
             -- Strictness supplies an implicit `aborts_if false`. In partial
             -- mode it is sufficient only, just like an explicit clause;
             -- it imposes no coverage requirement on an actual abort.
-            (if isStrict && !isPartial then mkConst ``False else mkConst ``True)
+            (if !isStrict || isPartial then mkConst ``True
+             else if declaration.body == .absent then mkConst ``False
+             else markObligation (noFailureRange ns declaration) (mkConst ``False))
           mkLambdaFVars #[arguments, state, failureBinder] permitted
         else
           let bound ← parameterBinders signature.frame.carriers parameterSlots signature.argumentTypes arguments
@@ -3944,24 +4137,46 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
           -- The value is typed by its carrier; an invocation's rows that
           -- mention the frame's type parameters are decided where the frame
           -- resolves them to scalars.
-          for invoked in #[row, type.getArg! 2] do
+          let methodEvidence := declaration.profile == .rust &&
+            declaration.attributes.any (fun
+              | .assign "method_evidence" (.constant (.integer parameter)) _ =>
+                  parameter == Int.ofNat index
+              | _ => false)
+          for invoked in (if methodEvidence then #[] else #[row, type.getArg! 2]) do
             if mentionsInvocableParameter invoked then
               conjuncts := conjuncts.push
                 (mkAppN (mkConst ``VerexIR.Proofs.ScalarAt)
                   (signature.frame.leading ++ #[(← signature.frame.concrete), invoked]))
           -- Over a model, the frame is of the model's invocations.
           let invoke? ← modelInvoke? executable (← signature.frame.concrete)
+          -- A compiler-generated static method dictionary carries a checked
+          -- non-panicking, memory-preserving contract. Unlike the ordinary
+          -- function-value frame, this obligation applies to mutable receivers.
+          if methodEvidence then
+            conjuncts := conjuncts.push (← mkAppM'
+              (mkAppN (mkConst ``VerexIR.Proofs.MethodContract)
+                (signature.frame.leading ++ #[executable, (← signature.frame.concrete)]))
+              #[row, sharing, shape, value])
+          if declaration.profile == .rust && declaration.attributes.any (fun
+              | .assign "scoped_method_evidence" (.constant (.integer parameter)) _ =>
+                  parameter == Int.ofNat index
+              | _ => false) then
+            conjuncts := conjuncts.push (← mkAppM'
+              (mkAppN (mkConst ``VerexIR.Proofs.ReceiverScopedMethod)
+                (signature.frame.leading ++ #[(← signature.frame.concrete)]))
+              #[row, sharing, shape, value])
           match declaration.contract.parameterFrames.find? (·.parameter.index == index) with
           | none =>
-              conjuncts := conjuncts.push (← match invoke? with
-                | some invoke =>
-                    mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf)
-                      (signature.frame.leading ++ #[(← signature.frame.concrete), invoke]))
-                      #[row, sharing, shape, value]
-                | none =>
-                    mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
-                      (signature.frame.leading ++ #[executable, (← signature.frame.concrete)]))
-                      #[row, sharing, shape, value])
+              unless methodEvidence do
+                conjuncts := conjuncts.push (← match invoke? with
+                  | some invoke =>
+                      mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf)
+                        (signature.frame.leading ++ #[(← signature.frame.concrete), invoke]))
+                        #[row, sharing, shape, value]
+                  | none =>
+                      mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
+                        (signature.frame.leading ++ #[executable, (← signature.frame.concrete)]))
+                        #[row, sharing, shape, value])
           | some frame =>
               -- The closed frame but for the targets, the formals bound to
               -- an invocation's arguments; `modifies_of<f> *` frames nothing.
@@ -4014,25 +4229,6 @@ private partial def pathSegments (stx : Syntax) : Array String :=
 
 private def pathName (segments : Array String) : Name :=
   segments.foldl (fun name segment => Name.str name segment) .anonymous
-
-/-- A function's own name, without its namespace path. -/
-private def functionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
-  let qualified? : Option VerexIR.QualifiedName := do
-    let ns ← unit.namespaces[handle.namespaceId.index]?
-    let declaration ← ns.functions[handle.functionId.index]?
-    ns.nameOf declaration.name
-  (qualified?.map (·.name)).getD ""
-
-/-- A function's path-qualified name, in every namespace. -/
-def qualifiedFunctionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
-  let path := (unit.tables.namespaces[handle.namespaceId.index]?.map (·.segments)).getD #[]
-  "::".intercalate (path.push (functionName unit handle)).toList
-
-/-- A function's name relative to a unit: its own name in the unit's module,
-namespace 0, and its path-qualified name in another namespace. -/
-def functionKey (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
-  if handle.namespaceId.index == 0 then functionName unit handle
-  else qualifiedFunctionName unit handle
 
 /-- The prelude model a native is read by, beside what its specification
 states: the Move Prover's prelude defines a native whatever its
@@ -4188,14 +4384,8 @@ def ensureUnitDefinition (namespaceSegments : Array String)
     let authoritative := (VerexSL.registeredUnit? (← getEnv) name.getPrefix).getD unit
     liftTermElabM <| VerexIR.Proofs.Denote.registerNominalUnit name authoritative
     return name
-  -- A theorem holds of the unit as preparation admits it: a unit the static
-  -- checker refuses would make every theorem about it vacuous.
-  let failures := VerexIR.Validation.StaticTyping.unitFailures unit
-    (VerexIR.Validation.targetPointerWidth? unit)
-  unless failures.isEmpty do
-    throwError m!"the unit is not statically typed, so preparation refuses it:\n\
-      {"\n".intercalate failures.toList}"
-  -- Nor may preparation refuse its loans.
+  -- A theorem holds of the unit as preparation admits it. Preparation may not
+  -- refuse its loans; typing reads the certificates a rejection withholds.
   -- A rejection is located in its namespace's tables; a loan-death
   -- diagnostic has no location.
   let loanErrors : Array (Option ValidatedNamespace × VerexIR.Validation.Diagnostic) :=
@@ -4217,6 +4407,12 @@ def ensureUnitDefinition (namespaceSegments : Array String)
       pure s!"{d.code}: {d.message} at {position}{String.join related}"
     throwError m!"the borrow analysis rejects the unit, so preparation refuses it:\n\
       {"\n".intercalate lines}"
+  -- A unit the static checker refuses would make every theorem about it vacuous.
+  let failures := VerexIR.Validation.StaticTyping.unitFailures unit
+    (VerexIR.Validation.targetPointerWidth? unit)
+  unless failures.isEmpty do
+    throwError m!"the unit is not statically typed, so preparation refuses it:\n\
+      {"\n".intercalate failures.toList}"
   -- Nor may execution preparation refuse it under every registry.
   let refusals := VerexIR.Validation.executionRefusals unit
   unless refusals.isEmpty do

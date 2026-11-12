@@ -174,7 +174,7 @@ def mentionsLifetimeParameter (ns : ValidatedNamespace) : Nat → TypeId → Boo
     | none => false
     | some type => match type with
       | .tuple elements => elements.any (mentionsLifetimeParameter ns fuel)
-      | .vector element _ | .typeDomain element => mentionsLifetimeParameter ns fuel element
+      | .vector element _ | .slice element | .typeDomain element => mentionsLifetimeParameter ns fuel element
       | .resourceDomain _ arguments =>
           arguments.any (·.any (mentionsLifetimeParameter ns fuel))
       | .nominal _ arguments => arguments.any fun
@@ -409,7 +409,7 @@ def primitiveTyped (pointerWidth : Option Nat) (operation : PrimitiveOperation)
   | .destroyEmptyVector | .checkVectorIndex _ => packs [] result
   | .length => integral result
   | .index => match operands with
-      | [.vector element _, index] => integral index && result == element
+      | [.vector element _, index] | [.slice element, index] => integral index && result == element
       | _ => false
   | .compare => holds result (-1) && holds result 0 && holds result 1
   | .signerAddress => result == .address
@@ -428,7 +428,7 @@ def primitiveTyped (pointerWidth : Option Nat) (operation : PrimitiveOperation)
       | _ => false
   | .logicalAnd | .logicalOr | .logicalNot | .equal | .notEqual
   | .less | .greater | .lessEqual | .greaterEqual => result == .bool
-  | .copyValue | .moveValue => operands == [result]
+  | .copyValue | .moveValue => result.sized && operands == [result]
   | .range | .implies | .equivalent | .identical => true
 
 /-- The variants' types of a field present in each of them: what a value of
@@ -472,7 +472,10 @@ def placeType (context : Context) : Nat → PlaceId → Option (SemTy × Option 
         -- shared as its base: the record must be the reference's kind.
         match type with
         | .reference kind referent =>
-            if (kind == .shared) == sharedDereference context.unit context.ns.unitIdentity id then
+            -- Under a shared view a mutable reference holds what it refers to.
+            let viewed := placeThroughShared context.unit context.ns context.ns.places.size base
+            if (kind == .shared || viewed) ==
+                sharedDereference context.unit context.ns.unitIdentity id then
               some (referent, none)
             else none
         | _ => none
@@ -489,7 +492,7 @@ def placeType (context : Context) : Nat → PlaceId → Option (SemTy × Option 
     | some (.index base index) => do
         let (type, _) ← context.placeType fuel base
         match type with
-        | .vector element _ => match context.exprType index with
+        | .vector element _ | .slice element => match context.exprType index with
             | some indexType =>
                 if integral context.pointerWidth indexType then some (element, none) else none
             | none => none
@@ -501,8 +504,14 @@ def placeType (context : Context) : Nat → PlaceId → Option (SemTy × Option 
         | _ => none
     | some (.subslice base start stop fromEnd) => do
         let (type, _) ← context.placeType fuel base
-        let .vector element length := type | none
-        some (.vector element (subsliceLength length start stop fromEnd), none)
+        match type with
+        | .vector element length => some (.vector element (subsliceLength length start stop fromEnd), none)
+        | .slice element => some (.slice element, none)
+        | _ => none
+    | some (.unsize base) => do
+        let (type, _) ← context.placeType fuel base
+        let .vector element _ := type | none
+        some (.slice element, none)
     | some (.downcast base variant) => do
         let (type, _) ← context.placeType fuel base
         let .nominal _ _ := type | none
@@ -645,14 +654,14 @@ def checkCall (context : Context) (result : SemTy) : CallKind → Array GenericA
           resolveArguments context.ns context.env instantiations with
       | none, _ => true
       | some (targetNs, declaration), some arguments =>
-          arguments.size == declaration.signature.generics.size &&
+          arguments.all SemArg.sized && (arguments.size == declaration.signature.generics.size &&
             kindsAgree declaration.signature.generics instantiations &&
             context.edgeClosed reference instantiations &&
             match signatureTypes? targetNs declaration arguments with
             | some (parameters, results) => operands.size == parameters.length &&
                 (operands.toList.zip parameters).all (fun (operand, parameter) =>
                   context.flows operand parameter) && packs results result
-            | none => false
+            | none => false)
       | _, _ => false
   | .constructor reference variant, instantiations, operands =>
       match structTarget? context.unit context.ns reference,
@@ -682,7 +691,7 @@ def checkCall (context : Context) (result : SemTy) : CallKind → Array GenericA
           resolveArguments context.ns context.env instantiations, result with
       | none, _, _ => true
       | some (targetNs, declaration), some arguments, .function openTypes resultType =>
-          arguments.size == declaration.signature.generics.size &&
+          arguments.all SemArg.sized && (arguments.size == declaration.signature.generics.size &&
             kindsAgree declaration.signature.generics instantiations &&
             context.edgeClosed reference instantiations &&
             mask < 2 ^ declaration.signature.parameters.size &&
@@ -694,7 +703,7 @@ def checkCall (context : Context) (result : SemTy) : CallKind → Array GenericA
                     context.flows capture parameter) &&
                   openTypes == ClosureMask.extract mask false parameters &&
                   packs results resultType
-            | none => false
+            | none => false)
       | _, _, _ => false
   | .invoke, _, operands => match operands.toList with
       | callee :: supplied => match context.exprType callee with
@@ -705,11 +714,11 @@ def checkCall (context : Context) (result : SemTy) : CallKind → Array GenericA
       | [] => false
   | .extension _ _, _, _ => false
 
-/-- A selected value's type: the field's own, or, through a reference, a
-reference of its kind to it (a shared reference is the value it observes). -/
+/-- A selected value's type: the field's own, or, through a shared reference, a
+shared reference to it (a shared reference is the value it observes). -/
 def selected (operand result : SemTy) (field : SemTy → Bool) : Bool :=
   field result || match operand, result with
-    | .reference kind _, .reference resultKind referent => kind == resultKind && field referent
+    | .reference .shared _, .reference .shared referent => field referent
     | _, _ => false
 
 /-- The nominal type a data operation's operand holds, directly or through
@@ -767,33 +776,55 @@ def checkData (context : Context) (result : SemTy) : DataOperation → Array Exp
           | _ => false
       | _, _ => false
 
-/-- Whether an operation at these instantiations and operands produces
-values of `result`. -/
+/-- A shared computed borrow may expose a sequence as an unsized slice view. -/
+def mutableReferent (type : SemTy) : Bool :=
+  type.sized || (type matches .slice _)
+
+def sharedBorrowResult (source result : SemTy) : Bool :=
+  result == .reference .shared source || match source, result with
+    | .vector element _, .reference .shared (.slice viewed) => element == viewed
+    | _, _ => false
+
+/-- Whether an operation produces values of `result`. -/
 def checkOperation (context : Context) (result : SemTy) (operation : Operation)
     (instantiations : Array GenericArgument) (operands : Array ExprId) : Bool :=
   match operation with
-  | .copy place | .read place | .move place =>
-      operands.isEmpty && context.placeTypeOf place == some result
+  | .copy place | .move place =>
+      result.sized && operands.isEmpty && context.placeTypeOf place == some result
+  | .read place => operands.isEmpty && context.placeTypeOf place == some result
+  | .readDiscriminant place => operands.isEmpty && instantiations.isEmpty &&
+      integral context.pointerWidth result &&
+      match context.placeTypeOf place with
+      | some (.nominal name _) =>
+          match context.unit.tables.names.findIdx? (· == name) with
+          | some index => match nominalTarget? context.unit context.ns ⟨index⟩ with
+              | some (_, declaration, _) => !declaration.variants.isEmpty &&
+                  declaration.variants.all fun variant =>
+                    variant.discriminant.any (holds context.pointerWidth result ·)
+              | none => false
+          | none => false
+      | _ => false
   | .borrow kind place => operands.isEmpty &&
       match borrowedKind kind, context.placeTypeOf place with
-      | some referenceKind, some referent => result == .reference referenceKind referent
+      | some referenceKind, some referent => result == .reference referenceKind referent &&
+          (referenceKind == .shared || mutableReferent referent)
       | _, _ => false
   | .write place => match operands.toList, context.placeTypeOf place with
-      | [value], some type => context.flows value type && packs [] result
+      | [value], some type => type.sized && context.flows value type && packs [] result
       | _, _ => false
   | .drop place => operands.isEmpty && (context.placeTypeOf place).isSome && packs [] result
   | .call kind => context.checkCall result kind instantiations operands
   | .global kind => match instantiations.toList with
       | [.typeArg resource] => context.consults (context.ns.typeId resource.typeId) &&
           match context.typeOf resource.typeId with
-          | some resourceType => match kind, operands.toList with
+          | some resourceType => resourceType.sized && (match kind, operands.toList with
               | .contains, [_] => result == .bool
               | .borrow borrowKind, [_] => match borrowedKind borrowKind with
                   | some referenceKind => result == .reference referenceKind resourceType
                   | none => false
               | .take, [_] => result == resourceType
               | .publish, [_, value] => context.flows value resourceType && packs [] result
-              | _, _ => false
+              | _, _ => false)
           | none => false
       | _ => false
   | .primitive operation => match operands.toList.mapM context.exprType with
@@ -809,11 +840,11 @@ def checkOperation (context : Context) (result : SemTy) (operation : Operation)
               (kind == .shared) == sharedNode context.ns reference
           | _ => false
       | .mutate, [reference, value] => match context.exprType reference with
-          | some (.reference .mutable referent) => context.flows value referent && packs [] result
+          | some (.reference .mutable referent) => referent.sized && context.flows value referent && packs [] result
           | _ => false
       -- A shared borrow of a computed value is that value.
       | .borrow .immutable, [value] => match context.exprType value with
-          | some type => result == .reference .shared type
+          | some type => sharedBorrowResult type result
           | none => false
       -- Any other value borrow has no runtime evaluation.
       | .borrow _, _ => true
@@ -868,7 +899,7 @@ def checkNode (context : Context) (id : ExprId) : Bool :=
           | none => false
       | .throw_ _ _ => true
       | .assign place value => (match context.placeTypeOf place with
-            | some placeType => context.flows value placeType
+            | some placeType => placeType.sized && context.flows value placeType
             | none => false) && packs [] type
       | .assignPattern pattern value => (context.stops value || match context.exprType value with
             | some valueType => context.patternTyped pattern valueType

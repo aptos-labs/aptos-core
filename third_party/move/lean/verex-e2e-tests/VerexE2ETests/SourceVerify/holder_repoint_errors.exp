@@ -1,0 +1,10 @@
+VerexE2ETests/SourceVerify/holder_repoint_errors.spec.lean:10:3: error: the specification clause `ensures spec.result[0] == 7` is not established
+VerexE2ETests/SourceVerify/holder_repoint_errors.spec.lean:11:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/holder_repoint_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `caller` failed; provide a proof in the module:
+  verify caller by lean =>
+    verex_obligations
+    verex_on
+    | ensures_3 => verex_prepare; sorry
+    | ensures_4 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

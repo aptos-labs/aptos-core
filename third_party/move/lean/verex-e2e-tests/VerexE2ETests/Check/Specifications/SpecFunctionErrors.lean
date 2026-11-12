@@ -13,9 +13,9 @@ recursive call does not decrease it.
 
 Accepted, by contrast: a body that reassigns a local has a pure
 reading (the assignment rebinds the local). A function taking a mutable
-reference reads its entry value when applied to `old(..)`; applied to the
-bare parameter, which denotes the exit value in `ensures`, the reading
-differs from the result, and the clause fails. A clause reading a resource
+reference only to read through it reads its entry value when applied to
+`old(..)`; applied to the bare parameter, which denotes the exit value in
+`ensures`, the reading differs from the result, and the clause fails. A clause reading a resource
 through a specification function brings that resource into the contract, as
 a direct read does. The Move surface declares specification functions over
 its bounded integer types, and a specification function may read `old`, the
@@ -37,20 +37,22 @@ verex module 0x42::mutable_parameter where
   struct Coin has Key where
     value : u64
 
+  public fun current(coin : &mut Coin) -> u64 := coin.value
+
   public fun bump(coin : &mut Coin) -> u64 := do
-    let current := *coin
-    *coin := new Coin { value := current.value + 1 }
-    current.value
+    let before := current(coin)
+    *coin := new Coin { value := before + 1 }
+    before
 
   public fun use_bump(coin : &mut Coin) -> u64 := bump(coin)
   spec use_bump where
-    ensures result == bump(old(coin))
+    ensures result == current(old(coin))
     aborts_if old(coin).value + 1 > MAX_U64
 
   public fun use_bump_exit(coin : &mut Coin) -> u64 := bump(coin)
   spec use_bump_exit where
     pragma aborts_if_is_partial
-    ensures result == bump(coin)
+    ensures result == current(coin)
 
 verex module 0x42::native_version where
   struct Coin has Key where

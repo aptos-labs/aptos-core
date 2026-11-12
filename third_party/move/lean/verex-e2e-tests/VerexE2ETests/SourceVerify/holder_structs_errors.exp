@@ -1,0 +1,80 @@
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:11:3: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `hold_write_read_false` failed; provide a proof in the module:
+  verify hold_write_read_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:17:3: error: the specification clause `ensures x == old(x)` is not established
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `hold_param_false` failed; provide a proof in the module:
+  verify hold_param_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:23:3: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:22:6: error: verex verification failed: the automatic verification of `hold_move_out_false` failed; provide a proof in the module:
+  verify hold_move_out_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:32:3: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:31:6: error: verex verification failed: the automatic verification of `hold_callee_val_false` failed; provide a proof in the module:
+  verify hold_callee_val_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:41:3: error: the specification clause `ensures result == 7` is not established
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:40:6: error: verex verification failed: the automatic verification of `hold_callee_mut_false` failed; provide a proof in the module:
+  verify hold_callee_mut_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:47:3: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:46:6: error: verex verification failed: the automatic verification of `hold_return_false` failed; provide a proof in the module:
+  verify hold_return_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:53:3: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:52:6: error: verex verification failed: the automatic verification of `hold_move_local_false` failed; provide a proof in the module:
+  verify hold_move_local_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:59:3: error: the specification clause `ensures b == 2` is not established
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:58:6: error: verex verification failed: the automatic verification of `hold_reassign_false` failed; provide a proof in the module:
+  verify hold_reassign_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:66:3: error: the specification clause `ensures result.x == 1` is not established
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:65:6: error: verex verification failed: the automatic verification of `hold_join_false` failed; provide a proof in the module:
+  verify hold_join_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:72:3: error: the specification clause `ensures result.x == 2` is not established
+VerexE2ETests/SourceVerify/holder_structs_errors.spec.lean:71:6: error: verex verification failed: the automatic verification of `two_local_false` failed; provide a proof in the module:
+  verify two_local_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

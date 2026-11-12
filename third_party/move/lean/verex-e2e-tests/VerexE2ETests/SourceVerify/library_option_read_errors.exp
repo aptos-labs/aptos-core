@@ -1,0 +1,49 @@
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:4:1: error: `no panic when aborts at call 1 of expect` is not established: the call `value.expect("a value")` at VerexE2ETests/SourceVerify/library_option_read_errors.rs:5:5 may panic
+  from: VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "None"
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `or_panic` failed; provide a proof in the module:
+  verify or_panic by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of expect => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:8:3: error: the specification clause `ensures result is Some` is not established
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `view` failed; provide a proof in the module:
+  verify «view» by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:11:3: error: the specification clause `ensures result is Ok` is not established
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `or_error` failed; provide a proof in the module:
+  verify or_error by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:14:3: error: the specification clause `ensures value == old(value)` is not established
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:13:6: error: verex verification failed: the automatic verification of `taken` failed; provide a proof in the module:
+  verify taken by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:17:3: error: the specification clause `ensures result is None` is not established
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `replaced` failed; provide a proof in the module:
+  verify replaced by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:20:3: error: the specification clause `ensures value is None ==> result == 1` is not established
+VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:19:6: error: verex verification failed: the automatic verification of `defaulted` failed; provide a proof in the module:
+  verify defaulted by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -4,6 +4,7 @@
 import VerexIR.Validation.Diagnostic
 import VerexIR.Validation.PlaceIndex
 import VerexIR.Validation.Validated
+import VerexIR.Validation.ReceiverNoEscape
 
 /-!
 # Conservative structured-loan analysis
@@ -36,6 +37,9 @@ acyclic namespace-resolved struct/enum carrier paths, including instantiated gen
 fields, when declared lifetimes identify the returned component. Recursive
 nominal back-edges conservatively retain their subtree root while nonrecursive
 sibling carriers remain precise.
+A result position holds the loans passed at parameters whose declared regions outlive
+its own, by a declared or implied bound; a region nothing is declared of relates to
+all. A body is checked against the same rule, since rustc does not guard VerexSL.
 Evaluating a mutable reference other than as the operand of a dereference or
 freeze may write its referent, so it conflicts with live loans reborrowed
 through it. Function call and result boundaries recursively
@@ -45,14 +49,6 @@ record that the mutable source lifetime outlives the shared result lifetime.
 -/
 
 namespace VerexIR.Validation
-
-private inductive LoanProjection where
-  | dereference
-  | field (name : NameId)
-  | index (literal : Option Nat)
-  | subslice (start stop : Nat) (fromEnd : Bool)
-  | downcast (variant : NameId)
-  deriving Repr, BEq, Inhabited
 
 /-- Root of a loaned place: a checked function local, or one keyed global
 resource family. -/
@@ -77,12 +73,13 @@ private structure LoanPlace where
 produce a runtime loan-death event. Its identity still follows the same
 holder and aggregate-carrier flow as loans created by the body. -/
 private inductive LoanSource where
-  | parameter (localId : LocalId)
+  /-- A reference a parameter holds at a path, empty for a reference parameter. -/
+  | parameter (localId : LocalId) (path : Array LoanProjection := #[])
   | expression (exprId : ExprId)
   deriving Repr, BEq, Inhabited
 
 private def LoanSource.expression? : LoanSource → Option ExprId
-  | .parameter _ => none
+  | .parameter _ _ => none
   | .expression exprId => some exprId
 
 private structure LoanFact where
@@ -93,14 +90,37 @@ private structure LoanFact where
   loc : LocId
   holders : Array LocalId := #[]
   holderPlaces : Array LoanPlace := #[]
+  /-- The places the loan was moved out of, until written. -/
+  movedFrom : Array LoanPlace := #[]
+  /-- In a death: the loan goes on, these holders alone are dead. -/
+  alone : Bool := false
   /-- Established when the loan is created, before local holders can die.
   Joining alternative origins requires every origin to allow escape. -/
   canEscape : Bool := false
+  /-- Stored through caller-owned reference storage; a non-result boundary carrier. -/
+  callerHeld : Bool := false
   deriving Repr, BEq, Inhabited
 
 private structure BorrowState where
   active : Array LoanFact := #[]
+  /-- The value of the `return` this state leaves by, and the loans it carries. -/
+  returned : Option (ExprId × Array LoanFact) := none
   deriving BEq, Inhabited
+
+/-- A loan as the state has it at a node's entry (`before`) or exit. -/
+private structure LoanPoint where
+  anchor : ExprId
+  before : Bool
+  loan : LoanFact
+  deriving Inhabited
+
+/-- The recorded deaths, and what the check of those deaths reads: the merged
+state at each anchor. Combined together, so no flow keeps one without the other. -/
+private structure DeathLog where
+  deaths : Array (ExprId × LoanDeath) := #[]
+  carrierDeaths : Array LoanDeath := #[]
+  points : Array LoanPoint := #[]
+  deriving Inhabited
 
 private structure BorrowFlow where
   normal : Option BorrowState := none
@@ -115,7 +135,7 @@ private structure BorrowFlow where
   /-- Death points of mutable loans, keyed by the loan's borrow expression.
   Recorded where the flow releases a loan; the semantics ends the loan
   there. -/
-  deaths : Array (ExprId × LoanDeath) := #[]
+  deaths : DeathLog := {}
   diagnostics : Array Diagnostic := #[]
   deriving Inhabited
 
@@ -132,30 +152,69 @@ private def appendUniqueLoans (left right : Array LoanFact) : Array LoanFact :=
     if loans.any (·.source == loan.source) then
       loans.map fun current =>
         if current.source == loan.source then
+          -- Merge `place` conservatively: `.external` only when both sides are.
+          -- `forgetMovedOut` re-roots a loan to `.external` when its carrier
+          -- reference is overwritten; the other branch may still hold the
+          -- concrete place, so take whichever side is concrete.
+          let place := match current.place.root, loan.place.root with
+            | .external, _ => loan.place
+            | _, _ => current.place
           { current with
+            place
             holders := appendUniqueLocals current.holders loan.holders
             holderPlaces := appendUniqueLoanPlaces current.holderPlaces loan.holderPlaces
-            canEscape := current.canEscape && loan.canEscape }
+            movedFrom := appendUniqueLoanPlaces current.movedFrom loan.movedFrom
+            canEscape := current.canEscape && loan.canEscape
+            callerHeld := current.callerHeld || loan.callerHeld }
         else current
     else loans.push loan
 
-/-- Mutable loans of `before` no longer active in `after`. -/
+/-- Mutable loans of `before` no longer active in `after`, and of those still active
+the places no longer holding them: a death states what such a place held. -/
 private def diffLoans (before after : BorrowState) : Array LoanFact :=
-  before.active.filter fun loan =>
-    loan.kind == .mutable && loan.source.expression?.isSome &&
-      !after.active.any (·.source == loan.source)
+  before.active.filterMap fun loan =>
+    if loan.kind != .mutable || loan.source.expression?.isNone then none else
+    match after.active.find? (·.source == loan.source) with
+    | none => some loan
+    | some kept =>
+        -- A place this step moved the reference out of gave it on: no death.
+        let moved := kept.movedFrom.filter (!loan.movedFrom.contains ·)
+        let holders := loan.holders.filter fun holder =>
+          !kept.holders.contains holder && !moved.any (·.root == .local holder)
+        let holderPlaces := loan.holderPlaces.filter fun place =>
+          !kept.holderPlaces.contains place && !moved.contains place
+        if holders.isEmpty && holderPlaces.isEmpty then none
+        else some { loan with
+          alone := true
+          holders := holders ++ (holderPlaces.filterMap (·.root.local?)).filter
+            (!holders.contains ·)
+          holderPlaces }
 
-private def appendUniqueDeaths (left right : Array (ExprId × LoanDeath)) :
-    Array (ExprId × LoanDeath) :=
-  right.foldl (init := left) fun deaths death =>
-    if deaths.contains death then deaths else deaths.push death
+private def appendUniqueDeaths (left right : DeathLog) : DeathLog :=
+  { deaths := right.deaths.foldl (init := left.deaths) fun deaths death =>
+      if deaths.contains death then deaths else deaths.push death
+    carrierDeaths := left.carrierDeaths ++ right.carrierDeaths
+    points := left.points ++ right.points }
 
-private def pushDeaths (deaths : Array (ExprId × LoanDeath))
-    (died : Array LoanFact) (death : LoanDeath) : Array (ExprId × LoanDeath) :=
+/-- Note the mutable loans a state holds at a node's entry or exit. -/
+private def DeathLog.atPoint (log : DeathLog) (anchor : ExprId) (before : Bool)
+    (state : BorrowState) : DeathLog :=
+  { log with points := state.active.foldl (init := log.points) fun points loan =>
+      if loan.kind == .mutable && loan.source.expression?.isSome && !loan.holders.isEmpty then
+        points.push { anchor, before, loan }
+      else points }
+
+private def pushDeaths (deaths : DeathLog)
+    (died : Array LoanFact) (death : LoanDeath) : DeathLog :=
   died.foldl (init := deaths) fun deaths loan =>
     match loan.source with
-    | .parameter _ => deaths
-    | .expression exprId => appendUniqueDeaths deaths #[(exprId, death)]
+    | .parameter _ _ => deaths
+    | .expression exprId =>
+        let holderPaths := loan.holderPlaces.filterMap fun place =>
+          place.root.local?.map (·, place.projections)
+        appendUniqueDeaths deaths
+          { deaths := #[(exprId,
+              { death with holders := loan.holders, holderPaths, alone := loan.alone })] }
 
 private def mergeState (left right : BorrowState) : BorrowState :=
   { active := appendUniqueLoans left.active right.active }
@@ -200,6 +259,9 @@ private partial def loanPlace? (ns : ValidatedNamespace) (placeId : PlaceId)
       let place ← loanPlace? ns base fuel
       some { place with
         projections := place.projections.push (.subslice start stop fromEnd) }
+  | fuel + 1, some (.unsize base) => do
+      let place ← loanPlace? ns base fuel
+      some { place with projections := place.projections.push (.subslice 0 0 true) }
   | fuel + 1, some (.downcast base variant) => do
       let place ← loanPlace? ns base fuel
       some { place with projections := place.projections.push (.downcast variant) }
@@ -267,6 +329,34 @@ private def conflictDiagnostic (loc : LocId) (loan : LoanFact) (action : String)
     primary := some loc
     related := #[{ loc := loan.loc, message := "active loan originates here" }] }
 
+/-- A written place is a new place: what moved out of it says nothing about what it
+holds, and a loan reborrowed through the reference it held no longer goes through it.
+The loan goes on through its holders. -/
+private def forgetMovedOut (state : BorrowState) (place : LoanPlace) : BorrowState :=
+  { active := state.active.map fun loan =>
+      let through := placeCovers place loan.place &&
+        (loan.place.projections.toList.drop place.projections.size).any
+          (· matches .dereference)
+      { loan with
+        movedFrom := loan.movedFrom.filter (!placeCovers place ·)
+        place := if through then { root := .external } else loan.place } }
+
+private def forgetMovedOutOf (ns : ValidatedNamespace) (state : BorrowState) (placeId : PlaceId) :
+    BorrowState :=
+  (loanPlace? ns placeId).elim state (forgetMovedOut state)
+
+/-- What a write of a place conflicts with: a loan reborrowed through a reference the
+place holds goes on when the reference is overwritten. -/
+private def shallowWriteState (ns : ValidatedNamespace) (state : BorrowState) (placeId : PlaceId) :
+    BorrowState :=
+  match loanPlace? ns placeId with
+  | none => state
+  | some written =>
+      { active := state.active.filter fun loan =>
+          !(placeCovers written loan.place &&
+            (loan.place.projections.toList.drop written.projections.size).any
+              (· matches .dereference)) }
+
 private def accessDiagnostics (state : BorrowState) (loc : LocId) (place : LoanPlace)
     (mutable : Bool) (action : String) : Array Diagnostic :=
   state.active.foldl (init := #[]) fun diagnostics loan =>
@@ -279,13 +369,25 @@ private def referenceType? (ns : ValidatedNamespace) (typeId : TypeId) : Option 
   | some (.reference reference) => some reference
   | _ => none
 
+/-- The path of a place up to its first dereference: where the reference it
+goes through rests. None without a dereference. -/
+private def referenceCarrier? (place : LoanPlace) : Option LoanPlace :=
+  (place.projections.findIdx? (· matches .dereference)).map fun first =>
+    { place with projections := place.projections.extract 0 first }
+
+/-- The loans a holder carries at a place. -/
+private def loansCarriedAt (state : BorrowState) (place : LoanPlace) : Array LoanFact :=
+  state.active.filter fun loan =>
+    let carriers := loan.holderPlaces.filter (·.root == place.root)
+    if carriers.isEmpty then place.root.local?.any loan.holders.contains
+    else carriers.any (placesOverlap · place)
+
 /-- A reborrow can escape only when every current origin of its reference
 is known to outlive this frame. Missing origins provide no such evidence. -/
 private def reborrowCanEscape (state : BorrowState) (place : LoanPlace) : Bool :=
-  place.projections[0]? == some .dereference &&
-    place.root.local?.any fun rootLocal =>
-      let parents := state.active.filter (·.holders.contains rootLocal)
-      !parents.isEmpty && parents.all (·.canEscape)
+  (referenceCarrier? place).any fun carrier =>
+    let parents := loansCarriedAt state carrier
+    !parents.isEmpty && parents.all (·.canEscape)
 
 /-- The code of a write to an element index under a live mutable loan; read
 out of the diagnostics into the certificate by `borrowOutcome`, so it refuses
@@ -305,7 +407,8 @@ private partial def placeIndexesLocal (ns : ValidatedNamespace) (localId : Local
         | _ => false) || placeIndexesLocal ns localId base fuel
   | fuel + 1, some (.deref base) | fuel + 1, some (.field base _ _) |
       fuel + 1, some (.ghostField base _ _) | fuel + 1, some (.subslice base ..) |
-      fuel + 1, some (.downcast base _) => placeIndexesLocal ns localId base fuel
+      fuel + 1, some (.downcast base _) | fuel + 1, some (.unsize base) =>
+        placeIndexesLocal ns localId base fuel
 
 /-- Whether a loan is a mutable borrow of a place that selects an element at
 a local's value.  The loan's place keeps only literal indices, so the index
@@ -408,7 +511,7 @@ private partial def placeIndexAccessDiagnostics (ns : ValidatedNamespace)
   | 0, _ | _, none | _, some (.localVar _) => #[]
   | fuel + 1, some (.deref base) | fuel + 1, some (.field base _ _) |
       fuel + 1, some (.ghostField base _ _) | fuel + 1, some (.subslice base ..) |
-      fuel + 1, some (.downcast base _) =>
+      fuel + 1, some (.unsize base) | fuel + 1, some (.downcast base _) =>
       placeIndexAccessDiagnostics ns state loc base fuel
   | fuel + 1, some (.index base index) =>
       let baseDiagnostics := placeIndexAccessDiagnostics ns state loc base fuel
@@ -443,7 +546,7 @@ private partial def placeContainsDereference (ns : ValidatedNamespace) (placeId 
   | _, some (.deref _) => true
   | fuel + 1, some (.field base _ _) | fuel + 1, some (.ghostField base _ _) |
       fuel + 1, some (.index base _) | fuel + 1, some (.subslice base ..) |
-      fuel + 1, some (.downcast base _) =>
+      fuel + 1, some (.unsize base) | fuel + 1, some (.downcast base _) =>
       placeContainsDereference ns base fuel
 
 private def dereferenceConsumptionDiagnostics (ns : ValidatedNamespace) (loc : LocId)
@@ -460,7 +563,7 @@ private partial def placeUsesLocal (ns : ValidatedNamespace) (placeId : PlaceId)
   | _ + 1, some (.localVar candidate) => candidate == localId
   | fuel + 1, some (.deref base) | fuel + 1, some (.field base _ _) |
       fuel + 1, some (.ghostField base _ _) | fuel + 1, some (.subslice base ..) |
-      fuel + 1, some (.downcast base _) => placeUsesLocal ns base localId fuel
+      fuel + 1, some (.unsize base) | fuel + 1, some (.downcast base _) => placeUsesLocal ns base localId fuel
   | fuel + 1, some (.index base index) =>
       placeUsesLocal ns base localId fuel || match ns.expressions[index.index]? with
         | some { kind := .localVar candidate, .. } => candidate == localId
@@ -478,7 +581,7 @@ private partial def expressionUsesLocal (ns : ValidatedNamespace) (exprId : Expr
       let argumentsUse := arguments.any fun argument =>
         expressionUsesLocal ns argument localId fuel
       let placeUse := match operation with
-        | .move place | .copy place | .borrow _ place | .read place |
+        | .move place | .copy place | .borrow _ place | .read place | .readDiscriminant place |
             .write place | .drop place =>
             placeUsesLocal ns place localId (ns.places.size + 1)
         | _ => false
@@ -534,7 +637,7 @@ private partial def expressionUsesCarrier (ns : ValidatedNamespace) (exprId : Ex
   | _ + 1, some { kind := .localVar candidate, .. } => carrier.root == .local candidate
   | fuel + 1, some { kind := .operation operation _ arguments _, .. } =>
       arguments.any (expressionUsesCarrier ns · carrier fuel) || match operation with
-        | .move place | .copy place | .borrow _ place | .read place |
+        | .move place | .copy place | .borrow _ place | .read place | .readDiscriminant place |
             .write place | .drop place => placeUsesCarrier ns place carrier
         | _ => false
   | fuel + 1, some { kind := .block statements result, .. } =>
@@ -582,48 +685,130 @@ private partial def patternVariables (ns : ValidatedNamespace) (patternId : Patt
   | _, some { kind := .wildcard, .. } | _, some { kind := .literal _, .. } |
       _, some { kind := .range .., .. } => #[]
 
+/-- Whether evaluating a node may leave it by a `break` or `continue`. -/
+private partial def mayJumpOut (ns : ValidatedNamespace) (exprId : ExprId) (depth : Nat := 0) : Bool :=
+  match ns.expressions[exprId.index]? with
+  | none => false
+  | some expression => match expression.kind with
+    | .continue_ nest => nest >= depth
+    | .break_ nest value => nest >= depth || value.any (mayJumpOut ns · depth)
+    | .loop _ body => mayJumpOut ns body (depth + 1)
+    | .spec _ | .quantifier .. => false
+    | kind => (expressionChildren kind).any (mayJumpOut ns · depth)
+
 /-- Whether an expression, evaluated in order, reads a holder (`some true`)
-or first overwrites it whole (`some false`): an assignment to the local or a
-binding of it, after which what follows reads the new value. -/
+or first overwrites it whole (`some false`): an assignment covering the carrier
+or a binding of the local, after which what follows reads the new value. A
+conditional decides only where its branches agree or one reads; a loop's body may
+not run, so only its reading decides. -/
 private partial def holderFate (ns : ValidatedNamespace) (holder : LocalId)
-    (uses : ExprId → Bool) (exprId : ExprId) : Option Bool :=
+    (overwrites placeUses : PlaceId → Bool) (uses : ExprId → Bool) (exprId : ExprId) : Option Bool :=
+  let fate := holderFate ns holder overwrites placeUses uses
+  -- An operand evaluated first may jump past an overwrite.
+  let after (operands : List ExprId) (result : Option Bool) : Option Bool :=
+    if result == some false && operands.any (mayJumpOut ns ·) then none else result
+  let choice (fates : List (Option Bool)) : Option Bool :=
+    if fates.any (· == some true) then some true
+    else if fates.all (· == some false) then some false
+    else none
   match ns.expressions[exprId.index]? with
   | some { kind := .assign place value, .. } =>
-      if ns.places[place.index]? == some (.localVar holder) then some (uses value)
-      else if uses exprId then some true else none
+      match fate value with
+      | some decided => some decided
+      | none =>
+          if overwrites place then after [value] (some false)
+          else if placeUses place then some true else none
   | some { kind := .assignPattern pattern value, .. } =>
       if uses value then some true
-      else if (patternVariables ns pattern).contains holder then some false else none
+      else if (patternVariables ns pattern).contains holder then after [value] (some false)
+      else none
   | some { kind := .letDecl pattern initializer body, .. } =>
-      if initializer.any uses then some true
-      else if (patternVariables ns pattern).contains holder then some false
-      else holderFate ns holder uses body
+      match initializer.bind fate with
+      | some decided => some decided
+      | none =>
+          if (patternVariables ns pattern).contains holder then
+            after initializer.toList (some false)
+          else after initializer.toList (fate body)
   | some { kind := .block statements result, .. } =>
-      sequenceFate ns holder uses (statements.toList ++ result.toList)
+      holderFate.sequenceFate ns holder overwrites placeUses uses (statements.toList ++ result.toList)
+  | some { kind := .ifElse condition thenBranch elseBranch, .. } =>
+      match fate condition with
+      | some decided => some decided
+      | none =>
+        match elseBranch with
+        | some branch => after [condition] (choice [fate thenBranch, fate branch])
+        | none => if fate thenBranch == some true then some true else none
+  | some { kind := .match_ scrutinee arms, .. } =>
+      match fate scrutinee with
+      | some decided => some decided
+      | none =>
+      if arms.any (·.guard.any uses) then some true
+      else if arms.isEmpty then none
+      else after (scrutinee :: arms.toList.flatMap (·.guard.toList))
+        (choice (arms.toList.map (fate ·.body)))
+  | some { kind := .loop _ body, .. } =>
+      if fate body == some true then some true else none
+  -- Operands are looked into: one may bind the holder afresh before reading it.
+  | some { kind := .operation operation _ arguments _, .. } =>
+      match holderFate.sequenceFate ns holder overwrites placeUses uses arguments.toList with
+      | some decided => some decided
+      | none => match operation with
+        | .write place =>
+            if overwrites place then after arguments.toList (some false)
+            else if placeUses place then some true else none
+        | .move place | .copy place | .borrow _ place | .read place | .readDiscriminant place | .drop place =>
+            if placeUses place then some true else none
+        | _ => none
   | _ => if uses exprId then some true else none
 where
-  sequenceFate (ns : ValidatedNamespace) (holder : LocalId) (uses : ExprId → Bool) :
-      List ExprId → Option Bool
+  /-- Past an element that may jump, an overwrite no longer decides: the jump
+  skips it, so what follows is still scanned for reads. -/
+  sequenceFate (ns : ValidatedNamespace) (holder : LocalId) (overwrites placeUses : PlaceId → Bool)
+      (uses : ExprId → Bool) (expressions : List ExprId) (jumped : Bool := false) : Option Bool :=
+    match expressions with
     | [] => none
     | expression :: rest =>
-        match holderFate ns holder uses expression with
-        | some fate => some fate
-        | none => sequenceFate ns holder uses rest
+        match holderFate ns holder overwrites placeUses uses expression with
+        | some true => some true
+        | some false =>
+            if jumped then sequenceFate ns holder overwrites placeUses uses rest true else some false
+        | none =>
+            sequenceFate ns holder overwrites placeUses uses rest (jumped || mayJumpOut ns expression)
 
-/-- Whether a sequence of expressions reads a holder before it overwrites
-the holder whole (`holderFate`). -/
-private def usedBeforeOverwrite (ns : ValidatedNamespace) (holder : LocalId)
-    (uses : ExprId → Bool) (expressions : List ExprId) : Bool :=
-  (holderFate.sequenceFate ns holder uses expressions).getD false
+/-- The fate of a carrier over a sequence of expressions. -/
+private def carrierFate (ns : ValidatedNamespace) (carrier : LoanPlace) (holder : LocalId)
+    (expressions : List ExprId) : Option Bool :=
+  holderFate.sequenceFate ns holder
+    (fun place => (loanPlace? ns place).any (placeCovers · carrier))
+    (placeUsesCarrier ns · carrier)
+    (fun expression => expressionUsesCarrier ns expression carrier (ns.expressions.size + 1))
+    expressions
+
+/-- The fate of a local over a sequence of expressions. -/
+private def localFate (ns : ValidatedNamespace) (holder : LocalId)
+    (expressions : List ExprId) : Option Bool :=
+  holderFate.sequenceFate ns holder
+    (fun place => ns.places[place.index]? == some (.localVar holder))
+    (placeUsesLocal ns · holder (ns.places.size + 1))
+    (fun expression => expressionUsesLocal ns expression holder (ns.expressions.size + 1))
+    expressions
+
+/-- Whether expressions read a carrier before overwriting it. -/
+private def carrierUsedBy (ns : ValidatedNamespace) (carrier : LoanPlace) (holder : LocalId)
+    (expressions : List ExprId) : Bool :=
+  (carrierFate ns carrier holder expressions).getD false
+
+/-- Whether expressions read a local before overwriting it. -/
+private def localUsedBy (ns : ValidatedNamespace) (holder : LocalId)
+    (expressions : List ExprId) : Bool :=
+  (localFate ns holder expressions).getD false
 
 private def loanUsedBy (ns : ValidatedNamespace) (expressions : List ExprId)
     (loan : LoanFact) : Bool :=
   loan.holders.any fun holder =>
     let carriers := loan.holderPlaces.filter (·.root == .local holder)
-    if carriers.isEmpty then usedBeforeOverwrite ns holder (fun expression =>
-      expressionUsesLocal ns expression holder (ns.expressions.size + 1)) expressions
-    else carriers.any fun carrier => usedBeforeOverwrite ns holder (fun expression =>
-      expressionUsesCarrier ns expression carrier (ns.expressions.size + 1)) expressions
+    if carriers.isEmpty then localUsedBy ns holder expressions
+    else carriers.any fun carrier => carrierUsedBy ns carrier holder expressions
 
 private def loansUsedBy (ns : ValidatedNamespace) (expressions : List ExprId)
     (state : BorrowState) (initial : Array LoanSource := #[]) : Array LoanSource :=
@@ -645,49 +830,98 @@ private def loansUsedByPlace (ns : ValidatedNamespace) (placeId : PlaceId)
     else preserved.push loan.source
 
 private def operationPlace? : Operation → Option PlaceId
-  | .move place | .copy place | .borrow _ place | .read place |
+  | .move place | .copy place | .borrow _ place | .read place | .readDiscriminant place |
       .write place | .drop place => some place
   | _ => none
 
-/-- The holders the continuation of an expression may read before it
-overwrites them: the rest of every enclosing sequence, the loop body again
-across a back edge, and what follows a branch or a loop.  `preserved` names
-only loans that exist when an enclosing construct starts; a loan born inside
-it is kept live past the construct through its holder instead. -/
-private abbrev LiveOut := LoanFact → LocalId → Bool
+/-- Whether a loan is a mutable one the caller lends. Outside Move it stays
+active while a place holds it, so a write that destroys it is seen. -/
+private def isLentMutable (ns : ValidatedNamespace) (loan : LoanFact) : Bool :=
+  ns.profile != some .move && loan.kind == .mutable && loan.source.expression?.isNone
 
-/-- Whether an expression reads what a holder of a loan holds of it: the
-places carrying the loan where the holder records them, as `loanUsedBy`. -/
-private def usesHolderOf (ns : ValidatedNamespace) (loan : LoanFact) (holder : LocalId)
-    (expression : ExprId) : Bool :=
-  let carriers := loan.holderPlaces.filter (·.root == .local holder)
-  if carriers.isEmpty then expressionUsesLocal ns expression holder (ns.expressions.size + 1)
-  else carriers.any fun carrier =>
-    expressionUsesCarrier ns expression carrier (ns.expressions.size + 1)
-
-/-- A holder of a loan is live after `expressions` if they read it before
-overwriting it, or leave it untouched and the continuation `liveOut` reads
-it. -/
-private def liveAfter (ns : ValidatedNamespace) (expressions : List ExprId)
-    (liveOut : LiveOut) : LiveOut := fun loan holder =>
-  (holderFate.sequenceFate ns holder (usesHolderOf ns loan holder) expressions).getD
-    (liveOut loan holder)
-
-/-- A holder is live after one of several alternatives (branches or arms) if
-it is live after any of them; `fallsThrough` adds the path through none of
-them (an `if` without `else`). -/
-private def liveAfterAny (ns : ValidatedNamespace) (alternatives : List ExprId)
-    (fallsThrough : Bool) (liveOut : LiveOut) : LiveOut := fun loan holder =>
-  alternatives.any (liveAfter ns [·] liveOut loan holder) ||
-    (fallsThrough && liveOut loan holder)
+/-- Whether a tree writes or binds a local, not through a reference it holds. -/
+private partial def writesLocal (ns : ValidatedNamespace) (holder : LocalId) (exprId : ExprId) :
+    Bool :=
+  let writes := fun (place : PlaceId) =>
+    (loanPlace? ns place).any fun written =>
+      written.root == .local holder && !written.projections.any (· matches .dereference)
+  match ns.expressions[exprId.index]? with
+  | none => false
+  | some expression =>
+      (match expression.kind with
+        | .assign place _ | .operation (.write place) _ _ _ => writes place
+        | .letDecl pattern _ _ | .assignPattern pattern _ =>
+            (patternVariables ns pattern).contains holder
+        | _ => false) ||
+      (expressionChildren expression.kind).any (writesLocal ns holder)
 
 private def retainLoansUsedBy (ns : ValidatedNamespace) (expressions : List ExprId)
-    (state : BorrowState) (preserved : Array LoanSource := #[])
-    (liveOut : LiveOut := fun _ _ => false) : BorrowState :=
+    (state : BorrowState) (preserved : Array LoanSource := #[]) : BorrowState :=
+  let retained := state.active.filter fun loan =>
+    loan.callerHeld || loan.holders.isEmpty || preserved.contains loan.source ||
+      loanUsedBy ns expressions loan || isLentMutable ns loan
+  -- A loan going on through another holder: a place nothing reads again and something
+  -- writes again gives its reference up, at its death. One never written again rests
+  -- until the loan dies.
+  { active := retained.map fun loan =>
+      if loan.kind != .mutable || loan.source.expression?.isNone ||
+          preserved.contains loan.source then loan else
+      let gives := fun (holder : LocalId) =>
+        !loanUsedBy ns expressions { loan with holders := #[holder] } &&
+          expressions.any (writesLocal ns holder)
+      let holders := loan.holders.filter (!gives ·)
+      if holders.isEmpty then loan else
+      { loan with
+        holders
+        holderPlaces := loan.holderPlaces.filter fun place =>
+          place.root.local?.all holders.contains } }
+
+private def isOwnedCarrierPlace (place : LoanPlace) : Bool :=
+  !place.projections.any (· matches .dereference)
+
+/-- The loans of this frame a write of a place destroys a carrier of. -/
+private def overwrittenLoans (ns : ValidatedNamespace) (state : BorrowState) (placeId : PlaceId) :
+    Array LoanFact :=
+  match loanPlace? ns placeId with
+  | none => #[]
+  | some place =>
+      if !isOwnedCarrierPlace place then #[] else
+      state.active.filter fun loan =>
+        loan.kind == .mutable && loan.source.expression?.isSome &&
+          let carriers := loan.holderPlaces.filter (·.root == place.root)
+          if carriers.isEmpty then
+            place.projections.isEmpty && place.root.local?.any loan.holders.contains
+          else carriers.any (placeCovers place ·)
+
+/-- A write ends the loans it destroys a carrier of that nothing else uses: where
+it still holds them, since its death would read what the place holds next. Move
+holds no reference in a field, and a block already ends a local's loans before
+the write overwriting it. -/
+private def retireOverwritten (ns : ValidatedNamespace) (state : BorrowState)
+    (overwritten : Array LoanFact) (expressions : List ExprId) : BorrowState :=
+  if ns.profile == some .move then state else
   { active := state.active.filter fun loan =>
-      loan.holders.isEmpty || preserved.contains loan.source ||
-        loanUsedBy ns expressions loan ||
-        loan.holders.any (liveAfter ns expressions liveOut loan) }
+      loan.callerHeld || !overwritten.any (·.source == loan.source) || loanUsedBy ns expressions loan }
+
+/-- A write destroying a carrier of a loan that lives on through another holder:
+the loan's death would resolve what the place holds then. -/
+private def overwrittenLiveDiagnostics (state : BorrowState) (overwritten carried : Array LoanFact)
+    (loc : LocId) : Array Diagnostic :=
+  if overwritten.any fun loan =>
+      !carried.any (·.source == loan.source) && state.active.any (·.source == loan.source) then
+    #[.at "VIR-SEMANTIC-BORROW-OVERWRITE"
+      "a mutable reference that lives on through another holder cannot be overwritten here" loc]
+  else #[]
+
+/-- A write destroying a mutable reference the caller lends: its loan has no
+death in this frame, and the slot could not export it at the exit. -/
+private def overwrittenLoanDiagnostics (ns : ValidatedNamespace) (before after : BorrowState)
+    (loc : LocId) : Array Diagnostic :=
+  if before.active.any fun loan =>
+      isLentMutable ns loan && !after.active.any (·.source == loan.source) then
+    #[.at "VIR-SEMANTIC-BORROW-OVERWRITE"
+      "a mutable reference the function's caller lends cannot be overwritten" loc]
+  else #[]
 
 private def bindObservedLoans (state : BorrowState) (observed : Array LoanFact)
     (holder : LocalId) : BorrowState :=
@@ -706,7 +940,7 @@ private def releaseHolderLoans (state : BorrowState) (carried : Array LoanFact)
       if !loan.holders.contains holder then some loan else
         let holders := loan.holders.filter (· != holder)
         let holderPlaces := loan.holderPlaces.filter (·.root != .local holder)
-        if holders.isEmpty && !carried.any (·.source == loan.source) then none
+        if holders.isEmpty && !loan.callerHeld && !carried.any (·.source == loan.source) then none
         else some { loan with holders, holderPlaces } }
 
 private def releasePlaceLoans (ns : ValidatedNamespace) (state : BorrowState)
@@ -714,6 +948,11 @@ private def releasePlaceLoans (ns : ValidatedNamespace) (state : BorrowState)
   match loanPlace? ns placeId with
   | none => state
   | some place =>
+    -- A loan the consumed value carries on was moved out of the place.
+    let appendMoved (loan : LoanFact) : Array LoanPlace :=
+      if carried.any (·.source == loan.source) then
+        appendUniqueLoanPlaces loan.movedFrom #[place]
+      else loan.movedFrom
     let active := state.active.filterMap fun loan =>
       let carriers := loan.holderPlaces.filter (·.root == place.root)
       if carriers.isEmpty then
@@ -721,8 +960,8 @@ private def releasePlaceLoans (ns : ValidatedNamespace) (state : BorrowState)
         | some rootLocal =>
             if place.projections.isEmpty && loan.holders.contains rootLocal then
               let holders := loan.holders.filter (· != rootLocal)
-              if holders.isEmpty && !carried.any (·.source == loan.source) then none
-              else some ({ loan with holders } : LoanFact)
+              if holders.isEmpty && !loan.callerHeld && !carried.any (·.source == loan.source) then none
+              else some ({ loan with holders, movedFrom := appendMoved loan } : LoanFact)
             else some loan
         | none => some loan
       else
@@ -733,12 +972,9 @@ private def releasePlaceLoans (ns : ValidatedNamespace) (state : BorrowState)
             else match place.root.local? with
               | some rootLocal => loan.holders.filter (· != rootLocal)
               | none => loan.holders
-          if holders.isEmpty && !carried.any (·.source == loan.source) then none
-          else some ({ loan with holders, holderPlaces } : LoanFact)
+          if holders.isEmpty && !loan.callerHeld && !carried.any (·.source == loan.source) then none
+          else some ({ loan with holders, holderPlaces, movedFrom := appendMoved loan } : LoanFact)
     { active }
-
-private def isOwnedCarrierPlace (place : LoanPlace) : Bool :=
-  !place.projections.any (· matches .dereference)
 
 private def releasePlaceLoansUnusedBy (ns : ValidatedNamespace) (state : BorrowState)
     (placeId : PlaceId) (expressions : List ExprId) : BorrowState :=
@@ -754,7 +990,7 @@ private def releasePlaceLoansUnusedBy (ns : ValidatedNamespace) (state : BorrowS
             if place.projections.isEmpty && loan.holders.contains rootLocal &&
                 !expressions.any (expressionUsesLocal ns · rootLocal (ns.expressions.size + 1)) then
               let holders := loan.holders.filter (· != rootLocal)
-              if holders.isEmpty then none else some ({ loan with holders } : LoanFact)
+              if holders.isEmpty && !loan.callerHeld then none else some ({ loan with holders } : LoanFact)
             else some loan
         | none => some loan
       else
@@ -766,7 +1002,7 @@ private def releasePlaceLoansUnusedBy (ns : ValidatedNamespace) (state : BorrowS
             else match place.root.local? with
               | some rootLocal => loan.holders.filter (· != rootLocal)
               | none => loan.holders
-          if holders.isEmpty then none
+          if holders.isEmpty && !loan.callerHeld then none
           else some ({ loan with holders, holderPlaces } : LoanFact)
     { active }
 
@@ -781,11 +1017,62 @@ private def recordBoundLoans (state : BorrowState) (observed : Array LoanFact) :
 private def loansHeldAtPlace (ns : ValidatedNamespace) (state : BorrowState)
     (placeId : PlaceId) : Array LoanFact :=
   match loanPlace? ns placeId with
-  | some place => state.active.filter fun loan =>
-      let carriers := loan.holderPlaces.filter (·.root == place.root)
-      if carriers.isEmpty then place.root.local?.any loan.holders.contains
-      else carriers.any (placesOverlap · place)
+  | some place => loansCarriedAt state place
   | none => #[]
+
+/-- A carrier path the checked post-RHS retirement can read exactly. -/
+def retirableCarrierPlace (ns : ValidatedNamespace) : Nat → PlaceId → Bool
+  | 0, _ => false
+  | fuel + 1, place => match ns.places[place.index]? with
+    | some (.localVar _) => true
+    | some (.deref base) | some (.field base ..) | some (.downcast base _) =>
+        retirableCarrierPlace ns fuel base
+    | some (.index base index) =>
+        match ns.expressions[index.index]? with
+        | some { kind := .value (.integer value) _, .. } =>
+            value >= 0 && retirableCarrierPlace ns fuel base
+        | _ => false
+    | _ => false
+
+/-- A direct mutable-reference destination can retire its old carrier after
+its RHS has run. Moving the old reference out makes the runtime retirement a
+no-op. Imprecise indexes and whole aggregates remain unsupported. -/
+private def carrierRetirement? (ns : ValidatedNamespace) (placeId : PlaceId)
+    (value : ExprId) (before : BorrowState) (carried : Array LoanFact) : Option LoanDeath := do
+  if ns.profile == some .move || !retirableCarrierPlace ns (ns.places.size + 1) placeId then none else do
+  let expression ← ns.expressions[value.index]?
+  let reference ← referenceType? ns expression.typeId
+  if reference.kind != .mutable then none else do
+  let place ← loanPlace? ns placeId
+  let holder ← place.root.local?
+  let oldLoans := loansHeldAtPlace ns before placeId
+  -- A plain local's known lexical loan already has the ordinary checked death.
+  -- Incoming loans and nested carriers still need the explicit path retirement.
+  if place.projections.isEmpty && !oldLoans.isEmpty &&
+      oldLoans.all (fun loan => loan.source.expression?.isSome) then none else do
+  -- The RHS carries the same loan onward; do not settle that identity.
+  if oldLoans.any (fun old =>
+      carried.any (·.source == old.source)) then none else
+  some { anchor := value, holders := #[holder], holderPaths := #[(holder, place.projections)], alone := true }
+
+private def addCarrierRetirement (log : DeathLog) (death : Option LoanDeath) : DeathLog :=
+  match death with
+  | none => log
+  | some death => { log with carrierDeaths := log.carrierDeaths.push death }
+
+/-- A replacement stored through caller-owned reference storage escapes even
+when the function returns unit. Local lenders cannot be stored there. -/
+private def replacementEscapeDiagnostics (ns : ValidatedNamespace) (state : BorrowState)
+    (placeId : PlaceId) (carried : Array LoanFact) (loc : LocId) : Array Diagnostic :=
+  if ns.profile == some .move then #[] else
+  match loanPlace? ns placeId >>= referenceCarrier? with
+  | none => #[]
+  | some carrier =>
+      let parents := loansCarriedAt state carrier
+      if (parents.isEmpty || parents.any (·.canEscape)) && carried.any (!·.canEscape) then
+        #[.at "VIR-SEMANTIC-BORROW-ESCAPE"
+          "a reference to frame-owned storage cannot be written through a caller-owned reference" loc]
+      else #[]
 
 /-- The locals an expression declares, by `let` or a match arm. -/
 private partial def bodyDeclaredLocals (ns : ValidatedNamespace) (root : ExprId)
@@ -832,7 +1119,7 @@ private partial def typeMayContainReference (ns : ValidatedNamespace) (typeId : 
   | _, some (.reference _) => true
   | fuel + 1, some (.tuple elements) =>
       elements.any fun element => typeMayContainReference ns element fuel
-  | fuel + 1, some (.vector element _) => typeMayContainReference ns element fuel
+  | fuel + 1, some (.vector element _) | fuel + 1, some (.slice element) => typeMayContainReference ns element fuel
   | fuel + 1, some (.function arguments result _) =>
       arguments.any (typeMayContainReference ns · fuel) ||
         typeMayContainReference ns result fuel
@@ -926,11 +1213,10 @@ private def branchPreserved (ns : ValidatedNamespace) (branch : ExprId)
     (preserved : Array LoanSource) : Array LoanSource :=
   if exitOf ns (ns.expressions.size + 1) branch == some .leaves then #[] else preserved
 
-/-- The continuation of a branch: none where it leaves the function. -/
-private def branchLiveOut (ns : ValidatedNamespace) (branch : ExprId) (liveOut : LiveOut) :
-    LiveOut :=
-  if exitOf ns (ns.expressions.size + 1) branch == some .leaves then fun _ _ => false
-  else liveOut
+/-- What evaluation reaches after a branch: nothing where it leaves the function. -/
+private def branchFuture (ns : ValidatedNamespace) (branch : ExprId) (future : List ExprId) :
+    List ExprId :=
+  if exitOf ns (ns.expressions.size + 1) branch == some .leaves then [] else future
 
 private def loanFlowsFromExpression (ns : ValidatedNamespace) (loan : LoanFact)
     (expression : ExprId) : Bool :=
@@ -969,15 +1255,250 @@ private def loanPathsAtPlace (loan : LoanFact) (place : LoanPlace) :
     | some suffix => some suffix.toArray
     | none => if placesOverlap carrier place then some #[] else none
 
-/-- Reachability over instantiated outlives edges. The worklist carries a
-visited set, keeping the search polynomial; enumerating paths instead is
-exponential on diamond- or cycle-shaped instantiated predicate edges. -/
-private def lifetimeOutlivesVia
-    (edges : Array (LifetimeId × LifetimeId)) (longer shorter : LifetimeId)
-    (fuel : Nat) : Bool :=
-  go fuel #[longer] #[]
+/-- A region of a signature: a lifetime binder of the declaration, `'static`, or
+one nothing is declared of, an elided lifetime or one inside a type argument,
+which is the caller's. -/
+private inductive SignatureRegion where
+  | binder (index : Nat)
+  | static
+  | unknown
+  /-- A position at the calling function's own type parameter. -/
+  | callerParameter
+  deriving BEq, Inhabited
+
+private def appendUniqueRegions (left right : Array SignatureRegion) : Array SignatureRegion :=
+  right.foldl (init := left) fun regions region =>
+    if regions.contains region then regions else regions.push region
+
+/-- A lifetime of a declared type under the arguments of the nominals around it,
+innermost first. `foreign` is a position inside a type argument. -/
+private def regionInContexts (ns : ValidatedNamespace) (foreign : Bool) :
+    List (Array GenericArgument) → LifetimeId → SignatureRegion
+  | [], lifetime =>
+      match ns.tables.lifetimes[lifetime.index]? with
+      | some { kind := .static, .. } => if foreign then .unknown else .static
+      | some { kind := .parameter index, .. } => if foreign then .unknown else .binder index
+      | some { kind := .inference, .. } | some { kind := .local, .. } | none => .unknown
+  | arguments :: outer, lifetime =>
+      match ns.tables.lifetimes[lifetime.index]? with
+      | some { kind := .static, .. } => if foreign then .unknown else .static
+      | some { kind := .parameter index, .. } =>
+          if foreign then .unknown else
+          match arguments[index]? with
+          | some (.lifetime value) => regionInContexts ns foreign outer value
+          | _ => .unknown
+      | some { kind := .inference, .. } | some { kind := .local, .. } | none => .unknown
+
+/-- Whether a value of a type can hold a loan of the frame: a lifetime names one, and
+a reference among a nominal's declared fields holds one, whether or not its surface
+spells a lifetime. A type parameter's regions outlive the frame. -/
+private partial def typeMayHoldFrameLoan (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (typeId : TypeId) (fuel : Nat := ns.tables.types.size + 1) : Bool :=
+  match fuel, ns.tables.types[typeId.index]? with
+  | 0, _ => typeMayContainReference ns typeId
+  | _, some (.typeParameter _) => false
+  | fuel + 1, some (.tuple elements) => elements.any (typeMayHoldFrameLoan unit ns · fuel)
+  | fuel + 1, some (.vector element _) | fuel + 1, some (.slice element) => typeMayHoldFrameLoan unit ns element fuel
+  | fuel + 1, some (.nominal name arguments) =>
+      ns.profile != some .move && (arguments.any (fun
+        | .lifetime _ => true
+        | .typeArg use => typeMayHoldFrameLoan unit ns use.typeId fuel
+        | .const _ | .evidence _ => false) ||
+        match unit.tables.names[name.index]? with
+        | none => true
+        | some qualified => match unit.namespaces[qualified.namespaceId.index]? with
+          | none => true
+          | some owner => match owner.structs.find? (·.name == name) with
+            | none => true
+            | some declaration =>
+                (declaration.variants.foldl (fun fields variant => fields ++ variant.fields)
+                  declaration.fields).any (typeMayHoldFrameLoan unit ns ·.type.typeId fuel))
+  | _, _ => typeMayContainReference ns typeId
+
+/-- The regions a type mentions. A nominal's fields mention only what its
+arguments do. A type binder of the signature is its instantiation's, all unknown,
+and without one, in the function's own body, it holds no loan of this frame. -/
+private partial def regionsBelow (ns : ValidatedNamespace)
+    (instantiations : Option (Array GenericArgument)) (foreign : Bool)
+    (contexts : List (Array GenericArgument)) (fuel : Nat) (typeId : TypeId) :
+    Array SignatureRegion :=
+  match fuel, ns.tables.types[typeId.index]? with
+  | 0, _ | _, none => #[.unknown]
+  | fuel + 1, some type =>
+    let below := regionsBelow ns instantiations foreign contexts fuel
+    match type with
+    | .reference reference =>
+        appendUniqueRegions #[regionInContexts ns foreign contexts reference.lifetime]
+          (below reference.referent)
+    | .tuple elements =>
+        elements.foldl (fun regions element => appendUniqueRegions regions (below element)) #[]
+    | .vector element _ | .slice element | .typeDomain element => below element
+    | .nominal _ arguments => arguments.foldl (init := #[]) fun regions argument =>
+        match argument with
+        | .lifetime lifetime =>
+            appendUniqueRegions regions #[regionInContexts ns foreign contexts lifetime]
+        | .typeArg use => appendUniqueRegions regions (below use.typeId)
+        | .const _ | .evidence _ => regions
+    | .typeParameter index => match contexts with
+        | arguments :: outer => match arguments[index]? with
+            | some (.typeArg use) =>
+                regionsBelow ns instantiations foreign outer fuel use.typeId
+            | _ => #[.unknown]
+        | [] =>
+            if foreign then #[.unknown] else
+            match instantiations with
+            | none => #[]
+            | some arguments => match arguments[index]? with
+                | some (.typeArg use) => regionsBelow ns instantiations true [] fuel use.typeId
+                | _ => #[.unknown]
+    | .function .. | .profile _ | .resourceDomain .. => #[.unknown]
+    | .unit | .never | .bool | .character | .string | .bytes | .address | .signer
+    | .integer .. | .range | .eventStore | .stateDomain => #[]
+
+/-- The regions of what rests at a path of a value of a type: those below the
+place the path reaches, or below where it leaves the type's owned structure. -/
+private partial def regionsAtPath (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (instantiations : Option (Array GenericArgument)) (foreign : Bool)
+    (contexts : List (Array GenericArgument)) (variant : Option NameId) (fuel : Nat)
+    (typeId : TypeId) : List LoanProjection → Array SignatureRegion
+  | [] => regionsBelow ns instantiations foreign contexts fuel typeId
+  | path@(projection :: rest) =>
+    let whole := regionsBelow ns instantiations foreign contexts fuel typeId
+    match fuel, ns.tables.types[typeId.index]? with
+    | fuel + 1, some (.tuple elements) => match projection with
+        | .index (some index) => match elements[index]? with
+            | some element =>
+                regionsAtPath unit ns instantiations foreign contexts none fuel element rest
+            | none => whole
+        | _ => whole
+    | fuel + 1, some (.vector element _) | fuel + 1, some (.slice element) => match projection with
+        | .index _ => regionsAtPath unit ns instantiations foreign contexts none fuel element rest
+        | _ => whole
+    | fuel + 1, some (.typeParameter index) => match contexts with
+        | arguments :: outer => match arguments[index]? with
+            | some (.typeArg use) =>
+                regionsAtPath unit ns instantiations foreign outer none fuel use.typeId path
+            | _ => whole
+        | [] => whole
+    | fuel + 1, some (.nominal name arguments) => match projection, nominalAt? unit name with
+        | .downcast selected, some _ =>
+            regionsAtPath unit ns instantiations foreign contexts (some selected) fuel typeId rest
+        | .field field, some (_, declaration) =>
+            let fields : Array FieldDecl := match variant with
+              | none => declaration.fields
+              | some selected => match declaration.variants.find?
+                  (fun (candidate : VariantDecl) => candidate.name == selected) with
+                  | some found => found.fields
+                  | none => #[]
+            match fields.find? (fun (candidate : FieldDecl) => candidate.name == field) with
+            | some found =>
+                regionsAtPath unit ns instantiations foreign (arguments :: contexts) none fuel
+                  found.type.typeId rest
+            | none => whole
+        | _, _ => whole
+    | _, _ => whole
+
+/-- The references a value of a type holds by value, with their paths and
+regions: the positions a loan can rest at. An opaque nominal's are its own
+regions. Unknown where the type does not say (a function value). -/
+private partial def signaturePositions (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (instantiations : Option (Array GenericArgument)) (foreign : Bool)
+    (contexts : List (Array GenericArgument)) (prefix_ : Array LoanProjection)
+    (visiting : Array NameId) (fuel : Nat) (typeId : TypeId) :
+    Option (Array (Array LoanProjection × SignatureRegion)) :=
+  match fuel, ns.tables.types[typeId.index]? with
+  | 0, _ | _, none => none
+  | _, some (.reference reference) =>
+      some #[(prefix_, regionInContexts ns foreign contexts reference.lifetime)]
+  | fuel + 1, some (.tuple elements) =>
+      elements.zipIdx.foldlM (m := Option) (init := #[]) fun positions (element, index) => do
+        let nested ← signaturePositions unit ns instantiations foreign contexts
+          (prefix_.push (.index (some index))) visiting fuel element
+        pure (positions ++ nested)
+  | fuel + 1, some (.vector element _) | fuel + 1, some (.slice element) =>
+      signaturePositions unit ns instantiations foreign contexts (prefix_.push (.index none))
+        visiting fuel element
+  | fuel + 1, some (.typeDomain element) =>
+      signaturePositions unit ns instantiations foreign contexts prefix_ visiting fuel element
+  | fuel + 1, some (.typeParameter index) => match contexts with
+      | arguments :: outer => match arguments[index]? with
+          | some (.typeArg use) =>
+              signaturePositions unit ns instantiations foreign outer prefix_ visiting fuel
+                use.typeId
+          | _ => none
+      | [] =>
+          if foreign then some #[(prefix_, .callerParameter)] else
+          match instantiations with
+          | none => some #[(prefix_, .unknown)]
+          | some arguments => match arguments[index]? with
+              | some (.typeArg use) =>
+                  signaturePositions unit ns instantiations true [] prefix_ visiting fuel use.typeId
+              | _ => none
+  | fuel + 1, some (.nominal name arguments) =>
+      if visiting.contains name then some #[(prefix_, .unknown)] else do
+      let (_, declaration) ← nominalAt? unit name
+      if declaration.fields.isEmpty && declaration.variants.isEmpty then
+        return (regionsBelow ns instantiations foreign contexts (fuel + 1) typeId).map (prefix_, ·)
+      let visiting := visiting.push name
+      let inFields (prefix_ : Array LoanProjection) (fields : Array FieldDecl) :=
+        fields.foldlM (m := Option) (init := #[]) fun positions field => do
+          let nested ← signaturePositions unit ns instantiations foreign (arguments :: contexts)
+            (prefix_.push (.field field.name)) visiting fuel field.type.typeId
+          pure (positions ++ nested)
+      if declaration.variants.isEmpty then inFields prefix_ declaration.fields
+      else declaration.variants.foldlM (m := Option) (init := #[]) fun positions variant => do
+        let nested ← inFields (prefix_.push (.downcast variant.name)) variant.fields
+        pure (positions ++ nested)
+  | _, some (.profile _) | _, some (.function ..) |
+      _, some (.resourceDomain ..) => none
+  | _, some .unit | _, some .never | _, some .bool | _, some .character |
+      _, some .string | _, some .bytes | _, some .address | _, some .signer |
+      _, some (.integer ..) | _, some .range |
+      _, some .eventStore | _, some .stateDomain => some #[]
+
+/-- The outlives bounds a type implies, as rustc assumes them of a signature: what
+a reference's referent mentions outlives the reference. -/
+private partial def impliedRegionEdges (ns : ValidatedNamespace)
+    (fuel : Nat) (found : Array (SignatureRegion × SignatureRegion)) (typeId : TypeId) :
+    Array (SignatureRegion × SignatureRegion) :=
+  match fuel, ns.tables.types[typeId.index]? with
+  | 0, _ | _, none => found
+  | fuel + 1, some type => match type with
+    | .reference reference =>
+        let shorter := regionInContexts ns false [] reference.lifetime
+        let found := (regionsBelow ns none false [] fuel reference.referent).foldl
+          (init := found) fun found longer => found.push (longer, shorter)
+        impliedRegionEdges ns fuel found reference.referent
+    | .tuple elements => elements.foldl (impliedRegionEdges ns fuel) found
+    | .vector element _ | .slice element | .typeDomain element => impliedRegionEdges ns fuel found element
+    | .nominal _ arguments => arguments.foldl (init := found) fun found argument =>
+        match argument with
+        | .typeArg use => impliedRegionEdges ns fuel found use.typeId
+        | .lifetime _ | .const _ | .evidence _ => found
+    | .typeParameter _ | .function .. | .profile _ | .resourceDomain ..
+    | .unit | .never | .bool | .character | .string | .bytes | .address | .signer
+    | .integer .. | .range | .eventStore | .stateDomain => found
+
+/-- The outlives bounds of a signature, declared and implied. -/
+private def signatureRegionEdges (ns : ValidatedNamespace)
+    (signature : Signature) : Array (SignatureRegion × SignatureRegion) :=
+  let predicates := signature.generics.foldl
+    (fun predicates binder => predicates ++ binder.predicates) signature.predicates
+  let declared := predicates.filterMap fun predicate => match predicate with
+    | .lifetimeOutlives longer shorter =>
+        some (regionInContexts ns false [] longer, regionInContexts ns false [] shorter)
+    | _ => none
+  let types := signature.parameters.map (·.typeUse.typeId) ++ signature.results.map (·.typeId)
+  types.foldl (impliedRegionEdges ns (ns.tables.types.size + 1)) declared
+
+/-- Reachability over outlives edges. The worklist carries a visited set, keeping
+the search polynomial; enumerating paths instead is exponential on diamond- or
+cycle-shaped predicate edges. -/
+private def regionOutlivesVia (edges : Array (SignatureRegion × SignatureRegion))
+    (longer shorter : SignatureRegion) : Bool :=
+  go (edges.size + 1) #[longer] #[]
 where
-  go : Nat → Array LifetimeId → Array LifetimeId → Bool
+  go : Nat → Array SignatureRegion → Array SignatureRegion → Bool
     | 0, _, _ => false
     | fuel + 1, frontier, visited =>
         frontier.contains shorter ||
@@ -987,91 +1508,43 @@ where
                  !next.contains edge.2 then next.push edge.2 else next
            !next.isEmpty && go fuel next visited)
 
-private def callResultLifetimeInContexts (ns : ValidatedNamespace) :
-    List (Array GenericArgument) → LifetimeId → LifetimeId
-  | [], lifetime => lifetime
-  | arguments :: outer, lifetime =>
-      match ns.tables.lifetimes[lifetime.index]? with
-      | some { kind := .parameter index, .. } => match arguments[index]? with
-          | some (.lifetime value) => callResultLifetimeInContexts ns outer value
-          | _ => lifetime
-      | _ => lifetime
+/-- Whether a loan resting at `source` may rest at `target`. A region nothing is
+declared of may be related to any by what this unit does not see. -/
+private def regionsRelated (edges : Array (SignatureRegion × SignatureRegion))
+    (source target : SignatureRegion) : Bool :=
+  source == .unknown || target == .unknown || target == .callerParameter ||
+    source == .static || regionOutlivesVia edges source target
 
-private partial def structuralCallResultLoanPathsFuel (unit : ValidatedUnit)
-    (ns : ValidatedNamespace)
-    (typeId : TypeId) (instantiations : Array GenericArgument)
-    (edges : Array (LifetimeId × LifetimeId)) (sourceLifetime : LifetimeId)
-    (contexts : List (Array GenericArgument))
-    (pathPrefix : Array LoanProjection) (visiting : Array NameId)
-    (fuel : Nat) :
-    Option (Array (Array LoanProjection)) :=
-  -- The fuel is seeded once by the wrapper below. Re-seeding on zero inside
-  -- the recursion would never terminate on an identity type-parameter
-  -- instantiation, such as a generic callee applied to the caller's own
-  -- type parameter.
-  match fuel, ns.tables.types[typeId.index]? with
-  | 0, _ | _, none => none
-  | _, some (.reference reference) =>
-      let target := instantiatedLifetime ns instantiations <|
-        callResultLifetimeInContexts ns contexts reference.lifetime
-      if lifetimeOutlivesVia edges sourceLifetime target
-          (ns.tables.lifetimes.size + 1) then some #[pathPrefix]
-      else some #[]
-  | fuel + 1, some (.tuple elements) =>
-      (elements.zip (Array.range elements.size)).foldlM (m := Option)
-        (init := #[]) fun paths pair => do
-          let nested ← structuralCallResultLoanPathsFuel unit ns pair.1 instantiations edges
-            sourceLifetime contexts (pathPrefix.push (.index (some pair.2))) visiting fuel
-          pure (appendUniqueProjectionPaths paths nested)
-  | fuel + 1, some (.vector element _) =>
-      structuralCallResultLoanPathsFuel unit ns element instantiations edges sourceLifetime
-        contexts (pathPrefix.push (.index none)) visiting fuel
-  | fuel + 1, some (.typeParameter index) => match contexts with
-      | arguments :: outer => match arguments[index]? with
-          | some (.typeArg typeUse) => structuralCallResultLoanPathsFuel unit ns typeUse.typeId
-              instantiations edges sourceLifetime outer pathPrefix visiting fuel
-          | _ => none
-      | [] => match instantiations[index]? with
-          | some (.typeArg typeUse) => structuralCallResultLoanPathsFuel unit ns typeUse.typeId
-              instantiations edges sourceLifetime [] pathPrefix visiting fuel
-          | _ => none
-  | fuel + 1, some (.typeDomain element) =>
-      structuralCallResultLoanPathsFuel unit ns element instantiations edges sourceLifetime contexts
-        pathPrefix visiting fuel
-  | fuel + 1, some (.nominal name arguments) =>
-      if visiting.contains name then some #[pathPrefix] else do
-      let (_, declaration) ← nominalAt? unit name
-      let visiting := visiting.push name
-      if declaration.variants.isEmpty then
-        declaration.fields.foldlM (m := Option) (init := #[]) fun paths field => do
-          let nested ← structuralCallResultLoanPathsFuel unit ns field.type.typeId instantiations
-            edges sourceLifetime (arguments :: contexts)
-            (pathPrefix.push (.field field.name)) visiting fuel
-          pure (appendUniqueProjectionPaths paths nested)
-      else declaration.variants.foldlM (m := Option) (init := #[]) fun paths variant => do
-        let variantPrefix := pathPrefix.push (.downcast variant.name)
-        let nested ← variant.fields.foldlM (m := Option) (init := #[]) fun paths field => do
-          let fieldPaths ← structuralCallResultLoanPathsFuel unit ns field.type.typeId instantiations
-            edges sourceLifetime (arguments :: contexts)
-            (variantPrefix.push (.field field.name)) visiting fuel
-          pure (appendUniqueProjectionPaths paths fieldPaths)
-        pure (appendUniqueProjectionPaths paths nested)
-  | _, some (.profile _) | _, some (.function ..) |
-      _, some (.resourceDomain ..) => none
-  | _, some .unit | _, some .never | _, some .bool | _, some .character |
-      _, some .string | _, some .bytes | _, some .address | _, some .signer |
-      _, some (.integer ..) | _, some .range |
-      _, some .eventStore | _, some .stateDomain => some #[]
+/-- Whether a loan passed at `sources` may rest at a call result's position. A caller's
+type parameter outlives the caller's body, so no loan of its frame rests there. -/
+private def loanMayRestAt (edges : Array (SignatureRegion × SignatureRegion)) (loan : LoanFact)
+    (sources : Array SignatureRegion) (target : SignatureRegion) : Bool :=
+  (target != .callerParameter || loan.canEscape) && sources.any (regionsRelated edges · target)
 
-private def structuralCallResultLoanPaths? (unit : ValidatedUnit)
-    (ns : ValidatedNamespace)
-    (typeId : TypeId) (instantiations : Array GenericArgument)
-    (edges : Array (LifetimeId × LifetimeId)) (sourceLifetime : LifetimeId)
-    (contexts : List (Array GenericArgument) := [])
-    (pathPrefix : Array LoanProjection := #[]) :
-    Option (Array (Array LoanProjection)) :=
-  structuralCallResultLoanPathsFuel unit ns typeId instantiations edges sourceLifetime
-    contexts pathPrefix #[] (ns.tables.types.size + 1)
+/-- The positions of a call's result: each result in turn, with a path below its
+index where the function has several. -/
+private def callResultPositions? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (signature : Signature) (instantiations : Option (Array GenericArgument)) :
+    Option (Array (Array LoanProjection × SignatureRegion)) :=
+  let fuel := ns.tables.types.size + 1
+  match signature.results.toList with
+  | [] => some #[]
+  | [result] => signaturePositions unit ns instantiations false [] #[] #[] fuel result.typeId
+  | _ => signature.results.zipIdx.foldlM (m := Option) (init := #[]) fun positions (result, index) => do
+      let nested ← signaturePositions unit ns instantiations false [] #[.index (some index)] #[]
+        fuel result.typeId
+      pure (positions ++ nested)
+
+/-- The regions of the parameters a loan is passed at, at its paths in each
+argument. -/
+private def loanRegionsAtCall (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (signature : Signature) (instantiations : Array GenericArgument) (arguments : Array ExprId)
+    (loan : LoanFact) (pathsIn : ExprId → Array (Array LoanProjection)) : Array SignatureRegion :=
+  (arguments.zip signature.parameters).foldl (init := #[]) fun regions (argument, parameter) =>
+    if !loanFlowsFromExpression ns loan argument then regions else
+    (pathsIn argument).foldl (init := regions) fun regions path =>
+      appendUniqueRegions regions <| regionsAtPath unit ns (some instantiations) false [] none
+        (ns.tables.types.size + 1) parameter.typeUse.typeId path.toList
 
 private partial def loanPathsInExpression (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (loan : LoanFact)
@@ -1095,33 +1568,22 @@ private partial def loanPathsInExpression (unit : ValidatedUnit) (ns : Validated
               #[.index (some pair.2)] ++ path
             appendUniqueProjectionPaths paths nested
       -- A call's result carries only loans its arguments carry, at the
-      -- components whose lifetimes the loan's outlives.
+      -- components whose regions those at the arguments outlive.
       | .call (.function reference) =>
           if !loanFlowsFromExpression ns loan exprId then #[] else
           match functionAt? unit reference with
             | some (_, declaration) =>
-                  let predicates := declaration.signature.generics.foldl
-                    (fun predicates binder => predicates ++ binder.predicates)
-                    declaration.signature.predicates
-                  let edges := predicates.filterMap fun predicate => match predicate with
-                    | .lifetimeOutlives longer shorter => some (
-                        instantiatedLifetime ns instantiations longer,
-                        instantiatedLifetime ns instantiations shorter)
-                    | _ => none
-                  let paths? := match declaration.signature.results.toList with
-                    | [] => some #[]
-                    | [result] => structuralCallResultLoanPaths? unit ns result.typeId
-                        instantiations edges loan.lifetime
-                    | _ => (declaration.signature.results.zip
-                        (Array.range declaration.signature.results.size)).foldlM
-                        (m := Option) (init := #[]) fun paths (pair : TypeUse × Nat) => do
-                          let nested ← structuralCallResultLoanPaths? unit ns pair.1.typeId
-                            instantiations edges loan.lifetime []
-                            #[.index (some pair.2)]
-                          pure (appendUniqueProjectionPaths paths nested)
-                  match paths? with
-                  | some paths => if paths.isEmpty then #[#[]] else paths
-                  | none => #[#[]]
+                let signature := declaration.signature
+                match callResultPositions? unit ns signature (some instantiations) with
+                | none => #[#[]]
+                | some positions =>
+                    let edges := signatureRegionEdges ns signature
+                    let sources := loanRegionsAtCall unit ns signature instantiations arguments loan
+                      (loanPathsInExpression unit ns loan · fuel)
+                    positions.foldl (init := #[]) fun paths (path, target) =>
+                      if loanMayRestAt edges loan sources target then
+                        appendUniqueProjectionPaths paths #[path]
+                      else paths
             | none => #[#[]]
       | .call (.constructor reference variantName) =>
           match nominalAt? unit reference.name with
@@ -1189,7 +1651,16 @@ private def bindObservedLoansAtPlaceFromExpression (unit : ValidatedUnit) (ns : 
   match loanPlace? ns placeId with
   | none => state
   | some place =>
-    if !isOwnedCarrierPlace place then state else
+    if !isOwnedCarrierPlace place then
+      let callerStorage := ns.profile != some .move &&
+        (referenceCarrier? place).any fun carrier =>
+          let parents := loansCarriedAt state carrier
+          parents.isEmpty || parents.any (·.canEscape)
+      { active := state.active.map fun loan =>
+          if callerStorage && loan.canEscape && observed.any (·.source == loan.source) then
+            { loan with callerHeld := true }
+          else loan }
+    else
     { active := state.active.map fun loan =>
         match observed.find? (·.source == loan.source) with
         | none => loan
@@ -1276,21 +1747,6 @@ private def replacePatternLoans (unit : ValidatedUnit) (ns : ValidatedNamespace)
   updatePatternLoansFromExpression true unit ns state observed pattern expression
     #[] (ns.patterns.size + 1)
 
-private def instantiatedOutlivesEdges (ns : ValidatedNamespace)
-    (declaration : FunctionDecl FunctionBody) (instantiations : Array GenericArgument) :
-    Array (LifetimeId × LifetimeId) :=
-  let predicates := declaration.signature.generics.foldl
-    (fun predicates binder => predicates ++ binder.predicates) declaration.signature.predicates
-  predicates.filterMap fun predicate => match predicate with
-    | .lifetimeOutlives longer shorter => some (
-        instantiatedLifetime ns instantiations longer,
-        instantiatedLifetime ns instantiations shorter)
-    | _ => none
-
-private def appendUniqueLifetime (lifetimes : Array LifetimeId) (lifetime : LifetimeId) :
-    Array LifetimeId :=
-  if lifetimes.contains lifetime then lifetimes else lifetimes.push lifetime
-
 private def instantiatedLifetimeInContexts (ns : ValidatedNamespace) :
     List (Array GenericArgument) → LifetimeId → LifetimeId
   | [], lifetime => lifetime
@@ -1301,94 +1757,27 @@ private def instantiatedLifetimeInContexts (ns : ValidatedNamespace) :
           | _ => lifetime
       | _ => lifetime
 
-private partial def instantiatedTypeUseInContexts (ns : ValidatedNamespace)
-    (contexts : List (Array GenericArgument)) (typeUse : TypeUse) (fuel : Nat) : TypeUse :=
-  match fuel, contexts, ns.tables.types[typeUse.typeId.index]? with
-  | 0, _, _ | _, [], _ => typeUse
-  | fuel + 1, instantiations :: outer, some (.typeParameter index) =>
-      match instantiations[index]? with
-      | some (.typeArg instantiated) =>
-          instantiatedTypeUseInContexts ns outer instantiated fuel
-      | _ => typeUse
-  | _, _, _ => typeUse
-
-private def instantiatedArgumentsInContexts (ns : ValidatedNamespace)
-    (contexts : List (Array GenericArgument)) (arguments : Array GenericArgument) :
-    Array GenericArgument :=
-  arguments.map fun argument => match argument with
-    | .lifetime lifetime => .lifetime (instantiatedLifetimeInContexts ns contexts lifetime)
-    | .typeArg typeUse => .typeArg <|
-        instantiatedTypeUseInContexts ns contexts typeUse (ns.tables.types.size + 1)
-    | argument => argument
-
-private partial def knownReferenceLifetimes? (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (typeId : TypeId)
-    (contexts : List (Array GenericArgument)) (fuel : Nat)
-    (visiting : Array (NameId × Array GenericArgument) := #[]) : Option (Array LifetimeId) :=
-  match fuel, ns.tables.types[typeId.index]? with
-  | 0, _ | _, none => none
-  | _, some (.reference reference) =>
-      some #[instantiatedLifetimeInContexts ns contexts reference.lifetime]
-  | fuel + 1, some (.tuple elements) =>
-      elements.foldlM (m := Option) (init := #[]) fun lifetimes element => do
-        let nested ← knownReferenceLifetimes? unit ns element contexts fuel visiting
-        pure (nested.foldl appendUniqueLifetime lifetimes)
-  | fuel + 1, some (.vector element _) | fuel + 1, some (.typeDomain element) =>
-      knownReferenceLifetimes? unit ns element contexts fuel visiting
-  | fuel + 1, some (.nominal name arguments) =>
-      let frame := (name, instantiatedArgumentsInContexts ns contexts arguments)
-      if visiting.contains frame then some #[]
-      else if visiting.any (·.1 == name) then none
-      else do
-      let (_, declaration) ← nominalAt? unit name
-      let fields := declaration.variants.foldl
-        (fun fields variant => fields ++ variant.fields) declaration.fields
-      fields.foldlM (m := Option) (init := #[]) fun lifetimes field => do
-        let nested ← knownReferenceLifetimes? unit ns field.type.typeId
-          (arguments :: contexts) fuel (visiting.push frame)
-        pure (nested.foldl appendUniqueLifetime lifetimes)
-  | fuel + 1, some (.typeParameter index) => match contexts with
-      | instantiations :: outer => match instantiations[index]? with
-          | some (.typeArg instantiated) =>
-              knownReferenceLifetimes? unit ns instantiated.typeId outer fuel visiting
-          | _ => none
-      | [] => none
-  | _, some (.profile _) | _, some (.function ..) |
-      _, some (.resourceDomain ..) => none
-  | _, some .unit | _, some .never | _, some .bool | _, some .character |
-      _, some .string | _, some .bytes | _, some .address | _, some .signer |
-      _, some (.integer ..) | _, some .range |
-      _, some .eventStore | _, some .stateDomain => some #[]
-
+/-- The loans a direct call's result carries: those passed at a parameter whose
+region outlives the region of a position of the result. Unknown where the callee
+or its result type is. -/
 private def directCallResultLoans? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (reference : QualifiedRef)
     (instantiations : Array GenericArgument) (arguments : Array ExprId)
     (observed : Array LoanFact) : Option (Array LoanFact) := do
   let (_, declaration) ← functionAt? unit reference
-  let edges := instantiatedOutlivesEdges ns declaration instantiations
-  let resultLifetimes ← declaration.signature.results.foldlM (m := Option)
-    (init := #[]) fun lifetimes result => do
-      let nested ← knownReferenceLifetimes? unit ns result.typeId [instantiations]
-        (ns.tables.types.size + 1)
-      pure <| nested.foldl appendUniqueLifetime lifetimes
-  let referenceArguments ← (arguments.zip declaration.signature.parameters).foldlM
-    (m := Option) (init := #[]) fun sources pair => do
-      let lifetimes ← knownReferenceLifetimes? unit ns pair.2.typeUse.typeId
-        [instantiations] (ns.tables.types.size + 1)
-      pure <| if lifetimes.isEmpty then sources else sources.push (pair.1, lifetimes)
-  if resultLifetimes.isEmpty then some #[] else
-  if referenceArguments.isEmpty then some #[] else
-    let sources := referenceArguments.filter fun source =>
-      source.2.any fun sourceLifetime => resultLifetimes.any fun resultLifetime =>
-        lifetimeOutlivesVia edges sourceLifetime resultLifetime (ns.tables.lifetimes.size + 1)
-    if sources.isEmpty then none else
-      some (observed.filter fun loan =>
-        sources.any fun source => loanFlowsFromExpression ns loan source.1)
+  let signature := declaration.signature
+  let positions ← callResultPositions? unit ns signature (some instantiations)
+  if positions.isEmpty then some #[] else
+  let edges := signatureRegionEdges ns signature
+  some <| observed.filter fun loan =>
+    let sources := loanRegionsAtCall unit ns signature instantiations arguments loan
+      (loanPathsInExpression unit ns loan · (ns.expressions.size + 1))
+    positions.any fun (_, target) => loanMayRestAt edges loan sources target
 
 private def discardUncarriedTemporaries (state : BorrowState)
     (observed carried : Array LoanFact) : BorrowState :=
   { active := state.active.filter fun loan =>
-      !loan.holders.isEmpty || !observed.any (·.source == loan.source) ||
+      loan.callerHeld || !loan.holders.isEmpty || !observed.any (·.source == loan.source) ||
         carried.any (·.source == loan.source) }
 
 /-- The flow after a call, direct or through a function value, whose result
@@ -1401,7 +1790,7 @@ private def callResultFlow (ns : ValidatedNamespace) (exprId : ExprId) (expressi
   -- Incoming parameter origins carry provenance, but have no local runtime
   -- loan event. A mutable reference returned through them still needs the
   -- call-site registration and death that an otherwise untracked result uses.
-  let onlyIncoming := (directLoans ++ observed).all (·.source.expression?.isNone)
+  let onlyIncoming := directLoans.all (·.source.expression?.isNone)
   let produced := if onlyIncoming then
     match referenceType? ns expression.typeId with
     | some referenceType =>
@@ -1427,7 +1816,7 @@ write-back and record no death. -/
 private def retainResultLoans (state : BorrowState)
     (carried : Array LoanFact) : BorrowState :=
   { active := state.active.filter fun loan =>
-      loan.kind != .mutable || carried.any (·.source == loan.source) }
+      loan.callerHeld || loan.kind != .mutable || carried.any (·.source == loan.source) }
 
 private def releaseHoldersUnusedBy (ns : ValidatedNamespace) (state : BorrowState)
     (holders : Array LocalId) (expressions : List ExprId) : BorrowState :=
@@ -1443,32 +1832,41 @@ mutual
   private partial def analyzeExpr (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (exprId : ExprId)
       (state : BorrowState) (preserved : Array LoanSource := #[])
-      (discarded : Bool := false) (readOnly : Bool := false)
-      (liveOut : LiveOut := fun _ _ => false) : BorrowFlow :=
-    let flow := analyzeExprCore unit ns exprId state preserved discarded readOnly liveOut
+      (discarded : Bool := false) (readOnly : Bool := false) (future : List ExprId := []) :
+      BorrowFlow :=
+    let flow := analyzeExprCore unit ns exprId state preserved discarded readOnly future
+    let flow := { flow with deaths := flow.deaths.atPoint exprId true state }
     match flow.normal with
     | none => flow
     | some exit =>
+        let flow := { flow with deaths := flow.deaths.atPoint exprId false exit }
         let candidates := appendUniqueLoans state.active flow.observed
         let died := candidates.filter fun loan =>
           loan.kind == .mutable && loan.source.expression?.isSome &&
             !exit.active.any (·.source == loan.source) &&
-            !flow.deaths.any (fun death => loan.source == .expression death.1)
+            !flow.deaths.deaths.any (fun death => loan.source == .expression death.1)
+        -- What removes a loan without recording its death removes one no place
+        -- holds: a temporary a call took, or a value it moved. A merged fact
+        -- would name places that hold other references by now.
+        let unheld := died.map fun loan => ({ loan with holders := #[], holderPlaces := #[] } : LoanFact)
         if died.isEmpty then flow
-        else { flow with deaths := pushDeaths flow.deaths died { anchor := exprId } }
+        else { flow with deaths := pushDeaths flow.deaths unheld { anchor := exprId } }
 
   /-- `readOnly` marks an operand only read through: evaluating a mutable
-  reference anywhere else may write its referent.  `liveOut` holds the
-  holders the continuation may read before overwriting them (`LiveOut`). -/
+  reference anywhere else may write its referent. `future` is what evaluation
+  can reach after the node. -/
   private partial def analyzeExprCore (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (exprId : ExprId)
       (state : BorrowState) (preserved : Array LoanSource := #[])
-      (discarded : Bool := false) (readOnly : Bool := false)
-      (liveOut : LiveOut := fun _ _ => false) : BorrowFlow :=
+      (discarded : Bool := false) (readOnly : Bool := false) (future : List ExprId := []) :
+      BorrowFlow :=
     match ns.expressions[exprId.index]? with
     | none => { normal := some state }
     | some expression => match expression.kind with
         | .value .. | .constant _ | .quantifier .. | .spec _ => { normal := some state }
+        -- A read of a local moves nothing: `inferLocalAccess` has already made
+        -- the read of a value without `Copy` a `.move`, which alone arms
+        -- `movedFrom`.
         | .localVar localId =>
             let place : LoanPlace := { root := .local localId }
             let loans := state.active.filter (·.holders.contains localId)
@@ -1491,14 +1889,23 @@ mutual
               diagnostics := accessDiagnostics state expression.loc place false "local read" ++
                 referentDiagnostics }
         | .operation operation instantiations arguments _ =>
+            let overwritten := match operation with
+              | .write place => overwrittenLoans ns state place
+              | _ => #[]
             let argumentState := match operation with
-              | .write place => releasePlaceLoansUnusedBy ns state place arguments.toList
+              | .write place => retireOverwritten ns
+                  (releasePlaceLoansUnusedBy ns state place arguments.toList) overwritten
+                  (arguments.toList ++ future)
+              -- A drop ends the loans its value alone holds, while it still
+              -- holds them.
+              | .drop place => releasePlaceLoans ns state #[] place
               | _ => state
             let entryDeaths := match arguments[0]? with
               | some first =>
-                  pushDeaths #[] (diffLoans state argumentState)
+                  pushDeaths {} (diffLoans state argumentState)
                     { anchor := first, before := true }
-              | none => pushDeaths #[] (diffLoans state argumentState) { anchor := exprId }
+              | none =>
+                  pushDeaths {} (diffLoans state argumentState) { anchor := exprId, before := true }
             let operationPreserved := match operationPlace? operation with
               | some place => loansUsedByPlace ns place argumentState preserved
               | none => preserved
@@ -1506,7 +1913,7 @@ mutual
               | .reference .dereference | .reference (.freeze _) => true
               | _ => false
             let argumentsFlow := analyzeExprList unit ns arguments.toList argumentState
-              operationPreserved readOnly (liveOut := liveOut)
+              operationPreserved readOnly (future := future)
             match argumentsFlow.normal with
             | none => argumentsFlow
             | some afterArguments =>
@@ -1536,6 +1943,9 @@ mutual
                       let parentLoans := loansHeldAtPlace ns afterArguments place
                       let valueLoans := appendUniqueLoans parentLoans loans
                       (some state, valueLoans, valueLoans, diagnostics)
+                  | .readDiscriminant place =>
+                      (some afterArguments, #[], loansHeldAtPlace ns afterArguments place,
+                        checkPlaceAccess ns afterArguments expression.loc place false "enum tag read")
                   | .copy place | .read place =>
                       let accessed := loansHeldAtPlace ns afterArguments place
                       let valueLoans := if typeMayContainReference ns expression.typeId then
@@ -1548,17 +1958,32 @@ mutual
                       let valueLoans := if typeMayContainReference ns expression.typeId then
                         accessed else #[]
                       let afterConsume := releasePlaceLoans ns afterArguments valueLoans place
+                      -- A loan the caller lends has no death here, and a dropped
+                      -- value could not export it at the exit.
+                      let droppedIncoming := state.active.any fun (loan : LoanFact) =>
+                        loan.kind == ReferenceKind.mutable && loan.source.expression?.isNone &&
+                          !argumentState.active.any (·.source == loan.source)
                       (some afterConsume, valueLoans, accessed,
                         checkPlaceAccess ns afterArguments expression.loc place true "place consume" ++
-                          dereferenceConsumptionDiagnostics ns expression.loc place)
+                          dereferenceConsumptionDiagnostics ns expression.loc place ++
+                          if droppedIncoming then #[Diagnostic.at "VIR-SEMANTIC-BORROW-DROP"
+                            "a drop of a mutable reference the function's caller lends is not supported"
+                            expression.loc] else #[])
                   | .write place =>
                       let afterWrite := match arguments[0]? with
                         | some value => replaceObservedLoansAtPlaceFromExpression unit ns afterArguments
                             argumentsFlow.valueLoans place value
                         | none => releasePlaceLoans ns afterArguments
                             argumentsFlow.valueLoans place
-                      (some afterWrite, #[], #[],
-                        checkPlaceAccess ns afterArguments expression.loc place true "place write")
+                      (some (forgetMovedOutOf ns afterWrite place), #[], #[],
+                        checkPlaceAccess ns afterArguments expression.loc place true "place write" ++
+                          (if (arguments[0]?.bind fun value =>
+                              carrierRetirement? ns place value state argumentsFlow.valueLoans).isSome then #[]
+                            else overwrittenLoanDiagnostics ns state argumentState expression.loc ++
+                              overwrittenLoanDiagnostics ns afterArguments afterWrite expression.loc) ++
+                          replacementEscapeDiagnostics ns afterArguments place argumentsFlow.valueLoans expression.loc ++
+                          overwrittenLiveDiagnostics afterWrite overwritten
+                            argumentsFlow.valueLoans expression.loc)
                   | .call (.function reference) =>
                       let directLoans := if typeMayContainReference ns expression.typeId then
                         (directCallResultLoans? unit ns reference instantiations arguments
@@ -1569,8 +1994,17 @@ mutual
                   -- The callee is unknown: the result may carry any loan an
                   -- argument lends.
                   | .call .invoke =>
+                      let receiverScoped := (arguments[0]?).any
+                        (ReceiverNoEscape.scopedInvocationAt ns exprId)
                       let directLoans := if typeMayContainReference ns expression.typeId then
-                        argumentsFlow.observed else #[]
+                        argumentsFlow.observed.filter fun (loan : LoanFact) =>
+                          -- Only the receiver's private loan ends. A loan also
+                          -- lent by another argument or the callable remains.
+                          loan.canEscape || !receiverScoped ||
+                            !(arguments[1]?).any (loanFlowsFromExpression ns loan) ||
+                            (arguments.zipIdx).any (fun (argument, index) =>
+                              index != 1 && loanFlowsFromExpression ns loan argument)
+                        else #[]
                       callResultFlow ns exprId expression afterArguments argumentsFlow.observed
                         directLoans
                   | _ =>
@@ -1580,17 +2014,23 @@ mutual
                       -- operation, as it does at a call.
                       (some (discardUncarriedTemporaries afterArguments argumentsFlow.observed
                         valueLoans), valueLoans, #[], #[])
+                -- A write ends what it destroys once its operand is evaluated.
+                let writeDeaths := match operation, normal, arguments[0]? with
+                  | .write place, some after, some first =>
+                      addCarrierRetirement
+                        (pushDeaths {} (diffLoans afterArguments after) { anchor := first })
+                        (carrierRetirement? ns place first state argumentsFlow.valueLoans)
+                  | _, _, _ => {}
                 { argumentsFlow with
                   normal
                   valueLoans
                   observed := appendUniqueLoans argumentsFlow.observed operationObserved
-                  deaths := appendUniqueDeaths entryDeaths argumentsFlow.deaths
+                  deaths := appendUniqueDeaths (appendUniqueDeaths entryDeaths argumentsFlow.deaths)
+                    writeDeaths
                   diagnostics := argumentsFlow.diagnostics ++ diagnostics }
         | .block statements result =>
-            analyzeBlockExprList unit ns (statements.toList ++ result.toList) state preserved
-              liveOut
+            analyzeBlockExprList unit ns (statements.toList ++ result.toList) state preserved future
         | .letDecl pattern initializer body =>
-            let bodyProtected := loansUsedBy ns [body] state preserved
             let initializerFlow : BorrowFlow := match initializer with
               | none => { normal := some state }
               | some value =>
@@ -1606,14 +2046,13 @@ mutual
                       | _ => false) &&
                     !(patternVariables ns pattern (ns.patterns.size + 1)).any
                       (fun localId => expressionUsesLocal ns body localId (ns.expressions.size + 1))
-                  -- The binding overwrites the pattern's locals, then the body runs.
-                  let bindings := patternVariables ns pattern (ns.patterns.size + 1)
-                  analyzeExpr unit ns value state bodyProtected discarded
-                    (liveOut := fun loan holder =>
-                      !bindings.contains holder && liveAfter ns [body] liveOut loan holder)
+                  analyzeExpr unit ns value state preserved discarded (future := body :: future)
             match initializerFlow.normal with
             | none => initializerFlow
             | some afterInitializer =>
+                let afterInitializer := (patternVariables ns pattern).foldl
+                  (fun state holder => forgetMovedOut state { root := .local holder })
+                  afterInitializer
                 let afterInitializer := match initializer with
                   | some value => bindPatternLoans unit ns afterInitializer
                       initializerFlow.valueLoans pattern value
@@ -1630,12 +2069,10 @@ mutual
                   initializerFlow.valueLoans #[]
                 let initializerObserved := appendUniqueLoans initializerFlow.observed <|
                   recordBoundLoans afterInitializer initializerFlow.valueLoans
-                let afterInitializer := retainLoansUsedBy ns [body] afterInitializer preserved
-                  liveOut
-                let entryDeaths := pushDeaths #[] (diffLoans bound afterInitializer)
+                let afterInitializer := retainLoansUsedBy ns (body :: future) afterInitializer preserved
+                let entryDeaths := pushDeaths {} (diffLoans bound afterInitializer)
                   { anchor := body, before := true }
-                let bodyFlow := analyzeExpr unit ns body afterInitializer preserved
-                  (liveOut := liveOut)
+                let bodyFlow := analyzeExpr unit ns body afterInitializer preserved (future := future)
                 { bodyFlow with
                   breaks := initializerFlow.breaks ++ bodyFlow.breaks
                   breakValueLoans := initializerFlow.breakValueLoans ++ bodyFlow.breakValueLoans
@@ -1647,34 +2084,39 @@ mutual
                   diagnostics := initializerFlow.diagnostics ++ indexDiagnostics ++
                     bodyFlow.diagnostics }
         | .ifElse condition thenBranch elseBranch =>
-            let branchExpressions := thenBranch :: elseBranch.toList
-            let conditionProtected := loansUsedBy ns branchExpressions state preserved
-            let conditionFlow := analyzeExpr unit ns condition state conditionProtected
-              (liveOut := liveAfterAny ns branchExpressions elseBranch.isNone liveOut)
+            -- After the condition one branch runs: the node itself decides.
+            let conditionFlow := analyzeExpr unit ns condition state preserved
+              (future := exprId :: future)
             match conditionFlow.normal with
             | none => conditionFlow
             | some branchState =>
                 let thenPreserved := branchPreserved ns thenBranch preserved
-                let thenLiveOut := branchLiveOut ns thenBranch liveOut
-                let thenState := retainLoansUsedBy ns [thenBranch] branchState thenPreserved
-                  thenLiveOut
-                let thenEntryDeaths := pushDeaths #[] (diffLoans branchState thenState)
+                let thenFuture := branchFuture ns thenBranch future
+                let thenState := retainLoansUsedBy ns (thenBranch :: thenFuture) branchState
+                  thenPreserved
+                let thenEntryDeaths := pushDeaths {} (diffLoans branchState thenState)
                   { anchor := thenBranch, before := true }
                 let thenFlow := analyzeExpr unit ns thenBranch thenState thenPreserved
-                  (liveOut := thenLiveOut)
+                  (future := thenFuture)
                 let (elseEntryDeaths, elseFlow) := match elseBranch with
                   | some branch =>
                       let elsePreserved := branchPreserved ns branch preserved
-                      let elseLiveOut := branchLiveOut ns branch liveOut
-                      let elseState := retainLoansUsedBy ns [branch] branchState elsePreserved
-                        elseLiveOut
-                      (pushDeaths #[] (diffLoans branchState elseState)
+                      let elseFuture := branchFuture ns branch future
+                      let elseState := retainLoansUsedBy ns (branch :: elseFuture) branchState
+                        elsePreserved
+                      (pushDeaths {} (diffLoans branchState elseState)
                           { anchor := branch, before := true },
-                        analyzeExpr unit ns branch elseState elsePreserved
-                          (liveOut := elseLiveOut))
+                        analyzeExpr unit ns branch elseState elsePreserved (future := elseFuture))
                   | none =>
-                      let elseState := retainLoansUsedBy ns [] branchState preserved liveOut
-                      (pushDeaths #[] (diffLoans branchState elseState) { anchor := exprId },
+                      -- The anchor after the conditional runs on both paths: a
+                      -- loan the taken branch still holds stays live through it.
+                      let thenExit := (thenFlow.normal.map (·.active)).getD #[]
+                      let retained := retainLoansUsedBy ns future branchState preserved
+                      let kept := branchState.active.filter fun loan =>
+                        thenExit.any (·.source == loan.source) ||
+                          retained.active.any (·.source == loan.source)
+                      let elseState : BorrowState := { active := kept }
+                      (pushDeaths {} (diffLoans branchState elseState) { anchor := exprId },
                         { normal := some elseState })
                 let branches := mergeFlows thenFlow elseFlow
                 { branches with
@@ -1688,21 +2130,21 @@ mutual
                       appendUniqueDeaths elseEntryDeaths branches.deaths
                   diagnostics := conditionFlow.diagnostics ++ branches.diagnostics }
         | .match_ scrutinee arms =>
-            let armExpressions := arms.foldl (fun expressions arm =>
-              expressions ++ arm.guard.toList ++ [arm.body]) []
-            let scrutineeProtected := loansUsedBy ns armExpressions state preserved
-            let scrutineeFlow := analyzeExpr unit ns scrutinee state scrutineeProtected
-              (liveOut := fun loan holder => arms.any fun arm =>
-                liveAfter ns (arm.guard.toList ++ [arm.body]) liveOut loan holder)
+            let scrutineeFlow := analyzeExpr unit ns scrutinee state preserved
+              (future := exprId :: future)
             match scrutineeFlow.normal with
             | none => scrutineeFlow
             | some armState =>
                 let armsFlow := arms.foldl (fun flow arm =>
-                  let expressions := arm.guard.toList ++ [arm.body]
                   let armPreserved := branchPreserved ns arm.body preserved
-                  let armLiveOut := branchLiveOut ns arm.body liveOut
-                  let state := retainLoansUsedBy ns expressions armState armPreserved armLiveOut
-                  let entryDeaths := pushDeaths #[] (diffLoans armState state)
+                  let armFuture := branchFuture ns arm.body future
+                  -- A failing guard reaches the arms after it.
+                  let guardFuture := exprId :: future
+                  let reached := match arm.guard with
+                    | some guard => guard :: guardFuture
+                    | none => arm.body :: armFuture
+                  let state := retainLoansUsedBy ns reached armState armPreserved
+                  let entryDeaths := pushDeaths {} (diffLoans armState state)
                     { anchor := arm.guard.getD arm.body, before := true }
                   -- An arm writes every local its pattern binds, as a `let`
                   -- does, so in a loop it may re-bind the index of a loan
@@ -1713,7 +2155,7 @@ mutual
                     (patternVariables ns arm.pattern (ns.patterns.size + 1)).foldl
                       (init := #[]) fun diagnostics localId =>
                         diagnostics ++ indexWriteDiagnostics ns armState patternLoc localId
-                  let armFlow := analyzeArm unit ns arm state armPreserved armLiveOut
+                  let armFlow := analyzeArm unit ns arm state armPreserved armFuture guardFuture
                   mergeFlows flow
                     { armFlow with
                       deaths := appendUniqueDeaths entryDeaths armFlow.deaths
@@ -1727,15 +2169,15 @@ mutual
                   deaths := appendUniqueDeaths scrutineeFlow.deaths armsFlow.deaths
                   diagnostics := scrutineeFlow.diagnostics ++ armsFlow.diagnostics }
         | .loop _ body =>
-            let loopState := retainLoansUsedBy ns [body] state preserved liveOut
-            let entryDeaths := pushDeaths #[] (diffLoans state loopState)
+            let loopState := retainLoansUsedBy ns (body :: future) state preserved
+            let entryDeaths := pushDeaths {} (diffLoans state loopState)
               { anchor := body, before := true }
             let flow := analyzeLoop unit ns body loopState loopState
-              (loopState.active.size + ns.expressions.size + 1) preserved (liveOut := liveOut)
+              (loopState.active.size + ns.expressions.size + 1) preserved (future := future)
             { flow with deaths := appendUniqueDeaths entryDeaths flow.deaths }
         | .break_ nest value =>
             let valueFlow := match value with
-              | some value => analyzeExpr unit ns value state preserved (liveOut := liveOut)
+              | some value => analyzeExpr unit ns value state preserved (future := future)
               | none => { normal := some state }
             let breaks := match valueFlow.normal with
               | some afterValue => valueFlow.breaks.push (nest, afterValue)
@@ -1753,6 +2195,8 @@ mutual
             | some afterValues =>
                 let returned := retainResultLoans afterValues valuesFlow.valueLoans
                 let died := diffLoans afterValues returned
+                let returned := { returned with
+                  returned := values.back?.map (·, valuesFlow.valueLoans) }
                 let death := match values.back? with
                   | some anchor => ({ anchor } : LoanDeath)
                   | none => { anchor := exprId, before := true }
@@ -1774,23 +2218,30 @@ mutual
                   normal := none
                   deaths := pushDeaths valuesFlow.deaths died death }
         | .assign place value =>
-            let valueState := releasePlaceLoansUnusedBy ns state place [value]
-            let entryDeaths := pushDeaths #[] (diffLoans state valueState)
+            let overwritten := overwrittenLoans ns state place
+            let released := releasePlaceLoansUnusedBy ns state place [value]
+            let valueState := retireOverwritten ns released overwritten (value :: future)
+            let entryDeaths := pushDeaths {} (diffLoans state valueState)
               { anchor := value, before := true }
             let assignmentPreserved := loansUsedByPlace ns place valueState preserved
             let valueFlow := analyzeExpr unit ns value valueState assignmentPreserved
-              (liveOut := liveOut)
+              (future := future)
             match valueFlow.normal with
             | none => valueFlow
             | some afterValue =>
+                let releasedValue := afterValue
                 let bound := replaceObservedLoansAtPlaceFromExpression unit ns afterValue
                   valueFlow.valueLoans place value
                 -- Once the value's loans are bound to the place, a loan
                 -- neither the place nor what follows uses ends, after the
                 -- value and before the write.
-                let afterValue := retainLoansUsedBy ns [] bound
-                  (loansUsedByPlace ns place bound preserved) liveOut
-                let writeDeaths := pushDeaths #[] (diffLoans bound afterValue) { anchor := value }
+                let afterValue := retainLoansUsedBy ns future bound
+                  (loansUsedByPlace ns place bound preserved)
+                let afterValue := forgetMovedOutOf ns afterValue place
+                let retirement := carrierRetirement? ns place value state valueFlow.valueLoans
+                let writeDeaths := addCarrierRetirement (pushDeaths {}
+                  (diffLoans (if ns.profile == some .move then bound else releasedValue) afterValue)
+                  { anchor := value }) retirement
                 { valueFlow with
                   normal := some afterValue
                   valueLoans := #[]
@@ -1799,13 +2250,20 @@ mutual
                   deaths := appendUniqueDeaths (appendUniqueDeaths entryDeaths valueFlow.deaths)
                     writeDeaths
                   diagnostics := valueFlow.diagnostics ++
-                    checkPlaceAccess ns afterValue expression.loc place true "assignment" }
+                    checkPlaceAccess ns (shallowWriteState ns afterValue place) expression.loc place true
+                      "assignment" ++
+                      (if retirement.isSome then #[] else
+                        overwrittenLoanDiagnostics ns state released expression.loc ++
+                        overwrittenLoanDiagnostics ns releasedValue bound expression.loc) ++
+                      replacementEscapeDiagnostics ns releasedValue place valueFlow.valueLoans expression.loc ++
+                      overwrittenLiveDiagnostics afterValue overwritten valueFlow.valueLoans
+                        expression.loc }
         | .assignPattern pattern value =>
             let valueState := releaseHoldersUnusedBy ns state
               (patternVariables ns pattern) [value]
-            let entryDeaths := pushDeaths #[] (diffLoans state valueState)
+            let entryDeaths := pushDeaths {} (diffLoans state valueState)
               { anchor := value, before := true }
-            let valueFlow := analyzeExpr unit ns value valueState preserved (liveOut := liveOut)
+            let valueFlow := analyzeExpr unit ns value valueState preserved (future := future)
             match valueFlow.normal with
             | none => valueFlow
             | some afterValue =>
@@ -1814,7 +2272,14 @@ mutual
                 let indexDiagnostics := (patternVariables ns pattern).foldl (init := #[])
                   fun diagnostics localId =>
                     diagnostics ++ indexWriteDiagnostics ns afterValue expression.loc localId
-                let afterValue := replacePatternLoans unit ns afterValue valueFlow.valueLoans pattern value
+                let replaced := replacePatternLoans unit ns afterValue valueFlow.valueLoans pattern value
+                let replaced := (patternVariables ns pattern).foldl
+                  (fun state holder => forgetMovedOut state { root := .local holder }) replaced
+                let rebinding :=
+                  overwrittenLoanDiagnostics ns state valueState expression.loc ++
+                  overwrittenLoanDiagnostics ns afterValue replaced expression.loc
+                let bindDeaths := pushDeaths {} (diffLoans afterValue replaced) { anchor := value }
+                let afterValue := replaced
                 let afterValue := discardUncarriedTemporaries afterValue
                   valueFlow.valueLoans #[]
                 { valueFlow with
@@ -1822,8 +2287,9 @@ mutual
                   valueLoans := #[]
                   observed := appendUniqueLoans valueFlow.observed <|
                     recordBoundLoans afterValue valueFlow.valueLoans
-                  deaths := appendUniqueDeaths entryDeaths valueFlow.deaths
-                  diagnostics := valueFlow.diagnostics ++ indexDiagnostics }
+                  deaths := appendUniqueDeaths (appendUniqueDeaths entryDeaths valueFlow.deaths)
+                    bindDeaths
+                  diagnostics := valueFlow.diagnostics ++ rebinding ++ indexDiagnostics }
 
   /-- Operands evaluated in order. Before an operand, a loan held only by
   locals that neither it, a later operand, nor the continuation uses dies,
@@ -1831,23 +2297,22 @@ mutual
   private partial def analyzeExprList (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (expressions : List ExprId)
       (state : BorrowState) (preserved : Array LoanSource := #[]) (readOnly : Bool := false)
-      (carried : Array LoanSource := #[]) (liveOut : LiveOut := fun _ _ => false) : BorrowFlow :=
+      (carried : Array LoanSource := #[]) (future : List ExprId := []) : BorrowFlow :=
     match expressions with
     | [] => { normal := some state }
     | expression :: tail =>
         let entry := state
-        let state := retainLoansUsedBy ns expressions state (preserved ++ carried) liveOut
-        let entryDeaths := pushDeaths #[] (diffLoans entry state)
+        let state := retainLoansUsedBy ns (expressions ++ future) state (preserved ++ carried)
+        let entryDeaths := pushDeaths {} (diffLoans entry state)
           { anchor := expression, before := true }
-        let futureProtected := loansUsedBy ns tail state (preserved ++ carried)
-        let head := analyzeExpr unit ns expression state futureProtected (readOnly := readOnly)
-          (liveOut := liveAfter ns tail liveOut)
+        let head := analyzeExpr unit ns expression state (preserved ++ carried) (readOnly := readOnly)
+          (future := tail ++ future)
         match head.normal with
         | none => { head with deaths := appendUniqueDeaths entryDeaths head.deaths }
         | some afterHead =>
             let carried := head.valueLoans.foldl (init := carried) fun carried loan =>
               if carried.contains loan.source then carried else carried.push loan.source
-            let rest := analyzeExprList unit ns tail afterHead preserved readOnly carried liveOut
+            let rest := analyzeExprList unit ns tail afterHead preserved readOnly carried future
             { rest with
               breaks := head.breaks ++ rest.breaks
               breakValueLoans := head.breakValueLoans ++ rest.breakValueLoans
@@ -1861,25 +2326,24 @@ mutual
 
   private partial def analyzeBlockExprList (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (expressions : List ExprId) (state : BorrowState)
-      (preserved : Array LoanSource := #[]) (liveOut : LiveOut := fun _ _ => false) : BorrowFlow :=
+      (preserved : Array LoanSource := #[]) (future : List ExprId := []) : BorrowFlow :=
     match expressions with
     | [] => { normal := some state }
     | expression :: tail =>
         let entry := state
-        let state := retainLoansUsedBy ns expressions state preserved liveOut
-        let entryDeaths := pushDeaths #[] (diffLoans entry state)
+        let state := retainLoansUsedBy ns (expressions ++ future) state preserved
+        let entryDeaths := pushDeaths {} (diffLoans entry state)
           { anchor := expression, before := true }
-        let futureProtected := loansUsedBy ns tail state preserved
-        let head := analyzeExpr unit ns expression state futureProtected
-          (liveOut := liveAfter ns tail liveOut)
+        let head := analyzeExpr unit ns expression state preserved
+          (future := tail ++ future)
         match head.normal with
         | none => { head with deaths := appendUniqueDeaths entryDeaths head.deaths }
         | some afterHead =>
             let discarded := if tail.isEmpty then afterHead else
               discardUncarriedTemporaries afterHead head.valueLoans #[]
-            let discardDeaths := pushDeaths #[] (diffLoans afterHead discarded)
+            let discardDeaths := pushDeaths {} (diffLoans afterHead discarded)
               { anchor := expression }
-            let rest := analyzeBlockExprList unit ns tail discarded preserved liveOut
+            let rest := analyzeBlockExprList unit ns tail discarded preserved future
             { rest with
               breaks := head.breaks ++ rest.breaks
               breakValueLoans := head.breakValueLoans ++ rest.breakValueLoans
@@ -1894,42 +2358,40 @@ mutual
 
   private partial def analyzeArm (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (arm : MatchArm)
-      (state : BorrowState) (preserved : Array LoanSource := #[])
-      (liveOut : LiveOut := fun _ _ => false) : BorrowFlow :=
+      (state : BorrowState) (preserved : Array LoanSource) (future guardFuture : List ExprId) :
+      BorrowFlow :=
     match arm.guard with
-    | none => analyzeExpr unit ns arm.body state preserved (liveOut := liveOut)
+    | none => analyzeExpr unit ns arm.body state preserved (future := future)
     | some guard =>
-        let guardProtected := loansUsedBy ns [arm.body] state preserved
-        let guardFlow := analyzeExpr unit ns guard state guardProtected
-          (liveOut := liveAfter ns [arm.body] liveOut)
+        let guardFlow := analyzeExpr unit ns guard state preserved
+          (future := guardFuture)
         match guardFlow.normal with
         | none => guardFlow
         | some afterGuard =>
-            let bodyFlow := analyzeExpr unit ns arm.body afterGuard preserved (liveOut := liveOut)
+            let bodyState := retainLoansUsedBy ns (arm.body :: future) afterGuard preserved
+            let entryDeaths := pushDeaths {} (diffLoans afterGuard bodyState)
+              { anchor := arm.body, before := true }
+            let bodyFlow := analyzeExpr unit ns arm.body bodyState preserved (future := future)
             { bodyFlow with
               breaks := guardFlow.breaks ++ bodyFlow.breaks
               breakValueLoans := guardFlow.breakValueLoans ++ bodyFlow.breakValueLoans
               continues := guardFlow.continues ++ bodyFlow.continues
               returns := guardFlow.returns ++ bodyFlow.returns
               observed := appendUniqueLoans guardFlow.observed bodyFlow.observed
-              deaths := appendUniqueDeaths guardFlow.deaths bodyFlow.deaths
+              deaths := appendUniqueDeaths guardFlow.deaths <|
+                appendUniqueDeaths entryDeaths bodyFlow.deaths
               diagnostics := guardFlow.diagnostics ++ bodyFlow.diagnostics }
 
   private partial def analyzeLoop (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (body : ExprId)
       (initial entry : BorrowState) (fuel : Nat)
       (preserved : Array LoanSource := #[]) (declared? : Option (Array LocalId) := none)
-      (liveOut : LiveOut := fun _ _ => false) :
-      BorrowFlow :=
+      (future : List ExprId := []) : BorrowFlow :=
     let declared := match declared? with
       | some declared => declared
       | none => bodyDeclaredLocals ns body
-    -- After an iteration the body runs again (or the loop is left): a holder
-    -- the body reads, other than a local it declares afresh, carries its
-    -- loans across the back edge.
-    let bodyLiveOut : LiveOut := fun loan holder =>
-      (!declared.contains holder && usesHolderOf ns loan holder body) || liveOut loan holder
-    let bodyFlow := analyzeExpr unit ns body entry preserved (liveOut := bodyLiveOut)
+    -- The body runs again after itself.
+    let bodyFlow := analyzeExpr unit ns body entry preserved (future := body :: future)
     let valueLoans := bodyFlow.breakValueLoans.foldl (init := #[]) fun loans pair =>
       if pair.1 == 0 then appendUniqueLoans loans pair.2 else loans
     let outerBreakValueLoans := bodyFlow.breakValueLoans.filterMap fun (nest, loans) =>
@@ -1937,8 +2399,8 @@ mutual
     -- A `continue` of this loop ends the loans its body's locals hold: the
     -- body declares them afresh before any use on re-entry.
     let bodyScoped (loan : LoanFact) : Bool :=
-      !loan.holders.isEmpty && loan.holders.all declared.contains
-    let continueDeaths := bodyFlow.continues.foldl (init := #[]) fun deaths (nest, state, anchor) =>
+      !loan.callerHeld && !loan.holders.isEmpty && loan.holders.all declared.contains
+    let continueDeaths := bodyFlow.continues.foldl (init := ({} : DeathLog)) fun deaths (nest, state, anchor) =>
       if nest == 0 then
         pushDeaths deaths (state.active.filter fun loan => loan.kind == .mutable && bodyScoped loan)
           { anchor, before := true }
@@ -1954,7 +2416,7 @@ mutual
     let nextEntry := reentries.foldl mergeState entry
     if fuel > 0 && nextEntry != entry then
       let next := analyzeLoop unit ns body initial nextEntry (fuel - 1) preserved (some declared)
-        liveOut
+        future
       { next with
         valueLoans := appendUniqueLoans valueLoans next.valueLoans
         breakValueLoans := outerBreakValueLoans ++ next.breakValueLoans
@@ -1982,6 +2444,45 @@ private def referenceParameters (ns : ValidatedNamespace)
   function.locals.take function.signature.parameters.size |>.filterMap fun localDecl => do
     let reference ← referenceType? ns localDecl.type.typeId
     some { localId := localDecl.id, kind := reference.kind, lifetime := reference.lifetime }
+
+/-- The references a value of a type holds by value, with their paths: not
+behind a reference, and a nominal's back edge cut. -/
+private partial def heldReferences (unit : ValidatedUnit) (ns : ValidatedNamespace) :
+    Nat → TypeId → List (Array GenericArgument) → Array LoanProjection → Array NameId →
+      Array (Array LoanProjection × ReferenceType)
+  | 0, _, _, _, _ => #[]
+  | fuel + 1, typeId, contexts, path, visiting =>
+      match ns.tables.types[typeId.index]? with
+      | some (.reference reference) =>
+          #[(path, { reference with
+            lifetime := instantiatedLifetimeInContexts ns contexts reference.lifetime })]
+      | some (.tuple elements) =>
+          elements.zipIdx.flatMap fun (element, index) =>
+            heldReferences unit ns fuel element contexts (path.push (.index (some index))) visiting
+      | some (.vector element _) | some (.slice element) =>
+          heldReferences unit ns fuel element contexts (path.push (.index none)) visiting
+      | some (.typeParameter index) => match contexts with
+          | arguments :: outer => match arguments[index]? with
+              | some (.typeArg use) => heldReferences unit ns fuel use.typeId outer path visiting
+              | _ => #[]
+          | [] => #[]
+      | some (.nominal name arguments) =>
+          if visiting.contains name then #[] else
+          match nominalAt? unit name with
+          | none => #[]
+          | some (_, declaration) =>
+              let inner := visiting.push name
+              let fieldsAt (start : Array LoanProjection) (fields : Array FieldDecl) :=
+                fields.flatMap fun field =>
+                  heldReferences unit ns fuel field.type.typeId (arguments :: contexts)
+                    (start.push (.field field.name)) inner
+              if declaration.variants.isEmpty then fieldsAt path declaration.fields
+              else declaration.variants.flatMap fun variant =>
+                fieldsAt (path.push (.downcast variant.name)) variant.fields
+      | some (.profile _) | some (.function ..) | some (.typeDomain _)
+      | some (.resourceDomain ..) | some .unit | some .never | some .bool | some .character
+      | some .string | some .bytes | some .address | some .signer | some (.integer ..)
+      | some .range | some .eventStore | some .stateDomain | none => #[]
 
 private def appendUniqueRelation (relations : Array LifetimeRelationFact)
     (relation : LifetimeRelationFact) : Array LifetimeRelationFact :=
@@ -2081,6 +2582,9 @@ private partial def structuralLifetimeRelationsFuel (fuel : Nat)
       if sourceLength != targetLength then #[] else
         structuralLifetimeRelationsFuel fuel ns sourceElement sourceInstantiations
           targetElement targetInstantiations variance
+  | fuel + 1, some (.slice sourceElement), some (.slice targetElement) =>
+      structuralLifetimeRelationsFuel fuel ns sourceElement sourceInstantiations
+        targetElement targetInstantiations variance
   | fuel + 1, some (.function sourceArguments sourceResult _),
       some (.function targetArguments targetResult _) =>
       if sourceArguments.size != targetArguments.size then #[] else
@@ -2247,7 +2751,7 @@ private partial def typeLifetimes (ns : ValidatedNamespace) (found : Array Lifet
   match ns.tables.types[typeId.index]? with
   | some (.reference value) => typeLifetimes ns (pushLifetime found value.lifetime) value.referent
   | some (.tuple elements) => elements.foldl (typeLifetimes ns) found
-  | some (.vector element _) | some (.typeDomain element) => typeLifetimes ns found element
+  | some (.vector element _) | some (.slice element) | some (.typeDomain element) => typeLifetimes ns found element
   | some (.function arguments result _) =>
       typeLifetimes ns (arguments.foldl (typeLifetimes ns) found) result
   | some (.nominal _ arguments) => arguments.foldl (init := found) fun found => fun
@@ -2298,6 +2802,34 @@ private def solvedLifetimeRelations (ns : ValidatedNamespace)
     | _ => relations
   closeLifetimeRelations (derived.foldl appendUniqueRelation withStatic) (lifetimes.size + 1)
 
+/-- What a function's value lends its caller must be what its signature says: a
+caller reads from the declared regions which loans a result holds, so holding one
+of a parameter whose regions do not outlive the result's would free the lender
+while it is borrowed. A reborrow carries the loans of the reference it goes through. -/
+private def resultRegionDiagnostics (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (function : FunctionDecl FunctionBody) (value : ExprId) (carried : Array LoanFact) :
+    Array Diagnostic :=
+  if ns.profile == some .move then #[] else
+  match function.signature.results.toList, callResultPositions? unit ns function.signature none with
+  | [_], some positions =>
+      let edges := signatureRegionEdges ns function.signature
+      carried.foldl (init := #[]) fun diagnostics loan =>
+        match loan.source with
+        | .expression _ => diagnostics
+        | .parameter localId path =>
+            let sources := match function.locals[localId.index]? with
+              | some localDecl => regionsAtPath unit ns none false [] none
+                  (ns.tables.types.size + 1) localDecl.type.typeId path.toList
+              | none => #[.unknown]
+            let allowed := (loanPathsInExpression unit ns loan value (ns.expressions.size + 1)).all
+              fun held => positions.all fun (position, target) =>
+                !projectionsOverlap held.toList position.toList ||
+                  sources.any (regionsRelated edges · target)
+            if allowed then diagnostics else diagnostics.push (.at "VIR-SEMANTIC-BORROW-RESULT-REGION"
+              "a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none"
+              (ns.expressions[value.index]?.elim function.loc (·.loc)))
+  | _, _ => #[]
+
 private def borrowAnalysis (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (function : FunctionDecl FunctionBody) : BorrowFlow :=
   match function.body with
@@ -2313,7 +2845,28 @@ private def borrowAnalysis (unit : ValidatedUnit) (ns : ValidatedNamespace)
         holders := #[parameter.localId]
         holderPlaces := #[{ root := .local parameter.localId }]
         canEscape := true } : LoanFact)
-      let flow := analyzeExpr unit ns root { active := incoming }
+      -- A reference a parameter holds by value is lent to the function too.
+      let held := if ns.profile == some .move then #[] else
+        (function.locals.take function.signature.parameters.size).flatMap fun localDecl =>
+          if (referenceType? ns localDecl.type.typeId).isSome then #[] else
+          (heldReferences unit ns (ns.tables.types.size + 1) localDecl.type.typeId [] #[] #[]).map
+            fun (path, reference) => ({
+              source := .parameter localDecl.id path
+              kind := reference.kind
+              place := { root := .external }
+              lifetime := reference.lifetime
+              loc := function.loc
+              holders := #[localDecl.id]
+              holderPlaces := #[{ root := .local localDecl.id, projections := path }]
+              canEscape := true } : LoanFact)
+      let flow := analyzeExpr unit ns root { active := incoming ++ held }
+      let regionDiagnostics := flow.returns.foldl (init :=
+          if flow.normal.isSome then resultRegionDiagnostics unit ns function root flow.valueLoans
+          else #[]) fun diagnostics state =>
+        match state.returned with
+        | some (value, carried) => diagnostics ++ resultRegionDiagnostics unit ns function value carried
+        | none => diagnostics
+      let flow := { flow with diagnostics := flow.diagnostics ++ regionDiagnostics }
       -- A normally returned value is the last possible carrier. Mutable
       -- loans absent from that value die after the root evaluates; recording
       -- that point makes function-exit reconciliation explicit rather than
@@ -2336,27 +2889,251 @@ private def borrowAnalysis (unit : ValidatedUnit) (ns : ValidatedNamespace)
         state.active.any frameOwned
       if (!normalEscapes && !returnEscapes) ||
           !function.signature.results.any (fun result =>
-            typeMayContainReference ns result.typeId) then flow
+            typeMayHoldFrameLoan unit ns result.typeId) then flow
       else
         let diagnostic := Diagnostic.at "VIR-SEMANTIC-BORROW-ESCAPE"
           "a local or Move global loan may escape through a reference-bearing function result" function.loc
         { flow with diagnostics := flow.diagnostics.push diagnostic }
+
+/-- Whether a path from each node of a body reads a carrier first, before and after
+the node. An independent computation over the paths of the body: what follows a node
+is passed in, a jump reaches its target's, nothing follows a return or a throw, and
+the first access on a path decides: a read reports it, an overwrite ends the path. -/
+private structure FirstAccess where
+  before : Array Bool
+  after : Array Bool
+  deriving Inhabited
+
+private def FirstAccess.ofSize (size : Nat) : FirstAccess :=
+  { before := Array.replicate size false, after := Array.replicate size false }
+
+/-- A carrier's first access in the rest of a path from a node, `after` being that of
+what follows it, with `loops` what a `continue` and a `break` of each enclosing loop
+reach, innermost first. -/
+private partial def readFirst (ns : ValidatedNamespace) (carrier : LoanPlace) (exprId : ExprId)
+    (after : Bool) (loops : List (Bool × Bool)) : StateM FirstAccess Bool := do
+  modify fun found => { found with after := found.after.setIfInBounds exprId.index after }
+  let sequence (nodes : List ExprId) (after : Bool) : StateM FirstAccess Bool :=
+    nodes.foldrM (fun node after => readFirst ns carrier node after loops) after
+  let binds (pattern : PatternId) : Bool :=
+    carrier.root.local?.any (patternVariables ns pattern).contains
+  let reads := fun (place : PlaceId) (after : Bool) =>
+    placeUsesCarrier ns place carrier || after
+  let overwrites := fun (place : PlaceId) (after : Bool) =>
+    if (loanPlace? ns place).any (placeCovers · carrier) then false else reads place after
+  let result ← match ns.expressions[exprId.index]? with
+    | none => pure true
+    | some expression => match expression.kind with
+      | .value .. | .constant _ => pure after
+      | .localVar _ | .spec _ | .quantifier .. =>
+          pure (expressionUsesCarrier ns exprId carrier (ns.expressions.size + 1) || after)
+      | .operation operation _ arguments _ =>
+          sequence arguments.toList <| match operation with
+            | .write place | .drop place => overwrites place after
+            | .move place | .copy place | .borrow _ place | .read place | .readDiscriminant place => reads place after
+            | _ => after
+      | .block statements result => sequence (statements.toList ++ result.toList) after
+      | .letDecl pattern initializer body => do
+          let inBody ← readFirst ns carrier body after loops
+          let afterValue := !binds pattern && inBody
+          initializer.elim (pure afterValue) fun value =>
+            readFirst ns carrier value afterValue loops
+      | .ifElse condition thenBranch elseBranch => do
+          let onThen ← readFirst ns carrier thenBranch after loops
+          let onElse ← elseBranch.elim (pure after) fun branch =>
+            readFirst ns carrier branch after loops
+          readFirst ns carrier condition (onThen || onElse) loops
+      | .match_ scrutinee arms => do
+          -- A failing guard reaches the arms after its own.
+          let reached ← arms.toList.foldrM (init := false) fun arm later => do
+            let onBody ← readFirst ns carrier arm.body after loops
+            let onBody := !binds arm.pattern && onBody
+            let entered ← arm.guard.elim (pure onBody) fun guard =>
+              readFirst ns carrier guard (onBody || later) loops
+            pure (entered || later)
+          readFirst ns carrier scrutinee reached loops
+      | .loop _ body =>
+          let rec iterate (head : Bool) (fuel : Nat) : StateM FirstAccess Bool := do
+            let next ← readFirst ns carrier body head ((head, after) :: loops)
+            if next == head || fuel == 0 then pure next else iterate next (fuel - 1)
+          iterate false 2
+      | .continue_ nest => pure ((loops[nest]?.map (·.1)).getD true)
+      | .break_ nest value =>
+          let target := (loops[nest]?.map (·.2)).getD true
+          value.elim (pure target) fun value => readFirst ns carrier value target loops
+      | .return_ values | .throw_ _ values => sequence values.toList false
+      | .assign place value => readFirst ns carrier value (overwrites place after) loops
+      | .assignPattern pattern value =>
+          readFirst ns carrier value (!binds pattern && after) loops
+  modify fun found => { found with before := found.before.setIfInBounds exprId.index result }
+  pure result
+
+/-- The carriers of a loan's holders. -/
+private def holderCarriers (holders : Array LocalId) (places : Array LoanPlace) : Array LoanPlace :=
+  holders.flatMap fun holder =>
+    let carriers := places.filter (·.root == .local holder)
+    if carriers.isEmpty then #[{ root := .local holder }] else carriers
+
+/-- Whether a carrier is read first on some path from a death's anchor. -/
+private def carrierReadAt (ns : ValidatedNamespace) (root : ExprId) (death : LoanDeath)
+    (carrier : LoanPlace) : Bool :=
+  let (_, found) := (readFirst ns carrier root false []).run (.ofSize ns.expressions.size)
+  (if death.before then found.before else found.after)[death.anchor.index]?.getD true
+
+private def recordedPlaces (death : LoanDeath) : Array LoanPlace :=
+  death.holderPaths.map fun (holder, projections) => { root := .local holder, projections }
+
+/-- Whether a holder a death records is read from its anchor on. -/
+def loanDeathReadsHolder (ns : ValidatedNamespace) (root : ExprId) (death : LoanDeath) : Bool :=
+  (holderCarriers death.holders (recordedPlaces death)).any (carrierReadAt ns root death)
+
+/-- An internal check that fails closed. A death assumes each holder's current
+value is final, so every holder of the loan in the merged state at the anchor must
+be dead from there on: an equation over a place still read is broken by the next
+write through it, and the path turns vacuous. -/
+private def loanDeathLivenessDiagnostics (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (function : FunctionDecl FunctionBody) (root : ExprId) (log : DeathLog) : Array Diagnostic :=
+  let refused := log.deaths.find? fun (source, death) =>
+    let live := fun (holders : Array LocalId) (places : Array LoanPlace) =>
+      (holderCarriers holders places).any (carrierReadAt ns root death)
+    live death.holders (recordedPlaces death) || !death.alone && log.points.any fun point =>
+      point.anchor == death.anchor && point.before == death.before &&
+        point.loan.source == .expression source &&
+          live point.loan.holders point.loan.holderPlaces
+  match refused with
+  | some (_, death) =>
+    let name := ((unit.tables.names[function.name.index]?).map (·.name)).getD "?"
+    let loc := ((ns.expressions[death.anchor.index]?).map (·.loc)).getD function.loc
+    #[Diagnostic.at "VIR-SEMANTIC-LOAN-DEATH"
+      s!"internal: in `{name}`, a loan dies where a place holding it is still read" loc]
+  | none => #[]
+
+/-- Whether evaluating a node may leave it other than by finishing or a panic. -/
+private partial def mayExit (ns : ValidatedNamespace) (exprId : ExprId) (depth : Nat := 0) : Bool :=
+  match ns.expressions[exprId.index]? with
+  | none => true
+  | some expression => match expression.kind with
+    | .return_ _ | .throw_ .. => true
+    | .continue_ nest => nest >= depth
+    | .break_ nest value => nest >= depth || value.any (mayExit ns · depth)
+    | .loop _ body => mayExit ns body (depth + 1)
+    | .spec _ | .quantifier .. => false
+    | kind => (expressionChildren kind).any (mayExit ns · depth)
+
+/-- What runs after a node within its parents. -/
+private inductive FollowingStep where
+  | later (nodes : List ExprId)
+  | writes (place : PlaceId)
+  /-- A join, a repeated body or an exit. -/
+  | boundary
+
+/-- Whether a node overwrites a carrier (`some true`), or may leave, or uses a place
+overlapping it, whole holder included, first (`some false`). -/
+private partial def overwriteScan (ns : ValidatedNamespace) (carrier : LoanPlace) (exprId : ExprId) :
+    Option Bool :=
+  let uses := fun (node : ExprId) =>
+    expressionUsesCarrier ns node carrier (ns.expressions.size + 1)
+  let leaves := fun (node : ExprId) => mayExit ns node
+  let sequence := fun (nodes : List ExprId) =>
+    nodes.foldl (init := (none : Option Bool)) fun fate node =>
+      fate.orElse fun _ => overwriteScan ns carrier node
+  let write := fun (place : PlaceId) (value : ExprId) =>
+    if uses value || leaves value then some false
+    else if (loanPlace? ns place).any (placeCovers · carrier) then some true
+    else if placeUsesCarrier ns place carrier then some false
+    else none
+  match ns.expressions[exprId.index]? with
+  | none => some false
+  | some expression => match expression.kind with
+    | .assign place value => write place value
+    | .operation (.write place) _ #[value] _ => write place value
+    | .block statements result => sequence (statements.toList ++ result.toList)
+    | .letDecl _ initializer body => sequence (initializer.toList ++ [body])
+    | _ => if uses exprId || leaves exprId then some false else none
+
+/-- Whether an overwrite of a carrier follows on the path from a node, before any
+join, exit or use of a place overlapping it. -/
+private partial def overwriteFollows (ns : ValidatedNamespace) (carrier : LoanPlace) :
+    List FollowingStep → Bool
+  | [] | .boundary :: _ => false
+  | .writes place :: rest =>
+      if (loanPlace? ns place).any (placeCovers · carrier) then true
+      else if placeUsesCarrier ns place carrier then false
+      else overwriteFollows ns carrier rest
+  | .later nodes :: rest =>
+      match nodes.foldl (init := (none : Option Bool)) fun fate node =>
+          fate.orElse fun _ => overwriteScan ns carrier node with
+      | some fate => fate
+      | none => overwriteFollows ns carrier rest
+
+/-- The moves of an owned component an overwrite follows, from a node of a body. -/
+private partial def collectTransfers (ns : ValidatedNamespace) (exprId : ExprId)
+    (following : List FollowingStep) (found : Array ExprId) : Array ExprId :=
+  let inOrder := fun (nodes : List ExprId) (found : Array ExprId) =>
+    let rec go : List ExprId → Array ExprId → Array ExprId
+      | [], found => found
+      | head :: tail, found => go tail (collectTransfers ns head (.later tail :: following) found)
+    go nodes found
+  let apart := fun (nodes : List ExprId) (found : Array ExprId) =>
+    nodes.foldl (fun found node => collectTransfers ns node [.boundary] found) found
+  match ns.expressions[exprId.index]? with
+  | none => found
+  | some expression => match expression.kind with
+    | .operation (.move place) _ _ _ =>
+        match loanPlace? ns place with
+        | some carrier =>
+            if !carrier.projections.isEmpty && isOwnedCarrierPlace carrier &&
+                overwriteFollows ns carrier following then found.push exprId
+            else found
+        | none => found
+    | .operation (.write place) _ #[value] _ | .assign place value =>
+        collectTransfers ns value (.writes place :: following) found
+    | .operation _ _ arguments _ => inOrder arguments.toList found
+    | .block statements result => inOrder (statements.toList ++ result.toList) found
+    | .letDecl _ initializer body =>
+        let found := initializer.elim found fun value =>
+          collectTransfers ns value (.later [body] :: following) found
+        collectTransfers ns body following found
+    | .assignPattern _ value => apart [value] found
+    | .ifElse condition thenBranch elseBranch =>
+        apart (condition :: thenBranch :: elseBranch.toList) found
+    | .match_ scrutinee arms =>
+        apart (scrutinee :: arms.toList.flatMap fun arm => arm.guard.toList ++ [arm.body]) found
+    | .loop _ body => apart [body] found
+    | .break_ _ value => apart value.toList found
+    | .return_ values | .throw_ _ values => apart values.toList found
+    | _ => found
+
+/-- The moves of an owned component a namespace's bodies transfer: an overwrite of
+the component follows on the path, before any join, exit or use of a place
+overlapping it. Everything else reads a moved reference as a reborrow. -/
+def transferredMoves (ns : ValidatedNamespace) : Array ExprId :=
+  ns.functions.foldl (init := #[]) fun found function =>
+    match function.body with
+    | .structured root => collectTransfers ns root [] found
+    | .absent => found
 
 /-- Run the borrow analysis once for one function: conservative conflicts and
 unsupported local-loan coverage diagnostics, and the proof-facing local-loan
 receipt exactly when the analysis accepts the function. -/
 def borrowOutcome (namespaceId : NamespaceId) (functionId : FunctionId)
     (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (function : FunctionDecl FunctionBody) :
+    (function : FunctionDecl FunctionBody) (receiverNoEscape : Array Nat := #[]) :
     Array Diagnostic × Option BorrowCertificate :=
   match function.body with
   | .absent => (#[], none)
   | .structured root =>
       let analysis := borrowAnalysis unit ns function
+      let diagnostics := analysis.diagnostics ++
+        loanDeathLivenessDiagnostics unit ns function root analysis.deaths ++
+        (if analysis.deaths.carrierDeaths.any (loanDeathReadsHolder ns root) then
+          #[.at "VIR-SEMANTIC-LOAN-DEATH"
+            "an overwritten reference carrier is still read before replacement" function.loc]
+         else #[])
       -- A write to an element index under a live loan refuses this function
       -- only: it is read out of the diagnostics into the certificate.
-      let indexWrites := analysis.diagnostics.filter (·.code == indexWriteUnderLoanCode)
-      let others := analysis.diagnostics.filter (·.code != indexWriteUnderLoanCode)
+      let indexWrites := diagnostics.filter (·.code == indexWriteUnderLoanCode)
+      let others := diagnostics.filter (·.code != indexWriteUnderLoanCode)
       if others.isEmpty then
         let relations := solvedLifetimeRelations ns function analysis.observed
         (#[], some {
@@ -2369,10 +3146,16 @@ def borrowOutcome (namespaceId : NamespaceId) (functionId : FunctionId)
             let expression ← loan.source.expression?
             some {
               expression, lifetime := loan.lifetime
-              holders := loan.holders
-              deaths := analysis.deaths.filterMap fun (loanExpression, death) =>
-                if loanExpression == expression then some death else none }
-          lifetimeRelations := relations })
+              deaths := analysis.deaths.deaths.filterMap fun (loanExpression, death) =>
+                if loanExpression == expression then
+                  -- A reference holds its loan itself.
+                  some { death with holderPaths := death.holderPaths.filter fun (holder, _) =>
+                    (function.locals[holder.index]?).any fun declared =>
+                      (referenceType? ns declared.type.typeId).isNone }
+                else none }
+          lifetimeRelations := relations
+          carrierDeaths := analysis.deaths.carrierDeaths
+          receiverNoEscape := receiverNoEscape })
       else (others, none)
 
 end VerexIR.Validation

@@ -28,6 +28,7 @@ does not show is in the status directory.
 - [`source-verification.md`](designs/source-verification.md): `verex-move verify` / `verex-rust verify` / `move prove --lean`, proof files, pragmas, message mapping.
 - [`verex-sl.md`](designs/verex-sl.md): the profile-aware Verex source language.
 - [`prophetic-references.md`](designs/prophetic-references.md): the prophecy ownership model of references.
+- [`unsafe-pointers.md`](designs/unsafe-pointers.md): raw pointers and checked memory beside the prophetic model: typed and byte allocations, `transmute` and unions, minted references as memory loans, what unsafe Rust is allowed, MonoVM's unsafe code mapped.
 - [`static-memory.md`](designs/static-memory.md): one typed memory per resource type.
 - [`intrinsic-maps.md`](designs/intrinsic-maps.md): the abstract map value of intrinsic map types, roles, validity, typed map lemmas.
 - [`ghost-fields.md`](designs/ghost-fields.md): ghost fields and validity slots.
@@ -36,7 +37,8 @@ does not show is in the status directory.
 - [`lemmas.md`](designs/lemmas.md): `spec lemma`s and `proof` blocks.
 - [`numeric-representation.md`](designs/numeric-representation.md): integers as mathematical integers, not the Prover's bit vectors.
 - [`relocatable-namespaces.md`](designs/relocatable-namespaces.md): namespaces linked by relocation; verification across modules.
-- [`rust-mir-design.md`](designs/rust-mir-design.md): the Rustc Public frontend, Rust profile, source backend, milestones.
+- [`rust-verification.md`](designs/rust-verification.md): the model of Rust source verification: the supported surface, the rejection boundaries per stage, failure contract and panic obligations, references in aggregates, slices, closures and `Fn*` evidence as static dictionaries, library contracts at shapes, crates.
+- [`rust-mir-design.md`](designs/rust-mir-design.md): the Rustc Public frontend, Rust profile, source backend, import contract and trust boundary.
 - [`monovm-link-design.md`](designs/monovm-link-design.md): MonoVM linked for differential execution.
 - [`../verex-rust/rust-exporter/README.md`](../verex-rust/rust-exporter/README.md): exporter scope and commands.
 

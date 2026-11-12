@@ -9,8 +9,11 @@ use aptos_transaction_simulation::{InMemoryStateStore, SimulationStateStore};
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureOverride};
 
 /// Flags that must be on. The binary format flag caps the deserializer, and the
-/// overridden modules are compiled at HEAD's bytecode version.
+/// overridden modules are compiled at HEAD's bytecode version. The versioned
+/// transaction validation flag makes V1 call the same prologue and epilogue
+/// MonoMove does.
 const FORCED_ON: &[FeatureFlag] = &[
+    FeatureFlag::VERSIONED_TRANSACTION_VALIDATION,
     FeatureFlag::ENABLE_FUNCTION_REFLECTION,
     FeatureFlag::FUNCTION_VALUE_DISPATCH,
     FeatureFlag::VM_BINARY_FORMAT_V10,
