@@ -21,7 +21,10 @@ use crate::{
     errors::ResourceGroupSerializationError,
     executor_utilities::Materializer,
     mono_move::{
-        group_chain::{committed_value, unbuilt_metadata_before, GroupMetadata, GroupView},
+        group_chain::{
+            committed_value, finish_group_post_commit, unbuilt_metadata_before, GroupMetadata,
+            GroupView,
+        },
         version_matches, MonoValue, ParallelReader,
     },
     single_transaction_executor::{SharedViewArgs, SingleTransactionExecutor, ViewMode},
@@ -186,7 +189,7 @@ fn build_committed_view(
     writer_idx: TxnIndex,
 ) -> Result<Arc<GroupView>, PanicError> {
     if let Some(view) = metadata.current() {
-        return Ok(view.clone());
+        return Ok(view);
     }
     let changes = metadata
         .changes()
@@ -688,6 +691,12 @@ impl MonoMockExecutor {
                 prev = build_committed_view(data, &unbuilt_metadata, &prev, writer_idx)?;
             }
             let view = build_committed_view(data, group_metadata, &prev, txn_idx)?;
+            finish_group_post_commit(
+                data,
+                &MockKey::Resource(*group_key),
+                txn_idx,
+                group_metadata,
+            )?;
             let assembled = view
                 .iter()
                 .map(|(tag, bytes)| {
