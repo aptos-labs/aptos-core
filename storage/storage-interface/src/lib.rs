@@ -564,6 +564,16 @@ pub trait DbReader: Send + Sync {
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
     }
 
+    /// Like `get_state_value_with_version_by_version`, but `version` must be a block end (state
+    /// checkpoint), which avoids looking up the block containing `version`.
+    fn get_state_value_with_version_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        self.get_state_value_with_version_by_version(state_key, version)
+    }
+
     fn get_state_value_with_proof_by_version(
         &self,
         state_key: &StateKey,
