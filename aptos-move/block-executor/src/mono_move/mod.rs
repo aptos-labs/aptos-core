@@ -35,8 +35,9 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
+use bytes::Bytes;
 use group_chain::{
-    committed_member_value, group_write, view_before, GroupCodec, GroupLink, MonoGroupCodec,
+    committed_value, group_write, member_tag, unbuilt_links_before, GroupLink, GroupView,
 };
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
@@ -46,7 +47,7 @@ use mono_move_core::storage::resource_provider::{
     InMemoryStorageKey, ReadPin, ResourceProvider, ResourceProviderError, StorageRead, Version,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_runtime::{SegmentedArena, SessionEffects, WriteClass};
+use mono_move_runtime::{serialize, SegmentedArena, SessionEffects, WriteClass};
 use move_binary_format::CompiledModule;
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::Module;
@@ -67,7 +68,7 @@ use provider::{BlockSTMParallelProvider, BlockSTMSequentialProvider};
 /// An in-memory write produced by MonoMove transaction execution. This write
 /// can be later converted to storage format if needed.
 #[derive(Clone)]
-pub enum MonoValue {
+pub enum MonoValue<K = InMemoryStorageKey> {
     Write {
         ptr: NonNull<u8>,
         kind: WriteOpKind,
@@ -81,17 +82,17 @@ pub enum MonoValue {
     //
     // TODO(completeness): add state value metadata and size here.
     GroupMetadata {
-        group: Arc<GroupLink>,
+        group: Arc<GroupLink<K>>,
     },
 }
 
 // SAFETY: The value stores the pointer to the immutable value in a frozen,
 // never-mutated arena. The ref-counted pointer to arena is always carried along
 // so it is safe to dereference this pointer and share between threads.
-unsafe impl Send for MonoValue {}
-unsafe impl Sync for MonoValue {}
+unsafe impl<K: Send + Sync> Send for MonoValue<K> {}
+unsafe impl<K: Send + Sync> Sync for MonoValue<K> {}
 
-impl MonoValue {
+impl<K> MonoValue<K> {
     /// Serves the value a map holds at a slot as a read at `version`.
     /// Sequential execution does not speculate, so it passes [`None`].
     fn as_storage_read(&self, version: Version) -> Result<StorageRead, ResourceProviderError> {
@@ -112,7 +113,7 @@ impl MonoValue {
     }
 }
 
-impl SpeculativeValue for MonoValue {
+impl<K: Clone + Send + Sync> SpeculativeValue for MonoValue<K> {
     fn eq_value(&self, _other: &Self) -> bool {
         // False here only forces re-validation, so safe to use.
         // TODO(perf): carry layouts so that structs can be validated as a single memcmp?
@@ -312,7 +313,7 @@ pub enum MonoTxnOutput {
         skips_rest: bool,
         /// One link per resource group this transaction wrote a member of,
         /// built once so that every caller shares it.
-        group_links: Vec<(InMemoryStorageKey, Arc<GroupLink>)>,
+        group_links: Vec<(InMemoryStorageKey, Arc<GroupLink<InMemoryStorageKey>>)>,
     },
     /// Signals block executor that this transaction has to be skipped and
     /// retried later.
@@ -370,7 +371,7 @@ impl MonoTxnOutput {
                 changed_groups
                     .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
                     .or_default()
-                    .push(key.value_ty());
+                    .push(key.clone());
             }
         }
         let group_links = changed_groups
@@ -396,7 +397,7 @@ impl MonoTxnOutput {
 
     /// The links of the resource groups this transaction wrote, keyed by group
     /// slot.
-    fn group_links(&self) -> &[(InMemoryStorageKey, Arc<GroupLink>)] {
+    fn group_links(&self) -> &[(InMemoryStorageKey, Arc<GroupLink<InMemoryStorageKey>>)] {
         match self {
             MonoTxnOutput::Executed { group_links, .. } => group_links,
             MonoTxnOutput::SkippedToRetry => &[],
@@ -549,6 +550,69 @@ impl TxnOutput for MonoTxnOutput {
         // TODO(security): can add extra checks here?
         true
     }
+}
+
+/// What a transaction wrote to a group member at `key`: the member's key in the
+/// group's view, and its new bytes or [`None`] if it was deleted.
+fn member_change(
+    guard: &ExecutionGuard<'_>,
+    key: &InMemoryStorageKey,
+    value: &MonoValue,
+) -> Result<(Bytes, Option<Bytes>), PanicError> {
+    let tag = member_tag(key.value_ty())?;
+    let bytes = match value {
+        // SAFETY: the value holds the pin on the frozen heap `ptr` points into,
+        // which is never mutated again.
+        MonoValue::Write { ptr, .. } => Some(
+            unsafe { serialize(guard, ptr.as_ptr(), key.value_ty()) }
+                .map(Bytes::from)
+                .map_err(|e| {
+                    code_invariant_error(format!("Failed to serialize a group member: {e}"))
+                })?,
+        ),
+        MonoValue::Deletion => None,
+        MonoValue::GroupMetadata { .. } => {
+            return Err(code_invariant_error(format!(
+                "Group member {key:?} holds group metadata"
+            )))
+        },
+    };
+    Ok((tag, bytes))
+}
+
+/// The view of `link`, which committed transaction `writer_idx` wrote, built
+/// on top of `prev` unless it is built already.
+fn build_committed_view(
+    guard: &ExecutionGuard<'_>,
+    data: &VersionedData<InMemoryStorageKey, MonoValue>,
+    link: &GroupLink<InMemoryStorageKey>,
+    prev: &GroupView,
+    writer_idx: TxnIndex,
+) -> Result<Arc<GroupView>, PanicError> {
+    if let Some(view) = link.view() {
+        return Ok(view.clone());
+    }
+    let changes = link
+        .changes()
+        .iter()
+        .map(|key| member_change(guard, key, &committed_value(data, key, writer_idx)?))
+        .collect::<Result<Vec<_>, PanicError>>()?;
+    Ok(link.build_view(prev, changes))
+}
+
+/// The group's view just before `txn_idx`. Builds the views of the committed
+/// links below it that are not built yet.
+fn view_before(
+    guard: &ExecutionGuard<'_>,
+    data: &VersionedData<InMemoryStorageKey, MonoValue>,
+    group_key: &InMemoryStorageKey,
+    txn_idx: TxnIndex,
+) -> Result<Arc<GroupView>, PanicError> {
+    let (mut view, unbuilt) = unbuilt_links_before(data, group_key, txn_idx)?;
+    for (writer_idx, link) in unbuilt {
+        view = build_committed_view(guard, data, &link, &view, writer_idx)?;
+    }
+    Ok(view)
 }
 
 /// A per-worker MonoMove executor.
@@ -789,7 +853,6 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             .materialize_partial(&guard, features, auxiliary_data)
             .map_err(materialization_failed)?;
 
-        let codec = MonoGroupCodec { guard: &guard };
         let mut group_writes = Vec::with_capacity(links.len());
         for (group_key, link) in &links {
             let (prev, view) = match &mode {
@@ -799,24 +862,25 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     })?;
                     // Sequential execution applied this transaction's writes
                     // before materializing it, and no later one has run yet.
-                    let view = link.build_view(&codec, &prev, |member_ty| {
-                        unsync_map
-                            .fetch_data(&codec.member_key(group_key, member_ty))
-                            .ok_or_else(|| {
+                    let changes = link
+                        .changes()
+                        .iter()
+                        .map(|key| {
+                            let value = unsync_map.fetch_data(key).ok_or_else(|| {
                                 code_invariant_error(format!(
-                                    "No write for a member of {group_key:?} in sequential \
-                                     execution"
+                                    "No write at {key:?} in sequential execution"
                                 ))
-                            })
-                    })?;
+                            })?;
+                            member_change(&guard, key, &value)
+                        })
+                        .collect::<Result<Vec<_>, PanicError>>()?;
+                    let view = link.build_view(&prev, changes);
                     (prev, view)
                 },
                 ViewMode::Parallel { versioned_map, .. } => {
                     let data = versioned_map.data();
-                    let prev = view_before(data, &codec, group_key, txn_idx)?;
-                    let view = link.build_view(&codec, &prev, |member_ty| {
-                        committed_member_value(data, &codec, group_key, member_ty, txn_idx)
-                    })?;
+                    let prev = view_before(&guard, data, group_key, txn_idx)?;
+                    let view = build_committed_view(&guard, data, link, &prev, txn_idx)?;
                     (prev, view)
                 },
             };

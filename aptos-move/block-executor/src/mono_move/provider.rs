@@ -223,7 +223,7 @@ fn invariant_violation(msg: impl ToString) -> ResourceProviderError {
 /// Reads the multi-version map on behalf of one incarnation of one transaction,
 /// waiting out the dependencies it runs into.
 pub(crate) struct ParallelReader<'a, K> {
-    versioned_map: &'a MVHashMap<K, (), MonoValue, DelayedFieldID>,
+    versioned_map: &'a MVHashMap<K, (), MonoValue<K>, DelayedFieldID>,
     scheduler: SchedulerWrapper<'a>,
     txn_idx: TxnIndex,
     incarnation: Incarnation,
@@ -232,9 +232,9 @@ pub(crate) struct ParallelReader<'a, K> {
     speculative_failure: Cell<bool>,
 }
 
-impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
+impl<'a, K: Hash + Clone + Eq + Debug + Send + Sync> ParallelReader<'a, K> {
     pub(crate) fn new(
-        versioned_map: &'a MVHashMap<K, (), MonoValue, DelayedFieldID>,
+        versioned_map: &'a MVHashMap<K, (), MonoValue<K>, DelayedFieldID>,
         scheduler: SchedulerWrapper<'a>,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
@@ -276,7 +276,7 @@ impl<'a, K: Hash + Clone + Eq + Debug> ParallelReader<'a, K> {
     pub(crate) fn read_or_initialize(
         &self,
         key: &K,
-        init: impl Fn() -> Result<MonoValue, ResourceProviderError>,
+        init: impl Fn() -> Result<MonoValue<K>, ResourceProviderError>,
     ) -> Result<StorageRead, ResourceProviderError> {
         let data = self.versioned_map.data();
         loop {
