@@ -62,8 +62,7 @@ impl<'guard> MonoRunner<'guard> {
         self.gc_count
     }
 
-    /// Ends the session, returning its side effects. Writes that left a
-    /// resource unchanged are not part of them.
+    /// Ends the session, returning the most recent run's side effects.
     pub fn finish(self) -> VMResult<SessionEffects> {
         self.interp.finish()
     }

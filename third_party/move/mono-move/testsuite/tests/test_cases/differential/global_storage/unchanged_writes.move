@@ -1,6 +1,7 @@
 // Writes that leave a resource's bytes unchanged. V1 reports a modification
-// for a resource written through a mutable borrow, even with the bytes it
-// already had; MonoMove drops a write whose value equals the value it read.
+// for every resource it marks dirty (written through a mutable reference, or
+// moved out and back), even with the bytes it already had; MonoMove drops a
+// write whose value equals the value it read.
 // Found by masm-smith fuzzing.
 
 // RUN: publish
@@ -17,6 +18,11 @@ module 0x42::unchanged {
 
     public fun borrow_only(a: address): u64 acquires Counter {
         borrow_global_mut<Counter>(a).value
+    }
+
+    public fun take_and_put_back(s: signer, a: address) acquires Counter {
+        let counter = move_from<Counter>(a);
+        move_to(&s, counter);
     }
 
     public fun take(a: address): u64 acquires Counter {
@@ -36,6 +42,11 @@ module 0x42::unchanged {
 // A mutable borrow with no write through it is not a write on either.
 // RUN: execute 0x42::unchanged::borrow_only --args 0x42 --commit
 // CHECK: results: 7 | writes: none
+
+// Expected divergence: moved out and back unchanged.
+// RUN: execute 0x42::unchanged::take_and_put_back --args 0x42, 0x42 --commit
+// CHECK-V1: writes: modify 0x42::unchanged::Counter at 0x42 0x0700000000000000
+// CHECK-V2: writes: none
 
 // A changed value is a write on both.
 // RUN: execute 0x42::unchanged::set --args 0x42, 8 --commit

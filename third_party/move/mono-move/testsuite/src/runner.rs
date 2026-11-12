@@ -253,14 +253,10 @@ fn render_event(
 /// Combines return values, rendered events, and rendered writes into the
 /// normalized output string that `CHECK` directives match against: a
 /// `results:` segment when the call returns values, an `events:` segment when
-/// it emits events, and a `writes:` segment when the step renders its writes
-/// (`writes: none` if it made none), joined by ` | `. A void, event-free call
-/// that does not render its writes renders as `results:`.
-fn render_execution_output(
-    vals: &[String],
-    events: &[String],
-    writes: Option<&[String]>,
-) -> String {
+/// it emits events, and a `writes:` segment when the step renders its writes,
+/// joined by ` | `. A void, event-free call that does not render its writes
+/// renders as `results:`.
+fn render_execution_output(vals: &[String], events: &[String], writes: Option<&str>) -> String {
     let mut segments = Vec::new();
     if !vals.is_empty() {
         segments.push(format!("results: {}", vals.join(", ")));
@@ -268,15 +264,41 @@ fn render_execution_output(
     if !events.is_empty() {
         segments.push(format!("events: {}", events.join("; ")));
     }
-    match writes {
-        None => {},
-        Some([]) => segments.push("writes: none".to_string()),
-        Some(writes) => segments.push(format!("writes: {}", writes.join("; "))),
+    if let Some(writes) = writes {
+        segments.push(format!("writes: {}", writes));
     }
     if segments.is_empty() {
         return "results:".to_string();
     }
     segments.join(" | ")
+}
+
+/// Renders a committing step's output, with its writes as `writes: none`, a
+/// list of writes, or `writes: error: <message>` when they could not be
+/// collected. Returns the writes to commit, which are `None` on an error.
+fn render_with_writes(
+    vals: &[String],
+    events: &[String],
+    writes: Result<ChangeSet, String>,
+) -> (String, Option<ChangeSet>) {
+    match writes {
+        Ok(changes) => {
+            let rendered = render_writes(&changes);
+            let segment = if rendered.is_empty() {
+                "none".to_string()
+            } else {
+                rendered.join("; ")
+            };
+            (
+                render_execution_output(vals, events, Some(&segment)),
+                Some(changes),
+            )
+        },
+        Err(err) => (
+            render_execution_output(vals, events, Some(&format!("error: {}", err))),
+            None,
+        ),
+    }
 }
 
 /// Renders a change set's resource writes, ordered by address and then type,
@@ -464,18 +486,18 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                     )
                 });
 
-                // V1 is the reference, so its writes are the ones kept when it
-                // ran.
-                let (v1_output, v1_changes) = match v1 {
-                    Some(v1) => (v1.output, v1.changes),
-                    None => (Output::success(String::new()), None),
-                };
                 let (v2_output, v2_changes, v2_gc_count) = match v2 {
                     Some(v2) => (v2.output, v2.changes, v2.gc_count),
                     None => (Output::success(String::new()), None, 0),
                 };
+                // V1 is the reference: when it ran, its writes are the ones
+                // kept, even if it made none (e.g. it aborted).
+                let (v1_output, changes) = match v1 {
+                    Some(v1) => (v1.output, v1.changes),
+                    None => (Output::success(String::new()), v2_changes),
+                };
                 check_output(&checks, &v1_output, &v2_output, v2_gc_count)?;
-                if let Some(changes) = v1_changes.or(v2_changes) {
+                if let Some(changes) = changes {
                     storage
                         .apply(changes)
                         .map_err(|err| anyhow!("failed to commit the step's writes: {}", err))?;
@@ -688,14 +710,12 @@ fn execute_function_v1(
                 .collect::<Vec<_>>();
             let events = finalize_events_v1(&extensions);
             if commit {
-                match data_cache.into_effects(&module_storage) {
-                    Ok(change_set) => {
-                        let writes = render_writes(&change_set);
-                        changes = Some(change_set);
-                        Output::success(render_execution_output(&vals, &events, Some(&writes)))
-                    },
-                    Err(err) => Output::success(format!("error: writes: {}", err)),
-                }
+                let writes = data_cache
+                    .into_effects(&module_storage)
+                    .map_err(|err| err.to_string());
+                let (display, change_set) = render_with_writes(&vals, &events, writes);
+                changes = change_set;
+                Output::success(display)
             } else {
                 Output::success(render_execution_output(&vals, &events, None))
             }
@@ -813,14 +833,9 @@ fn execute_function_v2(
                     .and_then(|effects| {
                         resource_changes(guard, &effects).map_err(|err| err.to_string())
                     });
-                match writes {
-                    Ok(change_set) => {
-                        let writes = render_writes(&change_set);
-                        changes = Some(change_set);
-                        RunResult::Success(render_execution_output(&vals, &events, Some(&writes)))
-                    },
-                    Err(err) => RunResult::Success(format!("error: writes: {}", err)),
-                }
+                let (display, change_set) = render_with_writes(&vals, &events, writes);
+                changes = change_set;
+                RunResult::Success(display)
             },
             RunResult::Success((vals, events)) => {
                 RunResult::Success(render_execution_output(&vals, &events, None))

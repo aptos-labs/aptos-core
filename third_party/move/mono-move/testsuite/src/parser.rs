@@ -44,10 +44,10 @@
 //! `--commit` makes the step a transaction whose global-storage writes are
 //! part of its output and outlive it. On success, the output gains a
 //! `writes:` segment listing each write as `create`, `modify`, or `delete`
-//! with its resource type, address, and bytes (or `writes: none`). The writes
+//! with its resource type, address, and bytes (or `writes: none`, or
+//! `writes: error: <message>` if they could not be collected). The writes
 //! are then committed to the storage both VMs read in later steps: V1's when
-//! V1 ran, MonoMove's otherwise. Without it, every step starts from the same
-//! storage and its writes are discarded.
+//! V1 ran, MonoMove's otherwise. Without it, the step's writes are discarded.
 //!
 //! Modifiers may appear in any order.
 //!

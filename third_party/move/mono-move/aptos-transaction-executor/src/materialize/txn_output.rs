@@ -87,8 +87,8 @@ type MemberOp = Option<Bytes>;
 // Only entries whose value changed reach this point: at the end of the
 // session, a copied-on-write value that still equals the value it was read
 // from is no longer a write. This diverges from the V1 VM, which emits a
-// modification for every resource written through a mutable borrow, even when
-// its bytes are unchanged.
+// modification for every resource it marks dirty (written through a mutable
+// reference, or moved out and back), even when its bytes are unchanged.
 //
 // TODO(metering): writes are not charged IO gas or storage fees.
 fn drain_write_set(

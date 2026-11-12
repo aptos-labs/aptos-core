@@ -271,7 +271,7 @@ The proposal is to support this gradually.
 
 At session end, each copied-on-write resource is compared with the value it was read from, and is a write only if the two differ.
 This is a full value comparison rather than the compaction-time `memcmp` of Step 2.
-Unlike V1, which emits a modification for every resource written through a mutable borrow, a resource stored back unchanged is not a write.
+Unlike V1, which emits a modification for every resource it marks dirty (written through a mutable reference, or moved out and back), a resource stored back unchanged is not a write.
 
 ### Step 2
 
