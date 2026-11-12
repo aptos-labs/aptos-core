@@ -10,7 +10,7 @@ use crate::{
     RosettaContext,
 };
 use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
-use aptos_logger::debug;
+use aptos_logger::{debug, warn};
 use aptos_rest_client::{Account, Response};
 use aptos_sdk::move_types::{
     ident_str,
@@ -20,7 +20,10 @@ use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashSet, convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
-use warp::Filter;
+use warp::{
+    http::{header, HeaderMap, HeaderName},
+    Filter,
+};
 
 /// The year 2000 in milliseconds, as this is the lower limit for Rosetta API implementations
 pub const Y2K_MS: u64 = 946713600000;
@@ -45,11 +48,71 @@ pub fn check_network(
     }
 }
 
-/// Attaches RosettaContext to warp paths
+/// Returns true if `name` is an HTTP hop-by-hop or payload-framing header that must not be
+/// copied verbatim onto outbound node requests.
+pub fn is_disallowed_forward_header(name: &HeaderName) -> bool {
+    name == header::CONNECTION
+        || name == header::CONTENT_ENCODING
+        || name == header::CONTENT_LENGTH
+        || name == header::HOST
+        || name == header::PROXY_AUTHENTICATE
+        || name == header::PROXY_AUTHORIZATION
+        || name == header::TE
+        || name == header::TRAILER
+        || name == header::TRANSFER_ENCODING
+        || name == header::UPGRADE
+        || name.as_str() == "keep-alive"
+}
+
+/// Filters `forward_headers` on startup, dropping hop-by-hop and payload-framing headers.
+pub fn sanitize_forward_headers(mut forward_headers: HashSet<HeaderName>) -> HashSet<HeaderName> {
+    forward_headers.retain(|name| {
+        if is_disallowed_forward_header(name) {
+            warn!(
+                "Header '{}' is a hop-by-hop or framing header and cannot be forwarded; skipping",
+                name
+            );
+            false
+        } else {
+            true
+        }
+    });
+    forward_headers
+}
+
+/// Copies only headers present in `allowlist` from `incoming_headers`, excluding any
+/// connection-specific headers nominated by an incoming `Connection` header.
+pub fn filter_headers(incoming_headers: &HeaderMap, allowlist: &HashSet<HeaderName>) -> HeaderMap {
+    let mut connection_scoped = HashSet::new();
+    for val in incoming_headers.get_all(header::CONNECTION) {
+        if let Ok(s) = val.to_str() {
+            for token in s.split(',') {
+                if let Ok(name) = HeaderName::from_str(token.trim()) {
+                    connection_scoped.insert(name);
+                }
+            }
+        }
+    }
+
+    let mut forwarded = HeaderMap::new();
+    for name in allowlist {
+        if is_disallowed_forward_header(name) || connection_scoped.contains(name) {
+            continue;
+        }
+        for value in incoming_headers.get_all(name) {
+            forwarded.append(name.clone(), value.clone());
+        }
+    }
+    forwarded
+}
+
+/// Attaches a per-request `RosettaContext` to warp paths, copying any allowlisted incoming
+/// headers onto the request's outbound REST client.
 pub fn with_context(
     context: RosettaContext,
 ) -> impl Filter<Extract = (RosettaContext,), Error = Infallible> + Clone {
-    warp::any().map(move || context.clone())
+    warp::header::headers_cloned()
+        .map(move |headers: HeaderMap| context.with_forwarded_headers(&headers))
 }
 
 /// Fills in an empty request for any REST API path that doesn't take any input body
@@ -410,9 +473,10 @@ pub fn parse_coin_currency(
 
 #[cfg(test)]
 mod test {
-    use crate::common::BlockHash;
+    use crate::common::{filter_headers, sanitize_forward_headers, BlockHash};
     use aptos_types::chain_id::{ChainId, NamedChain};
-    use std::str::FromStr;
+    use std::{collections::HashSet, str::FromStr};
+    use warp::http::{header, HeaderMap, HeaderName, HeaderValue};
 
     #[test]
     pub fn chain_id_height_check() {
@@ -454,5 +518,76 @@ mod test {
         for str in invalid_block_hashes {
             BlockHash::from_str(str).expect_err("Invalid block hash");
         }
+    }
+
+    #[test]
+    pub fn test_filter_headers_allowlist_and_case_insensitivity() {
+        let mut incoming = HeaderMap::new();
+        incoming.insert("X-Client-ID", HeaderValue::from_static("billing-svc"));
+        incoming.append("x-request-id", HeaderValue::from_static("req-1"));
+        incoming.append("x-request-id", HeaderValue::from_static("req-2"));
+        incoming.insert("x-unlisted", HeaderValue::from_static("secret"));
+        incoming.insert(header::HOST, HeaderValue::from_static("localhost:8082"));
+
+        // Empty allowlist forwards nothing
+        assert!(filter_headers(&incoming, &HashSet::new()).is_empty());
+
+        let allowlist: HashSet<HeaderName> = [
+            HeaderName::from_static("x-client-id"),
+            HeaderName::from_static("x-request-id"),
+            HeaderName::from_static("x-missing"),
+        ]
+        .into_iter()
+        .collect();
+
+        let forwarded = filter_headers(&incoming, &allowlist);
+        assert_eq!(forwarded.len(), 3);
+        assert_eq!(
+            forwarded.get("x-client-id"),
+            Some(&HeaderValue::from_static("billing-svc"))
+        );
+        let req_ids: Vec<_> = forwarded.get_all("x-request-id").iter().collect();
+        assert_eq!(req_ids, vec![
+            &HeaderValue::from_static("req-1"),
+            &HeaderValue::from_static("req-2"),
+        ]);
+        assert!(forwarded.get("x-unlisted").is_none());
+        assert!(forwarded.get(header::HOST).is_none());
+    }
+
+    #[test]
+    pub fn test_disallowed_and_connection_scoped_headers_not_forwarded() {
+        let configured: HashSet<HeaderName> = [
+            HeaderName::from_static("x-client-id"),
+            HeaderName::from_static("x-hop-temp"),
+            header::HOST,
+            header::CONTENT_LENGTH,
+            header::TRANSFER_ENCODING,
+            header::CONNECTION,
+            HeaderName::from_static("keep-alive"),
+        ]
+        .into_iter()
+        .collect();
+
+        let sanitized = sanitize_forward_headers(configured);
+        assert_eq!(sanitized.len(), 2);
+        assert!(sanitized.contains(&HeaderName::from_static("x-client-id")));
+        assert!(sanitized.contains(&HeaderName::from_static("x-hop-temp")));
+
+        let mut incoming = HeaderMap::new();
+        incoming.insert("x-client-id", HeaderValue::from_static("svc"));
+        incoming.insert("x-hop-temp", HeaderValue::from_static("drop-me"));
+        incoming.insert(
+            header::CONNECTION,
+            HeaderValue::from_static("keep-alive, x-hop-temp"),
+        );
+
+        let forwarded = filter_headers(&incoming, &sanitized);
+        assert_eq!(forwarded.len(), 1);
+        assert_eq!(
+            forwarded.get("x-client-id"),
+            Some(&HeaderValue::from_static("svc"))
+        );
+        assert!(forwarded.get("x-hop-temp").is_none());
     }
 }

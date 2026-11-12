@@ -2,23 +2,35 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    bootstrap_async,
+    client::RosettaClient,
     common::native_coin,
+    routes,
     types::{
-        AccountIdentifier, Currency, CurrencyMetadata, OperationType, Transaction,
-        FUNGIBLE_ASSET_MODULE, FUNGIBLE_STORE_RESOURCE, OBJECT_CORE_RESOURCE, OBJECT_MODULE,
-        OBJECT_RESOURCE_GROUP,
+        AccountBalanceRequest, AccountIdentifier, Currency, CurrencyMetadata, NetworkIdentifier,
+        NetworkRequest, OperationType, Transaction, FUNGIBLE_ASSET_MODULE, FUNGIBLE_STORE_RESOURCE,
+        OBJECT_CORE_RESOURCE, OBJECT_MODULE, OBJECT_RESOURCE_GROUP,
     },
     RosettaContext,
+};
+use aptos_config::{
+    config::{ApiConfig, RoleType},
+    utils::get_available_port,
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey, SigningKey, Uniform,
 };
-use aptos_rest_client::aptos_api_types::{ResourceGroup, TransactionOnChainData};
+use aptos_rest_client::aptos_api_types::{
+    mime_types::BCS, BcsBlock, IndexResponseBcs, ResourceGroup, TransactionOnChainData,
+    X_APTOS_BLOCK_HEIGHT, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_OLDEST_VERSION,
+    X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION, X_APTOS_OLDEST_BLOCK_HEIGHT,
+};
 use aptos_types::{
     account_address::create_derived_object_address,
     account_config::{
-        fungible_store::FungibleStoreResource, DepositFAEvent, ObjectCoreResource, WithdrawFAEvent,
+        fungible_store::FungibleStoreResource, AccountResource, DepositFAEvent, ObjectCoreResource,
+        WithdrawFAEvent,
     },
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -34,7 +46,20 @@ use aptos_types::{
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::StructTag};
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use std::{collections::HashSet, str::FromStr};
+use std::{
+    collections::HashSet,
+    str::FromStr,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+use url::Url;
+use warp::{
+    http::{
+        header, HeaderMap, HeaderName, HeaderValue, Method, Response as HttpResponse, StatusCode,
+    },
+    path::FullPath,
+    Filter,
+};
 
 const APT_ADDRESS: AccountAddress = AccountAddress::TEN;
 const OTHER_CURRENCY_ADDRESS: &str = "0x12341234123412341234123412341234";
@@ -51,7 +76,7 @@ async fn test_rosetta_context() -> RosettaContext {
     let mut currencies = HashSet::new();
     currencies.insert(OTHER_CURRENCY.clone());
 
-    RosettaContext::new(None, ChainId::test(), None, currencies).await
+    RosettaContext::new(None, ChainId::test(), None, currencies, HashSet::new()).await
 }
 
 fn primary_store_address(owner: AccountAddress, metadata: AccountAddress) -> AccountAddress {
@@ -1046,4 +1071,482 @@ async fn test_storage_refund_exceeds_gas_fee() {
         storage_refund as i128 - gas_fee as i128,
         "Net should equal storage_refund - gas_fee"
     );
+}
+
+#[derive(Clone, Debug)]
+struct RecordedNodeCall {
+    method: Method,
+    path: String,
+    headers: HeaderMap,
+}
+
+fn mock_node_bcs_response(body: Vec<u8>, chain_id: ChainId) -> HttpResponse<Vec<u8>> {
+    HttpResponse::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, BCS)
+        .header(X_APTOS_CHAIN_ID, chain_id.id().to_string())
+        .header(X_APTOS_LEDGER_VERSION, "10")
+        .header(X_APTOS_LEDGER_OLDEST_VERSION, "0")
+        .header(X_APTOS_LEDGER_TIMESTAMP, "1700000000000000")
+        .header(X_APTOS_EPOCH, "1")
+        .header(X_APTOS_BLOCK_HEIGHT, "5")
+        .header(X_APTOS_OLDEST_BLOCK_HEIGHT, "1")
+        .body(body)
+        .unwrap()
+}
+
+async fn spawn_mock_fullnode(
+    chain_id: ChainId,
+) -> (
+    Url,
+    Arc<Mutex<Vec<RecordedNodeCall>>>,
+    tokio::task::JoinHandle<()>,
+) {
+    let recorded: Arc<Mutex<Vec<RecordedNodeCall>>> = Arc::new(Mutex::new(Vec::new()));
+    let recorded_filter = {
+        let recorded = recorded.clone();
+        warp::method()
+            .and(warp::path::full())
+            .and(warp::header::headers_cloned())
+            .map(
+                move |method: Method, full_path: FullPath, headers: HeaderMap| {
+                    recorded.lock().unwrap().push(RecordedNodeCall {
+                        method,
+                        path: full_path.as_str().to_string(),
+                        headers,
+                    });
+                },
+            )
+            .untuple_one()
+    };
+
+    let index_route = warp::path!("v1")
+        .and(warp::path::end())
+        .and(warp::get())
+        .and(recorded_filter.clone())
+        .map(move || {
+            let index = IndexResponseBcs {
+                chain_id: chain_id.id(),
+                epoch: 1.into(),
+                ledger_version: 10.into(),
+                oldest_ledger_version: 0.into(),
+                ledger_timestamp: 1_700_000_000_000_000.into(),
+                node_role: RoleType::FullNode,
+                oldest_block_height: 1.into(),
+                block_height: 5.into(),
+            };
+            mock_node_bcs_response(bcs::to_bytes(&index).unwrap(), chain_id)
+        });
+
+    let block_route = warp::path!("v1" / "blocks" / "by_height" / u64)
+        .and(warp::get())
+        .and(recorded_filter.clone())
+        .map(move |height: u64| {
+            let block = BcsBlock {
+                block_height: height,
+                block_hash: HashValue::zero(),
+                block_timestamp: 1_700_000_000_000_000,
+                first_version: height,
+                last_version: height,
+                transactions: Some(vec![]),
+            };
+            mock_node_bcs_response(bcs::to_bytes(&block).unwrap(), chain_id)
+        });
+
+    let account_resource_route = warp::path!("v1" / "accounts" / String / "resource" / String)
+        .and(warp::get())
+        .and(recorded_filter.clone())
+        .map(move |_addr: String, _resource: String| {
+            let account = AccountResource::new_stateless(AccountAddress::ONE);
+            mock_node_bcs_response(bcs::to_bytes(&account).unwrap(), chain_id)
+        });
+
+    let view_route = warp::path!("v1" / "view")
+        .and(warp::post())
+        .and(warp::body::bytes())
+        .and(recorded_filter.clone())
+        .map(move |_body: warp::hyper::body::Bytes| {
+            let balances = vec![42_000u64];
+            mock_node_bcs_response(bcs::to_bytes(&balances).unwrap(), chain_id)
+        });
+
+    let healthy_route = warp::path!("v1" / "-" / "healthy")
+        .and(warp::get())
+        .and(recorded_filter)
+        .map(move || mock_node_bcs_response(b"ok".to_vec(), chain_id));
+
+    let all_routes = index_route
+        .or(block_route)
+        .or(account_resource_route)
+        .or(view_route)
+        .or(healthy_route);
+
+    let (addr, server) = warp::serve(all_routes).bind_ephemeral(([127, 0, 0, 1], 0));
+    let handle = tokio::spawn(server);
+    let url = Url::parse(&format!("http://{}", addr)).unwrap();
+    (url, recorded, handle)
+}
+
+async fn spawn_rosetta_with_mock_node(
+    chain_id: ChainId,
+    node_url: Url,
+    forward_headers: HashSet<HeaderName>,
+) -> (Url, RosettaClient, tokio::task::JoinHandle<()>) {
+    let port = get_available_port();
+    let rosetta_addr = format!("127.0.0.1:{}", port);
+    let rosetta_url: Url = format!("http://{}", rosetta_addr).parse().unwrap();
+    let api_config = ApiConfig {
+        enabled: true,
+        address: rosetta_addr.parse().unwrap(),
+        ..Default::default()
+    };
+
+    let handle = bootstrap_async(
+        chain_id,
+        api_config,
+        Some(aptos_rest_client::Client::new(node_url)),
+        HashSet::new(),
+        forward_headers,
+    )
+    .await
+    .unwrap();
+
+    let client = RosettaClient::new(rosetta_url.clone());
+    for _ in 0..50 {
+        if client.network_list().await.is_ok() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+
+    (rosetta_url, client, handle)
+}
+
+#[tokio::test]
+async fn test_default_empty_allowlist_drops_incoming_headers() {
+    let chain_id = ChainId::test();
+    let (node_url, recorded, _node_handle) = spawn_mock_fullnode(chain_id).await;
+    let (_rosetta_url, rosetta_client, _rosetta_handle) =
+        spawn_rosetta_with_mock_node(chain_id, node_url, HashSet::new()).await;
+
+    // Clear startup calls (e.g. bootstrap chain_id check)
+    recorded.lock().unwrap().clear();
+
+    let mut incoming_headers = HeaderMap::new();
+    incoming_headers.insert("x-client-id", HeaderValue::from_static("caller-1"));
+    incoming_headers.insert("x-request-id", HeaderValue::from_static("req-1"));
+
+    rosetta_client
+        .with_headers(incoming_headers)
+        .network_status(&NetworkRequest {
+            network_identifier: NetworkIdentifier::from(chain_id),
+        })
+        .await
+        .unwrap();
+
+    let calls = recorded.lock().unwrap();
+    assert!(
+        calls.len() >= 3,
+        "Expected /network/status to make at least 3 node calls, got {}",
+        calls.len()
+    );
+    for call in calls.iter() {
+        assert!(
+            call.headers.get("x-client-id").is_none(),
+            "Default empty allowlist must not forward x-client-id on {}",
+            call.path
+        );
+        assert!(
+            call.headers.get("x-request-id").is_none(),
+            "Default empty allowlist must not forward x-request-id on {}",
+            call.path
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_forward_allowlisted_headers_across_all_outbound_node_calls() {
+    let chain_id = ChainId::test();
+    let (node_url, recorded, _node_handle) = spawn_mock_fullnode(chain_id).await;
+    let allowlist: HashSet<HeaderName> = [
+        HeaderName::from_static("x-client-id"),
+        HeaderName::from_static("x-request-id"),
+    ]
+    .into_iter()
+    .collect();
+    let (rosetta_url, rosetta_client, _rosetta_handle) =
+        spawn_rosetta_with_mock_node(chain_id, node_url, allowlist).await;
+
+    recorded.lock().unwrap().clear();
+
+    // /account/balance triggers multiple outbound calls across both rest_client and block_cache:
+    // 1) GET /v1 (get_ledger_information)
+    // 2) GET /v1/blocks/by_height/5 (BlockRetriever::get_block_info_by_height)
+    // 3) GET /v1/accounts/.../resource/0x1::account::Account (get_sequence_number)
+    // 4) POST /v1/view (get_base_balances)
+    let mut incoming_headers = HeaderMap::new();
+    incoming_headers.insert("X-Client-ID", HeaderValue::from_static("billing-service"));
+    incoming_headers.insert("x-request-id", HeaderValue::from_static("trace-abc-999"));
+    incoming_headers.insert("x-unlisted-secret", HeaderValue::from_static("do-not-copy"));
+
+    let balance_resp = rosetta_client
+        .with_headers(incoming_headers)
+        .account_balance(&AccountBalanceRequest {
+            network_identifier: NetworkIdentifier::from(chain_id),
+            account_identifier: AccountIdentifier::base_account(AccountAddress::ONE),
+            block_identifier: None,
+            currencies: Some(vec![native_coin()]),
+        })
+        .await
+        .unwrap();
+    assert_eq!(balance_resp.balances.len(), 1);
+    assert_eq!(balance_resp.balances[0].value, "42000");
+
+    {
+        let calls = recorded.lock().unwrap();
+        assert_eq!(
+            calls.len(),
+            4,
+            "Expected 4 outbound node calls for /account/balance, got: {:?}",
+            calls
+        );
+        for call in calls.iter() {
+            assert_eq!(
+                call.headers.get("x-client-id"),
+                Some(&HeaderValue::from_static("billing-service")),
+                "Missing x-client-id on outbound call {} {}",
+                call.method,
+                call.path
+            );
+            assert_eq!(
+                call.headers.get("x-request-id"),
+                Some(&HeaderValue::from_static("trace-abc-999")),
+                "Missing x-request-id on outbound call {} {}",
+                call.method,
+                call.path
+            );
+            assert!(
+                call.headers.get("x-unlisted-secret").is_none(),
+                "Non-allowlisted header must be dropped on {} {}",
+                call.method,
+                call.path
+            );
+        }
+    }
+
+    // Also verify GET /-/healthy forwards allowlisted headers
+    recorded.lock().unwrap().clear();
+    let http_resp = reqwest::Client::new()
+        .get(rosetta_url.join("-/healthy").unwrap())
+        .header("x-client-id", "health-checker")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(http_resp.status(), StatusCode::OK);
+
+    let calls = recorded.lock().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].path, "/v1/-/healthy");
+    assert_eq!(
+        calls[0].headers.get("x-client-id"),
+        Some(&HeaderValue::from_static("health-checker"))
+    );
+    assert!(calls[0].headers.get("x-request-id").is_none());
+}
+
+#[tokio::test]
+async fn test_per_request_header_isolation_no_cross_request_leakage() {
+    let chain_id = ChainId::test();
+    let (node_url, recorded, _node_handle) = spawn_mock_fullnode(chain_id).await;
+    let allowlist: HashSet<HeaderName> = [
+        HeaderName::from_static("x-client-id"),
+        HeaderName::from_static("x-request-id"),
+    ]
+    .into_iter()
+    .collect();
+    let (_rosetta_url, rosetta_client, _rosetta_handle) =
+        spawn_rosetta_with_mock_node(chain_id, node_url, allowlist).await;
+
+    recorded.lock().unwrap().clear();
+
+    let net_req = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
+
+    // Phase 1: Fire concurrent requests with distinct headers, partial headers, and no headers
+    let mut handles = Vec::new();
+    for i in 0..8usize {
+        // Group A: both allowlisted headers + one unlisted header
+        let client_a = rosetta_client.clone();
+        let req_a = net_req.clone();
+        handles.push(tokio::spawn(async move {
+            let mut h = HeaderMap::new();
+            h.insert(
+                "x-client-id",
+                HeaderValue::from_str(&format!("client-{i}")).unwrap(),
+            );
+            h.insert(
+                "x-request-id",
+                HeaderValue::from_str(&format!("req-{i}")).unwrap(),
+            );
+            h.insert(
+                "x-other",
+                HeaderValue::from_str(&format!("secret-{i}")).unwrap(),
+            );
+            client_a
+                .with_headers(h)
+                .network_status(&req_a)
+                .await
+                .unwrap();
+        }));
+
+        // Group B: only x-client-id (no x-request-id)
+        let client_b = rosetta_client.clone();
+        let req_b = net_req.clone();
+        handles.push(tokio::spawn(async move {
+            let mut h = HeaderMap::new();
+            h.insert(
+                "x-client-id",
+                HeaderValue::from_str(&format!("partial-{i}")).unwrap(),
+            );
+            client_b
+                .with_headers(h)
+                .network_status(&req_b)
+                .await
+                .unwrap();
+        }));
+
+        // Group C: no allowlisted headers at all
+        let client_c = rosetta_client.clone();
+        let req_c = net_req.clone();
+        handles.push(tokio::spawn(async move {
+            let mut h = HeaderMap::new();
+            h.insert("x-other", HeaderValue::from_static("unlisted-only"));
+            client_c
+                .with_headers(h)
+                .network_status(&req_c)
+                .await
+                .unwrap();
+        }));
+    }
+
+    for h in handles {
+        h.await.unwrap();
+    }
+
+    {
+        let calls = recorded.lock().unwrap();
+        // 24 Rosetta /network/status requests * 3 outbound node calls each = 72 calls
+        assert_eq!(calls.len(), 72);
+
+        let mut anon_count = 0usize;
+        let mut partial_counts = [0usize; 8];
+        let mut full_counts = [0usize; 8];
+
+        for call in calls.iter() {
+            assert!(call.headers.get("x-other").is_none());
+            let cid = call
+                .headers
+                .get("x-client-id")
+                .and_then(|v| v.to_str().ok());
+            let rid = call
+                .headers
+                .get("x-request-id")
+                .and_then(|v| v.to_str().ok());
+
+            match (cid, rid) {
+                (None, None) => {
+                    anon_count += 1;
+                },
+                (Some(c), None) => {
+                    let idx: usize = c
+                        .strip_prefix("partial-")
+                        .expect("Single-header call must come from partial group")
+                        .parse()
+                        .unwrap();
+                    partial_counts[idx] += 1;
+                },
+                (Some(c), Some(r)) => {
+                    let c_idx: usize = c
+                        .strip_prefix("client-")
+                        .expect("Paired call must come from client group")
+                        .parse()
+                        .unwrap();
+                    let r_idx: usize = r
+                        .strip_prefix("req-")
+                        .expect("Paired call must have matching req-id")
+                        .parse()
+                        .unwrap();
+                    assert_eq!(
+                        c_idx, r_idx,
+                        "Header leakage detected: x-client-id={} paired with x-request-id={}",
+                        c, r
+                    );
+                    full_counts[c_idx] += 1;
+                },
+                (None, Some(r)) => {
+                    panic!("Unexpected orphan x-request-id={} without x-client-id", r);
+                },
+            }
+        }
+
+        assert_eq!(anon_count, 24);
+        assert_eq!(partial_counts, [3; 8]);
+        assert_eq!(full_counts, [3; 8]);
+    }
+
+    // Phase 2: Sequential headered -> unheadered on the shared connection pool
+    recorded.lock().unwrap().clear();
+    let mut seq_headers = HeaderMap::new();
+    seq_headers.insert("x-client-id", HeaderValue::from_static("seq-caller"));
+    seq_headers.insert("x-request-id", HeaderValue::from_static("seq-req"));
+    rosetta_client
+        .with_headers(seq_headers)
+        .network_status(&net_req)
+        .await
+        .unwrap();
+    rosetta_client.network_status(&net_req).await.unwrap();
+
+    let calls = recorded.lock().unwrap();
+    assert_eq!(calls.len(), 6);
+    for call in &calls[0..3] {
+        assert_eq!(
+            call.headers.get("x-client-id"),
+            Some(&HeaderValue::from_static("seq-caller"))
+        );
+        assert_eq!(
+            call.headers.get("x-request-id"),
+            Some(&HeaderValue::from_static("seq-req"))
+        );
+    }
+    for call in &calls[3..6] {
+        assert!(call.headers.get("x-client-id").is_none());
+        assert!(call.headers.get("x-request-id").is_none());
+    }
+}
+
+#[tokio::test]
+async fn test_cors_preflight_allows_configured_forward_headers() {
+    let allowlist: HashSet<HeaderName> = [
+        HeaderName::from_static("x-client-id"),
+        HeaderName::from_static("x-request-id"),
+    ]
+    .into_iter()
+    .collect();
+    let context = RosettaContext::new(None, ChainId::test(), None, HashSet::new(), allowlist).await;
+    let router = routes(context);
+
+    let resp = warp::test::request()
+        .method("OPTIONS")
+        .path("/network/list")
+        .header("origin", "https://example.com")
+        .header("access-control-request-method", "POST")
+        .header(
+            "access-control-request-headers",
+            "content-type, x-client-id, x-request-id",
+        )
+        .reply(&router)
+        .await;
+
+    assert_eq!(resp.status(), StatusCode::OK);
 }
