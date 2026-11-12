@@ -92,7 +92,23 @@ theorem contentsTypes_substList (unit : Validation.ValidatedUnit) (source : Stru
 /-- The declared types of a nominal value's ghost fields, whose slots follow
 its declared fields (`doc/designs/ghost-fields.md`). -/
 def ghostTypeIds (unit : Validation.ValidatedUnit) (source : StructHandle) : List TypeId :=
-  (SemanticOperations.nominalGhosts unit source).toList.map (·.type.typeId)
+  match unit.namespaces[source.namespaceId.index]? with
+  | some ns => (SemanticOperations.nominalGhosts unit source).toList.map (ns.typeId ·.type.typeId)
+  | none => []
+
+theorem ghostTypeIds_of {unit : Validation.ValidatedUnit} {source : StructHandle}
+    {ns : Validation.ValidatedNamespace}
+    (namespace_eq : unit.namespaces[source.namespaceId.index]? = some ns) :
+    ghostTypeIds unit source =
+      (SemanticOperations.nominalGhosts unit source).toList.map (ns.typeId ·.type.typeId) := by
+  simp [ghostTypeIds, namespace_eq]
+
+@[simp] theorem ghostTypeIds_length (unit : Validation.ValidatedUnit) (source : StructHandle) :
+    (ghostTypeIds unit source).length = (SemanticOperations.nominalGhosts unit source).size := by
+  unfold ghostTypeIds
+  split
+  · simp
+  · next none_eq => simp [SemanticOperations.nominalGhosts, none_eq]
 
 mutual
   /-- A value inhabits a semantic type, its loans typed by `loans`. -/
@@ -130,7 +146,7 @@ mutual
         (declaration_eq : SemanticOperations.handleFields? unit source variant =
           some (declaringNamespace, declared))
         (fieldTypes_resolve : ResolvesAll declaringNamespace.tables arguments.toArray
-          (declared.toList.map (·.type.typeId)) fieldTypes)
+          (declared.toList.map (declaringNamespace.typeId ·.type.typeId)) fieldTypes)
         (ghostTypes_resolve : ResolvesAll declaringNamespace.tables arguments.toArray
           (ghostTypeIds unit source) ghostTypes)
         (fields_typed : HasTypes unit loans fields.toList

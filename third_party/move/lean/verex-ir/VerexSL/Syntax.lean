@@ -210,7 +210,8 @@ private def kwPhantom := Lean.Parser.nonReservedSymbol "phantom" true
 /-- Identifiers are contextual to VerexSL: host-Lean keywords such as
 `end` and `at`, and modifiers such as `view`, remain ordinary local names.
 Clause delimiters must use `«...»` when intended as identifiers, so an
-expression cannot consume the next contract clause. -/
+expression cannot consume the next contract clause, and so must the boolean
+literals, so `&false` borrows a value and not a local. -/
 private def verexIdentifier : Lean.Parser.Parser :=
   ["_", "move", "rust", "Unit", "Never", "Bool", "Char", "string", "Bytes",
     "Address", "Signer", "UInt", "SInt", "UPtr", "IPtr", "Nat", "Int",
@@ -227,7 +228,7 @@ private def verexIdentifier : Lean.Parser.Parser :=
     "discriminant", "invoke", "function", "as", "match", "with"].foldr
       (fun keyword parser =>
         (if ["let_pre", "let_post", "modifies", "modifies_of", "reads", "requires", "ensures",
-            "aborts_if", "aborts_with", "invariant"].contains keyword then
+            "aborts_if", "aborts_with", "invariant", "true", "false"].contains keyword then
           Lean.Parser.notFollowedBy (Lean.Parser.nonReservedSymbol keyword true) keyword
         else Lean.Parser.notSymbol keyword) >> parser)
       Lean.Parser.rawIdent
@@ -633,14 +634,19 @@ syntax (name := verexUpdateStatement)
       (Lean.Parser.ppLine >> Lean.Parser.categoryParser `verexSpecStatement 0))
 syntax (name := verexSingleSpecExpr)
   kwSpec verexSpecStatement : verexExpr
+/-- `proof` starts a step only with the step on its line; otherwise it is a
+local, so that a statement on the next line stays a statement. -/
+private def proofKeyword :=
+  kwProof >> Lean.Parser.checkLineEq "a proof step must start on the same line as `proof`"
 /-- A step of the function's proof: verified with the function, and not run
 where a caller inlines it. -/
 @[verexExpr_parser] def verexProofBlockExpr := leading_parser
-  kwProof >> kwDo >>
+  Lean.Parser.withPosition <| proofKeyword >> kwDo >>
     Lean.Parser.withPosition (Lean.Parser.manyIndent
       (Lean.Parser.ppLine >> Lean.Parser.categoryParser `verexSpecStatement 0))
-syntax (name := verexSingleProofExpr)
-  kwProof verexSpecStatement : verexExpr
+@[verexExpr_parser] def verexSingleProofExpr := leading_parser
+  Lean.Parser.withPosition <| proofKeyword >>
+    Lean.Parser.categoryParser `verexSpecStatement 0
 syntax (name := verexLetStatementSyntax)
   kwLet (kwMut)? verexBindingPattern ":" verexType ":=" verexExpr (";")? : verexStatement
 syntax (name := verexInferredLetStatementSyntax)
@@ -756,12 +762,11 @@ private def verexIfBranchParser :=
     Lean.Parser.categoryParser `verexExpr 0)
 @[verexExpr_parser] def verexIfExpr := leading_parser
   kwIf >> Lean.Parser.categoryParser `verexExpr 0 >> kwThen >>
-    -- Save the position immediately after each delimiter so `many1Indent`
-    -- can establish the offside column for a branch beginning on the next
-    -- line, while the inline branch remains available on the same line.
-    Lean.Parser.withPosition verexIfBranchParser >>
-    Lean.Parser.optional (kwElse >>
-      Lean.Parser.withPosition verexIfBranchParser)
+    -- A branch on its own lines sets its offside column; an inline branch
+    -- keeps the enclosing one, so that it may wrap under its `then`. An `else`
+    -- left of the offside column belongs to an enclosing `if`.
+    verexIfBranchParser >>
+    Lean.Parser.optional (Lean.Parser.checkColGe >> kwElse >> verexIfBranchParser)
 declare_syntax_cat verexLoopLabel
 syntax (name := verexLoopLabelSyntax) "@" verexIdentifier : verexLoopLabel
 syntax (name := verexLoopExpr)
@@ -870,7 +875,7 @@ declare_syntax_cat verexAttributeListSyntax
 syntax (name := verexAttributeSyntax)
   verexIdentifier ("(" verexAttribute,+ ")")? : verexAttribute
 syntax (name := verexAttributeAssignmentSyntax)
-  verexIdentifier "=" (num <|> str <|> verexIdentifier) : verexAttribute
+  verexIdentifier "=" (verexQualifiedName <|> num <|> str <|> verexIdentifier) : verexAttribute
 syntax (name := verexAttributeList) "@[" verexAttribute,+ "]" : verexAttributeListSyntax
 
 syntax (name := verexStructItem)

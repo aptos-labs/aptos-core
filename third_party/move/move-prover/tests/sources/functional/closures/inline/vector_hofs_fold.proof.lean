@@ -10,7 +10,8 @@ open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote
 
 verify count_even_concrete by lean =>
   have even_prefix (i : Int) (low : 0 ≤ i) (high : i ≤ 6) :
-      «spec_fold$lambda$0».spec unit (Skolems.runtime unit)
+      «spec_fold$lambda$0».spec unit (Skolems.runtime unit).toCarriers
+        (Skolems.runtime unit).type
         (({ values := #[⟨1, by decide⟩, ⟨2, by decide⟩, ⟨3, by decide⟩, ⟨4, by decide⟩,
             ⟨5, by decide⟩, ⟨6, by decide⟩], bounded := by decide } :
           SpecVector (SpecInt (.bits 64) false)), 0, i, ()) = i / 2 := by

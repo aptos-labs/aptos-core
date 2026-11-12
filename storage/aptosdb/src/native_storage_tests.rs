@@ -2596,4 +2596,198 @@ mod reopen {
         assert_eq!(read(&db, 1), decoded(b'c'));
         assert_eq!(read(&db, 2), decoded(b'b'));
     }
+
+    /// Fast sync to a target whose order root is the empty-tree placeholder,
+    /// then commit orders on top.
+    #[test]
+    fn fast_sync_to_an_empty_order_tree_then_commit() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_orders(&db, 0, &[], &[]);
+            commit_orders(&db, 1, &[], &[]);
+        }
+        let db = open(&dir, true);
+        db.reset_order_after_fast_sync(1, *SPARSE_MERKLE_PLACEHOLDER_HASH)
+            .expect("reset");
+        commit_orders(&db, 2, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+        assert_eq!(order_rows(&db).len(), 1);
+        drop(db);
+        let db = open(&dir, true);
+        assert_eq!(order_rows(&db).len(), 1, "cold load");
+    }
+
+    /// Fast sync streams the order snapshot a target commits a root for,
+    /// finalizes onto it, and reopens past the open-time root check.
+    #[test]
+    fn fast_sync_restores_orders_then_commits() {
+        use aptos_storage_interface::{
+            state_store::orders::{NativeOrder, OrderKey},
+            DbWriter, StateKind,
+        };
+        use aptos_types::{
+            aggregate_signature::AggregateSignature,
+            block_info::BlockInfo,
+            ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+            state_store::{native_order::NativeSingleOrder, state_value::StateValue},
+        };
+
+        /// A block with one main-state write, so main state has a snapshot
+        /// to restore, and `roots` (position, order) committed.
+        fn block(
+            seq: u8,
+            orders: &[(StateKey, Option<&[u8]>)],
+            roots: Option<(HashValue, HashValue)>,
+        ) -> TransactionToCommit {
+            let txn_info = TransactionInfo::builder_v1()
+                .transaction_hash(HashValue::random())
+                .state_change_hash(HashValue::random())
+                .event_root_hash(HashValue::random())
+                .state_checkpoint_hash(HashValue::random())
+                .gas_used(0)
+                .status(ExecutionStatus::Success)
+                .maybe_position_state_checkpoint_hash(roots.map(|(position, _)| position))
+                .maybe_order_state_checkpoint_hash(roots.map(|(_, order)| order))
+                .build();
+            let mut write_set = WriteSet::new_for_test(vec![(
+                StateKey::raw(&[seq]),
+                Some(StateValue::new_legacy(vec![seq].into())),
+            )])
+            .into_v1();
+            write_set.add_native_orders(
+                orders
+                    .iter()
+                    .map(|(key, value)| {
+                        let op = match value {
+                            Some(bytes) => WriteOp::legacy_modification(bytes.to_vec().into()),
+                            None => WriteOp::legacy_deletion(),
+                        };
+                        (key.clone(), NativeOrderOp::from_write_op(op))
+                    })
+                    .collect(),
+            );
+            TransactionToCommit::new(
+                Transaction::block_epilogue_v0(HashValue::zero(), BlockEndInfo::new_empty()),
+                txn_info,
+                write_set,
+                vec![],
+                false,
+                TransactionAuxiliaryData::default(),
+            )
+        }
+        fn restore(
+            src: &AptosDB,
+            dst: &AptosDB,
+            version: Version,
+            kind: StateKind,
+            root: HashValue,
+        ) {
+            let num_items = src.get_state_item_count(version, kind).unwrap();
+            let mut receiver = dst
+                .get_state_snapshot_receiver(version, root, kind)
+                .unwrap();
+            let mut first_index = 0;
+            while first_index < num_items {
+                let chunk = src
+                    .get_state_value_chunk_with_proof(version, first_index, 1, kind)
+                    .unwrap();
+                first_index += chunk.raw_values.len();
+                receiver.add_chunk(chunk.raw_values, chunk.proof).unwrap();
+            }
+            receiver.finish_box().unwrap();
+        }
+        fn read(db: &AptosDB, order_id: u128) -> Option<NativeOrder> {
+            let bundle = db.order().expect("order store attached");
+            let tip = bundle.orders.lock().clone();
+            let key = OrderKey::Single {
+                exchange: exchange(1),
+                market: super::market(7),
+                order_id,
+            };
+            bundle.order_base.with_view(&tip, |view| view.get(&key))
+        }
+        fn decoded(tag: u8) -> Option<NativeOrder> {
+            Some(NativeOrder::Single(
+                NativeSingleOrder::deserialize(&order_value(tag)).unwrap(),
+            ))
+        }
+
+        let (a, b, c) = (order_value(b'a'), order_value(b'b'), order_value(b'c'));
+        let writes: Vec<Vec<(StateKey, Option<&[u8]>)>> = vec![
+            vec![(order_key(1), Some(&a)), (order_key(2), Some(&b))],
+            vec![(order_key(1), None), (order_key(3), Some(&c))],
+        ];
+        let target = writes.len() as Version - 1;
+        // A reference node supplies the roots the target commits.
+        let roots = {
+            let dir = TempPath::new();
+            let db = open(&dir, true);
+            for (version, w) in writes.iter().enumerate() {
+                commit_orders(&db, version as Version, &[], w);
+            }
+            (position_root(&db), order_root(&db))
+        };
+        let src_dir = TempPath::new();
+        let src = open(&src_dir, true);
+        for (version, w) in writes.iter().enumerate() {
+            let version = version as Version;
+            src.save_transactions_for_test(
+                &[block(
+                    version as u8,
+                    w,
+                    (version == target).then_some(roots),
+                )],
+                version,
+                None,
+                true,
+            )
+            .unwrap();
+        }
+        assert_eq!(order_root(&src), roots.1);
+
+        let dst_dir = TempPath::new();
+        {
+            let dst = open(&dst_dir, true);
+            let main_root = src.state_store.get_root_hash(target).unwrap();
+            restore(&src, &dst, target, StateKind::MainState, main_root);
+            restore(&src, &dst, target, StateKind::Order, roots.1);
+            let ledger_info = LedgerInfoWithSignatures::new(
+                LedgerInfo::new(
+                    BlockInfo::new(
+                        0,
+                        0,
+                        HashValue::zero(),
+                        src.get_accumulator_root_hash(target).unwrap(),
+                        target,
+                        0,
+                        None,
+                    ),
+                    HashValue::zero(),
+                ),
+                AggregateSignature::empty(),
+            );
+            dst.finalize_state_snapshot(
+                target,
+                src.get_transaction_outputs(target, 1, target).unwrap(),
+                &[ledger_info],
+            )
+            .unwrap();
+
+            assert_eq!(order_root(&dst), roots.1);
+            assert_eq!(order_rows(&dst), order_rows(&src));
+            assert_eq!(read(&dst, 1), None);
+            assert_eq!(read(&dst, 2), decoded(b'b'));
+            assert_eq!(read(&dst, 3), decoded(b'c'));
+        }
+
+        let dst = open(&dst_dir, true);
+        assert_eq!(order_root(&dst), roots.1, "cold load");
+        assert_eq!(read(&dst, 3), decoded(b'c'));
+        commit_orders(&dst, target + 1, &[], &[(
+            order_key(2),
+            Some(&order_value(b'd')),
+        )]);
+        assert_eq!(read(&dst, 2), decoded(b'd'));
+        assert_eq!(read(&dst, 3), decoded(b'c'));
+    }
 }

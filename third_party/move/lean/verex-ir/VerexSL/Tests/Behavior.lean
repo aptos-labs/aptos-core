@@ -45,7 +45,10 @@ run_cmd do
   unless takesUnit contract.type do
     throwError "a contract stating behavioral predicates does not take the unit"
   let constants := contract.value!.getUsedConstants
-  for predicate in [``VerexIR.Proofs.AbortsOf, ``VerexIR.Proofs.EnsuresOf,
+  -- `aborts_of` and `ensures_of` of a clause are stated over the arguments'
+  -- entry values (`AbortsOfEntries`, `EnsuresOfEntries`), which name no
+  -- prophecy but the finals the clause reads.
+  for predicate in [``VerexIR.Proofs.AbortsOfEntries, ``VerexIR.Proofs.EnsuresOfEntries,
       ``VerexIR.Proofs.ResultOf] do
     unless constants.contains predicate do
       throwError s!"the contract does not state {predicate}"

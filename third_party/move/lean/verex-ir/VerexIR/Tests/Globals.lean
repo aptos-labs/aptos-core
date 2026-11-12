@@ -187,6 +187,51 @@ private def publishWhileBorrowedFixture : RawUnit :=
 #guard preparationHasDiagnosticAt publishWhileBorrowedFixture
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨13⟩
 
+/- The temporary borrow of the signer ends with `publish`, so the signer can be
+consumed after it; a borrow a local still holds does not end there. -/
+private def publishSignerBorrowFixture (held : Bool) : RawUnit :=
+  let ns := fixture.namespaces[0]!
+  let expression (loc typeId : Nat) (kind : ExprKind) : Expr :=
+    { loc := ⟨loc⟩, typeId := ⟨typeId⟩, kind }
+  let borrow := expression 0 8 (.operation (.borrow .immutable ⟨0⟩) #[] #[])
+  let value := expression 1 2 (.value (.integer 7))
+  let resource := expression 2 5 (.operation
+    (.call (.constructor { namespaceId := ⟨0⟩, name := ⟨2⟩ })) #[] #[⟨1⟩])
+  let holder := expression 3 8 (.localVar ⟨1⟩)
+  let publish := expression 4 0 (.operation (.global .publish)
+    #[.typeArg (typeUse 5 4)] #[if held then ⟨3⟩ else ⟨0⟩, ⟨2⟩])
+  let consume := expression 5 0 (.operation (.drop ⟨0⟩) #[] #[])
+  let laterUse := expression 6 8 (.localVar ⟨1⟩)
+  let body := expression 7 0 (.block (if held then #[⟨4⟩, ⟨5⟩, ⟨6⟩] else #[⟨4⟩, ⟨5⟩]) none)
+  let bound := expression 8 0 (.letDecl ⟨0⟩ (some ⟨0⟩) ⟨7⟩)
+  { fixture with
+    tables := { fixture.tables with
+      types := fixture.tables.types ++ #[.signer,
+        .reference { profile := .move, kind := .shared, referent := ⟨7⟩, lifetime := ⟨0⟩ }] }
+    namespaces := #[{ ns with
+      expressions := #[borrow, value, resource, holder, publish, consume, laterUse, body, bound]
+      patterns := #[{ loc := ⟨9⟩, typeId := ⟨8⟩, kind := .variable ⟨1⟩ }]
+      places := #[.localVar ⟨0⟩]
+      functions := #[{
+        loc := ⟨10⟩
+        name := ⟨0⟩
+        profile := .move
+        signature := { parameters := #[{ name := "account", typeUse := typeUse 7 10 }] }
+        body := .structured (if held then ⟨8⟩ else ⟨7⟩)
+        origin := ⟨0⟩
+        alignment := ⟨0⟩
+        locals := #[
+          { id := ⟨0⟩, name := "account", type := typeUse 7 10, mutable := false, loc := ⟨10⟩ },
+          { id := ⟨1⟩, name := "holder", type := typeUse 8 10, mutable := false, loc := ⟨10⟩ }] }] }] }
+
+#guard match validate #[schema] (publishSignerBorrowFixture false) with
+  | .error _ => false
+  | .ok checked => checked.borrowDiagnostics.isEmpty
+#guard match validate #[schema] (publishSignerBorrowFixture true) with
+  | .error _ => false
+  | .ok checked => checked.borrowDiagnostics.any fun diagnostic =>
+      diagnostic.code == "VIR-SEMANTIC-BORROW-CONFLICT" && diagnostic.primary == some ⟨5⟩
+
 private def badPublishValueFixture : RawUnit :=
   let ns := fixture.namespaces[0]!
   { fixture with namespaces := #[{

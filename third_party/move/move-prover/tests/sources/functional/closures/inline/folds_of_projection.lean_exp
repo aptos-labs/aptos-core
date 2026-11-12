@@ -43,4 +43,178 @@ warning: cannot derive `folds_of` exactly for this lambda argument: the lambda c
     │ ╰─│──────────' from a call inlined at this callsite
     │   ╰─────────' lambda argument
 
-tests/sources/functional/closures/inline/.verex/folds_of_projection.move.lean:382:15: error: VEREX-CALL-NAME: unknown function `spec_fold$gen$3`
+tests/sources/functional/closures/inline/folds_of_projection.move:57:9: error: the specification clause `ensures spec.result[1] == «spec_fold$lambda$3»(v, 0, v.length)` is not established
+tests/sources/functional/closures/inline/folds_of_projection.move:55:5: error: verex verification failed: the automatic verification of `independent_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_projection.proof.lean`:
+  verify independent_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/folds_of_projection.move:106:9: error: the specification clause `ensures spec.result[1] == «spec_fold$lambda$0»(v, 0, v.length)` is not established
+tests/sources/functional/closures/inline/folds_of_projection.move:104:5: error: verex verification failed: the automatic verification of `reads_updated_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_projection.proof.lean`:
+  verify reads_updated_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/folds_of_projection.move:122:9: error: the specification clause `ensures spec.result[1] == «spec_fold$lambda$4»(v, 0, v.length)` is not established
+tests/sources/functional/closures/inline/folds_of_projection.move:120:5: error: verex verification failed: the automatic verification of `reads_prior_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_projection.proof.lean`:
+  verify reads_prior_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/folds_of_projection.move:137:9: error: the specification clause `ensures spec.result[1] == «spec_fold$lambda$1»(v, 0, v.length)` is not established
+tests/sources/functional/closures/inline/folds_of_projection.move:135:5: error: verex verification failed: the automatic verification of `guarded_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_projection.proof.lean`:
+  verify guarded_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/folds_of_projection.move:154:9: error: the specification clause `ensures spec.result[2] == «spec_fold$lambda$0»(v, 0, v.length)` is not established
+tests/sources/functional/closures/inline/folds_of_projection.move:152:5: error: verex verification failed: the automatic verification of `chain_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_projection.proof.lean`:
+  verify chain_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/folds_of_projection.move:189:9: error: the specification clause `ensures spec.result[1] == 0` is not established
+tests/sources/functional/closures/inline/folds_of_projection.move:187:5: error: verex verification failed: the automatic verification of `mixed_state_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_projection.proof.lean`:
+  verify mixed_state_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/folds_of_projection.move:206:5: error: verification failed with a residual obligation:
+case step.some.some.some.some.some.right.right.right
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+v : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
+assumed permitted : True
+this✝ :
+  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 10 } } (v, ())
+    initialState✝
+verexContinuation✝ : VerexIR.Proofs.Denote.Flow
+    (VerexIR.Proofs.Denote.ResultShape.one
+      (VerexIR.Proofs.Denote.NTy.tuple
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+                          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+                            VerexIR.Proofs.Denote.NRow.nil))))))))))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
+verexContinuation : VerexIR.Proofs.Denote.Flow
+    (VerexIR.Proofs.Denote.ResultShape.one
+      (VerexIR.Proofs.Denote.NTy.tuple
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+                          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+                            VerexIR.Proofs.Denote.NRow.nil))))))))))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  verexContinuation✝
+fst✝ : Option (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+a b i : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+invariant_3_1 :
+  a.val =
+    «spec_fold$lambda$0».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+      (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, i.val, ())
+invariant_3_2 :
+  b.val =
+    «spec_fold$lambda$1».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+      (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, i.val, ())
+invariant_3_3 :
+  ∀ (_j_11 : Int),
+    0 ≤ _j_11 →
+      _j_11 < i.val →
+        ¬(((18446744073709550615 <
+                  «spec_fold$lambda$1».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+                    (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, _j_11, ()) ∨
+                «spec_fold$lambda$1».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+                      (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, _j_11, ()) +
+                    1000 <
+                  «spec_fold$lambda$0».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+                    (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, _j_11, ())) ∨
+              18446744073709551615 <
+                «spec_fold$lambda$0».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+                    (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, _j_11, ()) +
+                  (v.values[_j_11.toNat]?.getD { val := 0, fits := ⋯ }).val) ∨
+            18446744073709551614 <
+              «spec_fold$lambda$1».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+                (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, _j_11, ()))
+invariant_1 : i.val ≤ ↑v.values.size
+invariant_2 : True
+pathDecision✝ : ↑v.values.size ≤ i.val
+⊢ ¬((((∃ j,
+            0 ≤ j ∧
+              j < ↑v.values.size ∧
+                18446744073709551615 <
+                  «spec_fold$lambda$1».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+                      (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, j, ()) +
+                    1000) ∨
+          ∃ j,
+            0 ≤ j ∧
+              j < ↑v.values.size ∧
+                «spec_fold$lambda$1».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+                      (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, j, ()) +
+                    1000 <
+                  «spec_fold$lambda$0».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+                    (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, j, ())) ∨
+        ∃ j,
+          0 ≤ j ∧
+            j < ↑v.values.size ∧
+              18446744073709551615 <
+                «spec_fold$lambda$0».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+                    (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, j, ()) +
+                  (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val) ∨
+      ∃ j,
+        0 ≤ j ∧
+          j < ↑v.values.size ∧
+            18446744073709551615 <
+              «spec_fold$lambda$1».spec unit (VerexIR.Proofs.Denote.Skolems.runtime unit).toCarriers
+                  (VerexIR.Proofs.Denote.Skolems.runtime unit).type (v, 0, j, ()) +
+                1)
+tests/sources/functional/closures/inline/folds_of_projection.move:208:9: error: the specification clause `aborts_if ∃ (j in 0 .. v.length),
+        «spec_fold$lambda$1»(v, 0, j) + 1000 > MAX_U64` is not established
+tests/sources/functional/closures/inline/folds_of_projection.move:210:9: error: the specification clause `aborts_if ∃ (j in 0 .. v.length),
+        «spec_fold$lambda$0»(v, 0, j) > «spec_fold$lambda$1»(v, 0, j) + 1000` is not established
+tests/sources/functional/closures/inline/folds_of_projection.move:213:9: error: the specification clause `aborts_if ∃ (j in 0 .. v.length),
+        «spec_fold$lambda$0»(v, 0, j) + v[j] > MAX_U64` is not established
+tests/sources/functional/closures/inline/folds_of_projection.move:215:9: error: the specification clause `aborts_if ∃ (j in 0 .. v.length),
+        «spec_fold$lambda$1»(v, 0, j) + 1 > MAX_U64` is not established
+tests/sources/functional/closures/inline/folds_of_projection.move:206:5: error: verex verification failed: the automatic verification of `cross_abort` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_projection.proof.lean`:
+  verify cross_abort by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

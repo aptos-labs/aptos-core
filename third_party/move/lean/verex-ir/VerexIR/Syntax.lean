@@ -743,8 +743,8 @@ default. A state label is a name (`NameId`) the specification refers to,
 bound by a quantifier over the state domain or defined by a state-change
 predicate. -/
 structure MemoryRange where
-  pre : Option Nat := none
-  post : Option Nat := none
+  pre : Option NameId := none
+  post : Option NameId := none
   deriving Repr, BEq, Inhabited
 
 /-- Provenance category for an explicit specification trace point. -/
@@ -783,10 +783,10 @@ inductive SpecOperation where
   | typeDomain
   | resourceDomain
   | stateDomain
-  | global (label : Option Nat := none)
+  | global (label : Option NameId := none)
   /-- `exists<R>(a)` read at a state label; without one, the executable
   `global.contains` reads the current state. -/
-  | exists (label : Option Nat := none)
+  | exists (label : Option NameId := none)
   | canModify
   | old
   /-- The final value of a returned mutable reference: its prophecy, which a
@@ -893,7 +893,7 @@ structure QuantifierBinder where
   /-- The state label a binder over the state domain binds, which the memory
   ranges of the body refer to, as the name (`NameId`) the label is; `none`
   for every other domain. -/
-  label : Option Nat := none
+  label : Option NameId := none
   deriving Repr, BEq, Inhabited
 
 /-- Shared condition roles used by Move-style specifications for both Move and

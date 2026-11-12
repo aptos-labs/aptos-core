@@ -3,6 +3,8 @@
 
 import Lean
 import VerexIR.Proofs.Denote.Term
+import VerexIR.Proofs.Denote.NominalQuote
+import VerexIR.Proofs.Denote.FamilyTransport
 
 /-!
 # The entries of native tables
@@ -184,6 +186,30 @@ end VerexIR.SpecMap
 
 namespace VerexIR.Proofs.Denote.NativeMaps
 
+open Lean Meta in
+/-- Read a named field's certification at the field's own family boundary.
+The owner's dependent certificate can prevent conversion of the whole selector
+at an instantiated family. Its `ofDeepHolds` result depends only on the field,
+so existing observations can use the canonical field operation without
+expanding the owner's certificate or changing the stored selector. -/
+def certificationView (value : Lean.Expr) : MetaM Lean.Expr := withDefault do
+  unless value.isAppOfArity ``Var.selectCertified 7 do return value
+  let some certified ← unfoldDefinition? value | return value
+  return (← FamilyTransport.respellOperation? certified).getD certified
+
+open Lean Meta in
+/-- The inhabitants supplied by a named verification family keep that
+family's projection spelling. A local runtime inhabitant can be convertible
+to this projection, but retaining both spellings would produce two typed
+readers of the same plain value. Other families retain their supplied
+inhabitants; a replacement is accepted only by checked conversion. -/
+def canonicalInhabitants (carriers supplied : Lean.Expr) : MetaM Lean.Expr := do
+  let carriers := carriers.consumeMData
+  unless carriers.isAppOfArity ``Skolems.toCarriers 3 do return supplied
+  let canonical := mkAppN (mkConst ``Skolems.carriersNonempty) carriers.getAppArgs
+  unless ← withNewMCtxDepth (withDefault (isDefEq supplied canonical)) do return supplied
+  return canonical
+
 /-! ## Typed reads
 
 The keys and values of a table, as a typed map holds them: integers by
@@ -236,14 +262,15 @@ of an instantiated family at its argument. -/
     NTy.read (.function parameters shared results) = fun value => value := rfl
 omit [Carriers] in
 @[simp, vir_denote_norm] theorem NTy.read_param_instantiate (θ : TypeArgs) (Θ : Carriers)
-    (index : Nat) :
+    [@CarriersNonempty Θ] (index : Nat) :
     @NTy.read (Carriers.instantiate θ Θ) (.param index) =
       @NTy.read Θ ((NTy.param index).subst θ.1) := rfl
 omit [Carriers] in
 @[simp, vir_denote_norm] theorem NTy.unread_param_instantiate (θ : TypeArgs) (Θ : Carriers)
-    (index : Nat) (inhabitable : (NTy.param index).inhabitable = true) :
-    @NTy.unread (Carriers.instantiate θ Θ) (.param index) inhabitable =
-      @NTy.unread Θ ((NTy.param index).subst θ.1)
+    [Ξ : @CarriersNonempty Θ] (index : Nat) (inhabitable : (NTy.param index).inhabitable = true) :
+    @NTy.unread (Carriers.instantiate θ Θ) (CarriersNonempty.instantiate θ Θ) (.param index)
+        inhabitable =
+      @NTy.unread Θ Ξ ((NTy.param index).subst θ.1)
         (NRow.getD_inhabitable θ.1 θ.inhabitable index (.param index) rfl) := rfl
 /-! The native equality of tables of scalar keys and values: the equality of
 their typed maps. -/
@@ -328,7 +355,7 @@ caller's table. -/
 
 /-- The typed map of a caller's table carried to a callee's family of type
 parameters is that of the caller's table. -/
-theorem ofEntries_toSkolem_params [Θ : Carriers] {K V : Type}
+theorem ofEntries_toSkolem_params [Θ : Carriers] [@CarriersNonempty Θ] {K V : Type}
     (θ : TypeArgs) (i j : Nat)
     (key : @NTy.carrier (Carriers.instantiate θ Θ) (.param i) → K)
     (value : @NTy.carrier (Carriers.instantiate θ Θ) (.param j) → V)
@@ -343,7 +370,7 @@ theorem ofEntries_toSkolem_params [Θ : Carriers] {K V : Type}
 /-- A table of type parameters carried between a caller and a callee's
 family is the same table. -/
 @[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.ofSkolem_table_params
-    [Θ : Carriers] (θ : TypeArgs) (i j : Nat)
+    [Θ : Carriers] [@CarriersNonempty Θ] (θ : TypeArgs) (i j : Nat)
     (table : @NTy.carrier (Carriers.instantiate θ Θ) (.table (.param i) (.param j))) :
     NTy.ofSkolem θ (.table (.param i) (.param j)) table = table :=
   SpecEntries.ext (by
@@ -351,14 +378,15 @@ family is the same table. -/
     exact List.map_id'' (fun _ => rfl) _)
 
 @[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.toSkolem_table_params
-    [Θ : Carriers] (θ : TypeArgs) (i j : Nat)
+    [Θ : Carriers] [@CarriersNonempty Θ] (θ : TypeArgs) (i j : Nat)
     (table : ((NTy.table (.param i) (.param j)).subst θ.1).carrier) :
     NTy.toSkolem θ (.table (.param i) (.param j)) table = table :=
   SpecEntries.ext (by
     show List.map (fun entry => (entry.fst, entry.snd)) table.entries = table.entries
     exact List.map_id'' (fun _ => rfl) _)
 
-theorem ofEntries_ofSkolem_params [Θ : Carriers] {K V : Type} (θ : TypeArgs) (i j : Nat)
+theorem ofEntries_ofSkolem_params [Θ : Carriers] [@CarriersNonempty Θ] {K V : Type}
+    (θ : TypeArgs) (i j : Nat)
     (key : ((NTy.param i).subst θ.1).carrier → K)
     (value : ((NTy.param j).subst θ.1).carrier → V)
     (table : @NTy.carrier (Carriers.instantiate θ Θ) (.table (.param i) (.param j))) :
@@ -370,29 +398,31 @@ theorem ofEntries_ofSkolem_params [Θ : Carriers] {K V : Type} (θ : TypeArgs) (
   exact List.map_id'' (fun _ => rfl) _
 
 open Lean Meta in
-/-- A transported table of type parameters, its family, arguments, indices,
-and the caller's table. -/
+/-- A transported table of type parameters, its family, the family's
+inhabitants (`CarriersNonempty`, which the transports take), arguments,
+indices, and the caller's table. -/
 private def transportedParams? (table : Lean.Expr) :
-    Option (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr) := do
-  guard (table.isAppOfArity ``NTy.toSkolem 4 || table.isAppOfArity ``NTy.ofSkolem 4)
-  let type := table.getArg! 2
+    Option (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr) := do
+  guard (table.isAppOfArity ``NTy.toSkolem 5 || table.isAppOfArity ``NTy.ofSkolem 5)
+  let type := table.getArg! 3
   guard (type.isAppOfArity ``NTy.table 2)
   let key := type.getArg! 0
   let value := type.getArg! 1
   guard (key.isAppOfArity ``NTy.param 1 && value.isAppOfArity ``NTy.param 1)
-  return (table.getArg! 0, table.getArg! 1, key.getArg! 0, value.getArg! 0, table.getArg! 3)
+  return (table.getArg! 0, table.getArg! 1, table.getArg! 2, key.getArg! 0, value.getArg! 0,
+    table.getArg! 4)
 
 open Lean Meta in
 /-- The typed map of a caller's table carried to a generic callee is the
 caller's (`ofEntries_toSkolem_params`). -/
 simproc ↓ [vir_denote, vir_denote_norm] ofEntriesTransport (SpecMap.ofEntries _ _ _) := fun e => do
   let_expr SpecMap.ofEntries _ _ keyType valueType key value table := e | return .continue
-  let some (family, θ, i, j, caller) := transportedParams? table | return .continue
+  let some (family, nonempty, θ, i, j, caller) := transportedParams? table | return .continue
   let result := mkAppN e.getAppFn (e.getAppArgs.set! 6 caller)
   let identity := if table.isAppOf ``NTy.toSkolem then ``ofEntries_toSkolem_params
     else ``ofEntries_ofSkolem_params
   let proof := mkAppN (mkConst identity)
-    #[family, keyType, valueType, θ, i, j, key, value, caller]
+    #[family, nonempty, keyType, valueType, θ, i, j, key, value, caller]
   return .visit { expr := result, proof? := some (← mkExpectedTypeHint proof (← mkEq e result)) }
 
 open Lean Meta in
@@ -599,33 +629,365 @@ attribute [vir_denote_norm] Int.reduceEq Int.reduceLT Int.reduceLE Nat.reduceEqD
       (key entry.1, value entry.2) ::
         SpecMap.ofEntries key value ⟨rest, by simp at bounded; omega⟩ := rfl
 
+/-- The typed map of the plain entries of a certified table, read as they
+are, is the typed map of its certified entries read through `NTy.forget`:
+one table read at its two layers gives one map under the map that forgets a
+value's certificates.  This is what ties a clause about a table inside a
+value of its type to a clause about the same table inside a mutable
+reference's current, whose entries are plain while the loan lives
+(`doc/designs/data-invariants.md`).  In the normal form, so that a
+clause reading a table through a reference's current reaches the same map as
+one reading it through a value of its type; `NTy.forget_table` is therefore
+kept out of the normal form, since rewriting this equation's left side first
+would leave the two readings in two shapes. -/
+@[simp, vir_denote_norm] theorem _root_.VerexIR.SpecMap.ofEntries_forget_table [Carriers]
+    (key value : NTy) (entries : (NTy.table key value).carrier) :
+    SpecMap.ofEntries (fun k => k) (fun v => v) (NTy.forget (.table key value) entries) =
+      SpecMap.ofEntries (NTy.forget key) (NTy.forget value) entries := by
+  have forgotten : (NTy.forget (.table key value) entries).entries =
+      entries.entries.map fun entry => (NTy.forget key entry.1, NTy.forget value entry.2) := rfl
+  simp [SpecMap.ofEntries, forgotten]
+
+/-! The plain reading at a type that carries no certificate, which is the
+certified reading at that type (`NTy.read_int`, `NTy.read_unit`, …): one
+term and one normal form at either layer, so that a clause reading a type
+parameter's plain values reaches the argument's reading once the transport
+has named the argument (`NTy.readPlain_instantiate`). -/
+
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_int [Θ : Carriers]
+    [CarriersNonempty Θ] (width : Nat) (signed : Bool) (held) :
+    NTy.readPlain (.int width signed) held = @SpecInt.val (.bits width) signed := rfl
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_num [Θ : Carriers]
+    [CarriersNonempty Θ] (held) :
+    NTy.readPlain .num held = @SpecInt.val .unbounded true := rfl
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_unit [Θ : Carriers]
+    [CarriersNonempty Θ] (held) : NTy.readPlain .unit held = fun value => value := rfl
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_bool [Θ : Carriers]
+    [CarriersNonempty Θ] (held) : NTy.readPlain .bool held = fun value => value := rfl
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_address [Θ : Carriers]
+    [CarriersNonempty Θ] (held) : NTy.readPlain .address held = fun value => value := rfl
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_signer [Θ : Carriers]
+    [CarriersNonempty Θ] (held) : NTy.readPlain .signer held = fun value => value := rfl
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_string [Θ : Carriers]
+    [CarriersNonempty Θ] (held) : NTy.readPlain .string held = fun value => value := rfl
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_bytes [Θ : Carriers]
+    [CarriersNonempty Θ] (held) : NTy.readPlain .bytes held = fun value => value := rfl
+
+/-- A certified value's plain side reads as the value does: one value, one
+typed value, at either layer.  Forgetting keeps the encoding
+(`NTy.plainEncode_forget`) and a typed value is determined by it
+(`NTy.readWrite_read`, `NTy.readBack_readWrite`). -/
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_forget [Θ : Carriers]
+    [CarriersNonempty Θ] (τ : NTy) (held : τ.inhabitable = true) (value : τ.carrier) :
+    NTy.readPlain τ held (NTy.forget τ value) = NTy.read τ value := by
+  rw [NTy.readPlain_eq_readBack, NTy.plainEncode_forget, ← NTy.readWrite_read,
+    NTy.readBack_readWrite]
+
+/-- The typed map of a table certified by its owner's certificate is the
+typed map of the plain entries it certifies, where the keys' and values'
+readings agree on a certified value and on the plain one it certifies: a
+certified struct carries one certificate for its whole plain row
+(`NTy.carrier`), so a table field read out of one is the plain field
+certified by the owner (`NTy.ofDeepHolds`), and a clause about that table
+is a clause about the plain field.  The twin of
+`SpecMap.ofEntries_forget_table`, where the certified value is the primary
+one; the readings are the premises because a view spells them at the type
+it reads (`typedView?`), not through `NTy.read`. -/
+theorem _root_.VerexIR.SpecMap.ofEntries_ofDeepHolds_table [Θ : Carriers] {K V : Type}
+    (key value : NTy) (readKey : @NTy.plain Θ key → K) (readValue : @NTy.plain Θ value → V)
+    (certifiedKey : @NTy.carrier Θ key → K) (certifiedValue : @NTy.carrier Θ value → V)
+    (keyAgrees : ∀ k holds, certifiedKey (NTy.ofDeepHolds key k holds) = readKey k)
+    (valueAgrees : ∀ v holds, certifiedValue (NTy.ofDeepHolds value v holds) = readValue v)
+    (entries : @NTy.plain Θ (.table key value))
+    (holds : NTy.deepHolds (.table key value) entries) :
+    SpecMap.ofEntries certifiedKey certifiedValue
+        (NTy.ofDeepHolds (.table key value) entries holds) =
+      SpecMap.ofEntries readKey readValue entries := by
+  show List.map _ (List.map _ entries.entries.attach) = List.map _ entries.entries
+  rw [List.map_map]
+  conv => rhs; rw [← List.attach_map_val]
+  refine List.map_congr_left fun entry _ => ?_
+  simp only [Function.comp_apply, keyAgrees, valueAgrees]
+
+/-- A plain table satisfying its certificates is determined by its typed
+reading: certify its entries, recover the certified table through the read's
+inverse, and forget once. The hypothesis is essential because a plain
+reader's total decoder can identify invalid values. -/
+theorem _root_.VerexIR.SpecMap.eq_forget_writeBack_of_ofEntries_readPlain
+    [Θ : Carriers] [CarriersNonempty Θ] (key value : NTy)
+    (keyHeld : key.inhabitable = true) (valueHeld : value.inhabitable = true)
+    (entries : (NTy.table key value).plain)
+    (holds : NTy.deepHolds (.table key value) entries)
+    (map : SpecMap key.readCarrier value.readCarrier)
+    (defined : SpecMap.ofEntries (NTy.readPlain key keyHeld)
+      (NTy.readPlain value valueHeld) entries = map) :
+    entries = NTy.forget (.table key value)
+      (SpecMap.writeBack (fun entry =>
+        (NTy.unread key keyHeld entry.1, NTy.unread value valueHeld entry.2)) map) := by
+  have agreement (τ : NTy) (held : τ.inhabitable = true)
+      (plain : τ.plain) (valid : NTy.deepHolds τ plain) :
+      NTy.read τ (NTy.ofDeepHolds τ plain valid) = NTy.readPlain τ held plain := by
+    rw [← NTy.readPlain_forget τ held, NTy.forget_ofDeepHolds]
+  have certified : SpecMap.ofEntries (NTy.read key) (NTy.read value)
+      (NTy.ofDeepHolds (.table key value) entries holds) = map := by
+    rw [SpecMap.ofEntries_ofDeepHolds_table key value
+      (NTy.readPlain key keyHeld) (NTy.readPlain value valueHeld)
+      (NTy.read key) (NTy.read value) (agreement key keyHeld) (agreement value valueHeld)]
+    exact defined
+  have recovered := SpecMap.eq_writeBack_of_ofEntries
+    (NTy.unread_read key keyHeld) (NTy.unread_read value valueHeld) certified
+  exact (NTy.forget_ofDeepHolds (.table key value) entries holds).symm.trans
+    (congrArg (NTy.forget (.table key value)) recovered)
+
+open Lean Meta in
+/-- A table certified by its owner's certificate, read at the plain entries
+it certifies (`SpecMap.ofEntries_ofDeepHolds_table`): the readings a view
+spells read no certificate where the two layers agree, and that agreement
+is reflexivity. A certificate-bearing key or value uses its total plain
+reader, related to its certified reading by the table's actual certificate
+and `NTy.readPlain_forget`. -/
+simproc [vir_denote_norm] ofEntriesOfDeepHoldsTable
+    (VerexIR.SpecMap.ofEntries _ _ _) := fun e => do
+  let_expr VerexIR.SpecMap.ofEntries _ _ _ _ certifiedKey certifiedValue certified := e
+    | return .continue
+  let certified ← certificationView certified
+  let_expr NTy.ofDeepHolds carriers τ entries holds := certified | return .continue
+  let_expr NTy.table key value := ← whnfR τ | return .continue
+  -- The lemma's premises are readings of the plain layer, so a reading
+  -- whose own layer is not the table's plain one is not one of them, and the
+  -- map is left as it is.  The two layers of a type that carries no
+  -- certificate are one type by unfolding the family at the key's and the
+  -- value's types, which is a definitional fact of the family and not a
+  -- reducible one, so the layers are decided — and the application below
+  -- built — at the transparency that fact needs.
+  let standsAtPlain (reader τ : Lean.Expr) : MetaM Bool :=
+    withTransparency .default do
+      let .forallE _ domain _ _ := ← whnfR (← inferType reader) | return false
+      withNewMCtxDepth <| isDefEq domain (mkApp2 (mkConst ``NTy.plainOf)
+        (mkApp (mkConst ``Carriers.toPlain) carriers) τ)
+  -- Each reading reads the plain values of its type as well: the two
+  -- layers are one type where the type carries no certificate, and the
+  -- reading is then the plain one by reflexivity.  The plain layer is
+  -- named in its canonical spelling (`PlainSpelling`).
+  let reflexive (reader : Lean.Expr) (τ : Lean.Expr) : MetaM (Option Lean.Expr) :=
+    withTransparency .default <|
+    withLocalDeclD `value (mkApp2 (mkConst ``NTy.plainOf)
+        (mkApp (mkConst ``Carriers.toPlain) carriers) τ) fun value =>
+      withLocalDeclD `holds (mkApp3 (mkConst ``NTy.deepHolds) carriers τ value) fun held => do
+        let certified := mkApp4 (mkConst ``NTy.ofDeepHolds) carriers τ value held
+        let wanted ← mkEq (mkApp reader certified) (mkApp reader value)
+        let proof ← (try
+            let reflexivity ← mkEqRefl (mkApp reader value)
+            unless ← withNewMCtxDepth (isDefEq (← inferType reflexivity) wanted) do failure
+            pure (some (← mkExpectedTypeHint reflexivity wanted))
+          catch _ => pure none)
+        let some proof := proof | return none
+        return some (← mkLambdaFVars #[value, held] proof)
+  let agreement (reader τ : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+    if ← standsAtPlain reader τ then
+      if let some proof ← reflexive reader τ then return some (reader, proof)
+    observing? <| withDefault do
+      let nonempty ← canonicalInhabitants carriers
+        (← synthInstance (mkApp (mkConst ``CarriersNonempty) carriers))
+      let inhabitable := mkApp (mkConst ``NTy.inhabitable) τ
+      unless ← isDefEq inhabitable (mkConst ``Bool.true) do failure
+      let inhabited ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+        (← mkEq inhabitable (mkConst ``Bool.true))
+      let plainRead := mkAppN (mkConst ``NTy.readPlain) #[carriers, nonempty, τ, inhabited]
+      let proof ← withLocalDeclD `value (mkApp2 (mkConst ``NTy.plain) carriers τ) fun value =>
+        withLocalDeclD `holds (mkApp3 (mkConst ``NTy.deepHolds) carriers τ value) fun held => do
+          let certified := mkApp4 (mkConst ``NTy.ofDeepHolds) carriers τ value held
+          let reads := mkAppN (mkConst ``NTy.readPlain_forget)
+            #[carriers, nonempty, τ, inhabited, certified]
+          let forgets := mkAppN (mkConst ``NTy.forget_ofDeepHolds) #[carriers, τ, value, held]
+          let same ← mkEqTrans (← mkEqSymm reads) (← mkCongrArg plainRead forgets)
+          let wanted ← mkEq (mkApp reader certified) (mkApp plainRead value)
+          unless ← isDefEq (← inferType same) wanted do failure
+          mkLambdaFVars #[value, held] (← mkExpectedTypeHint same wanted)
+      return (plainRead, proof)
+  let some (readKey, keyAgrees) ← agreement certifiedKey key | return .continue
+  let some (readValue, valueAgrees) ← agreement certifiedValue value | return .continue
+  -- Building the application decides the layers once more, and a simproc
+  -- that raised instead of declining would abort the whole stage that
+  -- visits the node.
+  let application : MetaM (Option Lean.Expr) := observing? <| withTransparency .default <|
+    mkAppOptM ``VerexIR.SpecMap.ofEntries_ofDeepHolds_table
+      #[carriers, none, none, key, value, readKey, readValue, certifiedKey,
+        certifiedValue, keyAgrees, valueAgrees, entries, holds]
+  let some proof ← application | return .continue
+  let some (_, _, rhs) := (← whnfR (← inferType proof)).eq? | return .continue
+  return .visit { expr := rhs, proof? := some proof }
+
+/-- Reading keys injectively preserves a sequence map's distinctness.
+Values do not participate in its validity. -/
+theorem _root_.VerexIR.SpecMap.valid_sequence_ofEntries_read {K V K' V' : Type}
+    (key : K → K') (value : V → V')
+    (injective : ∀ {left right}, key left = key right → left = right)
+    (entries : SpecEntries (K × V)) :
+    SpecMap.Valid .sequence (SpecMap.ofEntries (fun k => k) (fun v => v) entries) ↔
+      SpecMap.Valid .sequence (SpecMap.ofEntries key value entries) := by
+  simp only [SpecMap.Valid, SpecMap.Distinct, SpecMap.ofEntries, List.Nodup, List.pairwise_map]
+  constructor
+  · intro held
+    exact held.imp fun different same => different (injective same)
+  · intro held
+    exact held.imp fun different same => different (congrArg key same)
+
+/-- The validity a map owner carries of its entries as they are, read as the
+validity of the map a specification states: validity reads the keys alone,
+and a reading of them that decides their order carries it either way.  The
+values are read along, since a specification's map reads both. -/
+theorem _root_.VerexIR.SpecMap.valid_ofEntries_read {K V K' V' : Type}
+    (carrierOrder : SpecMap.KeyOrder K) (order : SpecMap.KeyOrder K')
+    (key : K → K') (value : V → V')
+    (decides : ∀ left right, carrierOrder.compare left right = order.compare (key left) (key right))
+    (entries : SpecEntries (K × V)) :
+    SpecMap.Valid (.ordered carrierOrder) (SpecMap.ofEntries (fun k => k) (fun v => v) entries) ↔
+      SpecMap.Valid (.ordered order) (SpecMap.ofEntries key value entries) := by
+  show SpecMap.Ascending _ _ ↔ SpecMap.Ascending _ _
+  simp only [SpecMap.Ascending, SpecMap.ofEntries, List.pairwise_map, decides]
+
+open Lean Meta in
+/-- Read an integer-key map's validity at the same view as its operations.
+The integer projection preserves distinctness for a sequence and comparison
+for an ordered map; both therefore use the canonical integer-valued view. -/
+simproc [vir_denote_norm] validOfEntriesRead (VerexIR.SpecMap.Valid _ _) := fun e => do
+  let_expr VerexIR.SpecMap.Valid _ _ discipline map := e | return .continue
+  let sequence := discipline.isAppOfArity ``VerexIR.SpecMap.Discipline.sequence 1
+  let carrierOrder? := (discipline.app2? ``VerexIR.SpecMap.Discipline.ordered).map Prod.snd
+  unless sequence || carrierOrder?.isSome do return .continue
+  let_expr VerexIR.SpecMap.ofEntries keyType valueType _ _ readKey readValue entries := map
+    | return .continue
+  -- A declaration carries its entries unchanged. Already-read maps keep
+  -- their own view and do not pass through this boundary again.
+  let identity (reader type : Lean.Expr) : MetaM Bool :=
+    withLocalDeclD `value type fun value =>
+      withNewMCtxDepth <| isDefEq (mkApp reader value) value
+  unless ← identity readKey keyType do return .continue
+  unless ← identity readValue valueType do return .continue
+  let keyRepresentation ← whnfR keyType
+  let_expr VerexIR.SpecInt width signed := keyRepresentation | return .continue
+  let read := mkApp2 (mkConst ``VerexIR.SpecInt.val) width signed
+  let valueRead ← do
+    let value ← whnfR valueType
+    if value.isAppOfArity ``VerexIR.SpecInt 2 then
+      pure (mkApp2 (mkConst ``VerexIR.SpecInt.val) (value.getArg! 0) (value.getArg! 1))
+    else withLocalDeclD `value valueType fun held => mkLambdaFVars #[held] held
+  let application : MetaM (Option Lean.Expr) := observing? <| withTransparency .default <| do
+    if sequence then
+      return ← mkAppOptM ``VerexIR.SpecMap.valid_sequence_ofEntries_read
+        #[keyType, valueType, none, none, read, valueRead,
+          mkApp2 (mkConst ``VerexIR.SpecInt.ext) width signed, entries]
+    let some carrierOrder := carrierOrder? | failure
+    let_expr NTy.keyOrder _ _ τ := carrierOrder | failure
+    let τ ← whnfR τ
+    unless τ.isAppOfArity ``NTy.int 2 do failure
+    let integers := mkConst ``VerexIR.SpecMap.intOrder
+    let compared (order left right : Lean.Expr) : MetaM Lean.Expr := do
+      return mkApp2 (← mkAppM ``VerexIR.SpecMap.KeyOrder.compare #[order]) left right
+    let decides ← withLocalDeclD `left keyType fun left =>
+      withLocalDeclD `right keyType fun right => do
+        let wanted ← mkEq (← compared carrierOrder left right)
+          (← compared integers (mkApp read left) (mkApp read right))
+        let reflexivity ← mkEqRefl (← compared integers (mkApp read left) (mkApp read right))
+        unless ← withNewMCtxDepth (isDefEq (← inferType reflexivity) wanted) do failure
+        let proof ← mkExpectedTypeHint reflexivity wanted
+        mkLambdaFVars #[left, right] proof
+    mkAppOptM ``VerexIR.SpecMap.valid_ofEntries_read
+      #[keyType, valueType, none, none, carrierOrder, integers, read, valueRead, decides, entries]
+  let some equivalence ← application | return .continue
+  let some (_, rhs) := (← whnfR (← inferType equivalence)).app2? ``Iff | return .continue
+  return .visit { expr := rhs, proof? := some (← mkAppM ``propext #[equivalence]) }
+
+/-- A type parameter's plain reading at the family a call's type arguments
+induce is the outer family's reading at the argument's type: the induced
+family stores the argument's canonical plain reader, so the parameter's
+reader is definitionally the argument's reader. -/
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.readPlain_instantiate
+    (θ : TypeArgs) (outer : Carriers) [Ξ : @CarriersNonempty outer] (index : Nat)
+    (held : (NTy.param index).inhabitable = true)
+    (outerHeld : ((NTy.param index).subst θ.1).inhabitable = true) :
+    @NTy.readPlain (Carriers.instantiate θ outer) inferInstance (.param index) held =
+      @NTy.readPlain outer Ξ ((NTy.param index).subst θ.1) outerHeld := by
+  rfl
+
+/-- A type parameter's reading at the family a call's type arguments induce
+is the outer family's reading at the argument's type. -/
+@[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.read_instantiate
+    (θ : TypeArgs) (outer : Carriers) [@CarriersNonempty outer] (index : Nat)
+    (value : @NTy.carrier (Carriers.instantiate θ outer) (.param index)) :
+    @NTy.read (Carriers.instantiate θ outer) (.param index) value =
+      @NTy.read outer ((NTy.param index).subst θ.1) value := rfl
+
+open Lean Meta in
+/-- Reduce a native type's head without unfolding its canonical descriptor. -/
+def nativeTypeHead (type : Lean.Expr) : MetaM Lean.Expr := do
+  let env ← getEnv
+  withDefault <| whnfHeadPred type.consumeMData (fun type => pure (!isNominalType env type))
+
 open Lean Meta in
 /-- The family and type a view is decided on: the type's normal form, where a
 parameter of an instantiated family is the argument it stands for, in the
-outer family. The encoders agree by unfolding. -/
-private partial def resolvedType (carriers τ : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
-  let τ ← whnfD τ.consumeMData
-  let_expr NTy.param index := τ | return (carriers, τ)
+outer family, with the proof that the resolved type has values where the
+resolution supplies one.  The encoders agree by unfolding.  A frame's type
+arguments are inhabitable by their own certificate
+(`TypeArgs.inhabitable`), so a parameter resolved through one has values
+even where the argument is symbolic and nothing evaluates: without the
+proof a view of a declaration's own clause at a symbolic frame could not be
+decided at all (`typedView?`). -/
+private partial def resolvedType (carriers τ : Lean.Expr) :
+    MetaM (Lean.Expr × Lean.Expr × Option Lean.Expr × Option Lean.Expr) := do
+  let τ ← nativeTypeHead τ
+  let_expr NTy.param index := τ | return (carriers, τ, none, none)
   -- The instantiated family, spelled by carriers or by skolems.
-  let instantiation? : Option (Lean.Expr × Lean.Expr) := do
+  let instantiation? : Option (Lean.Expr × Lean.Expr × Lean.Expr) := do
     let carriers := carriers.consumeMData
-    if let .app (.app (.const ``Carriers.instantiate _) θ) outer := carriers then return (θ, outer)
+    if carriers.isAppOfArity ``Carriers.instantiate 3 then
+      return (carriers.getArg! 0, carriers.getArg! 1, carriers.getArg! 2)
     let .app (.app (.app toCarriers unit) functions) skolems := carriers | none
     guard (toCarriers.isConstOf ``Skolems.toCarriers)
     let .app (.app (.app (.app instantiate _) _) θ) outer := skolems.consumeMData | none
     guard (instantiate.isConstOf ``Skolems.instantiate)
-    return (θ, mkApp3 toCarriers unit functions outer)
-  let some (θ, outer) := instantiation? | return (carriers, τ)
-  resolvedType outer
-    (mkApp2 (mkConst ``NTy.subst) (mkProj ``TypeArgs 0 θ) (mkApp (mkConst ``NTy.param) index))
+    return (θ, mkApp3 toCarriers unit functions outer,
+      mkApp3 (mkConst ``Skolems.carriersNonempty) unit functions outer)
+  let some (θ, outer, nonempty) := instantiation? | return (carriers, τ, none, none)
+  let parameter := mkApp (mkConst ``NTy.param) index
+  -- The row the frame substitutes: `TypeArgs` is an abbreviation of the
+  -- subtype of a row by its inhabitability, so the row is that subtype's
+  -- value and a projection of `TypeArgs` names nothing.
+  let row := mkProj ``Subtype 0 θ
+  let resolved := mkApp2 (mkConst ``NTy.subst) row parameter
+  -- The argument's inhabitability, from the frame's: a parameter itself has
+  -- values, so the row's default does (`NRow.getD_inhabitable`).
+  let inhabitable := mkAppN (mkConst ``NRow.getD_inhabitable)
+    #[row, mkApp (mkConst ``TypeArgs.inhabitable) θ, index, parameter,
+      ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+        (← mkEq (mkApp (mkConst ``NTy.inhabitable) parameter) (mkConst ``Bool.true))]
+  let (outerCarriers, outerType, outerInhabitable?, outerNonempty?) ← resolvedType outer resolved
+  let resolvedNonempty := outerNonempty?.orElse fun _ =>
+    if outerCarriers == outer then some nonempty else none
+  if let some outerInhabitable := outerInhabitable? then
+    return (outerCarriers, outerType, some outerInhabitable, resolvedNonempty)
+  let hinted ← mkExpectedTypeHint inhabitable
+    (← mkEq (mkApp (mkConst ``NTy.inhabitable) outerType) (mkConst ``Bool.true))
+  return (outerCarriers, outerType, some hinted, resolvedNonempty)
 
 /-- The view of a native type's values in a typed map: integers by their
-values, other types as they are, a type parameter's as its family reads
-them, with the typed values' instances. -/
+values and certified concrete values as they are, a type parameter's as its
+family reads them, with the typed values' instances. A plain type that can
+carry certificates uses its total typed reader (`NTy.readPlain`); its inverse
+requires the table's actual certificate. A view reads one of the two
+layers a value of the type has — the certified values of a table a value of
+its type holds, or the plain values of a table a mutable reference's current
+holds, which carry no certificate while the loan lives
+(`doc/designs/data-invariants.md`). -/
 structure TypedView where
   /-- The family and type the view is decided on (`resolvedType`). -/
   carriers : Lean.Expr
   type : Lean.Expr
+  /-- The family's inhabitants (`CarriersNonempty`), which the default of a
+  missing key and the write-back take. -/
+  nonempty : Lean.Expr
   /-- The Lean type of the typed values. -/
   carrier : Lean.Expr
   /-- The read of a native value into its typed value. -/
@@ -638,45 +1000,215 @@ structure TypedView where
   integer : Bool
   /-- Whether the read is the identity: the values are held as they are. -/
   identity : Bool
+  /-- Whether the view reads the plain values of its type (`NTy.plain`) —
+  the entries of a table a mutable reference's current holds — rather than
+  the certified ones.  An integer type's two layers are the same type, so
+  its view is the same at both and the flag only records which was asked
+  for. -/
+  plain : Bool
   /-- The native value of a typed value, inverse to the read (`NTy.unread`). -/
   unread : Lean.Expr
+
+open Lean Meta in
+/-- The plain reader at a resolved certificate-free type. Decide the branch
+at construction, while preserving the nominal type descriptor in its domain.
+Unknown types and types carrying certificates retain their total codec reader. -/
+def canonicalPlainReader? (carriers τ : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  if carriers.hasLooseBVars || τ.hasLooseBVars then return none
+  let resolved ← nativeTypeHead τ
+  if resolved.hasLooseBVars || isNominalType (← getEnv) resolved then return none
+  if resolved.isAppOfArity ``NTy.param 1 then
+    -- Given sorts, including the declaration scaffold, share their plain
+    -- and typed values and store the identity plain reader. Inspect that
+    -- interpretation rather than choosing an identity for an unknown family.
+    let domain := mkApp2 (mkConst ``NTy.plain) carriers τ
+    let typed := mkApp2 (mkConst ``NTy.readCarrier) carriers τ
+    unless ← withNewMCtxDepth (withDefault (isDefEq domain typed)) do return none
+    let identity ← withLocalDeclD `value domain fun value => mkLambdaFVars #[value] value
+    let reader := mkProj ``Subtype 0
+      (mkApp2 (mkConst ``Carriers.plainRead) carriers (resolved.getArg! 0))
+    unless ← withNewMCtxDepth (withDefault (isDefEq reader identity)) do return none
+    return some identity
+  let free ← withTransparency .default <| whnf
+    (mkApp (mkConst ``NTy.certificateFree) resolved)
+  unless free.isConstOf ``Bool.true do return none
+  if resolved.isAppOfArity ``NTy.int 2 then
+    return some (mkApp2 (mkConst ``SpecInt.val)
+      (mkApp (mkConst ``IntWidth.bits) (resolved.getArg! 0)) (resolved.getArg! 1))
+  if resolved.isConstOf ``NTy.num then
+    return some (mkApp2 (mkConst ``SpecInt.val)
+      (mkConst ``IntWidth.unbounded) (mkConst ``Bool.true))
+  let domain := mkApp2 (mkConst ``NTy.carrier) carriers τ
+  return some (← withLocalDeclD `value domain fun value => mkLambdaFVars #[value] value)
+
+open Lean Meta in
+/-- A certificate-free identity reader at the canonical native carrier.
+Already-materialized plain identity lambdas are handled at the same boundary
+as the family's readers, retaining the original native type descriptor. -/
+private def canonicalIdentityReader (reader : Lean.Expr) : MetaM Lean.Expr := do
+  let .lam _ domain body _ := reader.consumeMData | return reader
+  unless body == .bvar 0 do return reader
+  let domain := domain.consumeMData
+  let familyType? : Option (Lean.Expr × Lean.Expr) := do
+    if domain.isAppOfArity ``NTy.plain 2 then
+      return (domain.getArg! 0, domain.getArg! 1)
+    if domain.isAppOfArity ``NTy.plainOf 2 then
+      let_expr Carriers.toPlain family := domain.getArg! 0 | none
+      return (family, domain.getArg! 1)
+    none
+  let some (family, type) := familyType? | return reader
+  let some canonical ← canonicalPlainReader? family type | return reader
+  unless ← withNewMCtxDepth (withDefault (isDefEq reader canonical)) do return reader
+  return canonical
+
+open Lean Meta in
+/-- Reconstruct a table field's named pair projections from the actual pair
+at each layer. An instantiated owner schema can otherwise retain old
+implicit field types even though its value is the caller's same pair. -/
+private partial def tableFieldProjections (entries : Lean.Expr) : MetaM Lean.Expr := do
+  let entries := entries.consumeMData
+  let .const getter _ := entries.getAppFn | return entries
+  unless (getter == ``Prod.fst || getter == ``Prod.snd) && entries.getAppNumArgs == 3 do
+    return entries
+  let pair ← tableFieldProjections (entries.getArg! 2)
+  let rebuilt ← withDefault (mkAppM' entries.getAppFn #[pair])
+  unless ← withNewMCtxDepth (withDefault (isDefEq entries rebuilt)) do return entries
+  return rebuilt
+
+open Lean Meta in
+/-- Construct a typed map from its readers' canonical domains and codomains.
+The explicit raw types keep a generic read specialized to a concrete type
+identical to that concrete read, including identity readers already emitted
+at the plain layer. The table is accepted only by checked conversion. -/
+def typedMapOfEntries (key value entries : Lean.Expr) : MetaM Lean.Expr := withDefault do
+  let entries ← tableFieldProjections entries
+  let key ← canonicalIdentityReader key
+  let value ← canonicalIdentityReader value
+  let .forallE _ keyDomain keyRange _ ← whnfR (← inferType key)
+    | throwError "the map's key reader is not a function"
+  let .forallE _ valueDomain valueRange _ ← whnfR (← inferType value)
+    | throwError "the map's value reader is not a function"
+  if keyRange.hasLooseBVars || valueRange.hasLooseBVars then
+    throwError "a typed map's reader has a dependent codomain"
+  mkAppOptM ``VerexIR.SpecMap.ofEntries
+    #[keyDomain, valueDomain, keyRange, valueRange, key, value, entries]
+
+open Lean Meta in
+/-- Rebuild a map observation at its reader-derived types after the readers
+specialize at an instantiated family. -/
+def canonicalMapOfEntries? (map : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let_expr VerexIR.SpecMap.ofEntries _ _ _ _ key value entries := map | return none
+  observing? <| withDefault do
+    let canonical ← typedMapOfEntries key value entries
+    if canonical == map then failure
+    unless ← withNewMCtxDepth (isDefEq map canonical) do failure
+    return canonical
 
 open Lean Meta in
 /-- The typed view of a native type's values: integers by their values for
 integers and `num`, the family's reads for a type parameter, the values
 themselves where the type has an inhabitant that evaluates; none
-otherwise. -/
-def typedView? (carriers τ : Lean.Expr) : MetaM (Option TypedView) := do
-  let (carriers, τ) ← resolvedType carriers τ
+otherwise. `plain` asks for the view of the type's plain values, the
+entries a table inside a mutable reference's current holds. Certificate-free
+concrete values keep their identity view; concrete values that can carry a
+certificate and unresolved parameters use the total typed reader
+(`NTy.readPlain`). This is the same reader a generic parameter obtains at
+instantiation. Recovering the plain entries from that reading requires their
+actual `deepHolds` certificate, since invalid plain values can share the
+decoder's fallback (`doc/designs/data-invariants.md`). -/
+def typedView? (carriers τ : Lean.Expr) (plain : Bool := false) :
+    MetaM (Option TypedView) := do
+  let (carriers, τ, resolved?, resolvedNonempty?) ← resolvedType carriers τ
   let int := mkConst ``Int
   let inhabitable := mkApp (mkConst ``NTy.inhabitable) τ
-  unless ← withDefault (isDefEq inhabitable (mkConst ``Bool.true)) do return none
-  let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
-    (← mkEq inhabitable (mkConst ``Bool.true))
-  let unread := mkApp3 (mkConst ``NTy.unread) carriers τ decided
+  -- The type has values: evaluated where the type is known, and otherwise
+  -- by the resolution's certificate, which a symbolic frame's type
+  -- arguments carry (`resolvedType`).
+  let decided? : Option Lean.Expr ←
+    if ← withDefault (isDefEq inhabitable (mkConst ``Bool.true)) then
+      some <$> mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+        (← mkEq inhabitable (mkConst ``Bool.true))
+    else pure resolved?
+  let some decided := decided? | return none
+  -- A read of a missing key returns the type's inhabitant, so every view
+  -- needs the family's inhabitants; a family without them is a mistake in
+  -- the goal's instances, not a type the view declines.
+  let some nonempty ← (match resolvedNonempty? with
+    | some supplied => pure (some supplied)
+    | none => synthInstance? (mkApp (mkConst ``CarriersNonempty) carriers))
+    | throwError "typedView?: the family {carriers} has no `CarriersNonempty` instance"
+  let nonempty ← canonicalInhabitants carriers nonempty
+  let unread := mkApp4 (mkConst ``NTy.unread) carriers nonempty τ decided
   let integers (bits signed : Lean.Expr) : MetaM TypedView := do
-    return { carriers, type := τ, carrier := int, read := mkApp2 (mkConst ``SpecInt.val) bits signed,
+    return { carriers, type := τ, nonempty, carrier := int,
+             read := mkApp2 (mkConst ``SpecInt.val) bits signed,
              inhabited := ← synthInstance (← mkAppM ``Inhabited #[int]),
              decEq := ← synthInstance (← mkAppM ``DecidableEq #[int]), integer := true,
-             identity := false, unread }
+             identity := false, plain, unread }
   if τ.isAppOfArity ``NTy.int 2 then
     return some (← integers (mkApp (mkConst ``IntWidth.bits) (τ.getArg! 0)) (τ.getArg! 1))
   if τ.isConstOf ``NTy.num then
     return some (← integers (mkConst ``IntWidth.unbounded) (mkConst ``Bool.true))
+  -- A given parameter has one abstract sort for its native, plain and
+  -- specification roles. Emit that sort's identity view directly rather than
+  -- reintroducing the concrete read/unread path into generic clauses.
+  if carriers.isAppOfArity ``GivenFrame.toCarriers 1 && τ.isAppOfArity ``NTy.param 1 then
+    let carrier := mkApp2 (mkConst ``NTy.carrier) carriers τ
+    let read ← withLocalDeclD `value carrier fun value => mkLambdaFVars #[value] value
+    return some { carriers, type := τ, nonempty, carrier, read,
+                  inhabited := mkApp4 (mkConst ``NTy.readInhabited) carriers nonempty τ decided,
+                  decEq := mkApp2 (mkConst ``NTy.decEq) carriers τ, integer := false,
+                  identity := true, plain, unread := read }
+  let inhabitant := mkApp4 (mkConst ``NTy.inhabitantOf) carriers nonempty τ decided
+  let env ← getEnv
+  let knownShape := isNominalType env τ ||
+    match τ.getAppFn.constName?.bind env.find? with
+    | some (.ctorInfo info) => info.induct == ``NTy
+    | _ => false
+  let needsPlainReader ← if plain && knownShape then do
+      let free ← withTransparency .default <| whnf (mkApp (mkConst ``NTy.certificateFree) τ)
+      pure (!free.isConstOf ``Bool.true)
+    else pure false
+  if plain && (τ.isAppOfArity ``NTy.param 1 || !knownShape || needsPlainReader) then
+    -- Keep the same total typed reader for a concrete certificate-bearing
+    -- type and for a parameter instantiated at that type. An unresolved
+    -- argument retains these operations until its family is known.
+    -- The reader follows the argument's
+    -- reader at an instantiation (`NTy.readPlain_instantiate`), preserving
+    -- its typed sort and the total codec semantics. A typed value reads
+    -- back to the plain layer by forgetting the certificate its unread
+    -- operation supplies.
+    let typedCarrier := mkApp2 (mkConst ``NTy.readCarrier) carriers τ
+    let unreadPlain ← withLocalDeclD `typed typedCarrier fun typed => do
+      mkLambdaFVars #[typed] (mkApp3 (mkConst ``NTy.forget) carriers τ (mkApp unread typed))
+    return some { carriers, type := τ, nonempty, carrier := typedCarrier,
+                  read := mkAppN (mkConst ``NTy.readPlain) #[carriers, nonempty, τ, decided],
+                  inhabited := mkApp4 (mkConst ``NTy.readInhabited) carriers nonempty τ decided,
+                  decEq := mkApp2 (mkConst ``NTy.readDecEq) carriers τ, integer := false,
+                  identity := false, plain, unread := unreadPlain }
+  if plain then
+    -- Certificate-free concrete values have the same plain and native
+    -- carrier. Use the native spelling for the identity reader and its
+    -- instances, as the certified view and a specialized generic view do.
+    let carrier := mkApp2 (mkConst ``NTy.carrier) carriers τ
+    let read ← withLocalDeclD `value carrier fun value => mkLambdaFVars #[value] value
+    return some { carriers, type := τ, nonempty, carrier, read,
+                  inhabited := mkApp3 (mkConst ``nativeInhabited) carriers τ inhabitant,
+                  decEq := mkApp2 (mkConst ``NTy.decEq) carriers τ, integer := false,
+                  identity := true, plain, unread := read }
   if τ.isAppOfArity ``NTy.param 1 then
-    return some { carriers, type := τ,
+    return some { carriers, type := τ, nonempty,
                   carrier := mkApp2 (mkConst ``NTy.readCarrier) carriers τ,
                   read := mkApp2 (mkConst ``NTy.read) carriers τ,
-                  inhabited := mkApp3 (mkConst ``NTy.readInhabited) carriers τ decided,
+                  inhabited := mkApp4 (mkConst ``NTy.readInhabited) carriers nonempty τ decided,
                   decEq := mkApp2 (mkConst ``NTy.readDecEq) carriers τ, integer := false,
-                  identity := false, unread }
-  let fallback := mkApp3 (mkConst ``NTy.inhabitantOf) carriers τ decided
-  let inhabited := mkApp3 (mkConst ``nativeInhabited) carriers τ fallback
+                  identity := false, plain, unread }
+  let inhabited := mkApp3 (mkConst ``nativeInhabited) carriers τ inhabitant
   let carrier := mkApp2 (mkConst ``NTy.carrier) carriers τ
   let read ← withLocalDeclD `value carrier fun value => mkLambdaFVars #[value] value
-  return some { carriers, type := τ, carrier, read, inhabited,
+  return some { carriers, type := τ, nonempty, carrier, read, inhabited,
                 decEq := mkApp2 (mkConst ``NTy.decEq) carriers τ, integer := false,
-                identity := true, unread := read }
+                identity := true, plain, unread := read }
 
 open Lean Meta in
 /-- The entry a table holds for a typed entry of its map, each part unread
@@ -689,14 +1221,37 @@ def TypedView.entryUnread (keys values : TypedView) : MetaM Lean.Expr := do
         values.unread.beta #[← mkAppM ``Prod.snd #[entry]]])
 
 open Lean Meta in
-/-- That a view's values read back (`NTy.unread_read`): `∀ x, unread (read x) = x`. -/
+/-- That a view's values read back (`NTy.unread_read`): `∀ x, unread (read x) = x`.
+A plain view that reads its values as they are reads them back by
+reflexivity; `NTy.unread_read` is a statement about the type's certified
+values and does not reach the plain ones. -/
 def TypedView.readBack (view : TypedView) : MetaM Lean.Expr := do
+  if view.plain then
+    unless view.identity do
+      throwError "a total plain reader has no unconditional read-back: recovering its plain \
+        values requires their actual certificate (`NTy.deepHolds`)"
+    return ← withLocalDeclD `value view.carrier fun value => do
+      mkLambdaFVars #[value] (← mkEqRefl value)
   let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
     (← mkEq (mkApp (mkConst ``NTy.inhabitable) view.type) (mkConst ``Bool.true))
   withLocalDeclD `value (mkApp2 (mkConst ``NTy.carrier) view.carriers view.type) fun value => do
-    let proof := mkApp4 (mkConst ``NTy.unread_read) view.carriers view.type decided value
+    let proof := mkAppN (mkConst ``NTy.unread_read)
+      #[view.carriers, view.nonempty, view.type, decided, value]
     mkLambdaFVars #[value] (← mkExpectedTypeHint proof
       (← mkEq (view.unread.beta #[view.read.beta #[value]]) value))
+
+open Lean Meta in
+/-- The order a view's typed values compare by as an ordered map's keys, at
+the given value ranks: the structural order of the type's values
+(`NTy.keyOrder`) where the view reads certified values, and the runtime
+order of the plain values' encodings where it reads plain ones — the same
+order, since forgetting a value's certificates keeps its encoding
+(`NTy.plainEncode_forget`), through the shared constructor
+(`SpecMap.KeyOrder.byRuntime`), whose injectivity the plain codec gives. -/
+def TypedView.plainKeyOrder (view : TypedView) (rank : Lean.Expr) : MetaM Lean.Expr := do
+  let codec := mkApp2 (mkConst ``NTy.plainCodec) view.carriers view.type
+  mkAppM ``SpecMap.KeyOrder.byRuntime
+    #[← mkAppM ``Codec.encode #[codec], ← mkAppM ``Codec.encode_injective #[codec], rank]
 
 open Lean Meta in
 /-- Under typed values, a choice projecting nothing of a value is the

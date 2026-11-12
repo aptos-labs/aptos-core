@@ -830,19 +830,19 @@ private def allDataOperations : Array DataOperation := #[
   .selectGhost qref "ghost"]
 
 private def allSpecOperations : Array SpecOperation := #[
-  .functionCall qref { pre := some 0, post := some 1 },
-  .behavior (.writeOf 1) { pre := some 0, post := some 1 },
+  .functionCall qref { pre := some ⟨0⟩, post := some ⟨1⟩ },
+  .behavior (.writeOf 1) { pre := some ⟨0⟩, post := some ⟨1⟩ },
   .result 0, .typeValue, .typeDomain, .resourceDomain, .stateDomain,
-  .global (some 0), .canModify, .old, .saveStateAnchor 0,
+  .global (some ⟨0⟩), .canModify, .old, .saveStateAnchor 0,
   .withStateAnchor 0, .foldsCaptureAnchor 0, .inlineCallSummary,
-  .trace .user, .publish { pre := some 0 }, .remove { post := some 1 },
-  .update { pre := some 0, post := some 1 }, .emptyVector, .singletonVector,
+  .trace .user, .publish { pre := some ⟨0⟩ }, .remove { post := some ⟨1⟩ },
+  .update { pre := some ⟨0⟩, post := some ⟨1⟩ }, .emptyVector, .singletonVector,
   .updateVector, .concatVector, .indexOfVector, .containsVector,
   .lengthVector, .indexVector, .sliceVector, .inRange,
   .inVectorRange, .vectorRange, .maxValue 128, .bitVectorToInt,
   .intToBitVector, .abortFlag, .abortCode, .wellFormed, .boxValue,
   .unboxValue, .emptyEventStore, .extendEventStore, .eventStoreIncludes,
-  .eventStoreIncludedIn, .noOp, .final, .lemma qref { pre := some 0 }, .exists (some 0)]
+  .eventStoreIncludedIn, .noOp, .final, .lemma qref { pre := some ⟨0⟩ }, .exists (some ⟨0⟩)]
 
 private def operationRepresentatives : Array Operation := #[
   .move ⟨0⟩,

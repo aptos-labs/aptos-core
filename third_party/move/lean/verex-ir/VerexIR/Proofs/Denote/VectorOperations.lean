@@ -25,7 +25,7 @@ theorem wp_dite_rule {σ ε α : Type} (condition : Prop) [Decidable condition]
 end VerexIR.Proofs
 
 namespace VerexIR.Proofs.Denote
-variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
+variable {unit : Validation.ValidatedUnit}
 
 /-- Executable unsigned indices cannot take a negative-index branch. -/
 @[vir_denote_norm] theorem unsigned_val_not_negative {width : Nat}
@@ -37,19 +37,19 @@ variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit
 def swapBounded {α : Type} (v : SpecVector α) (i j : Nat) : SpecVector α :=
   ⟨v.values.swapIfInBounds i j, by simpa only [Array.size_swapIfInBounds] using v.bounded⟩
 
-@[vir_denote ↓ high] theorem denote_swap_direct {ρ : ResultShape} {Γ : NRow} {τ : NTy}
+@[vir_denote ↓ high] theorem denote_swap_direct [C : Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow} {τ : NTy}
     {width : Nat} {signed : Bool} (site : Nat)
     (vector : Term unit ρ Γ (.vector τ)) (left right : Term unit ρ Γ (.int width signed))
-    (executable : Validation.ExecutableUnit unit) (meanings : Meanings executable) (env : HEnv Γ) :
-    (Term.swap site vector left right).denote meanings env =
-      Flow.bind (vector.denote meanings env) fun values env =>
-        Flow.bind (left.denote meanings env) fun i env =>
-          Flow.bind (right.denote meanings env) fun j env =>
+    (meanings : InterpreterOps unit C State) (env : HEnv Γ) :
+    (Term.swap site vector left right).denoteIn meanings env =
+      Flow.bind (vector.denoteIn meanings env) fun values env =>
+        Flow.bind (left.denoteIn meanings env) fun i env =>
+          Flow.bind (right.denoteIn meanings env) fun j env =>
             if i.val < 0 ∨ j.val < 0 ∨ values.values.size ≤ i.val.toNat ∨
                 values.values.size ≤ j.val.toNat then
               abortAt site (Failure.ofInts .abort #[i.val, j.val])
             else Spec.pure (.value (swapBounded values i.val.toNat j.val.toNat) env) := by
-  rw [Term.denote]
+  rw [Term.denoteIn]
   congr 1
   funext values env
   congr 1
@@ -80,24 +80,24 @@ def eraseBounded {α : Type} (v : SpecVector α) (i : Nat) : SpecVector α :=
 
 -- Keep the result carrier explicit: inferred partially expanded HLists
 -- obstruct later normalization across generic caller/callee frames.
-@[vir_denote ↓ high] theorem denote_remove_direct {ρ : ResultShape} {Γ : NRow} {τ : NTy}
+@[vir_denote ↓ high] theorem denote_remove_direct [C : Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow} {τ : NTy}
     {width : Nat} {signed : Bool} (site : Nat)
     (vector : Term unit ρ Γ (.vector τ)) (position : Term unit ρ Γ (.int width signed))
-    (executable : Validation.ExecutableUnit unit) (meanings : Meanings executable) (env : HEnv Γ) :
-    (Term.remove site vector position).denote meanings env =
+    (meanings : InterpreterOps unit C State) (env : HEnv Γ) :
+    (Term.remove site vector position).denoteIn meanings env =
       Flow.bind (β := NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))
-        (vector.denote meanings env) fun values env =>
+        (vector.denoteIn meanings env) fun values env =>
         Flow.bind (β := NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))
-          (position.denote meanings env) fun i env =>
+          (position.denoteIn meanings env) fun i env =>
           opAt site (if h : i.val < 0 ∨ values.values.size ≤ i.val.toNat then
             (abortAt site (Failure.ofInts .abort #[i.val]) :
-              Comp unit (Flow ρ Γ (NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))))
-          else Spec.pure (@Flow.value unit _ _ ρ Γ
+              Spec State Failure (Flow ρ Γ (NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))))
+          else Spec.pure (@Flow.value C ρ Γ
             (NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))
             ((values.values[i.val.toNat]'(Nat.lt_of_not_ge (fun outside => h (Or.inr outside))),
               (eraseBounded values i.val.toNat, ())) :
               HList (.cons τ (.cons (.vector τ) .nil))) env)) := by
-  rw [Term.denote]
+  rw [Term.denoteIn]
   congr 1
   funext values env
   congr 1

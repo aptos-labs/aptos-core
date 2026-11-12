@@ -400,7 +400,8 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                                           cases fn_eq : Internal.evalFunction fuel
                                               executable handle
                                               (callTypeInstantiation unit handle
-                                                valuesFrame.typeInstantiation instantiations) valuesState
+                                                valuesFrame.typeInstantiation
+                                                (ns.genericArguments instantiations)) valuesState
                                               values.toArray with
                                           | error error => simp [fn_eq] at h
                                           | ok functionResult =>

@@ -15,11 +15,16 @@ tests/sources/functional/closures/inline/folds_of.move:103:5: error: the loop in
           ).total
             + v[_j_20]
             > MAX_U64))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of.move:111:9: error: the specification clause `ensures result
+        == «spec_fold$lambda$0»(
+          v, new NoAbilities { total := 0 }, v.length
+        ).total` is not established
 tests/sources/functional/closures/inline/folds_of.move:109:5: error: verex verification failed: the automatic verification of `sum_without_abilities` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of.proof.lean`:
   verify sum_without_abilities by lean =>
     verex_obligations
     verex_on
     | invariant_3_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of.move:27:13: error: the loop invariant `acc

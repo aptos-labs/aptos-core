@@ -47,9 +47,10 @@ def loanDeathsIn (loans : Array CheckedLoanFact) (anchor : ExprId) (deaths : Anc
 the borrow certificates of its functions. -/
 def loanDeathsAt (unit : ValidatedUnit) (namespaceId : NamespaceId) (anchor : ExprId) :
     AnchorDeaths :=
-  unit.borrowCertificates.foldl (init := {}) fun deaths certificate =>
-    if certificate.namespaceId == namespaceId then loanDeathsIn certificate.loans anchor deaths
-    else deaths
+  match unit.namespaces[namespaceId.index]? with
+  | some ns => ns.borrowCertificates.foldl (init := {}) fun deaths certificate =>
+      loanDeathsIn certificate.loans anchor deaths
+  | none => {}
 
 /-- Expression ids consumed as place indexes. A place reads its index in
 place, so a death anchored there would never run. -/
@@ -63,11 +64,9 @@ private def placeIndexIds (ns : ValidatedNamespace) : List ExprId :=
 namespace's arena, or at a place index. Borrow analysis anchors deaths at
 operation, branch, or statement nodes, so either is an internal error. -/
 def loanDeathDiagnostics (unit : ValidatedUnit) : Array Diagnostic :=
-  unit.borrowCertificates.foldl (init := #[]) fun diagnostics certificate =>
-    match unit.namespaces[certificate.namespaceId.index]? with
-    | none => diagnostics
-    | some ns =>
-        let reserved := placeIndexIds ns
+  unit.namespaces.foldl (init := #[]) fun diagnostics ns =>
+    let reserved := placeIndexIds ns
+    ns.borrowCertificates.foldl (init := diagnostics) fun diagnostics certificate =>
         certificate.loans.foldl (init := diagnostics) fun diagnostics loan =>
           loan.deaths.foldl (init := diagnostics) fun diagnostics death =>
             if ns.expressions.size ≤ death.anchor.index then
@@ -108,8 +107,8 @@ def sortByIndex {α : Type} (entries : List (Nat × α)) : List (Nat × α) :=
 `loanDeathsAt` does at each: a compilation the kernel evaluates looks an
 anchor up in logarithmic time instead of scanning every certificate. -/
 def deathIndex (unit : ValidatedUnit) (namespaceId : NamespaceId) : KeyTree AnchorDeaths :=
-  let entries := unit.borrowCertificates.toList.foldl (init := []) fun entries certificate =>
-    if certificate.namespaceId != namespaceId then entries else
+  let certificates := ((unit.namespaces[namespaceId.index]?).map (·.borrowCertificates)).getD #[]
+  let entries := certificates.toList.foldl (init := []) fun entries certificate =>
     certificate.loans.toList.zipIdx.foldl (init := entries) fun entries (loan, index) =>
       loan.deaths.toList.foldl (init := entries) fun entries death =>
         (death.anchor.index, (death.before, (⟨index⟩ : LoanId))) :: entries

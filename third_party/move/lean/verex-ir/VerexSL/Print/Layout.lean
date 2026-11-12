@@ -104,7 +104,7 @@ private def byteLiteral (values : Array UInt8) : String :=
 private def identifier (value : String) : String :=
   let value := if value.startsWith "'" then (value.drop 1).toString else value
   if !value.isEmpty && value.all Char.isDigit then value
-  else (Lean.Name.mkSimple value).toStringWithToken (isToken := isReservedWord)
+  else escapedIdentifier value
 
 private def pragmaName (value : String) : String :=
   if value == "opaque" then value else identifier value
@@ -448,6 +448,12 @@ private def operatorInfoForExpr? : Expr → Option OperatorInfo
       if arguments.size == arity then some info else none
   | _ => none
 
+/-- Whether an expression's text ends in the type of a cast. -/
+private partial def endsInCast : Expr → Bool
+  | .typedPrimitive .profileCast .. => true
+  | .primitive _ arguments _ => (arguments.back?).any endsInCast
+  | _ => false
+
 private def expressionPrecedence (expression : Expr) : Nat :=
   if let some info := operatorInfoForExpr? expression then info.precedence
   else match expression with
@@ -542,7 +548,10 @@ mutual
                 | .left => (info.precedence, info.precedence + 1)
                 | .right => (info.precedence + 1, info.precedence)
                 | .none => (info.precedence + 1, info.precedence + 1)
+              -- `x as u8 < y` would read `u8 <` as the start of type arguments.
+              let leftEndsInCast := info.symbol == "<" && endsInCast left
               let left ← expressionDocAt leftPrecedence left
+              let left := if leftEndsInCast then text "(" ++ left ++ text ")" else left
               let right ← expressionDocAt rightPrecedence right
               pure <| Format.group <| left ++
                 Format.nest 2 (soft ++ text s!"{info.symbol} " ++ right)
@@ -794,7 +803,7 @@ mutual
           let [element] := types.toList
             | throw "spec.emptyVector expects one element type"
           unless arguments.isEmpty do throw "spec.emptyVector expects no operands"
-          return text s!"vec::<{typeText element.value}>()"
+          return text s!"vec::<{closeAngles (typeText element.value)}()"
         let builtin? := match operation with
           | .singletonVector => some "vec"
           | .updateVector => some "update"
@@ -1272,6 +1281,7 @@ private partial def sourceAttributeText : SourceAttribute → String
         | .number value => toString value
         | .string value => toString (repr value)
         | .name value => identifier value
+        | .qualifiedName value => value
 
 private def attributesDoc (attributes : Array SourceAttribute) : Doc :=
   if attributes.isEmpty then .nil else
@@ -1446,7 +1456,8 @@ import, and address aliases) and one rendering per namespace, in order;
 comments discarded as trivia by Lean's parser; the source backend uses these
 for explicit unsupported-declaration notices. -/
 def formatParts (unit : CompilationUnit) (width : Nat := 80)
-    (leadingComments : Array String := #[]) (declaredAliases : Array (String × String) := #[]) :
+    (leadingComments : Array String := #[]) (declaredAliases : Array (String × String) := #[])
+    (imports : Array Lean.Name := #[]) :
     Except String (String × Array String) := do
   let namespaces ← unit.namespaces.mapM fun ns => do
     let uses := ns.uses.map fun path => text s!"use {pathText path}"
@@ -1495,7 +1506,8 @@ def formatParts (unit : CompilationUnit) (width : Nat := 80)
       text s!"address_alias {identifier name} = {address}") ++ hard ++ hard
   let prelude := text "-- Copyright © Aptos Foundation" ++ hard ++
     text "-- SPDX-License-Identifier: Apache-2.0" ++ hard ++ hard ++
-    text "import VerexSL" ++ hard ++ hard ++ aliasDeclarations
+    vcat (#[text "import VerexSL"] ++ imports.map fun name => text s!"import {name}") ++ hard ++
+    hard ++ aliasDeclarations
   pure (renderDoc prelude width, namespaces.map (renderDoc · width))
 
 /-- The file of a prelude and its namespaces: the namespaces separated by a
@@ -1547,9 +1559,11 @@ def formatSource (environment : Environment) (source : String) (width : Nat := 8
 /-- Lay out several semantic sources, one namespace each, as one file with
 their namespaces in the given order. -/
 def formatSourceParts (environment : Environment) (sources : Array String) (width : Nat := 80)
-    (sourceName : String := "<generated>") (declaredAliases : Array (String × String) := #[]) :
+    (sourceName : String := "<generated>") (declaredAliases : Array (String × String) := #[])
+    (imports : Array Name := #[]) :
     Except String (String × Array String) := do
   let units ← sources.mapM (parseSource environment · sourceName)
   formatParts { sourceName, namespaces := units.flatMap (·.namespaces) } width #[] declaredAliases
+    imports
 
 end VerexSL.Print.Layout

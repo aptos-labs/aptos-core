@@ -1,4 +1,5 @@
 Move prover returns: exiting with verification errors
+tests/sources/functional/script_incorrect.move:2:1: info: `main` uses concrete verification: Given interpretation does not yet support in-body assumption interpretation
 tests/sources/functional/script_incorrect.move:13:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/script_incorrect.move:12:5: error: verex verification failed: the automatic verification of `main` failed; provide a proof in `tests/sources/functional/script_incorrect.proof.lean`:
   verify main by lean =>

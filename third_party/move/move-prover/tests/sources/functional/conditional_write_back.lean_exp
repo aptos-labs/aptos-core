@@ -1,0 +1,1 @@
+tests/sources/functional/conditional_write_back.move:1:1: info: `diff_resource_generic` uses concrete verification: Given interpretation does not yet support storage interpretation

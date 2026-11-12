@@ -19,7 +19,8 @@ arguments alone.
 namespace VerexIR.Proofs.Denote
 
 section Frames
-variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Θ : Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
+  [Θ : Skolems unit]
 
 /-- The target's native argument row: the captures and the supplied
 arguments, woven. -/
@@ -551,8 +552,8 @@ theorem NTy.lend_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (τ : N
       NTy.lend (τ.subst θ.1) prophecies value loans
   | .ref referent, prophecies, value, loan :: loans => by
       cases prophecies <;>
-        simp only [NTy.lend, NTy.toSkolem, NTy.encode_toSkolem, Bool.false_eq_true,
-          ite_false, ite_true]
+        simp only [NTy.lend, NTy.toSkolem, NTy.encode_toSkolem, NTy.plainEncode_toSkolem,
+          Bool.false_eq_true, ite_false, ite_true]
   | .ref _, _, _, [] => rfl
   | .tuple elements, prophecies, values, loans => by
       simp only [NTy.lend, NTy.toSkolem, NRow.lend_toSkolem θ free elements]
@@ -614,7 +615,7 @@ theorem ResultShape.lend_ofSkolem (θ : TypeArgs) (free : θ.1.refFree = true) :
       simp only [ResultShape.lend, ResultShape.ofSkolem, NTy.lend_toSkolem θ free τ]
 
 /-- A result in the target's view. -/
-def ResultShape.toSkolem (θ : TypeArgs) : (shape : ResultShape) →
+noncomputable def ResultShape.toSkolem (θ : TypeArgs) : (shape : ResultShape) →
     (shape.subst θ.1).carrier → @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape
   | .none, value => value
   | .one τ, value => NTy.toSkolem θ τ value
@@ -712,7 +713,7 @@ theorem propheticRun_subst {unit : VerexIR.Validation.ValidatedUnit} [FunctionCa
 
 /-- A function value of the frame type arguments induce, in the caller's
 view (`NTy.ofSkolem`), at the substituted result shape's row. -/
-def ResultShape.functionOfSkolem (θ : TypeArgs) (σs : NRow) (shared : Sharing) :
+noncomputable def ResultShape.functionOfSkolem (θ : TypeArgs) (σs : NRow) (shared : Sharing) :
     (shape : ResultShape) →
     @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row) →
     (NTy.function (NRow.subst θ.1 σs) shared (shape.subst θ.1).row).carrier
@@ -866,7 +867,7 @@ def _root_.VerexIR.Proofs.Contract.ofSkolem (θ : TypeArgs) {σs : NRow} {shape 
 
 /-- A meaning at the frame type arguments induce, at the caller's types:
 its arguments carried into the callee's view, its result read back. -/
-def specializedMeaning (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
+noncomputable def specializedMeaning (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
     (meaning : @HList (Skolems.instantiate θ Θ).toCarriers σs →
       Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)) :
     HList (NRow.subst θ.1 σs) → Comp unit (shape.subst θ.1).carrier :=

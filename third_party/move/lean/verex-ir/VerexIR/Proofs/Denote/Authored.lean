@@ -11,7 +11,7 @@ namespace VerexIR.Proofs.Denote
 
 open Lean Meta Elab Tactic
 
-/-- A fact a proof step gave, by its name (`doc/plan/proof-language.md`,
+/-- A fact a proof step gave, by its name (`doc/designs/proof-language.md`,
 "Closers"): a hidden mark beside the hypothesis, so that the block's normal
 form takes the hypothesis of that name as a rule. The mark depends on
 nothing: a rewriting, a substitution or a case split carries it along as
@@ -25,13 +25,48 @@ carry, so that each leaf prepares only what its clause adds. -/
 structure PathPrepared : Prop where
   intro ::
 
+/-- Read clause markers on path hypotheses without removing the markers
+that route the target's obligations. -/
+def unmarkPathHypotheses (goal : MVarId) : MetaM MVarId := do
+  let mut goal := goal
+  for decl in ← goal.withContext getLCtx do
+    if decl.isImplementationDetail || decl.isLet then continue
+    let type ← goal.withContext (instantiateMVars decl.type)
+    unless (type.find? (·.isAppOfArity ``VerexIR.Proofs.Obligation 4)).isSome do continue
+    let type ← goal.withContext <| Core.transform type (post := fun e =>
+      return if e.isAppOfArity ``VerexIR.Proofs.Obligation 4 then .done e.appArg! else .continue)
+    goal ← goal.replaceLocalDeclDefEq decl.fvarId type
+  return goal
+
+/-- Whether a clause introduced local declarations after path preparation.
+Such premises may rewrite older facts, so their normalization still visits
+the context. An unchanged path needs only target-marker removal. -/
+def pathHasDelta (goal : MVarId) : MetaM Bool := goal.withContext do
+  let mut prepared := false
+  let mut delta := false
+  for decl in ← getLCtx do
+    if decl.type.isConstOf ``PathPrepared then
+      prepared := true
+      delta := false
+    else if prepared then delta := true
+  return !prepared || delta
+
 /-- Prepare a completed path's context once, before its clauses split
 (`verex_prepare values`), where a proof's `on` step takes one of its clauses,
 and mark the goals `PathPrepared`. -/
 elab "verex_step_prepare" : tactic => focusGoal do
   -- Only a path with a clause a proof's `on` step takes.
   unless ← (← targetState).pathRouted.get do return
+  setGoals (← (← getGoals).mapM fun goal => unmarkPathHypotheses goal)
   evalTactic (← `(tactic| verex_prepare values))
+  -- Family projection can expose equalities and bounds after the ordinary
+  -- value preparation. Finish this context-wide work before clauses split.
+  evalTactic (← `(tactic| all_goals (try simp only [whichProjectFamily] at *)))
+  evalTactic (← `(tactic| all_goals verex_split_hypotheses))
+  evalTactic (← `(tactic| all_goals verex_subst_vars))
+  evalTactic (← `(tactic| all_goals verex_reduce_projections))
+  evalTactic (← `(tactic| all_goals verex_type_bounds))
+  evalTactic (← `(tactic| all_goals verex_finish_prepare))
   let marked ← (← getGoals).mapM fun goal => goal.withContext do
     let (mark, goal) ← (← goal.assert `pathPrepared (mkConst ``PathPrepared)
       (mkConst ``PathPrepared.intro)).intro1P
@@ -200,8 +235,7 @@ macro "verex_typed_close" : tactic => `(tactic| (
   | (verex_goal_witnesses; done)
   | (verex_decide; done)
   | (simp [*, ↓evaluateMapHasKey, evaluateMapHasKey, ↓evaluateMapValueAt, evaluateMapValueAt,
-      evaluateBitwiseAnd, evaluateBitwiseOr, evaluateBitwiseXor,
-      VerexIR.Proofs.Denote.NativeMaps.get_integers_asInt]; done)))
+      evaluateBitwiseAnd, evaluateBitwiseOr, evaluateBitwiseXor]; done)))
 
 /-- Generate a function's obligations, prepare shared contexts, and route
 source clauses to ordinary Lean proofs. Every top-level preparation step

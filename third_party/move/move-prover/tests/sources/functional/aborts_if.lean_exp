@@ -29,9 +29,9 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
       (fun result final => final = initialState✝ ∧ y.val < x.val) (fun failure => True) state
-a✝ : x.val ≤ y.val
+pathDecision✝ : x.val ≤ y.val
 ⊢ y.val < x.val
 tests/sources/functional/aborts_if.move:50:5: error: verex verification failed: the automatic verification of `abort4_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
   verify abort4_incorrect by lean =>
@@ -63,12 +63,12 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
       (fun result final => final = initialState✝ ∧ y.val < x.val)
       (fun failure =>
         VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 1562 1578 (x.val ≤ y.val))
       state
-a✝ : y.val ≤ x.val
+pathDecision✝ : y.val ≤ x.val
 ⊢ y.val < x.val
 tests/sources/functional/aborts_if.move:67:5: error: verex verification failed: the automatic verification of `abort6_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
   verify abort6_incorrect by lean =>
@@ -92,13 +92,13 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
       (fun result final => final = initialState✝ ∧ ¬(x.val < y.val ∨ x.val = y.val))
       (fun failure =>
         VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 2072 2087 (x.val < y.val) ∨
           VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 2092 2108 (x.val = y.val))
       state
-a✝ : y.val ≤ x.val
+pathDecision✝ : y.val ≤ x.val
 ⊢ ¬(x.val < y.val ∨ x.val = y.val)
 tests/sources/functional/aborts_if.move:89:5: error: verex verification failed: the automatic verification of `multi_abort2_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
   verify multi_abort2_incorrect by lean =>
@@ -130,12 +130,13 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value) (fun result final => False)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+      (fun result final => False)
       (fun failure =>
         VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 2655 2669 True ∨
           VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 2674 2689 (0 < x.val))
       state
-a✝ : ¬x.val = 0
+pathDecision✝ : ¬x.val = 0
 ⊢ False
 tests/sources/functional/aborts_if.move:118:5: error: verex verification failed: the automatic verification of `multi_abort5_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
   verify multi_abort5_incorrect by lean =>
@@ -165,9 +166,9 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
       (fun result final => final = initialState✝ ∧ ¬x.val = 4) (fun failure => True) state
-a✝ : ¬(x.val = 2 ∨ x.val = 3)
+pathDecision✝ : ¬(x.val = 2 ∨ x.val = 3)
 ⊢ ¬x.val = 4
 tests/sources/functional/aborts_if.move:148:5: error: verex verification failed: the automatic verification of `abort_at_2_or_3_spec_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
   verify abort_at_2_or_3_spec_incorrect by lean =>
@@ -190,9 +191,9 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
       (fun result final => final = initialState✝) (fun failure => False) state
-a✝ : x.val = 2 ∨ x.val = 3
+pathDecision✝ : x.val = 2 ∨ x.val = 3
 ⊢ False
 tests/sources/functional/aborts_if.move:157:5: error: verex verification failed: the automatic verification of `abort_at_2_or_3_strict_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
   verify abort_at_2_or_3_strict_incorrect by lean =>

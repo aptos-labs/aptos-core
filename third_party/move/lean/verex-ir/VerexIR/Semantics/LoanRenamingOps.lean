@@ -390,7 +390,7 @@ theorem placeVariantMismatchFuel?_rename (unit : Validation.ValidatedUnit)
                   | some value =>
                       cases value <;> try simp
                       rename_i source variant values
-                      cases variant <;> cases resolveStruct? unit ns.identity owner <;>
+                      cases variant <;> cases resolveStruct? unit ns.unitIdentity owner <;>
                         cases sourceFieldName? ns field <;> rfl
           | downcast base variant =>
               simp only [resolve, ih]
@@ -424,7 +424,7 @@ theorem variantMismatch?_rename (unit : Validation.ValidatedUnit)
           · rfl
           · cases a <;> try simp
             rename_i source variant values
-            cases variant <;> cases resolveStruct? unit ns.identity reference <;> rfl
+            cases variant <;> cases resolveStruct? unit ns.unitIdentity reference <;> rfl
           · simp only [List.map_cons]
             cases a <;> simp only [RuntimeValue.rename]
       | _ => rfl
@@ -562,7 +562,7 @@ theorem bindPatternFuel_rename (injective : Function.Injective ρ) (unit : Valid
                 RuntimeValue.rename_vector, RuntimeValue.rename_nominal, RuntimeValue.rename_closure,
                 RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole, RuntimeValue.rename_ghost] <;> try rfl
               case nominal source actualVariant values =>
-                cases resolveNominal? unit ns name with
+                cases resolveNominal? unit ns (ns.nameId name) with
                 | none => rfl
                 | some expected =>
                     simp only [Option.bind_some, Array.size_map]

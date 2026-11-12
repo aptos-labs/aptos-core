@@ -8,10 +8,10 @@ import VerexIR.Proofs.GlobalTyping
 # Function values of a link set
 
 The pieces a link set's generated function values are built from
-(`doc/plan/native-function-values.md`, "Step 2b, decided"): the carriers of
-native types and their codecs over an explicit function arm, so that a
-generated family can decode and encode the captures of its closure sites
-before its instance exists; the closures of a function type no site
+(`doc/designs/higher-order-functions.md`, "Function values as native data"):
+the carriers of native types and their codecs over an explicit function arm,
+so that a generated family can decode and encode the captures of its closure
+sites before its instance exists; the closures of a function type no site
 encodes (`ForeignClosure`); and the laws relating the codecs, which the
 generated laws instantiate.
 
@@ -19,6 +19,19 @@ The codecs agree with the base frame's (`Carriers.runtime`): at a concrete
 type, `NTy.carrierWith (FunctionCarriers.carrier unit) τ` is the base
 frame's carrier by definition, and the codecs are the base frame's at the
 instance's function arm.
+
+That definitional equality now holds only away from a struct, a variant and
+a reference. `NTy.carrierWith` is a *plain* family — a struct is its field
+row, a variant its row under its name — while the base frame's carrier of
+such a type is certified by its data invariant (`NTy.carrier`,
+`doc/designs/data-invariants.md`): `{ row : HListPlain fields //
+NTy.deepHolds … row }` at a struct, and `σ.plain × σ.carrier` at a
+reference. A generated family whose site captures a struct, a variant or a
+reference therefore spells a carrier the base frame does not have, and its
+`carrier…` equation does not close by `rfl`. Reconciling the two families —
+either by mirroring the certified one here or by certifying once where a
+decoded capture becomes a carrier value — is open, and the generator
+(`VerexSL/Verify/FunctionValues.lean`) changes with it.
 -/
 
 namespace VerexIR.Proofs.Denote
@@ -1189,7 +1202,7 @@ end Laws
 
 /-! ## Closure sites and their family
 
-A link set's function values (`doc/plan/native-function-values.md`):
+A link set's function values (`doc/designs/higher-order-functions.md`):
 a constructor per closure site holding the site's captures natively, and
 `foreign` holding every other closure the unit types at a function type.
 The generated block provides the family, its constructors, and its
@@ -1588,14 +1601,31 @@ theorem encode_decode : (bound : Nat) → ∀ parameters shared results (closure
   closure_of_ofClosure? := fun closure value decoded =>
     Φ.encode_decode _ parameters shared results closure (Nat.lt_succ_self _) value decoded
 
-/-- A link set's function values, the unit's instance. -/
-@[reducible] noncomputable def functionCarriers : FunctionCarriers unit where
+/-- A link set's function values, the unit's instance, over the data
+invariants of the link set's declarations (`Carriers.own`).
+
+The predicate is an argument and not the field's default, because the
+default is `True`: a link set that inherited it would give every
+declaration of every unit in the set a trivially true invariant, and a
+struct's carrier would certify nothing while every pack's obligation
+closed.  The argument also carries the two-step generation the design asks
+for (`doc/designs/data-invariants.md`, "Data invariants"): the base
+instance is this family at `fun _ _ _ => True`, which closes the predicate
+over the plain decoding, and the instance proper is the same family at that
+predicate — the same carriers, functions and laws, since none of them reads
+`own`.  Where the link set has more than one unit the predicate dispatches
+on the handle's origin and conjoins the clauses of the declaration it
+names, which is the generator's work: the library has no list of the set's
+members. -/
+@[reducible] noncomputable def functionCarriers
+    (own : StructHandle → NRow → RuntimeValue → Prop) : FunctionCarriers unit where
   carrier := Φ.F
   functions := Φ.functions
   admits := fun parameters shared results value =>
     Φ.admits_encode _ parameters shared results value (Nat.lt_succ_self _)
   decodes := fun parameters shared results closure admitted =>
     Φ.decodes _ parameters shared results closure (Nat.lt_succ_self _) admitted
+  own := own
 
 /-- A site's closure: its key, capturing its captures' encodings. -/
 theorem encode_site_eq (index : Fin Φ.sites.length)
@@ -1610,19 +1640,27 @@ theorem encode_site_eq (index : Fin Φ.sites.length)
 
 /-- At the base frame, construction is the value whose closure it creates:
 a site's constructor where the closure is the site's (`encode_site_eq`),
-whatever its instantiation. -/
-theorem construct_eq {parameters : NRow} {shared : Sharing} {results : NRow}
+whatever its instantiation.  The base frame is the runtime family, so the
+unit's inhabitants are assumed here as everywhere a frame is built
+(`Skolems.runtime`); the data invariants the family carries play no part. -/
+theorem construct_eq {own : StructHandle → NRow → RuntimeValue → Prop}
+    [@CarriersNonempty (@Carriers.runtime unit (Φ.functionCarriers own))]
+    {parameters : NRow} {shared : Sharing} {results : NRow}
     {handle : FunctionHandle} {mask : Nat} {typeInstantiation : Array (TypeId × TypeId)}
-    {σs : NRow} (captures : @HList (@Carriers.runtime unit Φ.functionCarriers) σs)
-    (typed : @SiteTyped unit Φ.functionCarriers (@Skolems.runtime unit Φ.functionCarriers)
+    {σs : NRow} (captures : @HList (@Carriers.runtime unit (Φ.functionCarriers own)) σs)
+    (typed : @SiteTyped unit (Φ.functionCarriers own)
+      (@Skolems.runtime unit (Φ.functionCarriers own) inferInstance)
       parameters shared results handle mask typeInstantiation σs)
     (value : Φ.F parameters shared results)
-    (closed : @closureOf unit Φ.functionCarriers (@Skolems.runtime unit Φ.functionCarriers)
+    (closed : @closureOf unit (Φ.functionCarriers own)
+      (@Skolems.runtime unit (Φ.functionCarriers own) inferInstance)
       handle mask typeInstantiation σs captures = Φ.encode value) :
-    @Skolems.construct unit Φ.functionCarriers (@Skolems.runtime unit Φ.functionCarriers)
+    @Skolems.construct unit (Φ.functionCarriers own)
+      (@Skolems.runtime unit (Φ.functionCarriers own) inferInstance)
       parameters shared results handle mask typeInstantiation σs captures typed = value :=
   (Φ.functions parameters shared results).closure_injective
-    ((@Skolems.closure_construct unit Φ.functionCarriers (@Skolems.runtime unit Φ.functionCarriers)
+    ((@Skolems.closure_construct unit (Φ.functionCarriers own)
+      (@Skolems.runtime unit (Φ.functionCarriers own) inferInstance)
       parameters shared results handle mask typeInstantiation σs captures typed).trans closed)
 
 end SiteFamily

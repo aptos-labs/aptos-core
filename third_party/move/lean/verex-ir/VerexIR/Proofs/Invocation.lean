@@ -311,10 +311,17 @@ variable [Carriers]
 
 /-- The values a row of arguments passes: a mutable reference's entry value,
 any other argument's encoding. -/
-def Denote.HList.entries : {row : NRow} → HList row → List RuntimeValue
+noncomputable def Denote.HList.entries : {row : NRow} → HList row → List RuntimeValue
   | .nil, _ => []
-  | .cons (.ref σ) _, values => σ.encode values.1.1 :: HList.entries values.2
+  | .cons (.ref σ) _, values => σ.plainEncode values.1.1 :: HList.entries values.2
   | .cons τ _, values => τ.encode values.1 :: HList.entries values.2
+
+/-- The values a plain row of arguments passes, as a settled row is
+(`HList.settle`). -/
+noncomputable def Denote.HListPlain.entries : {row : NRow} → HListPlain row → List RuntimeValue
+  | .nil, _ => []
+  | .cons (.ref σ) _, values => σ.plainEncode values.1.1 :: HListPlain.entries values.2
+  | .cons τ _, values => τ.plainEncode values.1 :: HListPlain.entries values.2
 
 /-- The entry values of a row of arguments hold no loan. -/
 theorem Denote.HList.entries_plain : (row : NRow) → (values : HList row) →
@@ -323,29 +330,39 @@ theorem Denote.HList.entries_plain : (row : NRow) → (values : HList row) →
   | .cons τ rest, values, entry, member => by
       cases τ <;> simp only [HList.entries, List.mem_cons] at member <;>
         rcases member with rfl | member <;>
-        first | exact NTy.encode_plain _ _ | exact HList.entries_plain rest values.2 entry member
+        first
+          | exact NTy.encode_plain _ _
+          | exact NTy.plainEncode_plain _ _
+          | exact HList.entries_plain rest values.2 entry member
 
 /-- Settled arguments pass the arguments' entry values. -/
 theorem Denote.HList.entries_settle : (row : NRow) → (values : HList row) →
-    HList.entries (HList.settle row values) = HList.entries values
+    HListPlain.entries (HList.settle row values) = HList.entries values
   | .nil, _ => rfl
   | .cons τ rest, values => by
       have later := Denote.HList.entries_settle rest values.2
-      cases τ <;> simp only [HList.settle, HList.entries, NTy.settle, HList.cons, later]
+      cases τ <;>
+        simp only [HList.settle, HList.entries, HListPlain.entries, later] <;>
+        first
+          | rfl
+          | rw [show NTy.settle _ values.1 = NTy.forget _ values.1 from rfl,
+              NTy.plainEncode_forget]
 
 /-- Settling is idempotent. -/
 theorem Denote.HList.settle_settle : (row : NRow) → (values : HList row) →
-    HList.settle row (HList.settle row values) = HList.settle row values
+    HListPlain.settle row (HList.settle row values) = HList.settle row values
   | .nil, _ => rfl
   | .cons τ rest, values => by
       have later := Denote.HList.settle_settle rest values.2
-      cases τ <;> simp only [HList.settle, NTy.settle, HList.cons, later]
+      cases τ <;>
+        simp only [HList.settle, HListPlain.settle, NTy.settle, NTy.settlePlain, NTy.forget, later]
 
 /-- A result's values as a run returns them, read as `readResults` reads
 them: a returned mutable reference as its current value. -/
-def Denote.ResultShape.current : (shape : ResultShape) → shape.carrier → Array RuntimeValue
+noncomputable def Denote.ResultShape.current : (shape : ResultShape) → shape.carrier →
+    Array RuntimeValue
   | .none, _ => #[]
-  | .one (.ref σ), value => #[σ.encode value.1]
+  | .one (.ref σ), value => #[σ.plainEncode value.1]
   | .one τ, value => #[τ.encode value]
 
 /-- A result read as values holds no loan. -/
@@ -354,7 +371,8 @@ theorem Denote.ResultShape.current_plain : (shape : ResultShape) → (result : s
   | .none, _, _, member => by simp [ResultShape.current] at member
   | .one τ, result, value, member => by
       cases τ <;> simp only [ResultShape.current, List.mem_toArray, List.mem_singleton] at member <;>
-        subst member <;> exact NTy.encode_plain _ _
+        subst member <;>
+        first | exact NTy.encode_plain _ _ | exact NTy.plainEncode_plain _ _
 
 /-- Settled results read as the same values are equal. -/
 theorem Denote.ResultShape.eq_of_current : (shape : ResultShape) → {result result' : shape.carrier} →
@@ -366,8 +384,10 @@ theorem Denote.ResultShape.eq_of_current : (shape : ResultShape) → {result res
       cases τ with
       | ref σ =>
           simp only [ResultShape.current, ResultShape.Settled, List.toList_toArray,
-            List.cons.injEq, and_true, NTy.encode, Codec.encode_eq_encode] at listed settled settled'
-          exact Prod.ext listed (settled.symm.trans (listed.trans settled'))
+            List.cons.injEq, and_true, NTy.plainEncode,
+            Codec.encode_eq_encode] at listed settled settled'
+          refine Prod.ext listed (NTy.encode_injective σ ?_)
+          rw [← NTy.plainEncode_forget, ← NTy.plainEncode_forget, ← settled, ← settled', listed]
       | _ =>
           simp only [ResultShape.current, List.toList_toArray, List.cons.injEq, and_true,
             NTy.encode, Codec.encode_eq_encode] at listed
@@ -422,7 +442,8 @@ theorem Denote.ResultShape.lend_settled : (shape : ResultShape) → shape.row.le
       cases τ with
       | ref σ =>
           simp only [ResultShape.Settled] at settled
-          cases loans <;> simp [ResultShape.lend, NTy.lend, settled]
+          cases loans <;>
+            simp [ResultShape.lend, NTy.lend, settled, NTy.plainEncode_forget]
       | _ =>
           simp only [NRow.lentFlat, Bool.and_true] at flat
           simp only [ResultShape.lend, NTy.lend_refFree _ flat]
@@ -446,8 +467,9 @@ theorem Denote.ResultShape.readResults_lend : (shape : ResultShape) → shape.ro
                 reduceCtorEq] at lent
               subst lent
               simp only [NRow.mutable, List.toList_toArray, readResults, ite_false,
-                RuntimeValue.observe, RuntimeValue.observe_of_plain (NTy.encode_plain σ result.1),
-                ResultShape.current, NTy.encode]
+                RuntimeValue.observe,
+                RuntimeValue.observe_of_plain (NTy.plainEncode_plain σ result.1),
+                ResultShape.current, NTy.plainEncode]
       | _ =>
           simp only [NRow.lentFlat, Bool.and_true] at flat
           simp only [ResultShape.lend, NTy.lend_refFree _ flat] at lent
@@ -871,15 +893,15 @@ private theorem closureRun_ok_agree {executable : ExecutableUnit unit}
   rw [← resolved, ← resolved₂]
   simp only [RuntimeState.resolveReturned, renamed, globals, tableHandles, and_self]
 
-/-- An invocation that returns from `state` does not abort from it, on
+/-- A closure's run that returns from `state` excludes an abort from it, on
 arguments of the same entry values. -/
-theorem not_abortsOf_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
-    {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
-    {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
+private theorem closureRun_not_aborts_of_ok {executable : ExecutableUnit unit}
+    (agrees : RunsAgree executable) {closure : ClosureValue} {σs : NRow}
+    (flat : σs.lentFlat = true) {shape : ResultShape}
     {args args' : HList σs} (same : HList.settle σs args = HList.settle σs args')
     {state post : Memory unit} {result : shape.carrier}
-    (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post) :
-    ¬AbortsOf (closureMeaning executable) σs shared shape function args' state := by
+    (ok : (closureRun executable closure σs shape args).ok state result post) :
+    ¬∃ error, (closureRun executable closure σs shape args').aborts state error := by
   rintro ⟨error, start', loans', supplied', arguments', encodes', admissible', lends', composes',
     aborted⟩
   obtain ⟨start, loans, supplied, arguments, results, exit, -, -, encodes, admissible, lends,
@@ -888,23 +910,68 @@ theorem not_abortsOf_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgre
   obtain ⟨lentRow', lendsRow', rfl⟩ := lendArguments_lentFlat flat lends'
   rw [entries_of_settle same] at lendsRow'
   obtain ⟨_, aborted⟩ := aborted
-  obtain ⟨_, _, -, -, renamed, -⟩ := lentRuns_agree agrees
-    ((Carriers.functions σs shared shape.row).closure function).plain
+  obtain ⟨_, _, -, -, renamed, -⟩ := lentRuns_agree agrees closure.plain
     (HList.entries_plain σs args) encodes encodes' admissible admissible' lendsRow lendsRow'
     composes composes' runs aborted
   simp [Outcome.rename_returned, Outcome.rename_threw] at renamed
+
+/-- An invocation that returns from `state` does not abort from it, on
+arguments of the same entry values. -/
+theorem not_abortsOf_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
+    {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
+    {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
+    {args args' : HList σs} (same : HList.settle σs args = HList.settle σs args')
+    {state post : Memory unit} {result : shape.carrier}
+    (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post) :
+    ¬AbortsOf (closureMeaning executable) σs shared shape function args' state :=
+  closureRun_not_aborts_of_ok agrees flat same ok
+
+/-- An invocation that returns from `state` does not abort from it on
+arguments of its own entry values: `aborts_of` as a clause states it
+(`AbortsOfEntries`), which names no prophecy. -/
+theorem not_abortsOfEntries_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
+    {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
+    {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
+    {args : HList σs} {entries : HListPlain σs} (same : HList.settle σs args = entries)
+    {state post : Memory unit} {result : shape.carrier}
+    (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post) :
+    ¬AbortsOfEntries (closureMeaning executable) σs shared shape function entries state := by
+  rintro ⟨args', settles, aborts⟩
+  exact not_abortsOf_of_ok agrees flat (same.trans settles.symm) ok aborts
+
+/-- A call that returns from `state` does not abort from it. -/
+theorem not_callAborts_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
+    {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
+    (flat : full.lentFlat = true) {shape : ResultShape} {args : HList full}
+    {state post : Memory unit} {result : shape.carrier}
+    (ok : CallEnsures (propheticMeaning executable typeInstantiation handle full shape args) result
+      state post) :
+    ¬CallAborts (propheticMeaning executable typeInstantiation handle full shape args) state := by
+  have closed := closureRun_closureOf executable handle (Weave.supplying full) rfl
+    typeInstantiation () shape args
+  rw [Weave.compose_supplying] at closed
+  rintro ⟨error, -, aborted⟩
+  have run : (closureRun executable (closureOf handle (Weave.supplying full).mask typeInstantiation
+      (σs := .nil) ()) full shape args).ok state result post := by
+    rw [closed]
+    exact ok.2
+  have failed : (closureRun executable (closureOf handle (Weave.supplying full).mask
+      typeInstantiation (σs := .nil) ()) full shape args).aborts state error := by
+    rw [closed]
+    exact aborted
+  exact closureRun_not_aborts_of_ok agrees flat rfl run ⟨error, failed⟩
 
 /-- `result_of` is the settled result of every run from `state` on
 arguments of the same entry values. -/
 theorem resultOf_eq_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
     {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
     {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
-    (shapeFlat : shape.row.lentFlat = true) {args args' : HList σs}
-    (same : HList.settle σs args = HList.settle σs args') {state post : Memory unit}
+    (shapeFlat : shape.row.lentFlat = true) {args : HList σs} {entries : HListPlain σs}
+    (same : HList.settle σs args = entries) {state post : Memory unit}
     {result : shape.carrier}
     (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post)
     (settled : shape.Settled result) (default : shape.carrier) :
-    ResultOf (closureMeaning executable) σs shared shape function args' state default = result := by
+    ResultOf (closureMeaning executable) σs shared shape function entries state default = result := by
   obtain ⟨chosen, ⟨sameChosen, settledChosen, okChosen⟩, chosenResult, _⟩ :=
     settledEncoding_choose (invoke := closureMeaning executable)
       ⟨runEncoding σs shape (args, result, post), (args, result, post), ⟨same, settled, ok⟩, rfl⟩
@@ -918,12 +985,12 @@ of the same entry values that returns a settled result. -/
 theorem stateOf_eq_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
     {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
     {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
-    (shapeFlat : shape.row.lentFlat = true) {args args' : HList σs}
-    (same : HList.settle σs args = HList.settle σs args') {state post : Memory unit}
+    (shapeFlat : shape.row.lentFlat = true) {args : HList σs} {entries : HListPlain σs}
+    (same : HList.settle σs args = entries) {state post : Memory unit}
     {result : shape.carrier}
     (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post)
     (settled : shape.Settled result) :
-    StateOf (closureMeaning executable) σs shared shape function args' state = post := by
+    StateOf (closureMeaning executable) σs shared shape function entries state = post := by
   obtain ⟨chosen, ⟨sameChosen, settledChosen, okChosen⟩, _, chosenState⟩ :=
     settledEncoding_choose (invoke := closureMeaning executable)
       ⟨runEncoding σs shape (args, result, post), (args, result, post), ⟨same, settled, ok⟩, rfl⟩
@@ -977,21 +1044,26 @@ theorem wp_closureMeaning_unseen {unit : ValidatedUnit} [FunctionCarriers unit]
     {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
     (returns : ∀ result final,
       EnsuresOf (closureMeaning executable) σs shared shape function args result initial final →
-      ¬AbortsOf (closureMeaning executable) σs shared shape function args initial →
-      (∀ default, ResultOf (closureMeaning executable) σs shared shape function args initial
-        default = result) →
-      StateOf (closureMeaning executable) σs shared shape function args initial = final →
+      ¬AbortsOfEntries (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial →
+      (∀ default, ResultOf (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial default = result) →
+      StateOf (closureMeaning executable) σs shared shape function (HList.settle σs args) initial =
+        final →
       ensures result final)
     (fails : ∀ error, AbortsOf (closureMeaning executable) σs shared shape function args initial →
+      AbortsOfEntries (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial →
       aborts error) :
     wp (closureMeaning executable σs shared shape function args) ensures aborts initial := by
   have flat := NRow.lentFlat_of_refFree σs free
   have shapeFlat := NRow.lentFlat_of_refFree shape.row shapeFree
   refine (wp_closureRun_typed executable natives _ args free shapeFree typed decodes
     ensures aborts).mpr
-    ⟨fun result final run => ?_, fun error aborted => fails error ⟨error, aborted⟩⟩
+    ⟨fun result final run => ?_, fun error aborted =>
+      fails error ⟨error, aborted⟩ (abortsOfEntries_of_abortsOf ⟨error, aborted⟩)⟩
   have settled := ResultShape.settled_of_refFree shape shapeFree result
-  exact returns result final run (not_abortsOf_of_ok agrees flat rfl run)
+  exact returns result final run (not_abortsOfEntries_of_ok agrees flat rfl run)
     (resultOf_eq_of_ok agrees flat shapeFlat rfl run settled)
     (stateOf_eq_of_ok agrees flat shapeFlat rfl run settled)
 
@@ -1271,7 +1343,8 @@ theorem HasTypes.map_normalize_of_scalar {unit : ValidatedUnit} {loans : LoanTyp
             HasTypes.map_normalize_of_scalar rest tail tailTyped]
 
 /-- Results of a scalar row decode at their result shape. -/
-theorem RowDecodes.ofScalar {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit] :
+theorem RowDecodes.ofScalar {unit : ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] :
     (shape : ResultShape) → {types : List SemTy} → shape.row.scalarTypes? = some types →
       RowDecodes unit shape types
   | .none, _, scalar => by
@@ -1361,8 +1434,8 @@ theorem wp_named_typed {unit : ValidatedUnit} [FunctionCarriers unit]
     (continued : wp (propheticMeaning executable typeInstantiation handle full shape args)
       (fun result final =>
         EnsuresOf (closureMeaning executable) full shared shape named args result initial final →
-        ¬AbortsOf (closureMeaning executable) full shared shape named (HList.settle full args)
-          initial →
+        ¬AbortsOfEntries (closureMeaning executable) full shared shape named
+          (HList.settle full args) initial →
         (shape.Settled result → ∀ default,
           ResultOf (closureMeaning executable) full shared shape named (HList.settle full args)
             initial default = result) →
@@ -1371,17 +1444,46 @@ theorem wp_named_typed {unit : ValidatedUnit} [FunctionCarriers unit]
             initial = final) →
         ensures result final)
       (fun error =>
-        AbortsOf (closureMeaning executable) full shared shape named args initial → aborts error)
+        AbortsOf (closureMeaning executable) full shared shape named args initial →
+        AbortsOfEntries (closureMeaning executable) full shared shape named
+          (HList.settle full args) initial →
+        aborts error)
       initial) :
     wp (propheticMeaning executable typeInstantiation handle full shape args) ensures aborts
       initial :=
-  have same := (HList.settle_settle full args).symm
+  have same : HList.settle full args = HList.settle full args := rfl
   wp_named naming ⟨fun result final execution ensuresOf => continued.1 result final execution
       ensuresOf
-      (not_abortsOf_of_ok agrees fullFlat same ensuresOf)
+      (not_abortsOfEntries_of_ok agrees fullFlat same ensuresOf)
       (fun settled default => resultOf_eq_of_ok agrees fullFlat shapeFlat same ensuresOf settled
         default)
       (fun settled => stateOf_eq_of_ok agrees fullFlat shapeFlat same ensuresOf settled),
+    fun error aborted abortsOf =>
+      continued.2.1 error aborted abortsOf (abortsOfEntries_of_abortsOf abortsOf),
+    continued.2.2⟩
+
+/-- `wp_call_runs` where runs agree: the call's run also rules out its abort. -/
+theorem wp_call_runs_agree {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit]
+    (agrees : RunsAgree executable)
+    {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
+    {shape : ResultShape} (flat : full.lentFlat = true) {args : HList full}
+    {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
+    {initial : Memory unit}
+    (continued : wp (propheticMeaning executable typeInstantiation handle full shape args)
+      (fun result final =>
+        CallEnsures (propheticMeaning executable typeInstantiation handle full shape args) result
+          initial final →
+        ¬CallAborts (propheticMeaning executable typeInstantiation handle full shape args) initial →
+        ensures result final)
+      (fun error =>
+        CallAborts (propheticMeaning executable typeInstantiation handle full shape args) initial →
+          aborts error)
+      initial) :
+    wp (propheticMeaning executable typeInstantiation handle full shape args) ensures aborts
+      initial :=
+  wp_call_runs ⟨fun result final execution run => continued.1 result final execution run
+      (not_callAborts_of_ok agrees flat run),
     continued.2.1, continued.2.2⟩
 
 /-- Runs of the unit's functions end, at a family: an invocation of a typed
@@ -1639,9 +1741,12 @@ theorem wp_invoke_unseen (invoke : InvokeMeaning) {σs : NRow} {shared : Sharing
     (returns : ∀ result final, EnsuresOf invoke σs shared shape function args result initial final →
       ensures result final)
     (fails : ∀ error, (invoke σs shared shape function args).aborts initial error →
-      AbortsOf invoke σs shared shape function args initial → aborts error) :
+      AbortsOf invoke σs shared shape function args initial →
+      AbortsOfEntries invoke σs shared shape function (HList.settle σs args) initial →
+      aborts error) :
     wp (invoke σs shared shape function args) ensures aborts initial :=
-  ⟨returns, fun error aborted => fails error aborted ⟨error, aborted⟩, defined⟩
+  ⟨returns, fun error aborted =>
+    fails error aborted ⟨error, aborted⟩ (abortsOfEntries_of_abortsOf ⟨error, aborted⟩), defined⟩
 
 omit [Skolems unit] in
 /-- What a verified function's contract states of one of its runs, where
@@ -1665,20 +1770,6 @@ theorem abortOfSatisfies {Args Result : Type} {function : Args → Comp unit Res
     (assumed : contract.assumes args initial) (permitted : contract.requires args initial) :
     ∃ error, contract.aborts args initial error :=
   aborted.imp fun error h => (verified args initial assumed permitted).2.1 error h
-
-omit [Skolems unit] in
-/-- A run of a meaning refining another is a run of the other. -/
-theorem okOfRefines {α : Type} {left right : Comp unit α} (refines : Spec.Refines left right)
-    {initial final : Memory unit} {result : α} (run : left.ok initial result final) :
-    right.ok initial result final :=
-  refines.ok initial result final run
-
-omit [Skolems unit] in
-/-- An abort of a meaning refining another is an abort of the other. -/
-theorem abortsOfRefines {α : Type} {left right : Comp unit α} (refines : Spec.Refines left right)
-    {initial : Memory unit} (aborted : ∃ error, left.aborts initial error) :
-    ∃ error, right.aborts initial error :=
-  aborted.imp fun error h => refines.aborts initial error h
 
 end Model
 

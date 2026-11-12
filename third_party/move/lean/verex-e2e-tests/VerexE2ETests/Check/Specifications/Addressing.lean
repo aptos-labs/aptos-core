@@ -5,13 +5,13 @@ import VerexSL
 
 /-!
 An authored proof addresses an obligation by its key
-(`doc/plan/proof-language.md`, "Obligation addressing"): a callee's
-precondition by the callee's clause and the call, numbered among the calls
-of the callee in source order, so that one call's precondition is routed
-and the other's is not; without the call, every call's. A selector takes
-an obligation's paths by their source decisions: the branch an `if` takes,
-where a path aborts (an `assert!`, an operation), whether it leaves a loop,
-and the arm a `match` takes.
+(`doc/designs/proof-language.md`, "Obligation addressing and provenance"): a
+callee's precondition by the callee's clause and the call, numbered among the
+calls of the callee in source order, so that one call's precondition is routed
+and the other's is not; without the call, every call's. A selector takes an
+obligation's paths by their source decisions: the branch an `if` takes, where a
+path aborts (an `assert!`, an operation), whether it leaves a loop, and the arm
+a `match` takes.
 -/
 
 namespace VerexSL.Tests.Check.Specifications.Addressing

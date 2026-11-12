@@ -24,15 +24,12 @@ structure Owner where
   /-- Zero preserves the unlimited-leaf setting. -/
   limit : Nat
   spent : Nat := 0
+  /-- The part of `spent` that preparation shared with other owners. -/
   preparationSpent : Nat := 0
   deriving Inhabited
 
 def Owner.remaining (owner : Owner) : Option Nat :=
   if owner.limit == 0 then none else some (owner.limit - owner.spent)
-
-def Owner.preparationRemaining (owner : Owner) : Nat :=
-  (if owner.limit == 0 then 1000000 else min 1000000 (owner.limit / 20)) -
-    owner.preparationSpent
 
 structure Ledger where
   owners : Array Owner := #[]
@@ -62,6 +59,18 @@ def Ledger.allocateAfter (ledger : Ledger) (limit : Nat) (debits : Array DebitId
   let owner ← ledger.afterDebits limit debits
   return ({ ledger with owners := ledger.owners.push owner }, ledger.owners.size)
 
+/-- Split the allowances of owners that served a group before its clauses
+existed: each clause takes over what they spent, counted once. -/
+def Ledger.split (ledger : Ledger) (owners : Array OwnerId) (count : Nat) :
+    Ledger × Array OwnerId := Id.run do
+  let mut merged : Owner := { limit := 0 }
+  for id in owners do
+    let some owner := ledger.owners[id]? | continue
+    merged := ⟨max merged.limit owner.limit, max merged.spent owner.spent,
+      max merged.preparationSpent owner.preparationSpent⟩
+  let ids := (Array.range count).map (ledger.owners.size + ·)
+  return ({ ledger with owners := ledger.owners ++ Array.replicate count merged }, ids)
+
 /-- Record physical work once. Allocating each downstream clause later
 inherits its debit without adding the work again to the physical total. -/
 def Ledger.defer (ledger : Ledger) (work : Work) (cost : Nat) : Ledger × DebitId :=
@@ -75,14 +84,13 @@ private def intersect (left right : Option Nat) : Option Nat :=
   | some left, some right => some (min left right)
 
 /-- Every participating owner must have headroom. Unknown or empty owner
-sets fail closed; duplicated identities never create another allowance. -/
-def Ledger.allowance (ledger : Ledger) (owners : Array OwnerId) (work : Work) : Option Nat :=
+sets fail closed; duplicated identities never create another allowance.
+Preparation draws on the same leaf allowance as the leaves it serves. -/
+def Ledger.allowance (ledger : Ledger) (owners : Array OwnerId) : Option Nat :=
   if owners.isEmpty then some 0 else owners.foldl (init := none) fun limit id =>
     match ledger.owners[id]? with
     | none => some 0
-    | some owner => intersect limit <| match work with
-      | .leaf => owner.remaining
-      | .preparation => intersect owner.remaining (some owner.preparationRemaining)
+    | some owner => intersect limit owner.remaining
 
 /-- Charge each distinct owner once, including after an unsuccessful attempt. -/
 def Ledger.charge (ledger : Ledger) (owners : Array OwnerId) (work : Work) (cost : Nat) : Ledger :=
@@ -103,14 +111,13 @@ private def checkTarget (context : Core.Context) : TacticM Unit := do
     Core.throwMaxHeartbeat `verex `maxHeartbeats context.maxHeartbeats
 
 /-- Run one physical operation, bounded by all participating owners and the
-original target deadline. A shared-slice failure leaves the remaining leaf
-allowance available. Only tactic state is rolled back on failure. -/
+original target deadline. Only tactic state is rolled back on failure. -/
 def run (ledger : IO.Ref Ledger) (owners : Array OwnerId) (work : Work)
     (action : TacticM α) : TacticM (Outcome α × Nat) := do
   let context ← readThe Core.Context
   checkTarget context
   let start ← IO.getNumHeartbeats
-  let allowance := (← ledger.get).allowance owners work
+  let allowance := (← ledger.get).allowance owners
   if allowance == some 0 then return (.exhausted, 0)
   let saved ← saveState
   let now ← IO.getNumHeartbeats
@@ -137,7 +144,7 @@ def run (ledger : IO.Ref Ledger) (owners : Array OwnerId) (work : Work)
   | .done _ => pure ()
   | _ => saved.restore
   -- The enclosing deadline is a target failure, never an ordinary leaf or
-  -- shared-slice exhaustion, even when the nested cap caught its exception.
+  -- allowance exhaustion, even when the nested cap caught its exception.
   checkTarget context
   return (outcome, cost)
 
