@@ -18,6 +18,8 @@ use std::sync::Arc;
 pub struct DbStateView {
     db: Arc<dyn DbReader>,
     version: Option<Version>,
+    /// Whether `version` is known to be a block end, which allows a cheaper read.
+    at_checkpoint: bool,
     /// DB doesn't support returning proofs for buffered state, so only optionally verify proof.
     /// TODO: support returning state proof for buffered state.
     maybe_verify_against_state_root_hash: Option<HashValue>,
@@ -37,9 +39,13 @@ impl DbStateView {
                     proof.verify(root_hash, *key.crypto_hash_ref(), value.as_ref())?;
                 }
             }
-            Ok(self
-                .db
-                .get_state_value_with_version_by_version(key, version)?)
+            Ok(if self.at_checkpoint {
+                self.db
+                    .get_state_value_with_version_at_checkpoint(key, version)?
+            } else {
+                self.db
+                    .get_state_value_with_version_by_version(key, version)?
+            })
         } else {
             Ok(None)
         }
@@ -88,6 +94,7 @@ impl LatestDbStateCheckpointView for Arc<dyn DbReader> {
             version: self
                 .get_latest_state_checkpoint_version()
                 .map_err(Into::<StateViewError>::into)?,
+            at_checkpoint: true,
             maybe_verify_against_state_root_hash: None,
         })
     }
@@ -102,6 +109,7 @@ impl DbStateViewAtVersion for Arc<dyn DbReader> {
         Ok(DbStateView {
             db: self.clone(),
             version,
+            at_checkpoint: false,
             maybe_verify_against_state_root_hash: None,
         })
     }
@@ -137,12 +145,14 @@ impl VerifiedStateViewAtVersion for Arc<dyn DbReader> {
             Ok(DbStateView {
                 db,
                 version: Some(version),
+                at_checkpoint: true,
                 maybe_verify_against_state_root_hash: Some(state_root_hash),
             })
         } else {
             Ok(DbStateView {
                 db,
                 version: None,
+                at_checkpoint: true,
                 maybe_verify_against_state_root_hash: None,
             })
         }
