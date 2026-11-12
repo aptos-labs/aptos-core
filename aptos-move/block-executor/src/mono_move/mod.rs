@@ -60,9 +60,9 @@ use std::{
 pub(crate) mod group_chain;
 mod provider;
 
-use provider::{BlockSTMParallelProvider, BlockSTMSequentialProvider};
 #[cfg(test)]
-pub(crate) use provider::{ParallelReader, StorageBase};
+pub(crate) use provider::ParallelReader;
+use provider::{BlockSTMParallelProvider, BlockSTMSequentialProvider};
 
 /// An in-memory write produced by MonoMove transaction execution. This write
 /// can be later converted to storage format if needed.
