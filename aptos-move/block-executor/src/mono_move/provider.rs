@@ -70,7 +70,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         key: &InMemoryStorageKey,
         blob: &[u8],
     ) -> Result<StorageRead, ResourceProviderError> {
-        let value = self.deserialize_value(key, blob)?;
+        let value = deserialize_value(self.guard, self.arena, key.value_ty(), blob)?;
         let read = value.as_storage_read(None)?;
         self.unsync_map.set_base_value(key.clone(), value);
         Ok(read)
@@ -81,25 +81,6 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         self.unsync_map
             .set_base_value(key.clone(), MonoValue::Deletion);
         StorageRead::DoesNotExist { version: None }
-    }
-
-    /// The group's stored members, decoded from the base view. Empty if no
-    /// group is stored there.
-    fn get_pre_block_group(
-        &self,
-        group_key: &InMemoryStorageKey,
-    ) -> Result<GroupView, ResourceProviderError> {
-        let state_key = group_key
-            .as_state_key()
-            .map_err(|e| invariant_violation(format!("{e:#}")))?;
-        match self
-            .base_view
-            .get_state_value(&state_key)
-            .map_err(|e| invariant_violation(format!("Group read failed: {e}")))?
-        {
-            Some(value) => decode_group_view(value.bytes()),
-            None => Ok(GroupView::default()),
-        }
     }
 
     /// Reads one member of a resource group. `key` names the member's own slot,
@@ -125,9 +106,10 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
                 ))
             },
             None => {
-                let metadata = Arc::new(GroupMetadata::from_storage(
-                    self.get_pre_block_group(group_key)?,
-                ));
+                let metadata = Arc::new(GroupMetadata::from_storage(get_pre_block_group(
+                    self.base_view,
+                    group_key,
+                )?));
                 self.unsync_map
                     .set_base_value(group_key.clone(), MonoValue::GroupMetadata {
                         group: metadata.clone(),
@@ -138,21 +120,10 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         let view = metadata
             .current()
             .ok_or_else(|| invariant_violation("The group slot's metadata has no view"))?;
-        let tag = member_tag(key.value_ty()).map_err(invariant_violation)?;
-        match view.get(&tag) {
-            Some(blob) => self.cache_existing_value(key, blob),
-            None => Ok(self.cache_not_existing_value(key)),
-        }
-    }
-
-    /// Deserializes a stored value of the type `key` names into this worker's
-    /// arena.
-    fn deserialize_value(
-        &self,
-        key: &InMemoryStorageKey,
-        blob: &[u8],
-    ) -> Result<MonoValue, ResourceProviderError> {
-        deserialize_value(self.guard, self.arena, key.value_ty(), blob)
+        let value = get_group_member(self.guard, self.arena, &view, key)?;
+        let read = value.as_storage_read(None)?;
+        self.unsync_map.set_base_value(key.clone(), value);
+        Ok(read)
     }
 }
 
@@ -206,6 +177,47 @@ fn deserialize_value(
         kind: WriteOpKind::Modification,
         pin,
     })
+}
+
+/// The bytes stored at `key` before the block, or [`None`] for an empty slot.
+fn get_pre_block_value(
+    base_view: &impl TStateView<Key = StateKey>,
+    key: &InMemoryStorageKey,
+) -> Result<Option<Bytes>, ResourceProviderError> {
+    let state_key = key
+        .as_state_key()
+        .map_err(|e| invariant_violation(format!("{e:#}")))?;
+    Ok(base_view
+        .get_state_value(&state_key)
+        .map_err(|e| invariant_violation(format!("Storage read failed: {e}")))?
+        .map(|value| value.bytes().clone()))
+}
+
+/// The members of the group stored at `group_key` before the block. Empty if
+/// no group is stored there.
+fn get_pre_block_group(
+    base_view: &impl TStateView<Key = StateKey>,
+    group_key: &InMemoryStorageKey,
+) -> Result<GroupView, ResourceProviderError> {
+    match get_pre_block_value(base_view, group_key)? {
+        Some(blob) => decode_group_view(&blob),
+        None => Ok(GroupView::default()),
+    }
+}
+
+/// The value of the member at `key` in the group `view`, deserialized into
+/// `arena`, or a deletion if the group has no such member.
+fn get_group_member(
+    guard: &ExecutionGuard<'_>,
+    arena: &SegmentedArena,
+    view: &GroupView,
+    key: &InMemoryStorageKey,
+) -> Result<MonoValue, ResourceProviderError> {
+    let tag = member_tag(key.value_ty()).map_err(invariant_violation)?;
+    match view.get(&tag) {
+        Some(blob) => deserialize_value(guard, arena, key.value_ty(), blob),
+        None => Ok(MonoValue::Deletion),
+    }
 }
 
 /// Decodes a stored group's blob into its view.
@@ -386,43 +398,15 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
         self.reader.speculative_failure()
     }
 
-    /// The bytes stored at `key` before the block, or [`None`] for an empty
-    /// slot.
-    fn get_pre_block_value(
-        &self,
-        key: &InMemoryStorageKey,
-    ) -> Result<Option<Bytes>, ResourceProviderError> {
-        let state_key = key
-            .as_state_key()
-            .map_err(|e| invariant_violation(format!("{e:#}")))?;
-        Ok(self
-            .base_view
-            .get_state_value(&state_key)
-            .map_err(|e| invariant_violation(format!("Storage read failed: {e}")))?
-            .map(|value| value.bytes().clone()))
-    }
-
     /// The value stored at `key` before the block, or a deletion for an empty
     /// slot.
     fn get_pre_block_resource(
         &self,
         key: &InMemoryStorageKey,
     ) -> Result<MonoValue, ResourceProviderError> {
-        match self.get_pre_block_value(key)? {
+        match get_pre_block_value(self.base_view, key)? {
             Some(blob) => deserialize_value(self.guard, self.arena, key.value_ty(), &blob),
             None => Ok(MonoValue::Deletion),
-        }
-    }
-
-    /// The members of the group stored at `group_key` before the block. Empty
-    /// if no group is stored there.
-    fn get_pre_block_group(
-        &self,
-        group_key: &InMemoryStorageKey,
-    ) -> Result<GroupView, ResourceProviderError> {
-        match self.get_pre_block_value(group_key)? {
-            Some(blob) => decode_group_view(&blob),
-            None => Ok(GroupView::default()),
         }
     }
 }
@@ -443,15 +427,9 @@ impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMParallelProvide
                     let group = self
                         .reader
                         .get_or_initialize_pre_block_group(&group_key, || {
-                            self.get_pre_block_group(&group_key)
+                            get_pre_block_group(self.base_view, &group_key)
                         })?;
-                    let tag = member_tag(key.value_ty()).map_err(invariant_violation)?;
-                    match group.get(&tag) {
-                        Some(blob) => {
-                            deserialize_value(self.guard, self.arena, key.value_ty(), blob)
-                        },
-                        None => Ok(MonoValue::Deletion),
-                    }
+                    get_group_member(self.guard, self.arena, &group, key)
                 })
             },
         }

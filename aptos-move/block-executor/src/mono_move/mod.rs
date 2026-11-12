@@ -341,15 +341,6 @@ impl std::fmt::Debug for MonoTxnOutput {
     }
 }
 
-/// Wraps an outcome so the output and the read set can share it.
-//
-// The outcome is neither `Send` nor `Sync`; the output and the read set that
-// share it vouch for that.
-#[allow(clippy::arc_with_non_send_sync)]
-fn shared_outcome(outcome: TxnOutcome) -> Arc<TxnOutcome> {
-    Arc::new(outcome)
-}
-
 /// The frozen effects of a committed, executed transaction, or `None` for a
 /// discard or an empty-effects commit (both write nothing).
 fn committed_effects(outcome: &TxnOutcome) -> Option<&SessionEffects> {
@@ -755,7 +746,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
     ) -> Result<(ExecutionStatus<Self::Output>, Self::Input), PanicError> {
         let guard = self.execution_guard()?;
 
-        let (outcome, skips_rest, reads, unsync_map) = match mode {
+        let (outcome, skips_rest, incarnation, unsync_map) = match mode {
             ViewMode::Sequential { unsync_map, .. } => {
                 let provider = BlockSTMSequentialProvider::new(
                     &guard,
@@ -765,15 +756,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 );
                 let (outcome, skips_rest) =
                     self.run(&guard, shared.base_view, &provider, txn, auxiliary_info)?;
-                let outcome = shared_outcome(outcome);
-                // Sequential execution never validates, so the read set is
-                // not collected.
-                (
-                    outcome,
-                    skips_rest,
-                    MonoReads::empty(None),
-                    Some(unsync_map),
-                )
+                (outcome, skips_rest, None, Some(unsync_map))
             },
             ViewMode::Parallel {
                 versioned_map,
@@ -801,10 +784,20 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     ));
                 }
                 let (outcome, skips_rest) = result?;
-                let outcome = shared_outcome(outcome);
-                let reads = MonoReads::new(outcome.clone(), incarnation);
-                (outcome, skips_rest, reads, None)
+                (outcome, skips_rest, Some(incarnation), None)
             },
+        };
+
+        // The read set validates from the outcome's read-write set, so it shares
+        // the outcome with the output. The outcome is neither `Send` nor `Sync`;
+        // both vouch for that.
+        #[allow(clippy::arc_with_non_send_sync)]
+        let outcome = Arc::new(outcome);
+        let reads = match incarnation {
+            Some(incarnation) => MonoReads::new(outcome.clone(), incarnation),
+            // Sequential execution never validates, so the read set is not
+            // collected.
+            None => MonoReads::empty(None),
         };
 
         let output = MonoTxnOutput::executed(outcome, skips_rest);
