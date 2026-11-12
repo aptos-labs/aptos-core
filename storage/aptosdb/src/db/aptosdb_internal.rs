@@ -2,7 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    db::AptosDB,
+    db::{
+        exact_state_read::{BlockRangeCache, MAX_CACHED_BLOCK_RANGES},
+        AptosDB,
+    },
     event_store::EventStore,
     ledger_db::LedgerDb,
     metrics::{API_LATENCY_SECONDS, CONCURRENCY_GAUGE},
@@ -116,6 +119,7 @@ impl AptosDB {
             position: None,
             order: None,
             collateral: None,
+            block_range_cache: BlockRangeCache::new(MAX_CACHED_BLOCK_RANGES),
         }
     }
 

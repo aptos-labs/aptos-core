@@ -87,6 +87,12 @@ impl DbWriter for AptosDB {
                 sync_commit || chunk.is_reconfig,
             )?;
 
+            // So that exact reads of recent blocks don't look up their ranges.
+            self.block_range_cache.insert_blocks(
+                chunk.first_version,
+                chunk.state_update_refs.all_checkpoint_versions(),
+            );
+
             Ok(())
         })
     }

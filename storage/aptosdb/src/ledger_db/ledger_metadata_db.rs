@@ -287,6 +287,22 @@ impl LedgerMetadataDb {
         Ok(block_height)
     }
 
+    /// Returns the first version of the indexed block containing `version`, and that of the next
+    /// indexed block if any. `None` if no block at or before `version` is indexed.
+    pub(crate) fn get_block_boundaries_by_version(
+        &self,
+        version: Version,
+    ) -> Result<Option<(Version, Option<Version>)>> {
+        let mut iter = self.db.iter::<BlockByVersionSchema>()?;
+        iter.seek_for_prev(&version)?;
+        let Some((first_version, _)) = iter.next().transpose()? else {
+            return Ok(None);
+        };
+        let next_first_version = iter.next().transpose()?.map(|(version, _)| version);
+
+        Ok(Some((first_version, next_first_version)))
+    }
+
     pub(crate) fn get_block_height_at_or_after_version(
         &self,
         version: Version,

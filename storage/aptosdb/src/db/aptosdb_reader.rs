@@ -694,8 +694,9 @@ impl DbReader for AptosDB {
         gauged_api("get_state_value_by_version", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
-            self.state_store
-                .get_state_value_by_version(state_store_key, version)
+            Ok(self
+                .get_state_value_with_version_exact(state_store_key, version)?
+                .map(|(_, value)| value))
         })
     }
 
@@ -706,6 +707,26 @@ impl DbReader for AptosDB {
     ) -> Result<Option<(Version, StateValue)>> {
         gauged_api("get_state_value_with_version_by_version", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
+
+            self.get_state_value_with_version_exact(state_key, version)
+        })
+    }
+
+    fn get_state_value_with_version_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        gauged_api("get_state_value_with_version_at_checkpoint", || {
+            self.error_if_state_kv_pruned("StateValue", version)?;
+            // Skipped if the txn info is unavailable (e.g. pruned).
+            debug_assert!(
+                self.ledger_db
+                    .transaction_info_db()
+                    .get_transaction_info(version)
+                    .map_or(true, |txn_info| txn_info.has_state_checkpoint_hash()),
+                "Version {version} is not a block end.",
+            );
 
             self.state_store
                 .get_state_value_with_version_by_version(state_key, version)

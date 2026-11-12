@@ -50,6 +50,7 @@ pub struct AptosDB {
     pub(crate) position: Option<Arc<PositionBundle>>,
     pub(crate) order: Option<Arc<OrderBundle>>,
     pub(crate) collateral: Option<Arc<CollateralBundle>>,
+    block_range_cache: BlockRangeCache,
 }
 
 // DbReader implementations and private functions used by them.
@@ -58,6 +59,9 @@ mod aptosdb_reader;
 mod aptosdb_writer;
 // Other private methods.
 mod aptosdb_internal;
+// Exact state reads in the middle of a block.
+mod exact_state_read;
+use exact_state_read::BlockRangeCache;
 // Native-position subsystem: `PositionBundle` + `impl AptosDB` for
 // `position()` / `init_native_position()`.
 mod aptosdb_native_position;

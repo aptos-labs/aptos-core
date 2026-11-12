@@ -83,6 +83,55 @@ impl TransactionInfoDb {
         iter.expect_continuous_versions(start_version, num_transaction_infos)
     }
 
+    /// Returns the first version at or after `version` whose transaction info has a state
+    /// checkpoint hash, or `None` if the transaction infos end before one.
+    pub(crate) fn get_checkpoint_version_at_or_after(
+        &self,
+        version: Version,
+    ) -> Result<Option<Version>> {
+        let mut iter = self.db.iter::<TransactionInfoSchema>()?;
+        iter.seek(&version)?;
+        for (expected_version, item) in (version..).zip(iter) {
+            let (version, transaction_info) = item?;
+            if version != expected_version {
+                return Err(Self::missing(expected_version));
+            }
+            if transaction_info.has_state_checkpoint_hash() {
+                return Ok(Some(version));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Returns the last version in `[min_version, version)` whose transaction info has a state
+    /// checkpoint hash, or `None` if there is none.
+    pub(crate) fn get_checkpoint_version_before(
+        &self,
+        version: Version,
+        min_version: Version,
+    ) -> Result<Option<Version>> {
+        if version <= min_version {
+            return Ok(None);
+        }
+        let mut iter = self.db.rev_iter::<TransactionInfoSchema>()?;
+        iter.seek_for_prev(&(version - 1))?;
+        for expected_version in (min_version..version).rev() {
+            let (version, transaction_info) = iter
+                .next()
+                .transpose()?
+                .filter(|(version, _)| *version == expected_version)
+                .ok_or_else(|| Self::missing(expected_version))?;
+            if transaction_info.has_state_checkpoint_hash() {
+                return Ok(Some(version));
+            }
+        }
+        Ok(None)
+    }
+
+    fn missing(version: Version) -> AptosDbError {
+        AptosDbError::NotFound(format!("No TransactionInfo at version {}", version))
+    }
+
     /// Returns transaction info at `version` with proof towards root of ledger at `ledger_version`.
     pub(crate) fn get_transaction_info_with_proof(
         &self,
