@@ -13,15 +13,14 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
-use bytes::Bytes;
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
-use move_core_types::language_storage::{ModuleId, StructTag};
+use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, Script};
 use move_vm_types::code::{ModuleCache, ModuleCode, UnsyncModuleCache, UnsyncScriptCache};
 use serde::Serialize;
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     fmt::Debug,
     hash::Hash,
     sync::{
@@ -29,10 +28,6 @@ use std::{
         Arc,
     },
 };
-
-/// A resource group's current members. [`None`] if the group does not exist
-/// in storage.
-type ResourceGroupEntry = Option<BTreeMap<StructTag, Bytes>>;
 
 /// UnsyncMap is designed to mimic the functionality of MVHashMap for sequential execution.
 /// In this case only the latest recorded version is relevant, simplifying the implementation.
@@ -48,12 +43,6 @@ pub struct UnsyncMap<K, T, V, I> {
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
-
-    /// Current members of each resource group touched this block, initialized
-    /// from storage on the first touch and then overwritten when transaction
-    /// commits.
-    // TODO(cleanup): unify with group cache used by V1 VM.
-    groups: RefCell<HashMap<K, ResourceGroupEntry>>,
 }
 
 impl<K, T, V, I> UnsyncMap<K, T, V, I>
@@ -73,7 +62,6 @@ where
             delayed_field_map: RefCell::new(HashMap::new()),
             total_base_resource_size: AtomicU64::new(0),
             total_base_delayed_field_size: AtomicU64::new(0),
-            groups: RefCell::new(HashMap::new()),
         }
     }
 
@@ -287,26 +275,6 @@ where
             Ordering::Relaxed,
         );
         self.delayed_field_map.borrow_mut().insert(id, value);
-    }
-
-    /// Returns the group if exists in the cache.
-    pub fn get_group(&self, key: &K) -> Option<ResourceGroupEntry> {
-        self.groups.borrow().get(key).cloned()
-    }
-
-    /// Returns the group member's bytes if the group is cached. The outer
-    /// option tells whether the group is cached, the inner one whether it has
-    /// this member.
-    pub fn get_group_member(&self, key: &K, tag: &StructTag) -> Option<Option<Bytes>> {
-        self.groups
-            .borrow()
-            .get(key)
-            .map(|entry| entry.as_ref().and_then(|members| members.get(tag).cloned()))
-    }
-
-    /// Initializes or overwrites the group.
-    pub fn insert_group(&self, key: K, members: ResourceGroupEntry) {
-        self.groups.borrow_mut().insert(key, members);
     }
 }
 

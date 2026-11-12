@@ -25,16 +25,14 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
-use bytes::Bytes;
+use group_chain::{
+    committed_member_value, group_write, view_below, GroupCodec, GroupLink, MonoGroupCodec,
+};
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
-    production_natives, AptosDataProvider, AptosTransactionExecutor, DiscardReason, TxnOutcome,
+    production_natives, AptosTransactionExecutor, DiscardReason, TxnOutcome,
 };
-use mono_move_core::{
-    nominal_tag,
-    storage::resource_provider::{InMemoryStorageKey, ReadPin},
-    types::InternedType,
-};
+use mono_move_core::storage::resource_provider::{InMemoryStorageKey, ReadPin, ResourceProvider};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_runtime::{SegmentedArena, SessionEffects, WriteClass};
 use move_core_types::language_storage::{ModuleId, StructTag};
@@ -45,6 +43,7 @@ use std::{
     sync::Arc,
 };
 
+pub(crate) mod group_chain;
 mod provider;
 mod reads;
 
@@ -59,34 +58,19 @@ pub use reads::MonoReads;
 /// can be later converted to storage format if needed.
 #[derive(Clone)]
 pub enum MonoValue {
-    /// A resource-group member's bytes as storage holds them, not yet
-    /// deserialized.
-    ///
-    /// A group is stored as one blob that maps member tags to bytes, without
-    /// the members' types. Deserializing a member needs its type's layout and
-    /// GC descriptor, which exist only once a function using the type is
-    /// lowered. The group still enters the map whole, as Block-STM tracks its
-    /// tags as one unit, so every member starts as bytes. The first reader that
-    /// knows a member's type replaces it with [`MonoValue::Write`]. A member
-    /// nobody reads is written back as these bytes, never deserialized.
-    ResourceGroupMemberBytes(Bytes),
     Write {
         ptr: NonNull<u8>,
-        /// The value's interned type, so that any transaction assembling the
-        /// enclosing group's blob can serialize this member.
-        ty: InternedType,
         kind: WriteOpKind,
         /// Pins the allocation backing the pointer. As long as we hold the pin,
         /// using the pointer is safe.
         pin: Arc<dyn ReadPin>,
     },
     Deletion,
-    /// The value Block-STM versions at a resource group's own slot. MonoMove
-    /// carries no group metadata, but the slot still has to hold an entry: the
-    /// block executor writes and removes it alongside the group's members.
+    /// An entry at a resource group's own slot: the stored group, or one
+    /// transaction's changes to it. Group members live under their own keys.
     //
     // TODO(completeness): add state value metadata here.
-    GroupMetadata,
+    GroupLink(Arc<GroupLink>),
 }
 
 // SAFETY: The value stores the pointer to the immutable value in a frozen,
@@ -102,54 +86,41 @@ impl SpeculativeValue for MonoValue {
         false
     }
 
-    fn eq_metadata(&self, other: &Self) -> bool {
-        // TODO(cleanup): refactor group metadata to not be a write op.
-        //
-        // Only a group slot carries metadata, and MonoMove's is always the same.
-        matches!(
-            (self, other),
-            (MonoValue::GroupMetadata, MonoValue::GroupMetadata)
-        )
+    fn eq_metadata(&self, _other: &Self) -> bool {
+        // MonoMove versions no group metadata. False here only forces
+        // re-validation, so safe to use.
+        false
     }
 
     fn bytes_len(&self) -> Option<usize> {
         // TODO(cleanup): this is only used for memory logging, revisit.
-        //
-        // Returning `None` everywhere also keeps every group size at
-        // `ResourceGroupSize::zero_combined()`, so group sizes never
-        // participate in validation.
         match self {
             // A heap value's serialized size is unknown until materialization.
             MonoValue::Write { .. } => None,
-            MonoValue::ResourceGroupMemberBytes(_) => None,
             MonoValue::Deletion => None,
-            MonoValue::GroupMetadata => None,
+            MonoValue::GroupLink(_) => None,
         }
     }
 
     fn write_op_kind(&self) -> WriteOpKind {
         match self {
             MonoValue::Write { kind, .. } => kind.clone(),
-            MonoValue::ResourceGroupMemberBytes(_) | MonoValue::GroupMetadata => {
-                WriteOpKind::Modification
-            },
+            MonoValue::GroupLink(_) => WriteOpKind::Modification,
             MonoValue::Deletion => WriteOpKind::Deletion,
         }
     }
 }
 
-/// Builds the map value for a write of `ty`, pinned to the heap it lives in.
-fn written_value(class: WriteClass, ty: InternedType, pin: &Arc<dyn ReadPin>) -> MonoValue {
+/// Builds the map value for a write, pinned to the heap it lives in.
+fn written_value(class: WriteClass, pin: &Arc<dyn ReadPin>) -> MonoValue {
     match class {
         WriteClass::Creation(ptr) => MonoValue::Write {
             ptr,
-            ty,
             kind: WriteOpKind::Creation,
             pin: pin.clone(),
         },
         WriteClass::Modification(ptr) => MonoValue::Write {
             ptr,
-            ty,
             kind: WriteOpKind::Modification,
             pin: pin.clone(),
         },
@@ -165,11 +136,10 @@ pub enum MonoTxnOutput {
         /// Whether this transaction emitted a reconfiguration (new-epoch) event,
         /// after which the block executor skips the remaining transactions.
         skips_rest: bool,
-        /// Writes that land in a storage slot of their own.
+        /// Writes keyed by their own storage slot. Resource-group members
+        /// are keyed like plain resources, and each group with a written
+        /// member also gets a [`MonoValue::GroupLink`] at its own slot.
         resource_writes: HashMap<InMemoryStorageKey, MonoValue>,
-        /// Writes that land inside a resource group, keyed by the group's own
-        /// storage slot and tagged by the member's struct tag.
-        group_writes: HashMap<InMemoryStorageKey, BTreeMap<StructTag, MonoValue>>,
     },
     /// Signals block executor that this transaction has to be skipped and
     /// retried later.
@@ -208,35 +178,28 @@ fn committed_effects(outcome: &TxnOutcome) -> Option<&SessionEffects> {
 }
 
 impl MonoTxnOutput {
-    /// Splits the transaction's writes into flat storage slots and
-    /// resource-group members. The block executor reads both back several times
-    /// per commit, so the effects are walked once here.
-    ///
-    /// A group member whose type has no struct tag cannot be written to storage
-    /// at all, so it is left out; materialization reports it as a failure.
+    /// Collects the transaction's writes. The block executor reads them back
+    /// several times per commit, so the effects are walked once here.
     fn executed(outcome: TxnOutcome, skips_rest: bool) -> Self {
         let mut resource_writes = HashMap::new();
-        let mut group_writes: HashMap<_, BTreeMap<_, _>> = HashMap::new();
 
         if let Some(effects) = committed_effects(&outcome) {
             let pin: Arc<dyn ReadPin> = effects.frozen_heap();
+            let mut changed_groups: HashMap<_, Vec<_>> = HashMap::new();
             for (key, class, group) in effects.read_write_set().writes_unordered() {
-                let ty = key.value_ty();
-                let value = written_value(class, ty, &pin);
-                match group {
-                    None => {
-                        resource_writes.insert(key.clone(), value);
-                    },
-                    Some(group_ty) => {
-                        let Ok(tag) = nominal_tag(ty) else {
-                            continue;
-                        };
-                        group_writes
-                            .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
-                            .or_default()
-                            .insert(tag, value);
-                    },
+                if let Some(group_ty) = group {
+                    changed_groups
+                        .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
+                        .or_default()
+                        .push(key.value_ty());
                 }
+                resource_writes.insert(key.clone(), written_value(class, &pin));
+            }
+            for (group_key, changed) in changed_groups {
+                resource_writes.insert(
+                    group_key,
+                    MonoValue::GroupLink(Arc::new(GroupLink::changed(changed))),
+                );
             }
         }
 
@@ -244,8 +207,24 @@ impl MonoTxnOutput {
             outcome,
             skips_rest,
             resource_writes,
-            group_writes,
         }
+    }
+
+    /// The group links this transaction wrote, keyed by group slot.
+    fn group_links(&self) -> Vec<(InMemoryStorageKey, Arc<GroupLink>)> {
+        let MonoTxnOutput::Executed {
+            resource_writes, ..
+        } = self
+        else {
+            return vec![];
+        };
+        resource_writes
+            .iter()
+            .filter_map(|(key, value)| match value {
+                MonoValue::GroupLink(link) => Some((key.clone(), link.clone())),
+                MonoValue::Write { .. } | MonoValue::Deletion => None,
+            })
+            .collect()
     }
 }
 
@@ -286,24 +265,8 @@ impl TxnOutput for MonoTxnOutput {
             BTreeMap<Self::Tag, Self::Value>,
         ),
     > {
-        let MonoTxnOutput::Executed { group_writes, .. } = self else {
-            return HashMap::new();
-        };
-        group_writes
-            .iter()
-            .map(|(group_key, members)| {
-                (
-                    group_key.clone(),
-                    (
-                        MonoValue::GroupMetadata,
-                        // Every `MonoValue` reports no serialized length, so
-                        // this is also what the map computes for the group.
-                        ResourceGroupSize::zero_combined(),
-                        members.clone(),
-                    ),
-                )
-            })
-            .collect()
+        // Group members are written as plain resources.
+        HashMap::new()
     }
 
     fn for_each_resource_key(
@@ -324,14 +287,9 @@ impl TxnOutput for MonoTxnOutput {
 
     fn for_each_resource_group_key_and_tags(
         &self,
-        callback: &mut dyn FnMut(&Self::Key, HashSet<&Self::Tag>) -> Result<(), PanicError>,
+        _callback: &mut dyn FnMut(&Self::Key, HashSet<&Self::Tag>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
-        let MonoTxnOutput::Executed { group_writes, .. } = self else {
-            return Ok(());
-        };
-        for (group_key, members) in group_writes {
-            callback(group_key, members.keys().collect())?;
-        }
+        // Group members are written as plain resources.
         Ok(())
     }
 
@@ -421,7 +379,7 @@ impl MonoTransactionExecutor {
 
     /// Runs the transaction against `data_provider`, returning its outcome and
     /// whether it cut the block short with a reconfiguration event.
-    fn run<'g, S: TStateView<Key = StateKey> + Sync, P: AptosDataProvider>(
+    fn run<'g, S: TStateView<Key = StateKey> + Sync, P: ResourceProvider>(
         &self,
         guard: &'g ExecutionGuard<'g>,
         base_view: &S,
@@ -511,7 +469,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
     ) -> Result<(ExecutionStatus<Self::Output>, Self::Input), PanicError> {
         let guard = self.execution_guard()?;
 
-        let (outcome, skips_rest, reads) = match mode {
+        let (outcome, skips_rest, reads, unsync_map) = match mode {
             ViewMode::Sequential { unsync_map, .. } => {
                 let provider = BlockSTMSequentialProvider::new(
                     &guard,
@@ -523,7 +481,12 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     self.run(&guard, shared.base_view, &provider, txn, auxiliary_info)?;
                 // Sequential execution never validates, so the read set is
                 // not collected.
-                (outcome, skips_rest, MonoReads::empty(None))
+                (
+                    outcome,
+                    skips_rest,
+                    MonoReads::empty(None),
+                    Some(unsync_map),
+                )
             },
             ViewMode::Parallel {
                 versioned_map,
@@ -552,33 +515,47 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 }
                 let (outcome, skips_rest) = result?;
                 let reads = match outcome.read_write_set() {
-                    Some(rws) => MonoReads::from_read_write_set(rws, incarnation)?,
+                    Some(rws) => MonoReads::from_read_write_set(rws, incarnation),
                     None => MonoReads::empty(Some(incarnation)),
                 };
-                (outcome, skips_rest, reads)
+                (outcome, skips_rest, reads, None)
             },
         };
 
-        Ok((
-            ExecutionStatus::Executed {
-                output: MonoTxnOutput::executed(outcome, skips_rest),
-                skips_rest,
-            },
-            reads,
-        ))
+        let output = MonoTxnOutput::executed(outcome, skips_rest);
+        // Sequential execution applies this transaction's writes before it is
+        // materialized, replacing the previous link at each group's slot. That
+        // link's view is already built, so this transaction's link keeps it.
+        if let Some(unsync_map) = unsync_map {
+            for (group_key, link) in output.group_links() {
+                let prev = match unsync_map.fetch_data(&group_key) {
+                    Some(MonoValue::GroupLink(prev)) => prev.built_view().cloned(),
+                    Some(MonoValue::Write { .. } | MonoValue::Deletion) | None => None,
+                }
+                .ok_or_else(|| {
+                    code_invariant_error(format!(
+                        "Group {group_key:?} was written before it was read"
+                    ))
+                })?;
+                link.set_prev(prev)?;
+            }
+        }
+
+        Ok((ExecutionStatus::Executed { output, skips_rest }, reads))
     }
 
     fn materialize<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(
         &self,
         output: Self::Output,
         _input: &Self::Input,
-        shared: SharedViewArgs<'_, S>,
+        _shared: SharedViewArgs<'_, S>,
         mode: ViewMode<'_, Self::Input>,
         txn_idx: TxnIndex,
     ) -> Result<
         <Self::Output as TxnOutput>::CommittedOutput,
         PanicOr<ResourceGroupSerializationError>,
     > {
+        let links = output.group_links();
         let outcome = match output {
             MonoTxnOutput::Executed { outcome, .. } => outcome,
             // A skipped output renders to an empty, kept-success transaction.
@@ -602,50 +579,50 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         let materialization_failed =
             |e| PanicOr::CodeInvariantError(format!("Failed to materialize outputs: {e}"));
 
-        match mode {
-            ViewMode::Sequential { unsync_map, .. } => {
-                let provider = BlockSTMSequentialProvider::new(
-                    &guard,
-                    shared.base_view,
-                    unsync_map,
-                    &self.arena,
-                );
-                let (output, groups) = outcome
-                    .materialize(&guard, &provider, features, auxiliary_data)
-                    .map_err(materialization_failed)?;
+        // Group members are left out: their groups are assembled below from
+        // the links this transaction wrote.
+        let mut output = outcome
+            .materialize(&guard, None, features, auxiliary_data)
+            .map_err(materialization_failed)?;
 
-                // Cache each group this transaction assembled so a later
-                // transaction touching the same group merges on top of it. The
-                // groups come in an unspecified order, which is fine: each key
-                // is inserted once, into a map.
-                for (group_key, members) in groups.into_iter_unordered() {
-                    unsync_map.insert_group(group_key, members);
-                }
-                Ok(output)
-            },
-            ViewMode::Parallel {
-                versioned_map,
-                scheduler,
-                incarnation,
-                ..
-            } => {
-                let provider = BlockSTMParallelProvider::new(
-                    &guard,
-                    shared.base_view,
-                    versioned_map,
-                    scheduler,
-                    txn_idx,
-                    incarnation,
-                    &self.arena,
-                );
-                // Groups are assembled from the versioned map on demand, so
-                // nothing is cached back here.
-                let (output, _groups) = outcome
-                    .materialize(&guard, &provider, features, auxiliary_data)
-                    .map_err(materialization_failed)?;
-                Ok(output)
-            },
+        let codec = MonoGroupCodec { guard: &guard };
+        for (group_key, link) in &links {
+            let (prev, view) = match &mode {
+                ViewMode::Sequential { unsync_map, .. } => {
+                    let prev = link.prev().cloned().ok_or_else(|| {
+                        code_invariant_error("A sequential group link has no previous view")
+                    })?;
+                    // Sequential execution applied this transaction's writes
+                    // before materializing it, and no later one has run yet.
+                    let view = link.view_on(&codec, &prev, |member_ty| {
+                        unsync_map
+                            .fetch_data(&codec.member_key(group_key, member_ty))
+                            .ok_or_else(|| {
+                                code_invariant_error(format!(
+                                    "No write for a member of {group_key:?} in sequential \
+                                     execution"
+                                ))
+                            })
+                    })?;
+                    (prev, view)
+                },
+                ViewMode::Parallel { versioned_map, .. } => {
+                    let data = versioned_map.data();
+                    let prev = view_below(data, &codec, group_key, txn_idx)?;
+                    let view = link.view_on(&codec, &prev, |member_ty| {
+                        committed_member_value(data, &codec, group_key, member_ty, txn_idx)
+                    })?;
+                    (prev, view)
+                },
+            };
+            let state_key = group_key
+                .as_state_key()
+                .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))?;
+            output
+                .write_set_mut()
+                .insert_value_write(state_key, group_write(!prev.is_empty(), &view)?);
         }
+        Ok(output)
     }
 
     fn check_materialization<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(

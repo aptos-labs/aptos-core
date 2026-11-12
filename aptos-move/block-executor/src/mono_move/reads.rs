@@ -13,21 +13,14 @@ use crate::{
 };
 use aptos_mvhashmap::{
     types::{
-        Incarnation, MVDataError, MVDataOutput, MVGroupError, StorageVersion, TxnIndex,
-        Version as MVVersion,
+        Incarnation, MVDataError, MVDataOutput, StorageVersion, TxnIndex, Version as MVVersion,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
     versioned_group_data::VersionedGroupData,
 };
-use aptos_types::{
-    error::{code_invariant_error, PanicError},
-    vm::modules::AptosModuleExtension,
-};
-use mono_move_core::{
-    nominal_tag,
-    storage::resource_provider::{InMemoryStorageKey, Version},
-};
+use aptos_types::{error::PanicError, vm::modules::AptosModuleExtension};
+use mono_move_core::storage::resource_provider::{InMemoryStorageKey, Version};
 use mono_move_runtime::ResourceReadWriteSet;
 use move_binary_format::CompiledModule;
 use move_core_types::language_storage::{ModuleId, StructTag};
@@ -38,28 +31,30 @@ use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
+    marker::PhantomData,
 };
 
-/// The versions a MonoMove transaction observed, split by where the value lives:
-/// its own storage slot, or a tag inside a resource group.
+/// The versions a MonoMove transaction observed. Resource-group members are
+/// read under their own keys, like any other resource, so `T` only names the
+/// tag type Block-STM's group interface expects.
 pub struct MonoReads<K, T> {
     data_reads: HashMap<K, Version>,
-    group_reads: HashMap<(K, T), Version>,
     /// The incarnation these reads were captured at, for BlockSTMv2. [`None`]
     /// only under sequential execution, which does not validate.
     incarnation: Option<Incarnation>,
     /// Set when the transaction is known not to be committable regardless of
     /// what it read. Fails validation unconditionally.
     speculative_failure: bool,
+    _tag: PhantomData<T>,
 }
 
 impl<K, T> Default for MonoReads<K, T> {
     fn default() -> Self {
         Self {
             data_reads: HashMap::new(),
-            group_reads: HashMap::new(),
             incarnation: None,
             speculative_failure: false,
+            _tag: PhantomData,
         }
     }
 }
@@ -76,45 +71,27 @@ impl<K, T> MonoReads<K, T> {
     }
 }
 
-impl<K: Eq + Hash, T: Eq + Hash> MonoReads<K, T> {
+impl<K: Eq + Hash, T> MonoReads<K, T> {
     /// Records a read of a value in its own storage slot.
     pub(crate) fn record_data_read(&mut self, key: K, version: Version) {
         self.data_reads.insert(key, version);
     }
-
-    /// Records a read of a resource-group member.
-    pub(crate) fn record_group_read(&mut self, group_key: K, tag: T, version: Version) {
-        self.group_reads.insert((group_key, tag), version);
-    }
 }
 
 impl MonoReads<InMemoryStorageKey, StructTag> {
-    /// Collects the versions a finished transaction observed. A read inside a
-    /// resource group is re-keyed onto the group's slot, which is where the
-    /// multi-version map holds it.
+    /// Collects the versions a finished transaction observed.
     pub(crate) fn from_read_write_set(
         rws: &ResourceReadWriteSet,
         incarnation: Incarnation,
-    ) -> Result<Self, PanicError> {
+    ) -> Self {
         let mut reads = Self {
             incarnation: Some(incarnation),
             ..Default::default()
         };
-        for (key, version, group) in rws.reads_unordered() {
-            match group {
-                None => reads.record_data_read(key.clone(), version),
-                Some(group_ty) => {
-                    let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
-                    let tag = nominal_tag(key.value_ty()).map_err(|e| {
-                        code_invariant_error(format!(
-                            "MonoMove: group member type is not nominal: {e:#}"
-                        ))
-                    })?;
-                    reads.record_group_read(group_key, tag, version);
-                },
-            }
+        for (key, version, _group) in rws.reads_unordered() {
+            reads.record_data_read(key.clone(), version);
         }
-        Ok(reads)
+        reads
     }
 }
 
@@ -159,23 +136,11 @@ where
 
     fn validate_group_reads(
         &self,
-        group_map: &VersionedGroupData<Self::Key, Self::Tag, Self::Value>,
-        idx_to_validate: TxnIndex,
+        _group_map: &VersionedGroupData<Self::Key, Self::Tag, Self::Value>,
+        _idx_to_validate: TxnIndex,
     ) -> bool {
-        if self.speculative_failure {
-            return false;
-        }
-        self.group_reads.iter().all(|((group_key, tag), recorded)| {
-            match group_map.fetch_tagged_data_no_record(group_key, tag, idx_to_validate) {
-                Ok((observed, _)) => version_matches(*recorded, observed),
-                // Reading a member always leaves an entry behind, even when the
-                // member is not there, so neither of these can name a tag this
-                // transaction read.
-                Err(MVGroupError::TagNotFound) => false,
-                Err(MVGroupError::Uninitialized) => false,
-                Err(MVGroupError::Dependency(_)) => false,
-            }
-        })
+        // Group members are validated as data reads.
+        !self.speculative_failure
     }
 
     fn validate_delayed_field_reads(

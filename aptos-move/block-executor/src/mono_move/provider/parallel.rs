@@ -7,30 +7,28 @@
 
 use crate::{
     mono_move::{
-        provider::{invariant_violation, materialized_value, ParallelReader, StorageBase},
+        group_chain::{member_tag, GroupView},
+        provider::{
+            decode_group_view, invariant_violation, materialized_value, ParallelReader, StorageBase,
+        },
         MonoValue,
     },
     scheduler_wrapper::SchedulerWrapper,
 };
-use anyhow::{anyhow, Result};
 use aptos_mvhashmap::{
     types::{Incarnation, TxnIndex},
     MVHashMap,
 };
 use aptos_types::state_store::{state_key::StateKey, TStateView};
 use bytes::Bytes;
-use mono_move_aptos_transaction_executor::{
-    check_group_key, decode_group_members, AptosDataProvider, GroupMembers,
-};
 use mono_move_core::{
-    nominal_tag,
     storage::resource_provider::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
     },
     types::InternedType,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{serialize, SegmentedArena};
+use mono_move_runtime::SegmentedArena;
 use move_core_types::language_storage::StructTag;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 
@@ -81,24 +79,6 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMParallelProvider<'a, 'ctx,
             .map_err(|e| invariant_violation(format!("Storage read failed: {e}")))?
             .map(|value| value.bytes().clone()))
     }
-
-    /// The stored bytes of a group member the multi-version map holds.
-    fn member_bytes(&self, value: &MonoValue) -> Result<Bytes> {
-        match value {
-            MonoValue::ResourceGroupMemberBytes(bytes) => Ok(bytes.clone()),
-            MonoValue::Write { ptr, ty, .. } => {
-                // SAFETY: the entry holding this pointer also pins the frozen
-                // heap it points into, and that heap is never mutated again.
-                let blob = unsafe { serialize(self.guard, ptr.as_ptr(), *ty) }
-                    .map_err(|e| anyhow!("failed to serialize a group member: {e}"))?;
-                Ok(Bytes::from(blob))
-            },
-            // Deleted members are dropped when the group is assembled, and a
-            // group's own slot never appears among its members.
-            MonoValue::Deletion => Err(anyhow!("a deleted group member was assembled")),
-            MonoValue::GroupMetadata => Err(anyhow!("group metadata was assembled as a member")),
-        }
-    }
 }
 
 impl<S: TStateView<Key = StateKey>> StorageBase<InMemoryStorageKey, StructTag>
@@ -113,17 +93,14 @@ impl<S: TStateView<Key = StateKey>> StorageBase<InMemoryStorageKey, StructTag>
             .transpose()
     }
 
-    fn group_members(
+    fn group_view(
         &self,
         group_key: &InMemoryStorageKey,
-    ) -> Result<Vec<(StructTag, Bytes)>, ResourceProviderError> {
-        let Some(blob) = self.base_bytes(group_key)? else {
-            return Ok(vec![]);
-        };
-        Ok(decode_group_members(&blob)
-            .map_err(|e| invariant_violation(format!("Stored group failed to decode: {e:#}")))?
-            .into_iter()
-            .collect())
+    ) -> Result<GroupView, ResourceProviderError> {
+        match self.base_bytes(group_key)? {
+            Some(blob) => decode_group_view(&blob),
+            None => Ok(GroupView::new()),
+        }
     }
 
     fn materialize_member(
@@ -145,49 +122,11 @@ impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMParallelProvide
             None => self.reader.read_resource(self, key),
             Some(group_ty) => {
                 let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
-                let member_tag = nominal_tag(key.value_ty())
-                    .map_err(|e| invariant_violation(format!("{e:#}")))?;
-                self.reader
-                    .read_group_member(self, key, &group_key, &member_tag)
+                // The tag is only needed to provision the member from the
+                // stored group, on the block's first read of it.
+                let tag = || member_tag(key.value_ty()).map_err(invariant_violation);
+                self.reader.read_group_member(self, key, &group_key, tag)
             },
         }
-    }
-}
-
-impl<S: TStateView<Key = StateKey>> AptosDataProvider for BlockSTMParallelProvider<'_, '_, S> {
-    /// The group as the transactions committed before this one left it. An
-    /// empty group is never stored, so it reads back as no group at all.
-    ///
-    /// Unlike [`ResourceProvider::get_resource`], this does not wait out
-    /// dependencies or record the read, and it turns anything it runs into into
-    /// an invariant violation. That is only sound because materialization is the
-    /// sole caller and runs after this transaction commits, so no entry below it
-    /// is still speculative and nothing it observes can later change. Calling
-    /// this during speculative execution would turn an ordinary dependency into
-    /// a failure of the whole block, and would leave the read unvalidated.
-    fn group_members(
-        &self,
-        group_key: &InMemoryStorageKey,
-    ) -> Result<Option<GroupMembers>, ResourceProviderError> {
-        check_group_key(group_key)?;
-        let members = self
-            .reader
-            .versioned_map()
-            .group_data()
-            .group_members_at(group_key, self.reader.txn_idx())
-            .map_err(|e| {
-                invariant_violation(format!(
-                    "failed to read the members of {group_key:?}: {e:?}"
-                ))
-            })?;
-        if members.is_empty() {
-            return Ok(None);
-        }
-        members
-            .iter()
-            .map(|(tag, value)| Ok((tag.clone(), self.member_bytes(value)?)))
-            .collect::<Result<GroupMembers>>()
-            .map(Some)
-            .map_err(|e| invariant_violation(format!("{e:#}")))
     }
 }

@@ -11,13 +11,21 @@
 mod parallel;
 mod sequential;
 
-use crate::{mono_move::MonoValue, scheduler_wrapper::SchedulerWrapper, view::wait_for_dependency};
+use crate::{
+    mono_move::{
+        group_chain::{tag_bytes, GroupLink, GroupView},
+        MonoValue,
+    },
+    scheduler_wrapper::SchedulerWrapper,
+    view::wait_for_dependency,
+};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDataError, MVDataOutput, MVGroupError, TxnIndex, Version as MVVersion},
+    types::{Incarnation, MVDataError, MVDataOutput, TxnIndex, Version as MVVersion},
     MVHashMap,
 };
 use aptos_types::write_set::WriteOpKind;
 use bytes::Bytes;
+use mono_move_aptos_transaction_executor::decode_group_members;
 use mono_move_core::{
     storage::resource_provider::{ResourceProviderError, StorageRead, Version},
     types::InternedType,
@@ -28,7 +36,7 @@ use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 pub(crate) use parallel::BlockSTMParallelProvider;
 pub(crate) use sequential::BlockSTMSequentialProvider;
 use serde::Serialize;
-use std::{cell::Cell, fmt::Debug, hash::Hash};
+use std::{cell::Cell, fmt::Debug, hash::Hash, sync::Arc};
 
 /// Materializes a stored blob into the in-memory value for a slot of type `ty`.
 pub(crate) fn materialized_value(
@@ -40,7 +48,6 @@ pub(crate) fn materialized_value(
     let (ptr, pin) = arena.deserialize(guard, ty, blob)?;
     Ok(MonoValue::Write {
         ptr,
-        ty,
         // A value that is in storage exists, so reading it back is a
         // modification; an empty slot is stored as `MonoValue::Deletion`.
         kind: WriteOpKind::Modification,
@@ -61,17 +68,19 @@ pub(crate) fn storage_read(
             pin: pin.clone(),
         },
         MonoValue::Deletion => StorageRead::DoesNotExist { version },
-        // Both are upgraded or filtered out before a read gets here: stored
-        // group members become writes, and a group's own slot is never read.
-        MonoValue::ResourceGroupMemberBytes(_) => {
-            return Err(invariant_violation(
-                "Undecoded storage bytes served as a read",
-            ))
-        },
-        MonoValue::GroupMetadata => {
-            return Err(invariant_violation("Group metadata served as a read"))
+        // A group's own slot is only read at commit, never by a transaction.
+        MonoValue::GroupLink(_) => {
+            return Err(invariant_violation("A group link served as a read"))
         },
     })
+}
+
+/// Decodes a stored group's blob into its view.
+pub(crate) fn decode_group_view(blob: &[u8]) -> Result<GroupView, ResourceProviderError> {
+    decode_group_members(blob)?
+        .into_iter()
+        .map(|(tag, bytes)| Ok((tag_bytes(&tag).map_err(invariant_violation)?, bytes)))
+        .collect()
 }
 
 pub(crate) fn invariant_violation(msg: impl ToString) -> ResourceProviderError {
@@ -87,8 +96,8 @@ pub(crate) trait StorageBase<K, T> {
     fn resource(&self, key: &K) -> Result<Option<MonoValue>, ResourceProviderError>;
 
     /// The members of the group stored at `group_key` before the block, in the
-    /// encoding storage holds them in.
-    fn group_members(&self, group_key: &K) -> Result<Vec<(T, Bytes)>, ResourceProviderError>;
+    /// encoding storage holds them in. Empty if no group is stored there.
+    fn group_view(&self, group_key: &K) -> Result<GroupView, ResourceProviderError>;
 
     /// Materializes a stored group member, whose type `key` names.
     fn materialize_member(&self, key: &K, blob: &Bytes)
@@ -127,14 +136,6 @@ where
         }
     }
 
-    pub(crate) fn versioned_map(&self) -> &'a MVHashMap<K, T, MonoValue, DelayedFieldID> {
-        self.versioned_map
-    }
-
-    pub(crate) fn txn_idx(&self) -> TxnIndex {
-        self.txn_idx
-    }
-
     /// Whether any read failed speculatively. Nothing this transaction produced
     /// may commit once this is set.
     pub(crate) fn speculative_failure(&self) -> bool {
@@ -165,6 +166,37 @@ where
         base: &dyn StorageBase<K, T>,
         key: &K,
     ) -> Result<StorageRead, ResourceProviderError> {
+        self.read_data(key, || {
+            Ok(base.resource(key)?.unwrap_or(MonoValue::Deletion))
+        })
+    }
+
+    /// Reads one member of a resource group. `key` names the member's own slot,
+    /// which is where the multi-version map holds it; `group_key` and `tag`
+    /// locate its pre-block value in the stored group.
+    pub(crate) fn read_group_member(
+        &self,
+        base: &dyn StorageBase<K, T>,
+        key: &K,
+        group_key: &K,
+        tag: impl Fn() -> Result<Bytes, ResourceProviderError>,
+    ) -> Result<StorageRead, ResourceProviderError> {
+        self.read_data(key, || {
+            let view = self.stored_group_view(base, group_key)?;
+            match view.get(&tag()?) {
+                Some(blob) => base.materialize_member(key, blob),
+                None => Ok(MonoValue::Deletion),
+            }
+        })
+    }
+
+    /// Reads the data map at `key`, provisioning it with `base_value` if this
+    /// is the block's first read of it.
+    fn read_data(
+        &self,
+        key: &K,
+        base_value: impl Fn() -> Result<MonoValue, ResourceProviderError>,
+    ) -> Result<StorageRead, ResourceProviderError> {
         let data = self.versioned_map.data();
         loop {
             let read = if self.scheduler.is_v2() {
@@ -177,7 +209,7 @@ where
                     return storage_read(&value, mono_version(version))
                 },
                 Err(MVDataError::Uninitialized) => {
-                    let value = base.resource(key)?.unwrap_or(MonoValue::Deletion);
+                    let value = base_value()?;
                     // Another worker may be provisioning the same slot from the
                     // same storage, so whichever value is already there stands.
                     data.set_base_value(key.clone(), value, |_, _| {});
@@ -187,72 +219,43 @@ where
         }
     }
 
-    /// Reads one member of a resource group. `key` names the member's own slot,
-    /// which is what gives its type; `group_key` and `tag` locate it in the map.
-    pub(crate) fn read_group_member(
+    /// The stored group's view, provisioning the group's slot with it on the
+    /// block's first read of the group. Reading the slot at index 0 sees only
+    /// its base entry, never a transaction's link, so this records nothing.
+    fn stored_group_view(
         &self,
         base: &dyn StorageBase<K, T>,
-        key: &K,
         group_key: &K,
-        tag: &T,
-    ) -> Result<StorageRead, ResourceProviderError> {
-        let group_data = self.versioned_map.group_data();
+    ) -> Result<Arc<GroupView>, ResourceProviderError> {
+        let data = self.versioned_map.data();
         loop {
-            let read = if self.scheduler.is_v2() {
-                group_data.fetch_tagged_data_and_record_dependency(
-                    group_key,
-                    tag,
-                    self.txn_idx,
-                    self.incarnation,
-                )
-            } else {
-                group_data.fetch_tagged_data_no_record(group_key, tag, self.txn_idx)
-            };
-            match read {
-                Ok((_, MonoValue::ResourceGroupMemberBytes(blob))) => {
-                    // A stored group does not name its members' types, so the
-                    // first reader that knows one replaces the bytes with the
-                    // flat value. Re-read, as another worker may have won.
-                    let value = base.materialize_member(key, &blob)?;
-                    group_data.update_tagged_base_value_with_layout(
-                        group_key.clone(),
-                        tag.clone(),
-                        value,
-                        |prev, new| {
-                            if matches!(prev, MonoValue::ResourceGroupMemberBytes(_)) {
-                                *prev = new;
-                            }
-                        },
-                    );
+            match data.fetch_data_no_record(group_key, 0) {
+                Ok(MVDataOutput::Versioned(_, MonoValue::GroupLink(link))) => {
+                    return link
+                        .built_view()
+                        .cloned()
+                        .ok_or_else(|| invariant_violation("The stored group's link has no view"));
                 },
-                Ok((version, value)) => return storage_read(&value, mono_version(version)),
-                Err(MVGroupError::Uninitialized) => {
-                    let members = base
-                        .group_members(group_key)?
-                        .into_iter()
-                        .map(|(tag, blob)| (tag, MonoValue::ResourceGroupMemberBytes(blob)))
-                        .collect();
-                    // The whole group goes in at once: a group left half
-                    // initialized cannot be repaired by a later read.
-                    group_data
-                        .set_raw_base_values(group_key.clone(), members)
-                        .map_err(|e| {
-                            invariant_violation(format!("Failed to set group base values: {e:#}"))
-                        })?;
+                Ok(MVDataOutput::Versioned(_, MonoValue::Write { .. } | MonoValue::Deletion)) => {
+                    return Err(invariant_violation(
+                        "A group slot's base entry is not a link",
+                    ))
                 },
-                // The group is there but the member is not. Record that as a
-                // deletion at the pre-block version and retry: BlockSTMv2 can
-                // only track a read that has an entry to hang it off, so
-                // returning without one would miss later writes to this tag.
-                Err(MVGroupError::TagNotFound) => {
-                    group_data.update_tagged_base_value_with_layout(
+                Err(MVDataError::Uninitialized) => {
+                    let link = GroupLink::stored(base.group_view(group_key)?);
+                    // Another worker may be provisioning the same group from the
+                    // same storage, so whichever link is already there stands.
+                    data.set_base_value(
                         group_key.clone(),
-                        tag.clone(),
-                        MonoValue::Deletion,
+                        MonoValue::GroupLink(Arc::new(link)),
                         |_, _| {},
                     );
                 },
-                Err(MVGroupError::Dependency(dep_idx)) => self.wait(dep_idx)?,
+                Err(MVDataError::Dependency(_)) => {
+                    return Err(invariant_violation(
+                        "A group slot's base entry has a dependency",
+                    ))
+                },
             }
         }
     }

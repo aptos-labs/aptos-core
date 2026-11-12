@@ -6,7 +6,7 @@ use crate::{
         DiscardReason, ExecutionStatus, MaterializationError, NoEffectsReason, SystemTxnFailure,
     },
     materialize,
-    providers::{AptosDataProvider, MaterializedGroups},
+    providers::AptosDataProvider,
 };
 use aptos_types::{
     fee_statement::FeeStatement,
@@ -84,31 +84,30 @@ impl TxnOutcome {
     }
 
     /// Forces the outcome into a `TransactionOutput`: converts the status,
-    /// serializes writes (merging resource-group members), and finalizes
-    /// events. Also returns the resource groups it assembled, so a caller can
-    /// cache them without re-decoding the write set. Fails only if the effects
+    /// serializes writes, and finalizes events. Fails only if the effects
     /// cannot be converted to storage formats, e.g. BCS serialized, which is
     /// abnormal — unlike a discard, which is a normal outcome carried in the
     /// output's status. `layouts` must describe the written and event values'
-    /// interned types, and `provider` supplies resource-group pre-state for
-    /// member merges.
+    /// interned types.
+    ///
+    /// With `groups`, resource-group members are merged into their groups'
+    /// stored members, which `groups` supplies, and each group gets one write.
+    /// Without it, group members are left out of the write set, and the caller
+    /// assembles the groups.
     //
     // TODO(perf): this is only intended for compatibility and testing, and
     // the block coordinator should eventually handle the effects directly.
     pub fn materialize(
         self,
         layouts: &impl LayoutProvider,
-        provider: &dyn AptosDataProvider,
+        groups: Option<&dyn AptosDataProvider>,
         features: &Features,
         auxiliary_data: TransactionAuxiliaryData,
-    ) -> Result<(TransactionOutput, MaterializedGroups), MaterializationError> {
+    ) -> Result<TransactionOutput, MaterializationError> {
         match self {
-            TxnOutcome::Discarded { reason, .. } => Ok((
-                materialize::discarded_output(
-                    materialize::discard_to_vm_status(reason).status_code(),
-                    auxiliary_data,
-                ),
-                MaterializedGroups::new(),
+            TxnOutcome::Discarded { reason, .. } => Ok(materialize::discarded_output(
+                materialize::discard_to_vm_status(reason).status_code(),
+                auxiliary_data,
             )),
             // A fatally failed system transaction has no output; the block
             // coordinator aborts the block instead.
@@ -121,10 +120,9 @@ impl TxnOutcome {
             TxnOutcome::Panic(err) => Err(MaterializationError::new(vec![format!(
                 "session could not be closed: {err:?}"
             )])),
-            TxnOutcome::ExecutedNoEffects(_) => Ok((
-                materialize::empty_success_output(auxiliary_data),
-                MaterializedGroups::new(),
-            )),
+            TxnOutcome::ExecutedNoEffects(_) => {
+                Ok(materialize::empty_success_output(auxiliary_data))
+            },
             TxnOutcome::Executed {
                 status: execution_status,
                 fee_statement,
@@ -137,7 +135,7 @@ impl TxnOutcome {
                 materialize::executed_output(
                     &effects,
                     layouts,
-                    provider,
+                    groups,
                     fee_statement.gas_used(),
                     txn_status,
                     auxiliary_data,
