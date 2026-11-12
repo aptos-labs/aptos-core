@@ -314,7 +314,7 @@ impl<'a, K: Hash + Clone + Eq + Debug + Send + Sync> ParallelReader<'a, K> {
         loop {
             match data.fetch_data_no_record(group_key, 0) {
                 Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata { group: metadata })) => {
-                    return metadata.current().cloned().ok_or_else(|| {
+                    return metadata.current().ok_or_else(|| {
                         invariant_violation("The stored group's metadata has no view")
                     });
                 },
