@@ -271,6 +271,9 @@ The proposal is to support this gradually.
 
 Any `borrow_global_mut`/`move_to` is considered side-effecting and produces a write.
 
+Status: superseded. At session end, each copied-on-write resource is compared against its read value and is no longer a write when the two are equal. This is a full value comparison, not yet the compaction-time `memcmp` of Step 2.
+Unlike V1, which emits a modification for every resource written through a mutable borrow, MonoMove therefore emits no write for a resource stored back unchanged.
+
 ### Step 2
 
 When the transaction makes its writes visible, it also compacts its heap to remove any temporary data that is now dead (compaction).

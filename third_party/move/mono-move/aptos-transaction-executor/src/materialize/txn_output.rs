@@ -84,9 +84,11 @@ type MemberOp = Option<Bytes>;
 /// and the errors) are deterministic, not depending on the order of iteration of
 /// any data structures.
 //
-// TODO(correctness): every copied-on-write entry is emitted as a write, even
-// when the bytes are unchanged. Eventually we will want to byte-compare against
-// the original bytes.
+// Only entries whose value changed reach this point: at the end of the
+// session, a copied-on-write value that still equals the value it was read
+// from is no longer a write. This diverges from the legacy VM, which emits a
+// modification for every resource written through a mutable borrow, even when
+// its bytes are unchanged.
 //
 // TODO(metering): writes are not charged IO gas or storage fees.
 fn drain_write_set(

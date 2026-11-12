@@ -11,6 +11,7 @@ use crate::{
 use anyhow::{anyhow, bail, Error, Result};
 use mono_move_core::{
     native::{NativeExtensions, NoNatives},
+    storage::resource_provider::ResourceProvider,
     types::{is_signer_or_signer_immut_ref, EMPTY_TYPE_LIST},
     Function, GasMeter, VMInternalError, VMResult,
 };
@@ -19,7 +20,7 @@ use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_natives::{make_all_test_natives, make_all_test_only_and_production_natives};
 use mono_move_runtime::{
     CallBuilder, CompletedCall, InterpreterContext, InterpreterOptions, ProductionContextFamily,
-    ProductionNativeRegistry, RuntimeStatus,
+    ProductionNativeRegistry, RuntimeStatus, SessionEffects,
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, vm_status::AbortLocation,
@@ -59,6 +60,12 @@ impl<'guard> MonoRunner<'guard> {
     /// Number of garbage collections the most recent [`run`](Self::run) ran.
     pub fn gc_count(&self) -> usize {
         self.gc_count
+    }
+
+    /// Ends the session, returning its side effects. Writes that left a
+    /// resource unchanged are not part of them.
+    pub fn finish(self) -> VMResult<SessionEffects> {
+        self.interp.finish()
     }
 
     /// Run the entry function once, filling its parameters in order: signer
@@ -173,6 +180,36 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     heap_size: Option<usize>,
     body: impl FnOnce(&mut MonoRunner<'_>) -> R,
 ) -> Result<R> {
+    // Framework code gates features on `exists<Features>(@std)`, so the
+    // resource has to be there for those paths to run at all.
+    let storage = storage_with_default_features_for_test();
+    let resource_provider = storage_resource_provider(guard, &storage);
+    let mut runner = mono_runner(
+        guard,
+        module_provider,
+        &resource_provider,
+        address,
+        module_name,
+        function_name,
+        extensions,
+        heap_size,
+    )?;
+    Ok(body(&mut runner))
+}
+
+/// Like [`with_mono_function`], but reads global storage from
+/// `resource_provider` and returns the runner, so the caller can
+/// [`finish`](MonoRunner::finish) it and inspect the session's effects.
+pub fn mono_runner<'a>(
+    guard: &'a ExecutionGuard<'_>,
+    module_provider: &'a InMemoryModuleProvider,
+    resource_provider: &'a dyn ResourceProvider,
+    address: AccountAddress,
+    module_name: &IdentStr,
+    function_name: &IdentStr,
+    extensions: NativeExtensions,
+    heap_size: Option<usize>,
+) -> Result<MonoRunner<'a>> {
     let natives = build_natives();
 
     let loader = Loader::new_with_policy(
@@ -193,14 +230,10 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     if let Some(n) = heap_size {
         options.heap_size = n;
     }
-    // Framework code gates features on `exists<Features>(@std)`, so the
-    // resource has to be there for those paths to run at all.
-    let storage = storage_with_default_features_for_test();
-    let resource_provider = storage_resource_provider(guard, &storage);
     let mut interp = InterpreterContext::new_with_options(
         loader,
         GasMeter::new(GAS_BUDGET),
-        &resource_provider,
+        resource_provider,
         natives,
         options,
     )
@@ -212,12 +245,11 @@ pub fn with_mono_function<'guard, 'ctx, R>(
         Err(err) => return Err(Error::new(err).context("failed to load function")),
     };
 
-    let mut runner = MonoRunner {
+    Ok(MonoRunner {
         interp,
         function,
         gc_count: 0,
-    };
-    Ok(body(&mut runner))
+    })
 }
 
 /// Compile `source`, load `0x1::module_name`, and hand its IR to `body`

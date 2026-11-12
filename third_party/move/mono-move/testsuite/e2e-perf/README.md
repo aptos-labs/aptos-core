@@ -96,8 +96,9 @@ not agree, and neither direction is a bug on its own:
 
 - MonoMove is unmetered today, so it writes no fee slots and emits no fee
   statement. That pulls its output below V1's.
-- MonoMove copies on every `borrow_global_mut`, so a copy counts as a write even
-  where the value did not change. That pulls its output above V1's.
+- MonoMove drops a write whose value did not change, while V1 emits a
+  modification for every resource written through a mutable borrow. That pulls
+  its output below V1's too.
 
 Either can change as MonoMove gains metering or a finer write set, so the
 absolute numbers are not the point. The ratio is calibrated, and what the
