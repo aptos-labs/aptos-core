@@ -1,8 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Resource groups assembled at commit from the chain of metadata entries at
-//! each group's own slot.
+//! Resource groups assembled in post-commit materialization from the chain of
+//! metadata entries at each group's own slot.
 //!
 //! Group members live in the data map under their own keys. A transaction that
 //! writes members of a group also writes one metadata entry at the group's
@@ -20,8 +20,6 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use mono_move_core::{nominal_tag, types::InternedType};
-use move_core_types::language_storage::StructTag;
 use std::{
     collections::BTreeMap,
     fmt::Debug,
@@ -112,7 +110,7 @@ impl<K> GroupMetadata<K> {
 /// entries between it and `txn_idx` whose views are not built yet, lowest
 /// first, each with the index of the transaction that wrote it.
 ///
-/// Only called at commit, when every entry below `txn_idx` is committed.
+/// Only called in post-commit, when every entry below `txn_idx` is committed.
 #[allow(clippy::type_complexity)]
 pub(crate) fn unbuilt_metadata_before<K: Hash + Clone + Debug + Eq + Send + Sync>(
     data: &VersionedData<K, MonoValue<K>>,
@@ -152,7 +150,7 @@ pub(crate) fn unbuilt_metadata_before<K: Hash + Clone + Debug + Eq + Send + Sync
             },
             Err(MVDataError::Dependency(dep_idx)) => {
                 return Err(code_invariant_error(format!(
-                    "Group {group_key:?} has uncommitted metadata at {dep_idx} at commit"
+                    "Group {group_key:?} has uncommitted metadata at {dep_idx} in post-commit"
                 )))
             },
         }
@@ -161,7 +159,7 @@ pub(crate) fn unbuilt_metadata_before<K: Hash + Clone + Debug + Eq + Send + Sync
 
 /// The value transaction `writer_idx` wrote at `key`.
 ///
-/// Only called at commit, when the writer's entries are committed.
+/// Only called in post-commit, when the writer's entries are committed.
 pub(crate) fn committed_value<K: Hash + Clone + Debug + Eq + Send + Sync>(
     data: &VersionedData<K, MonoValue<K>>,
     key: &K,
@@ -187,22 +185,6 @@ pub(crate) fn group_write(existed: bool, view: &GroupView) -> Result<WriteOp, Pa
         (true, true) => WriteOp::legacy_deletion(),
         (false, true) => return Err(code_invariant_error("An empty group emitted a write")),
     })
-}
-
-/// The key of the member of type `member_ty` in a view.
-//
-// TODO(perf): cache the tag bytes per interned type.
-pub(crate) fn member_tag(member_ty: InternedType) -> Result<Bytes, PanicError> {
-    let tag = nominal_tag(member_ty)
-        .map_err(|e| code_invariant_error(format!("Group member has no tag: {e:#}")))?;
-    tag_bytes(&tag)
-}
-
-/// The BCS encoding of a member's struct tag, which keys it in a view.
-pub(crate) fn tag_bytes(tag: &StructTag) -> Result<Bytes, PanicError> {
-    bcs::to_bytes(tag)
-        .map(Bytes::from)
-        .map_err(|e| code_invariant_error(format!("Failed to encode a struct tag: {e}")))
 }
 
 /// BCS-encodes a group: the member count, then each entry's tag and

@@ -7,8 +7,8 @@
 
 use crate::{
     mono_move::{
-        group_chain::{member_tag, tag_bytes, GroupMetadata, GroupView},
-        MonoValue,
+        group_chain::{GroupMetadata, GroupView},
+        member_tag, tag_bytes, MonoValue,
     },
     scheduler_wrapper::SchedulerWrapper,
     view::wait_for_dependency,

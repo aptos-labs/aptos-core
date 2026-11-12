@@ -37,19 +37,23 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use group_chain::{
-    committed_value, group_write, member_tag, unbuilt_metadata_before, GroupMetadata, GroupView,
+    committed_value, group_write, unbuilt_metadata_before, GroupMetadata, GroupView,
 };
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
     production_natives, AptosTransactionExecutor, DiscardReason, TxnOutcome,
 };
-use mono_move_core::storage::resource_provider::{
-    InMemoryStorageKey, ReadPin, ResourceProvider, ResourceProviderError, StorageRead, Version,
+use mono_move_core::{
+    nominal_tag,
+    storage::resource_provider::{
+        InMemoryStorageKey, ReadPin, ResourceProvider, ResourceProviderError, StorageRead, Version,
+    },
+    types::InternedType,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_runtime::{serialize, SegmentedArena, SessionEffects, WriteClass};
 use move_binary_format::CompiledModule;
-use move_core_types::language_storage::ModuleId;
+use move_core_types::language_storage::{ModuleId, StructTag};
 use move_vm_runtime::Module;
 use move_vm_types::{code::SyncModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
 use std::{
@@ -103,7 +107,7 @@ impl<K> MonoValue<K> {
                 pin: pin.clone(),
             },
             MonoValue::Deletion => StorageRead::DoesNotExist { version },
-            // A group's own slot is only read at commit, never by a transaction.
+            // A group's own slot is never served to a transaction as a read.
             MonoValue::GroupMetadata { .. } => {
                 return Err(ResourceProviderError::InvariantViolation(
                     "Group metadata served as a read".to_string(),
@@ -550,6 +554,22 @@ impl TxnOutput for MonoTxnOutput {
         // TODO(security): can add extra checks here?
         true
     }
+}
+
+/// The key of the member of type `member_ty` in a view.
+//
+// TODO(perf): cache the tag bytes per interned type.
+fn member_tag(member_ty: InternedType) -> Result<Bytes, PanicError> {
+    let tag = nominal_tag(member_ty)
+        .map_err(|e| code_invariant_error(format!("Group member has no tag: {e:#}")))?;
+    tag_bytes(&tag)
+}
+
+/// The BCS encoding of a member's struct tag, which keys it in a view.
+fn tag_bytes(tag: &StructTag) -> Result<Bytes, PanicError> {
+    bcs::to_bytes(tag)
+        .map(Bytes::from)
+        .map_err(|e| code_invariant_error(format!("Failed to encode a struct tag: {e}")))
 }
 
 /// What a transaction wrote to a group member at `key`: the member's key in the
