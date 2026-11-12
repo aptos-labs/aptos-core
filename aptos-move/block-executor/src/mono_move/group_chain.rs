@@ -127,7 +127,8 @@ pub struct GroupMetadata<K> {
     current: Mutex<GroupViewState>,
     /// The post-commits that still read `current`: this transaction's own, and
     /// the next writer's, which builds on it. The view is released when both
-    /// finished, as later writers stop at the next writer's view.
+    /// finished, as later writers stop at the next writer's view. Unused for
+    /// the stored group, which is never released.
     pending_post_commits: AtomicU8,
     /// The group's members before these changes. Only set in sequential
     /// execution, where this entry replaces the previous one at the group's
@@ -141,8 +142,7 @@ impl<K> GroupMetadata<K> {
         Self {
             changes: vec![],
             current: Mutex::new(GroupViewState::Built(Arc::new(view))),
-            // Never released: execution reads the stored group.
-            pending_post_commits: AtomicU8::new(u8::MAX),
+            pending_post_commits: AtomicU8::new(0),
             before: OnceLock::new(),
         }
     }
@@ -204,6 +204,7 @@ impl<K> GroupMetadata<K> {
     /// Records that one of the post-commits reading this entry's view
     /// finished, and releases the view after the last one.
     fn finish_post_commit(&self) {
+        // Execution reads the stored group, so its view is never released.
         if self.changes.is_empty() {
             return;
         }
