@@ -4553,7 +4553,6 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-scratchpad",
- "aptos-secure-net",
  "aptos-types",
  "arr_macro",
  "bcs 0.1.4",
