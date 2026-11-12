@@ -14,7 +14,7 @@ use aptos_types::{
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
 };
 use mono_move_core::{value_layout::LayoutProvider, VMInternalError, VMResult};
-use mono_move_runtime::SessionEffects;
+use mono_move_runtime::{ResourceReadWriteSet, SessionEffects};
 
 /// The outcome of one transaction, not yet materialized into a write set.
 /// Intended to be consumed by the block coordinator for efficient handling.
@@ -55,13 +55,15 @@ impl TxnOutcome {
         matches!(self, TxnOutcome::Discarded { .. })
     }
 
-    /// The session's effects, present whenever the transaction opened a
+    /// The global storage the transaction touched, present whenever it opened a
     /// session. Only [`Self::Executed`] turns its writes into output; every
-    /// other variant keeps them solely so its reads can be validated.
-    pub fn effects(&self) -> Option<&SessionEffects> {
+    /// other variant keeps this solely so its reads can be validated.
+    pub fn read_write_set(&self) -> Option<&ResourceReadWriteSet> {
         match self {
-            TxnOutcome::Executed { effects, .. } => Some(effects),
-            TxnOutcome::Discarded { effects, .. } => effects.as_ref(),
+            TxnOutcome::Executed { effects, .. } => Some(effects.read_write_set()),
+            TxnOutcome::Discarded { effects, .. } => {
+                effects.as_ref().map(SessionEffects::read_write_set)
+            },
             // Nothing to commit or to validate.
             TxnOutcome::ExecutedNoEffects(_) => None,
             // The block is aborted, so there is nothing left to validate.

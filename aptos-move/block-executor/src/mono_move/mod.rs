@@ -219,23 +219,24 @@ impl TxnInput for MonoReads {
         if self.speculative_failure {
             return false;
         }
-        let Some(effects) = self.outcome.as_ref().and_then(|outcome| outcome.effects()) else {
+        let Some(rws) = self
+            .outcome
+            .as_ref()
+            .and_then(|outcome| outcome.read_write_set())
+        else {
             return true;
         };
-        effects
-            .read_write_set()
-            .reads_unordered()
-            .all(|(key, recorded, _group)| {
-                match data_map.fetch_data_no_record(key, idx_to_validate) {
-                    Ok(MVDataOutput::Versioned(observed, _)) => version_matches(recorded, observed),
-                    // A base value this transaction initialized cannot
-                    // disappear, so this only happens if the entry was never
-                    // there. Either way the recorded version is no longer
-                    // backed by the map.
-                    Err(MVDataError::Uninitialized) => false,
-                    Err(MVDataError::Dependency(_)) => false,
-                }
-            })
+        rws.reads_unordered().all(|(key, recorded, _group)| {
+            match data_map.fetch_data_no_record(key, idx_to_validate) {
+                Ok(MVDataOutput::Versioned(observed, _)) => version_matches(recorded, observed),
+                // A base value this transaction initialized cannot
+                // disappear, so this only happens if the entry was never
+                // there. Either way the recorded version is no longer
+                // backed by the map.
+                Err(MVDataError::Uninitialized) => false,
+                Err(MVDataError::Dependency(_)) => false,
+            }
+        })
     }
 
     fn validate_group_reads(
