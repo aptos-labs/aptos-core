@@ -36,7 +36,9 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
-use group_chain::{committed_value, unbuilt_metadata_before, GroupMetadata, GroupView};
+use group_chain::{
+    committed_value, finish_group_post_commit, unbuilt_metadata_before, GroupMetadata, GroupView,
+};
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
     production_natives, AptosTransactionExecutor, DiscardReason, TxnOutcome,
@@ -608,7 +610,7 @@ fn build_committed_view(
     writer_idx: TxnIndex,
 ) -> Result<Arc<GroupView>, PanicError> {
     if let Some(view) = metadata.current() {
-        return Ok(view.clone());
+        return Ok(view);
     }
     let changes = metadata
         .changes()
@@ -813,7 +815,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         if let Some(unsync_map) = unsync_map {
             for (group_key, metadata) in output.group_metadata() {
                 let prev = match unsync_map.fetch_data(group_key) {
-                    Some(MonoValue::GroupMetadata { group }) => group.current().cloned(),
+                    Some(MonoValue::GroupMetadata { group }) => group.current(),
                     Some(MonoValue::Write { .. } | MonoValue::Deletion) | None => None,
                 }
                 .ok_or_else(|| {
@@ -900,6 +902,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     let data = versioned_map.data();
                     let prev = view_before(&guard, data, group_key, txn_idx)?;
                     let view = build_committed_view(&guard, data, metadata, &prev, txn_idx)?;
+                    finish_group_post_commit(data, group_key, txn_idx, metadata)?;
                     (prev, view)
                 },
             };
