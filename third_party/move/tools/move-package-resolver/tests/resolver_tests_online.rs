@@ -5,11 +5,13 @@ use std::path::Path;
 
 mod runner;
 
-datatest_stable::harness!(
-    resolver_tests_online,
-    "testsuite-online",
-    r"^testsuite-online/[^/]+/Move\.toml$"
-);
+datatest_stable::harness! {
+    {
+        test = resolver_tests_online,
+        root = "testsuite-online",
+        pattern = r"^[^/]+/Move\.toml$",
+    },
+}
 
 fn resolver_tests_online(manifest_path: &Path) -> datatest_stable::Result<()> {
     runner::run_resolver_expected_output_tests(manifest_path)

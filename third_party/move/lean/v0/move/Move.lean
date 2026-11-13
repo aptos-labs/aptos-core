@@ -25,7 +25,7 @@ import Move.Verify.Compare
 import Move.Verify.Paths
 import Move.Verify.Syntax
 import Move.Verify.Tactics
-import Move.Compiler.LIR
+import Move.Compiler.VIR
 import Move.Compiler.LCNF
 import Move.Compiler.Normalize
 import Move.Compiler.Elab
@@ -36,7 +36,7 @@ import Move.Compiler.Export
 
 `Move` is the source-language and compiler namespace for smart contracts
 authored in Lean and lowered to `MoveModel.IR`. The compiler tool remains
-named Leaner. The language is defined in `Move/leaner-move.md`, introduced by
+named Verex. The language is defined in `Move/verex-move.md`, introduced by
 example in `Move/README.md`, and designed in `Move/design-plan.md` and
 `Move/verification-design.md`.
 -/

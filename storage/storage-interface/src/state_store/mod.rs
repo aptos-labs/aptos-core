@@ -1,8 +1,15 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub mod account_index;
+pub mod collateral;
 mod hot_state;
+pub mod hot_state_config;
 pub mod leaf_entry;
+pub mod native_overlay;
+pub mod order_books;
+pub mod orders;
+pub mod positions;
 pub mod sharded_jmt_state;
 pub mod state;
 pub mod state_delta;
@@ -102,14 +109,12 @@ pub fn empty_hot_state_updates() -> [HotStateShardUpdates; NUM_STATE_SHARDS] {
 #[derive(Clone, Debug)]
 pub struct HotStateUpdates {
     pub for_last_checkpoint: Option<[HotStateShardUpdates; NUM_STATE_SHARDS]>,
-    pub for_latest: Option<[HotStateShardUpdates; NUM_STATE_SHARDS]>,
 }
 
 impl HotStateUpdates {
     pub fn new_empty() -> Self {
         Self {
             for_last_checkpoint: None,
-            for_latest: None,
         }
     }
 }

@@ -55,7 +55,7 @@ use aptos_logger::warn;
 use aptos_move_cli::{
     ArgWithType, ArgWithTypeVec, ChunkedPublishOption, CompilePackage, DownloadPackage,
     EntryFunctionArguments, FrameworkPackageArgs, IncludedArtifacts, IncludedArtifactsArgs,
-    InitPackage, LargePackagesModuleOption, MemberId, MoveEnv, MovePackageOptions,
+    InitPackage, LargePackagesModuleOption, MemberId, MoveEnv, MovePackageOptions, MoveVm,
     OverrideSizeCheckOption, PublishPackage, RunFunction, RunScript, ScriptFunctionArguments,
     TestPackage, TypeArgVec,
 };
@@ -79,7 +79,6 @@ use std::{
     time::Duration,
 };
 use tempfile::TempDir;
-use thiserror::__private::AsDisplay;
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -471,7 +470,7 @@ impl CliTestFramework {
         let source_path = self.move_dir().join(rel_path);
         write_to_file(
             source_path.as_path(),
-            &source_path.as_display().to_string(),
+            &source_path.display().to_string(),
             content.as_bytes(),
         )
         .unwrap();
@@ -866,6 +865,8 @@ impl CliTestFramework {
             compute_coverage: false,
             dump_state: false,
             fail_fast: false,
+            move_vm: MoveVm::V1,
+            allow_inconclusive: false,
             env: Default::default(),
         }
         .execute()

@@ -7,13 +7,43 @@ use crate::{
 };
 use aptos::test::CliTestFramework;
 use aptos_forge::{Node, Swarm};
-use aptos_types::on_chain_config::{OnChainChunkyDKGConfig, OnChainRandomnessConfig};
-use std::sync::Arc;
+use aptos_rest_client::Client;
+use aptos_types::on_chain_config::OnChainRandomnessConfig;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
+
+/// Waits until the ledger is in `epoch`.
+///
+/// With Chunky DKG enabled, the randomness DKG for an epoch can complete while the
+/// reconfiguration still waits for Chunky DKG. Stake operations abort while a
+/// reconfiguration is in progress, so send them only after the epoch has changed.
+async fn wait_for_epoch(client: &Client, epoch: u64, time_limit_secs: u64) {
+    let timer = Instant::now();
+    loop {
+        let ledger_epoch = client
+            .get_ledger_information()
+            .await
+            .unwrap()
+            .into_inner()
+            .epoch;
+        if ledger_epoch >= epoch {
+            return;
+        }
+        assert!(
+            timer.elapsed().as_secs() < time_limit_secs,
+            "Timed out waiting for epoch {epoch}; still in epoch {ledger_epoch}"
+        );
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+}
 
 #[tokio::test]
 async fn dkg_with_validator_join_leave() {
     let epoch_duration_secs = 40;
-    let estimated_dkg_latency_secs = 80;
+    // Covers Chunky DKG too. The first session includes expensive key generation on debug builds.
+    let estimated_dkg_latency_secs = 560;
     let time_limit_secs = epoch_duration_secs + estimated_dkg_latency_secs;
 
     let swarm = SwarmBuilder::new_local(7)
@@ -26,9 +56,6 @@ async fn dkg_with_validator_join_leave() {
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
             conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
-            // This test toggles the validator set; chunky DKG reconfigs race
-            // with leave_validator_set, so keep it off.
-            conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_disabled());
         }))
         .build()
         .await;
@@ -90,6 +117,7 @@ async fn dkg_with_validator_join_leave() {
     )
     .await;
     let idx = cli.add_account_to_cli(victim_validator_sk);
+    wait_for_epoch(&client, dkg_session_2.target_epoch(), time_limit_secs).await;
     let txn_result = cli.leave_validator_set(idx, None).await.unwrap();
     println!("Txn result: {:?}", txn_result);
 
@@ -117,6 +145,8 @@ async fn dkg_with_validator_join_leave() {
     );
 
     println!("Now re-join.");
+    // The epoch with one fewer validator starts only after Chunky DKG handles the smaller set.
+    wait_for_epoch(&client, dkg_session_3.target_epoch(), time_limit_secs).await;
     let txn_result = cli.join_validator_set(idx, None).await;
     println!("Txn result: {:?}", txn_result);
     println!(

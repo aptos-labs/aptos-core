@@ -13,7 +13,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
+    write_set::{NativeCollateralOp, NativeOrderOp, NativePositionOp, WriteOp},
 };
 use derivative::Derivative;
 use move_core_types::{
@@ -23,7 +23,10 @@ use move_core_types::{
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rustc_hash::FxHashSet;
-use std::{collections::BTreeMap, mem};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -36,6 +39,8 @@ pub struct VMOutput {
     module_write_set: ModuleWriteSet,
     fee_statement: FeeStatement,
     status: TransactionStatus,
+    /// Hot state promotions, non-empty only in block epilogues.
+    hotness: BTreeSet<StateKey>,
     /// Trace of the user transaction payload execution in Move VM. Trace is always created as
     /// empty, and users have to set it manually after execution.
     #[derivative(PartialEq = "ignore", Debug = "ignore")]
@@ -54,6 +59,7 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
+            hotness: BTreeSet::new(),
             trace: Trace::empty(),
         }
     }
@@ -64,6 +70,7 @@ impl VMOutput {
             module_write_set: ModuleWriteSet::empty(),
             fee_statement: FeeStatement::zero(),
             status,
+            hotness: BTreeSet::new(),
             trace: Trace::empty(),
         }
     }
@@ -82,6 +89,10 @@ impl VMOutput {
         self.change_set.delayed_field_change_set()
     }
 
+    pub fn collateral_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+        self.change_set.collateral_write_set()
+    }
+
     pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
         self.change_set.events()
     }
@@ -96,6 +107,42 @@ impl VMOutput {
 
     pub fn status(&self) -> &TransactionStatus {
         &self.status
+    }
+
+    /// Sets the keys the block epilogue makes hot. They bypass the change set because they are
+    /// not writes, and are materialized into the `WriteSet`'s hotness bucket.
+    ///
+    /// Panics if hotness is already set.
+    pub fn set_hotness(&mut self, hotness: BTreeSet<StateKey>) {
+        assert!(
+            self.hotness.is_empty(),
+            "hotness should only be initialized once."
+        );
+        self.hotness = hotness;
+    }
+
+    /// Adds the keys read by the block epilogue itself to its hotness. Keys it writes are skipped,
+    /// as the write makes them hot. Returns the number of keys newly added.
+    pub fn add_read_only_hotness<'a>(
+        &mut self,
+        reads: impl IntoIterator<Item = &'a StateKey>,
+    ) -> usize {
+        let Self {
+            change_set,
+            module_write_set,
+            hotness,
+            ..
+        } = self;
+        let num_before = hotness.len();
+        for key in reads {
+            if !change_set.resource_write_set().contains_key(key)
+                && !module_write_set.writes().contains_key(key)
+                && !hotness.contains(key)
+            {
+                hotness.insert(key.clone());
+            }
+        }
+        hotness.len() - num_before
     }
 
     /// Sets the trace for this output. Should only be called once to replace the default empty
@@ -114,9 +161,14 @@ impl VMOutput {
 
     pub fn materialized_size(&self) -> u64 {
         let mut size = 0;
+        // Position writes are included here (though not gas-metered) so the
+        // per-block output size limit accounts for them.
         for (state_key, write_size) in self
             .change_set
             .write_set_size_iter()
+            .chain(self.change_set.position_write_set_size_iter())
+            .chain(self.change_set.order_write_set_size_iter())
+            .chain(self.change_set.collateral_write_set_size_iter())
             .chain(self.module_write_set.write_set_size_iter())
         {
             size += state_key.size() as u64 + write_size.write_len().unwrap_or(0);
@@ -155,10 +207,11 @@ impl VMOutput {
     /// Constructs `TransactionOutput`.
     pub fn into_transaction_output(self) -> Result<TransactionOutput, PanicError> {
         let Self {
-            change_set,
+            mut change_set,
             module_write_set,
             fee_statement,
             status,
+            hotness,
             trace,
         } = self;
 
@@ -171,9 +224,47 @@ impl VMOutput {
             ));
         }
 
-        let (write_set, events) = change_set
+        // Drain the position bucket into the WriteSet's `native_positions`
+        // sibling bucket; the storage applier consumes it from there. It must
+        // be empty before combining, which rejects non-materialized positions.
+        let native_positions: BTreeMap<StateKey, NativePositionOp> = change_set
+            .take_position_write_set()
+            .into_iter()
+            .map(|(k, op)| (k, NativePositionOp::from_write_op(op)))
+            .collect();
+        let native_orders: BTreeMap<StateKey, NativeOrderOp> = change_set
+            .take_order_write_set()
+            .into_iter()
+            .map(|(k, op)| (k, NativeOrderOp::from_write_op(op)))
+            .collect();
+        let native_collateral: BTreeMap<StateKey, NativeCollateralOp> = change_set
+            .take_collateral_write_set()
+            .into_iter()
+            .map(|(k, op)| (k, NativeCollateralOp::from_write_op(op)))
+            .collect();
+
+        let (mut write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
             .into_inner();
+        write_set.add_hotness(hotness);
+        // `freeze()` produces V0, whose extension bucket is `#[serde(skip)]`.
+        // Upgrade so the native writes survive serialization (write-set replay,
+        // output sync, remote execution) rather than being silently dropped.
+        if !native_positions.is_empty()
+            || !native_orders.is_empty()
+            || !native_collateral.is_empty()
+        {
+            write_set = write_set.into_v1();
+        }
+        if !native_positions.is_empty() {
+            write_set.add_native_positions(native_positions);
+        }
+        if !native_orders.is_empty() {
+            write_set.add_native_orders(native_orders);
+        }
+        if !native_collateral.is_empty() {
+            write_set.add_native_collateral(native_collateral);
+        }
         Ok(TransactionOutput::new(
             write_set,
             events,
@@ -190,10 +281,14 @@ impl VMOutput {
         mut self,
         patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         patched_events: Vec<ContractEvent>,
+        patched_collateral_writes: Vec<(StateKey, WriteOp)>,
     ) -> Result<TransactionOutput, PanicError> {
         // materialize delayed fields into resource writes
         self.change_set
             .extend_resource_write_set(patched_resource_write_set.into_iter())?;
+        // materialize snapshot identifiers in collateral writes
+        self.change_set
+            .replace_materialized_collateral_writes(patched_collateral_writes)?;
         let _ = self.change_set.drain_delayed_field_change_set();
 
         // materialize delayed fields into events

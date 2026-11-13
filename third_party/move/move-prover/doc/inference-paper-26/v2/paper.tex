@@ -1,28 +1,27 @@
 % Shared body of the paper: everything the two drivers have in common.
-% `main.tex` builds the arXiv preprint, `main-anon.tex` the double-blind
-% submission; they differ only in the option passed to the workshop style,
-% which sets `\if@anonymous` and so drives every `\Anon{...}{...}` below and in
-% the section files.
+% `main.tex` builds the named-author version, `main-anon.tex` the double-blind
+% submission; they differ only in `\ifAnonymous`, which drives every
+% `\Anon{...}{...}` below and in the section files.
 %
 % Do not add a \documentclass here -- the drivers own that.
 
 \usepackage[utf8]{inputenc}
 
 \input{prelude.tex}
+\input{tables/tasks}
 
-\bibliographystyle{plainnat}
+\bibliographystyle{splncs04}
 
-% The template requires both: \title is the paper, \workshoptitle the venue
-% named in the page-1 notice of a camera-ready copy.
-\title{Hybrid Mechanical and Agentic\\ Specification Inference: A Study}
-\workshoptitle{AI for Verifiable Coding}
+\title{Hybrid Mechanical and Agentic\texorpdfstring{\\}{} Specification Inference}
+\titlerunning{Hybrid Mechanical and Agentic Specification Inference}
 
-% Under double blind the style prints ``Anonymous Author(s)'' and ignores this
-% block -- but it still typesets \thanks, so the footnote has to go too.
-\author{%
-	\Anon{Wolfgang Grieskamp\thanks{Corresponding author: \texttt{wg@aptoslabs.com}},
-	Teng Zhang, and Vineeth Kashyap \\
-	Aptos Labs, Palo Alto, USA}{Anonymous Author(s)}
+\Anon{%
+	\author{Wolfgang Grieskamp \and Teng Zhang \and Vineeth Kashyap}
+	\authorrunning{W. Grieskamp et al.}
+	\institute{Aptos Labs, Palo Alto, USA\\ \email{wg@aptoslabs.com}}
+}{%
+	\author{Anonymous Author(s)}
+	\institute{Anonymous Institution(s)}
 }
 
 \begin{document}
@@ -30,13 +29,31 @@
 \maketitle
 
 \begin{abstract}
-	Formal verification stalls from the cost of specification: to establish high-level facts, contracts have to be written for many supporting functions. Specification inference is one technique which can help by deriving specs from programs which can then be used to prove the primarily interesting properties. In this paper, we present a study for inference in the Move smart contract language, which has a specification language built in and strong verification support. We use an agent to run inference, and equip it with mechanical tools based on \emph{weakest precondition analysis}. Inference performance and quality is measured for three different inference tactics: pure agent inference, and two forms of hybrid inference with WP, while running against Opus~5, Sol~5.6, and Terra~5.6. As a corpus we use extracts from a real-world private product, avoiding bias from known code examples. The study shows multiple interesting results: first, pure model based spec inference works surprisingly well, tackling hard problems which require the agent to invent lemmas and helpers. Second, different models make different use of \WP: the mid-level model, Terra, benfits most by a 25\% reduction in API cost, whereas the higher end models do less. All have a lower error rate using \WP. In comparison, with help of \WP, Terra solves with the same success rate than the other models, but with much lower cost.
+Adoption of formal verification has long been hindered by the cost of manual specification.
+To prove high-level properties, one must also write contracts for supporting functions, many of which are mechanical and low-level.
+Specification inference automatically derives such contracts from the program.
+We present a hybrid of mechanical and agentic inference for Move, a smart contract language, integrated into its verifier, the Move Prover.
+A large language model (LLM) agent drives inference and verification through a tool that calls the Move Prover and derives specifications from code by weakest-precondition (\WP) analysis.
+We evaluate our approach on 26 targets, 24 of them extracted from public Move functions of the Aptos framework that have no specifications, under a frontier model and a mid-tier model of the same family (Sol~5.6 and Terra~5.6).
+With and without \WP, the agent completes over 90\% of its runs, so agentic inference is effective on its own.
+Adding \WP\ lowers its cost by 11--21\% overall and by 40--64\% on targets without loops.
+
+	\keywords{Specification inference \and Weakest precondition \and Reference elimination \and LLM agents \and Move Prover}
 \end{abstract}
 
 \input{intro}
-\input{hybrid}
+\input{example}
+\input{wp}
+\input{skills}
 \input{evaluation}
 \input{conclusion}
+
+\subsubsection*{Data Availability Statement.}
+The corpus is published with the inference plugin at~\Anon{\cite{MoveFlow}}{\cite{MoveFlowAnon}}: the package extracted from a pinned commit of the Aptos repository, the reference specifications, and the mutants.
+The round archives behind every table and figure --- per-cell costs, token counters, wall times, and mutant outcomes --- and the scripts that produce them from the archives are published there as well; \Anon{\cite{SpecInferenceCorpus}}{\cite{MoveFlowAnon}} explains how to verify the corpus, re-score a round, and rerun the experiment.
+
+\subsubsection*{Use of AI Tools.}
+Parts of the text of this paper were drafted and edited with a coding agent\Anon{ (Claude Code)}{}; the authors reviewed and take responsibility for all content.
 
 \bibliography{biblio}
 
@@ -44,34 +61,26 @@
 \Section{Per-Target Results}
 \label{sec:appendix}
 
-Tables~\ref{tab:opus}--\ref{tab:terra} give, for each target and arm, the mean cost per cell over the four replicates, mean input/output tokens in thousands (I/O k), the hybrid mean cost as a percentage of agent-only (vs. agent), and whether the specification succeeded at the first attempt and killed every held-out mutant (\Checkmark) or failed (\XSolidBrush, subscripted with the count where more than one replicate failed); $\ast$ marks cells whose scoring is still in progress and $\circ$ a cell lost to infrastructure.
-All figures count up to the end of the first attempt; input counts include uncached, cached, and cache-creation tokens.
+Tables~\ref{tab:sol} and~\ref{tab:terra} give, for each target and tactic, the mean cost per cell over the four replicates, mean input/output tokens in thousands (I/O k), the hybrid mean cost as a percentage of agent-only (vs. agent), and whether the specification killed every withheld mutant in all four replicates (\Checkmark) or a mutant survived (\XSolidBrush, subscripted with the count where more than one replicate failed); $\circ$ marks an unmeasured cell.
+Input counts include cached tokens.
+The targets above the middle rule have no loop that needs an invariant.
 
-\begin{table}[htbp]
+\begin{sidewaystable}
 \centering
-\caption{Opus~5 by target. Summed over the 20 targets the arms cost \$55.56, \$71.71, and \$70.65.}
-\label{tab:opus}
-\footnotesize
-\setlength{\tabcolsep}{2.2pt}
-\input{tables/opus}
-\end{table}
-
-\begin{table}[htbp]
-\centering
-\caption{Sol~5.6 by target. Summed over the 20 targets the arms cost \$41.35, \$39.30, and \$38.68.}
+\caption{Sol~5.6 by target. Summed over the 26 targets, the tactics cost \$36.72, \$31.67, and \$31.81.}
 \label{tab:sol}
-\footnotesize
+\scriptsize
 \setlength{\tabcolsep}{2.2pt}
 \input{tables/sol}
-\end{table}
+\end{sidewaystable}
 
-\begin{table}[htbp]
+\begin{sidewaystable}
 \centering
-\caption{Terra~5.6 by target ($^\dagger$placeholder: GLM~5.3 data until the Terra~5.6 round completes). Summed over the 20 targets the arms cost \$21.59, \$23.30, and \$22.18.}
+\caption{Terra~5.6 by target. Summed over the 26 targets, the tactics cost \$21.05, \$16.71, and \$18.79.}
 \label{tab:terra}
-\footnotesize
+\scriptsize
 \setlength{\tabcolsep}{2.2pt}
-\input{tables/glm}
-\end{table}
+\input{tables/terra}
+\end{sidewaystable}
 
 \end{document}

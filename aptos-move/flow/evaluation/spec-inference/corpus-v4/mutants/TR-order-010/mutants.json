@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 33,
+        "offset": 4376,
+        "sha256": "53e78fe951e5ea4cb82c31b3627454ba96ba4fdc445a4f97a69f2005bcc9f2c0"
+      },
+      "edit": {
+        "at": 15,
+        "kind": "substitute",
+        "length": 1,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-order-010-descending-not-strict",
+      "obligation_category": "normal-result",
+      "rationale": "The descending check accepts equal neighbours.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 33,
+        "offset": 4500,
+        "sha256": "d07681efcd12cfadcd07fd437db47d87d9d63b8855fb561cc30afdeb895820d6"
+      },
+      "edit": {
+        "at": 15,
+        "kind": "substitute",
+        "length": 1,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-order-010-ascending-not-strict",
+      "obligation_category": "normal-result",
+      "rationale": "The ascending check accepts equal neighbours.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 27,
+        "offset": 4196,
+        "sha256": "221d0de5568d99b2840884a46884fe76f9e38898284d8b33c8c660edd8848292"
+      },
+      "edit": {
+        "at": 4,
+        "kind": "substitute",
+        "length": 20,
+        "to": "false"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-order-010-drop-empty-guard",
+      "obligation_category": "abort",
+      "rationale": "Without the early return an empty vector underflows `length() - 1`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "edfb877ee10f48c2bfdd8c3ff4036817d5fc8bcf682649caeca0d410cdef3b7e",
+  "task_id": "TR-order-010"
+}

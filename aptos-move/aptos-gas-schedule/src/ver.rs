@@ -8,9 +8,21 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
-/// - V50:
+/// - V55 (`RELEASE_V1_50`):
+///   - New `txn.high_limit_txn_excess_price_multiplier` parameter: transactions with a
+///     staking-backed limits request pay this multiple of the gas price for execution and IO gas
+///     used above the base limits
+///   - New `txn.min_module_bytecode_version` parameter gating module publishing on a minimum
+///     bytecode version
+///   - Gas parameters for value graph traversal
+///   - Charge closure packing per abstract value unit of the captured values
+///   - Include the serialized size of a closure's captured layouts in its abstract value size
+/// - V54 (`TESTNET_RESET_OCT_2026`; live on testnet since 2026-10-06, frozen):
 ///   - Raise the abstract value size of a closure from 40 to 200
 ///   - Include the cost of a closure's type arguments in its abstract value size
+///   - Per-byte charges for `string::index_of` and `string::is_char_boundary`
+///   - Gas for `transaction_context::is_orderless_txn` and `is_multisig_payload_txn`
+///   - Gas for `init::get_caller_address_and_module_id` (lazy module initialization)
 /// - V49:
 ///   - Count the closure function-type node towards type size and depth limits
 /// - V48:
@@ -89,7 +101,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_50;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_51;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -133,5 +145,13 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_47: u64 = 51;
     pub const RELEASE_V1_48: u64 = 52;
     pub const RELEASE_V1_49: u64 = 53;
-    pub const RELEASE_V1_50: u64 = 54;
+    /// Version 54 was meant to be 1.50 but went live on testnet on 2026-10-06: the reset genesis
+    /// (`aptos-networks/testnet-v2/genesis.blob`) was generated with a main-based CLI whose
+    /// `LATEST_GAS_FEATURE_VERSION` was 54, while the framework came from the 1.49 branch. Testnet
+    /// has executed at version 54 since, so it is a released version: the set of keys gated at
+    /// `TESTNET_RESET_OCT_2026..` and the code paths behind it are frozen. Anything newer goes
+    /// under `RELEASE_V1_50`.
+    pub const TESTNET_RESET_OCT_2026: u64 = 54;
+    pub const RELEASE_V1_50: u64 = 55;
+    pub const RELEASE_V1_51: u64 = 56;
 }

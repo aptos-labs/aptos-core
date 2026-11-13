@@ -246,6 +246,11 @@ where
 
         fn charge_ld_const(&mut self, size: NumBytes) -> PartialVMResult<()>;
 
+        fn charge_pack_closure_captured_values(
+            &mut self,
+            args: impl Iterator<Item = impl ValueView>,
+        ) -> PartialVMResult<()>;
+
         fn charge_move_loc(&mut self, val: impl ValueView) -> PartialVMResult<()>;
 
         fn charge_store_loc(&mut self, val: impl ValueView) -> PartialVMResult<()>;

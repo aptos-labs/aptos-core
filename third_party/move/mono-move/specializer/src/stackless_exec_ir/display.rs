@@ -5,8 +5,8 @@
 //! entity handles (functions, fields, variants) resolve via `CompiledModule`.
 
 use super::{
-    BinaryOp, CmpKind, FunctionIR, HomeIndex, ImmValue, Instr, ModuleIR, NamedSlot, SsaSlot,
-    UnaryOp,
+    BinaryOp, CmpKind, FunctionIR, HomeIndex, ImmValue, Instr, ModuleIR, NamedSlot,
+    ReentrancyCheck, SsaSlot, UnaryOp,
 };
 use mono_move_core::types::{display_type, display_type_list, InternedTypeList};
 use move_binary_format::{
@@ -579,7 +579,11 @@ fn display_instr<SlotForm: Copy + fmt::Display>(
         // --- Calls ---
         Instr::Call { data } => {
             write_dsts(f, &data.rets)?;
-            write!(f, "call {}", func_name(module, data.function_handle))?;
+            let op = match data.reentrancy_check {
+                ReentrancyCheck::Required => "call",
+                ReentrancyCheck::Exempt => "call_exempt",
+            };
+            write!(f, "{} {}", op, func_name(module, data.function_handle))?;
             write_ty_args(f, data.ty_args)?;
             write!(f, ", {}", slot_names(&data.args))
         },

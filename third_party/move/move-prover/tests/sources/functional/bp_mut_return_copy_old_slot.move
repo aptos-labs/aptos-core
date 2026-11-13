@@ -2,10 +2,10 @@
 // Repro: derived `ensures_of` for a closure puts the POST-state in the OLD slot
 // when the closure returns a copy of the `&mut` parameter it just mutated.
 //
-// `returns_copy` FAILS with "post-condition does not hold"; `returns_const` passes.
-// The two differ only in what the closure returns.
+// `returns_copy` and `returns_const` differ only in what they return; the bug hit
+// the former alone, which is what isolates it to the returned-copy shape.
 //
-// Generated Boogie for the failing lambda:
+// Generated Boogie for the lambda when the bug was present:
 //     $t2 := $Dereference($t1);      // entry snapshot  (correct old state)
 //     call $t1 := dec($t1, $t0);     // the mutation
 //     $t4 := $Dereference($t1);      // the `*x` return expression (post state)

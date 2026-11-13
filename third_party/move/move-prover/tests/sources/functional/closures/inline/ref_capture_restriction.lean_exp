@@ -1,0 +1,12 @@
+Move prover returns: exiting with model building errors
+error: captured value cannot be a reference, but has type `&u64`
+   ┌─ tests/sources/functional/closures/inline/ref_capture_restriction.move:14:32
+   │
+14 │         regular_apply(|y| y + *r, x) // error: captured value cannot be a reference
+   │                                ^
+
+error: captured value cannot be a reference, but has type `&u64`
+   ┌─ tests/sources/functional/closures/inline/ref_capture_restriction.move:24:37
+   │
+24 │         let _w = Wrap { f: |y| y + *r }; // error: captured value cannot be a reference
+   │                                     ^

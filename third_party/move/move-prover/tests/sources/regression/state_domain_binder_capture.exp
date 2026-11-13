@@ -1,0 +1,36 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/state_domain_binder_capture.move:22:9
+   │
+22 │         ensures exists s in *: (exists s_val: num: s_val < 100 && (s.. |~ lt_100(x)));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/state_domain_binder_capture.move:17: captured
+   =     at tests/sources/regression/state_domain_binder_capture.move:21: captured (spec)
+   =     at tests/sources/regression/state_domain_binder_capture.move:17: captured
+   =         x = <redacted>
+   =     at tests/sources/regression/state_domain_binder_capture.move:18: captured
+   =     at tests/sources/regression/state_domain_binder_capture.move:13: keep
+   =         x = <redacted>
+   =     at tests/sources/regression/state_domain_binder_capture.move:14: keep
+   =     at tests/sources/regression/state_domain_binder_capture.move:13: keep
+   =         x = <redacted>
+   =     at tests/sources/regression/state_domain_binder_capture.move:22: captured (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/state_domain_binder_capture.move:30:9
+   │
+30 │         ensures exists s in *: (exists k_val: num: k_val < 100 && (s.. |~ lt_100(x)));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/state_domain_binder_capture.move:25: renamed
+   =     at tests/sources/regression/state_domain_binder_capture.move:29: renamed (spec)
+   =     at tests/sources/regression/state_domain_binder_capture.move:25: renamed
+   =         x = <redacted>
+   =     at tests/sources/regression/state_domain_binder_capture.move:26: renamed
+   =     at tests/sources/regression/state_domain_binder_capture.move:13: keep
+   =         x = <redacted>
+   =     at tests/sources/regression/state_domain_binder_capture.move:14: keep
+   =     at tests/sources/regression/state_domain_binder_capture.move:13: keep
+   =         x = <redacted>
+   =     at tests/sources/regression/state_domain_binder_capture.move:30: renamed (spec)

@@ -59,7 +59,7 @@ use ark_ec::{
 };
 use ark_ff::{AdditiveGroup, Field, Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and

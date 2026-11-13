@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/proof_header_errors.proof.lean:8:18: error: this file holds the proofs of `proof_header_errors.move`, not of `proofs.move`
+VerexE2ETests/SourceVerify/proof_header_errors.proof.lean:9:1: error: `verex proofs where` follows the proof file's header, which selects its module

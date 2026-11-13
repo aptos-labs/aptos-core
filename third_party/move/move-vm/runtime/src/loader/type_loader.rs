@@ -10,7 +10,6 @@ use move_vm_types::loaded_data::{
     runtime_types::{AbilityInfo, Type},
     struct_name_indexing::StructNameIndex,
 };
-use triomphe::Arc as TriompheArc;
 
 /// Converts a signature token into the in memory type representation used by the MoveVM.
 pub fn convert_tok_to_type(
@@ -72,35 +71,25 @@ fn convert_tok_to_type_impl(
         SignatureToken::Vector(inner_tok) => {
             let (inner_type, is_fully_instantiated) =
                 convert_tok_to_type_impl(module, inner_tok, struct_name_table)?;
-            (
-                Type::Vector(TriompheArc::new(inner_type)),
-                is_fully_instantiated,
-            )
+            (Type::vector(inner_type), is_fully_instantiated)
         },
         SignatureToken::Function(args, results, abilities) => {
             let (args, args_fully_instantiated) =
                 convert_toks_to_types_impl(module, args, struct_name_table)?;
             let (results, results_fully_instantiated) =
                 convert_toks_to_types_impl(module, results, struct_name_table)?;
-            let ty = Type::Function {
-                args,
-                results,
-                abilities: *abilities,
-            };
+            let ty = Type::function(args, results, *abilities);
             (ty, args_fully_instantiated && results_fully_instantiated)
         },
         SignatureToken::Reference(inner_tok) => {
             let (inner_type, is_fully_instantiated) =
                 convert_tok_to_type_impl(module, inner_tok, struct_name_table)?;
-            (Type::Reference(Box::new(inner_type)), is_fully_instantiated)
+            (Type::reference(inner_type), is_fully_instantiated)
         },
         SignatureToken::MutableReference(inner_tok) => {
             let (inner_type, is_fully_instantiated) =
                 convert_tok_to_type_impl(module, inner_tok, struct_name_table)?;
-            (
-                Type::MutableReference(Box::new(inner_type)),
-                is_fully_instantiated,
-            )
+            (Type::mut_reference(inner_type), is_fully_instantiated)
         },
         SignatureToken::Struct(sh_idx) => {
             let struct_handle = module.struct_handle_at(*sh_idx);
@@ -114,10 +103,10 @@ fn convert_tok_to_type_impl(
             let (type_args, type_args_fully_instantiated) =
                 convert_toks_to_types_impl(module, tys, struct_name_table)?;
             let struct_handle = module.struct_handle_at(*sh_idx);
-            let ty = Type::StructInstantiation {
-                idx: struct_name_table[sh_idx.0 as usize],
-                ty_args: TriompheArc::new(type_args),
-                ability: AbilityInfo::generic_struct(
+            let ty = Type::struct_instantiation(
+                struct_name_table[sh_idx.0 as usize],
+                type_args,
+                AbilityInfo::generic_struct(
                     struct_handle.abilities,
                     struct_handle
                         .type_parameters
@@ -125,7 +114,7 @@ fn convert_tok_to_type_impl(
                         .map(|ty| ty.is_phantom)
                         .collect(),
                 ),
-            };
+            );
             (ty, type_args_fully_instantiated)
         },
     };

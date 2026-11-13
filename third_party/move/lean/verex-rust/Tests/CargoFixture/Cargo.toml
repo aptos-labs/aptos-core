@@ -1,0 +1,16 @@
+[package]
+name = "verex-rust-cargo-fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = ["extra", "dependency-call"]
+extra = []
+# A call into the dependency crate, which declares its function in the unit.
+dependency-call = []
+
+[dependencies]
+verex-rust-cargo-fixture-dependency = { path = "dependency" }
+
+[workspace]

@@ -1,0 +1,104 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/ghost_field_bp.move:25:5: error: the data invariant `f : Fn(u64) -> BpS has Copy, Drop` does not hold where a value is constructed
+tests/sources/functional/ghost_field_bp.move:29:9: error: the data invariant `invariant ∀ (v : u64; r : BpS), ensures_of<f>(v, r) ==> r == bp_make_one()` does not hold where a value is constructed
+tests/sources/functional/ghost_field_bp.move:40:5: error: verification failed with a residual obligation:
+case continues.continues
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+nativesTyped : VerexIR.NativesTyped executable✝
+nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+self_bp_mk : VerexIR.Proofs.Denote.HList bp_mk.params → VerexIR.Proofs.Denote.Comp unit bp_mk.shape.carrier
+verexAgree : VerexIR.Proofs.TypesAgree unit
+verexResources : VerexIR.Proofs.ResourcesTyped unit
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted invariantHolds✝ left✝² : True
+left✝¹ :
+  (VerexIR.Proofs.Denote.NTy.function
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [false] }
+        (VerexIR.Proofs.Denote.NRow.cons 0x42.ghost_field_bp.unit.nominal.namespace.0.declaration✝⁻⁰
+          VerexIR.Proofs.Denote.NRow.nil)).deepHolds
+    (FunctionValue.site0 ())
+right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+left✝ :
+  ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (v : Int) (fits : 0 ≤ v ∧ v ≤ 18446744073709551615)
+    (r : 0x42.ghost_field_bp.unit.nominal.namespace.0.declaration✝⁻⁰.carrier),
+    VerexIR.Proofs.EnsuresOfEntries (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit))
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [false] }
+        (VerexIR.Proofs.Denote.ResultShape.one 0x42.ghost_field_bp.unit.nominal.namespace.0.declaration✝⁻⁰)
+        (FunctionValue.site0 ()) ({ val := v, fits := ⋯ }, ()) () r memory memory →
+      r.val.fst.val = 1
+right✝ :
+  VerexIR.Proofs.KeepsMemoryAtOf (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit))
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+    { parameters := [false], results := [false] }
+    (VerexIR.Proofs.Denote.ResultShape.one 0x42.ghost_field_bp.unit.nominal.namespace.0.declaration✝⁻⁰)
+    (FunctionValue.site0 ())
+⊢ VerexIR.Proofs.wp
+    (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit)
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [false] }
+      (VerexIR.Proofs.Denote.ResultShape.one 0x42.ghost_field_bp.unit.nominal.namespace.0.declaration✝⁻⁰)
+      (FunctionValue.site0 ()) ({ val := 1, fits := ⋯ }, ()))
+    (fun value state =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Flow.bind
+          ((VerexIR.Proofs.Denote.opAt 1274
+                (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit)
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                    VerexIR.Proofs.Denote.NRow.nil)
+                  { parameters := [false], results := [false] }
+                  (VerexIR.Proofs.Denote.ResultShape.one 0x42.ghost_field_bp.unit.nominal.namespace.0.declaration✝⁻⁰)
+                  (FunctionValue.site0 ()) ({ val := 2, fits := ⋯ }, ()))).bind
+            fun result =>
+            VerexIR.Proofs.Spec.pure
+              (VerexIR.Proofs.Denote.Flow.value
+                ((VerexIR.Proofs.Denote.ResultShape.one
+                      0x42.ghost_field_bp.unit.nominal.namespace.0.declaration✝⁻⁰).toBody
+                  result)
+                (some
+                    (0x42.ghost_field_bp.unit.nominal.namespace.0.declaration✝¹⁻⁰.ofDeepHolds
+                      (FunctionValue.site0 (), ()) ⋯),
+                  some value, none, ())))
+          fun v env =>
+          VerexIR.Proofs.Denote.letAt VerexIR.Proofs.Denote.Var.here.there.there v
+            (VerexIR.Proofs.Denote.Term.denoteIn
+              {
+                  call :=
+                    VerexIR.Proofs.Denote.routeMeaning { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                        VerexIR.Proofs.Denote.NRow.nil)
+                      (VerexIR.Proofs.Denote.ResultShape.one
+                        0x42.ghost_field_bp.unit.nominal.namespace.0.declaration✝⁻⁰)
+                      self_bp_mk (VerexIR.Proofs.Denote.propheticMeaning executable✝ #[]),
+                  generic := VerexIR.Proofs.Denote.closedGeneric executable✝ #[],
+                  invoke := verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit), typeInstantiation := #[],
+                  assumption := fun x => none,
+                  ghost := ghosts { executable := executable✝, invoke := verexInvoke, coherent := verexInvokeCoherent },
+                  atInstance := VerexIR.Proofs.Denote.closedInstance executable✝ #[] }.interpreterOps
+              ((VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there).drop
+                ((VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there.there).drop
+                  (VerexIR.Proofs.Denote.Term.lit false _proof_7)))
+              (VerexIR.Proofs.Denote.Var.here.there.there.set v env)))
+        (fun value state =>
+          VerexIR.Proofs.wp
+            (match value with
+            | VerexIR.Proofs.Denote.Flow.value value env => VerexIR.Proofs.Spec.pure value
+            | VerexIR.Proofs.Denote.Flow.return_ result env => VerexIR.Proofs.Spec.pure result
+            | VerexIR.Proofs.Denote.Flow.break_ nest env => VerexIR.Proofs.Spec.bottom
+            | VerexIR.Proofs.Denote.Flow.continue_ nest env => VerexIR.Proofs.Spec.bottom)
+            (fun result final => result = true) (fun failure => True) state)
+        (fun failure => True) state)
+    (fun failure => True) initialState✝
+tests/sources/functional/ghost_field_bp.move:40:5: error: verex verification failed: the automatic verification of `bp_exploit` failed; provide a proof in `tests/sources/functional/ghost_field_bp.proof.lean`:
+  verify bp_exploit by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

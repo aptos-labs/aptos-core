@@ -149,12 +149,12 @@ fun stale_read_after_consume(): u64 {
   code:
   L0:
     0: x0 := ld_u64 7 @0
-    1: [r0] := call make, [x0] @1
+    1: [r0] := call_exempt make, [x0] @1
     2: r1 := copy r0 @3
     3: r4 := imm_borrow_loc r1 @5
     4: r2 := vec_len u64, r4 @6
-    5: [r3] := call mutate_first, [r0] @9
-    6: [x0] := call first, [r1] @12
+    5: [r3] := call_exempt mutate_first, [r0] @9
+    6: [x0] := call_exempt first, [r1] @12
     7: r5 := mul x0, #100 @14
     8: r5 := add r5, r3 @16
     9: r5 := add r5, r2 @18

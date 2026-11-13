@@ -56,6 +56,12 @@ fn end_to_end() {
     let first_ver_to_backup = (total_txns / 4) as Version;
     let num_txns_to_backup = total_txns - first_ver_to_backup as usize;
     let target_version = first_ver_to_backup + total_txns as Version / 2;
+    // The restore ends at the last block end at or before the target.
+    let restored_version = blocks
+        .iter()
+        .map(|(_txns, li)| li.ledger_info().version())
+        .take_while(|version| *version <= target_version)
+        .last();
     let mut backup_handles = vec![];
     if first_ver_to_backup > 0 {
         let transaction_backup_before_first_ver = rt
@@ -125,8 +131,15 @@ fn end_to_end() {
     // care of it before running consensus. The latest transactions are deemed "synced" instead of
     // "committed" most likely.
     let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
+    let Some(restored_version) = restored_version else {
+        // The target is in the first block, so nothing is restored.
+        assert_eq!(tgt_db.get_synced_version().unwrap(), None);
+        rt.shutdown_timeout(Duration::from_secs(1));
+        return;
+    };
+    let num_restored = restored_version + 1;
     let ouptputlist = tgt_db
-        .get_transaction_outputs(0, target_version, target_version)
+        .get_transaction_outputs(0, num_restored, restored_version)
         .unwrap()
         .consume_output_list_with_proof();
 
@@ -138,19 +151,19 @@ fn end_to_end() {
         blocks
             .iter()
             .flat_map(|(txns, _li)| txns)
-            .take(target_version as usize)
+            .take(num_restored as usize)
             .map(|txn_to_commit| txn_to_commit.write_set().clone()),
     ) {
         assert_eq!(restore_ws, org_ws);
     }
 
-    assert_eq!(tgt_db.expect_synced_version(), target_version);
+    assert_eq!(tgt_db.expect_synced_version(), restored_version);
     // TODO(grao): Test PersistedAuxiliaryInfo here.
     let recovered_transactions = tgt_db
         .get_transactions(
             0,
-            target_version,
-            target_version,
+            num_restored,
+            restored_version,
             true, /* fetch_events */
         )
         .unwrap()
@@ -159,7 +172,7 @@ fn end_to_end() {
     assert_eq!(
         recovered_transactions.transactions,
         txns.into_iter()
-            .take(target_version as usize)
+            .take(num_restored as usize)
             .cloned()
             .collect::<Vec<_>>()
     );
@@ -172,7 +185,7 @@ fn end_to_end() {
                 txns.iter()
                     .map(|txn_to_commit| txn_to_commit.events().to_vec())
             })
-            .take(target_version as usize)
+            .take(num_restored as usize)
             .collect::<Vec<_>>()
     );
 

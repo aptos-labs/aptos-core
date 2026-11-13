@@ -272,8 +272,8 @@ fn test_publish_metrics() {
 
     // Verify that the metric family has the expected values
     let metric_family: &MetricFamily = metric_families.first().unwrap();
-    assert_eq!("test counter help", metric_family.get_help());
-    assert_eq!("test_counter", metric_family.get_name());
+    assert_eq!("test counter help", metric_family.help());
+    assert_eq!("test_counter", metric_family.name());
 
     // Verify that the metric has the expected value
     let metrics = metric_family.get_metric();

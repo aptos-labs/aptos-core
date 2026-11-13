@@ -1,0 +1,29 @@
+--- a/sources/stdlib/extracted_vector_range.move
++++ b/sources/stdlib/extracted_vector_range.move
+@@ -14,0 +15,6 @@
++        } spec {
++            invariant step > 0;
++            invariant start == old(start) + len(vec) * step;
++            invariant forall k in 0..len(vec): vec[k] == old(start) + k * step;
++            invariant len(vec) > 0 ==> vec[len(vec) - 1] < end;
++            invariant len(vec) > 0 ==> old(start) < end;
+@@ -16,0 +23,19 @@
++    }
++
++    spec module {
++        /// The first value of the progression at or past `end`, which is the
++        /// increment the loop computes last.
++        fun next_past(start: num, end: num, step: num): num {
++            end + (step - (end - start) % step) % step
++        }
++    }
++
++    spec range_with_step {
++        pragma opaque;
++        aborts_if step == 0;
++        // The last increment is computed even though its value is never
++        // pushed, and it can overflow although every pushed value fits.
++        aborts_if start < end && next_past(start, end, step) > MAX_U64;
++        ensures forall k in 0..len(result): result[k] == start + k * step;
++        ensures len(result) > 0 ==> result[len(result) - 1] < end;
++        ensures start + len(result) * step >= end;

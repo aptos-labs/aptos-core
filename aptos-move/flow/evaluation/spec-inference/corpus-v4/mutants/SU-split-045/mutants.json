@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 30,
+        "offset": 515,
+        "sha256": "6423a61e3fec2f25ab44153021d779ab6306e44f5c2c54181f0b53b6a6012627"
+      },
+      "edit": {
+        "at": 27,
+        "kind": "substitute",
+        "length": 1,
+        "to": "1"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_sui_derivable_account.move",
+      "mutant_id": "SU-split-045-scheme-from-second-byte",
+      "obligation_category": "normal-result",
+      "rationale": "The scheme is read from the second byte.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 16,
+        "offset": 743,
+        "sha256": "31feca6cf18e64b26591e349074feeba8a8db6ca131ac0198b155b554725b026"
+      },
+      "edit": {
+        "at": 11,
+        "kind": "substitute",
+        "length": 2,
+        "to": "64"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_sui_derivable_account.move",
+      "mutant_id": "SU-split-045-signature-one-short",
+      "obligation_category": "normal-result",
+      "rationale": "The signature ends one byte early and the key starts one early.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 50,
+        "offset": 932,
+        "sha256": "1f68f74485a829f2feab4a42ecfb5758d231415c7d3a50743c521b95edf488fa"
+      },
+      "edit": {
+        "at": 40,
+        "kind": "substitute",
+        "length": 8,
+        "to": "bytes[i - 1]"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_sui_derivable_account.move",
+      "mutant_id": "SU-split-045-key-shifted-back",
+      "obligation_category": "normal-result",
+      "rationale": "Each key byte is taken one position early.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "0a596bc6a95ada214c668a5f715f0ad1b24d7123833e69914f7435a82d6cf6eb",
+  "task_id": "SU-split-045"
+}

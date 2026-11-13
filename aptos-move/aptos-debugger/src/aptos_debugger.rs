@@ -13,6 +13,7 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
+    on_chain_config::{Features, OnChainConfig},
     state_store::TStateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
@@ -548,12 +549,61 @@ fn execute_block_no_limit(
 ) -> Result<Vec<TransactionOutput>, BlockError> {
     let local_config = BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level);
     let executor = AptosVMBlockExecutor::new_with_local_config(local_config);
-    executor
+    let onchain_config = match Features::fetch_config(state_view)
+        .map_err(|err| BlockError::new(format!("Failed to fetch Features: {err:?}")))?
+    {
+        Some(features) => {
+            BlockExecutorConfigFromOnchain::new_no_block_limit().with_features(&features)
+        },
+        None => BlockExecutorConfigFromOnchain::new_no_block_limit(),
+    };
+    let mut outputs = executor
         .execute_block(
             txn_provider,
             state_view,
-            BlockExecutorConfigFromOnchain::new_no_block_limit(), // TODO(HotState): will need to incorporate some features.
+            onchain_config,
             TransactionSliceMetadata::unknown(),
         )
-        .map(BlockOutput::into_transaction_outputs_forced)
+        .map(BlockOutput::into_transaction_outputs_forced)?;
+    // Same as `DoGetExecutionOutput`, which produced the committed write set hashes.
+    if onchain_config.hotness_in_epilogue() {
+        outputs
+            .iter_mut()
+            .for_each(TransactionOutput::convert_write_set_to_v1);
+    }
+    Ok(outputs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_executor_test_helpers::integration_test_impl::commit_blocks_with_onchain_features;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_reexecution_with_onchain_features() {
+        let db_dir = aptos_temppath::TempPath::new();
+        db_dir.create_as_dir().unwrap();
+        // The debugger state view doesn't track storage usage, so skip the first block of the
+        // epoch, which writes it.
+        let versions = commit_blocks_with_onchain_features(db_dir.path());
+        let first_version = *versions.start();
+        let num_txns = versions.count() as u64;
+
+        let debugger = AptosDebugger::db(db_dir.path()).unwrap();
+        let (txns, txn_infos, aux_infos) = debugger
+            .get_committed_transactions(first_version, num_txns)
+            .await
+            .unwrap();
+        let outputs = debugger
+            .execute_transactions_at_version(first_version, txns, aux_infos, 1, &[1])
+            .unwrap();
+        for (version, output, txn_info) in
+            itertools::multizip((first_version.., &outputs, &txn_infos))
+        {
+            output
+                .ensure_match_transaction_info(version, txn_info, None, None)
+                .unwrap();
+        }
+        assert_eq!(outputs.len() as u64, num_txns);
+    }
 }

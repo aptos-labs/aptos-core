@@ -30,8 +30,11 @@ enum LoweringError {
     #[error("Transfer({transfer}) read without a prior def in this block")]
     TransferReadWithoutDef { transfer: u16 },
 
-    #[error("scratch slot required when emitting 2+ parallel copies")]
-    ScratchSlotRequiredForParallelCopy,
+    #[error("parallel copy stuck: found no copy cycle to break")]
+    ParallelCopyNoProgress,
+
+    #[error("parallel copy scratch offset overflows u32")]
+    ParallelCopyScratchOverflow,
 
     // ---- GC layout derivation ----
     #[error("nominal type has no layout populated")]
@@ -42,6 +45,9 @@ enum LoweringError {
 
     #[error("layout id does not resolve to a layout")]
     LayoutIdUnresolved,
+
+    #[error("a layout published by type carries no type")]
+    LayoutWithoutType,
 
     #[error("gc_layout: field offset {field_offset} + inner offset {inner_offset} overflows u32")]
     GcFieldOffsetOverflow {
@@ -163,6 +169,12 @@ enum LoweringError {
     #[error("{op}: no descriptor published for the resource type (its layout may be unresolved)")]
     ResourceTypeNoDescriptor { op: &'static str },
 
+    /// A resource operation targets a type outside the current module.
+    /// Well-formed bytecode uses module-local resource definitions; the runtime
+    /// reentrancy check relies on that restriction.
+    #[error("{op}: resource type is not defined in the current module")]
+    ResourceTypeForeignModule { op: &'static str },
+
     #[error("{op}: no descriptor published for this vector type (element may be generic or have unresolved layout)")]
     VectorTypeNoDescriptor { op: &'static str },
 
@@ -189,10 +201,12 @@ impl IntoExecutionError for LoweringError {
             ExpectedReferenceType
             | ClosureSignatureNotFunction
             | TransferReadWithoutDef { .. }
-            | ScratchSlotRequiredForParallelCopy
+            | ParallelCopyNoProgress
+            | ParallelCopyScratchOverflow
             | LayoutNotPopulated
             | TypeParamReachedGcLayout
             | LayoutIdUnresolved
+            | LayoutWithoutType
             | GcFieldOffsetOverflow { .. }
             | NoConcreteSize { .. }
             | StructLayoutNotPopulated { .. }
@@ -226,6 +240,7 @@ impl IntoExecutionError for LoweringError {
             | NotOverlapSafe { .. }
             | BoxPtrSlotNotReserved { .. }
             | ResourceTypeNoDescriptor { .. }
+            | ResourceTypeForeignModule { .. }
             | VectorTypeNoDescriptor { .. }
             | VariantOrdinalOutOfRange { .. }
             | EnumPtrScratchMissing { .. }

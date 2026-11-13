@@ -11,6 +11,8 @@ timeout. Its optional controls are:
 
 - `filter: "module"`, `"module::function"`, or `"address::module::function"`
   for a focused proof (numeric or named address; bare module names must be unambiguous);
+- `functions: [...]`, instead of `filter`, to prove several functions together,
+  each named as in a function `filter`;
 - `exclude: [...]` to omit known targets temporarily while diagnosing others;
 - `split_vcs_by_assert: true` to identify which assertion in a function is hard
   or false;

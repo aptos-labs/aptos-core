@@ -35,7 +35,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{One, Zero};
 use core::fmt::Debug;
 use itertools::izip;
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use rayon::prelude::*;
 use std::{iter, marker::PhantomData};
 

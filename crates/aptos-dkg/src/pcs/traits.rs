@@ -6,7 +6,7 @@
 // TODO: This trait is still very much a work in progress
 
 use crate::fiat_shamir::PolynomialCommitmentScheme as _;
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use std::fmt::Debug;
 
 pub trait PolynomialCommitmentScheme {

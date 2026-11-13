@@ -99,6 +99,13 @@ pub trait EntryPointTrait: std::fmt::Debug + Sync + Send + CloneEntryPointTrait 
         None
     }
 
+    /// Like `initialize_entry_point`, but signed by the root account and
+    /// submitted ahead of it, for setup that needs a governance signer —
+    /// which the root account can borrow on test genesis.
+    fn root_initialize_entry_point(&self) -> Option<Box<dyn EntryPointTrait>> {
+        None
+    }
+
     fn multi_sig_additional_num(&self) -> MultiSigConfig {
         MultiSigConfig::None
     }

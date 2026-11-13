@@ -1,33 +1,33 @@
-# Move-to-Leaner transpilation via XAST
+# Move-to-Verex transpilation via XAST
 
 Status: living design document; M1–M2 implemented, M3 underway (see
 *Implementation status*)
 
-> **Future architecture.** This document records the current XAST-to-Leaner
+> **Future architecture.** This document records the current XAST-to-Verex
 > implementation and its milestone status. The independent
-> [unified LIR design](../../designs/lir-design.md) defines the target shared semantic
+> [unified VIR design](../../designs/vir-design.md) defines the target shared semantic
 > boundary for Move and the upcoming Rust MIR importer: XAST becomes a
 > temporary Move-frontend transport, and validation, capability reporting, and
-> source emission consume profile-aware LIR.
+> source emission consume profile-aware VIR.
 > Existing milestone statuses below describe the current implementation, not
 > the final ownership boundary.
 
-This document designs the reverse direction of the Leaner pipeline: importing
+This document designs the reverse direction of the Verex pipeline: importing
 existing Move source — up to the whole Aptos framework — into Lean.  The
 compiler-v2 typed AST, including specifications, is exported through a new
 **XAST** exchange format and compiled by a Lean-side transpiler into the
-*textual* Leaner Move surface language defined in
-[`leaner-move.md`](../move/Move/leaner-move.md).  The output is ordinary `.lean`
+*textual* Verex Move surface language defined in
+[`verex-move.md`](../move/Move/verex-move.md).  The output is ordinary `.lean`
 source: `module` blocks with `struct`/`enum` declarations, `fun`s, and
-`spec`s that elaborate, lower, and verify like hand-authored Leaner code.
+`spec`s that elaborate, lower, and verify like hand-authored Verex code.
 
-Related documents: [`leaner-move.md`](../move/Move/leaner-move.md) (the
+Related documents: [`verex-move.md`](../move/Move/verex-move.md) (the
 language), [`project-plan.md`](../move/Move/project-plan.md) (what the surface
 and the verifier do not yet handle), [`design-plan.md`](../move/Move/design-plan.md)
-(Leaner-to-bytecode, XIR), [`verification-design.md`](../move/Move/verification-design.md)
+(Verex-to-bytecode, XIR), [`verification-design.md`](../move/Move/verification-design.md)
 (source contracts), [`invariant-design.md`](../move/Move/invariant-design.md)
 (data and global invariants), [`loop-design.md`](../move/Move/loop-design.md)
-(structured loops), and [`lir-design.md`](../../designs/lir-design.md) (the future
+(structured loops), and [`vir-design.md`](../../designs/vir-design.md) (the future
 profile-aware intermediate representation shared with Rust MIR).
 
 ## Implementation status
@@ -46,7 +46,7 @@ M1–M2 are implemented and tested; M3 is underway:
   the elaboration gate: each `Transpiler/Tests/Programs/<name>.move` is
   exported by the CLI at test time and compared with the generated
   `<Name>.lean` beside it, which is built against `Move`.
-- **Leaner.** E2/E3: the `pragma aborts_if_is_partial | aborts_if_is_strict`
+- **Verex.** E2/E3: the `pragma aborts_if_is_partial | aborts_if_is_strict`
   clause and the two-directional `aborts_if` semantics (`Contract.mustAbort`,
   `Move/Verify/{Contract,Syntax,Tactics}.lean`, tested by
   `Tests/Verification/AbortDirections.lean`); E7: `Bool`, `Address`, and
@@ -66,10 +66,10 @@ M1–M2 are implemented and tested; M3 is underway:
   automatically as part of the elaboration gate.  The stdlib baselines are
   generated without it (loop invariants and the nonlinear fixed-point
   arithmetic are beyond the automatic prover for now).  The acceptance
-  programs transpile to Leaner source that elaborates and whose specs are
+  programs transpile to Verex source that elaborates and whose specs are
   accepted.
 - **Specification functions.** A Move function applied in a specification
-  denotes its specification version, which Leaner derives from the
+  denotes its specification version, which Verex derives from the
   function's retained body at its declaration (`f.specFun`, the pure
   reading: `Move.Verify.Source.pureReadingTerm`; `#derive_move_spec_function`),
   so the transpiler emits nothing for the compiler's companions `$f`
@@ -85,7 +85,7 @@ M1–M2 are implemented and tested; M3 is underway:
   types, expressions, statements, and declarations of compiler-v2 Move;
   retained inline helpers may have function-typed parameters and invoke them,
   while lambdas, closures/captures, storage, and general dynamic dispatch
-  remain excluded — into readable Leaner source. Function-value behavior
+  remain excluded — into readable Verex source. Function-value behavior
   summaries are transported by XAST v4 and lower to the target language's
   closed behavior-operation family.
   Signed integers (`i8`–`i256`, Move 2.3) are part of the language on both
@@ -94,12 +94,12 @@ M1–M2 are implemented and tested; M3 is underway:
   codes), `modifies`, loop invariants, spec functions, and spec `let`,
   preserving the production prover's spec semantics.
 - Represent the **semantics-bearing core pragmas** (`aborts_if_is_partial`,
-  `aborts_if_is_strict`) in Leaner Move; drop all others.  `pragma opaque`
-  is dropped by decision: Leaner verification is modular by construction.
+  `aborts_if_is_strict`) in Verex Move; drop all others.  `pragma opaque`
+  is dropped by decision: Verex verification is modular by construction.
 - Preserve **readability**: receiver/dot notation for `self` functions and
   standard-library operations, original names, doc comments and ordinary
   comments, source structure (loops stay loops, matches stay matches), and a
-  layout that reads like hand-written Leaner.
+  layout that reads like hand-written Verex.
 - Scale to the target corpus: **every module of the Aptos framework**
   (move-stdlib, aptos-stdlib, aptos-framework, aptos-token,
   aptos-token-objects; 167 module declarations, ~78 k implementation lines,
@@ -108,16 +108,16 @@ M1–M2 are implemented and tested; M3 is underway:
 ## Non-goals
 
 - Constructed and stored function values, closures/captures, and
-  dispatchable-fungible-asset `FunctionInfo` machinery. XAST and Leaner do
+  dispatchable-fungible-asset `FunctionInfo` machinery. XAST and Verex do
   support the narrow compile-time-only slice
   needed by retained `inline fun`s: function-typed parameters and their
   invocations. Inlining removes almost all framework lambda usage (339 lambda
   sites feed `inline fun`s); construction that remains is rejected explicitly.
-- Round-tripping transpiled modules back to bytecode through the Leaner
+- Round-tripping transpiled modules back to bytecode through the Verex
   executable pipeline.  Transpiled output targets *source verification*;
   re-export through XIR is at most a differential-testing aid for the
   executable subset.
-- Proving the transpiler correct.  Generated Leaner source is re-elaborated,
+- Proving the transpiler correct.  Generated Verex source is re-elaborated,
   re-type-checked, and re-verified by Lean; the transpiler itself is trusted
   only for *fidelity of translation*, which testing addresses.
 - A general Move parser in Lean.  XAST is produced by compiler v2; Lean never
@@ -141,7 +141,7 @@ Move package sources (.move + .spec.move)
   Lean transpiler (lake exe transpile, new package `transpiler`)
         |-- decode JSON into Transpiler.Xast.*  (mirror data structures)
         |-- feature check, name legalization, policy (pragmas, dot notation)
-        |-- print textual Leaner Move
+        |-- print textual Verex Move
         |
   generated .lean files (one Move module per file)
         |
@@ -331,7 +331,7 @@ inlined:
 Rejected by the current Rust producer/schema (hard error naming the function):
 `Invalid`, `Lambda`, `Operation::Closure`, `Type::Error`, and `Type::Var`.
 `Operation::Behavior` carries its closed kind and pre/post memory range through
-the Rust producer, Lean mirror, decoder, and XAST-to-LIR adapter. `Type::Fun`
+the Rust producer, Lean mirror, decoder, and XAST-to-VIR adapter. `Type::Fun`
 and `Invoke` are carried for retained inline helpers. Every
 `PrimitiveType` — `Bool`, `U8`–`U256`, `I8`–`I256`, `Address`, `Signer`,
 and the spec-only `Num`, `Range`, `EventStore` — is transported.
@@ -430,7 +430,7 @@ third_party/move/lean/transpiler/     package "transpiler" -> library Transpiler
     Effects.lean     `Action`/global-write inference over the package call graph
     Order.lean       declaration ordering (Lean elaborates in order; Move does not care)
     Comments.lean    span-based re-attachment of source comments
-    Print.lean       `Std.Format`-based Leaner Move pretty printer; the
+    Print.lean       `Std.Format`-based Verex Move pretty printer; the
                      feature gate lives here too (an unsupported construct
                      raises, the declaration is emitted commented out with
                      the reason and recorded in the report)
@@ -447,10 +447,10 @@ third_party/move/lean/transpiler/     package "transpiler" -> library Transpiler
 ```
 
 The library itself depends only on Lean core (`Lean.Data.Json`,
-`Std.Format`): it manipulates text and never elaborates Leaner.  The package
+`Std.Format`): it manipulates text and never elaborates Verex.  The package
 requires `move` for its test suite — generated showcase modules are built
 against `Move` as the elaboration gate — and so that a checkout builds the
-tool and its targets together; `Transpiler.Names` mirrors Leaner's primitive
+tool and its targets together; `Transpiler.Names` mirrors Verex's primitive
 names as data, not as imports.
 
 The driver is a batch tool: it takes Move input (a package directory, or
@@ -462,7 +462,7 @@ performs no elaboration itself; `lake build` on the output is the check.
 
 ### Module and name mapping
 
-- **Module identity is Leaner's `module M at address where`.**  The Move
+- **Module identity is Verex's `module M at address where`.**  The Move
   module name is the Lean identifier verbatim and the address is a literal or
   a registered alias, so `aptos_framework::coin` becomes
 
@@ -474,7 +474,7 @@ performs no elaboration itself; `lake build` on the output is the check.
   for linkage with on-chain modules, `module` equates the Lean namespace
   component with the Move name, and `coin.transfer` then reads exactly like
   `coin::transfer`.  Struct, function, field, and parameter names are kept as
-  written (Move's casing rules coincide with Leaner's).
+  written (Move's casing rules coincide with Verex's).
 - **Addresses.**  `Move.ConventionalAddresses` already registers `std`,
   `aptos_std`, `aptos_framework`, `aptos_token`, `aptos_token_objects`, and
   the other conventional aliases, so framework modules need no declarations.
@@ -493,10 +493,10 @@ performs no elaboration itself; `lake build` on the output is the check.
   (`«end»`, `«Sort»`, `«open»`), which preserve the exact name and work
   with dot notation (`x.«end»`).  The legalizer keeps a fixed reserved-word
   list and disambiguates duplicates deterministically.
-- **Friends** print as Leaner friend items (`friend aptos_framework::coin;`),
-  which already exist; Leaner checks that a friend shares the module's
+- **Friends** print as Verex friend items (`friend aptos_framework::coin;`),
+  which already exist; Verex checks that a friend shares the module's
   address, as Move does.
-- One Move module per generated file (matching Leaner's one-export-per-file
+- One Move module per generated file (matching Verex's one-export-per-file
   rule); the file path follows the namespace with Lake's PascalCase file
   convention (`AptosFramework/Coin.lean` declares `AptosFramework.coin`), and
   imports of transpiled dependencies are ordinary Lean `import`s.
@@ -505,7 +505,7 @@ performs no elaboration itself; `lake build` on the output is the check.
 
 ### Declaration order and layout
 
-Move accepts declarations in any order; a Leaner `module` block is
+Move accepts declarations in any order; a Verex `module` block is
 elaborated by Lean **in order**, so a `fun` must follow the `fun`s it calls,
 a `spec` the `def`s (spec functions) and types it mentions, and a data
 invariant the declarations its predicate uses.  `Order.lean` therefore
@@ -515,7 +515,7 @@ independent declarations:
 1. constants, then structs and enums in dependency order, each followed by
    its data invariant (`spec T where invariant …`);
 2. spec functions as Lean-only `def`s, in dependency order, under a
-   `/-! ## Model -/` section per Leaner's file layout convention;
+   `/-! ## Model -/` section per Verex's file layout convention;
 3. functions in call-graph order, each `spec` directly under its `fun`;
    recursive functions are `partial`, and a strongly connected component
    prints as one `mutual … end` block;
@@ -526,7 +526,7 @@ independent declarations:
 Within that order the printer is a `Std.Format` pretty printer (groups,
 nesting, and soft breaks at the project's line width), not string
 concatenation: long argument lists, `spec` clauses, and `match` arms wrap
-the way the checked-in Leaner sources do, indentation is two spaces, and the
+the way the checked-in Verex sources do, indentation is two spaces, and the
 output is deterministic for identical input so framework transpiles diff
 cleanly.  Blank lines separate items; a `spec` hugs its `fun`.
 
@@ -565,11 +565,11 @@ Three tiers, the first two on by default:
    block, so `x.f args` works exactly where `x.f(args)` worked in Move.
    The model records per call whether the source used receiver syntax
    (`SurfaceSyntax::ReceiverCall`); XAST carries that bit and the printer
-   reproduces the author's call style.  Requirement on Leaner (part of E1):
+   reproduces the author's call style.  Requirement on Verex (part of E1):
    a `fun` declared inside a nested namespace of a `module` is exported
    under its last name component (`T.f` is Move function `f`).
 2. **Curated stdlib table.**  Standard functions that predate receiver
-   syntax get dot notation via the mapping onto Leaner's primitives:
+   syntax get dot notation via the mapping onto Verex's primitives:
    `vector::length(&v)` → `v.length`, `vector::push_back(&mut v, x)` →
    `v.push x`, `vector::is_empty(&v)` → `v.isEmpty`, `vector::swap(&mut v,
    i, j)` → `v.swap i j`, `signer::address_of(s)` → `s.address`
@@ -577,7 +577,7 @@ Three tiers, the first two on by default:
    Lean-native primitives (`std::vector` → `Move.Vector`, `std::signer` →
    `Ref.address`) instead of being transpiled; everything else in the
    standard library (`option`, `string`, `error`, …) is transpiled as an
-   ordinary module.  Where Leaner's `spec` does not yet accept a receiver
+   ordinary module.  Where Verex's `spec` does not yet accept a receiver
    spelling (`v.get i`, `r.insert i e`, `r.remove i`), the printer emits the
    qualified `Move.Vector.get`/`insert`/`remove` form until E11 closes that
    gap — the choice is per operation, not per module.
@@ -594,20 +594,20 @@ in the transpilation report.
 
 | Pragma (framework count) | Disposition |
 |---|---|
-| `aborts_if_is_partial` (127) | **Leaner pragma clause** (implemented): the clauses interpret sufficiency only; completeness stays uninterpreted (see semantics below).  The printer also emits it for a pure function whose spec declares no abort clause and is not strict: that states the production default and selects Leaner's relational contract shape |
-| `aborts_if_is_strict` (30) | **Leaner pragma clause** (implemented): an empty clause list means "never aborts" (module-level occurrences resolved per function at transpile time) |
-| `opaque` (529) | **Leaner pragma clause** (implemented, E9): the function is summarized for its callers by its contract (`Contract.summary`); its body is still verified against the contract when the verifier's translator can follow it, and assumed with a warning otherwise.  The frame reading of `modifies` is closed on opaque functions, loose otherwise (see *Printer normalizations*) |
-| `verify` (391) | no pragma needed: Leaner separates spec declaration from the `verify` command; the transpiler emits specs always and `verify` commands never (proof campaigns add them deliberately) |
+| `aborts_if_is_partial` (127) | **Verex pragma clause** (implemented): the clauses interpret sufficiency only; completeness stays uninterpreted (see semantics below).  The printer also emits it for a pure function whose spec declares no abort clause and is not strict: that states the production default and selects Verex's relational contract shape |
+| `aborts_if_is_strict` (30) | **Verex pragma clause** (implemented): an empty clause list means "never aborts" (module-level occurrences resolved per function at transpile time) |
+| `opaque` (529) | **Verex pragma clause** (implemented, E9): the function is summarized for its callers by its contract (`Contract.summary`); its body is still verified against the contract when the verifier's translator can follow it, and assumed with a warning otherwise.  The frame reading of `modifies` is closed on opaque functions, loose otherwise (see *Printer normalizations*) |
+| `verify` (391) | no pragma needed: Verex separates spec declaration from the `verify` command; the transpiler emits specs always and `verify` commands never (proof campaigns add them deliberately) |
 | `intrinsic`, `intrinsic = map …` (131) | schema v4 transports the model builder's resolved role mapping, but the transpiler currently rejects the owning module with a fatal E16-suspended diagnostic; no attributes or partial intrinsic model are emitted |
 | `timeout`, `unroll`, `seed`, `verify_duration_estimate`, `bv`, `bv_ret` | Boogie/SMT tuning; meaningless in Lean; dropped |
-| `disable_invariants_in_body` (5), `delegate_invariants_to_caller` (2), `emits_is_*` (0), others | dropped with a report entry; Leaner's global invariants are re-established at every write, so a suspended-invariant region has no counterpart yet (E18) |
+| `disable_invariants_in_body` (5), `delegate_invariants_to_caller` (2), `emits_is_*` (0), others | dropped with a report entry; Verex's global invariants are re-established at every write, so a suspended-invariant region has no counterpart yet (E18) |
 
 XAST transports all pragmas regardless, so changing this policy later needs
 no schema change.
 
 ### Printer normalizations
 
-- **Effects.**  Leaner marks effectful functions with an `Action` result;
+- **Effects.**  Verex marks effectful functions with an `Action` result;
   the model has no such distinction.  `Effects.lean` computes it as a fixed
   point over the package call graph (imports included): a function is printed
   as `Action` iff its body uses an `Action`-requiring primitive — global
@@ -615,26 +615,26 @@ no schema change.
   dereference, reference write, or `freeze`, vector mutation through a
   reference, or an explicit `abort`/`assert!` — or calls an `Action`
   function; entry functions are printed as `Action`.  Effectful bodies print as
-  `do` blocks; pure bodies as terms (Leaner wraps pure `do` in `Id.run`
+  `do` blocks; pure bodies as terms (Verex wraps pure `do` in `Id.run`
   automatically).
 - Reads through references in value position (`*balance >= amount`) are
-  hoisted into `let x ← *r` bindings in evaluation order, the form Leaner's
-  verifier translates; a write of the shape `*r = *r ± e` prints as Leaner's
+  hoisted into `let x ← *r` bindings in evaluation order, the form Verex's
+  verifier translates; a write of the shape `*r = *r ± e` prints as Verex's
   sequenced `r := *r ± e`.
 - `assert!(c, e)` arrives from the AST as a conditional `abort` and prints as
-  Leaner's `assert!(c, e)`; a negated condition prints with the comparison
+  Verex's `assert!(c, e)`; a negated condition prints with the comparison
   flipped (`assert!(current >= amount, E)`).  The verification translator
   accepts the macro (desugared like `Move.assert`, to `if c then pure () else
   abort e`).
 - `Assign`/`Mutate` print as `let mut` reassignment resp. reference `:=`
-  writes, using the type-directed forms Leaner already elaborates.
+  writes, using the type-directed forms Verex already elaborates.
 - Loops print as `while c do` / `loop` with `break`/`continue`
   (`loop_cont.nest > 0` becomes labeled `loop@l` with `break@l`/`continue@l`);
   Move's `for` loops are already desugared in the model.
 - Tuple-typed lets, multi-return calls, and tuple results print as Lean
   products (`U64 × Bool`, `let (a, b) := f x`); a tuple assignment to
   existing locals prints as a product `let` followed by the reassignments.
-- Guarded match arms (`MatchArm.condition`) print as Leaner's guarded arms
+- Guarded match arms (`MatchArm.condition`) print as Verex's guarded arms
   (`| pat if c => e`); enum matches survive the export as matches.  Matches
   over primitive values (literal and range arms) do not: compiler v2's match
   transform lowers them to `if` chains before the export stage, which print
@@ -642,9 +642,9 @@ no schema change.
   against exporting before the match transform.
 - Constant references print by name (`E_INSUFFICIENT_BALANCE`), preserving
   the error-code idiom; a constant declaration prints as `def NAME : T := e`
-  (Leaner folds integer constant expressions with checked semantics, and
+  (Verex folds integer constant expressions with checked semantics, and
   `Bool`, `Address`, and vector-literal constants as literals — E7).
-- **Loans and places.**  Leaner's place grammar accepts an element step only
+- **Loans and places.**  Verex's place grammar accepts an element step only
   directly after the root (`x[i].f`, not `x.f[i]`), borrows fields and
   elements through references only, and its verifier requires later borrows
   of a loaned place to chain through the live loan.  The printer therefore
@@ -658,14 +658,14 @@ no schema change.
   the block, so direct assignments and `push_back` go through it too.
   Nested places through a reference variable print as `&mut r.f.g`.
 - A boolean literal condition prints as the proposition (`aborts_if False`).
-- Spec clauses print in Leaner's fixed order `requires; modifies; ensures;
+- Spec clauses print in Verex's fixed order `requires; modifies; ensures;
   aborts_if …`, conjoining repeated `requires`/`ensures`; a spec without
   `ensures` prints `ensures True`.
 - Inside `aborts_if` clauses global places print as `old(R[a])`, making the
   pre-state reading that Move gives them explicit; `requires` reads the
   pre-state by construction, and in `ensures` bare `R[a]` is the post-state
   and `old(…)` the pre-state, exactly as in Move.
-- **`modifies` rendering.**  Leaner's frame is closed — an omitted
+- **`modifies` rendering.**  Verex's frame is closed — an omitted
   `modifies` means no global memory changes, `modifies R[a]` means nothing
   else changes — while the prover's `modifies` is per resource type: a
   `CanModify<R>(a)` assertion guards each write to `R` only if the spec
@@ -675,21 +675,21 @@ no schema change.
   (unlisted memory it writes is havoced coarsely, with a warning).  The
   printer maps this without inventing frame information:
   - no `modifies` clause and the function (transitively, per the effect
-    analysis) performs no global write → no clause, as in Leaner;
+    analysis) performs no global write → no clause, as in Verex;
   - no `modifies` clause but global writes → `modifies *;`, the loose frame
     (E20);
   - clauses on an **opaque** function → `modifies <targets>;` — the closed
-    frame, the same reading as Leaner's;
+    frame, the same reading as Verex's;
   - clauses on a non-opaque function → `modifies <targets>, *;` — the listed
     families closed at their addresses, everything else loose, exactly the
     per-family check the prover performs.
 
   This is the one place the dropped `opaque` pragma leaves a semantic
-  residue.  Leaner callers normally unfold a callee's `sourceSpec`, so a
+  residue.  Verex callers normally unfold a callee's `sourceSpec`, so a
   loose frame costs a caller proof nothing; where a proof campaign uses a
   contract directly (`wp_call`, verified recursive callees) it may tighten
   the transpiled clause by hand.
-- Spec binders follow Leaner's asymmetry: `&T` parameters lose the `&` in
+- Spec binders follow Verex's asymmetry: `&T` parameters lose the `&` in
   `spec` binders, `&mut T` parameters keep it.
 
 ### Transpilation report
@@ -715,7 +715,7 @@ two directions:
 `aborts_if_is_strict` makes an *empty* clause list mean `aborts_if false`
 (never aborts) instead of "no claim".
 
-Leaner's abort clauses (`leaner-move.md`, *Abort behaviour*) already have
+Verex's abort clauses (`verex-move.md`, *Abort behaviour*) already have
 the production *shape*: `aborts_if P with C` clauses are repeatable and
 disjoined, `aborts_if P` without a code permits any code, `aborts_if False`
 states that the function never aborts, and an *omitted* clause leaves abort
@@ -724,7 +724,7 @@ behaviour uninterpreted — which is deliberately not the same as providing
 "the function *may* abort where `P` holds, with code `C`", and `ensures` is
 owed where every declared condition is ruled out.  As the reference states,
 *a contract cannot express that a function must abort*.  To preserve
-production semantics the Leaner contract's abort condition becomes a pair of
+production semantics the Verex contract's abort condition becomes a pair of
 **optional** (interpreted or uninterpreted) Prop-valued components:
 
 ```lean
@@ -735,7 +735,7 @@ abortsOnly : Option (Args → State → U64 → Prop)   -- completeness
 - **Omitted `aborts_if` means uninterpreted.**  With no clauses (and no
   pragma) both components are `none`: nothing is checked at the
   definition, and callers learn nothing about abort behavior.  This is the
-  production default, and Leaner's today.
+  production default, and Verex's today.
 - **Provided clauses interpret the condition.**  Each clause
   `aborts_if Pi with Ci` contributes the sufficiency conjunct
   `Pi ⟹ mustAbort` and the completeness disjunct `Pi ∧ code = Ci`; a
@@ -757,7 +757,7 @@ knowledge.  The `pragma` spellings are surface markers deciding which
 components are interpreted, kept so transpiled specs read 1:1 against the
 Move original.
 
-This is a semantic strengthening of today's Leaner `aborts_if` (existing
+This is a semantic strengthening of today's Verex `aborts_if` (existing
 tests gain sufficiency obligations, which hold for the current examples)
 and is prerequisite work for faithful spec transport.  Example:
 
@@ -784,7 +784,7 @@ spec withdraw (addr : Address) (amount : U64) where
 
 ### Spec expression mapping
 
-| Move spec construct | Leaner rendering |
+| Move spec construct | Verex rendering |
 |---|---|
 | `old(e)` | `old(e)` (existing) |
 | `global<R>(a)` / `exists<R>(a)` | `R[a]` places / `existsAt<R>(a)` (existing); generic families `(R T)[a]`, `existsAt<R T>(a)` |
@@ -801,9 +801,9 @@ spec withdraw (addr : Address) (amount : U64) where
 | `exists …` quantifier | `∃ …` |
 | spec `let x = e;` / `let post x = e;` (pre / post) | Lean `let` in the clause; a `let post` is a `let` inside the post-state clause, which already sees post-state places |
 | `P ==> Q`, `P <==> Q` | `→`, `↔` |
-| `modifies global<R>(a)` (119 uses) | `modifies R[a]` — the existing Leaner clause — closed on opaque functions, followed by the loose wildcard `*` otherwise; `modifies *` alone for a writing function without clauses (rendering rule above, E20) |
-| spec fun with body (212) | Leaner's `spec fun` declaration under the Move name (a Lean definition for specifications, never lowered); one reading global memory is *stateful* and reads the state of the clause that applies it |
-| Move function called in a specification (pure in MSL's sense; the rewriter's companion `$f`) | the call `f args`: Leaner derives the specification version of `f` from `f`'s own body at its declaration (the same reading the compiler derives for `$f`), so nothing is printed for the companion; `std::vector` operations render as the list view (curated module); the natives' versions come from the intrinsic models (`spec fun borrow_address …`, `sha2_256`, `to_bytes`) |
+| `modifies global<R>(a)` (119 uses) | `modifies R[a]` — the existing Verex clause — closed on opaque functions, followed by the loose wildcard `*` otherwise; `modifies *` alone for a writing function without clauses (rendering rule above, E20) |
+| spec fun with body (212) | Verex's `spec fun` declaration under the Move name (a Lean definition for specifications, never lowered); one reading global memory is *stateful* and reads the state of the clause that applies it |
+| Move function called in a specification (pure in MSL's sense; the rewriter's companion `$f`) | the call `f args`: Verex derives the specification version of `f` from `f`'s own body at its declaration (the same reading the compiler derives for `$f`), so nothing is printed for the companion; `std::vector` operations render as the list view (curated module); the natives' versions come from the intrinsic models (`spec fun borrow_address …`, `sha2_256`, `to_bytes`) |
 | uninterpreted / `spec native fun` (62) | Lean `opaque` declarations; their attached conditions become hypotheses |
 | `axiom` | Lean `axiom`, flagged prominently in the report |
 | `invariant` in `spec StructName` | `spec T where invariant …` — the existing data invariant (`this`/`.field`) |
@@ -816,9 +816,9 @@ their preceding logical `let` bindings attach to the enclosing loop and are
 emitted in its trailing `where` region (E12); `assert`/`assume` (350 + 28) map
 to independent spec statement extensions (E14).
 
-## Required Leaner extensions
+## Required Verex extensions
 
-The transpiler targets the Leaner language as specified in `leaner-move.md`,
+The transpiler targets the Verex language as specified in `verex-move.md`,
 whose surface now covers the bulk of the framework's base language: all
 integer widths including signed, casts, bit operations and shifts, the full
 operator set, tuples and multiple returns, byte strings, `assert!`, range and
@@ -833,24 +833,24 @@ the plan below.
 | # | Extension | Status | Why (framework data) | Milestone |
 |---|---|---|---|---|
 | E1 | Module identity: address, alias, friends; root namespaces and nested-namespace receiver functions | **confirmed**: `module M at alias` inside an enclosing `namespace` (the aliased-package fixture `AptosFramework/Counter.lean`); receiver functions print in prefix form, the nested-namespace receiver tier is a readability item | 167 modules at real addresses; `0x3::token` vs `0x4::token`; 225 receiver functions | M1 |
-| E2 | Spec grammar: `pragma` clauses; explicit relational contract shape for a pure function with only `ensures` (Leaner's pure value contract reads aborting executions with wrapping values, unlike production) | **implemented**: `pragma aborts_if_is_partial \| aborts_if_is_strict;` clauses (`Move/Verify/Syntax.lean`); a pragma-led `ensures` on a pure function selects the relational contract; the printer conjoins repeated `requires`/`ensures` | 530 specs, 1889 `aborts_if`, 1513 `ensures`, 214 `requires` | M1 |
+| E2 | Spec grammar: `pragma` clauses; explicit relational contract shape for a pure function with only `ensures` (Verex's pure value contract reads aborting executions with wrapping values, unlike production) | **implemented**: `pragma aborts_if_is_partial \| aborts_if_is_strict;` clauses (`Move/Verify/Syntax.lean`); a pragma-led `ensures` on a pure function selects the relational contract; the printer conjoins repeated `requires`/`ensures` | 530 specs, 1889 `aborts_if`, 1513 `ensures`, 214 `requires` | M1 |
 | E3 | Two-directional `aborts_if` contract semantics with optional (uninterpreted) abort components; `aborts_if_is_partial` pragma; strictness | **implemented**: `Contract.mustAbort` (sufficiency) beside `aborts`/`mayAbort` (completeness); without the partial pragma every abort matches a clause; strict with no clauses means "never aborts" (`Tests/Verification/AbortDirections.lean`) | 127 partial, 30 strict pragma sites | M1 |
 | E7 | Named constants of type `Bool`, `Address`, and `vector<u8>` | **implemented**: the compiler folds `def NAME : Bool \| Address \| Vector U8 := literal` (`literalConstant?` in `Move/Compiler/Normalize.lean`), beside the checked integer folding | error-code and config constants everywhere | M1 |
 | E20 | Loose frame: the `modifies` wildcard target `*` — "every family not listed is unconstrained" — generalizing the existing `modifies R` (one family unconstrained) to the rest; `modifies *` alone is the fully open frame | **implemented** (`Move/Verify/Syntax.lean`, `Tests/Verification/LooseFrame.lean`) | the prover's `modifies` is per family and absent for most of the framework (119 clauses for 167 modules); mirrors the model's own `modifies_of<f> *` wildcard | M1 |
 | E9 | Native-function modeling: a `spec` on a `native fun` yields an assumed contract, and curated Lean-backed models for stdlib natives (hash, bcs, string internals, event natives) | **implemented**: natives and `pragma opaque` functions are summarized by their contracts (`Contract.summary`, `f.summarySpec`; `Tests/Verification/Summaries.lean`); the intrinsic models of `Transpiler/Intrinsics.lean` supply the specs the source lacks (signer, hash, bcs) | 225 `native fun` | M2 |
 | E11 | Receiver-style vector operations accepted by `spec`/`verify`; spec-side `toList` lemma library | operation set complete; `v.get i`/`r.insert`/`r.remove` rejected at `spec` | heavy vector use | M2 |
-| E12 | Loop invariants on `while`/`loop` (verification-side; compilation unaffected) | **done** (2026-08-23): XAST loop invariants print as `invariant P` at the loop head; Leaner translates them to fixed-point induction obligations over loop locals, live mutations, and anchored entry values; verification and transpiled-program baselines cover the path | 169 loop-invariant sites | M4 |
+| E12 | Loop invariants on `while`/`loop` (verification-side; compilation unaffected) | **done** (2026-08-23): XAST loop invariants print as `invariant P` at the loop head; Verex translates them to fixed-point induction obligations over loop locals, live mutations, and anchored entry values; verification and transpiled-program baselines cover the path | 169 loop-invariant sites | M4 |
 | E13 | More than two simultaneous `&mut` parameters | **done** (2026-08-24), without a fixed arity limit: calls, prophecy opening/reconciliation, dynamic reference returns, conservative all-input poisoning, forwarding, and contract verification use heterogeneous mutation tuples | rare in the framework | M4 |
-| E14 | Spec statements `assert`/`assume` in bodies | **done** (2026-08-24): XAST spec blocks print as source-only `assert P` / `assume P` statements; Leaner turns assertions into state-certification obligations and assumptions into path restrictions at the exact program state, including state-anchored `old` observations | 350 + 28 sites | M4 |
-| E16 | Intrinsic types: `Table`, `TableWithLength`, `SimpleMap`, `SmartTable`, `OrderedMap`, `BigOrderedMap`, aggregators → Lean-native models honoring the `intrinsic = map` function mapping | **Transport implemented; semantics suspended** (2026-08-24): schema v4 carries resolved mappings, and the six-type corpus checks all 158 binding occurrences. Modules that own an intrinsic are rejected explicitly. The generic model, complete role semantics, validation, diagnostics, and source round trip wait for the unified LIR; see [`intrinsic-design.md`](intrinsic-design.md) | 131 intrinsic pragmas, ~700 qualified `spec_*` calls | M5 |
+| E14 | Spec statements `assert`/`assume` in bodies | **done** (2026-08-24): XAST spec blocks print as source-only `assert P` / `assume P` statements; Verex turns assertions into state-certification obligations and assumptions into path restrictions at the exact program state, including state-anchored `old` observations | 350 + 28 sites | M4 |
+| E16 | Intrinsic types: `Table`, `TableWithLength`, `SimpleMap`, `SmartTable`, `OrderedMap`, `BigOrderedMap`, aggregators → Lean-native models honoring the `intrinsic = map` function mapping | **Transport implemented; semantics suspended** (2026-08-24): schema v4 carries resolved mappings, and the six-type corpus checks all 158 binding occurrences. Modules that own an intrinsic are rejected explicitly. The generic model, complete role semantics, validation, diagnostics, and source round trip wait for the unified VIR; see [`intrinsic-design.md`](intrinsic-design.md) | 131 intrinsic pragmas, ~700 qualified `spec_*` calls | M5 |
 | E17 | Events: emit natives as ghost/no-op effects (`#[event]` attributes already pass through as metadata) | attributes carried | 155 event structs, 6 `emits` specs | M5 |
 | E18 | `[suspendable]` invariants and `disable_invariants_in_body` regions, ghost spec variables | regular and update global invariants exist | 20 + 5 + 8 sites | M6 |
-| E19 | Enum variant-field borrows | **done** (2026-08-23): `&r.f` / `&mut r.f` on enum referents and `match` through `&`/`&mut` binding payload references, end to end (IR `borrowVariantField`/`testVariantRef`, XIR + Rust importer, Leaner surface/compiler/verifier, printer) | 77 enums, 32 matches | M5 |
+| E19 | Enum variant-field borrows | **done** (2026-08-23): `&r.f` / `&mut r.f` on enum referents and `match` through `&`/`&mut` binding payload references, end to end (IR `borrowVariantField`/`testVariantRef`, XIR + Rust importer, Verex surface/compiler/verifier, printer) | 77 enums, 32 matches | M5 |
 
-Dropped without replacement: `acquires` clauses (Leaner infers them),
+Dropped without replacement: `acquires` clauses (Verex infers them),
 `#[test]`/`#[test_only]` declarations (excluded at export), `inline fun`
 declarations (expanded; verify-mode retentions transpile as ordinary
-functions — Leaner's own `inline fun` is not used because the model's calls
+functions — Verex's own `inline fun` is not used because the model's calls
 to retained functions are ordinary calls).
 
 ## Worked example
@@ -877,7 +877,7 @@ module 0x42::basic_coin {
 }
 ```
 
-Generated Leaner (target shape):
+Generated Verex (target shape):
 
 ```lean
 -- generated by move-to-lean from basic_coin.move
@@ -932,12 +932,12 @@ modifies global<Coin>(addr);`, the output would be the closed
   built against `Move` by `lake test` — Lean elaboration re-checks
   representability, typing, and spec acceptance end to end.
 - **Verification test** (`Transpiler/Tests/Verification.lean`): `verify`
-  over the transpiled specs that Leaner proves automatically; it documents
+  over the transpiled specs that Verex proves automatically; it documents
   the ones it does not (a dropped loop invariant, an enum `match`, a
   `Vector.length`/`toList.length` lemma), none of them transpiler gaps.  The
   `--verify` flag produces the same commands inside generated files.
-- **Differential execution (stretch)**: for modules inside the Leaner
-  executable subset, compile the generated Leaner through the existing
+- **Differential execution (stretch)**: for modules inside the Verex
+  executable subset, compile the generated Verex through the existing
   XIR/compiler-v2 path and compare execution against the directly compiled
   original on transactional tests.
 - **Framework scoreboard**: CI job runs `exchange --format ast` +
@@ -956,15 +956,15 @@ Schema (`ast` module, version 4), producer for the full AST (rejections only
 for constructed/stored function values), the model-only build entry, CLI
 `--format ast`;
 Lean mirror types, decoder, effect inference, declaration ordering, and the
-`Std.Format` printer (with doc comments) for the base language Leaner
+`Std.Format` printer (with doc comments) for the base language Verex
 already accepts, plus E1–E3, E7, and E20 (module identity confirmations,
 `pragma` clauses and the relational contract shape, two-directional abort
 semantics, non-integer constants, the loose `modifies` frame).
 Acceptance: the
-Leaner test programs (`Tests/Verification/Account`, `Tests/Language/Loops`,
+Verex test programs (`Tests/Verification/Account`, `Tests/Language/Loops`,
 `Tests/Language/EnumPayloads`, `Tests/Language/Generics`,
 `Tests/Verification/OrderedMap` core) written in Move transpile to
-elaborating Leaner source; baselines in place.  **Done** (see *Implementation
+elaborating Verex source; baselines in place.  **Done** (see *Implementation
 status*).
 
 ### M2 — move-stdlib
@@ -978,8 +978,8 @@ work is semantic and presentation completeness):
 
 1. **Layout.**  The canonical `move-stdlib` package (`Move.toml`, `sources/`,
    spec files included) lives under
-   `leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/MoveStdlib/`, where every
-   exported module has a side-by-side LeanerLang-or-error expectation. The
+   `verex-e2e-tests/VerexE2ETests/MoveToVerexSL/MoveStdlib/`, where every
+   exported module has a side-by-side VerexSL-or-error expectation. The
    legacy generated Lean remains under `Transpiler/Tests/Programs/MoveStdlib/Std/`
    with its report. The transpiler baseline reads the E2E-owned source package,
    and its elaboration gate continues to compile the legacy generated modules.
@@ -989,28 +989,28 @@ work is semantic and presentation completeness):
    The Lean *namespaces* stay alias-rooted (`Std.error`).
 3. **Function values, per function.** XAST v2 carries function-typed
    parameters and `Invoke`, so the retained inline helpers in `option` and
-   `result` export. Leaner renders callbacks conservatively as
+   `result` export. Verex renders callbacks conservatively as
    `… → Action …`; public and private `inline fun` declarations are forced
    into callers and excluded from standalone source-spec derivation and Move
    output. Lambdas, closures/captures, and storage still produce named
    `skipped` entries. XAST v4 carries structured behavior payloads, so the four
    behavior-summary functions in `std::vector` now export and round-trip as
    ordinary `spec fun` declarations. `std::vector` stays curated: it *is*
-   Leaner's `Move.Vector`.
-4. **Natives.**  `native fun f (…) : T` (Leaner's body-less item, opaque at
+   Verex's `Move.Vector`.
+4. **Natives.**  `native fun f (…) : T` (Verex's body-less item, opaque at
    the Lean level) with its Move spec as an assumed contract (E9 in
    `Move/Verify`); uninterpreted spec functions print as `opaque` with their
    attached conditions as axioms.
 5. **Intrinsic models in Lean.**  A hand-written prelude beside the generated
    stdlib (the analogue of the prover's `prelude.bpl`/`native.bpl`): hash
    (`sha2_256`/`sha3_256` injective, 32 bytes), `bcs::to_bytes` (injective,
-   non-empty), `signer::borrow_address` (the signer's address, Leaner's
+   non-empty), `signer::borrow_address` (the signer's address, Verex's
    `Ref.address`), `mem::swap` (referents exchanged), `cmp::compare` (equal
    values compare `Equal`, otherwise an arbitrary fixed ordering), string
    internals (unconstrained, as in the prover), reflection natives.
 6. **Printer fixes** surfaced by the run: bare field selection in struct
    invariants (`invariant … list[i] …` → `this.list`); the prover-only
-   `int2bv`/`bv2int` representation switches erase onto Leaner's bounded
+   `int2bv`/`bv2int` representation switches erase onto Verex's bounded
    integers while `pragma bv` is dropped and reported; loop invariants and
    spec statements were initially dropped and were completed in M4
    (E12/E14).
@@ -1045,7 +1045,7 @@ Decisions taken on the way:
   `s.address`); `std::vector` stays curated.
 
 - **No dummy specs.**  A function without a spec block gets no `spec`:
-  Leaner derives a function's source semantics from its body at its
+  Verex derives a function's source semantics from its body at its
   declaration, for callers in any module, exactly when there is no `spec`
   block (`#derive_move_source_spec`, emitted by the module items for every
   `fun` with a body; best effort and silent — `set_option
@@ -1066,7 +1066,7 @@ Decisions taken on the way:
 - **Spec quantifier ranges** `forall x in lo..hi` range over `num`: the
   binder is `(x : Int)`, the bounds are the mathematical values of their
   leaves, and an `Int`-valued vector index narrows with `.toNat`.
-- **Loop invariants (E12)** print as Leaner's `invariant P` statements at the
+- **Loop invariants (E12)** print as Verex's `invariant P` statements at the
   loop head (the spec block the Move compiler places before the condition —
   of a `loop` body, or in the condition block of a `while`), over the body's
   locals; the verifier translates them to `Spec.withInvariant` and the
@@ -1083,7 +1083,7 @@ Decisions taken on the way:
   parameters, and spec-function results narrow or widen at the boundary;
   transitively needed spec `let`s are emitted.
 - **Bit-vector representation switches**: `int2bv`/`bv2int` are no-ops in
-  generated source because a Leaner `U8`/…/`U256` or signed integer already
+  generated source because a Verex `U8`/…/`U256` or signed integer already
   has fixed-width bit operations.  Arithmetic remains mathematical until a
   surrounding cast or declaration result reifies it with `MoveInt.ofInt`;
   bitwise operands stay bounded and only the completed result is widened.
@@ -1092,24 +1092,24 @@ Decisions taken on the way:
   rewriter (`SPEC_REWRITE`), so a call of a Move function in a specification
   arrives resolved to its companion `$f` and checked for pureness; the
   transpiler prints the call as `f args` and nothing for the companion —
-  Leaner derives the specification version of `f` from `f`'s own retained
+  Verex derives the specification version of `f` from `f`'s own retained
   body at its declaration (the pure reading: references erased, `assert!`s
   dropped, global reads as places, calls as versions — the reading the
   compiler derives for `$f`), and a body without one makes the specification
   applying it report why.  A spec function reading global memory
   (`basic_coin::total`) is a stateful `spec fun`; a native's version is
   declared by its intrinsic model (`spec fun borrow_address …`).  `std::vector`
-  operations render as the list view (the module is Leaner's).  `bit_vector`
+  operations render as the list view (the module is Verex's).  `bit_vector`
   is now clean.  In specifications, `x.f` on an enum value and `abort` read
   as the prover reads them (a variant dispatch; an unspecified per-site value,
   `Move.Spec.arbitrary`), so `option::spec_borrow` transpiles — printed as
-  `self.e`, Leaner's field selection on an enum value.  E19 — enum payload
+  `self.e`, Verex's field selection on an enum value.  E19 — enum payload
   *references* in code (`borrow`, `borrow_mut`, `swap`, `contains`,
-  `borrow_with_default`, `get_with_default`) — is done as a Leaner extension:
+  `borrow_with_default`, `get_with_default`) — is done as a Verex extension:
   IR `borrowVariantField(Inst)` / `testVariantRef(Inst)` (execution and
   typing semantics, interpreter, decoder/encoder; reference elimination
   rejects them for now), XIR `BorrowVariantField`/`TestVariantRef` with the
-  Rust importer, Leaner `&r.f` / `&mut r.f` on enum references
+  Rust importer, Verex `&r.f` / `&mut r.f` on enum references
   (`borrowVariantField(Mut)`) and `match` through a reference binding payload
   references (`Move.EnumAccess`: a `match` on a `Ref`/`MutRef` local
   dispatches with `testVariant(Mut)Ref` and borrows the payload), and the
@@ -1119,7 +1119,7 @@ Decisions taken on the way:
   `match` through a live mutation loans its payload fields with
   `withMutation(s2)` and rebuilds the variant).  The printer borrows a
   variant field through the owner (`&self.e`) and prints a payload-binding
-  `match` on the reference variable. Leaner's path-free mutation-level call
+  `match` on the reference variable. Verex's path-free mutation-level call
   relation now transports mutable-reference results, including
   `option::borrow_mut`, with conservative mutable-input poisoning and local
   payload reconciliation. See `Move/verification-design.md`, under
@@ -1128,7 +1128,7 @@ Decisions taken on the way:
   fresh name (`x'`); `let mut` bindings that would shadow a mutable local of
   the block are renamed too (Lean forbids the shadowing).
 
-Leaner extensions made for the stdlib, each with its witness:
+Verex extensions made for the stdlib, each with its witness:
 
 - **Imported struct and enum types in the executable compiler** (`bcs`,
   `string`, `reflect` use `option::Option`): the module links to other
@@ -1207,23 +1207,23 @@ carries an explicit, categorized exclusion.
   named-address aliases (`Std.*`, `AptosStd.*`, `AptosFramework.*`, …) by
   wrapping the module in a Lean namespace.
 - `pragma opaque` is dropped; `aborts_if_is_partial` and
-  `aborts_if_is_strict` become the only Leaner pragmas; all other pragmas
+  `aborts_if_is_strict` become the only Verex pragmas; all other pragmas
   are dropped with reported dispositions; `verify = false` is handled
   structurally by not emitting `verify`.
-- Leaner `aborts_if` gains production two-directional semantics with
+- Verex `aborts_if` gains production two-directional semantics with
   explicitly optional abort components: an omitted `aborts_if` leaves the
   abort condition uninterpreted, which differs from providing `True` or
   `False`.  The contract and proof layers stay pragma-free;
   `aborts_if_is_partial` leaves the completeness component uninterpreted,
   and strictness reduces to an explicit `aborts_if False`.
-- The printer owns effect inference (`Action` results), because Leaner's
+- The printer owns effect inference (`Action` results), because Verex's
   effect typing is explicit where Move's is implicit.
 - `modifies` is rendered, never synthesized: closed on opaque functions
-  (the prover's and Leaner's common reading), per-family with the loose
+  (the prover's and Verex's common reading), per-family with the loose
   wildcard `*` on non-opaque functions, `modifies *` for a writing function
   without clauses, omitted for a function that writes nothing.
 - The printer emits a dependency-respecting declaration order (Lean
-  elaborates in order), follows Leaner's file-layout convention, and is a
+  elaborates in order), follows Verex's file-layout convention, and is a
   `Std.Format` pretty printer with deterministic output.
 - Doc comments travel on declarations; ordinary comments travel in a
   source-scanned span table and are re-attached by span, with every dropped
@@ -1233,7 +1233,7 @@ carries an explicit, categorized exclusion.
   is off by default.
 - Name collisions and keywords are escaped with guillemets, never renamed.
 - Move functions in specifications: the producer runs the spec rewriter; the
-  transpiler prints the call (`f args`) and nothing for the companion — Leaner
+  transpiler prints the call (`f args`) and nothing for the companion — Verex
   derives the specification version of `f` from `f`'s body at its declaration
   and resolves `f` in clauses to it; `spec fun` is for what has no derivation.
 

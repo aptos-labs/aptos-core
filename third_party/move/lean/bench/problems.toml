@@ -1,0 +1,280 @@
+# Copyright © Aptos Foundation
+# SPDX-License-Identifier: Apache-2.0
+#
+# The problems of the verification benchmark (doc/status/verification-benchmarks.md),
+# read from the tree at the benchmarked commit. Paths are relative to the
+# repository root. A problem is `move` (modules of an in-tree package),
+# `lean` (a VerexSL file), or `rust` (a Rust file with its specification).
+# `inputs` lists further paths whose change changes the problem; `dev`
+# compiles a Move package in dev mode (its `[dev-addresses]`); `repeat`
+# runs a small problem several times and keeps the median; `timeout` is in
+# seconds for the complete problem including repeats (300 seconds by default).
+# The runner's --timeout overrides this value; --jobs controls independent problems.
+
+# ## Move standard library
+
+[[problem]]
+name = "option"
+kind = "move"
+package = "aptos-move/framework/move-stdlib"
+modules = ["std::option"]
+
+[[problem]]
+name = "vector"
+kind = "move"
+package = "aptos-move/framework/move-stdlib"
+modules = ["std::vector"]
+
+[[problem]]
+name = "string"
+kind = "move"
+package = "aptos-move/framework/move-stdlib"
+modules = ["std::string"]
+repeat = 3
+
+[[problem]]
+name = "error"
+kind = "move"
+package = "aptos-move/framework/move-stdlib"
+modules = ["std::error"]
+repeat = 3
+
+[[problem]]
+name = "bit_vector"
+kind = "move"
+package = "aptos-move/framework/move-stdlib"
+modules = ["std::bit_vector"]
+
+[[problem]]
+name = "fixed_point32"
+kind = "move"
+package = "aptos-move/framework/move-stdlib"
+modules = ["std::fixed_point32"]
+
+[[problem]]
+name = "features"
+kind = "move"
+package = "aptos-move/framework/move-stdlib"
+modules = ["std::features"]
+
+[[problem]]
+name = "acl"
+kind = "move"
+package = "aptos-move/framework/move-stdlib"
+modules = ["std::acl"]
+repeat = 3
+
+[[problem]]
+name = "cmp"
+kind = "move"
+package = "aptos-move/framework/move-stdlib"
+modules = ["std::cmp"]
+repeat = 3
+
+# ## Aptos standard library
+
+[[problem]]
+name = "math64"
+kind = "move"
+package = "aptos-move/framework/aptos-stdlib"
+modules = ["aptos_std::math64"]
+inputs = ["aptos-move/framework/move-stdlib"]
+
+[[problem]]
+name = "math128"
+kind = "move"
+package = "aptos-move/framework/aptos-stdlib"
+modules = ["aptos_std::math128"]
+inputs = ["aptos-move/framework/move-stdlib"]
+
+[[problem]]
+name = "math_fixed"
+kind = "move"
+package = "aptos-move/framework/aptos-stdlib"
+modules = ["aptos_std::math_fixed"]
+inputs = ["aptos-move/framework/move-stdlib"]
+
+[[problem]]
+name = "fixed_point64"
+kind = "move"
+package = "aptos-move/framework/aptos-stdlib"
+modules = ["aptos_std::fixed_point64"]
+inputs = ["aptos-move/framework/move-stdlib"]
+
+[[problem]]
+name = "simple_map"
+kind = "move"
+package = "aptos-move/framework/aptos-stdlib"
+modules = ["aptos_std::simple_map"]
+inputs = ["aptos-move/framework/move-stdlib"]
+
+[[problem]]
+name = "comparator"
+kind = "move"
+package = "aptos-move/framework/aptos-stdlib"
+modules = ["aptos_std::comparator"]
+inputs = ["aptos-move/framework/move-stdlib"]
+
+[[problem]]
+name = "capability"
+kind = "move"
+package = "aptos-move/framework/aptos-stdlib"
+modules = ["aptos_std::capability"]
+inputs = ["aptos-move/framework/move-stdlib"]
+
+[[problem]]
+name = "pool_u64"
+kind = "move"
+package = "aptos-move/framework/aptos-stdlib"
+modules = ["aptos_std::pool_u64"]
+inputs = ["aptos-move/framework/move-stdlib"]
+
+[[problem]]
+name = "ristretto255"
+kind = "move"
+package = "aptos-move/framework/aptos-stdlib"
+modules = ["aptos_std::ristretto255"]
+inputs = ["aptos-move/framework/move-stdlib"]
+
+[[problem]]
+name = "ed25519"
+kind = "move"
+package = "aptos-move/framework/aptos-stdlib"
+modules = ["aptos_std::ed25519"]
+inputs = ["aptos-move/framework/move-stdlib"]
+
+# ## Aptos framework
+
+[[problem]]
+name = "ordered_map"
+kind = "move"
+package = "aptos-move/framework/aptos-framework"
+modules = ["aptos_framework::ordered_map"]
+inputs = ["aptos-move/framework/move-stdlib", "aptos-move/framework/aptos-stdlib"]
+
+# ## Benchmark package (bench/package)
+
+[[problem]]
+name = "storage"
+kind = "move"
+package = "third_party/move/lean/bench/package"
+modules = ["bench::storage"]
+inputs = ["aptos-move/framework/move-stdlib"]
+repeat = 3
+
+[[problem]]
+name = "behavior"
+kind = "move"
+package = "third_party/move/lean/bench/package"
+modules = ["bench::behavior"]
+inputs = ["aptos-move/framework/move-stdlib"]
+repeat = 3
+
+[[problem]]
+name = "closures"
+kind = "move"
+package = "third_party/move/lean/bench/package"
+modules = ["bench::closures"]
+inputs = ["aptos-move/framework/move-stdlib"]
+repeat = 3
+
+[[problem]]
+name = "closure_loop"
+kind = "move"
+package = "third_party/move/lean/bench/package"
+modules = ["bench::closure_loop"]
+inputs = ["aptos-move/framework/move-stdlib"]
+repeat = 3
+
+# The Move counterpart of `rust_lower_bound`, whose claims `ordered_map` does not verify.
+[[problem]]
+name = "lower_bound"
+kind = "move"
+package = "third_party/move/lean/bench/package"
+modules = ["bench::lower_bound"]
+inputs = ["aptos-move/framework/move-stdlib"]
+repeat = 3
+
+# ## Higher-order paper (move-prover/doc/higher-order-paper-26/examples)
+
+[[problem]]
+name = "amm"
+expected_rejections = ["«0x42».amm::create_noncompliant_fee_pool"]
+kind = "move"
+package = "third_party/move/move-prover/doc/higher-order-paper-26/examples"
+modules = ["0x42::amm"]
+dev = true
+inputs = ["third_party/move/move-stdlib"]
+
+[[problem]]
+name = "calculator"
+kind = "move"
+package = "third_party/move/move-prover/doc/higher-order-paper-26/examples"
+modules = ["0x42::calculator"]
+dev = true
+inputs = ["third_party/move/move-stdlib"]
+
+# ## VerexSL
+
+[[problem]]
+name = "Quicksort"
+kind = "lean"
+file = "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Examples/Quicksort.lean"
+
+[[problem]]
+name = "OrderedMap"
+kind = "lean"
+file = "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Examples/OrderedMap.lean"
+
+[[problem]]
+name = "VectorOperations"
+kind = "lean"
+file = "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Vectors/VectorOperations.lean"
+repeat = 3
+
+[[problem]]
+name = "GenericStorage"
+kind = "lean"
+file = "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Generics/GenericStorage.lean"
+repeat = 3
+
+# ## Rust
+
+[[problem]]
+name = "bounds"
+kind = "rust"
+file = "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/bounds.rs"
+spec = "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/bounds.spec.lean"
+repeat = 3
+
+# Rust counterparts of Move problems (bench/rust): `rust_<name>` of `<name>`, and
+# `rust_lower_bound` of `lower_bound` and the search in `ordered_map`. The false
+# twins of each are `SourceVerify/bench_<name>_errors.rs`.
+
+[[problem]]
+name = "rust_math64"
+kind = "rust"
+file = "third_party/move/lean/bench/rust/math64.rs"
+spec = "third_party/move/lean/bench/rust/math64.spec.lean"
+inputs = ["third_party/move/lean/verex-rust/lib"]
+
+[[problem]]
+name = "rust_bit_vector"
+kind = "rust"
+file = "third_party/move/lean/bench/rust/bit_vector.rs"
+spec = "third_party/move/lean/bench/rust/bit_vector.spec.lean"
+inputs = ["third_party/move/lean/verex-rust/lib"]
+
+[[problem]]
+name = "rust_simple_map"
+kind = "rust"
+file = "third_party/move/lean/bench/rust/simple_map.rs"
+spec = "third_party/move/lean/bench/rust/simple_map.spec.lean"
+inputs = ["third_party/move/lean/verex-rust/lib"]
+
+[[problem]]
+name = "rust_lower_bound"
+kind = "rust"
+file = "third_party/move/lean/bench/rust/lower_bound.rs"
+spec = "third_party/move/lean/bench/rust/lower_bound.spec.lean"
+inputs = ["third_party/move/lean/verex-rust/lib"]

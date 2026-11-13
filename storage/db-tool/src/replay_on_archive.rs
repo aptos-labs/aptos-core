@@ -13,6 +13,7 @@ use aptos_db::{backup::backup_handler::BackupHandler, AptosDB};
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::DbStateViewAtVersion, AptosDbError, DbReader,
+    MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     block_executor::{
@@ -20,10 +21,11 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
+    on_chain_config::{Features, OnChainConfig},
     state_store::NUM_STATE_SHARDS,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
-        PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version,
+        PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionOutput, Version,
     },
     write_set::WriteSet,
 };
@@ -37,6 +39,7 @@ use aptos_vm_environment::prod_configs::{
 use clap::Parser;
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
 use std::{
+    ops::{Range, RangeInclusive},
     panic,
     path::{Path, PathBuf},
     process,
@@ -49,13 +52,13 @@ use std::{
 pub struct Opt {
     #[clap(
         long,
-        help = "The first transaction version required to be replayed and verified"
+        help = "The first transaction version to verify. Replay starts at the start of its block"
     )]
     start_version: Version,
 
     #[clap(
         long,
-        help = "The last transaction version required to be replayed and verified"
+        help = "The last transaction version to verify. Replay ends at the end of its block"
     )]
     end_version: Version,
 
@@ -71,7 +74,7 @@ pub struct Opt {
     #[clap(
         long,
         default_value = "500",
-        help = "The number of transactions to be replayed in a chunk"
+        help = "The number of transactions to be replayed in a chunk, extended to the next block end"
     )]
     pub chunk_size: usize,
 
@@ -122,25 +125,18 @@ impl Opt {
             &self,
             function_usage.as_ref().map(|(sink, _, _)| sink.clone()),
         )?;
-        if function_usage.is_some() {
-            let expected_limit = self
-                .end_version
-                .checked_sub(self.start_version)
-                .and_then(|limit| limit.checked_add(1))
-                .ok_or_else(|| anyhow::anyhow!("invalid or overflowing framework usage range"))?;
+        if let Some((collector, _, _)) = &function_usage {
+            // The replay is extended to block boundaries, while the report keeps the requested
+            // range, so that reports from workers replaying adjacent ranges neither overlap nor
+            // leave gaps.
+            let replayed = verifier.start..verifier.start + verifier.limit;
             anyhow::ensure!(
-                verifier.start == self.start_version && verifier.limit == expected_limit,
+                replayed.contains(&self.start_version) && replayed.contains(&self.end_version),
                 "archive database does not contain the complete requested framework usage range"
             );
-        }
-        if let Some((collector, _, _)) = &function_usage {
-            let end = verifier
-                .start
-                .checked_add(verifier.limit - 1)
-                .context("framework usage end version overflow")?;
             collector.set_ledger_timestamps(
-                verifier.arc_db.get_block_timestamp(verifier.start)?,
-                verifier.arc_db.get_block_timestamp(end)?,
+                verifier.arc_db.get_block_timestamp(self.start_version)?,
+                verifier.arc_db.get_block_timestamp(self.end_version)?,
             )?;
         }
         let all_errors = verifier.run()?;
@@ -198,6 +194,7 @@ impl ReplayTps {
 struct Verifier {
     backup_handler: BackupHandler,
     arc_db: Arc<dyn DbReader>,
+    requested_versions: RangeInclusive<Version>,
     start: Version,
     limit: u64,
     replay_concurrency_level: usize,
@@ -252,12 +249,14 @@ impl Verifier {
 
         // calculate a valid start and limit
         let (start, limit) =
-            Self::get_start_and_limit(&arc_db, config.start_version, config.end_version)?;
+            Self::get_start_and_limit(arc_db.as_ref(), config.start_version, config.end_version)?;
         set_layout_caches(true);
         set_paranoid_type_checks(config.paranoid_type_checks);
         // Paranoid checks are done async if enabled.
         set_async_runtime_checks(config.paranoid_type_checks);
         info!(
+            requested_start_version = config.start_version,
+            requested_end_version = config.end_version,
             start_version = start,
             limit = limit,
             "Replaying transactions."
@@ -265,6 +264,7 @@ impl Verifier {
         Ok(Self {
             backup_handler,
             arc_db,
+            requested_versions: config.start_version..=config.end_version,
             start,
             limit,
             replay_concurrency_level: config.replay_concurrency_level.get(),
@@ -288,16 +288,16 @@ impl Verifier {
             .num_threads(self.concurrent_replay)
             .thread_name(|i| format!("replay-verify-{}", i))
             .build()?;
-        let chunk_size = self.chunk_size as u64;
-        let total_chunks = self.limit.div_ceil(chunk_size);
+        let chunks = split_into_chunks(
+            self.arc_db.as_ref(),
+            self.start..self.start + self.limit,
+            self.chunk_size as u64,
+        )?;
+        info!(num_chunks = chunks.len(), "Split the replay into chunks.");
         let res: Vec<_> = thread_pool.install(|| {
-            (0..total_chunks)
+            chunks
                 .into_par_iter()
-                .map(|i| {
-                    let start = self.start + i * chunk_size;
-                    let end = std::cmp::min(start + chunk_size - 1, self.start + self.limit - 1);
-                    self.verify(start, end - start + 1)
-                })
+                .map(|chunk| self.verify(chunk.start, chunk.end - chunk.start))
                 .collect()
         });
         let mut all_failed_txns = Vec::new();
@@ -316,9 +316,10 @@ impl Verifier {
     // Execute the verify one valid range
     pub fn verify(&self, start: Version, limit: u64) -> Result<Vec<Error>> {
         let mut total_failed_txns = Vec::with_capacity(limit as usize);
-        let txn_iter = self
+        let mut txn_iter = self
             .backup_handler
-            .get_transaction_iter(start, limit as usize)?;
+            .get_transaction_iter(start, limit as usize)?
+            .peekable();
         let mut cur_txns = Vec::with_capacity(limit as usize);
         let mut cur_persisted_aux_info = Vec::with_capacity(limit as usize);
         let mut expected_events = Vec::with_capacity(limit as usize);
@@ -326,7 +327,7 @@ impl Verifier {
         let mut expected_txn_infos = Vec::with_capacity(limit as usize);
         let mut chunk_start_version = start;
         let executor = AptosVMBlockExecutor::new();
-        for item in txn_iter {
+        while let Some(item) = txn_iter.next() {
             // timeout check
             if let Some(duration) = self.timeout_secs {
                 if self.replay_stat.get_elapsed_secs() >= duration {
@@ -352,7 +353,10 @@ impl Verifier {
             expected_txn_infos.push(expected_txn_info);
             expected_events.push(expected_event);
             expected_writesets.push(expected_writeset);
-            if is_epoch_ending || cur_txns.len() >= self.chunk_size {
+            // The chunk is already sized to end at a block end, and cutting it by size could split
+            // a block.
+            let is_chunk_end = txn_iter.peek().is_none();
+            if is_epoch_ending || is_chunk_end {
                 let cnt = cur_txns.len();
                 while !cur_txns.is_empty() {
                     // verify results
@@ -372,25 +376,12 @@ impl Verifier {
                 self.replay_stat.print_tps();
             }
         }
-        // verify results
-        let cnt = cur_txns.len();
-        let fail_txns = self.execute_and_verify(
-            &executor,
-            &mut chunk_start_version,
-            &mut cur_txns,
-            &mut cur_persisted_aux_info,
-            &mut expected_txn_infos,
-            &mut expected_events,
-            &mut expected_writesets,
-        )?;
-        total_failed_txns.extend(fail_txns);
-        self.replay_stat.update_cnt(cnt as u64);
         Ok(total_failed_txns)
     }
 
     /// utility functions
     fn get_start_and_limit(
-        aptos_db: &Arc<dyn DbReader>,
+        aptos_db: &dyn DbReader,
         start_version: Version,
         end_version: Version,
     ) -> Result<(Version, u64)> {
@@ -399,27 +390,27 @@ impl Verifier {
             .ok_or(AptosDbError::NotFound(
                 "First txn version is None".to_string(),
             ))?;
-        let start = std::cmp::max(db_start, start_version);
-
         let db_end = aptos_db
             .get_synced_version()?
             .ok_or(AptosDbError::NotFound("Synced version is None".to_string()))?;
-        let end = std::cmp::min(end_version, db_end);
 
-        let limit = if start <= end {
-            end - start + 1
-        } else {
-            warn!(
-                start = start_version,
-                db_start = db_start,
-                end = end_version,
-                db_end = db_end,
-                "No transactions to verify in requested range."
-            );
-            0
-        };
-
-        Ok((start, limit))
+        match align_to_blocks(
+            aptos_db,
+            start_version..end_version.saturating_add(1),
+            db_start..db_end + 1,
+        )? {
+            Some(range) => Ok((range.start, range.end - range.start)),
+            None => {
+                warn!(
+                    start = start_version,
+                    db_start = db_start,
+                    end = end_version,
+                    db_end = db_end,
+                    "No whole blocks to verify in requested range."
+                );
+                Ok((start_version, 0))
+            },
+        }
     }
 
     fn execute_and_verify(
@@ -435,6 +426,13 @@ impl Verifier {
         if cur_txns.is_empty() {
             return Ok(None);
         }
+        anyhow::ensure!(
+            expected_txn_infos
+                .last()
+                .is_some_and(TransactionInfo::has_state_checkpoint_hash),
+            "Version {} is not a block end.",
+            *current_version + cur_txns.len() as Version - 1,
+        );
         let txns = cur_txns
             .iter()
             .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))
@@ -446,19 +444,33 @@ impl Verifier {
                 .map(|info| AuxiliaryInfo::new(*info, None))
                 .collect(),
         );
-        let executed_outputs = executor
+        let state_view = self
+            .arc_db
+            .state_view_at_version(current_version.checked_sub(1))?;
+        // Batches end at epoch boundaries, so the parent state's features apply to all of them.
+        let onchain_config = match Features::fetch_config(&state_view)? {
+            Some(features) => {
+                BlockExecutorConfigFromOnchain::new_no_block_limit().with_features(&features)
+            },
+            None => BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        };
+        let mut executed_outputs = executor
             .execute_block(
                 &txns_provider,
-                &self
-                    .arc_db
-                    .state_view_at_version(current_version.checked_sub(1))?,
-                BlockExecutorConfigFromOnchain::new_no_block_limit(), // TODO(HotState): will need to incorporate some features.
+                &state_view,
+                onchain_config,
                 TransactionSliceMetadata::Chunk {
                     begin: *current_version,
                     end: *current_version + cur_txns.len() as u64,
                 },
             )
             .map(BlockOutput::into_transaction_outputs_forced)?;
+        // Same as `DoGetExecutionOutput`, which produced the committed write set hashes.
+        if onchain_config.hotness_in_epilogue() {
+            executed_outputs
+                .iter_mut()
+                .for_each(TransactionOutput::convert_write_set_to_v1);
+        }
         assert_eq!(executed_outputs.len(), cur_txns.len());
 
         for idx in 0..cur_txns.len() {
@@ -471,12 +483,37 @@ impl Verifier {
                 Some(&expected_writesets[idx]),
                 Some(&expected_events[idx]),
             ) {
-                cur_txns.drain(0..idx + 1);
-                cur_persisted_aux_info.drain(0..idx + 1);
-                expected_txn_infos.drain(0..idx + 1);
-                expected_events.drain(0..idx + 1);
-                expected_writesets.drain(0..idx + 1);
+                // Re-execution has to start at a block start, so the rest of the failing block
+                // goes unverified.
+                let num_skipped = expected_txn_infos[idx..]
+                    .iter()
+                    .position(TransactionInfo::has_state_checkpoint_hash)
+                    .expect("Txns to execute end at a block end.");
+                if num_skipped > 0 {
+                    warn!(
+                        version = version,
+                        num_skipped = num_skipped,
+                        "Skipping the rest of the block after a mismatch."
+                    );
+                }
+                *current_version += num_skipped as Version;
+                let block_end_idx = idx + num_skipped;
+                cur_txns.drain(..=block_end_idx);
+                cur_persisted_aux_info.drain(..=block_end_idx);
+                expected_txn_infos.drain(..=block_end_idx);
+                expected_events.drain(..=block_end_idx);
+                expected_writesets.drain(..=block_end_idx);
 
+                // Txns outside the requested range only complete blocks. Neighboring ranges verify
+                // them, unless they are skipped on purpose.
+                if !self.requested_versions.contains(&version) {
+                    warn!(
+                        version = version,
+                        error = %err,
+                        "Ignoring mismatch outside the requested range."
+                    );
+                    return Ok(None);
+                }
                 return Ok(Some(err));
             }
 
@@ -495,6 +532,118 @@ impl Verifier {
 
         Ok(None)
     }
+}
+
+/// Clamps `range` to the whole blocks in `db_range`, then extends it to block boundaries.
+/// Returns `None` if no whole block is left.
+fn align_to_blocks(
+    db: &dyn DbReader,
+    range: Range<Version>,
+    db_range: Range<Version>,
+) -> Result<Option<Range<Version>>> {
+    if db_range.is_empty() {
+        return Ok(None);
+    }
+    // The DB can start and end mid-block.
+    let first_block_start = if starts_block(db, db_range.start)? {
+        db_range.start
+    } else if let Some(partial_block_end) = first_block_end_in(db, db_range.clone())? {
+        partial_block_end + 1
+    } else {
+        return Ok(None);
+    };
+    let Some(last_block_end) = last_block_end_in(db, db_range)? else {
+        return Ok(None);
+    };
+
+    let start = range.start.max(first_block_start);
+    let end = range.end.min(last_block_end + 1);
+    if start >= end {
+        return Ok(None);
+    }
+    let block_start = last_block_end_in(db, first_block_start..start)?
+        .map_or(first_block_start, |prev_block_end| prev_block_end + 1);
+    let block_end = first_block_end_in(db, end - 1..last_block_end)?.unwrap_or(last_block_end);
+    Ok(Some(block_start..block_end + 1))
+}
+
+/// Splits `range` of whole blocks into chunks of whole blocks, each extended from `chunk_size` txns
+/// to the next block end.
+fn split_into_chunks(
+    db: &dyn DbReader,
+    range: Range<Version>,
+    chunk_size: u64,
+) -> Result<Vec<Range<Version>>> {
+    anyhow::ensure!(chunk_size > 0, "Chunk size must be positive.");
+    let mut chunks = Vec::new();
+    let mut start = range.start;
+    while start < range.end {
+        let last = start.saturating_add(chunk_size).min(range.end) - 1;
+        let Some(block_end) = first_block_end_in(db, last..range.end)? else {
+            bail!("Version {} is not a block end.", range.end - 1);
+        };
+        chunks.push(start..block_end + 1);
+        start = block_end + 1;
+    }
+    Ok(chunks)
+}
+
+/// Whether the txn at `version` starts a block, judging by the txn itself, for when the previous
+/// `TransactionInfo` is not available.
+fn starts_block(db: &dyn DbReader, version: Version) -> Result<bool> {
+    let txn = db
+        .get_transaction_iterator(version, 1)?
+        .next()
+        .transpose()?
+        .with_context(|| format!("Transaction missing at version {version}."))?;
+    Ok(txn.is_block_start() || matches!(txn, Transaction::GenesisTransaction(_)))
+}
+
+fn first_block_end_in(db: &dyn DbReader, range: Range<Version>) -> Result<Option<Version>> {
+    for window_start in range.clone().step_by(MAX_REQUEST_LIMIT as usize) {
+        let window = window_start
+            ..window_start
+                .saturating_add(MAX_REQUEST_LIMIT)
+                .min(range.end);
+        if let Some(block_end) = block_ends_in(db, window)?.next() {
+            return Ok(Some(block_end?));
+        }
+    }
+    Ok(None)
+}
+
+fn last_block_end_in(db: &dyn DbReader, range: Range<Version>) -> Result<Option<Version>> {
+    let mut window_end = range.end;
+    while window_end > range.start {
+        let window_start = window_end
+            .saturating_sub(MAX_REQUEST_LIMIT)
+            .max(range.start);
+        let block_ends =
+            block_ends_in(db, window_start..window_end)?.collect::<Result<Vec<_>>>()?;
+        if let Some(block_end) = block_ends.last() {
+            return Ok(Some(*block_end));
+        }
+        window_end = window_start;
+    }
+    Ok(None)
+}
+
+/// Lazily yields the versions in `range` that end a block, i.e. whose `TransactionInfo` has a state
+/// checkpoint hash. `range` can't be longer than `MAX_REQUEST_LIMIT`.
+fn block_ends_in(
+    db: &dyn DbReader,
+    range: Range<Version>,
+) -> Result<impl Iterator<Item = Result<Version>> + '_> {
+    let mut txn_infos = db.get_transaction_info_iterator(range.start, range.end - range.start)?;
+    Ok(range
+        .map(move |version| {
+            // The DB iterator ends silently where txn infos are missing.
+            let txn_info = txn_infos
+                .next()
+                .with_context(|| format!("TransactionInfo missing at version {version}."))??;
+            Ok(txn_info.has_state_checkpoint_hash().then_some(version))
+        })
+        .filter_map(Result::transpose))
 }
 
 fn validate_archive_db_dir(db_dir: &Path) -> Result<()> {
@@ -520,6 +669,302 @@ fn validate_archive_db_dir(db_dir: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_crypto::HashValue;
+    use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl_inner;
+    use aptos_storage_interface::Result as DbResult;
+    use aptos_types::{
+        block_metadata::BlockMetadata,
+        transaction::{ChangeSet, ExecutionStatus, WriteSetPayload},
+    };
+    use itertools::Itertools;
+    use move_core_types::account_address::AccountAddress;
+
+    /// Txns from `first_version` on, ending a block wherever `block_ends` says so.
+    struct MockDb {
+        first_version: Version,
+        block_ends: Vec<bool>,
+        has_partial_first_block: bool,
+    }
+
+    impl MockDb {
+        fn new(first_version: Version, block_sizes: &[usize]) -> Self {
+            let block_ends = block_sizes
+                .iter()
+                .flat_map(|&size| (1..=size).map(move |i| i == size))
+                .collect();
+            Self {
+                first_version,
+                block_ends,
+                has_partial_first_block: false,
+            }
+        }
+
+        /// Starts the DB at the last `num_txns` txns of a block.
+        fn with_partial_first_block(mut self, num_txns: usize) -> Self {
+            self.first_version -= num_txns as Version;
+            self.block_ends
+                .splice(0..0, (1..=num_txns).map(|i| i == num_txns));
+            self.has_partial_first_block = true;
+            self
+        }
+
+        fn without_last_block_end(mut self) -> Self {
+            *self.block_ends.last_mut().unwrap() = false;
+            self
+        }
+
+        fn db_range(&self) -> Range<Version> {
+            self.first_version..self.first_version + self.block_ends.len() as Version
+        }
+
+        fn slice(&self, start_version: Version, limit: u64) -> &[bool] {
+            let start = (start_version - self.first_version) as usize;
+            let end = (start + limit as usize).min(self.block_ends.len());
+            &self.block_ends[start..end]
+        }
+    }
+
+    impl DbReader for MockDb {
+        fn get_transaction_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> DbResult<Box<dyn Iterator<Item = DbResult<Transaction>> + '_>> {
+            let first_version = self.first_version;
+            let starts_with_block = !self.has_partial_first_block;
+            let block_ends = &self.block_ends;
+            DbResult::Ok(Box::new((start_version..start_version + limit).map(
+                move |version| {
+                    let idx = (version - first_version) as usize;
+                    let is_block_start = match idx {
+                        0 => starts_with_block,
+                        _ => block_ends[idx - 1],
+                    };
+                    DbResult::Ok(
+                        if version == 0 {
+                            Transaction::GenesisTransaction(WriteSetPayload::Direct(
+                                ChangeSet::new(WriteSet::default(), vec![]),
+                            ))
+                        } else if is_block_start {
+                            Transaction::BlockMetadata(BlockMetadata::new(
+                                HashValue::zero(),
+                                0,
+                                0,
+                                AccountAddress::ZERO,
+                                vec![],
+                                vec![],
+                                0,
+                            ))
+                        } else {
+                            Transaction::StateCheckpoint(HashValue::zero())
+                        },
+                    )
+                },
+            )))
+        }
+
+        fn get_transaction_info_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> DbResult<Box<dyn Iterator<Item = DbResult<TransactionInfo>> + '_>> {
+            assert!(limit <= MAX_REQUEST_LIMIT);
+            DbResult::Ok(Box::new(self.slice(start_version, limit).iter().map(
+                |&is_block_end| {
+                    DbResult::Ok(TransactionInfo::new_placeholder(
+                        0,
+                        is_block_end.then(HashValue::zero),
+                        ExecutionStatus::Success,
+                    ))
+                },
+            )))
+        }
+    }
+
+    fn align(db: &MockDb, range: Range<Version>) -> Option<Range<Version>> {
+        align_to_blocks(db, range, db.db_range()).unwrap()
+    }
+
+    #[test]
+    fn align_extends_to_block_boundaries() {
+        // Blocks: [100, 102], [103, 106], [107, 107], [108, 111].
+        let db = MockDb::new(100, &[3, 4, 1, 4]);
+        assert_eq!(align(&db, 103..107), Some(103..107));
+        assert_eq!(align(&db, 104..106), Some(103..107));
+        assert_eq!(align(&db, 104..109), Some(103..112));
+        assert_eq!(align(&db, 107..108), Some(107..108));
+        assert_eq!(align(&db, 101..102), Some(100..103));
+        assert_eq!(align(&db, 100..112), Some(100..112));
+    }
+
+    #[test]
+    fn align_shrinks_to_blocks_in_db() {
+        // The DB starts and ends in the middle of blocks: [100, 101], [102, 104], [105, 108],
+        // [109, 110].
+        let db = MockDb::new(102, &[3, 4, 2])
+            .with_partial_first_block(2)
+            .without_last_block_end();
+        assert_eq!(db.db_range(), 100..111);
+        assert_eq!(align(&db, 100..111), Some(102..109));
+        assert_eq!(align(&db, 101..104), Some(102..105));
+        assert_eq!(align(&db, 106..111), Some(105..109));
+        // Only partial blocks.
+        assert_eq!(align(&db, 100..102), None);
+        assert_eq!(align(&db, 109..111), None);
+    }
+
+    #[test]
+    fn align_trusts_block_start_at_db_start() {
+        // Blocks: [100, 101], [102, 104].
+        let db = MockDb::new(100, &[2, 3]);
+        assert_eq!(align(&db, 100..101), Some(100..102));
+        // Genesis.
+        let db = MockDb::new(0, &[1, 3]);
+        assert_eq!(align(&db, 0..3), Some(0..4));
+    }
+
+    #[test]
+    fn align_scans_across_request_limits() {
+        let n = MAX_REQUEST_LIMIT;
+        // Blocks: [10, 10], [11, 11 + 2n], [12 + 2n, 12 + 2n].
+        let db = MockDb::new(10, &[1, 2 * n as usize + 1, 1]);
+        let big_block = 11..12 + 2 * n;
+        assert_eq!(align(&db, 12 + n..14 + n), Some(big_block.clone()));
+        assert_eq!(align(&db, 11..12), Some(big_block.clone()));
+        assert_eq!(
+            align(&db, big_block.end - 1..big_block.end),
+            Some(big_block)
+        );
+    }
+
+    #[test]
+    fn chunks_end_at_block_ends() {
+        // Blocks: [100, 102], [103, 106], [107, 107], [108, 111].
+        let db = MockDb::new(100, &[3, 4, 1, 4]);
+        let split = |chunk_size| split_into_chunks(&db, db.db_range(), chunk_size).unwrap();
+        assert_eq!(split(1), vec![100..103, 103..107, 107..108, 108..112]);
+        assert_eq!(split(4), vec![100..107, 107..112]);
+        assert_eq!(split(5), vec![100..107, 107..112]);
+        assert_eq!(split(8), vec![100..108, 108..112]);
+        assert_eq!(split(100), vec![100..112]);
+        assert_eq!(split_into_chunks(&db, 103..108, 2).unwrap(), vec![
+            103..107,
+            107..108
+        ]);
+    }
+
+    #[test]
+    fn chunks_cover_big_blocks() {
+        let n = MAX_REQUEST_LIMIT;
+        // Blocks: [0, 0], [1, 2n + 1], [2n + 2, 2n + 2].
+        let db = MockDb::new(0, &[1, 2 * n as usize + 1, 1]);
+        assert_eq!(split_into_chunks(&db, db.db_range(), 1).unwrap(), vec![
+            0..1,
+            1..2 * n + 2,
+            2 * n + 2..2 * n + 3
+        ]);
+        assert_eq!(split_into_chunks(&db, db.db_range(), 3).unwrap(), vec![
+            0..2 * n + 2,
+            2 * n + 2..2 * n + 3
+        ]);
+    }
+
+    #[test]
+    fn chunks_require_range_ending_at_block_end() {
+        let db = MockDb::new(100, &[3, 4]).without_last_block_end();
+        assert!(split_into_chunks(&db, db.db_range(), 2).is_err());
+    }
+
+    #[test]
+    fn replay_extends_to_blocks() {
+        let db_dir = aptos_temppath::TempPath::new();
+        // Blocks: [0, 0], [1, 11], [12, 13], [14, 29], where 11 and 13 end epochs. Dropped to
+        // release the DB lock.
+        drop(test_execution_with_storage_impl_inner(false, db_dir.path()));
+
+        for (start_version, end_version, chunk_size, expected_start, expected_limit) in [
+            (5, 20, 4, 1, 29),
+            (12, 12, 1, 12, 2),
+            (14, 29, 1, 14, 16),
+            (0, 100, 500, 0, 30),
+        ] {
+            let opt = Opt::try_parse_from([
+                "replay-on-archive",
+                "--start-version",
+                &start_version.to_string(),
+                "--end-version",
+                &end_version.to_string(),
+                "--target-db-dir",
+                db_dir.path().to_str().unwrap(),
+                "--chunk-size",
+                &chunk_size.to_string(),
+                "--concurrent-replay",
+                "2",
+                "--replay-concurrency-level",
+                "2",
+            ])
+            .unwrap();
+            let verifier = Verifier::new(&opt, None).unwrap();
+            assert_eq!(
+                (verifier.start, verifier.limit),
+                (expected_start, expected_limit)
+            );
+            let errors = verifier.run().unwrap();
+            assert!(errors.is_empty(), "{errors:?}");
+        }
+    }
+
+    #[test]
+    fn mismatches_reported_only_in_requested_range() {
+        let db_dir = aptos_temppath::TempPath::new();
+        // Blocks: [0, 0], [1, 11], [12, 13], [14, 29].
+        drop(test_execution_with_storage_impl_inner(false, db_dir.path()));
+        let opt = Opt::try_parse_from([
+            "replay-on-archive",
+            "--start-version",
+            "16",
+            "--end-version",
+            "25",
+            "--target-db-dir",
+            db_dir.path().to_str().unwrap(),
+        ])
+        .unwrap();
+        let verifier = Verifier::new(&opt, None).unwrap();
+        assert_eq!((verifier.start, verifier.limit), (14, 16));
+        let executor = AptosVMBlockExecutor::new();
+
+        for (mismatch_version, reported) in [(15, false), (20, true), (26, false)] {
+            let (mut txns, mut aux_infos, mut txn_infos, mut events, mut write_sets) = verifier
+                .backup_handler
+                .get_transaction_iter(verifier.start, verifier.limit as usize)
+                .unwrap()
+                .map(|item| item.unwrap())
+                .multiunzip::<(Vec<_>, Vec<_>, Vec<_>, Vec<_>, Vec<_>)>();
+            let txn_info = &mut txn_infos[(mismatch_version - verifier.start) as usize];
+            *txn_info = TransactionInfo::new_placeholder(
+                0,
+                txn_info.state_checkpoint_hash(),
+                ExecutionStatus::Success,
+            );
+
+            let mut version = verifier.start;
+            let error = verifier
+                .execute_and_verify(
+                    &executor,
+                    &mut version,
+                    &mut txns,
+                    &mut aux_infos,
+                    &mut txn_infos,
+                    &mut events,
+                    &mut write_sets,
+                )
+                .unwrap();
+            assert_eq!(error.is_some(), reported, "{error:?}");
+            // The rest of the block is skipped either way.
+            assert_eq!(version, 30);
+            assert!(txns.is_empty());
+        }
+    }
 
     #[test]
     fn archive_db_layout_validation_reports_missing_paths() {

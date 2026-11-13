@@ -1,0 +1,16 @@
+VerexE2ETests/SourceVerify/loop_rebind.move:40:9: error: the specification clause `ensures result == a` is not established
+VerexE2ETests/SourceVerify/loop_rebind.move:37:5: error: verex verification failed: the automatic verification of `rebind_step_false` failed; provide a proof in `VerexE2ETests/SourceVerify/loop_rebind.proof.lean`:
+  verify rebind_step_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/loop_rebind.move:57:9: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/loop_rebind.move:54:5: error: verex verification failed: the automatic verification of `rebind_step_vacuous` failed; provide a proof in `VerexE2ETests/SourceVerify/loop_rebind.proof.lean`:
+  verify rebind_step_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

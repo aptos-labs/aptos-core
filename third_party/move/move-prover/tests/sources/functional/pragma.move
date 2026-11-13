@@ -15,6 +15,15 @@ module 0x42::TestPragma {
         aborts_if _c;
     }
 
+    fun always_aborts_with_verify_manual_incorrect(_c: bool) {
+        abort(1)
+    }
+    spec always_aborts_with_verify_manual_incorrect {
+        // `manual` is verified like `true`.
+        pragma verify=manual;
+        aborts_if _c; // error: abort not covered by any of the `aborts_if` clauses
+    }
+
     fun always_aborts_without_verify(_c: bool) {
         abort(1)
     }

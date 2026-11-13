@@ -1,0 +1,539 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/apply_carrier_unread_memory.move:738:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:736:5: error: verex verification failed: the automatic verification of `rec_wrap_across_write` failed; provide a proof in the module:
+  verify rec_wrap_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:750:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:748:5: error: verex verification failed: the automatic verification of `rec_read_across_write` failed; provide a proof in the module:
+  verify rec_read_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:55:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:52:5: error: verex verification failed: the automatic verification of `two_calls_across_write` failed; provide a proof in the module:
+  verify two_calls_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:67:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:64:5: error: verex verification failed: the automatic verification of `two_calls_direct` failed; provide a proof in the module:
+  verify two_calls_direct by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:75:28: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:75:5: error: verex verification failed: the automatic verification of `two_calls_named` failed; provide a proof in the module:
+  verify two_calls_named by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:89:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:87:5: error: verex verification failed: the automatic verification of `mut_outputs_across_write` failed; provide a proof in the module:
+  verify mut_outputs_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:114:5: error: Tactic `assumption` failed
+
+case nativesTyped
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+args✝ : VerexIR.Proofs.Denote.HList params
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed : True
+permitted :
+  (initialState✝
+          {
+            type :=
+              VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                VerexIR.Proofs.Denote.NRow.nil
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil),
+            arguments := VerexIR.Proofs.Denote.NRow.nil }
+          (VerexIR.StorageKey.address "0x42")).isSome =
+      true ∧
+    ((initialState✝
+                {
+                  type :=
+                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                      VerexIR.Proofs.Denote.NRow.nil
+                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                        VerexIR.Proofs.Denote.NRow.nil),
+                  arguments := VerexIR.Proofs.Denote.NRow.nil }
+                (VerexIR.StorageKey.address "0x42")).getD
+            ({ val := 0, fits := ⋯ }, ())).fst.val =
+      0
+⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:114:5: error: verex verification failed: the automatic verification of `callback_across_write_unsat` failed; provide a proof in the module:
+  verify callback_across_write_unsat by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:128:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:126:5: error: verex verification failed: the automatic verification of `callback_across_write` failed; provide a proof in the module:
+  verify callback_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:170:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:167:5: error: verex verification failed: the automatic verification of `requires_across_write` failed; provide a proof in the module:
+  verify requires_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:190:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:188:5: error: verex verification failed: the automatic verification of `unbounded_across_write` failed; provide a proof in the module:
+  verify unbounded_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:207:25: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:207:5: error: verex verification failed: the automatic verification of `native_twice` failed; provide a proof in the module:
+  verify native_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:213:33: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:213:5: error: verex verification failed: the automatic verification of `native_wrapper_twice` failed; provide a proof in the module:
+  verify native_wrapper_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:269:37: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:269:5: error: verex verification failed: the automatic verification of `pure_native_across_write` failed; provide a proof in the module:
+  verify pure_native_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:279:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:278:5: error: verex verification failed: the automatic verification of `native_across_write` failed; provide a proof in the module:
+  verify native_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:303:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:301:5: error: verex verification failed: the automatic verification of `native_memory_across_write` failed; provide a proof in the module:
+  verify native_memory_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:313:32: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:313:5: error: verex verification failed: the automatic verification of `signer_across_write` failed; provide a proof in the module:
+  verify signer_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:369:5: error: Tactic `assumption` failed
+
+case nativesTyped
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+args✝ : VerexIR.Proofs.Denote.HList params
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed : True
+permitted :
+  (initialState✝
+          {
+            type :=
+              VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                VerexIR.Proofs.Denote.NRow.nil
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil),
+            arguments := VerexIR.Proofs.Denote.NRow.nil }
+          (VerexIR.StorageKey.address "0x42")).isSome =
+      true ∧
+    ((initialState✝
+                {
+                  type :=
+                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                      VerexIR.Proofs.Denote.NRow.nil
+                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                        VerexIR.Proofs.Denote.NRow.nil),
+                  arguments := VerexIR.Proofs.Denote.NRow.nil }
+                (VerexIR.StorageKey.address "0x42")).getD
+            ({ val := 0, fits := ⋯ }, ())).fst.val =
+      0
+⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:369:5: error: verex verification failed: the automatic verification of `reads_frame_across_write` failed; provide a proof in the module:
+  verify reads_frame_across_write by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:381:5: error: Tactic `assumption` failed
+
+case nativesTyped
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+args✝ : VerexIR.Proofs.Denote.HList params
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed : True
+permitted :
+  (initialState✝
+          {
+            type :=
+              VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                VerexIR.Proofs.Denote.NRow.nil
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil),
+            arguments := VerexIR.Proofs.Denote.NRow.nil }
+          (VerexIR.StorageKey.address "0x42")).isSome =
+      true ∧
+    ((initialState✝
+                {
+                  type :=
+                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                      VerexIR.Proofs.Denote.NRow.nil
+                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                        VerexIR.Proofs.Denote.NRow.nil),
+                  arguments := VerexIR.Proofs.Denote.NRow.nil }
+                (VerexIR.StorageKey.address "0x42")).getD
+            ({ val := 0, fits := ⋯ }, ())).fst.val =
+      0
+⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:381:5: error: verex verification failed: the automatic verification of `reads_frame_unsat_across_write` failed; provide a proof in the module:
+  verify reads_frame_unsat_across_write by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:393:5: error: Tactic `assumption` failed
+
+case nativesTyped
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+args✝ : VerexIR.Proofs.Denote.HList params
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed : True
+permitted :
+  (initialState✝
+          {
+            type :=
+              VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                VerexIR.Proofs.Denote.NRow.nil
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil),
+            arguments := VerexIR.Proofs.Denote.NRow.nil }
+          (VerexIR.StorageKey.address "0x42")).isSome =
+      true ∧
+    ((initialState✝
+                {
+                  type :=
+                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                      VerexIR.Proofs.Denote.NRow.nil
+                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                        VerexIR.Proofs.Denote.NRow.nil),
+                  arguments := VerexIR.Proofs.Denote.NRow.nil }
+                (VerexIR.StorageKey.address "0x42")).getD
+            ({ val := 0, fits := ⋯ }, ())).fst.val =
+      0
+⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:393:5: error: verex verification failed: the automatic verification of `transparent_reads_frame_across_write` failed; provide a proof in the module:
+  verify transparent_reads_frame_across_write by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:405:5: error: Tactic `assumption` failed
+
+case nativesTyped
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+args✝ : VerexIR.Proofs.Denote.HList params
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed : True
+permitted :
+  (initialState✝
+          {
+            type :=
+              VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                VerexIR.Proofs.Denote.NRow.nil
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil),
+            arguments := VerexIR.Proofs.Denote.NRow.nil }
+          (VerexIR.StorageKey.address "0x42")).isSome =
+      true ∧
+    ((initialState✝
+                {
+                  type :=
+                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                      VerexIR.Proofs.Denote.NRow.nil
+                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                        VerexIR.Proofs.Denote.NRow.nil),
+                  arguments := VerexIR.Proofs.Denote.NRow.nil }
+                (VerexIR.StorageKey.address "0x42")).getD
+            ({ val := 0, fits := ⋯ }, ())).fst.val =
+      0
+⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:405:5: error: verex verification failed: the automatic verification of `modifies_frame_across_write` failed; provide a proof in the module:
+  verify modifies_frame_across_write by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:414:5: error: Tactic `assumption` failed
+
+case nativesTyped
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+args✝ : VerexIR.Proofs.Denote.HList params
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:414:5: error: verex verification failed: the automatic verification of `reads_frame_twice` failed; provide a proof in the module:
+  verify reads_frame_twice by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:422:5: error: Tactic `assumption` failed
+
+case nativesTyped
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+args✝ : VerexIR.Proofs.Denote.HList params
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:422:5: error: verex verification failed: the automatic verification of `reads_any_twice` failed; provide a proof in the module:
+  verify reads_any_twice by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:435:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:434:5: error: verex verification failed: the automatic verification of `reads_frame_named_across_write` failed; provide a proof in the module:
+  verify reads_frame_named_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:469:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:467:5: error: verex verification failed: the automatic verification of `intrinsic_memory_across_write` failed; provide a proof in the module:
+  verify intrinsic_memory_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:481:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:479:5: error: verex verification failed: the automatic verification of `move_intrinsic_memory_across_write` failed; provide a proof in the module:
+  verify move_intrinsic_memory_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:501:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:499:5: error: verex verification failed: the automatic verification of `bodied_intrinsic_across_write` failed; provide a proof in the module:
+  verify bodied_intrinsic_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:519:31: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:519:5: error: verex verification failed: the automatic verification of `table_across_write` failed; provide a proof in the module:
+  verify table_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:545:25: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:545:5: error: verex verification failed: the automatic verification of `vector_twice` failed; provide a proof in the module:
+  verify vector_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:551:22: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:551:5: error: verex verification failed: the automatic verification of `bcs_twice` failed; provide a proof in the module:
+  verify bcs_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:557:25: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:557:5: error: verex verification failed: the automatic verification of `string_twice` failed; provide a proof in the module:
+  verify string_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:563:23: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:563:5: error: verex verification failed: the automatic verification of `hash_twice` failed; provide a proof in the module:
+  verify hash_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:580:29: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:580:5: error: verex verification failed: the automatic verification of `mut_native_twice` failed; provide a proof in the module:
+  verify mut_native_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:589:26: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:589:5: error: verex verification failed: the automatic verification of `context_twice` failed; provide a proof in the module:
+  verify context_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:600:31: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:600:5: error: verex verification failed: the automatic verification of `local_digest_twice` failed; provide a proof in the module:
+  verify local_digest_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:606:5: error: verification failed with a residual obligation:
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+nativesTyped : VerexIR.NativesTyped executable✝
+nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
+verexTerminating : VerexIR.Proofs.Terminating executable✝
+verexAgree : VerexIR.Proofs.TypesAgree unit
+verexResources : VerexIR.Proofs.ResourcesTyped unit
+f :
+  (VerexIR.Proofs.Denote.NTy.function
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [false] }
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
+        VerexIR.Proofs.Denote.NRow.nil)).carrier
+b : (VerexIR.Proofs.Denote.NTy.int 8 false).vector.carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed :
+  VerexIR.Proofs.KeepsMemoryAt executable✝
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector VerexIR.Proofs.Denote.NRow.nil)
+    { parameters := [false], results := [false] }
+    (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f
+permitted : True
+bounds : b.values.size < 18446744073709551616
+⊢ VerexIR.Proofs.wp
+    (VerexIR.Proofs.Denote.closureMeaning executable✝
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [false] }
+      (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ()))
+    (fun result final =>
+      (¬VerexIR.Proofs.AbortsOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
+                VerexIR.Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [false] }
+              (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
+              initialState✝ →
+          result =
+            VerexIR.Proofs.ResultOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
+                VerexIR.Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [false] }
+              (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
+              initialState✝ default) ∧
+        final = initialState✝ ∧
+          ¬VerexIR.Proofs.AbortsOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
+                VerexIR.Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [false] }
+              (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
+              initialState✝)
+    (fun error =>
+      VerexIR.Proofs.Denote.AbortsAt 1788885
+        (VerexIR.Proofs.AbortsOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
+            VerexIR.Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [false] }
+          (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
+          initialState✝))
+    initialState✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:606:5: error: verex verification failed: the automatic verification of `apply_bytes` failed; provide a proof in the module:
+  verify apply_bytes by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:615:39: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:615:5: error: verex verification failed: the automatic verification of `prelude_native_through_hof` failed; provide a proof in the module:
+  verify prelude_native_through_hof by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:654:9: error: the precondition `requires exists<S>(@0x42)` of `r_odd_requires` does not hold at this call
+tests/sources/functional/closures/apply_carrier_unread_memory.move:670:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:667:5: error: verex verification failed: the automatic verification of `requires_failed_across_write` failed; provide a proof in the module:
+  verify requires_failed_across_write by lean =>
+    verex_obligations
+    verex_on
+    | requires_1_of_r_odd_requires => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:692:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:690:5: error: verex verification failed: the automatic verification of `rec_wrap_across_write` failed; provide a proof in the module:
+  verify rec_wrap_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:704:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:702:5: error: verex verification failed: the automatic verification of `rec_read_across_write` failed; provide a proof in the module:
+  verify rec_read_across_write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

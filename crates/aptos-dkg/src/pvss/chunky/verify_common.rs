@@ -33,7 +33,7 @@ impl<'a, A: Serialize + Clone> SokContext<'a, A> {
     /// # Arguments
     /// * `signing_pubkey` - The dealer's BLS12-381 public key used for signing.
     /// * `session_id` - Session identifier; serialized and bound into the transcript.
-    /// * `dealer_id` - Index of the dealer in the weighted config.
+    /// * `dealer_id` - Index of the dealer in the signing public key list.
     /// * `dst` - Domain-separation tag (DST) for the proof system.
     pub fn new(
         signing_pubkey: bls12381::PublicKey,
@@ -68,13 +68,6 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
             "Expected {} encryption keys, but got {}",
             sc.get_total_num_players(),
             eks.len()
-        );
-    }
-    if spks.len() != sc.get_total_num_players() {
-        bail!(
-            "Expected {} signing public keys, but got {}",
-            sc.get_total_num_players(),
-            spks.len()
         );
     }
     if subtrs.Cs.len() != sc.get_total_num_players() {
@@ -148,6 +141,9 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
 
     // The previous checks should imply that Cs_flat.len() = sc.get_total_weight()
 
+    // Signing keys belong to the current dealers, while the weighted config
+    // describes next-epoch recipients. Their counts can differ when validators
+    // join or leave; only the dealer's index must be in bounds for signing keys.
     if dealer.id >= spks.len() {
         bail!(
             "Dealer id {} is out of bounds for {} signing public keys",

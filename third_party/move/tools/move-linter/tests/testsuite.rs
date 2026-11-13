@@ -33,7 +33,9 @@ pub const EXP_EXT: &str = "exp";
 /// E.g. `// @checks=strict,-needless_visibility`.
 const CHECKS_HEADER: &str = "// @checks=";
 
-datatest_stable::harness!(test_runner, "tests", r".*\.move$");
+datatest_stable::harness! {
+    { test = test_runner, root = "tests", pattern = r".*\.move$" },
+}
 
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     let spec = match read_spec_from_file(path) {

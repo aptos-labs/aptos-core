@@ -8,7 +8,7 @@ import Move.Attributes
 import Move.ConventionalAddresses
 
 /-!
-# Leaner surface syntax
+# Verex surface syntax
 
 One scoped borrow parser covers reference types and Move 2 places. Assignment
 uses Lean's existing `doReassign` syntax and dispatches by the left-hand local's
@@ -43,7 +43,7 @@ private def elabMoveIsVariant : TermElab := fun stx expectedType? => do
   let expanded ← `(match $value:term with | $pattern:term => true | _ => false)
   elabTerm expanded expectedType?
 
-/-! Compiler-only loop markers. They are private so authored Leaner cannot
+/-! Compiler-only loop markers. They are private so authored Verex cannot
 forge CFG control by calling the normalizer protocol directly. -/
 
 /-- Compiler-only source marker. Its monadic dependency keeps the call in
@@ -293,7 +293,7 @@ def elabPrimitiveMatch : TermElab := fun stx expectedType? => do
   let discriminantType ← whnf (← inferType discriminantExpr)
   if discriminantType.isAppOfArity ``Ref 1 ||
       discriminantType.isAppOfArity ``MutRef 1 then
-    -- Reading a Move reference is represented as an `Action` in Leaner even
+    -- Reading a Move reference is represented as an `Action` in Verex even
     -- though it cannot abort. Keep that sequencing visible to the compiler;
     -- source verification receives the referent value as its logical
     -- parameter and expands the retained syntax through the pure path below.
@@ -807,10 +807,10 @@ private partial def chainBorrowSyntax (mutable : Bool) (origin : Syntax)
     (effect : Term) : List String → TermElabM Term
   | [] => pure effect
   | fieldName :: rest => do
-      let ref := mkIdentFrom origin (Name.mkSimple "_leanerRef")
+      let ref := mkIdentFrom origin (Name.mkSimple "_verexRef")
       -- The next edge is a surface field borrow through the bound reference,
       -- so a structure field and an enum payload field are borrowed alike.
-      let place := mkIdentFrom origin (Name.str (Name.mkSimple "_leanerRef") fieldName)
+      let place := mkIdentFrom origin (Name.str (Name.mkSimple "_verexRef") fieldName)
       let next ← if mutable then `(&mut $place) else `(& $place)
       let tail ← chainBorrowSyntax mutable origin next rest
       `($effect >>= fun $ref => $tail)
@@ -847,12 +847,12 @@ private partial def elabBorrow (mutable : Bool) (place : Term)
               elabTerm (← `(borrowElemMut $base $index)) expectedType?
             else
               elabTerm (← `(do
-                let _leanerVectorRef ← freeze $base
-                borrowElem _leanerVectorRef $index)) expectedType?
+                let _verexVectorRef ← freeze $base
+                borrowElem _verexVectorRef $index)) expectedType?
           else if type.isAppOfArity ``Move.Vector 1 then
             let localBorrow := if mutable then ``borrowLocalMut else ``borrowLocal
             let elemBorrow := if mutable then ``borrowElemMut else ``borrowElem
-            let ref := mkIdentFrom base `_leanerVectorRef
+            let ref := mkIdentFrom base `_verexVectorRef
             let localCall ← `($(mkIdent localBorrow) $base)
             let elemCall ← `($(mkIdent elemBorrow) $ref $index)
             elabTerm (← `($localCall >>= fun $ref => $elemCall)) expectedType?
@@ -941,12 +941,12 @@ def elabMoveReassign : DoElab := fun stx cont => do
       if type.isAppOfArity ``MutRef 1 then
         match rhs with
         | `(* $ref - $amount) =>
-            let old := mkIdentFrom rhs `_leanerOld
+            let old := mkIdentFrom rhs `_verexOld
             elabDoElems1
               #[(← `(doElem| let $old ← read $ref)),
                 (← `(doElem| write $x ($old - $amount)))] cont
         | `(* $ref + $amount) =>
-            let old := mkIdentFrom rhs `_leanerOld
+            let old := mkIdentFrom rhs `_verexOld
             elabDoElems1
               #[(← `(doElem| let $old ← read $ref)),
                 (← `(doElem| write $x ($old + $amount)))] cont
@@ -970,7 +970,7 @@ private def elabMoveCompoundAssign (operation : Name) : DoElab := fun stx cont =
     else if operation == `div then `($left / $rhs)
     else `($left % $rhs)
   if type.isAppOfArity ``MutRef 1 then
-    let old := mkIdentFrom rhs `_leanerOld
+    let old := mkIdentFrom rhs `_verexOld
     let value ← combine ⟨old.raw⟩
     elabDoElems1
       #[(← `(doElem| let $old ← read $x)),

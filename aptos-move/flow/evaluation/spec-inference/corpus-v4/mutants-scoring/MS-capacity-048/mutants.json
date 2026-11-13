@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 80,
+        "offset": 3227,
+        "sha256": "ee18b0d2ab3f5a85f7a84b1a60d77bb089ccdd79ed441606679e86bdfe920916"
+      },
+      "edit": {
+        "at": 67,
+        "kind": "substitute",
+        "length": 13,
+        "to": "            1"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-capacity-048-full-reports-one",
+      "obligation_category": "normal-result",
+      "rationale": "An over-full queue reports a capacity of one.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 140,
+        "offset": 3086,
+        "sha256": "d3ed3940ecfad259862d24b96590014c4736d36819ca330f263156864d769af0"
+      },
+      "edit": {
+        "at": 57,
+        "kind": "substitute",
+        "length": 78,
+        "to": "last_executed_sequence_number - multisig_account_resource.next_sequence_number"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-capacity-048-subtraction-reversed",
+      "obligation_category": "abort",
+      "rationale": "The pending count subtracts in the wrong order.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 64,
+        "offset": 3325,
+        "sha256": "3990f5b11b94fe3c7bf815e39822fbcbd72b6c789493c5bbd891b1b564f99846"
+      },
+      "edit": {
+        "at": 37,
+        "kind": "substitute",
+        "length": 1,
+        "to": "+"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-capacity-048-capacity-adds",
+      "obligation_category": "normal-result",
+      "rationale": "Pending transactions add to the capacity.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "7de2017b0c339dfe8021333ff3eea5f590b8cc1b96ea29e793f22a7edcb52e97",
+  "task_id": "MS-capacity-048"
+}

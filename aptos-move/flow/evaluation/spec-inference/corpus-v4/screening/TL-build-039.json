@@ -1,0 +1,22 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_transaction_limits",
+  "reference_proved": true,
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "schema_version": 2,
+  "target": "aptos_framework::extracted_transaction_limits::new_tiers",
+  "task_id": "TL-build-039",
+  "task_tree_sha256": "f8d4cfa6a684df1d1db1851f8eb514a7ea334a87320248bf03461235102506cd",
+  "threshold_seconds": 20,
+  "wall_seconds": 5.7,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

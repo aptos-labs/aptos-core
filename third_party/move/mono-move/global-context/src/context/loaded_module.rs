@@ -11,12 +11,15 @@ use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{
     intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
-    types::{InternedType, InternedTypeList},
-    Function, FunctionDefinitionIndex, FunctionPtr, Interner,
+    types::{view_type, InternedType, InternedTypeList, Type},
+    Function, FunctionDefinitionIndex, FunctionPtr, Interner, NominalFields, PreparedModule,
 };
-use move_binary_format::access::ModuleAccess;
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{FunctionAttribute, StructDefinitionIndex, Visibility},
+};
 use move_core_types::identifier::IdentStr;
-use parking_lot::Mutex;
+use parking_lot::RwLock;
 use shared_dsa::{Entry, UnorderedMap, UnorderedSet};
 use specializer::{FunctionIR, ModuleIR};
 use std::sync::{Arc, OnceLock};
@@ -178,9 +181,11 @@ pub struct LoadedModule {
     ///    functions are stored in [`Self::functions`].
     /// 2. The type arguments are fully concrete — they're the actual
     ///    runtime types the function was monomorphized for.
+    /// Lookups run on every generic call and take the read lock, so workers
+    /// calling the same generic function do not block each other.
     // TODO(cleanup): revisit data structure used for actual monomorphized function storage.
     instantiated_functions:
-        Mutex<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
+        RwLock<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
     /// Maps the name of a group member defined in this module (a nominal type)
     /// to its group container type (also a nominal type). Built once when the
     /// module is loaded. If struct's or enum's name is not in the map, then it
@@ -189,6 +194,10 @@ pub struct LoadedModule {
     /// Names of the functions carrying the `#[randomness]` annotation. Built
     /// once when the module is loaded.
     randomness_annotated: UnorderedSet<InternedIdentifier>,
+    /// Indexed by struct definition: whether the compiler-generated pack API
+    /// of the struct or enum is fully public, see
+    /// [`Self::has_public_pack_api`]. Built once when the module is loaded.
+    public_pack_apis: Box<[bool]>,
 }
 
 impl LoadedModule {
@@ -229,16 +238,99 @@ impl LoadedModule {
             }
         }
         let resource_group_members = Self::build_resource_group_members(&ir, interner)?;
+        let public_pack_apis = Self::build_public_pack_apis(&ir);
         Ok(Box::new(Self {
             ir,
             cost,
             mandatory_dependencies,
             functions,
             function_indices,
-            instantiated_functions: Mutex::new(UnorderedMap::new()),
+            instantiated_functions: RwLock::new(UnorderedMap::new()),
             resource_group_members,
             randomness_annotated,
+            public_pack_apis,
         }))
+    }
+
+    /// Builds the per-definition answer to [`Self::has_public_pack_api`] in
+    /// one pass over the module's functions.
+    ///
+    /// Only two properties are checked here: that a function carries the
+    /// `Pack` or `PackVariant` attribute, and that it is public. Everything
+    /// else about a pack function is already guaranteed by the bytecode
+    /// verifier's struct API checker.
+    fn build_public_pack_apis(ir: &ModuleIR) -> Box<[bool]> {
+        let module = &ir.module;
+        // One flag per pack function the definition needs: one for a struct,
+        // one per variant for an enum.
+        let mut packable: Vec<Vec<bool>> = module
+            .struct_defs()
+            .iter()
+            .map(|def| {
+                let name =
+                    module.interned_identifier_at(module.struct_handle_at(def.struct_handle).name);
+                let num_variants = match module.interned_fields(name) {
+                    Some(NominalFields::Enum(variants)) => variants.len(),
+                    Some(NominalFields::Struct(_)) | None => 1,
+                };
+                vec![false; num_variants]
+            })
+            .collect();
+        for def in module.function_defs() {
+            if def.visibility != Visibility::Public {
+                continue;
+            }
+            let handle = module.function_handle_at(def.function);
+            let Some(def_idx) =
+                Self::packed_definition(module, module.interned_types_at(handle.return_))
+            else {
+                continue;
+            };
+            for attribute in &handle.attributes {
+                let variant = match attribute {
+                    FunctionAttribute::Pack => 0,
+                    FunctionAttribute::PackVariant(tag) => usize::from(*tag),
+                    FunctionAttribute::Persistent
+                    | FunctionAttribute::ModuleLock
+                    | FunctionAttribute::Unpack
+                    | FunctionAttribute::UnpackVariant(_)
+                    | FunctionAttribute::TestVariant(_)
+                    | FunctionAttribute::BorrowFieldImmutable(_)
+                    | FunctionAttribute::BorrowFieldMutable(_) => continue,
+                };
+                if let Some(flag) = packable[def_idx.0 as usize].get_mut(variant) {
+                    *flag = true;
+                }
+            }
+        }
+        packable
+            .iter()
+            .map(|flags| flags.iter().all(|&packable| packable))
+            .collect()
+    }
+
+    /// The definition in this module that a function with the given return
+    /// types packs: the single nominal it returns, if this module defines it.
+    /// For a function carrying a pack attribute, the bytecode verifier
+    /// guarantees this is `Some`; the `None` paths only make a function
+    /// without one cheap to skip.
+    fn packed_definition(
+        module: &PreparedModule,
+        return_tys: &[InternedType],
+    ) -> Option<StructDefinitionIndex> {
+        let &[returned] = return_tys else {
+            return None;
+        };
+        let Type::Nominal {
+            module_id, name, ..
+        } = view_type(returned)
+        else {
+            return None;
+        };
+        if *module_id != module.id() {
+            return None;
+        }
+        module.interned_nominal_type_def_idx(*name)
     }
 
     /// Builds the group-member map from this module's metadata:
@@ -320,7 +412,7 @@ impl LoadedModule {
         ty_args: InternedTypeList,
     ) -> Option<(FunctionPtr, Arc<[LoadedModuleSlot]>)> {
         self.instantiated_functions
-            .lock()
+            .read()
             .get(&(name, ty_args))
             .map(|f| (f.function, f.mandatory_dependencies.clone()))
     }
@@ -336,7 +428,7 @@ impl LoadedModule {
         function: Function,
         function_ms: Arc<[LoadedModuleSlot]>,
     ) -> FunctionPtr {
-        match self.instantiated_functions.lock().entry((name, ty_args)) {
+        match self.instantiated_functions.write().entry((name, ty_args)) {
             Entry::Occupied(e) => e.get().function,
             Entry::Vacant(e) => e.insert(FunctionSlot::new(function, function_ms)).function,
         }
@@ -353,6 +445,18 @@ impl LoadedModule {
     pub fn has_randomness_annotation(&self, name: &InternedIdentifier) -> bool {
         self.randomness_annotated.contains(name)
     }
+
+    /// Whether the struct or enum defined at `def_idx` can be packed from
+    /// outside its module: a struct needs a public function carrying the
+    /// `Pack` attribute, an enum one carrying `PackVariant` for every variant.
+    /// Their well-formedness is the bytecode verifier's job, see
+    /// [`Self::build_public_pack_apis`].
+    pub fn has_public_pack_api(&self, def_idx: StructDefinitionIndex) -> bool {
+        self.public_pack_apis
+            .get(def_idx.0 as usize)
+            .copied()
+            .unwrap_or(false)
+    }
 }
 
 impl Drop for LoadedModule {
@@ -366,8 +470,9 @@ impl Drop for LoadedModule {
     //      is dropped. In this case just-leaked box was never published into
     //      any slot, so it has no aliases by construction.
     //
-    // TODO(correctness): `FunctionPtr`s in other modules' `CallDirect` ops are only sound
-    //   if callers are evicted with direct callees. (or their code is de-optimized).
+    // TODO(correctness): Callers with cross-module `CallByPtr` ops must be evicted
+    //   with their callees or have those ops replaced before the callees are freed.
+    //   `CallByPtrExempt` targets only functions in the caller's module.
     fn drop(&mut self) {
         self.functions.retain(|_, cell| {
             if let Some(slot) = cell.take() {
@@ -376,9 +481,11 @@ impl Drop for LoadedModule {
             }
             false
         });
-        self.instantiated_functions.lock().for_each_value(|slot| {
-            // SAFETY: see impl-level comment — no aliases at drop time.
-            unsafe { slot.function.free_unchecked() };
-        });
+        self.instantiated_functions
+            .get_mut()
+            .for_each_value(|slot| {
+                // SAFETY: see impl-level comment — no aliases at drop time.
+                unsafe { slot.function.free_unchecked() };
+            });
     }
 }

@@ -4,13 +4,14 @@
 use crate::{
     errors::{DiscardReason, NoEffectsReason},
     outcome::TxnOutcome,
+    providers::AptosDataProvider,
 };
 use aptos_types::{
     state_store::state_storage_usage::StateStorageUsage,
     transaction::{AuxiliaryInfo, Transaction},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
-use mono_move_core::{storage::module_provider::ModuleProvider, ResourceProvider};
+use mono_move_core::{storage::module_provider::ModuleProvider, FrameworkSymbols};
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::ProductionNativeRegistry;
 
@@ -22,10 +23,12 @@ use mono_move_runtime::ProductionNativeRegistry;
 /// `system_txns`.
 pub struct AptosTransactionExecutor<'a> {
     pub(crate) guard: &'a ExecutionGuard<'a>,
+    /// The framework symbols interned once into `guard`'s context.
+    pub(crate) symbols: &'a FrameworkSymbols,
     /// All native functions available for this executor.
     pub(crate) natives: &'a ProductionNativeRegistry,
     pub(crate) module_provider: &'a dyn ModuleProvider,
-    pub(crate) data_provider: &'a dyn ResourceProvider,
+    pub(crate) data_provider: &'a dyn AptosDataProvider,
     /// The on-chain configs (features, gas schedule) at the current state.
     //
     // TODO(cleanup): reusing the legacy VM's environment type is transitional;
@@ -46,12 +49,13 @@ impl<'a> AptosTransactionExecutor<'a> {
         guard: &'a ExecutionGuard<'a>,
         natives: &'a ProductionNativeRegistry,
         module_provider: &'a dyn ModuleProvider,
-        data_provider: &'a dyn ResourceProvider,
+        data_provider: &'a dyn AptosDataProvider,
         env: &'a AptosEnvironment,
         usage: StateStorageUsage,
     ) -> Self {
         Self {
             guard,
+            symbols: guard.framework_symbols(),
             natives,
             module_provider,
             data_provider,

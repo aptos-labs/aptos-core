@@ -4,6 +4,12 @@ on:
   # PIES dispatches this workflow nightly on main. GitHub cron is prohibited by
   # repository policy. See devtools/aptos-cargo-cli/README.md for rollout.
   workflow_dispatch:
+    inputs:
+      rust_ci_provider:
+        description: "Rust CI provider (default honors RUST_CI_PROVIDER, otherwise hosted)"
+        type: choice
+        default: default
+        options: [default, hosted, aws]
 
 permissions:
   contents: read
@@ -18,16 +24,44 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  rust-ci-provider:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      provider: ${{ steps.select.outputs.provider }}
+    steps:
+      - id: select
+        env:
+          MANUAL_PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.rust_ci_provider || 'default' }}
+          CONFIGURED_PROVIDER: ${{ vars.RUST_CI_PROVIDER }}
+        run: |
+          provider="${CONFIGURED_PROVIDER:-hosted}"
+          if [ "$MANUAL_PROVIDER" != default ]; then
+            provider="$MANUAL_PROVIDER"
+          fi
+          case "$provider" in
+            hosted|aws) printf 'provider=%s\n' "$provider" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::RUST_CI_PROVIDER must be hosted or aws"; exit 1 ;;
+          esac
+
   cargo-tests:
     name: Full suite (${{ matrix.suite }})
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    needs: rust-ci-provider
+    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu24-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     timeout-minutes: 720
     strategy:
       fail-fast: false
       matrix:
         include:
-          - suite: workspace
-            command: cargo nextest run --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-keyless-circuit --exclude aptos-batch-encryption --profile ci --cargo-profile ci --no-fail-fast --retries 3
+          # The workspace suite is sharded into the same four static package groups
+          # as lint-test.yaml's hosted full suite; the excluded packages stay excluded.
+          - suite: workspace-compiler
+            command: cargo nextest run --locked -p move-compiler-v2 -p move-compiler-v2-transactional-tests --profile ci --cargo-profile ci --no-fail-fast --retries 3
+          - suite: workspace-mono-move
+            command: cargo nextest run --locked -p mono-move-testsuite --profile ci --cargo-profile ci --no-fail-fast --retries 3
+          - suite: workspace-move-e2e
+            command: cargo nextest run --locked -p e2e-move-tests --profile ci --cargo-profile ci --no-fail-fast --retries 3
+          - suite: workspace-remaining
+            command: cargo nextest run --locked --workspace --exclude move-compiler-v2 --exclude move-compiler-v2-transactional-tests --exclude mono-move-testsuite --exclude e2e-move-tests --exclude smoke-test --exclude aptos-testcases --exclude aptos-keyless-circuit --exclude aptos-batch-encryption --profile ci --cargo-profile ci --no-fail-fast --retries 3
           - suite: doc-tests
             command: cargo test --locked --workspace --profile ci --doc
           - suite: vm-features
@@ -39,7 +73,12 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-nightly-${{ matrix.suite }}
       - uses: ./.github/actions/rust-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider != 'hosted' }}
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: Run postgres database
@@ -75,13 +114,19 @@ jobs:
           retention-days: 14
 
   batch-encryption:
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    needs: rust-ci-provider
+    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu24-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-nightly-batch-encryption
       - uses: ./.github/actions/rust-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider != 'hosted' }}
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: Export pnpm path
@@ -204,11 +249,16 @@ jobs:
       SKIP_JOB: false
       POST_TO_SLACK: false
 
+  lean:
+    uses: ./.github/workflows/lean.yaml
+    with:
+      GIT_SHA: ${{ github.sha }}
+
   # Only a job-level `cancelled()` reflects a cancelled run; inside a job that
   # starts after the cancellation, step-level `cancelled()` is false.
   cancellation:
     name: Record a cancelled run
-    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed]
+    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed, lean]
     if: cancelled()
     runs-on: ubuntu-latest
     steps:
@@ -216,7 +266,7 @@ jobs:
 
   result:
     name: Nightly full-suite result
-    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed, cancellation]
+    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed, lean, cancellation]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -255,14 +305,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run nightly-full-suite-retry.yaml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f run_id="$GITHUB_RUN_ID"
 
-  # Every run posts its result with the linked seven-night bar, except a first
-  # attempt whose retry was dispatched: the retry posts instead. The result job's
-  # status decides the colour of this run's square. Delivery errors must not
-  # change the run conclusion, which the bar reads for past nights.
+  # Post a failed result, or a successful retry (yellow). A first attempt whose
+  # retry was dispatched waits for that attempt's result. Green and cancelled
+  # runs stay quiet. Delivery errors must not change the run conclusion, which
+  # the bar reads for past nights.
   notify:
     name: Notify Slack
     needs: [result, retry]
-    if: ${{ always() && needs.retry.result != 'success' }}
+    if: ${{ always() && !cancelled() && needs.retry.result != 'success' && (needs.result.result == 'failure' || (needs.result.result == 'success' && github.run_attempt != '1')) }}
     continue-on-error: true
     runs-on: ubuntu-latest
     permissions: {}

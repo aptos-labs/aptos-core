@@ -266,11 +266,11 @@ impl<I: Interner> Emitter<'_, I> {
             .ok_or(GasInstrumentationError::EnumDefinitionNotFound)?;
         let fields = self
             .module
-            .interned_variant_field_types_at(def_idx, variant)
+            .interned_variant_fields_at(def_idx, variant)
             .ok_or(GasInstrumentationError::NotAnEnum)?;
         Ok(fields
             .iter()
-            .map(|&f| self.interner.subst_type(f, *ty_args))
+            .map(|f| self.interner.subst_type(f.ty, *ty_args))
             .collect::<Result<Vec<_>, _>>()?)
     }
 

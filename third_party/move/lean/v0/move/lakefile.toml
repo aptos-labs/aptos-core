@@ -1,4 +1,4 @@
-# Leaner Move: the source language, its source contracts and `verify` proof
+# Verex Move: the source language, its source contracts and `verify` proof
 # engine, and lowering to XIR.
 name = "move"
 defaultTargets = ["Move"]

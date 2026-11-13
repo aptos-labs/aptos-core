@@ -1,0 +1,54 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/resources.move:39:6: error: the specification clause `ensures exists<R>(account.address)` is not established
+tests/sources/functional/resources.move:37:5: error: verex verification failed: the automatic verification of `create_resource_incorrect` failed; provide a proof in `tests/sources/functional/resources.proof.lean`:
+  verify create_resource_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/resources.move:55:5: error: verification failed with a residual obligation:
+case some.continues.continues.none.continues.right.right.right.right
+account : VerexIR.Proofs.Denote.NTy.signer.carrier
+a : VerexIR.Proofs.Denote.NTy.address.carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 1274 (some account, some a, none, none, ()) initialState✝
+val✝ : 0x42.TestResources.unit.nominal.namespace.0.declaration✝⁻⁰.carrier
+heq✝ :
+  initialState✝
+      { type := 0x42.TestResources.unit.nominal.namespace.0.declaration✝⁻⁰,
+        arguments := VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address a) =
+    some val✝
+invariantHolds✝² invariantHolds✝¹ left✝¹ : True
+left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds val✝.val.fst
+right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil val✝.val.snd
+verexAnchor :
+  VerexIR.Proofs.Denote.AnchorSaved 1539 (some account, some a, some val✝, some val✝.val.fst, ())
+    (initialState✝.set
+      { type := 0x42.TestResources.unit.nominal.namespace.0.declaration✝⁻⁰,
+        arguments := VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address a) none)
+heq :
+  (if account = a then none
+    else
+      initialState✝
+        { type := 0x42.TestResources.unit.nominal.namespace.0.declaration✝⁻⁰,
+          arguments := VerexIR.Proofs.Denote.NRow.nil }
+        (VerexIR.StorageKey.address account)) =
+    none
+invariantHolds✝ : True
+⊢ ¬(¬account = a ∧
+      (initialState✝
+            { type := 0x42.TestResources.unit.nominal.namespace.0.declaration✝⁻⁰,
+              arguments := VerexIR.Proofs.Denote.NRow.nil }
+            (VerexIR.StorageKey.address account)).isSome =
+        true)
+tests/sources/functional/resources.move:55:5: error: verex verification failed: the automatic verification of `move_from_addr_to_sender` failed; provide a proof in `tests/sources/functional/resources.proof.lean`:
+  verify move_from_addr_to_sender by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -55,11 +55,13 @@ use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard, MemoryRegion};
 use mono_move_core::{
     reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
-    FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
+    FrameworkSymbols, FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
     TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
+use shared_dsa::UnorderedMap;
 use std::{
+    any::{Any, TypeId},
     hash::{Hash, Hasher},
     marker::PhantomData,
 };
@@ -138,6 +140,14 @@ struct Context {
     /// Published type layouts (the type-driven walk shape, separate from the
     /// GC object descriptors above).
     layouts: Layouts,
+    /// Values a client preinstalls before execution for execution guards to
+    /// read, keyed by their type. See [`GlobalContext::preinstall`].
+    ///
+    /// This map never needs to be iterated, only looked up by type, so an
+    /// unordered map is the right choice. A `BTreeMap` would be weaker: it
+    /// would expose an ordering based on `TypeId`, which depends on the
+    /// compiler.
+    preinstalled: UnorderedMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 /// Storage for the published object-descriptor set.
@@ -340,7 +350,7 @@ impl GlobalContext {
     ) -> Self {
         let num_workers = num_workers.max(1);
 
-        Self {
+        let mut this = Self {
             ctx: Context {
                 identifiers: DashMap::default(),
                 module_ids: DashMap::default(),
@@ -351,10 +361,24 @@ impl GlobalContext {
                 script_cache: ScriptCache::new(),
                 descriptors: Descriptors::default(),
                 layouts: Layouts::default(),
+                preinstalled: UnorderedMap::new(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
-        }
+        };
+        install_framework_symbols(&mut this.ctx, &this.global_arena);
+        this
+    }
+
+    /// Makes `value` available to every execution guard through
+    /// [`ExecutionGuard::preinstalled`]. This is for things a client needs in
+    /// every transaction but only has to prepare once per context. A value of
+    /// the same type replaces the previous one, and all values are cleared
+    /// when the arenas are reset.
+    pub fn preinstall<T: Any + Send + Sync>(&mut self, value: T) {
+        self.ctx
+            .preinstalled
+            .insert(TypeId::of::<T>(), Box::new(value));
     }
 
     /// Transitions to maintenance mode by obtaining a [`MaintenanceGuard`]
@@ -418,6 +442,11 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         self.ctx.type_lists.len()
     }
 
+    /// Returns the number of preinstalled values.
+    pub fn preinstalled_count(&self) -> usize {
+        self.ctx.preinstalled.len()
+    }
+
     /// Resets all caches that store pointers to the arenas, and then resets
     /// the arenas as well.
     pub fn reset_arena_pool(&mut self) {
@@ -433,6 +462,10 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         unsafe {
             self.global_arena.reset_all_arenas_unchecked();
         }
+
+        // The interner started over, so the framework symbols are interned
+        // again. A client's preinstalled values are its own to redo.
+        install_framework_symbols(self.ctx, self.global_arena);
     }
 }
 
@@ -452,6 +485,22 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// size is not pooled is dropped.
     pub fn return_region(&self, region: MemoryRegion) {
         self.global_arena.return_region(region)
+    }
+
+    /// The value of type `T` the context preinstalled (see
+    /// [`GlobalContext::preinstall`]), if any.
+    pub fn preinstalled<T: Any + Send + Sync>(&self) -> Option<&'ctx T> {
+        let ctx: &'ctx Context = self.ctx;
+        ctx.preinstalled
+            .get(&TypeId::of::<T>())
+            .and_then(|value| value.downcast_ref::<T>())
+    }
+
+    /// The framework symbols the system refers to, interned once per context
+    /// rather than on every use.
+    pub fn framework_symbols(&self) -> &'ctx FrameworkSymbols {
+        self.preinstalled::<FrameworkSymbols>()
+            .expect("the framework symbols are installed at construction and after every reset")
     }
 
     /// Inserts a loaded module into the cache, keyed by its interned ID.
@@ -644,6 +693,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
             })
     }
 
+    /// The enum-object descriptor already published for `enum_ty`, if any.
+    pub fn enum_descriptor(&self, enum_ty: InternedType) -> Option<DescriptorId> {
+        self.ctx
+            .descriptors
+            .enum_by_type
+            .get(&enum_ty)
+            .map(|id| *id)
+    }
+
     /// Materializes an enum-object descriptor for `enum_ty` into the shared
     /// arena and returns its assigned [`DescriptorId`]. Idempotent on
     /// `enum_ty`. `variant_pointer_offsets[v]` are the heap-pointer byte
@@ -732,18 +790,24 @@ impl<'ctx> ExecutionGuard<'ctx> {
         self.ctx.layouts.by_ty.get(&ty).map(|r| *r)
     }
 
-    /// Publishes the layout for the given type and returns its assigned
-    /// [`LayoutId`].
-    pub fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+    /// Publishes the layout for the type it was built for and returns its
+    /// assigned [`LayoutId`]. Idempotent on the type.
+    ///
+    /// Expects a layout that carries its type: a struct, a vector or a frozen
+    /// enum. Returns [`None`] for a layout without one, which never belongs in
+    /// the by-type table: references and functions have reserved ids, and
+    /// enum variant bodies go through [`Self::publish_variant_layouts`].
+    pub fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {
+        let ty = layout.ty?;
         if let Some(id) = self.ctx.layouts.by_ty.get(&ty) {
-            return *id;
+            return Some(*id);
         }
 
         // TODO(perf): consider if we should append to the table without holding the shard lock.
-        *self.ctx.layouts.by_ty.entry(ty).or_insert_with(|| {
+        Some(*self.ctx.layouts.by_ty.entry(ty).or_insert_with(|| {
             let idx = self.ctx.layouts.table.push(layout);
             LayoutId::from_usize(idx)
-        })
+        }))
     }
 
     /// Publishes the variant-body layouts of enum and returns their [`LayoutId`]s.
@@ -1005,6 +1069,20 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
 // Only private APIs below.
 // ------------------------
 
+/// Interns the framework symbols the system refers to and preinstalls them
+/// for [`ExecutionGuard::framework_symbols`]. Runs at construction and after
+/// every reset, when the interner starts over, so no execution is in progress.
+fn install_framework_symbols(ctx: &mut Context, global_arena: &GlobalArenaPool) {
+    let symbols = FrameworkSymbols::new(&ExecutionGuard {
+        ctx,
+        global_arena: global_arena
+            .try_lock_arena(0)
+            .expect("no execution is in progress on a fresh or reset context"),
+    });
+    ctx.preinstalled
+        .insert(TypeId::of::<FrameworkSymbols>(), Box::new(symbols));
+}
+
 impl<'ctx> MaintenanceGuard<'ctx> {
     /// Clears all caches stored in [`Context`]. Triggered when the global
     /// arena requires a full reset (and thus, any cache that stores pointers
@@ -1030,6 +1108,7 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             script_cache,
             descriptors,
             layouts,
+            preinstalled,
         } = self.ctx;
 
         identifiers.clear();
@@ -1039,6 +1118,9 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         function_refs.clear();
         descriptors.reset();
         layouts.reset();
+        // Dropped, not rebuilt: `reset_arena_pool` reinstalls the framework
+        // symbols, and whoever resets preinstalls its own values again.
+        preinstalled.clear();
 
         // SAFETY: We are in maintenance phase, and therefore there are no
         // execution guards alive. Hence, there are no pointers to modules

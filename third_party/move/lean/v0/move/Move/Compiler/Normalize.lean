@@ -4,15 +4,15 @@
 import Move.Attributes
 import Move.Basic
 import Move.Action
-import Move.Compiler.LIR
+import Move.Compiler.VIR
 import Move.Compiler.LCNF
 import Move.Syntax
 
 /-!
 # LCNF normalization
 
-This pass recognizes the deliberately small Leaner primitive vocabulary,
-erases `Action`'s world token, and constructs a named, typed LIR.  Unknown
+This pass recognizes the deliberately small Verex primitive vocabulary,
+erases `Action`'s world token, and constructs a named, typed VIR.  Unknown
 runtime calls are errors instead of being silently compiled with Lean
 semantics.
 -/
@@ -36,8 +36,8 @@ private def typeName? (type : Expr) : Option Name :=
   | _ => none
 
 private structure TyContext where
-  bvars : List (Nat × LIR.Ty) := []
-  fvars : List (FVarId × LIR.Ty) := []
+  bvars : List (Nat × VIR.Ty) := []
+  fvars : List (FVarId × VIR.Ty) := []
 
 /-- Recognize a width-tag type name. -/
 private def widthOfTagName? (name : Name) : Option MoveModel.IR.IntWidth :=
@@ -65,7 +65,7 @@ private def signOfExpr? (type : Expr) : Option Bool :=
   | _ => none
 
 private partial def translateTyWith (env : Environment) (ctx : TyContext)
-    (type : Expr) : Except String (Option LIR.Ty) := do
+    (type : Expr) : Except String (Option VIR.Ty) := do
   if let .bvar index := type then
     let some ty := assocFind? index ctx.bvars
       | throw s!"unbound type variable `#{index}` in Move type (context {repr ctx.bvars})"
@@ -133,7 +133,7 @@ private partial def translateTyWith (env : Environment) (ctx : TyContext)
       return some <| if args.isEmpty then .struct name else .structInst name args.toArray
   throw s!"`{type}` is not a supported Move runtime type"
 
-private def translateTy (env : Environment) (type : Expr) : Except String (Option LIR.Ty) :=
+private def translateTy (env : Environment) (type : Expr) : Except String (Option VIR.Ty) :=
   translateTyWith env {} type
 
 /-- Whether a declaration's type ends in `Prop`. -/
@@ -162,9 +162,9 @@ private def resultType (type : Expr) : Expr :=
   | other => other
 
 private structure FunSignature where
-  typeParams : Array LIR.TypeParamDecl
-  params : Array LIR.Ty
-  returns : Array LIR.Ty
+  typeParams : Array VIR.TypeParamDecl
+  params : Array VIR.Ty
+  returns : Array VIR.Ty
   isEffectful : Bool
 
 private abbrev FunSignatures := List (Name × FunSignature)
@@ -173,7 +173,7 @@ private def forallBinders : Expr → List (Name × Expr)
   | .forallE name type body _ => (name, type) :: forallBinders body
   | _ => []
 
-private def syntheticType (name : Name) : Option LIR.Ty :=
+private def syntheticType (name : Name) : Option VIR.Ty :=
   match name.getString! with
   | "Bool" => some .bool
   | "U8" => some (.uint .w8)
@@ -193,7 +193,7 @@ private def syntheticType (name : Name) : Option LIR.Ty :=
   | _ => none
 
 private def functionContext (env : Environment) (decl : Decl .pure) :
-    Except String (TyContext × Array LIR.TypeParamDecl) := do
+    Except String (TyContext × Array VIR.TypeParamDecl) := do
   let some original := env.find? decl.name
     | throw s!"missing source declaration `{decl.name}`"
   let sourceNames := (forallBinders original.type).filterMap fun (name, type) =>
@@ -227,7 +227,7 @@ private def functionContext (env : Environment) (decl : Decl .pure) :
   pure ({ bvars := bvars, fvars := fvars }, typeParams)
 
 private partial def returnTypes (env : Environment) (ctx : TyContext)
-    (type : Expr) : Except String (Array LIR.Ty) := do
+    (type : Expr) : Except String (Array VIR.Ty) := do
   if type.isAppOfArity ``Prod 2 then
     let args := type.getAppArgs
     return (← returnTypes env ctx args[0]!) ++ (← returnTypes env ctx args[1]!)
@@ -241,7 +241,7 @@ outer product of `StateM World` is the sequencing implementation of
 `Action`, while products inside its value are flattened to the IR return
 array just like a pure product-valued function. -/
 private def functionShape (env : Environment) (ctx : TyContext)
-    (type : Expr) : Except String (Bool × Array LIR.Ty) := do
+    (type : Expr) : Except String (Bool × Array VIR.Ty) := do
   let type := resultType type
   if type.isAppOfArity ``Prod 2 then
     let args := type.getAppArgs
@@ -273,14 +273,14 @@ private def bvarContext (binderCount paramCount : Nat) : TyContext :=
   { bvars := (List.range paramCount).map fun param =>
       (binderCount - 1 - param, .typeParam param) }
 
-private partial def tyUsesParam (index : Nat) : LIR.Ty → Bool
+private partial def tyUsesParam (index : Nat) : VIR.Ty → Bool
   | .typeParam actual => actual == index
   | .structInst _ args | .enumInst _ args => args.any (tyUsesParam index)
   | .vector elem | .ref elem | .mutRef elem => tyUsesParam index elem
   | _ => false
 
 /-- The bounds a `(T : Store, Copy)` group declares, as an `AbilitySet`. -/
-private def declaredBounds (declared : Array Name) : LIR.AbilitySet :=
+private def declaredBounds (declared : Array Name) : VIR.AbilitySet :=
   { copy := declared.contains `Copy
     drop := declared.contains `Drop
     store := declared.contains `Store || declared.contains `Key
@@ -289,9 +289,9 @@ private def declaredBounds (declared : Array Name) : LIR.AbilitySet :=
 /-- A parameter's ability bounds.  Declared bounds win; otherwise they are
 inferred from the container's own abilities, which is all Move can conclude
 when the source does not say. -/
-private def inferredTypeParams (names : Array Name) (abilities : LIR.AbilitySet)
-    (fieldTypes : Array LIR.Ty)
-    (bounds : Array (String × Array Name) := #[]) : Array LIR.TypeParamDecl :=
+private def inferredTypeParams (names : Array Name) (abilities : VIR.AbilitySet)
+    (fieldTypes : Array VIR.Ty)
+    (bounds : Array (String × Array Name) := #[]) : Array VIR.TypeParamDecl :=
   names.mapIdx fun index name =>
     let phantom := !fieldTypes.any (tyUsesParam index)
     let declared? := bounds.find? (·.1 == name.toString) |>.map (·.2)
@@ -304,13 +304,13 @@ private def inferredTypeParams (names : Array Name) (abilities : LIR.AbilitySet)
             store := abilities.store || abilities.key }
     { name := name.toString, abilities := constraints, phantom := phantom }
 
-private def declaredAbilities (env : Environment) (name : Name) : LIR.AbilitySet :=
+private def declaredAbilities (env : Environment) (name : Name) : VIR.AbilitySet :=
   { copy := moveCopyAttr.hasTag env name
     drop := moveDropAttr.hasTag env name
     store := moveStoreAttr.hasTag env name
     key := moveKeyAttr.hasTag env name }
 
-private def compileStruct (env : Environment) (name : Name) : Except String LIR.StructDecl := do
+private def compileStruct (env : Environment) (name : Name) : Except String VIR.StructDecl := do
   unless moveStructAttr.hasTag env name do
     throw s!"`{name}` is not annotated with `move_struct`"
   let some info := getStructureInfo? env name
@@ -346,7 +346,7 @@ private def compileStruct (env : Environment) (name : Name) : Except String LIR.
     attributes := Move.userAttributes env name
   }
 
-private def compileEnum (env : Environment) (name : Name) : Except String LIR.StructDecl := do
+private def compileEnum (env : Environment) (name : Name) : Except String VIR.StructDecl := do
   unless moveEnumAttr.hasTag env name do
     throw s!"`{name}` is not annotated with `move_enum`"
   let some (.inductInfo info) := env.find? name
@@ -674,27 +674,27 @@ private partial def literalConstant? (name : Name) : CoreM (Option LiteralConsta
   scan [] code
 
 private structure PendingCall where
-  op : LIR.Oper
+  op : VIR.Oper
   srcs : Array FVarId
-  resultTy : Option LIR.Ty
+  resultTy : Option VIR.Ty
 
 private inductive Pending where
   | call (call : PendingCall)
-  | multiCall (op : LIR.Oper) (srcs : Array FVarId)
-      (resultTys : Array LIR.Ty) (effectful : Bool)
+  | multiCall (op : VIR.Oper) (srcs : Array FVarId)
+      (resultTys : Array VIR.Ty) (effectful : Bool)
   | abort (code : FVarId)
-  | vectorInsert (reference index value : FVarId) (elemTy : LIR.Ty)
-  | vectorRemove (reference index : FVarId) (elemTy : LIR.Ty)
-  | vectorPop (reference : FVarId) (elemTy : LIR.Ty)
-  | vectorMut (reference : FVarId) (args : Array FVarId) (elemTy : LIR.Ty)
-      (op : LIR.Oper) (resultTys : Array LIR.Ty)
+  | vectorInsert (reference index value : FVarId) (elemTy : VIR.Ty)
+  | vectorRemove (reference index : FVarId) (elemTy : VIR.Ty)
+  | vectorPop (reference : FVarId) (elemTy : VIR.Ty)
+  | vectorMut (reference : FVarId) (args : Array FVarId) (elemTy : VIR.Ty)
+      (op : VIR.Oper) (resultTys : Array VIR.Ty)
 
 private structure BuildState where
   module : Move.ModuleRef
   tyContext : TyContext := {}
-  locals : Array LIR.LocalDecl := #[]
+  locals : Array VIR.LocalDecl := #[]
   localIds : List FVarId := []
-  loopParams : Array LIR.LocalDecl := #[]
+  loopParams : Array VIR.LocalDecl := #[]
   pending : List (FVarId × Pending) := []
   projections : List (FVarId × Nat) := []
   descriptors : List (FVarId × Nat) := []
@@ -710,10 +710,10 @@ private structure BuildState where
   loopTails : List (Nat × (Array FVarId × Code .pure)) := []
   usedLoopMarkers : List (Name × Nat × Nat) := []
   products : List (FVarId × Array FVarId) := []
-  tupleLocals : List (FVarId × Array (String × LIR.Ty)) := []
+  tupleLocals : List (FVarId × Array (String × VIR.Ty)) := []
   loopLiveResults : List FVarId := []
   sourceMarkerResults : List FVarId := []
-  blocks : Array LIR.Block := #[]
+  blocks : Array VIR.Block := #[]
   calls : Array Name := #[]
   acquires : Array Name := #[]
   nextBlock : Nat := 0
@@ -750,7 +750,7 @@ private def addLocal (env : Environment) (id : FVarId) (type : Expr) : BuildM Un
         locals := s.locals.push { name := localName id, ty := ty }
         localIds := id :: s.localIds }
 
-private def addLocalTy (id : FVarId) (ty : LIR.Ty) : BuildM Unit := do
+private def addLocalTy (id : FVarId) (ty : VIR.Ty) : BuildM Unit := do
   let state ← get
   if state.localIds.any (· == id) then return
   modify fun s => { s with
@@ -783,7 +783,7 @@ private def aliasTransientValue (target source : FVarId) : BuildM Unit := do
     modify fun s => { s with returnValues := (target, value) :: s.returnValues }
 
 private def translateTypeArgs (env : Environment) (types : Array Expr)
-    (count : Nat) : BuildM (Array LIR.Ty) := do
+    (count : Nat) : BuildM (Array VIR.Ty) := do
   unless count ≤ types.size do
     throwError "generic application has {types.size} type arguments; expected at least {count}"
   let ctx := (← get).tyContext
@@ -795,12 +795,12 @@ private def translateTypeArgs (env : Environment) (types : Array Expr)
     | .error message => throwError message
   pure result
 
-private def translateCurrentTy (env : Environment) (type : Expr) : BuildM (Option LIR.Ty) := do
+private def translateCurrentTy (env : Environment) (type : Expr) : BuildM (Option VIR.Ty) := do
   match translateTyWith env (← get).tyContext type with
   | .ok ty => pure ty
   | .error message => throwError message
 
-private def localTy? (id : FVarId) : BuildM (Option LIR.Ty) := do
+private def localTy? (id : FVarId) : BuildM (Option VIR.Ty) := do
   let state ← get
   let name := localName id
   pure <| (state.loopParams ++ state.locals).find? (·.name == name) |>.map (·.ty)
@@ -817,17 +817,17 @@ private partial def flattenProductValue (id : FVarId) : BuildM (Array FVarId) :=
   return #[]
 
 private def currentReturnTypes (env : Environment) (type : Expr) :
-    BuildM (Array LIR.Ty) := do
+    BuildM (Array VIR.Ty) := do
   match returnTypes env (← get).tyContext type with
   | .ok types => return types
   | .error message => throwError message
 
 /-- Bind the constructor parameters of one transient product case to a flat
 array of Move locals.  A nested product parameter retains its slice for the
-next `cases`; leaf parameters become ordinary LIR locals. -/
+next `cases`; leaf parameters become ordinary VIR locals. -/
 private def bindTupleParams (env : Environment)
-    (params : Array (Param .pure)) (sources : Array (String × LIR.Ty))
-    (instrs : Array LIR.Instr) : BuildM (Array LIR.Instr) := do
+    (params : Array (Param .pure)) (sources : Array (String × VIR.Ty))
+    (instrs : Array VIR.Instr) : BuildM (Array VIR.Instr) := do
   let mut offset := 0
   let mut nextInstrs := instrs
   for param in params do
@@ -861,7 +861,7 @@ private def freshBlock (stem : String) : BuildM String := do
   modify fun s => { s with nextBlock := s.nextBlock + 1 }
   return s!"{stem}.{state.nextBlock}"
 
-private def freshTemp (ty : LIR.Ty) : BuildM String := do
+private def freshTemp (ty : VIR.Ty) : BuildM String := do
   let state ← get
   let name := s!"$tail.{state.nextTemp}"
   modify fun s => { s with
@@ -869,19 +869,19 @@ private def freshTemp (ty : LIR.Ty) : BuildM String := do
     nextTemp := s.nextTemp + 1 }
   return name
 
-private def freshResultLocals (types : Array LIR.Ty) :
-    BuildM (Array (String × LIR.Ty)) := do
+private def freshResultLocals (types : Array VIR.Ty) :
+    BuildM (Array (String × VIR.Ty)) := do
   types.mapM fun type => return (← freshTemp type, type)
 
 /-- Materialize a pending effect once LCNF exposes the `StateM` result.
 Vector insertion/removal retain Move's native reference API at source level,
 but are normalized to value operations bracketed by `read_ref`/`write_ref`.
-That keeps LIR and the downstream reference-elimination proof vocabulary
+That keeps VIR and the downstream reference-elimination proof vocabulary
 small while preserving the removed element as an ordinary destination. The
 compiler-v2 XIR reader recognizes this canonical triple and emits the update
 directly against the original mutable vector reference. -/
 private def materializePending (pending : Pending) (dsts : Array String)
-    (instrs : Array LIR.Instr) : BuildM (Array LIR.Instr) := do
+    (instrs : Array VIR.Instr) : BuildM (Array VIR.Instr) := do
   match pending with
   | .call call =>
       return instrs.push (.call dsts call.op (call.srcs.map localName))
@@ -893,7 +893,7 @@ private def materializePending (pending : Pending) (dsts : Array String)
   | .vectorInsert reference index value elemTy =>
       unless dsts.isEmpty do
         throwError "vector insert unexpectedly produced a Move value"
-      let vectorTy := LIR.Ty.vector elemTy
+      let vectorTy := VIR.Ty.vector elemTy
       let old ← freshTemp vectorTy
       let updated ← freshTemp vectorTy
       return instrs
@@ -904,7 +904,7 @@ private def materializePending (pending : Pending) (dsts : Array String)
   | .vectorRemove reference index elemTy =>
       unless dsts.size == 1 do
         throwError "vector remove must produce exactly one removed element"
-      let vectorTy := LIR.Ty.vector elemTy
+      let vectorTy := VIR.Ty.vector elemTy
       let old ← freshTemp vectorTy
       let updated ← freshTemp vectorTy
       return instrs
@@ -915,7 +915,7 @@ private def materializePending (pending : Pending) (dsts : Array String)
   | .vectorPop reference elemTy =>
       unless dsts.size == 1 do
         throwError "vector pop_back must produce exactly one removed element"
-      let vectorTy := LIR.Ty.vector elemTy
+      let vectorTy := VIR.Ty.vector elemTy
       let old ← freshTemp vectorTy
       let updated ← freshTemp vectorTy
       return instrs
@@ -925,7 +925,7 @@ private def materializePending (pending : Pending) (dsts : Array String)
   | .vectorMut reference args elemTy op resultTys =>
       unless dsts.size == resultTys.size do
         throwError "vector operation produced {dsts.size} values; expected {resultTys.size}"
-      let vectorTy := LIR.Ty.vector elemTy
+      let vectorTy := VIR.Ty.vector elemTy
       let old ← freshTemp vectorTy
       let updated ← freshTemp vectorTy
       return instrs
@@ -933,14 +933,14 @@ private def materializePending (pending : Pending) (dsts : Array String)
         |>.push (.call (#[updated] ++ dsts) op (#[old] ++ args.map localName))
         |>.push (.call #[] .writeRef #[localName reference, updated])
 
-private def emitBlock (name : String) (instrs : Array LIR.Instr)
-    (term : LIR.Terminator) : BuildM Unit := do
+private def emitBlock (name : String) (instrs : Array VIR.Instr)
+    (term : VIR.Terminator) : BuildM Unit := do
   let span := (← get).currentSpan
   let instrs := instrs.map (·.withSpan span)
   modify fun s => { s with
     blocks := s.blocks.push { name, instrs, term, termSpan := span } }
 
-private def locateCurrent (instrs : Array LIR.Instr) : BuildM (Array LIR.Instr) := do
+private def locateCurrent (instrs : Array VIR.Instr) : BuildM (Array VIR.Instr) := do
   let span := (← get).currentSpan
   return instrs.map (·.withSpan span)
 
@@ -1025,7 +1025,7 @@ private def loopExit (label : Nat) : BuildM String := do
   return name
 
 private def assignLoopState (label : Nat) (targets sources : Array FVarId)
-    (instrs : Array LIR.Instr) : BuildM (Array LIR.Instr) := do
+    (instrs : Array VIR.Instr) : BuildM (Array VIR.Instr) := do
   unless targets.size == sources.size do
     throwError "loop {label} edge has {sources.size} state values; expected {targets.size}"
   let mut nextInstrs := instrs
@@ -1046,14 +1046,14 @@ private def assignLoopState (label : Nat) (targets sources : Array FVarId)
   return nextInstrs
 
 private def emitLoopContinue (label : Nat) (state : Array FVarId)
-    (blockName : String) (instrs : Array LIR.Instr) : BuildM Unit := do
+    (blockName : String) (instrs : Array VIR.Instr) : BuildM Unit := do
   let some headerState := assocFind? label (← get).loopStates
     | throwError "continue targets loop {label} before its header state was recorded"
   let nextInstrs ← assignLoopState label headerState state instrs
   emitBlock blockName nextInstrs (.jump (← loopHeader label))
 
 private def emitLoopBreak (label : Nat) (state : Array FVarId)
-    (blockName : String) (instrs : Array LIR.Instr) : BuildM Unit := do
+    (blockName : String) (instrs : Array VIR.Instr) : BuildM Unit := do
   let some headerState := assocFind? label (← get).loopStates
     | throwError "break targets loop {label} before its header state was recorded"
   let nextInstrs ← assignLoopState label headerState state instrs
@@ -1075,7 +1075,7 @@ private def continuedCall? (decl : LetDecl .pure)
   | _, _ => none
 
 private def emitTailCall (_signature : FunSignature) (blockName : String)
-    (instrs : Array LIR.Instr) (vars : Array FVarId) : BuildM Unit := do
+    (instrs : Array VIR.Instr) (vars : Array FVarId) : BuildM Unit := do
   let params := (← get).loopParams
   -- Generic `partial` functions carry compiler-inserted `Inhabited`
   -- dictionaries, and effectful functions additionally carry the erased
@@ -1096,7 +1096,7 @@ private def emitTailCall (_signature : FunSignature) (blockName : String)
     nextInstrs := nextInstrs.push (.assign param.name temp)
   emitBlock blockName nextInstrs (.jump "entry")
 
-private def emitJoinJump (blockName : String) (instrs : Array LIR.Instr)
+private def emitJoinJump (blockName : String) (instrs : Array VIR.Instr)
     (destination : String) (params : Array FVarId)
     (args : Array (Arg .pure)) : BuildM Unit := do
   unless params.size == args.size do
@@ -1115,7 +1115,7 @@ private def emitJoinJump (blockName : String) (instrs : Array LIR.Instr)
   emitBlock blockName nextInstrs (.jump destination)
 
 private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
-    (instrs : Array LIR.Instr) : BuildM (Array LIR.Instr) := do
+    (instrs : Array VIR.Instr) : BuildM (Array VIR.Instr) := do
   match decl.value with
   | .lit (.nat n) =>
       modify fun s => { s with natLiterals := (decl.fvarId, n) :: s.natLiterals }
@@ -1146,7 +1146,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
           addLocal (← getEnv) decl.fvarId decl.type
           setLocalSourceName decl.fvarId sourceName
           let span : MoveModel.IR.SourceSpan := { start, «end» := stop }
-          let instr : LIR.Instr := .assign (srcName decl.fvarId) (srcName source)
+          let instr : VIR.Instr := .assign (srcName decl.fvarId) (srcName source)
           return instrs.push (instr.withSpan (some span))
         aliasTransientValue decl.fvarId source
         return instrs
@@ -1363,8 +1363,8 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
           | _ => #[]
         if fn == ``moveFrom then
           addAcquire owner
-        let resultTy := if fn == ``existsAt then some LIR.Ty.bool else some ownerTy
-        let op := if fn == ``existsAt then LIR.Oper.existsAt owner typeArgs
+        let resultTy := if fn == ``existsAt then some VIR.Ty.bool else some ownerTy
+        let op := if fn == ``existsAt then VIR.Oper.existsAt owner typeArgs
           else .moveFrom owner typeArgs
         modify fun s => { s with pending :=
           (decl.fvarId, .call { op, srcs := #[address], resultTy }) :: s.pending }
@@ -1522,7 +1522,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
       -- Integer operations carry their width as the leading width-tag type
       -- argument; the `Width` instance is erased and the value operands are
       -- the trailing locals. Only operations whose Move semantics depends on
-      -- the width annotate the LIR operation with it.
+      -- the width annotate the VIR operation with it.
       let widthOfType (index : Nat) : BuildM MoveModel.IR.IntWidth := do
         let some tag := types[index]?
           | throwError "integer operation is missing its width tag"
@@ -1544,7 +1544,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         let some w := widthOfExpr? widthTag
           | throwError "integer width is not statically known"
         pure ⟨w, signed⟩
-      let intBinary? : Option (MoveModel.IR.NumType → LIR.Oper) :=
+      let intBinary? : Option (MoveModel.IR.NumType → VIR.Oper) :=
         if fn == ``MoveInt.add then some (.add ·)
         else if fn == ``MoveInt.sub then some (.sub ·)
         else if fn == ``MoveInt.mul then some (.mul ·)
@@ -1568,10 +1568,10 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
           | throwError "binary operation is missing its right operand"
         let nt ← numTypeOfArgs 0 1
         let op := mkOp nt
-        let ty := if op matches .lt | .le | .eq then LIR.Ty.bool else .int nt
+        let ty := if op matches .lt | .le | .eq then VIR.Ty.bool else .int nt
         addLocalTy decl.fvarId ty
         return instrs.push (.call #[localName decl.fvarId] op #[srcName lhs, srcName rhs])
-      let generic? : Option LIR.Oper :=
+      let generic? : Option VIR.Oper :=
         if fn == ``Move.Compare.less then some .lt
         else if fn == ``Move.Compare.equal then some .eq
         else if fn == ``Move.Compare.genericDecidableLT then some .lt
@@ -1895,7 +1895,7 @@ private partial def collectJoinParams (env : Environment) : Code .pure → Build
 
 private partial def walk (env : Environment) (signatures : FunSignatures) (self : Name)
     (signature : FunSignature) (code : Code .pure) (blockName : String)
-    (instrs : Array LIR.Instr) : BuildM Unit := do
+    (instrs : Array VIR.Instr) : BuildM Unit := do
   match code with
   | .let decl next =>
       match continuedCall? decl next with
@@ -2146,7 +2146,7 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
               | .default body => walk env signatures self signature body name #[]
               | .ctorAlt _ _ _ => throwError "unexpected impure constructor alternative"
             let rec dispatch (alts : List (Alt .pure)) (name : String)
-                (dispatchInstrs : Array LIR.Instr) : BuildM Unit := do
+                (dispatchInstrs : Array VIR.Instr) : BuildM Unit := do
               match alts with
               | [] => throwError "Move enum match has no alternatives"
               | [alt] =>
@@ -2217,25 +2217,25 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
             | _ => throwError "unsupported case alternative in Move function"
   | .unreach _ => emitBlock blockName instrs (.ret #[])
 
-private def visibility (env : Environment) (name : Name) : LIR.Visibility :=
+private def visibility (env : Environment) (name : Name) : VIR.Visibility :=
   if moveEntryAttr.hasTag env name then .entry
   else if movePublicAttr.hasTag env name then .public_
   else if moveFriendAttr.hasTag env name || movePackageAttr.hasTag env name then .friend_
   else .private_
 
-private def lirSuccessors : LIR.Terminator → Array String
+private def virSuccessors : VIR.Terminator → Array String
   | .jump block => #[block]
   | .branch _ thenBlock elseBlock => #[thenBlock, elseBlock]
   | .ret _ | .abort _ => #[]
 
-private partial def reversePostorder (blocks : Array LIR.Block)
-    (entry : String) : Array LIR.Block :=
+private partial def reversePostorder (blocks : Array VIR.Block)
+    (entry : String) : Array VIR.Block :=
   let (_, postorder) := visit entry [] #[]
   let reachable := postorder.toList.map (·.name)
   postorder.reverse ++ blocks.filter fun block => !reachable.contains block.name
 where
-  visit (name : String) (visited : List String) (postorder : Array LIR.Block) :
-      List String × Array LIR.Block :=
+  visit (name : String) (visited : List String) (postorder : Array VIR.Block) :
+      List String × Array VIR.Block :=
     if visited.contains name then
       (visited, postorder)
     else
@@ -2243,13 +2243,13 @@ where
       | none => (name :: visited, postorder)
       | some block =>
           let (visited, postorder) :=
-            (lirSuccessors block.term).foldl (init := (name :: visited, postorder))
+            (virSuccessors block.term).foldl (init := (name :: visited, postorder))
               fun (visited, postorder) successor =>
                 visit successor visited postorder
           (visited, postorder.push block)
 
 private def compileFun (env : Environment) (signatures : FunSignatures)
-    (module : Move.ModuleRef) (name : Name) : CoreM LIR.FunDecl := do
+    (module : Move.ModuleRef) (name : Name) : CoreM VIR.FunDecl := do
   unless Move.isMoveFunction env name do
     throwError "`{name}` is not annotated as a Move function"
   let decl ← getBaseDecl name
@@ -2317,8 +2317,8 @@ private def compileFun (env : Environment) (signatures : FunSignatures)
 private def addNames (names additions : Array Name) : Array Name :=
   additions.foldl (fun names name => if names.any (· == name) then names else names.push name) names
 
-private def propagateAcquires (functions : Array LIR.FunDecl) : Array LIR.FunDecl :=
-  let rec go : Nat → Array LIR.FunDecl → Array LIR.FunDecl
+private def propagateAcquires (functions : Array VIR.FunDecl) : Array VIR.FunDecl :=
+  let rec go : Nat → Array VIR.FunDecl → Array VIR.FunDecl
     | 0, current => current
     | fuel + 1, current =>
         let next := current.map fun decl =>
@@ -2330,7 +2330,7 @@ private def propagateAcquires (functions : Array LIR.FunDecl) : Array LIR.FunDec
         go fuel next
   go functions.size functions
 
-private partial def typeDependencies : LIR.Ty → Array Name
+private partial def typeDependencies : VIR.Ty → Array Name
   | .struct name => #[name]
   | .enum name => #[name]
   | .structInst name args | .enumInst name args =>
@@ -2338,7 +2338,7 @@ private partial def typeDependencies : LIR.Ty → Array Name
   | .vector elem | .ref elem | .mutRef elem => typeDependencies elem
   | _ => #[]
 
-private def recursiveStruct? (structs : Array LIR.StructDecl) : Option Name :=
+private def recursiveStruct? (structs : Array VIR.StructDecl) : Option Name :=
   let direct := structs.map fun decl =>
     let dependencies := decl.fields.foldl
       (fun names field => addNames names (typeDependencies field.ty)) #[]
@@ -2369,15 +2369,15 @@ private def RequiredAbility.display : RequiredAbility → String
   | .store => "Store"
   | .key => "Key"
 
-private def abilitySetHas : LIR.AbilitySet → RequiredAbility → Bool
+private def abilitySetHas : VIR.AbilitySet → RequiredAbility → Bool
   | abilities, .copy => abilities.copy
   | abilities, .drop => abilities.drop
   | abilities, .store => abilities.store
   | abilities, .key => abilities.key
 
-private partial def typeHasAbility (structs : Array LIR.StructDecl)
-    (typeParams : Array LIR.TypeParamDecl) (fuel : Nat)
-    (required : RequiredAbility) : LIR.Ty → Bool
+private partial def typeHasAbility (structs : Array VIR.StructDecl)
+    (typeParams : Array VIR.TypeParamDecl) (fuel : Nat)
+    (required : RequiredAbility) : VIR.Ty → Bool
   | .bool | .uint _ | .sint _ | .address => required != .key
   | .signer => required == .drop
   | .typeParam index =>
@@ -2403,14 +2403,14 @@ private partial def typeHasAbility (structs : Array LIR.StructDecl)
             (!param.abilities.key ||
               typeHasAbility structs typeParams (fuel - 1) .key arg)
 
-private def validateFieldAbility (structs : Array LIR.StructDecl)
-    (decl : LIR.StructDecl) (declared required : RequiredAbility)
-    (field : LIR.FieldDecl) : Except String Unit := do
+private def validateFieldAbility (structs : Array VIR.StructDecl)
+    (decl : VIR.StructDecl) (declared required : RequiredAbility)
+    (field : VIR.FieldDecl) : Except String Unit := do
   unless typeHasAbility structs decl.typeParams (structs.size + 1) required field.ty do
     throw s!"Move type `{decl.moveName}` derives `{declared.display}`, but field \
       `{field.moveName}` does not have the required `{required.display}` ability"
 
-private def validateAbilities (structs : Array LIR.StructDecl) : Except String Unit := do
+private def validateAbilities (structs : Array VIR.StructDecl) : Except String Unit := do
   for decl in structs do
     let fields := decl.variants.getD #[] |>.foldl
       (fun fields variant => fields ++ variant.fields) decl.fields
@@ -2447,7 +2447,7 @@ private def taggedNamesInNamespace (env : Environment) (ns : Name)
 
 /-- Discover the deployable declarations owned by a registered Move namespace.
 This is the common selection rule used by source lowering and by frontends
-which consume an elaborated Leaner module as a whole. -/
+which consume an elaborated Verex module as a whole. -/
 def declarationsInNamespace (env : Environment) (ns : Name) : Array Name × Array Name :=
   let structNames := taggedNamesInNamespace env ns #[moveStructAttr, moveEnumAttr]
   let functionNames := taggedNamesInNamespace env ns
@@ -2460,9 +2460,9 @@ def declarationsInNamespace (env : Environment) (ns : Name) : Array Name × Arra
   let functionNames := functionNames.filter fun name => !moveInlineAttr.hasTag env name
   (structNames, functionNames)
 
-/-- Compile selected attributed Lean declarations to Leaner's named LIR. -/
+/-- Compile selected attributed Lean declarations to Verex's named VIR. -/
 def compileModule (outputModule : Move.ModuleRef) (structNames funNames : Array Name) :
-    CoreM LIR.Module := do
+    CoreM VIR.Module := do
   -- Compile the selected declarations as one request.  This also avoids
   -- duplicating Lean's impure code-generation index bookkeeping when several
   -- bodies are extracted while elaborating one module.
@@ -2502,7 +2502,7 @@ def compileModule (outputModule : Move.ModuleRef) (structNames funNames : Array 
     catch error =>
       throwError "while compiling Move function `{name}`:\n{error.toMessageData}"
   functions := propagateAcquires functions
-  let mut externalFuns : Array LIR.ExternalFunRef := #[]
+  let mut externalFuns : Array VIR.ExternalFunRef := #[]
   for function in functions do
     for callee in function.calls do
       unless funNames.any (· == callee) || externalFuns.any (·.leanName == callee) do
@@ -2526,8 +2526,8 @@ def compileModule (outputModule : Move.ModuleRef) (structNames funNames : Array 
   -- Types of other modules' structures and enums: fields, signatures,
   -- locals, and the type arguments of operations mention them; the module
   -- links to them by identity.
-  let mut externalStructs : Array LIR.ExternalStructRef := #[]
-  for name in LIR.mentionedStructNames structs functions do
+  let mut externalStructs : Array VIR.ExternalStructRef := #[]
+  for name in VIR.mentionedStructNames structs functions do
     unless structs.any (·.leanName == name) do
       let some owner := Move.moduleForDeclaration? env name
         | throwError "Move type `{name}` of another module has no enclosing module identity"

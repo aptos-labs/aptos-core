@@ -11,10 +11,13 @@ use prometheus::{
     Opts,
 };
 use std::sync::Arc;
-use sysinfo::{CpuExt, CpuRefreshKind, RefreshKind, System, SystemExt};
+use sysinfo::{CpuRefreshKind, RefreshKind, System};
 
 const SYSTEM_CPU_USAGE: &str = "system_cpu_usage";
 const SYSTEM_CPU_INFO: &str = "system_cpu_info";
+
+/// The global CPU name that older sysinfo versions reported on Linux, kept for metric continuity.
+const GLOBAL_CPU_ID: &str = "cpu";
 
 const CPU_ID_LABEL: &str = "cpu_id";
 const CPU_BRAND_LABEL: &str = "brand";
@@ -22,16 +25,18 @@ const CPU_VENDOR_LABEL: &str = "vendor";
 
 /// A Collector for exposing CPU metrics
 pub(crate) struct CpuMetricsCollector {
-    system: Arc<Mutex<System>>,
+    system: Option<Arc<Mutex<System>>>,
     cpu: Desc,
     cpu_info: Desc,
 }
 
 impl CpuMetricsCollector {
     fn new() -> Self {
-        let system = Arc::new(Mutex::new(System::new_with_specifics(
-            RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
-        )));
+        let system = System::new_with_specifics(
+            RefreshKind::nothing().with_cpu(CpuRefreshKind::nothing().with_usage()),
+        )
+        .ok()
+        .map(|system| Arc::new(Mutex::new(system)));
 
         let cpu = Opts::new(SYSTEM_CPU_USAGE, "CPU usage.")
             .namespace(NAMESPACE)
@@ -67,15 +72,17 @@ impl Collector for CpuMetricsCollector {
     fn collect(&self) -> Vec<MetricFamily> {
         let _measure = MeasureLatency::new("cpu".into());
 
-        let mut system = self.system.lock();
+        let Some(system) = &self.system else {
+            return Vec::new();
+        };
+        let mut system = system.lock();
 
-        system.refresh_cpu();
+        system.refresh_cpu_usage();
 
-        let global_cpu_info = &system.global_cpu_info();
         let cpu_usage = ConstMetric::new_gauge(
             self.cpu.clone(),
-            global_cpu_info.cpu_usage() as f64,
-            Some(&[system.global_cpu_info().name().into()]),
+            system.global_cpu_usage() as f64,
+            Some(&[GLOBAL_CPU_ID.into()]),
         )
         .unwrap();
 
@@ -86,7 +93,7 @@ impl Collector for CpuMetricsCollector {
             .flat_map(|(idx, cpu)| {
                 ConstMetric::new_gauge(
                     self.cpu.clone(),
-                    cpu.cpu_usage() as f64,
+                    cpu.usage() as f64,
                     Some(&[format!("cpu{}_idx{}", cpu.name(), idx + 1)]),
                 )
                 .unwrap()
@@ -94,13 +101,15 @@ impl Collector for CpuMetricsCollector {
             })
             .collect();
 
+        let (brand, vendor_id) = system
+            .cpus()
+            .first()
+            .map(|cpu| (cpu.brand(), cpu.vendor_id()))
+            .unwrap_or_default();
         let cpu_info = ConstMetric::new_gauge(
             self.cpu_info.clone(),
             1.0,
-            Some(&[
-                global_cpu_info.brand().into(),
-                global_cpu_info.vendor_id().into(),
-            ]),
+            Some(&[brand.into(), vendor_id.into()]),
         )
         .unwrap();
 

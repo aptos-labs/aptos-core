@@ -11,6 +11,7 @@ use crate::{
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
 use aptos_forge::{LocalSwarm, NodeExt};
+use aptos_genesis::builder::GenesisConfiguration;
 use aptos_types::on_chain_config::{
     ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
     ProposerElectionType,
@@ -661,43 +662,7 @@ async fn test_validator_sync_and_participate(fast_sync: bool, epoch_changes: boo
             }
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
-            // Shorten the required proposer history to speed up the test
-            let consensus_config = match genesis_config.consensus_config.clone() {
-                OnChainConsensusConfig::V1(consensus_config) => consensus_config,
-                OnChainConsensusConfig::V2(consensus_config) => consensus_config,
-                OnChainConsensusConfig::V3 { alg, .. } => alg.unwrap_jolteon_config_v1().clone(),
-                OnChainConsensusConfig::V4 { alg, .. } => alg.unwrap_jolteon_config_v1().clone(),
-                OnChainConsensusConfig::V5 { alg, .. } => alg.unwrap_jolteon_config_v1().clone(),
-            };
-            let leader_reputation_type = match &consensus_config.proposer_election_type {
-                ProposerElectionType::LeaderReputation(leader_reputation_type) => {
-                    leader_reputation_type
-                },
-                proposer_election_type => panic!(
-                    "This test requires a leader reputation proposer election, but got: {:?}",
-                    proposer_election_type
-                ),
-            };
-            let proposer_and_voter_config = match &leader_reputation_type {
-                LeaderReputationType::ProposerAndVoterV2(proposer_and_voter_config) => {
-                    proposer_and_voter_config
-                },
-                leader_reputation_type => panic!(
-                    "This test requires a proposer and voter V2 leader reputation, but got: {:?}",
-                    leader_reputation_type
-                ),
-            };
-            genesis_config.consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 {
-                proposer_election_type: ProposerElectionType::LeaderReputation(
-                    LeaderReputationType::ProposerAndVoter(ProposerAndVoterConfig {
-                        proposer_window_num_validators_multiplier: 1,
-                        voter_window_num_validators_multiplier: 1,
-                        use_history_from_previous_epoch_max_count: 1,
-                        ..*proposer_and_voter_config
-                    }),
-                ),
-                ..Default::default()
-            });
+            shorten_proposer_history(genesis_config);
 
             // Prevent epoch changes from occurring unnecessarily
             genesis_config.epoch_duration_secs = 10_000;
@@ -746,6 +711,45 @@ async fn test_validator_sync_and_participate(fast_sync: bool, epoch_changes: boo
         false,
     )
     .await;
+}
+
+/// Shortens the required proposer history, so a validator that synced after a
+/// data wipe can participate in consensus sooner.
+pub(crate) fn shorten_proposer_history(genesis_config: &mut GenesisConfiguration) {
+    let consensus_config = match genesis_config.consensus_config.clone() {
+        OnChainConsensusConfig::V1(consensus_config) => consensus_config,
+        OnChainConsensusConfig::V2(consensus_config) => consensus_config,
+        OnChainConsensusConfig::V3 { alg, .. } => alg.unwrap_jolteon_config_v1().clone(),
+        OnChainConsensusConfig::V4 { alg, .. } => alg.unwrap_jolteon_config_v1().clone(),
+        OnChainConsensusConfig::V5 { alg, .. } => alg.unwrap_jolteon_config_v1().clone(),
+    };
+    let leader_reputation_type = match &consensus_config.proposer_election_type {
+        ProposerElectionType::LeaderReputation(leader_reputation_type) => leader_reputation_type,
+        proposer_election_type => panic!(
+            "This test requires a leader reputation proposer election, but got: {:?}",
+            proposer_election_type
+        ),
+    };
+    let proposer_and_voter_config = match &leader_reputation_type {
+        LeaderReputationType::ProposerAndVoterV2(proposer_and_voter_config) => {
+            proposer_and_voter_config
+        },
+        leader_reputation_type => panic!(
+            "This test requires a proposer and voter V2 leader reputation, but got: {:?}",
+            leader_reputation_type
+        ),
+    };
+    genesis_config.consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 {
+        proposer_election_type: ProposerElectionType::LeaderReputation(
+            LeaderReputationType::ProposerAndVoter(ProposerAndVoterConfig {
+                proposer_window_num_validators_multiplier: 1,
+                voter_window_num_validators_multiplier: 1,
+                use_history_from_previous_epoch_max_count: 1,
+                ..*proposer_and_voter_config
+            }),
+        ),
+        ..Default::default()
+    });
 }
 
 /// A helper method that tests that all validators can sync after a failure and

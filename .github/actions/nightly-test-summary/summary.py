@@ -4,6 +4,7 @@
 
 """Render a nightly result for GitHub and Slack; never sends notifications itself."""
 
+from datetime import datetime
 import html
 import json
 import os
@@ -13,7 +14,7 @@ import subprocess
 HISTORY_NIGHTS = 7
 GREEN, YELLOW, RED, GREY = "\U0001f7e9", "\U0001f7e8", "\U0001f7e5", "\u2b1c"
 CANCELLED = "\u274c"
-FAILED = ("failure", "timed_out", "cancelled")
+FAILED = ("failure", "timed_out", "cancelled", "startup_failure")
 # The workflow job that runs only when the run was cancelled; not a suite.
 CANCELLATION_JOB = "cancellation"
 
@@ -25,7 +26,7 @@ def square(conclusion, retried=False, run_cancelled=False):
     # A job that times out is also `cancelled`; only a cancelled run crosses out.
     if conclusion == "cancelled" and run_cancelled:
         return CANCELLED
-    if conclusion in (*FAILED, "startup_failure"):
+    if conclusion in FAILED:
         return RED
     return GREY
 
@@ -45,38 +46,67 @@ def night_square(run):
     return square(conclusion, run.get("attempt", 1) > 1, conclusion == "cancelled")
 
 
-def build_history(previous, run_url, failed, attempt=1, cancelled=False):
-    """One linked square per night, oldest first, ending with this run."""
-    cells = [f"<{run['url']}|{night_square(run)}>" for run in recent_nights(previous)]
+def night_cell(night, url, created_at):
+    """A night's square, then its day of month linked to the run.
+
+    Slack does not make emoji-only link text clickable, so the day carries the link.
+    """
+    day = datetime.fromisoformat(created_at.replace("Z", "+00:00")).day if created_at else "tonight"
+    return f"{night}<{url}|{day}>"
+
+
+def build_history(previous, run_url, failed, attempt=1, cancelled=False, created_at=None):
+    """One square per night, oldest first, ending with this run."""
+    cells = [
+        night_cell(night_square(run), run["url"], run["createdAt"])
+        for run in recent_nights(previous)
+    ]
     if cancelled:
         tonight = CANCELLED
     else:
         tonight = square("failure" if failed else "success", attempt > 1)
-    cells.append(f"<{run_url}|{tonight}>")
-    return f"Last {len(cells)} nights: " + "".join(cells)
+    cells.append(night_cell(tonight, run_url, created_at))
+    return f"Last {len(cells)} nights: " + " ".join(cells)
 
 
-def job_rows(jobs, first_attempt_jobs, previous, cancelled=False):
-    """One row per failed job: its square on each night of the bar, then its failed steps."""
+def job_row(job, tonight, nights):
+    """A job's square on each night of the bar, its name linked to tonight's log, then its failed steps."""
+    cells = []
+    for run in nights:
+        past = {past["name"]: past.get("conclusion") for past in run.get("jobs") or []}
+        retried = job["name"] in failed_names(run.get("first_attempt_jobs"))
+        run_cancelled = run.get("conclusion") == "cancelled"
+        cells.append(square(past.get(job["name"]), retried, run_cancelled))
+    cells.append(tonight)
+    name = html.escape(job["name"], quote=False)
+    if job.get("html_url"):
+        name = f"<{job['html_url']}|{name}>"
+    steps = [step["name"] for step in job.get("steps", []) if step.get("conclusion") in FAILED]
+    failed_steps = html.escape(" \u2014 " + ", ".join(steps), quote=False) if steps else ""
+    return "".join(cells) + "  " + name + failed_steps
+
+
+def job_rows(jobs, previous, cancelled=False):
+    """One row per job that failed tonight; jobs a cancellation interrupted are left out."""
     nights = recent_nights(previous)
-    rows = []
-    for job in jobs or []:
-        if job.get("conclusion") not in FAILED:
-            continue
-        cells = []
-        for run in nights:
-            past = {past["name"]: past.get("conclusion") for past in run.get("jobs") or []}
-            retried = job["name"] in failed_names(run.get("first_attempt_jobs"))
-            run_cancelled = run.get("conclusion") == "cancelled"
-            cells.append(square(past.get(job["name"]), retried, run_cancelled))
-        tonight = square(job["conclusion"], run_cancelled=cancelled)
-        cells.append(f"<{job['html_url']}|{tonight}>" if job.get("html_url") else tonight)
-        steps = [
-            step["name"] for step in job.get("steps", []) if step.get("conclusion") in FAILED
-        ]
-        text = job["name"] + (" \u2014 " + ", ".join(steps) if steps else "")
-        rows.append("".join(cells) + "  " + html.escape(text, quote=False))
-    return rows
+    return [
+        job_row(job, RED, nights)
+        for job in jobs or []
+        if job.get("conclusion") in FAILED
+        and not (cancelled and job["conclusion"] == "cancelled")
+    ]
+
+
+def retry_rows(jobs, first_attempt_jobs, previous):
+    """One row per job that passed only on the retry, linked to its failed first attempt."""
+    nights = recent_nights(previous)
+    # Jobs still running, such as this one, are neither failed nor passed.
+    passed = {job["name"] for job in jobs or [] if job.get("conclusion") == "success"}
+    return [
+        job_row(job, YELLOW, nights)
+        for job in first_attempt_jobs or []
+        if job.get("conclusion") in FAILED and job["name"] in passed
+    ]
 
 
 def build_summary(
@@ -89,6 +119,7 @@ def build_summary(
     previous_runs=None,
     attempt=1,
     first_attempt_jobs=None,
+    created_at=None,
 ):
     needs = dict(needs)
     cancelled = needs.pop(CANCELLATION_JOB, {}).get("result") == "success"
@@ -109,25 +140,25 @@ def build_summary(
         verdict = "passed"
     lines = [
         f"Nightly full-suite {verdict}",
-        build_history(previous_runs, run_url, bool(incomplete), attempt, cancelled),
+        build_history(previous_runs, run_url, bool(incomplete), attempt, cancelled, created_at),
         f"Branch: {html.escape(branch, quote=False)}; commit: {sha}",
         f"<{run_url}|Run, logs, and artifacts>",
     ]
     if incomplete:
-        rows = job_rows(jobs, first_attempt_jobs, previous_runs, cancelled)
+        rows = [] if jobs is None else job_rows(jobs, previous_runs, cancelled)
         skipped = sorted(name for name, job in needs.items() if job["result"] == "skipped")
         if rows:
             lines.extend(rows)
-            if skipped:
+            # After a cancellation, skipped suites only restate it.
+            if skipped and not cancelled:
                 lines.append("Skipped suites: " + ", ".join(skipped))
-        else:
-            # Without job details, name the incomplete suites themselves.
+        elif jobs is None or not cancelled:
+            # No job row accounts for the failure: name the incomplete suites.
             lines.append("Required suites: " + "; ".join(incomplete))
-    # Jobs still running, such as this one, are neither failed nor passed.
-    passed = {job["name"] for job in jobs or [] if job.get("conclusion") == "success"}
-    recovered = sorted(failed_names(first_attempt_jobs) & passed)
-    if recovered:
-        lines.append(html.escape("Passed on retry: " + ", ".join(recovered), quote=False))
+    retried = retry_rows(jobs, first_attempt_jobs, previous_runs)
+    if retried:
+        lines.append("Passed on retry:")
+        lines.extend(retried)
     if previous_sha:
         repo_url = run_url.split("/actions/runs/")[0]
         lines.append(
@@ -192,6 +223,9 @@ def main():
     nights = recent_nights(
         [run for run in history or [] if str(run.get("databaseId")) != run_id]
     )
+    this_run = next(
+        (run for run in history or [] if str(run.get("databaseId")) == run_id), {}
+    )
     for run in nights:
         run["jobs"] = run_jobs(run["databaseId"])
         if run.get("attempt", 1) > 1:
@@ -206,6 +240,7 @@ def main():
         nights,
         attempt,
         run_jobs(run_id, 1) if attempt > 1 else None,
+        this_run.get("createdAt"),
     )
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write(f"failed={str(failed).lower()}\n")

@@ -3,6 +3,8 @@ Diagnostics:
 error: cannot borrow field `f1` of local `f1` which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:14:18
    │
+13 │         let c = inner;
+   │                 ----- previously mutably borrowed here
 14 │         let f1 = &inner.f1;
    │                  ^^^^^^^^^ borrow attempted here
 15 │         *c;
@@ -13,14 +15,10 @@ error: cannot read local `inner` since it is mutably borrowed
    │
 13 │         let c = inner;
    │                 ----- previously mutably borrowed here
-14 │         let f1 = &inner.f1;
-   │                  --------- field `f1` previously borrowed here
-15 │         *c;
+   ·
 16 │         *inner;
    │         ^^^^^^ read attempted here
-17 │         *f1;
-   │         --- conflicting reference `f1` used here
-18 │         *inner;
+   ·
 19 │         *c;
    │         -- conflicting reference `c` used here
 
@@ -38,6 +36,8 @@ error: cannot read local `inner` since it is mutably borrowed
 error: cannot borrow field `f1` of local `f1` which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:23:18
    │
+22 │         let c = id_mut(inner);
+   │                 ------------- previously mutably borrowed here
 23 │         let f1 = &inner.f1;
    │                  ^^^^^^^^^ borrow attempted here
 24 │         *c;
@@ -48,14 +48,10 @@ error: cannot read local `inner` since it is mutably borrowed
    │
 22 │         let c = id_mut(inner);
    │                 ------------- previously mutably borrowed here
-23 │         let f1 = &inner.f1;
-   │                  --------- field `f1` previously borrowed here
-24 │         *c;
+   ·
 25 │         *inner;
    │         ^^^^^^ read attempted here
-26 │         *f1;
-   │         --- conflicting reference `f1` used here
-27 │         *inner;
+   ·
 28 │         *c;
    │         -- conflicting reference `c` used here
 

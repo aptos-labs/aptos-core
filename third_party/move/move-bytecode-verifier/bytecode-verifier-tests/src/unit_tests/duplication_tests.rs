@@ -4,7 +4,7 @@
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use move_binary_format::{errors::VMResult, file_format::*, IndexKind};
-use move_bytecode_verifier::DuplicationChecker;
+use move_bytecode_verifier::{DuplicationChecker, VerifierConfig};
 use move_core_types::{ability::AbilitySet, identifier::Identifier, vm_status::StatusCode};
 use proptest::prelude::*;
 
@@ -25,7 +25,7 @@ fn duplicated_friend_decls() {
     m.friend_decls.push(handle.clone());
     m.friend_decls.push(handle);
     assert_duplicate_error(
-        DuplicationChecker::verify_module(&m),
+        DuplicationChecker::verify_module(&VerifierConfig::default(), &m),
         IndexKind::ModuleHandle,
     );
 }
@@ -57,7 +57,7 @@ fn duplicated_function_names() {
     // The checker first checks function handles before function definitions
     // Since we have duplicate handles, the error is reported at the FunctionHandle level
     assert_duplicate_error(
-        DuplicationChecker::verify_module(&m),
+        DuplicationChecker::verify_module(&VerifierConfig::default(), &m),
         IndexKind::FunctionHandle,
     );
 }
@@ -102,7 +102,7 @@ fn duplicated_struct_names() {
     // The checker first checks struct handles before struct definitions
     // Since we have duplicate handles, the error is reported at the StructHandle level
     assert_duplicate_error(
-        DuplicationChecker::verify_module(&m),
+        DuplicationChecker::verify_module(&VerifierConfig::default(), &m),
         IndexKind::StructHandle,
     );
 }
@@ -110,6 +110,6 @@ fn duplicated_struct_names() {
 proptest! {
     #[test]
     fn valid_duplication(module in CompiledModule::valid_strategy(20)) {
-        prop_assert!(DuplicationChecker::verify_module(&module).is_ok());
+        prop_assert!(DuplicationChecker::verify_module(&VerifierConfig::default(), &module).is_ok());
     }
 }

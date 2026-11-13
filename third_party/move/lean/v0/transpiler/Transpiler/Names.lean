@@ -9,14 +9,14 @@ import Transpiler.Xast
 Name policy of the transpiler: legalizing Move identifiers for Lean (keyword
 escaping with guillemets), the root namespace derived from a module's named
 address, Lean module paths of generated files, and the table of standard-library
-modules that map onto Leaner primitives instead of being transpiled.
+modules that map onto Verex primitives instead of being transpiled.
 -/
 
 namespace Transpiler.Names
 
 open Transpiler.Xast
 
-/-- Lean keywords and Leaner's module-scoped and spec-scoped keywords.  An
+/-- Lean keywords and Verex's module-scoped and spec-scoped keywords.  An
 identifier in this list is escaped as `«name»`, which preserves the exact
 name. -/
 def reserved : List String := [
@@ -32,7 +32,7 @@ def reserved : List String := [
   "nomatch", "nofun", "attribute", "omit", "include", "extends", "using", "suffices",
   "obtain", "exact", "intro", "forall", "exists", "fun", "assert", "true", "false",
   "sorry", "rfl", "id", "pure", "bind", "some", "none", "List", "Nat", "Int",
-  -- Leaner items and clauses
+  -- Verex items and clauses
   "struct", "enum", "entry", "friend", "spec", "verify", "module", "address_alias",
   "native", "inline", "package", "public", "requires", "ensures", "aborts_if",
   "modifies", "invariant", "pragma", "old", "existsAt", "result", "initial",
@@ -77,7 +77,7 @@ def leanModulePath (m : ModuleRef) : String :=
   | some root => root ++ "." ++ pascalCase m.name
   | none => pascalCase m.name
 
-/-- The standard-library module that maps onto Leaner primitives instead of
+/-- The standard-library module that maps onto Verex primitives instead of
 being transpiled: `std::vector` onto `Move.Vector` and the vector operations.
 (`std::signer` is transpiled like any module; its natives get their
 specification versions from the intrinsic models.) -/
@@ -89,13 +89,13 @@ of: the spec rewriter of compiler v2 names the companion of `f` `$f`. -/
 def companionFunction? (name : String) : Option String :=
   if name.startsWith "$" then some (name.drop 1).toString else none
 
-/-- A module Leaner provides itself, so the transpiler emits no file for it:
+/-- A module Verex provides itself, so the transpiler emits no file for it:
 `std::vector` is `Move.Vector` (its natives and helpers are the vector
 operation set). -/
 def curatedModule? (m : ModuleRef) : Option String :=
   if m.address == "0x1" && m.name == "vector" then some "Move.Vector" else none
 
-/-- How a `std::vector` function renders in Leaner. -/
+/-- How a `std::vector` function renders in Verex. -/
 inductive VecOp where
   /-- `Move.Vector.empty` (pure, ascribed). -/
   | empty
@@ -153,7 +153,7 @@ def VecOp.isAction : VecOp → Bool
   | .borrow | .borrowMut | .mutRef _ => true
   | _ => false
 
-/-- The Leaner spelling of a module-qualified name seen from `current`: bare
+/-- The Verex spelling of a module-qualified name seen from `current`: bare
 inside the same module, `mod.name` for a module under the same root, and the
 full path otherwise. -/
 def qualify (current : ModuleRef) (target : QualifiedName) : String :=

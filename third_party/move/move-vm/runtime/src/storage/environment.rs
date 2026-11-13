@@ -343,17 +343,21 @@ impl RuntimeEnvironment {
         ty_tag_builder.ty_to_ty_tag(ty)
     }
 
+    /// Canonical string of the type's tag. Deliberately not cached: `type_name` feeds
+    /// `any::unpack`, so a wrong name would let bytes of one type be decoded as another. Callers
+    /// charge per byte of the result, which covers the rendering.
+    pub fn ty_to_canonical_string(&self, ty: &Type) -> PartialVMResult<String> {
+        Ok(self.ty_to_ty_tag(ty)?.to_canonical_string())
+    }
+
     /// If type is a (generic or non-generic) struct or enum, returns its name. Otherwise, returns
     /// [None].
     pub fn get_struct_name(&self, ty: &Type) -> PartialVMResult<Option<(ModuleId, Identifier)>> {
         use Type::*;
 
-        Ok(match ty {
-            Struct { idx, .. } | StructInstantiation { idx, .. } => {
-                let struct_identifier = self.struct_name_index_map().idx_to_struct_name(*idx)?;
-                let (module, name) = struct_identifier.into_module_and_name();
-                Some((module, name))
-            },
+        let idx = match ty {
+            Struct { idx, .. } => *idx,
+            StructInstantiation(node) => node.idx(),
             Bool
             | U8
             | U16
@@ -373,8 +377,11 @@ impl RuntimeEnvironment {
             | Vector(_)
             | Reference(_)
             | MutableReference(_)
-            | Function { .. } => None,
-        })
+            | Function { .. } => return Ok(None),
+        };
+        let struct_identifier = self.struct_name_index_map().idx_to_struct_name(idx)?;
+        let (module, name) = struct_identifier.into_module_and_name();
+        Ok(Some((module, name)))
     }
 
     /// Returns the size of the struct name re-indexing cache. Can be used to bound the size of the
@@ -383,8 +390,9 @@ impl RuntimeEnvironment {
         self.struct_name_index_map.checked_len()
     }
 
-    /// Flushes the global caches with struct name indices and struct tags. Note that when calling
-    /// this function, modules that still store indices into struct name cache must also be flushed.
+    /// Flushes the struct name, type and type tag caches. Loaded modules hold struct name
+    /// indices and interned type ids, so the module cache must be flushed with this, and never
+    /// during execution (callers hold the module cache manager).
     pub fn flush_all_caches(&self) {
         self.ty_tag_cache.flush();
         self.struct_name_index_map.flush();

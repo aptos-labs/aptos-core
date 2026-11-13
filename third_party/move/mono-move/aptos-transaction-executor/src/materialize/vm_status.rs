@@ -10,8 +10,9 @@ use crate::errors::{
 use aptos_types::{
     error::{split_canonical, INVALID_ARGUMENT, INVALID_STATE, OUT_OF_RANGE},
     transaction::validation::{
-        EACCOUNT_DOES_NOT_EXIST, EBAD_ACCOUNT_AUTHENTICATION_KEY, EBAD_CHAIN_ID,
-        ECANT_PAY_GAS_DEPOSIT, EGAS_PAYER_ACCOUNT_MISSING,
+        transaction_limits_abort_status, transaction_limits_module_id,
+        transaction_validation_module_id, EACCOUNT_DOES_NOT_EXIST, EBAD_ACCOUNT_AUTHENTICATION_KEY,
+        EBAD_CHAIN_ID, ECANT_PAY_GAS_DEPOSIT, EGAS_PAYER_ACCOUNT_MISSING,
         EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT, ENONCE_ALREADY_USED,
         ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH, ESEQUENCE_NUMBER_TOO_BIG,
         ESEQUENCE_NUMBER_TOO_NEW, ESEQUENCE_NUMBER_TOO_OLD,
@@ -21,21 +22,16 @@ use aptos_types::{
 use mono_move_core::VMInternalError;
 use mono_move_output::v1_error::{self, V1Message};
 use move_binary_format::errors::PartialVMError;
-use move_core_types::{
-    account_address::AccountAddress,
-    ident_str,
-    language_storage::ModuleId,
-    vm_status::{AbortLocation, StatusCode, StatusType, VMStatus},
-};
+use move_core_types::vm_status::{AbortLocation, StatusCode, StatusType, VMStatus};
 use std::sync::LazyLock;
 
 /// Where the transaction prologue and epilogue live.
-static ABORT_LOC_VALIDATION_MODULE: LazyLock<AbortLocation> = LazyLock::new(|| {
-    AbortLocation::Module(ModuleId::new(
-        AccountAddress::ONE,
-        ident_str!("transaction_validation").to_owned(),
-    ))
-});
+static ABORT_LOC_VALIDATION_MODULE: LazyLock<AbortLocation> =
+    LazyLock::new(|| AbortLocation::Module(transaction_validation_module_id()));
+
+/// Where a request for raised limits is checked against its staking.
+static ABORT_LOC_LIMITS_MODULE: LazyLock<AbortLocation> =
+    LazyLock::new(|| AbortLocation::Module(transaction_limits_module_id()));
 
 /// Converts a type-erased VM error into `VMStatus`.
 ///
@@ -100,6 +96,7 @@ fn internal_error_to_status(err: &VMInternalError) -> VMStatus {
 pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
     match reason {
         DiscardReason::InvalidSignature => VMStatus::error(StatusCode::INVALID_SIGNATURE, None),
+        DiscardReason::KeylessValidationFailure(err) => VMStatus::from(err),
         DiscardReason::Unsupported(msg) => unsupported_status(msg),
         DiscardReason::Deprecated(what) => VMStatus::error(
             StatusCode::FEATURE_UNDER_GATING,
@@ -117,6 +114,12 @@ pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
             stage: ExecutionStage::Prologue,
             failure,
         } => prologue_failure_to_status(failure),
+        // Discarded with the failure's own status, as V1 does for a failure to
+        // create the sender's account.
+        DiscardReason::Failure {
+            stage: stage @ ExecutionStage::MeteredPrologue,
+            failure,
+        } => failure_status(&stage, &failure),
         DiscardReason::Failure { stage, failure } => {
             stage_failure_status(&stage, &format!("{failure:?}"))
         },
@@ -137,6 +140,13 @@ fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
         F::EncryptedGasPriceBelowMinimum { .. } => {
             StatusCode::ENCRYPTED_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND
         },
+        F::HighLimitGasPriceBelowMinimum { .. } => {
+            StatusCode::HIGH_LIMIT_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND
+        },
+        F::InvalidLimitsMultiplier { .. } => StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER,
+        F::LimitsRequestOnGovernanceScript => {
+            StatusCode::TXN_LIMITS_REQUEST_NOT_ALLOWED_FOR_GOVERNANCE_SCRIPT
+        },
         F::GasPriceAboveMaximum { .. } => StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
     };
     VMStatus::error(code, Some(failure.to_string()))
@@ -144,80 +154,74 @@ fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
 
 /// Converts an executed transaction's conclusion into its `VMStatus`.
 pub(crate) fn executed_vm_status(status: &ExecutionStatus) -> VMStatus {
-    let (stage, failure) = match status {
-        ExecutionStatus::Success => return VMStatus::Executed,
-        ExecutionStatus::Failure { stage, failure } => (stage, failure),
-    };
+    match status {
+        ExecutionStatus::Success => VMStatus::Executed,
+        ExecutionStatus::Failure { stage, failure } => failure_status(stage, failure),
+    }
+}
+
+/// Converts a failure in `stage` into its `VMStatus`. Only the payload and the
+/// metered prologue fail as the transaction's own; a failure anywhere else
+/// means the framework misbehaved, which V1 reports as an unexpected error.
+fn failure_status(stage: &ExecutionStage, failure: &MoveExecutionFailure) -> VMStatus {
+    let own_failure = matches!(
+        stage,
+        ExecutionStage::Payload | ExecutionStage::MeteredPrologue
+    );
     match failure {
         // The fee payer failing to cover the fee is the one epilogue abort that
-        // survives as the transaction's own; any other means the framework
-        // misbehaved, which V1 reports as an unexpected error.
+        // survives as the transaction's own.
         MoveExecutionFailure::Abort {
             code,
             message,
             location,
-        } if matches!(stage, ExecutionStage::Payload) || is_cant_pay_fee_abort(*code) => {
-            VMStatus::MoveAbort {
-                location: location.clone(),
-                code: *code,
-                message: message.clone(),
-            }
+        } if own_failure || is_cant_pay_fee_abort(*code) => VMStatus::MoveAbort {
+            location: location.clone(),
+            code: *code,
+            message: message.clone(),
         },
-        // Like the sibling arms: only the payload stage legitimately faults
-        // the transaction's arguments.
-        MoveExecutionFailure::InvalidArguments(reason)
-            if matches!(stage, ExecutionStage::Payload) =>
-        {
-            VMStatus::error(
-                match reason {
-                    InvalidArguments::NativeEntryFunction => {
-                        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
-                    },
-                    InvalidArguments::NotEntryFunction => {
-                        StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION
-                    },
-                    InvalidArguments::ReturnsValues
-                    | InvalidArguments::SignerAfterArgument
-                    | InvalidArguments::DisallowedParameterType => {
-                        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE
-                    },
-                    InvalidArguments::ArgumentCountMismatch => {
-                        StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH
-                    },
-                    InvalidArguments::SignerCountMismatch => {
-                        StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH
-                    },
-                    InvalidArguments::UndecodableArgument => {
-                        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
-                    },
+        MoveExecutionFailure::InvalidArguments(reason) if own_failure => VMStatus::error(
+            match reason {
+                InvalidArguments::NativeEntryFunction => {
+                    StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
                 },
-                None,
-            )
-        },
-        MoveExecutionFailure::RejectedScript(rejection)
-            if matches!(stage, ExecutionStage::Payload) =>
-        {
-            match rejection {
-                ScriptRejection::UnstableOnMainnet => VMStatus::error(
-                    StatusCode::UNSTABLE_BYTECODE_REJECTED,
-                    Some("script marked unstable cannot be run on mainnet".to_string()),
-                ),
-                ScriptRejection::EmitsEvents => {
-                    VMStatus::error(StatusCode::INVALID_OPERATION_IN_SCRIPT, None)
+                InvalidArguments::NotEntryFunction => {
+                    StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION
                 },
-            }
+                InvalidArguments::ReturnsValues
+                | InvalidArguments::SignerAfterArgument
+                | InvalidArguments::DisallowedParameterType => {
+                    StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE
+                },
+                InvalidArguments::ArgumentCountMismatch => StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
+                InvalidArguments::SignerCountMismatch => {
+                    StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH
+                },
+                InvalidArguments::UndecodableArgument
+                | InvalidArguments::MalformedString
+                | InvalidArguments::ObjectDoesNotExist
+                | InvalidArguments::ObjectLacksResource => {
+                    StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
+                },
+            },
+            None,
+        ),
+        MoveExecutionFailure::RejectedScript(rejection) if own_failure => match rejection {
+            ScriptRejection::UnstableOnMainnet => VMStatus::error(
+                StatusCode::UNSTABLE_BYTECODE_REJECTED,
+                Some("script marked unstable cannot be run on mainnet".to_string()),
+            ),
+            ScriptRejection::EmitsEvents => {
+                VMStatus::error(StatusCode::INVALID_OPERATION_IN_SCRIPT, None)
+            },
         },
         // V1 reports a payload it could not decrypt as an argument it could
         // not deserialize.
-        MoveExecutionFailure::UndecryptedPayload if matches!(stage, ExecutionStage::Payload) => {
-            VMStatus::error(
-                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-                Some("the encrypted payload was not decrypted".to_string()),
-            )
-        },
-        MoveExecutionFailure::RuntimeError(err) if matches!(stage, ExecutionStage::Payload) => {
-            internal_error_to_status(err)
-        },
+        MoveExecutionFailure::UndecryptedPayload if own_failure => VMStatus::error(
+            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+            Some("the encrypted payload was not decrypted".to_string()),
+        ),
+        MoveExecutionFailure::RuntimeError(err) if own_failure => internal_error_to_status(err),
         failure => stage_failure_status(stage, &format!("{failure:?}")),
     }
 }
@@ -242,9 +246,9 @@ fn unsupported_status(msg: &str) -> VMStatus {
 /// Mirrors V1's `convert_prologue_error`: recognized validation aborts map to
 /// their discard codes.
 //
-// TODO(completeness): V1 also recognizes aborts from `transaction_limits` and
-// the multisig account module. Neither is reachable here yet, so they land in
-// the unexpected-abort branch below.
+// TODO(completeness): V1 also recognizes aborts from the multisig account
+// module. They are not reachable here yet, so they land in the
+// unexpected-abort branch below.
 fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
     let (code, message, location) = match failure {
         MoveExecutionFailure::Abort {
@@ -262,6 +266,9 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
             return unexpected_validation_error("prologue", format!("{failure:?}"))
         },
     };
+    if location == *ABORT_LOC_LIMITS_MODULE {
+        return limits_abort_to_status(code, message, location);
+    }
     if location != *ABORT_LOC_VALIDATION_MODULE {
         return unexpected_prologue_abort(code, message, location);
     }
@@ -292,6 +299,14 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
     VMStatus::error(new_major_status, None)
 }
 
+/// Converts a rejected request for raised limits into its discard code.
+fn limits_abort_to_status(code: u64, message: Option<String>, location: AbortLocation) -> VMStatus {
+    match transaction_limits_abort_status(code) {
+        Some(status) => VMStatus::error(status, None),
+        None => unexpected_prologue_abort(code, message, location),
+    }
+}
+
 fn unexpected_prologue_abort(
     code: u64,
     message: Option<String>,
@@ -320,6 +335,7 @@ fn unexpected_validation_error(msg: &str, detail: String) -> VMStatus {
 fn stage_failure_status(stage: &ExecutionStage, detail: &str) -> VMStatus {
     let what = match stage {
         ExecutionStage::Prologue => "prologue",
+        ExecutionStage::MeteredPrologue => "metered prologue",
         ExecutionStage::Payload => "payload",
         ExecutionStage::Epilogue => "epilogue",
         ExecutionStage::EpilogueAfterRollback => "epilogue after a rolled-back payload",
@@ -335,7 +351,10 @@ mod tests {
     use mono_move_loader::LoaderError;
     use mono_move_runtime::{error::RuntimeInvariantViolation, ArithOp, RuntimeError};
     use move_binary_format::file_format::FunctionDefinitionIndex;
-    use move_core_types::vm_status::KeptVMStatus;
+    use move_core_types::{
+        account_address::AccountAddress, ident_str, language_storage::ModuleId,
+        vm_status::KeptVMStatus,
+    };
 
     fn test_module() -> ModuleId {
         ModuleId::new(AccountAddress::ONE, ident_str!("coin").to_owned())

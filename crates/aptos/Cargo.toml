@@ -90,7 +90,6 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 set_env = { workspace = true }
 tempfile = { workspace = true }
-thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

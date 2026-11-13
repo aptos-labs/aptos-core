@@ -5,8 +5,7 @@
 #   stage/                    staging directory (flat layout)
 #   arxiv-submission.tar.gz   final upload-ready bundle
 #
-# Drives main.tex, the single driver of this directory (NeurIPS style, preprint
-# mode).
+# Drives main.tex, the named-author driver of this directory (LNCS style).
 
 set -euo pipefail
 
@@ -49,15 +48,15 @@ mkdir stage
 
 # -- 3. Stage the explicit manifest.
 cp main.tex paper.tex stage/
-cp prelude.tex intro.tex hybrid.tex example.tex wp.tex skills.tex evaluation.tex conclusion.tex stage/
-mkdir -p stage/tables && cp tables/*.tex stage/tables/
-cp esz.sty neurips_2026_vericode.sty stage/
+cp prelude.tex intro.tex example.tex wp.tex skills.tex evaluation.tex conclusion.tex stage/
+mkdir -p stage/tables && cp tables/*.tex tables/*.dat stage/tables/
+cp esz.sty llncs.cls stage/
 cp build/main.bbl stage/main.bbl
 
 # -- 4. arXiv-emulation build to verify the staged sources compile with plain
 #       pdflatex (no latexmkrc, no aux_dir).
 mkdir stage/_verify
-cp stage/*.tex stage/*.sty stage/main.bbl stage/_verify/
+cp stage/*.tex stage/*.sty stage/*.cls stage/main.bbl stage/_verify/
 cp -r stage/tables stage/_verify/
 (
     cd stage/_verify

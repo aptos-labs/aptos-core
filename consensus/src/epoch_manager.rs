@@ -136,6 +136,10 @@ use std::{
     time::Duration,
 };
 
+mod dkg_state;
+
+use dkg_state::recover_dkg_state;
+
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
 const PROPOSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
@@ -1344,8 +1348,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let randomness_config_move_struct: anyhow::Result<RandomnessConfigMoveStruct> =
             payload.get();
         let onchain_jwk_consensus_config: anyhow::Result<OnChainJWKConsensusConfig> = payload.get();
-        let dkg_state = payload.get::<DKGState>();
-        let chunky_dkg_state = payload.get::<ChunkyDKGState>();
+        let mut dkg_state = payload.get::<DKGState>();
+        let mut chunky_dkg_state = payload.get::<ChunkyDKGState>();
         let chunky_dkg_config_move_struct: anyhow::Result<ChunkyDKGConfigMoveStruct> =
             payload.get();
         let onchain_chunky_dkg_config_seq_num: anyhow::Result<ChunkyDKGConfigSeqNum> =
@@ -1403,6 +1407,27 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             },
         };
 
+        // Either DKG can finish while the other still holds up reconfiguration.
+        // Recover the session that initialized this epoch before deriving keys.
+        if consensus_config.is_vtxn_enabled() && onchain_randomness_config.randomness_enabled() {
+            if let Err(error) = recover_dkg_state(
+                epoch_state.epoch,
+                &mut dkg_state,
+                |state| {
+                    state
+                        .last_completed
+                        .as_ref()
+                        .map(|s| s.metadata.dealer_epoch)
+                },
+                self.storage.aptos_db().as_ref(),
+            ) {
+                error!(
+                    epoch = epoch_state.epoch,
+                    error = ?error,
+                    "Failed to recover current-epoch randomness DKG state"
+                );
+            }
+        }
         let rand_configs = self.try_get_rand_config_for_new_epoch(
             loaded_consensus_key.clone(),
             &epoch_state,
@@ -1448,6 +1473,28 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_chunky_dkg_config_seq_num.seq_num,
             chunky_dkg_config_move_struct.ok(),
         );
+        if consensus_config.is_vtxn_enabled()
+            && onchain_chunky_dkg_config.chunky_dkg_enabled()
+            && !onchain_chunky_dkg_config.is_shadow_mode()
+        {
+            if let Err(error) = recover_dkg_state(
+                epoch_state.epoch,
+                &mut chunky_dkg_state,
+                |state| {
+                    state
+                        .last_completed
+                        .as_ref()
+                        .map(|s| s.metadata.dealer_epoch)
+                },
+                self.storage.aptos_db().as_ref(),
+            ) {
+                error!(
+                    epoch = epoch_state.epoch,
+                    error = ?error,
+                    "Failed to recover current-epoch Chunky DKG state"
+                );
+            }
+        }
         let secret_share_verifier = match self.try_get_secret_share_config_for_epoch(
             loaded_consensus_key.clone(),
             &epoch_state,
