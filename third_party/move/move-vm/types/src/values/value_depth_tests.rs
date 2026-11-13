@@ -5,7 +5,10 @@
 
 use crate::{
     value_serde::{MockFunctionValueExtension, ValueSerDeContext},
-    values::{AbstractFunction, GlobalValue, SerializedFunctionData, Struct, StructRef, Value},
+    values::{
+        AbstractFunction, GlobalValue, SerializedFunctionData, Struct, StructRef, Value,
+        DEFAULT_MAX_VM_VALUE_NESTED_DEPTH,
+    },
 };
 use better_any::{Tid, TidAble, TidExt};
 use claims::{assert_err, assert_none, assert_ok, assert_some};
@@ -15,7 +18,7 @@ use move_core_types::{
     function::{ClosureMask, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
     ident_str,
     language_storage::ModuleId,
-    value::{MoveStructLayout, MoveTypeLayout},
+    value::{MoveStructLayout, MoveTypeLayout, MoveValue},
     vm_status::StatusCode,
 };
 use std::{cmp::Ordering, fmt::Debug};
@@ -61,6 +64,10 @@ impl AbstractFunction for MockFunction {
     }
 
     fn ty_args_pseudo_gas_cost(&self) -> u64 {
+        0
+    }
+
+    fn captured_layouts_size(&self) -> u64 {
         0
     }
 }
@@ -178,6 +185,68 @@ fn test_serialization() {
         assert_err!(ctx(2).serialized_size(v, l));
         assert_none!(assert_ok!(ctx(1).serialize(v, l)));
         assert_err!(ctx(1).serialized_size(v, l));
+    }
+}
+
+#[test]
+fn test_vm_serialized_values_decode_off_chain() {
+    use MoveStructLayout::*;
+    use MoveTypeLayout as L;
+
+    // Off-chain decoding bounds value depth. The deepest value of each kind that the VM
+    // serializes under the production limit must still decode.
+    let mut extension = MockFunctionValueExtension::new();
+    extension
+        .expect_get_serialization_data()
+        .returning(move |af| {
+            Ok(af
+                .downcast_ref::<MockFunction>()
+                .expect("function must be a mock")
+                .data
+                .clone())
+        });
+    let ctx = || {
+        ValueSerDeContext::new(Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+            .with_func_args_deserialization(&extension)
+    };
+
+    type Wrap = fn(Value, MoveTypeLayout) -> (Value, MoveTypeLayout);
+    let wraps: [(&str, Wrap); 4] = [
+        ("vector", |v, l| {
+            (
+                Value::vector_unchecked(vec![v]).expect("vector must be created"),
+                L::Vector(Box::new(l)),
+            )
+        }),
+        ("struct", |v, l| {
+            (
+                Value::struct_(Struct::pack(vec![v])),
+                L::new_struct(Runtime(vec![l])),
+            )
+        }),
+        ("variant", |v, l| {
+            (
+                Value::struct_(Struct::pack(vec![Value::u16(1), v])),
+                L::new_struct(RuntimeVariants(vec![vec![], vec![l]])),
+            )
+        }),
+        ("closure", |v, l| {
+            (
+                MockFunction::closure(ClosureMask::new(0b1), vec![v], vec![l]),
+                L::Function,
+            )
+        }),
+    ];
+    for (name, wrap) in wraps {
+        let mut value = Value::vector_u8(vec![1, 2]);
+        let mut layout = L::Vector(Box::new(L::U8));
+        let mut deepest = None;
+        while let Some(bytes) = assert_ok!(ctx().serialize(&value, &layout)) {
+            deepest = Some((bytes, layout.clone()));
+            (value, layout) = wrap(value, layout);
+        }
+        let (bytes, layout) = assert_some!(deepest);
+        assert_ok!(MoveValue::simple_deserialize(&bytes, &layout), "{}", name);
     }
 }
 

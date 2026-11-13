@@ -1,0 +1,15 @@
+[package]
+name = "InferenceCorpusPublicV4"
+version = "1.0.0"
+
+# No dependencies: everything the targets need is vendored under
+# sources/deps/, so the package can be copied anywhere. The screen and the
+# run controller both relocate it.
+
+[addresses]
+aptos_experimental = "0x7"
+aptos_trading = "0x5"
+inference_corpus = "0xc0"
+std = "0x1"
+aptos_std = "0x1"
+aptos_framework = "0x1"

@@ -79,8 +79,8 @@ Partial abort coverage has one narrow exception. A caller is verified against
 its opaque callees' contracts rather than their bodies, so when one of those
 contracts is itself partial there is no exact abort condition left for the
 caller to state, and `pragma aborts_if_is_partial` is the honest form rather
-than a weakening. It counts only for partiality you *found*: reported by
-inference for the callee, or already present in the tree you started from.
+than a weakening. It counts only for partiality you *found*: already present
+in the tree you started from.
 Partiality you wrote yourself does not — marking a helper partial and then
 citing it would excuse any contract at all, and the check rejects that. When
 the exception applies, say in the contract which callee it comes from.
@@ -114,15 +114,16 @@ clause to delete. Diagnose its source:
 - loop havoc requires a stronger loop abstraction;
 - a hard quantifier or nonlinear expression requires an equivalent,
   solver-friendly representation; and
-- an unconstrained `result_of`, `ensures_of`, or `aborts_of` carrier requires a
-  stronger callee or function-value contract.
+- an unconstrained `result_of`, `ensures_of`, or `aborts_of` carrier of a callee
+  without an exact contract requires stating the target's behavior directly,
+  or a stronger function-value contract.
 
 ### Dependencies and abstraction
 
-An ordinary non-inline callee needs a contract strong enough for the target.
-Verify an opaque callee's body against that contract once; callers then consume
-only its result, abort, and frame behavior. Retain specification functions used
-by the target even when they are outside the executable call graph.
+The target is verified against its callees' contracts as given. Do not add,
+change, or remove a callee's contract; the check rejects each. A callee without
+a contract is read through its body. Retain specification functions used by the
+target even when they are outside the executable call graph.
 
 Do not synthesize ordinary contracts for `pragma intrinsic` functions; the
 prover supplies their semantics.

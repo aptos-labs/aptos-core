@@ -11,11 +11,11 @@ fun bypass(r0): u64 {
     r5: u64
   code:
   L0:
-    0: [r1] := call make, [r0] @1
+    0: [r1] := call_exempt make, [r0] @1
     1: r2 := copy r1 @3
     2: r4 := imm_borrow_loc r2 @5
     3: r0 := read_variant_field Holder::V::n, r4 @6
-    4: [r3] := call set_payload, [r2] @10
+    4: [r3] := call_exempt set_payload, [r2] @10
     5: r4 := imm_borrow_loc r1 @12
     6: r5 := read_variant_field Holder::V::n, r4 @13
     7: r5 := mul r5, #100 @16

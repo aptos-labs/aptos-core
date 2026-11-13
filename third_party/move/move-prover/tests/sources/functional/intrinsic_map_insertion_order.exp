@@ -1,0 +1,33 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/intrinsic_map_insertion_order.move:57:9
+   │
+57 │         ensures result;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/intrinsic_map_insertion_order.move:48: same_entries_not_equal
+   =         m1 = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_order.move:49: same_entries_not_equal
+   =         m1 = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_order.move:50: same_entries_not_equal
+   =         m1 = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_order.move:51: same_entries_not_equal
+   =         m2 = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_order.move:52: same_entries_not_equal
+   =         m2 = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_order.move:53: same_entries_not_equal
+   =         m2 = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_order.move:54: same_entries_not_equal
+   =     at tests/sources/functional/intrinsic_map_insertion_order.move:47: same_entries_not_equal
+   =         result = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_order.move:57: same_entries_not_equal (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/intrinsic_map_insertion_order.move:84:9
+   │
+84 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/intrinsic_map_insertion_order.move:82: canary
+   =         _m = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_order.move:84: canary (spec)

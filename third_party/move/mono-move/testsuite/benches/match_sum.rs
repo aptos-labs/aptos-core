@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, SamplingMode};
+use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
+use std::hint::black_box;
 
 const N: u64 = 1_000_000;
 

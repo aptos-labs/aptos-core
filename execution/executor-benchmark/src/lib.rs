@@ -13,6 +13,7 @@ pub mod measurements;
 mod metrics;
 pub mod native;
 pub mod pipeline;
+pub mod position_verifier;
 pub mod transaction_committer;
 pub mod transaction_executor;
 pub mod transaction_generator;
@@ -22,7 +23,7 @@ use crate::{
     db_access::DbAccessUtil,
     pipeline::Pipeline,
     transaction_committer::TransactionCommitter,
-    transaction_executor::TransactionExecutor,
+    transaction_executor::{TransactionExecutor, BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction_generator::{BenchmarkTimestamp, TransactionGenerator},
 };
 use aptos_api::context::Context;
@@ -53,7 +54,7 @@ use aptos_transaction_generator_lib::{
     TransactionType::{self, CoinTransfer},
 };
 use aptos_types::{
-    on_chain_config::{FeatureFlag, Features},
+    on_chain_config::{FeatureFlag, Features, OnChainConfig},
     transaction::{Script, Transaction, TransactionArgument},
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
@@ -83,11 +84,13 @@ const TABLE_INFO_DB_NAME: &str = "index_async_v2_db";
 pub struct StorageTestConfig {
     pub pruner_config: PrunerConfig,
     pub enable_indexer_grpc: bool,
+    pub enable_trading_native: bool,
 }
 
 impl StorageTestConfig {
     pub fn init_storage_config(&self, node_config: &mut NodeConfig) {
         node_config.storage.storage_pruner_config = self.pruner_config;
+        node_config.storage.rocksdb_configs.enable_trading_native = self.enable_trading_native;
         if self.enable_indexer_grpc {
             node_config.indexer_grpc.enabled = true;
             node_config.indexer_table_info.table_info_service_mode =
@@ -108,6 +111,10 @@ pub struct SingleRunResults {
 pub fn default_benchmark_features() -> Features {
     let mut features = Features::default();
     features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
+    // Off by default on-chain; harmless here, the natives only fire when
+    // the native-position workloads call them.
+    features.enable(FeatureFlag::TRADING_NATIVE);
+    features.enable(FeatureFlag::NATIVE_POSITION);
     features
 }
 
@@ -155,7 +162,12 @@ impl FeatureFlagOverrides {
 const TOGGLE_FEATURES_SCRIPT: &[u8] = include_bytes!("scripts/toggle_features_for_next_epoch.mv");
 
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
-    DbReaderWriter::new(
+    init_db_with_handle(config).1
+}
+
+/// Like `init_db`, also handing back the concrete `AptosDB`.
+pub fn init_db_with_handle(config: &NodeConfig) -> (Arc<AptosDB>, DbReaderWriter) {
+    DbReaderWriter::wrap(
         AptosDB::open(
             config.storage.get_dir_paths(),
             false, /* readonly */
@@ -428,7 +440,31 @@ where
         aptos_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     storage_test_config.init_storage_config(&mut config);
-    let db = init_db(&config);
+    let (aptos_db, db) = init_db_with_handle(&config);
+    let mut pipeline_config = pipeline_config;
+    if pipeline_config.verify_positions_each_block {
+        let reader = aptos_db
+            .native_state_reader()
+            .expect("--verify-positions-each-block needs --enable-trading-native");
+        pipeline_config.position_verifier = Some(Arc::new(
+            position_verifier::PositionIndexVerifier::new(reader),
+        ));
+    }
+    if pipeline_config.onchain_config_from_features {
+        let state_view = db
+            .reader
+            .latest_state_checkpoint_view()
+            .expect("latest state checkpoint view");
+        let features = Features::fetch_config(&state_view)
+            .expect("read Features")
+            .expect("Features resource present on-chain");
+        pipeline_config.onchain_config =
+            BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG.with_features(&features);
+        info!(
+            "Executor on-chain config derived from Features: {:?}",
+            pipeline_config.onchain_config
+        );
+    }
     let mut ts = Arc::new(BenchmarkTimestamp::from_db(&db));
     let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let root_account = Arc::new(root_account);
@@ -1294,6 +1330,7 @@ pub fn run_mix_with_default_params_and_features(
     };
 
     let storage_test_config = StorageTestConfig {
+        enable_trading_native: false,
         pruner_config: NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
         enable_indexer_grpc,
     };
@@ -1609,6 +1646,7 @@ mod tests {
         let storage_test_config = StorageTestConfig {
             pruner_config: NO_OP_STORAGE_PRUNER_CONFIG,
             enable_indexer_grpc: true,
+            enable_trading_native: false,
         };
 
         crate::db_generator::create_db_with_accounts::<AptosVMBlockExecutor>(

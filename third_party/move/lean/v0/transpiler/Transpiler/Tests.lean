@@ -2,11 +2,11 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Transpiler.Tests.Decode
-import Transpiler.Tests.Frontend.Leaner
+import Transpiler.Tests.Frontend.Verex
 import Transpiler.Tests.Baseline
 import Transpiler.Tests.Intrinsics.Sources
-import Transpiler.Tests.LIR.Boundary
-import Transpiler.Tests.Pipelines.MoveToLeanerLang
+import Transpiler.Tests.VIR.Boundary
+import Transpiler.Tests.Pipelines.MoveToVerexSL
 import Transpiler.Tests.Print.Axiom
 import Transpiler.Tests.Programs.Account
 import Transpiler.Tests.Programs.AptosFramework.Counter

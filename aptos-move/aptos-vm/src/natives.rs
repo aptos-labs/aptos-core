@@ -8,17 +8,24 @@ use aptos_aggregator::{bounded_math::SignedU128, types::DelayedFieldsSpeculative
 #[cfg(feature = "testing")]
 use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldValue};
 #[cfg(feature = "testing")]
+use aptos_collateral_natives::NativeCollateralContext;
+#[cfg(feature = "testing")]
 use aptos_framework_natives::randomness::RandomnessContext;
 #[cfg(feature = "testing")]
 use aptos_framework_natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
+use aptos_order_natives::NativeOrderContext;
+#[cfg(feature = "testing")]
+use aptos_position_natives::NativePositionContext;
+#[cfg(feature = "testing")]
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder};
 #[cfg(feature = "testing")]
 use aptos_types::{
     chain_id::ChainId,
+    contract_event::ContractEvent,
     error::{PanicError, PanicOr},
     state_store::{
         state_key::StateKey,
@@ -46,7 +53,8 @@ use {
         cryptography::ristretto255_point::NativeRistrettoPointContext,
         transaction_context::NativeTransactionContext,
     },
-    move_vm_runtime::native_extensions::NativeContextExtensions,
+    move_unit_test::backend::{TestEffects, TestEvent},
+    move_vm_runtime::{native_extensions::NativeContextExtensions, FunctionValueExtensionAdapter},
     once_cell::sync::Lazy,
 };
 
@@ -192,7 +200,44 @@ pub fn assert_no_test_natives(err_msg: &str) {
 
 #[cfg(feature = "testing")]
 pub fn configure_for_unit_test() {
-    move_unit_test::extensions::set_extension_hook(Box::new(unit_test_extensions_hook))
+    move_unit_test::extensions::set_extension_hook(Box::new(unit_test_extensions_hook));
+    move_unit_test::extensions::set_effects_hook(Box::new(unit_test_effects_hook));
+}
+
+/// Collects table changes and events from the unit-test extensions.
+#[cfg(feature = "testing")]
+fn unit_test_effects_hook(
+    exts: &mut NativeContextExtensions,
+    function_value_extension: &FunctionValueExtensionAdapter,
+    effects: &mut TestEffects,
+) -> PartialVMResult<()> {
+    use aptos_table_natives::NativeTableContext;
+
+    let table_changes = exts
+        .remove::<NativeTableContext>()
+        .into_change_set(function_value_extension)?;
+    for (handle, change) in table_changes.changes {
+        effects.table_items.insert(
+            handle.0,
+            change
+                .entries
+                .into_iter()
+                .map(|(key, op)| (key, op.map(|(bytes, _layout)| bytes)))
+                .collect(),
+        );
+    }
+    for event in exts.get::<NativeEventContext>().events_iter() {
+        let handle = match event {
+            ContractEvent::V1(event) => Some((event.key().to_bytes(), event.sequence_number())),
+            ContractEvent::V2(_) => None,
+        };
+        effects.events.push(TestEvent {
+            handle,
+            type_tag: event.type_tag().clone(),
+            data: event.event_data().to_vec(),
+        });
+    }
+    Ok(())
 }
 
 #[cfg(feature = "testing")]
@@ -219,6 +264,9 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());
     exts.add(NativeObjectContext::default());
+    exts.add(NativeCollateralContext::new());
+    exts.add(NativeOrderContext::new());
+    exts.add(NativePositionContext::new());
 
     let mut randomness_ctx = RandomnessContext::new();
     randomness_ctx.mark_unbiasable();

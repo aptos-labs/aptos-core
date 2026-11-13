@@ -25,7 +25,7 @@ codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
 colored = { workspace = true }
 ethnum = { workspace = true }
 flexi_logger = { workspace = true }
-im = { workspace = true }
+imbl = { workspace = true }
 itertools = { workspace = true }
 legacy-move-compiler = { workspace = true }
 log = { workspace = true, features = ["serde"] }

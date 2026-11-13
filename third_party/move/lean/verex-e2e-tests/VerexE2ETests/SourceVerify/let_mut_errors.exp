@@ -1,0 +1,32 @@
+VerexE2ETests/SourceVerify/let_mut_errors.spec.lean:8:3: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/SourceVerify/let_mut_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `reassigned` failed; provide a proof in the module:
+  verify reassigned by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/let_mut_errors.spec.lean:11:3: error: the specification clause `ensures result == 0` is not established
+VerexE2ETests/SourceVerify/let_mut_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `borrowed` failed; provide a proof in the module:
+  verify borrowed by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/let_mut_errors.spec.lean:14:3: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/SourceVerify/let_mut_errors.spec.lean:13:6: error: verex verification failed: the automatic verification of `field_borrowed` failed; provide a proof in the module:
+  verify field_borrowed by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/let_mut_errors.spec.lean:17:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/let_mut_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `in_branch` failed; provide a proof in the module:
+  verify in_branch by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

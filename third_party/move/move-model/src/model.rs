@@ -30,7 +30,7 @@ use crate::{
     pragmas::{
         CONDITION_INJECTED_PROP, DELEGATE_INVARIANTS_TO_CALLER_PRAGMA,
         DISABLE_INVARIANTS_IN_BODY_PRAGMA, FRIEND_PRAGMA, INTRINSIC_PRAGMA, OPAQUE_PRAGMA,
-        VERIFY_PRAGMA,
+        VERIFY_MANUAL, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -531,8 +531,8 @@ pub enum VerificationScope {
     Public,
     /// Verify all functions.
     All,
-    /// Verify only one function.
-    Only(String),
+    /// Verify only the named functions.
+    Only(Vec<String>),
     /// Verify only functions from the given module.
     OnlyModule(String),
     /// Verify no functions
@@ -540,21 +540,13 @@ pub enum VerificationScope {
 }
 
 impl VerificationScope {
-    /// Whether verification is exclusive to only one function or module. If set, this overrides
-    /// all implicitly included verification targets via invariants and friends.
+    /// Whether verification is exclusive to the named functions or a module. If set, this
+    /// overrides all implicitly included verification targets via invariants and friends.
     pub fn is_exclusive(&self) -> bool {
         matches!(
             self,
             VerificationScope::Only(_) | VerificationScope::OnlyModule(_)
         )
-    }
-
-    /// Returns the target function if verification is exclusive to one function.
-    pub fn get_exclusive_verify_function_name(&self) -> Option<&String> {
-        match self {
-            VerificationScope::Only(s) => Some(s),
-            _ => None,
-        }
     }
 }
 
@@ -572,6 +564,15 @@ pub enum SurfaceSyntax {
     /// Node was desugared from index syntax (e.g., `v[i]`).
     IndexNotation,
 }
+
+/// Environment extension enabling `FunctionEnv::leaves_fun_param_frame_to_call_site`.
+///
+/// Set by the compiler from the `deferred-closure-frames` experiment. Only a verification
+/// backend that carries a deferred closure's effects into usage summaries and loop havoc may
+/// turn it on; every other consumer of the model keeps reading an undeclared closure frame as
+/// empty.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct DeferredClosureFrames(pub bool);
 
 // =================================================================================================
 /// # Global Environment
@@ -1252,6 +1253,15 @@ impl GlobalEnv {
     /// Clear all accumulated diagnosis.
     pub fn clear_diag(&self) {
         self.diags.borrow_mut().clear();
+    }
+
+    /// Drops the diagnostics added after the first `start` that `keep` rejects.
+    pub fn retain_diags_since(&self, start: usize, keep: impl Fn(&Diagnostic<FileId>) -> bool) {
+        let mut index = 0;
+        self.diags.borrow_mut().retain(|(diag, _)| {
+            index += 1;
+            index <= start || keep(diag)
+        });
     }
 
     /// Returns the unknown location.
@@ -2875,13 +2885,20 @@ impl GlobalEnv {
             .unwrap_or("")
     }
 
-    /// Returns true if the boolean property is true.
+    /// Returns true if the boolean property is true. `pragma verify = manual` is
+    /// true: the function is verified, by an authored proof.
     pub fn is_property_true(&self, properties: &PropertyBag, name: &str) -> Option<bool> {
         let sym = &self.symbol_pool().make(name);
-        if let Some(PropertyValue::Value(Value::Bool(b))) = properties.get(sym) {
-            return Some(*b);
+        match properties.get(sym) {
+            Some(PropertyValue::Value(Value::Bool(b))) => Some(*b),
+            Some(PropertyValue::Symbol(value))
+                if name == VERIFY_PRAGMA
+                    && self.symbol_pool().string(*value).as_str() == VERIFY_MANUAL =>
+            {
+                Some(true)
+            },
+            _ => None,
         }
-        None
     }
 
     /// Returns the value of a number property.
@@ -4374,6 +4391,7 @@ impl StructData {
         variants: Option<BTreeMap<Symbol, StructVariant>>,
         is_native: bool,
         visibility: Visibility,
+        attributes: Vec<Attribute>,
     ) -> Self {
         Self {
             abilities,
@@ -4382,6 +4400,7 @@ impl StructData {
             variants,
             is_native,
             visibility,
+            attributes,
             is_empty_struct: false,
             ..Self::new(name, loc)
         }
@@ -5383,9 +5402,10 @@ impl FunctionData {
 
     /// Constructs the runtime-facing part of a function declaration.
     ///
-    /// `called_funs` is `None` when a later binary attachment will recover the
-    /// call graph. Source-independent IR loaders pass `Some`, including the
-    /// empty set, because no AST or compiled module exists to derive it from.
+    /// `used_funs` and `called_funs` are `None` when a later binary attachment
+    /// will recover the call graph. Source-independent IR loaders pass `Some`,
+    /// including the empty set, because no AST or compiled module exists to
+    /// derive it from.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_runtime(
         name: Symbol,
@@ -5399,6 +5419,7 @@ impl FunctionData {
         result_type: Type,
         access_specifiers: Option<Vec<AccessSpecifier>>,
         acquired_structs: Option<BTreeSet<StructId>>,
+        used_funs: Option<BTreeSet<QualifiedId<FunId>>>,
         called_funs: Option<BTreeSet<QualifiedId<FunId>>>,
     ) -> Self {
         Self {
@@ -5411,7 +5432,7 @@ impl FunctionData {
             result_type,
             access_specifiers,
             acquired_structs,
-            used_funs: called_funs.clone(),
+            used_funs,
             called_funs,
             ..Self::new(name, loc)
         }
@@ -6096,6 +6117,87 @@ impl<'env> FunctionEnv<'env> {
         &self.data.fun_param_access_of
     }
 
+    /// Whether this function leaves the frame of a function-typed parameter it declares
+    /// nothing for to its call sites, where the closure passed in supplies it.
+    ///
+    /// An absent `modifies_of`/`reads_of` normally means the parameter may touch no memory.
+    /// Two things consume that meaning, and deferring requires both to be vacuous:
+    ///
+    /// - The body is never proven (`pragma verify = false`), so no proof of this function
+    ///   rests on memory being untouched across the invoke.
+    /// - The specification names no global memory, so after a caller havocs what the
+    ///   closure writes, nothing in this function's contract re-establishes a claim about
+    ///   it.
+    ///
+    /// Either alone is not enough: a proven body consumes the frame even when the
+    /// conditions are memory-free, and conditions that constrain memory are assumed by
+    /// every caller even when the body is unproven. The call site havocs what the closure
+    /// writes across the call, which accounts for the closure only if it runs during the call:
+    /// the body must use the parameter only by invoking it, never storing, returning or
+    /// passing it on. The function must also be opaque: only
+    /// a call to an opaque function is checked for what its closure arguments write (a
+    /// transparent one is inlined, and its closure invoked in place). This is a property of
+    /// the written specification, not of the verification scope of a run, so that a call is
+    /// accepted or rejected the same way whichever functions are being verified.
+    ///
+    /// Every pass that consumes "an undeclared parameter frame is empty" must consult this:
+    /// the frame check at the call site, and the usage summary of the function making the
+    /// call, which has to account for what the closure writes.
+    ///
+    /// Only a verification backend that performs that accounting may enable it, through
+    /// [`DeferredClosureFrames`]; without it, an undeclared frame stays empty and such a
+    /// closure is rejected at its call site.
+    pub fn leaves_fun_param_frame_to_call_site(&self, param: Symbol) -> bool {
+        self.module_env
+            .env
+            .get_extension::<DeferredClosureFrames>()
+            .is_some_and(|enabled| enabled.0)
+            && self.is_opaque()
+            && self
+                .get_parameters()
+                .iter()
+                .any(|p| p.0 == param && p.1.skip_reference().is_function())
+            && self
+                .data
+                .fun_param_access_of
+                .iter()
+                .all(|access| access.fun_param != param)
+            && self.is_pragma_false(VERIFY_PRAGMA)
+            && self.get_spec_used_memory().is_empty()
+            && self.get_spec_generic_used_memory().is_empty()
+            && self.get_spec_old_memory().is_empty()
+            && self.get_spec_generic_old_memory().is_empty()
+            && self.fun_param_only_invoked(param)
+    }
+
+    /// Whether the body of this function uses the parameter `param` only by invoking it, so
+    /// that the function value passed for it cannot outlive a call: it is not stored, returned,
+    /// captured or passed on. False for a function without a body.
+    fn fun_param_only_invoked(&self, param: Symbol) -> bool {
+        let Some(def) = self.get_def() else {
+            return false;
+        };
+        let idx = self.get_parameters().iter().position(|p| p.0 == param);
+        let is_param = |exp: &ExpData| match exp {
+            ExpData::LocalVar(_, sym) => *sym == param,
+            ExpData::Temporary(_, temp) => Some(*temp) == idx,
+            _ => false,
+        };
+        let (mut uses, mut invokes) = (0usize, 0usize);
+        def.visit_pre_order(&mut |exp| {
+            if is_param(exp) {
+                uses += 1;
+            }
+            if let ExpData::Invoke(_, fun, _) = exp {
+                if is_param(fun) {
+                    invokes += 1;
+                }
+            }
+            true
+        });
+        uses == invokes
+    }
+
     /// Returns memory used by this function's spec conditions.
     pub fn get_spec_used_memory(&self) -> Ref<'_, BTreeSet<QualifiedInstId<StructId>>> {
         self.data.spec_used_memory.borrow()
@@ -6445,9 +6547,9 @@ impl<'env> FunctionEnv<'env> {
 
     /// Determine whether the function is target of verification.
     pub fn should_verify(&self, default_scope: &VerificationScope) -> bool {
-        if let VerificationScope::Only(function_name) = default_scope {
+        if let VerificationScope::Only(function_names) = default_scope {
             // Overrides pragmas.
-            return self.matches_name(function_name);
+            return self.matches_any_name(function_names);
         }
         if !self.module_env.is_target() {
             // Don't generate verify method for functions from dependencies.
@@ -6481,6 +6583,11 @@ impl<'env> FunctionEnv<'env> {
         } else {
             name.eq(&*self.get_simple_name_string())
         }
+    }
+
+    /// Whether any of `names` matches this function, as `matches_name` does.
+    pub fn matches_any_name(&self, names: &[String]) -> bool {
+        names.iter().any(|name| self.matches_name(name))
     }
 
     /// Determine whether this function is explicitly deactivated for verification.

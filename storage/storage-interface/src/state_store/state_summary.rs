@@ -4,7 +4,7 @@
 use crate::{
     metrics::TIMER,
     state_store::{
-        sharded_jmt_state::PositionStateWithSummary,
+        sharded_jmt_state::NativeStateWithSummary,
         state::LedgerState,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_with_summary::LedgerWithSummary,
@@ -13,7 +13,6 @@ use crate::{
     DbReader,
 };
 use anyhow::{bail, Result};
-use aptos_config::config::HotStateConfig;
 use aptos_crypto::{
     hash::{CryptoHash, CORRUPTION_SENTINEL, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -37,7 +36,6 @@ pub struct StateSummary {
     /// `None` for pipelines without a hot-state companion.
     pub hot_state_summary: Option<SparseMerkleTree>,
     pub global_state_summary: SparseMerkleTree,
-    hot_state_config: HotStateConfig,
 }
 
 impl StateSummary {
@@ -45,22 +43,19 @@ impl StateSummary {
         version: Option<Version>,
         hot_state_summary: SparseMerkleTree,
         global_state_summary: SparseMerkleTree,
-        hot_state_config: HotStateConfig,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
             hot_state_summary: Some(hot_state_summary),
             global_state_summary,
-            hot_state_config,
         }
     }
 
-    pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
+    pub fn new_empty() -> Self {
         Self {
             next_version: 0,
             hot_state_summary: Some(SparseMerkleTree::new_empty()),
             global_state_summary: SparseMerkleTree::new_empty(),
-            hot_state_config,
         }
     }
 
@@ -69,7 +64,6 @@ impl StateSummary {
             next_version: version + 1,
             hot_state_summary: None,
             global_state_summary,
-            hot_state_config: HotStateConfig::default(),
         }
     }
 
@@ -78,7 +72,6 @@ impl StateSummary {
             next_version: 0,
             hot_state_summary: None,
             global_state_summary: SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH),
-            hot_state_config: HotStateConfig::default(),
         }
     }
 
@@ -92,10 +85,6 @@ impl StateSummary {
 
     pub fn root_hash(&self) -> HashValue {
         self.global_state_summary.root_hash()
-    }
-
-    pub fn hot_state_config(&self) -> HotStateConfig {
-        self.hot_state_config
     }
 
     pub fn next_version(&self) -> Version {
@@ -152,7 +141,6 @@ impl StateSummary {
             next_version: updates.next_version(),
             hot_state_summary: Some(hot_smt_result?),
             global_state_summary: smt_result?,
-            hot_state_config: self.hot_state_config,
         })
     }
 
@@ -164,9 +152,6 @@ impl StateSummary {
         let current_hot = self.hot_state_summary.as_ref().ok_or_else(|| {
             anyhow::anyhow!("update_hot_state_summary on a StateSummary with no hot half")
         })?;
-        if !self.hot_state_config.compute_root_hash {
-            return Ok(SparseMerkleTree::new_empty());
-        }
         let persisted_hot_smt = persisted
             .hot_state_summary
             .as_ref()
@@ -226,43 +211,29 @@ impl StateSummary {
     }
 }
 
-/// At a given version, the summaries of the state and the last checkpoint state at or before the version.
+/// The summary of the state at the last checkpoint, which is where the ledger ends, as only
+/// whole blocks are committed.
 #[derive(Clone, Debug, Deref)]
 pub struct LedgerStateSummary {
     #[deref]
-    latest: StateSummary,
     last_checkpoint: StateSummary,
 }
 
 impl LedgerStateSummary {
-    pub fn new(last_checkpoint: StateSummary, latest: StateSummary) -> Self {
-        assert!(last_checkpoint.next_version() <= latest.next_version());
-
-        Self {
-            last_checkpoint,
-            latest,
-        }
+    pub fn new(last_checkpoint: StateSummary) -> Self {
+        Self { last_checkpoint }
     }
 
-    pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
-        let state_summary = StateSummary::new_empty(hot_state_config);
-        Self::new(state_summary.clone(), state_summary)
+    pub fn new_empty() -> Self {
+        Self::new(StateSummary::new_empty())
     }
 
     pub fn next_version(&self) -> Version {
-        self.latest.next_version()
+        self.last_checkpoint.next_version()
     }
 
     pub fn assert_versions_match(&self, state: &LedgerState) {
         assert_eq!(self.next_version(), state.next_version());
-        assert_eq!(
-            self.last_checkpoint.next_version(),
-            state.last_checkpoint().next_version()
-        );
-    }
-
-    pub fn latest(&self) -> &StateSummary {
-        &self.latest
     }
 
     pub fn last_checkpoint(&self) -> &StateSummary {
@@ -278,7 +249,7 @@ impl LedgerStateSummary {
         let _timer = TIMER.timer_with(&["ledger_state_summary__update"]);
 
         let last_checkpoint = if let Some(updates) = updates.for_last_checkpoint_batched() {
-            self.latest.update(
+            self.last_checkpoint.update(
                 persisted,
                 hot_state_updates.for_last_checkpoint.as_ref().unwrap(),
                 updates,
@@ -287,22 +258,7 @@ impl LedgerStateSummary {
             self.last_checkpoint.clone()
         };
 
-        let base_of_latest = if updates.for_last_checkpoint_batched().is_none() {
-            self.latest()
-        } else {
-            &last_checkpoint
-        };
-        let latest = if let Some(updates) = updates.for_latest_batched() {
-            base_of_latest.update(
-                persisted,
-                hot_state_updates.for_latest.as_ref().unwrap(),
-                updates,
-            )?
-        } else {
-            base_of_latest.clone()
-        };
-
-        Ok(Self::new(last_checkpoint, latest))
+        Ok(Self::new(last_checkpoint))
     }
 }
 
@@ -407,23 +363,67 @@ impl ProofRead for ColdProvableStateSummary<'_, '_> {
     }
 }
 
-/// The merklized position snapshot (freeze base + `ProofRead` for
-/// `ShardedJmtState::extend`, read at `version()`), paired with the
-/// pre-committed position tip used to seed the in-memory parent when no
-/// block parent is available. The async merkle committer can lag the tip,
-/// so the two differ and must not be conflated.
-pub struct ProvablePositionStateSummary<'db> {
-    persisted: PositionStateWithSummary,
-    pre_committed: LedgerWithSummary<PositionStateWithSummary>,
+/// Reads a native tree's proof at a version: the tree's analog of
+/// `DbReader::get_state_proof_by_version_ext`.
+type NativeProofFn = fn(
+    &(dyn DbReader + Sync),
+    &HashValue,
+    Version,
+    usize,
+) -> Result<SparseMerkleProofExt, crate::AptosDbError>;
+
+/// A native tree's merklized snapshot (freeze base + `ProofRead` for
+/// `ShardedJmtState::extend`, read at `version()`), paired with its
+/// pre-committed tip used to seed the in-memory parent when no block parent
+/// is available. The async merkle committer can lag the tip, so the two
+/// differ and must not be conflated.
+pub struct ProvableNativeStateSummary<'db> {
+    persisted: NativeStateWithSummary,
+    pre_committed: LedgerWithSummary<NativeStateWithSummary>,
     db: &'db (dyn DbReader + Sync),
+    proof: NativeProofFn,
 }
 
-impl<'db> ProvablePositionStateSummary<'db> {
-    pub fn new_persisted(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
+/// The position tree's provable summary.
+pub type ProvablePositionStateSummary<'db> = ProvableNativeStateSummary<'db>;
+
+/// The order tree's provable summary.
+pub type ProvableOrderStateSummary<'db> = ProvableNativeStateSummary<'db>;
+
+/// The collateral tree's provable summary.
+pub type ProvableCollateralStateSummary<'db> = ProvableNativeStateSummary<'db>;
+
+impl<'db> ProvableNativeStateSummary<'db> {
+    pub fn new_persisted_position(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
         Ok(Self {
             persisted: db.get_persisted_position_state_summary()?,
             pre_committed: db.get_pre_committed_position_state_summary()?,
             db,
+            proof: |db, key, version, root_depth| {
+                db.get_position_state_proof_by_version_ext(key, version, root_depth)
+            },
+        })
+    }
+
+    pub fn new_persisted_order(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
+        Ok(Self {
+            persisted: db.get_persisted_order_state_summary()?,
+            pre_committed: db.get_pre_committed_order_state_summary()?,
+            db,
+            proof: |db, key, version, root_depth| {
+                db.get_order_state_proof_by_version_ext(key, version, root_depth)
+            },
+        })
+    }
+
+    pub fn new_persisted_collateral(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
+        Ok(Self {
+            persisted: db.get_persisted_collateral_state_summary()?,
+            pre_committed: db.get_pre_committed_collateral_state_summary()?,
+            db,
+            proof: |db, key, version, root_depth| {
+                db.get_collateral_state_proof_by_version_ext(key, version, root_depth)
+            },
         })
     }
 
@@ -431,11 +431,16 @@ impl<'db> ProvablePositionStateSummary<'db> {
         self.persisted.summary()
     }
 
-    /// The pre-committed position tip — seeds the in-memory parent at genesis
-    /// or the first block after the feature is enabled. It includes committed
-    /// writes the merklized snapshot may not yet reflect, so the computed root
-    /// covers all prior position writes.
-    pub fn base(&self) -> &LedgerWithSummary<PositionStateWithSummary> {
+    /// The persisted state: the floor new layers are built over.
+    pub fn persisted(&self) -> &NativeStateWithSummary {
+        &self.persisted
+    }
+
+    /// The pre-committed tip — seeds the in-memory parent at genesis or the
+    /// first block after the feature is enabled. It includes committed writes
+    /// the merklized snapshot may not yet reflect, so the computed root covers
+    /// all prior writes.
+    pub fn base(&self) -> &LedgerWithSummary<NativeStateWithSummary> {
         &self.pre_committed
     }
 
@@ -444,12 +449,11 @@ impl<'db> ProvablePositionStateSummary<'db> {
     }
 }
 
-impl ProofRead for ProvablePositionStateSummary<'_> {
+impl ProofRead for ProvableNativeStateSummary<'_> {
     fn get_proof(&self, key: &HashValue, root_depth: usize) -> Option<SparseMerkleProofExt> {
         self.version().map(|version| {
-            self.db
-                .get_position_state_proof_by_version_ext(key, version, root_depth)
-                .expect("Failed to get position state proof by version.")
+            (self.proof)(self.db, key, version, root_depth)
+                .expect("Failed to get native state proof by version.")
         })
     }
 }

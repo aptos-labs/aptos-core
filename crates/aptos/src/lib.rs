@@ -29,6 +29,19 @@ use async_trait::async_trait;
 use clap::Parser;
 use std::{collections::BTreeMap, sync::Arc};
 
+/// Printed on every invocation of an Intel macOS build. This release still
+/// publishes that binary; the next macOS CLI release will not.
+pub const MACOS_X86_64_DEPRECATION_MESSAGE: &str = "\
+Warning: Aptos CLI support for Intel (x86_64) macOS is deprecated. \
+This is the last release that includes an Intel macOS build. \
+Future macOS releases will support Apple Silicon (arm64) only.";
+
+/// Warn when this binary is the deprecated Intel macOS build.
+pub fn warn_macos_x86_64_deprecation() {
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    eprintln!("{}", MACOS_X86_64_DEPRECATION_MESSAGE);
+}
+
 /// Create a fully wired `MoveEnv` with `RealAptosContext` and debugger support.
 ///
 /// Use this when constructing move CLI commands (e.g., `RunScript`, `RunFunction`)
@@ -98,6 +111,17 @@ impl Tool {
             },
         }
     }
+
+    /// Returns whether this command allows an update notice after its output.
+    pub fn shows_update_notice(&self) -> bool {
+        use Tool::*;
+        match self {
+            // `update` reports versions itself; `workspace` uses stdio for its control protocol.
+            Update(_) | Workspace(_) => false,
+            Account(_) | Config(_) | Genesis(_) | Governance(_) | Info(_) | Init(_) | Key(_)
+            | Move(_) | Multisig(_) | Node(_) | Stake(_) => true,
+        }
+    }
 }
 
 /// Show build information about the CLI
@@ -121,4 +145,26 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
 fn verify_tool() {
     use clap::CommandFactory;
     Tool::command().debug_assert()
+}
+
+#[test]
+fn macos_x86_64_deprecation_message_names_the_last_intel_release() {
+    assert!(MACOS_X86_64_DEPRECATION_MESSAGE.contains("x86_64"));
+    assert!(MACOS_X86_64_DEPRECATION_MESSAGE.contains("deprecated"));
+    assert!(MACOS_X86_64_DEPRECATION_MESSAGE.contains("last release"));
+    assert!(MACOS_X86_64_DEPRECATION_MESSAGE.contains("arm64"));
+}
+
+#[test]
+fn update_notice_is_skipped_for_update_commands() {
+    let shows_update_notice = |args: &[&str]| {
+        Tool::try_parse_from(args)
+            .expect("arguments should parse")
+            .shows_update_notice()
+    };
+    assert!(!shows_update_notice(&[
+        "aptos", "update", "aptos", "--check"
+    ]));
+    assert!(shows_update_notice(&["aptos", "info"]));
+    assert!(shows_update_notice(&["aptos", "move", "compile"]));
 }

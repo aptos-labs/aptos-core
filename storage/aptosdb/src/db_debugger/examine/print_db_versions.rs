@@ -36,8 +36,7 @@ impl Cmd {
         let rocksdb_config = RocksdbConfigs::default();
         let env = None;
         let block_cache = None;
-        // TODO(HotState): handle hot state merkle db and hot state kv db.
-        let (ledger_db, _hot_state_merkle_db, state_merkle_db, _hot_state_kv_db, state_kv_db) =
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) =
             AptosDB::open_dbs(
                 &StorageDirPaths::from_path(&self.db_dir),
                 rocksdb_config,
@@ -69,6 +68,16 @@ impl Cmd {
         println!(
             "StateMerkle Progress: {:?}",
             get_state_merkle_commit_progress(&state_merkle_db),
+        );
+
+        println!(
+            "HotStateKv Progress: {:?}",
+            get_state_kv_commit_progress(&hot_state_kv_db),
+        );
+
+        println!(
+            "HotStateMerkle Progress: {:?}",
+            get_state_merkle_commit_progress(&hot_state_merkle_db),
         );
 
         println!(
@@ -174,6 +183,65 @@ impl Cmd {
             println!(
                 "-- Shard {shard_id}: {:?}",
                 state_merkle_db
+                    .db_shard(shard_id)
+                    .get::<DbMetadataSchema>(
+                        &DbMetadataKey::EpochEndingStateMerkleShardPrunerProgress(shard_id)
+                    )?
+                    .map(|v| v.expect_version())
+            );
+        }
+
+        // Hot DBs reuse the cold pruner progress keys in their own metadata DBs.
+        println!(
+            "HotStateKvPruner Progress: {:?}",
+            hot_state_kv_db
+                .metadata_db()
+                .get::<DbMetadataSchema>(&DbMetadataKey::StateKvPrunerProgress)?
+                .map_or(0, |v| v.expect_version())
+        );
+
+        for shard_id in 0..NUM_STATE_SHARDS {
+            println!(
+                "-- Shard {shard_id}: {:?}",
+                hot_state_kv_db
+                    .db_shard(shard_id)
+                    .get::<DbMetadataSchema>(&DbMetadataKey::StateKvShardPrunerProgress(shard_id))?
+                    .map(|v| v.expect_version())
+            );
+        }
+
+        println!(
+            "HotStateMerklePruner Progress: {:?}",
+            hot_state_merkle_db
+                .metadata_db()
+                .get::<DbMetadataSchema>(&DbMetadataKey::StateMerklePrunerProgress)?
+                .map_or(0, |v| v.expect_version())
+        );
+
+        for shard_id in 0..NUM_STATE_SHARDS {
+            println!(
+                "-- Shard {shard_id}: {:?}",
+                hot_state_merkle_db
+                    .db_shard(shard_id)
+                    .get::<DbMetadataSchema>(&DbMetadataKey::StateMerkleShardPrunerProgress(
+                        shard_id
+                    ))?
+                    .map(|v| v.expect_version())
+            );
+        }
+
+        println!(
+            "HotEpochEndingStateMerkle Pruner Progress: {:?}",
+            hot_state_merkle_db
+                .metadata_db()
+                .get::<DbMetadataSchema>(&DbMetadataKey::EpochEndingStateMerklePrunerProgress)?
+                .map_or(0, |v| v.expect_version())
+        );
+
+        for shard_id in 0..NUM_STATE_SHARDS {
+            println!(
+                "-- Shard {shard_id}: {:?}",
+                hot_state_merkle_db
                     .db_shard(shard_id)
                     .get::<DbMetadataSchema>(
                         &DbMetadataKey::EpochEndingStateMerkleShardPrunerProgress(shard_id)

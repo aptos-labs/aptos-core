@@ -11,7 +11,7 @@ use aptos_jellyfish_merkle::{
     node_type::{Child, Node, NodeKey, NodeType},
     TreeReader,
 };
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{db_ensure as ensure, Result};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     transaction::Version,

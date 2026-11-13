@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{db_debugger::common::DbDir, AptosDB};
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{db_ensure as ensure, Result};
 use clap::Parser;
 use std::{fs, path::PathBuf};
 

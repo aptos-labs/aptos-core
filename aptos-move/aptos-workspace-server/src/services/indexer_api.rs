@@ -15,8 +15,10 @@ use aptos_localnet::{
     indexer_api::{post_metadata, HASURA_IMAGE, HASURA_METADATA},
 };
 use bollard::{
-    container::{CreateContainerOptions, WaitContainerOptions},
-    secret::{ContainerInspectResponse, HostConfig, PortBinding},
+    models::{ContainerCreateBody, ContainerInspectResponse, HostConfig, PortBinding},
+    query_parameters::{
+        CreateContainerOptions, CreateContainerOptionsBuilder, WaitContainerOptionsBuilder,
+    },
     Docker,
 };
 use futures::TryStreamExt;
@@ -54,10 +56,7 @@ fn get_hasura_assigned_port(container_info: &ContainerInspectResponse) -> Option
 fn create_container_options_and_config(
     instance_id: Uuid,
     network_name: String,
-) -> (
-    CreateContainerOptions<String>,
-    bollard::container::Config<String>,
-) {
+) -> (CreateContainerOptions, ContainerCreateBody) {
     let postgres_connection_string =
         get_postgres_connection_string_within_docker_network(instance_id);
 
@@ -77,10 +76,10 @@ fn create_container_options_and_config(
         ..Default::default()
     };
 
-    let config = bollard::container::Config {
+    let config = ContainerCreateBody {
         image: Some(HASURA_IMAGE.to_string()),
         tty: Some(true),
-        exposed_ports: Some(hashmap! {HASURA_DEFAULT_PORT.to_string() => hashmap!{}}),
+        exposed_ports: Some(vec![HASURA_DEFAULT_PORT.to_string()]),
         host_config: Some(host_config),
         env: Some(vec![
             format!("PG_DATABASE_URL={}", postgres_connection_string),
@@ -99,10 +98,9 @@ fn create_container_options_and_config(
         ..Default::default()
     };
 
-    let options = CreateContainerOptions {
-        name: format!("aptos-workspace-{}-indexer-api", instance_id),
-        ..Default::default()
-    };
+    let options = CreateContainerOptionsBuilder::new()
+        .name(&format!("aptos-workspace-{}-indexer-api", instance_id))
+        .build();
 
     (options, config)
 }
@@ -215,9 +213,11 @@ pub fn start_indexer_api(
         let _wait = docker
             .wait_container(
                 &format!("aptos-workspace-{}-indexer-api", instance_id),
-                Some(WaitContainerOptions {
-                    condition: "not-running",
-                }),
+                Some(
+                    WaitContainerOptionsBuilder::new()
+                        .condition("not-running")
+                        .build(),
+                ),
             )
             .try_collect::<Vec<_>>()
             .await

@@ -19,14 +19,9 @@ use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
-use aptos_types::{
-    state_store::state_key::StateKey,
-    transaction::Version,
-    write_set::{WriteSet, WriteSetV0},
-};
+use aptos_types::{transaction::Version, write_set::WriteSet};
 use byteorder::{BigEndian, ReadBytesExt};
-use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, mem::size_of};
+use std::mem::size_of;
 
 define_schema!(WriteSetSchema, Version, WriteSet, WRITE_SET_CF_NAME);
 
@@ -41,41 +36,13 @@ impl KeyCodec<WriteSetSchema> for Version {
     }
 }
 
-/// Legacy V1 payload (without the enum tag byte) from binaries that pre-date the
-/// `pub enum WriteSet { V0, V1 }` representation.
-/// TODO(HotState): this is only needed temporarily to avoid forge-compat test failures because in
-/// these tests the baseline validators would write legacy format to DB.
-#[derive(Deserialize, Serialize)]
-struct LegacyWriteSetV1Payload {
-    value: WriteSetV0,
-    hotness: BTreeSet<StateKey>,
-}
-
 impl ValueCodec<WriteSetSchema> for WriteSet {
     fn encode_value(&self) -> Result<Vec<u8>> {
         bcs::to_bytes(self).map_err(Into::into)
     }
 
     fn decode_value(data: &[u8]) -> Result<Self> {
-        // TODO(HotState): we could simply use `bcs::from_bytes` for everything once the latest
-        // release branch does not write LegacyWriteSetV1Payload and forge-compat test would not
-        // fail in CI.
-        match data.first() {
-            Some(&1) => match bcs::from_bytes::<WriteSet>(data) {
-                Ok(ws) => Ok(ws),
-                // Legacy V1 payload lacks the trailing `extensions` field, so the new decoder
-                // runs out of bytes while reading it. Any other error indicates real corruption
-                // and should propagate.
-                Err(bcs::Error::Eof) => {
-                    let legacy: LegacyWriteSetV1Payload = bcs::from_bytes(&data[1..])?;
-                    let mut ws = WriteSet::V0(legacy.value);
-                    ws.add_hotness(legacy.hotness);
-                    Ok(ws)
-                },
-                Err(e) => Err(e.into()),
-            },
-            _ => bcs::from_bytes::<WriteSet>(data).map_err(Into::into),
-        }
+        bcs::from_bytes(data).map_err(Into::into)
     }
 }
 

@@ -549,6 +549,32 @@ where
         res
     }
 
+    fn charge_pack_closure_captured_values(
+        &mut self,
+        args: impl Iterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        let (cost, res) =
+            self.delegate_charge(|base| base.charge_pack_closure_captured_values(args));
+        if !cost.is_zero() {
+            // Generic packing can record type creation between the two charges. Merge into
+            // the latest bytecode event so one closure pack still counts as one hit.
+            if let Some(ExecutionGasEvent::Bytecode {
+                op: Opcodes::PACK_CLOSURE,
+                cost: pack_cost,
+            }) = self
+                .active_event_stream()
+                .iter_mut()
+                .rev()
+                .find(|event| matches!(event, ExecutionGasEvent::Bytecode { .. }))
+            {
+                *pack_cost += cost;
+            } else {
+                self.record_bytecode(Opcodes::PACK_CLOSURE, cost);
+            }
+        }
+        res
+    }
+
     fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()> {
         let (cost, res) = self.delegate_charge(|base| base.charge_create_ty(num_nodes));
 

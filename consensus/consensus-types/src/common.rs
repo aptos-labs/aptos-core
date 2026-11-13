@@ -5,7 +5,7 @@ use crate::{
     payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit, TxnAndGasLimits},
     proof_of_store::{BatchInfoExt, BatchKind, ProofCache, ProofOfStore, TBatchInfo},
 };
-use anyhow::{bail, ensure, Context};
+use anyhow::{bail, ensure};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -141,27 +141,7 @@ pub fn verify_batch_kind_transactions(
                         txn.is_encrypted_txn(),
                         "Encrypted batch contains non-encrypted transaction"
                     );
-                    let encrypted_payload = txn
-                        .payload()
-                        .as_encrypted_payload()
-                        .expect("already verified is_encrypted_txn");
-                    ensure!(
-                        encrypted_payload.is_encrypted(),
-                        "Encrypted batch contains transaction not in Encrypted state"
-                    );
-                    ensure!(
-                        !encrypted_payload.extra_config().is_multisig(),
-                        "Encrypted transactions do not support multisig"
-                    );
-                    let signer_auth_keys = txn
-                        .authenticator()
-                        .all_signer_auth_keys(txn.sender())
-                        .context(
-                        "Encrypted transactions are not supported with this authenticator type",
-                    )?;
-                    encrypted_payload
-                        .verify(txn.sender(), signer_auth_keys)
-                        .context("Encrypted transaction ciphertext verification failed")
+                    txn.verify_encrypted_payload_for_submission()
                 })?;
         },
         Some(BatchKind::Normal) => {

@@ -27,7 +27,13 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
-        state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
+        collateral::{CollateralParent, ShardedCollateralLayers},
+        orders::{OrderParent, ShardedOrderLayers},
+        positions::{PositionParent, ShardedPositionLayers},
+        state_summary::{
+            ProvableCollateralStateSummary, ProvableOrderStateSummary,
+            ProvablePositionStateSummary, ProvableStateSummary,
+        },
         state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
@@ -221,6 +227,9 @@ where
             "execute_block"
         );
         let committed_block_id = self.committed_block_id();
+        let position_floor = self.prepare_position_base(block_id, parent_output)?;
+        let order_floor = self.prepare_order_base(block_id, parent_output)?;
+        let collateral_floor = self.prepare_collateral_base(block_id, parent_output)?;
 
         // Record ExecutionStart for traced transactions.
         // block_txns is populated at proposal time (round_manager::process_proposal).
@@ -248,7 +257,7 @@ where
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
                         Arc::clone(&self.db.reader),
-                        parent_output.result_state().latest().clone(),
+                        parent_output.result_state().last_checkpoint().clone(),
                     )?
                 };
 
@@ -264,6 +273,18 @@ where
                     transactions,
                     auxiliary_info,
                     parent_output.result_state(),
+                    parent_output
+                        .result_positions()
+                        .zip(position_floor.as_ref())
+                        .map(|(overlay, floor)| PositionParent { overlay, floor }),
+                    parent_output
+                        .result_orders()
+                        .zip(order_floor.as_ref())
+                        .map(|(overlay, floor)| OrderParent { overlay, floor }),
+                    parent_output
+                        .result_collateral()
+                        .zip(collateral_floor.as_ref())
+                        .map(|(overlay, floor)| CollateralParent { overlay, floor }),
                     state_view,
                     onchain_config,
                     TransactionSliceMetadata::block(parent_block_id, block_id),
@@ -295,6 +316,104 @@ where
             .block_tree
             .add_block(parent_block_id, block_id, output)?;
         Ok(())
+    }
+
+    /// Advances the position base, and refuses a block that can no
+    /// longer read against it.
+    ///
+    /// Called under `execution_lock`, so the base can't move while a
+    /// block executes — which is what lets one check here cover every
+    /// read the VM goes on to make.
+    fn prepare_position_base(
+        &self,
+        block_id: HashValue,
+        parent_output: &PartialStateComputeResult,
+    ) -> ExecutorResult<Option<ShardedPositionLayers>> {
+        let Some(parent_positions) = parent_output.result_positions() else {
+            return Ok(None);
+        };
+        // Advance only to a version this block descends from. A block
+        // that doesn't is on a dead branch; leaving the base where it is
+        // keeps that block readable until it's pruned.
+        let certified = self.block_tree.root_block();
+        let target = certified
+            .output
+            .result_positions()
+            .filter(|certified_positions| parent_positions.is_descendant_of(certified_positions));
+        let floor = self
+            .db
+            .writer
+            .advance_position_base(target)
+            .map_err(anyhow::Error::from)?
+            .ok_or_else(|| ExecutorError::InternalError {
+                error: "parent carries positions but native-position storage is absent".into(),
+            })?;
+        if !parent_positions.descends_from(&floor) {
+            // The base already sits past this block's branch point, so
+            // its reads would resolve against the certified branch.
+            return Err(ExecutorError::StaleBranch(block_id));
+        }
+        Ok(Some(floor))
+    }
+
+    /// The order analog of [`Self::prepare_position_base`], under the same
+    /// lock.
+    fn prepare_order_base(
+        &self,
+        block_id: HashValue,
+        parent_output: &PartialStateComputeResult,
+    ) -> ExecutorResult<Option<ShardedOrderLayers>> {
+        let Some(parent_orders) = parent_output.result_orders() else {
+            return Ok(None);
+        };
+        let certified = self.block_tree.root_block();
+        let target = certified
+            .output
+            .result_orders()
+            .filter(|certified_orders| parent_orders.is_descendant_of(certified_orders));
+        let floor = self
+            .db
+            .writer
+            .advance_order_base(target)
+            .map_err(anyhow::Error::from)?
+            .ok_or_else(|| ExecutorError::InternalError {
+                error: "parent carries orders but trading-native storage is absent".into(),
+            })?;
+        if !parent_orders.descends_from(&floor) {
+            return Err(ExecutorError::StaleBranch(block_id));
+        }
+        Ok(Some(floor))
+    }
+
+    /// The collateral analog of [`Self::prepare_position_base`], under the
+    /// same lock.
+    fn prepare_collateral_base(
+        &self,
+        block_id: HashValue,
+        parent_output: &PartialStateComputeResult,
+    ) -> ExecutorResult<Option<ShardedCollateralLayers>> {
+        let Some(parent_collateral) = parent_output.result_collateral() else {
+            return Ok(None);
+        };
+        let certified = self.block_tree.root_block();
+        let target = certified
+            .output
+            .result_collateral()
+            .filter(|certified_collateral| {
+                parent_collateral.is_descendant_of(certified_collateral)
+            });
+        let floor = self
+            .db
+            .writer
+            .advance_collateral_base(target)
+            .map_err(anyhow::Error::from)?
+            .ok_or_else(|| ExecutorError::InternalError {
+                error: "parent carries collateral but trading-native storage is absent".into(),
+            })?;
+        if !parent_collateral.descends_from(&floor) {
+            return Err(ExecutorError::StaleBranch(block_id));
+        }
+        Ok(Some(floor))
     }
 
     fn ledger_update(
@@ -356,10 +475,35 @@ where
                 let position_persisted = output
                     .execution_output
                     .compute_trading_native_state_roots
-                    .then(|| ProvablePositionStateSummary::new_persisted(self.db.reader.as_ref()))
+                    .then(|| {
+                        ProvablePositionStateSummary::new_persisted_position(
+                            self.db.reader.as_ref(),
+                        )
+                    })
                     .transpose()?;
                 let parent_position_summary =
                     parent_block.output.ensure_result_position_state_summary()?;
+                let order_persisted = output
+                    .execution_output
+                    .compute_trading_native_state_roots
+                    .then(|| {
+                        ProvableOrderStateSummary::new_persisted_order(self.db.reader.as_ref())
+                    })
+                    .transpose()?;
+                let parent_order_summary =
+                    parent_block.output.ensure_result_order_state_summary()?;
+                let collateral_persisted = output
+                    .execution_output
+                    .compute_trading_native_state_roots
+                    .then(|| {
+                        ProvableCollateralStateSummary::new_persisted_collateral(
+                            self.db.reader.as_ref(),
+                        )
+                    })
+                    .transpose()?;
+                let parent_collateral_summary = parent_block
+                    .output
+                    .ensure_result_collateral_state_summary()?;
                 output.set_state_checkpoint_output(
                     DoStateCheckpoint::run()
                         .execution_output(&output.execution_output)
@@ -369,6 +513,10 @@ where
                         )?)
                         .maybe_parent_position_state_summary(parent_position_summary)
                         .maybe_persisted_position_state_summary(position_persisted.as_ref())
+                        .maybe_parent_order_state_summary(parent_order_summary)
+                        .maybe_persisted_order_state_summary(order_persisted.as_ref())
+                        .maybe_parent_collateral_state_summary(parent_collateral_summary)
+                        .maybe_persisted_collateral_state_summary(collateral_persisted.as_ref())
                         .build()?,
                 );
                 output.set_ledger_update_output(DoLedgerUpdate::run(
@@ -456,7 +604,7 @@ where
         Ok(CachedStateView::new(
             StateViewId::BlockExecution { block_id },
             Arc::clone(&self.db.reader),
-            block.output.result_state().latest().clone(),
+            block.output.result_state().last_checkpoint().clone(),
         )?)
     }
 }

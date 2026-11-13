@@ -576,7 +576,14 @@ async fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     let results = par_map_blocking(transactions, num_cpus::get(), {
         let validator = Arc::clone(&smp.validator);
         move |t| {
-            let result = validator.read().validate_transaction(t.0.clone());
+            // mempool should only ever accept an EncryptedPayload::Encrypted variant.
+            let result = if t.0.verify_encrypted_payload_for_submission().is_err() {
+                Ok(aptos_types::transaction::VMValidatorResult::error(
+                    StatusCode::MALFORMED,
+                ))
+            } else {
+                validator.read().validate_transaction(t.0.clone())
+            };
             // Pre-compute the hash and length on the original transaction before
             // locking mempool. We return `t` so the cached values survive.
             if result.is_ok() {

@@ -876,41 +876,6 @@ impl BlockTransactionPayload {
         Ok(())
     }
 
-    /// Verifies the inline batches against the expected inline batches
-    fn verify_inline_batches(
-        &self,
-        expected_inline_batches: &[(BatchInfo, Vec<SignedTransaction>)],
-    ) -> Result<(), Error> {
-        // Get the expected inline batches
-        let expected_inline_batches: Vec<&BatchInfo> = expected_inline_batches
-            .iter()
-            .map(|(batch_info, _)| batch_info)
-            .collect();
-
-        // Get the inline batches in the payload
-        let inline_batches: Vec<&BatchInfo> = match self {
-            BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches)
-            | BlockTransactionPayload::QuorumStoreInlineHybridV2(_, inline_batches) => {
-                inline_batches.iter().collect()
-            },
-            _ => {
-                return Err(Error::InvalidMessageError(
-                    "Transaction payload does not contain inline batches!".to_string(),
-                ))
-            },
-        };
-
-        // Compare the expected inline batches against the payload inline batches
-        if expected_inline_batches != inline_batches {
-            return Err(Error::InvalidMessageError(format!(
-                "Transaction payload failed inline batch verification! Expected inline batches {:?} but found {:?}",
-                expected_inline_batches, inline_batches
-            )));
-        }
-
-        Ok(())
-    }
-
     fn verify_optqs_and_inline_batches(
         &self,
         expected_opt_batches: &Vec<BatchInfo>,

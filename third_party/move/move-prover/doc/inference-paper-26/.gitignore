@@ -3,3 +3,19 @@
 build/
 stage/
 runs/
+
+# LaTeX intermediates from builds that bypass latexmkrc's aux_dir (e.g. IDE
+# recipes). The PDFs stay tracked.
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.listing
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.synctex.gz(busy)
+*.toc

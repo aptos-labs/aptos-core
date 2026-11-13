@@ -401,38 +401,75 @@ def apply_mutant(package: Path, baseline: Path, case: dict[str, Any]) -> None:
         )
         return
 
-    # Inserting a loop invariant wraps the guard's source line, so the whole
-    # anchor is no longer contiguous even though the expression being mutated
-    # remains unchanged. Align both ends of the original anchor, then locate a
-    # small local context around the edit inside that region. Restricting the
-    # search to the aligned region distinguishes the intended expression from
-    # identical implementation text elsewhere; excluding specification ranges
-    # distinguishes it from a restatement inserted inside the wrapper.
-    context_start = max(0, relative_at - 2)
-    context_end = min(len(fragment), relative_at + length + 2)
-    original_context = fragment[context_start:context_end]
-    candidate_end = _implementation_offset(
-        pristine, text, offset + len(fragment) - 1
-    )
-    candidate_contexts = [
-        occurrence
-        for occurrence in _implementation_occurrences(text, original_context)
-        if candidate_at is not None
-        and candidate_end is not None
-        and candidate_at <= occurrence
-        and occurrence + len(original_context) <= candidate_end + 1
-    ]
-    if len(candidate_contexts) != 1:
+    # A loop invariant restructures the code around it without changing it:
+    # `while (c)` becomes `while ({ spec { .. }; c })`, so the anchor is no
+    # longer contiguous. Accept the aligned region when its code is the
+    # fragment's with only block braces and statement separators added, and
+    # locate the edit itself by alignment. Restricting the edit to the region
+    # distinguishes it from identical code elsewhere; the alignment excludes
+    # specifications, so it never lands in a restatement inside the wrapper.
+    candidate_end = _implementation_offset(pristine, text, offset + len(fragment) - 1)
+    edit_at = _implementation_offset(pristine, text, offset + relative_at)
+    original = fragment[relative_at:relative_at + length]
+    excluded = _non_implementation_ranges(text)
+    if (
+        candidate_at is None
+        or candidate_end is None
+        or edit_at is None
+        or not _only_structure_added(fragment, text, candidate_at, candidate_end + 1)
+        or not candidate_at <= edit_at <= edit_at + length <= candidate_end + 1
+        or text[edit_at:edit_at + length] != original
+        or any(edit_at < high and low < edit_at + length for low, high in excluded)
+    ):
         raise ValueError(
             f"cannot apply mutant {case['mutant_id']}: the implementation it "
             f"rewrites is not present unchanged and unambiguously outside "
             f"specifications in {relative}"
         )
-    candidate_context_at = candidate_contexts[0]
-    candidate_at = candidate_context_at + relative_at - context_start
     source.write_text(
-        text[:candidate_at] + replacement + text[candidate_at + length:],
+        text[:edit_at] + replacement + text[edit_at + length:],
         encoding="utf-8",
+    )
+
+
+#: Tokens a candidate may add around anchored code: the block and statement
+#: separator with which a specification is placed inside an expression.
+STRUCTURAL_TOKENS = frozenset("{};")
+
+
+def _code_tokens(source: str, start: int, end: int) -> list[str]:
+    """Tokens of `source[start:end]` outside specs, comments and strings."""
+    excluded = sorted(_non_implementation_ranges(source))
+    tokens = []
+    index = start
+    while index < end:
+        skip = next((high for low, high in excluded if low <= index < high), None)
+        if skip is not None:
+            index = skip
+            continue
+        if source[index].isspace():
+            index += 1
+        elif source[index].isalnum() or source[index] == "_":
+            word = index
+            while index < end and (source[index].isalnum() or source[index] == "_"):
+                index += 1
+            tokens.append(source[word:index])
+        else:
+            tokens.append(source[index])
+            index += 1
+    return tokens
+
+
+def _only_structure_added(fragment: str, candidate: str, start: int, end: int) -> bool:
+    """Whether `candidate[start:end]` is the fragment's code with nothing but
+    structural tokens inserted."""
+    before = _code_tokens(fragment, 0, len(fragment))
+    after = _code_tokens(candidate, start, end)
+    return all(
+        tag == "equal" or (tag == "insert" and set(after[j1:j2]) <= STRUCTURAL_TOKENS)
+        for tag, _, _, j1, j2 in SequenceMatcher(
+            None, before, after, autojunk=False
+        ).get_opcodes()
     )
 
 

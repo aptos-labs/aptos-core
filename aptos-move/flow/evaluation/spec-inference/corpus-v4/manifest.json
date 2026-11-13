@@ -1,0 +1,796 @@
+{
+ "corpus": "public-v4",
+ "generated_file_sha256": {
+  "authored/lomuto_partition.move": "37c2f4837b2653a9ce346740663bbe21fc46188307a8df044879f402fd7a6f84",
+  "authored/selection_machine.move": "2c8f35af367527df0371366dfa1de9109fec8d15a36483f063be809795c1b516",
+  "deps/acl.move": "bf430ab7d78046d6fa186f76a4417ae9d795f3a2132d18cefa6653464a3d7b48",
+  "deps/acl.spec.move": "f77ce2348dfe9df48a3a9a8b224b67d0b8aba279c3dfdbd6fd6f3d1d97f9c88c",
+  "deps/bcs.move": "e35293b8d4aa2f1a7d7d990161c3ddc7b9bd75730aaf9f75e6807147fa56a57f",
+  "deps/big_ordered_map.move": "8202b7674f711b8afc0c7ad135226677cf4911544fd59d3d7ac93501ff8b77a1",
+  "deps/big_ordered_map.spec.move": "fd4543f4ff5a247db9fe3dc51272edba33bb1752d8eb3e993b7f8913145a68aa",
+  "deps/bit_vector.move": "c44927e11766924fa46b849a7af9c3aa64373f983e423a52eb3fa69f90fbe5a3",
+  "deps/bit_vector.spec.move": "3cec7900bcf3cc6cf81cc599e6f62500937b876972b9301877001c29c0e50f13",
+  "deps/cmp.move": "547b193b8d07282f84dd0f8ed0b92e6ca4af2c83f7c3e7177844690ee7c00725",
+  "deps/comparator.move": "4f019cc8b5e958212427c2300f235de6b31736b9f3b68c3c28560f049657c209",
+  "deps/comparator.spec.move": "a62f85da1674ceee78356a5a5b598959e91efdd6aa36e88261f1a21d97949f29",
+  "deps/error.move": "601e2dfc1912e2511af75629f11786bd364732bd44e7d3e4da566c7f8096d784",
+  "deps/event.move": "4a77b954be9aeaeab487473846d83a27d22fb6fb46159fe2547f0573b539cd51",
+  "deps/event.spec.move": "16afb3d3216f9b61f2de1535e5f17a4871c84be081877babf054ab773c339ba1",
+  "deps/features.move": "34cc4cc34b784b500a927695ca9f7e5bb9f64b6e1b58e82cded74980273ebc5e",
+  "deps/features.spec.move": "12b57b7027559f650e1e240de55619a4702efebc65aa0145f1014aae10c0dfdd",
+  "deps/fixed_point32.move": "1b9841a48939f833084c7e48a7d936d4170f02ec815e471622dd58a3f6d65440",
+  "deps/hash.move": "c2a03491eec1bcd457c8ccf2253c2c2fcead565df3e31a3759e108996857af9b",
+  "deps/math64.move": "de4d7f6fb0a4d9122748b5605f457b99653e488d8387433cbf5117c00e359acf",
+  "deps/math64.spec.move": "acac43f27a89373434b243db70076d01ec144a67ba85f9fbc62c0c3c8ebed440",
+  "deps/mem.move": "019160e63639fe76603d00a46ccde79895de804f94a1fe564340df6cfcbe2012",
+  "deps/option.move": "a73e14c2712ada2f4f7af72259b70204bde97c3f38ac6741d76e561a8d1921bd",
+  "deps/ordered_map.move": "8e1eeeec0bb0c0341f7511eaae7edfa98be43b14b5d3dc59e82bc158e22cd941",
+  "deps/ordered_map.spec.move": "8a38785b8a76538f250899b71cd142d758528fb3af3ffbd991fa7aa6457cb524",
+  "deps/result.move": "1d74f56258c24ecb0b39a2d580da103f3c1ac9be1250ab37a97d0f1cc23e98e4",
+  "deps/signer.move": "441638048e1d0c5b8059bd78d3df7fac2a3d2086bfb6a975875e15693d0c6d20",
+  "deps/storage_slots_allocator.move": "213c1c0d73d1e59b160ae01f0c03d16ade3e660b992a10856f49fd8bf6836f02",
+  "deps/storage_slots_allocator.spec.move": "f9927f3823c26c2931f37f8237eddea7df7063da5be49194173adb50f8e8680a",
+  "deps/string.move": "cabbcf79eb26d2807a7ea34b4018fd66e701032e5b9a4316e1694fa3277408fe",
+  "deps/string.spec.move": "348b9b6cafcbb8dc721bffbef9d3d0c0c11a2b363d5d7e3371b8c127f9b59c2d",
+  "deps/system_addresses.move": "e58c6bea051644afe491827c91f4e41d3e83bafea7f7bb4070ac55e2a8e6cff5",
+  "deps/system_addresses.spec.move": "1f3aefc3de172ccec2069d8ccacfd8506f95225c4e0f629500243020cf289d81",
+  "deps/table.move": "64b549aba3db0bdeb634b177d5487ce4f093b2ede725f37b4f6c09dd5da0aa4e",
+  "deps/table.spec.move": "6e924d461abe7da372b156909c23ad50870babb283b23b1f206ba7621cbebd38",
+  "deps/table_with_length.move": "2952da589458a39b8cabe49f28ec250caae1091706ff684bbc3369970c38b9b3",
+  "deps/table_with_length.spec.move": "2446cf4e7db44a43d0589f65480e642a95e5c56242608d8fba2d040ea86344fb",
+  "deps/timestamp.move": "e234b60d7a417f07a7ac0bb41eb85881b43175415518ee8cd5721e770c3b9ef1",
+  "deps/timestamp.spec.move": "68378420868918c55a4f49656bf7c9109168de6d8dc6d2afd1491e6f77d120b7",
+  "deps/vector.move": "5e40b6403567965a38a4db36cd030f5441a6fd53e721587723b96c02c55732b3",
+  "framework/extracted_ethereum_derivable_account.move": "99c7f08e4f6822f43e9e8a41d6b408fce2f9e37a8778b4fddbc63487349e7939",
+  "framework/extracted_jwks.move": "ccc71d92f111503a1a3e99e3d7cf951dda75df788f7a5521507a25d18343844b",
+  "framework/extracted_multisig_account.move": "675bb57fa565826c30e1c617bb276b736e2260cef7b230adef1ec9993be46220",
+  "framework/extracted_multisig_account.spec.move": "20174d0e4c26de73494abe8d5d9de50af0dabecf2f72fbfb6c6095f8a1d91ebc",
+  "framework/extracted_rate_limiter.move": "7096ff62159b9915817ecef398072c48e2e78b7d78dba792f8a0a6d6ae0c5bec",
+  "framework/extracted_sui_derivable_account.move": "18e1b16cb46bfa29912824dc26ad74591bfac0b788f9fa00acaf898780dc1210",
+  "framework/extracted_transaction_limits.move": "e855ce9ffc3c8fea923be3282454622f5db0a35c5e99d2d898bb45d717b865db",
+  "stdlib/extracted_vector_range.move": "550152ff89ea6737a7546f029c68bdaec65296beef015dcc4b361f44ee8fe748",
+  "trading/extracted_bulk_order_types.move": "e84131374ef122104c57f0da35ee09ba0e133bc960223dadb1a88aafdeee3b6b",
+  "trading/extracted_bulk_order_utils.move": "2847f8e24e28476dce8591add536338d3cdc426ca06a32db172c279c47fb68ed",
+  "trading/extracted_dead_mans_switch_tracker.move": "e767d4cbc98e46a9e7d140dc3d563d8365958e3b90405d3c8f8a0546bb667bbd",
+  "trading/extracted_price_time_index.move": "38846e27ebce16d61996fa4ea85c5797abe12e83856bcf9b04ff34916454d0f9"
+ },
+ "provenance": {
+  "aptos_core": {
+   "commit": "ec1e75bb095640a47c061c15ac5c45c96dafb50f",
+   "repository": "https://github.com/aptos-labs/aptos-core.git"
+  }
+ },
+ "records": [
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "loop",
+    "adjacent-pair",
+    "early-return",
+    "quantified"
+   ],
+   "function": "validate_price_ordering",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-order-010.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_experimental",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_bulk_order_utils::validate_price_ordering",
+   "task_id": "TR-order-010",
+   "why": "Adjacent-pair scan with an early return. WP infers a top-level quantifier and marks it sathard, so the contract must be restated in a form the solver can use."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "loop",
+    "bounded-search",
+    "break",
+    "option"
+   ],
+   "function": "discard_price_crossing_levels",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-discard-011.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_experimental",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels",
+   "task_id": "TR-discard-011",
+   "why": "Bounded search stopping at the first non-crossing level. The contract must say both what was found and that nothing earlier qualified."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "loop",
+    "linear-search",
+    "mutable-reference",
+    "in-place",
+    "coupled-vectors",
+    "abort"
+   ],
+   "function": "cancel_at_price_level",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-cancel-026.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_experimental",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level",
+   "task_id": "TR-cancel-026",
+   "why": "Deletes one price level from two vectors that must move in lockstep. The result is the size at the first matching price, and zero when nothing matches -- a value a genuine zero-size level also produces, so the contract cannot read the result alone. Both vectors are shortened at the same index, which needs a removal characterization of each rather than a length fact. The abort is unstated and comes from the extraction: upstream reaches both vectors through the bulk order, where equal length is structural, so nothing in this body says `sizes` is as long as `prices` and the read at `sizes[i]` aborts when it is not."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "higher_order",
+    "function_values",
+    "loops",
+    "early-return",
+    "abort"
+   ],
+   "function": "select",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "inference_corpus::selection_machine",
+   "preparation_patch": "patches/SM-select-022.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "authored",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "inference_corpus::selection_machine::select",
+   "task_id": "SM-select-022",
+   "why": "The only target with function values. Both the continuation and the admissibility test arrive as parameters, so the contract cannot be stated without `result_of` and `aborts_of` over them, and the state after k draws needs a recursive specification function over a function value."
+  },
+  {
+   "canonical_algorithm": true,
+   "feature_strata": [
+    "loops",
+    "mutable-reference",
+    "in-place",
+    "permutation",
+    "lemma",
+    "abort"
+   ],
+   "function": "partition",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "inference_corpus::lomuto_partition",
+   "preparation_patch": "patches/QP-part-025.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "authored",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "inference_corpus::lomuto_partition::partition",
+   "task_id": "QP-part-025",
+   "why": "The only target that rearranges its input in place, and the quicksort case. The pivot value must be followed through two swaps to say where it ends up, and the loop invariant holds three regions at once: the strict prefix, the scanned suffix, and the pivot parked at the end. Saying the result is a rearrangement and not a rewrite needs a counting specification function, a swap lemma proved by segments, and an entry-point instantiation whose trigger is the double update the prover encodes `vector::swap` as; the direct `forall`/`exists` containment, a bare recursive count, and even a sum proxy all exhaust the solver. Neither abort is stated in the source: `length() - 1` underflows on an empty vector and the first swap rejects an out-of-range pivot."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "composition",
+    "assert",
+    "quantified",
+    "abort"
+   ],
+   "function": "new_bulk_order_request_with_sanitization",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-sanitize-028.patch",
+   "preparation_patch_sha256": "04c6228820833310b9174152428b091a7d2c37fc6dcdef3047fd2cec9a17693f",
+   "prepared_sha256": "ffca6b7834bab8e4e692226a0afba2a72cb1ae6c59cb0288e3c846654e978492",
+   "provenance": "aptos_experimental",
+   "reference_contracts": [
+    "extracted_bulk_order_types::new_bulk_order_request",
+    "extracted_bulk_order_utils::validate_not_zero_sizes",
+    "extracted_bulk_order_utils::validate_price_ordering"
+   ],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_bulk_order_utils::new_bulk_order_request_with_sanitization",
+   "task_id": "TR-sanitize-028",
+   "why": "Composition: eleven assertions, four of them through the two validation helpers, so the abort condition can only be stated once the helpers have exact contracts of their own. Only the best levels of the two sides are compared, strictly."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "coupled-vectors",
+    "tuple-result",
+    "option",
+    "mutable-reference",
+    "abort"
+   ],
+   "function": "match_order_and_get_next_from_bulk_order",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-match-029.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_experimental",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_bulk_order_utils::match_order_and_get_next_from_bulk_order",
+   "task_id": "TR-match-029",
+   "why": "Consumes the first level of two vectors that are only coupled by convention. Besides the stated size check it aborts on an empty size vector, on an empty price vector, and when a full match leaves sizes but no price to report."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "coupled-vectors",
+    "mutable-reference",
+    "overflow-assert",
+    "abort"
+   ],
+   "function": "reinsert_order_into_bulk_order",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-reinsert-030.patch",
+   "preparation_patch_sha256": "dd95c4d9c36a5461a2e5c1fb346af7a1880573e7713cf3dbbc97b1cb1189ecc9",
+   "prepared_sha256": "69f316cc5a1d702802f48b2f3b9de820bc6ce9d23911b514b41c160916eaa6ee",
+   "provenance": "aptos_experimental",
+   "reference_contracts": [
+    "extracted_bulk_order_utils::get_price_from_match_details",
+    "extracted_bulk_order_utils::get_remaining_size_from_match_details"
+   ],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_bulk_order_utils::reinsert_order_into_bulk_order",
+   "task_id": "TR-reinsert-030",
+   "why": "Merges into the first level or prepends a new one. The merge adds without an overflow check and reads the first size whether or not one exists."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "loop",
+    "early-return",
+    "quantified"
+   ],
+   "function": "validate_not_zero_sizes",
+   "guessability": "guessable",
+   "has_loop": true,
+   "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-nonzero-031.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_experimental",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_bulk_order_utils::validate_not_zero_sizes",
+   "task_id": "TR-nonzero-031",
+   "why": "A control: a linear scan with an early return whose contract is a single quantifier."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "option",
+    "branches"
+   ],
+   "function": "is_taker_order",
+   "guessability": "guessable",
+   "has_loop": false,
+   "module": "aptos_experimental::extracted_price_time_index",
+   "preparation_patch": "patches/PT-taker-034.patch",
+   "preparation_patch_sha256": "52621f736c288fdd8ab6eeacc958b701a0d2e4534541ed246c03717a970367ad",
+   "prepared_sha256": "515ccfe791fa8ffd9a80dd2b8799796e65bd875c7b257d3087ad0c273c8cb9c9",
+   "provenance": "aptos_experimental",
+   "reference_contracts": [
+    "extracted_price_time_index::best_ask_price",
+    "extracted_price_time_index::best_bid_price"
+   ],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_price_time_index::is_taker_order",
+   "task_id": "PT-taker-034",
+   "why": "A control: two option-guarded comparisons, inclusive on both sides."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "state-transition",
+    "map",
+    "global-read",
+    "abort"
+   ],
+   "function": "keep_alive",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "aptos_experimental::extracted_dead_mans_switch_tracker",
+   "preparation_patch": "patches/DM-keepalive-035.patch",
+   "preparation_patch_sha256": "863f82f29d5a6e5fb3c866e0be09707c8ee577fe0a6d22e383fe9c6cd905852d",
+   "prepared_sha256": "cf32d547f0e65233a79b60c11f4df7f0867874095c2160d2d33702d0ee2bb317",
+   "provenance": "aptos_experimental",
+   "reference_contracts": [
+    "extracted_dead_mans_switch_tracker::disable_keep_alive"
+   ],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive",
+   "task_id": "DM-keepalive-035",
+   "why": "A map-backed state transition that reads the global clock: a zero timeout removes the entry and is exempt from the minimum, a first keep-alive keeps existing orders valid, and only a renewal strictly after expiry starts a new session. The expiration addition can overflow."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "map",
+    "global-read",
+    "option",
+    "early-return"
+   ],
+   "function": "is_order_valid",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "aptos_experimental::extracted_dead_mans_switch_tracker",
+   "preparation_patch": "patches/DM-valid-036.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_experimental",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_dead_mans_switch_tracker::is_order_valid",
+   "task_id": "DM-valid-036",
+   "why": "Validity mixes a strict and an inclusive comparison against the clock, defaults a missing creation time to now, and reads the clock only for registered accounts."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "state-transition",
+    "global-read",
+    "modulo",
+    "floor-division",
+    "abort"
+   ],
+   "function": "refill",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "aptos_framework::extracted_rate_limiter",
+   "preparation_patch": "patches/RL-refill-037.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_framework",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_rate_limiter::refill",
+   "task_id": "RL-refill-037",
+   "why": "A token bucket: none of its five aborts is stated (clock moving backwards, two overflows, a zero interval, the capacity comparison), and reaching capacity exactly also discards the carried fraction."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "loop",
+    "adjacent-pair",
+    "quantified",
+    "abort"
+   ],
+   "function": "validate_tiers",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_framework::extracted_transaction_limits",
+   "preparation_patch": "patches/TL-tiers-038.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_framework",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_transaction_limits::validate_tiers",
+   "task_id": "TL-tiers-038",
+   "why": "An adjacent-pair check from index one, inclusive in the stake and strict in the multiplier; fewer than two tiers always pass."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "composition",
+    "loop",
+    "quantified",
+    "abort"
+   ],
+   "function": "new_tiers",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_framework::extracted_transaction_limits",
+   "preparation_patch": "patches/TL-build-039.patch",
+   "preparation_patch_sha256": "5d49fd649d50e4dc4b573af3d09fb429b594308a65613d5de135ca0fa005ccbd",
+   "prepared_sha256": "f8d4cfa6a684df1d1db1851f8eb514a7ea334a87320248bf03461235102506cd",
+   "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_transaction_limits::new_tier",
+    "extracted_transaction_limits::validate_tiers"
+   ],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_transaction_limits::new_tiers",
+   "task_id": "TL-build-039",
+   "why": "Builds tiers element-wise and then validates them, so its abort condition composes a length check, a per-element range check and the pairwise order, all restated over the input vectors."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "higher_order",
+    "linear-search",
+    "abort"
+   ],
+   "function": "find_min_stake_required",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_framework::extracted_transaction_limits",
+   "preparation_patch": "patches/TL-find-040.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_framework",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_transaction_limits::find_min_stake_required",
+   "task_id": "TL-find-040",
+   "why": "A search through the inline `vector::find`: the least covering tier, not the cheapest, and an abort when none covers."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "loop",
+    "quantified",
+    "abort"
+   ],
+   "function": "validate_scheme",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_framework::extracted_ethereum_derivable_account",
+   "preparation_patch": "patches/EA-scheme-041.patch",
+   "preparation_patch_sha256": "b2838899728717b01f05492a81e2b7bbf4d407d025db449a2786fbf1a7d10f6e",
+   "prepared_sha256": "c7d76c786d1a0622a2b16937e235149c6a995fd9a81b88d929ce0d619579b40b",
+   "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_ethereum_derivable_account::is_alpha"
+   ],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_ethereum_derivable_account::validate_scheme",
+   "task_id": "EA-scheme-041",
+   "why": "A function whose whole contract is its abort condition: a length range, a letter first, and a character class for the rest."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "loop",
+    "mul-div",
+    "abort"
+   ],
+   "function": "range_with_step",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "std::extracted_vector_range",
+   "preparation_patch": "patches/VR-range-042.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "move_stdlib",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "std::extracted_vector_range::range_with_step",
+   "task_id": "VR-range-042",
+   "why": "The last increment is computed although its value is never pushed, so it can overflow when every pushed value fits. The loop advances its own parameter, so the invariant must refer to the parameter's entry value."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "composition",
+    "state-transition",
+    "global-read",
+    "abort"
+   ],
+   "function": "request",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "aptos_framework::extracted_rate_limiter",
+   "preparation_patch": "patches/RL-request-043.patch",
+   "preparation_patch_sha256": "8c53312cc18aff371311d08ff8d881ff887206e3d2766e2c272cb7e124b0bd6b",
+   "prepared_sha256": "46cac80a98648dd643398a07db18e5e83dddd925a0238ce491ee1e6fbea38d53",
+   "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_rate_limiter::refill"
+   ],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_rate_limiter::request",
+   "task_id": "RL-request-043",
+   "why": "Composition: every abort and the new state come from the refill it calls, which needs an exact contract of its own before the inclusive request check can be stated."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "composition",
+    "global-read",
+    "enum-match",
+    "abort"
+   ],
+   "function": "validate_enough_stake",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "aptos_framework::extracted_transaction_limits",
+   "preparation_patch": "patches/TL-enough-044.patch",
+   "preparation_patch_sha256": "3b2840484faf2698f90d6ea5d70356a8fd1d35b0f27c3276f17fbbba9253fcf2",
+   "prepared_sha256": "709edb26990d36e975ac5b2f3cb0d253af09bb68ae01c6036081cd0ac6d6aaea",
+   "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_transaction_limits::find_min_stake_required"
+   ],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_transaction_limits::validate_enough_stake",
+   "task_id": "TL-enough-044",
+   "why": "Composition over a global configuration: two range checks, two tier searches through a helper whose contract must be exact, and two inclusive stake thresholds, all only as aborts."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "loops",
+    "tuple-result",
+    "abort"
+   ],
+   "function": "split_signature_bytes",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_framework::extracted_sui_derivable_account",
+   "preparation_patch": "patches/SU-split-045.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_framework",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_sui_derivable_account::split_signature_bytes",
+   "task_id": "SU-split-045",
+   "why": "Two loops sharing one index split a fixed-length input into three parts; the invariants must hand the index and the first part over to the second loop."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "loop",
+    "table",
+    "global-read",
+    "abort"
+   ],
+   "function": "get_pending_transactions",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_framework::extracted_multisig_account",
+   "preparation_patch": "patches/MS-pending-046.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_framework",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_multisig_account::get_pending_transactions",
+   "task_id": "MS-pending-046",
+   "why": "A loop over a table range from a global resource: empty when the range is, and aborting on an overflow of the start or on any missing entry inside it."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "global-read",
+    "table",
+    "option",
+    "abort"
+   ],
+   "function": "can_execute_with_timelock",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "aptos_framework::extracted_multisig_account",
+   "preparation_patch": "patches/MS-timelock-047.patch",
+   "preparation_patch_sha256": "92b8f4a23a72e53cb1486b99b008a305a559f7aa9541289eb9d9fa6657cb8bd2",
+   "prepared_sha256": "19df7da27b49d4d86e054ab206581ffaf466d6ffc8c7cdf3f7021fd143b240aa",
+   "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_multisig_account::get_transaction"
+   ],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_multisig_account::can_execute_with_timelock",
+   "task_id": "MS-timelock-047",
+   "why": "Reads two resources, a table entry and the clock. The transaction is fetched and its age computed before the override threshold is consulted, so meeting the threshold does not avoid those aborts; both comparisons are inclusive."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "global-read",
+    "underflow",
+    "branches"
+   ],
+   "function": "available_transaction_queue_capacity",
+   "guessability": "guessable",
+   "has_loop": false,
+   "module": "aptos_framework::extracted_multisig_account",
+   "preparation_patch": "patches/MS-capacity-048.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_framework",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_multisig_account::available_transaction_queue_capacity",
+   "task_id": "MS-capacity-048",
+   "why": "A control: a clamped capacity whose pending count underflows when the sequence numbers are out of order."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "loop",
+    "bounded-search",
+    "break",
+    "option",
+    "abort"
+   ],
+   "function": "upsert_provider_jwks",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_framework::extracted_jwks",
+   "preparation_patch": "patches/JW-upsert-049.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+   "provenance": "aptos_framework",
+   "reference_contracts": [],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_jwks::upsert_provider_jwks",
+   "task_id": "JW-upsert-049",
+   "why": "A scan that stops at the first entry the new issuer does not sort after, then replaces it if equal and inserts before it otherwise, possibly at the end. The order comes from an uninterpreted comparator, so nothing about sortedness can be assumed."
+  },
+  {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "composition",
+    "global-write",
+    "signer",
+    "quantified",
+    "abort"
+   ],
+   "function": "update_config",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "aptos_framework::extracted_transaction_limits",
+   "preparation_patch": "patches/TL-update-050.patch",
+   "preparation_patch_sha256": "a171a4ca119656fc1432af0f2abb64684e2ed6deef24497b8a607c27254e25b0",
+   "prepared_sha256": "2fe8e5353e19459cdb8271f15d6b3ce5288cd79ec0cddebe60c1c11e6c42a067",
+   "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_transaction_limits::new_tier",
+    "extracted_transaction_limits::new_tiers",
+    "extracted_transaction_limits::validate_tiers"
+   ],
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_framework::extracted_transaction_limits::update_config",
+   "task_id": "TL-update-050",
+   "why": "Composition with a global write: a signer check, two calls of a builder whose abort condition and result must be exact, and a configuration resource created when absent and replaced when present."
+  }
+ ],
+ "schema_version": 1
+}

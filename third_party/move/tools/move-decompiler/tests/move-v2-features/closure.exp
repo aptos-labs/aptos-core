@@ -1,7 +1,7 @@
 module 0x99::basic_enum {
     enum FV<T> has key {
         V1 {
-            v1: |&mut T|(T) has copy + store,
+            v1: |&mut T|T has copy + store,
         }
     }
     #[persistent]
@@ -18,17 +18,17 @@ module 0x99::basic_struct {
     struct Wrapper<T> has key {
         fv: T,
     }
-    fun add_resource_with_struct(acc: &signer, f: |&||(u64)|(u64) has copy + drop + store) {
-        let _v0 = Wrapper<|&||(u64)|(u64) has copy + drop + store>{fv: f};
-        move_to<Wrapper<|&||(u64)|(u64) has copy + drop + store>>(acc, _v0);
+    fun add_resource_with_struct(acc: &signer, f: |&||u64|u64 has copy + drop + store) {
+        let _v0 = Wrapper<|&||u64|u64 has copy + drop + store>{fv: f};
+        move_to<Wrapper<|&||u64|u64 has copy + drop + store>>(acc, _v0);
     }
     #[persistent]
-    fun test(f: &||(u64)): u64 {
+    fun test(f: &||u64): u64 {
         if (f == f) return 1;
         2
     }
     public fun test_driver(acc: &signer) {
-        let _v0: |&||(u64)|(u64) has copy + drop + store = |x| test(x);
+        let _v0: |&||u64|u64 has copy + drop + store = |x| test(x);
         add_resource_with_struct(acc, _v0);
     }
 }
@@ -39,7 +39,7 @@ module 0x99::lambda_arg {
     fun lambda__1__test(param_0: u64): u64 {
         3
     }
-    fun foo(f: |u64|(u64), x: u64): u64 {
+    fun foo(f: |u64|u64, x: u64): u64 {
         f(x)
     }
     public fun main() {
@@ -47,7 +47,7 @@ module 0x99::lambda_arg {
     }
 }
 module 0x99::lambda_basic {
-    fun map(x: u64, f: |u64|(u64) has drop): u64 {
+    fun map(x: u64, f: |u64|u64 has drop): u64 {
         f(x)
     }
     fun no_name_clash(x: u64, c: u64): u64 {
@@ -74,7 +74,7 @@ module 0x99::lambda_basic {
 }
 module 0x99::lambda_fun_wrapper {
     struct Work has drop {
-        _0: |u64|(u64) has drop,
+        _0: |u64|u64 has drop,
     }
     fun t1(): bool {
         let _v0 = Work{_0: |x| lambda__1__t1(x)};
@@ -104,7 +104,7 @@ module 0x99::lambda_generics {
     fun id<T>(self: S<T>): S<T> {
         self
     }
-    fun inlined<T: drop>(f: |S<T>|(S<T>), s: S<T>) {
+    fun inlined<T: drop>(f: |S<T>|S<T>, s: S<T>) {
         let _v0 = f(s);
     }
     fun test_receiver_inference(s: S<u64>) {
@@ -150,7 +150,7 @@ module 0x99::lambda_no_param1 {
     fun lambda__1__test(x: u64, param_1: u64): u64 {
         x
     }
-    fun foo(f: |u64, u64|(u64), g: |u64, u64|(u64), x: u64, _y: u64): u64 {
+    fun foo(f: |u64, u64|u64, g: |u64, u64|u64, x: u64, _y: u64): u64 {
         let _v0 = f(x, _y);
         let _v1 = g(x, _y);
         _v0 + _v1
@@ -163,7 +163,7 @@ module 0x99::lambda_pattern {
     struct S<T> {
         x: T,
     }
-    fun consume<T>(s: S<T>, x: T, f: |S<T>, T|(T)): T {
+    fun consume<T>(s: S<T>, x: T, f: |S<T>, T|T): T {
         f(s, x)
     }
     fun pattern(s: S<u64>, x: u64): u64 {
@@ -177,10 +177,10 @@ module 0x99::lambda_pattern {
     }
 }
 module 0x99::nested_lambda {
-    fun map1(x: u64, f: |u64|(u64)): u64 {
+    fun map1(x: u64, f: |u64|u64): u64 {
         f(x)
     }
-    fun map2(x: u8, f: |u8|(u8)): u8 {
+    fun map2(x: u8, f: |u8|u8): u8 {
         f(x)
     }
     fun nested(x: u64, c: u64): u64 {

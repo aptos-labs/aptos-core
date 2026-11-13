@@ -383,6 +383,13 @@ pub enum BehaviorKind {
     /// surface syntax; emitted by spec inference and translated by the
     /// Boogie backend to a Skolem axiomatized against `ensures_of`.
     WriteOf(usize),
+    /// `transition_of<f>(args)` — backend-internal witness that the memory
+    /// pair it is evaluated at is the pre- and post-state of a call to `f`
+    /// at `args`. Not surface syntax; the Boogie backend assumes it wherever
+    /// it assumes an `ensures_of<f>` fact of a call, and guards the
+    /// `result_of` axiom of a function which may write memory its contract
+    /// observes by it.
+    TransitionOf,
 }
 
 impl BehaviorKind {
@@ -395,6 +402,7 @@ impl BehaviorKind {
                 | BehaviorKind::UnchangedOf
                 | BehaviorKind::FoldsOf
                 | BehaviorKind::WriteOf(_)
+                | BehaviorKind::TransitionOf
         )
     }
 }
@@ -410,6 +418,7 @@ impl fmt::Display for BehaviorKind {
             UnchangedOf => write!(f, "unchanged_of"),
             FoldsOf => write!(f, "folds_of"),
             WriteOf(j) => write!(f, "write_of_{}", j),
+            TransitionOf => write!(f, "transition"),
         }
     }
 }
@@ -1251,6 +1260,7 @@ pub enum VisitorPosition {
     BeforeBody,             // Before body of Block expression.
     BeforeMatchBody(usize), // Before the ith body of a Match arm.
     AfterMatchBody(usize),  // After the ith body of a Match arm.
+    AfterQuantRange(usize), // After the ith range of a Quant; its binders are in scope from here.
     BeforeThen,             // Before then clause of IfElse expression.
     BeforeElse,             // Before else clause of IfElse expression.
     PreSequenceValue,       // Before final expr in a Sequence (or before Post, if seq is empty)
@@ -1630,14 +1640,27 @@ impl ExpData {
                 .for_each(|(_, sym)| shadow_or_unshadow_sym(sym, entering, shadow_map))
         }
 
+        // A state-domain binder (`S in *`) names a state, not a local; the
+        // builder keeps it out of the local scope and the rewriter scopes
+        // nothing for it, so an `S` in the body is an outer local.
+        fn for_syms_in_range_shadow_or_unshadow(
+            (pat, range): &(Pattern, Exp),
+            entering: bool,
+            shadow_map: &mut BTreeMap<Symbol, usize>,
+        ) {
+            if !matches!(range.as_ref(), ExpData::Call(_, Operation::StateDomain, _)) {
+                for_syms_in_pat_shadow_or_unshadow(pat, entering, shadow_map);
+            }
+        }
+
         fn for_syms_in_ranges_shadow_or_unshadow(
             ranges: &[(Pattern, Exp)],
             entering: bool,
             shadow_map: &mut BTreeMap<Symbol, usize>,
         ) {
-            ranges
-                .iter()
-                .for_each(|(pat, _)| for_syms_in_pat_shadow_or_unshadow(pat, entering, shadow_map));
+            ranges.iter().for_each(|range| {
+                for_syms_in_range_shadow_or_unshadow(range, entering, shadow_map)
+            });
         }
 
         fn is_sym_free(sym: &Symbol, shadow_map: &BTreeMap<Symbol, usize>) -> bool {
@@ -1665,8 +1688,11 @@ impl ExpData {
                 (Match(_, _, arms), AfterMatchBody(idx)) => {
                     for_syms_in_pat_shadow_or_unshadow(&arms[idx].pattern, false, &mut shadow_map)
                 },
-                (Quant(_, _, ranges, ..), Pre) => {
-                    for_syms_in_ranges_shadow_or_unshadow(ranges, true, &mut shadow_map);
+                // A range is evaluated with only the binders of the ranges before it in
+                // scope (`forall n in 0..n` reads an outer `n`), so a binder shadows
+                // from after its own range.
+                (Quant(_, _, ranges, ..), AfterQuantRange(idx)) => {
+                    for_syms_in_range_shadow_or_unshadow(&ranges[idx], true, &mut shadow_map);
                 },
                 (Quant(_, _, ranges, ..), Post) => {
                     for_syms_in_ranges_shadow_or_unshadow(ranges, false, &mut shadow_map);
@@ -1689,6 +1715,88 @@ impl ExpData {
             true // keep going
         };
         self.visit_positions(&mut visitor);
+    }
+
+    /// Collects the symbols bound by any binder (let, lambda, quantifier range,
+    /// match arm) within the expression.
+    pub fn binder_syms(&self) -> BTreeSet<Symbol> {
+        let mut bound = BTreeSet::new();
+        self.visit_pre_order(&mut |e| {
+            let mut add = |pat: &Pattern| bound.extend(pat.vars().into_iter().map(|(_, sym)| sym));
+            match e {
+                ExpData::Block(_, pat, ..) | ExpData::Lambda(_, pat, ..) => add(pat),
+                ExpData::Quant(_, _, ranges, ..) => ranges.iter().for_each(|(pat, _)| add(pat)),
+                ExpData::Match(_, _, arms) => arms.iter().for_each(|arm| add(&arm.pattern)),
+                _ => {},
+            }
+            true
+        });
+        bound
+    }
+
+    /// Instantiates type parameters in the expression, covering pattern node
+    /// types and struct pattern instantiations in addition to the expression
+    /// nodes `ExpRewriter::set_type_args` handles.
+    pub fn instantiate_with_patterns(&self, env: &GlobalEnv, type_args: &[Type]) -> Exp {
+        struct Instantiator<'a> {
+            env: &'a GlobalEnv,
+            type_args: &'a [Type],
+        }
+        impl Instantiator<'_> {
+            fn instantiate_pattern_id(&self, id: NodeId) -> Option<NodeId> {
+                ExpData::instantiate_node(self.env, id, self.type_args)
+            }
+        }
+        impl ExpRewriterFunctions for Instantiator<'_> {
+            fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
+                ExpData::instantiate_node(self.env, id, self.type_args)
+            }
+
+            fn rewrite_pattern(&mut self, pat: &Pattern, _creating_scope: bool) -> Option<Pattern> {
+                // Sub-patterns have already been rewritten when this is called;
+                // only the pattern's own node (and struct instantiation) is
+                // handled here.
+                match pat {
+                    Pattern::Var(id, sym) => self
+                        .instantiate_pattern_id(*id)
+                        .map(|new_id| Pattern::Var(new_id, *sym)),
+                    Pattern::Wildcard(id) => {
+                        self.instantiate_pattern_id(*id).map(Pattern::Wildcard)
+                    },
+                    Pattern::Tuple(id, pats) => self
+                        .instantiate_pattern_id(*id)
+                        .map(|new_id| Pattern::Tuple(new_id, pats.clone())),
+                    Pattern::Struct(id, sid, variant, pats) => {
+                        let new_id = self.instantiate_pattern_id(*id);
+                        let new_inst = Type::instantiate_slice(&sid.inst, self.type_args);
+                        if new_id.is_none() && new_inst == sid.inst {
+                            None
+                        } else {
+                            let mut new_sid = sid.clone();
+                            new_sid.inst = new_inst;
+                            Some(Pattern::Struct(
+                                new_id.unwrap_or(*id),
+                                new_sid,
+                                *variant,
+                                pats.clone(),
+                            ))
+                        }
+                    },
+                    Pattern::LiteralValue(id, value) => self
+                        .instantiate_pattern_id(*id)
+                        .map(|new_id| Pattern::LiteralValue(new_id, value.clone())),
+                    Pattern::Range(id, lo, hi, inclusive) => self
+                        .instantiate_pattern_id(*id)
+                        .map(|new_id| Pattern::Range(new_id, lo.clone(), hi.clone(), *inclusive)),
+                    Pattern::Error(id) => self.instantiate_pattern_id(*id).map(Pattern::Error),
+                }
+            }
+        }
+        let exp = self.clone().into_exp();
+        if type_args.is_empty() {
+            return exp;
+        }
+        Instantiator { env, type_args }.rewrite_exp(exp)
     }
 
     /// Returns just the free local variables in this expression.
@@ -2389,7 +2497,7 @@ impl ExpData {
                 Pre => visitor(false, e),
                 Post => visitor(true, e),
                 MidMutate | BeforeBody | BeforeThen | BeforeElse | BeforeMatchBody(_)
-                | AfterMatchBody(_) | PreSequenceValue => true,
+                | AfterMatchBody(_) | AfterQuantRange(_) | PreSequenceValue => true,
             };
             if should_continue {
                 Some(())
@@ -2465,8 +2573,9 @@ impl ExpData {
                 }
             },
             Quant(_, _, ranges, triggers, condition, body) => {
-                for (_, range) in ranges {
+                for (i, (_, range)) in ranges.iter().enumerate() {
                     range.visit_positions_impl(visitor)?;
+                    visitor(VisitorPosition::AfterQuantRange(i), self)?;
                 }
                 for trigger in triggers {
                     for e in trigger {

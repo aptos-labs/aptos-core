@@ -1,9 +1,9 @@
 # aptos-transaction-executor
 
 The AptosVM transaction-execution layer on the MonoMove VM. User transactions
-run prologue → payload → epilogue and produce an unmaterialized `TxnOutcome`;
-system transactions run unmetered and fee-free. Block-level coordination lives
-above this crate.
+run prologue → metered prologue → payload → epilogue and produce an
+unmaterialized `TxnOutcome`; system transactions run unmetered and fee-free.
+Block-level coordination lives above this crate.
 
 ## Working assumptions
 
@@ -16,9 +16,15 @@ above this crate.
 - Gas is deliberately incomplete: MonoMove's units are uncalibrated, and the
   intrinsic cost, the authentication and decryption surcharges, IO gas, and
   storage fees are none of them charged. The pre-execution checks still bound
-  the budget against those costs. Do not treat a gas mismatch against the
-  legacy VM as a regression.
-- Past the prologue, a transaction always commits and charges the fee.
+  the budget against those costs, except for the slots the metered prologue
+  creates, which are to be charged as they are written (see the
+  `TODO(metering)` at its call site) rather than estimated up front as AptosVM
+  does. Do not treat a gas mismatch against the legacy VM as a regression.
+- Past the prologue, a transaction always commits and charges the fee. The one
+  exception is a failure in the metered prologue (today: running out of gas
+  creating the sender's account), which discards as in AptosVM. The metered
+  prologue is Move code in `transaction_validation`, so new pre-payload state
+  setup goes there, not in the executor.
 - Materialization is optional. Nothing on the execution path may call into
   `materialize/` -- it is up to the higher-level coordinator to decide when to
   call it.
@@ -28,12 +34,8 @@ above this crate.
 Still open before the transaction executor can be wired to the block
 coordinator:
 
-- Argument validation is missing two things AptosVM does through its argument
-  constructors: value checks on the whitelisted framework types (`String`
-  UTF-8 validity, `Option` length, `Object<T>` existence), and public struct
-  and enum arguments. See the `TODO(security, completeness)` in
-  `user_txn/entry_func.rs`.
 - Multi-agent transactions are untested.
+- Validation should reject an unaffordable account creation at admission.
 
 ## Conventions
 

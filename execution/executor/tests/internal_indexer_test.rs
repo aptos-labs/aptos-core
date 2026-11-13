@@ -298,6 +298,7 @@ fn test_db_indexer_data() {
         ident_str!("bls12381_algebra"),
         ident_str!("consensus_config"),
         ident_str!("execution_config"),
+        ident_str!("hot_state_config"),
         ident_str!("multisig_account"),
         ident_str!("nonce_validation"),
         ident_str!("pool_u64_unbound"),

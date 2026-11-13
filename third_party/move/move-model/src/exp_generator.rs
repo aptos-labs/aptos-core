@@ -443,6 +443,39 @@ pub trait ExpGenerator<'env> {
         ExpData::Call(node_id, op, vec![exp]).into_exp()
     }
 
+    /// Makes an expression which selects the field at `offset` from a value of one of
+    /// `variants`.
+    fn mk_variant_field_select(
+        &self,
+        struct_env: &StructEnv,
+        variants: &[Symbol],
+        offset: usize,
+        targs: &[Type],
+        exp: Exp,
+    ) -> Exp {
+        let field_ids = variants
+            .iter()
+            .map(|variant| {
+                struct_env
+                    .get_field_by_offset_optional_variant(Some(*variant), offset)
+                    .get_id()
+            })
+            .collect_vec();
+        let field_env =
+            struct_env.get_field_by_offset_optional_variant(variants.first().copied(), offset);
+        let ty = field_env.get_type().instantiate(targs);
+        let mid = struct_env.module_env.get_id();
+        let sid = struct_env.get_id();
+        let struct_ty = Type::Struct(mid, sid, targs.to_vec());
+        let node_id = self.new_node(ty, Some(vec![struct_ty]));
+        ExpData::Call(
+            node_id,
+            Operation::SelectVariants(mid, sid, field_ids),
+            vec![exp],
+        )
+        .into_exp()
+    }
+
     /// Makes an expression which updates a field in a struct.
     /// Returns `UpdateField(module_id, struct_id, field_id)(struct_exp, new_value)`,
     /// with the struct type as the node instantiation (see `mk_field_select`).

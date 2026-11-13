@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    backup_types::state_snapshot::manifest::{SnapshotEndpoint, SnapshotKind},
     metrics::backup::{BACKUP_TIMER, THROUGHPUT_COUNTER},
     utils::error_notes::ErrorNotes,
 };
@@ -97,16 +98,36 @@ impl BackupServiceClient {
         key: HashValue,
         version: Version,
     ) -> Result<impl AsyncRead + use<>> {
-        self.get("state_range_proof", &format!("{}/{:x}", version, key))
+        self.get_range_proof(SnapshotKind::State, key, version)
             .await
     }
 
+    pub async fn get_range_proof(
+        &self,
+        kind: SnapshotKind,
+        key: HashValue,
+        version: Version,
+    ) -> Result<impl AsyncRead + use<>> {
+        self.get(
+            kind.endpoint(SnapshotEndpoint::RangeProof),
+            &format!("{}/{:x}", version, key),
+        )
+        .await
+    }
+
     pub async fn get_state_item_count(&self, version: Version) -> Result<usize> {
+        self.get_item_count(SnapshotKind::State, version).await
+    }
+
+    pub async fn get_item_count(&self, kind: SnapshotKind, version: Version) -> Result<usize> {
         let mut buf = Vec::new();
-        self.get("state_item_count", &format!("{}", version))
-            .await?
-            .read_to_end(&mut buf)
-            .await?;
+        self.get(
+            kind.endpoint(SnapshotEndpoint::ItemCount),
+            &format!("{}", version),
+        )
+        .await?
+        .read_to_end(&mut buf)
+        .await?;
         Ok(bcs::from_bytes::<u64>(&buf)? as usize)
     }
 
@@ -116,8 +137,19 @@ impl BackupServiceClient {
         start_idx: usize,
         limit: usize,
     ) -> Result<impl AsyncRead + use<>> {
+        self.get_snapshot_chunk(SnapshotKind::State, version, start_idx, limit)
+            .await
+    }
+
+    pub async fn get_snapshot_chunk(
+        &self,
+        kind: SnapshotKind,
+        version: Version,
+        start_idx: usize,
+        limit: usize,
+    ) -> Result<impl AsyncRead + use<>> {
         self.get(
-            "state_snapshot_chunk",
+            kind.endpoint(SnapshotEndpoint::Chunk),
             &format!("{}/{}/{}", version, start_idx, limit),
         )
         .await

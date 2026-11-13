@@ -46,7 +46,7 @@ use aptos_framework_natives::code::PublishRequest;
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
-    gas_feature_versions::{self, RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
+    gas_feature_versions::{self, RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38, RELEASE_V1_50},
     AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
@@ -124,7 +124,7 @@ use move_binary_format::{
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
     file_format::CompiledScript,
-    file_format_common::VERSION_5,
+    file_format_common::{VERSION_5, VERSION_MIN},
     CompiledModule,
 };
 use move_core_types::{
@@ -1813,13 +1813,13 @@ impl AptosVM {
         &self,
         module_storage: &impl AptosModuleStorage,
         traversal_context: &mut TraversalContext,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut impl AptosGasMeter,
         modules: &[CompiledModule],
         mut expected_modules: BTreeSet<String>,
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
     ) -> VMResult<()> {
         self.reject_unstable_bytecode(modules)?;
-        self.reject_legacy_module_bytecode(modules)?;
+        self.reject_legacy_module_bytecode(gas_meter, modules)?;
         native_validation::validate_module_natives(modules)?;
 
         for m in modules {
@@ -1871,24 +1871,41 @@ impl AptosVM {
         Ok(())
     }
 
-    /// Reject publishing of legacy (v5) module bytecode. Publishing only; modules already on chain
+    /// Reject publishing of legacy module bytecode. Publishing only; modules already on chain
     /// keep loading and executing at any version.
-    fn reject_legacy_module_bytecode(&self, modules: &[CompiledModule]) -> VMResult<()> {
+    ///
+    /// Two gates apply, and the stricter one wins:
+    ///   - `TimedFeatureFlag::RejectV5ModulePublishing` bans v5.
+    ///   - From gas feature version 1.50, the on-chain `txn.min_module_bytecode_version` gas
+    ///     parameter sets the minimum publishable version.
+    fn reject_legacy_module_bytecode(
+        &self,
+        gas_meter: &impl AptosGasMeter,
+        modules: &[CompiledModule],
+    ) -> VMResult<()> {
+        // Nothing below `VERSION_MIN` deserializes, so start from there.
+        let mut min_version = u64::from(VERSION_MIN);
         if self
             .timed_features()
             .is_enabled(TimedFeatureFlag::RejectV5ModulePublishing)
         {
-            for module in modules {
-                if module.version <= VERSION_5 {
-                    return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
-                        .with_message(format!(
-                            "publishing module bytecode version {} is not allowed; the minimum \
-                             publishable version is {}",
-                            module.version,
-                            VERSION_5 + 1
-                        ))
-                        .finish(Location::Undefined));
-                }
+            min_version = min_version.max(u64::from(VERSION_5 + 1));
+        }
+        if self.gas_feature_version() >= RELEASE_V1_50 {
+            min_version = min_version.max(u64::from(
+                gas_meter.vm_gas_params().txn.min_module_bytecode_version,
+            ));
+        }
+
+        for module in modules {
+            if u64::from(module.version) < min_version {
+                return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+                    .with_message(format!(
+                        "publishing module bytecode version {} is not allowed; the minimum \
+                         publishable version is {}",
+                        module.version, min_version
+                    ))
+                    .finish(Location::Undefined));
             }
         }
         Ok(())
@@ -2475,8 +2492,7 @@ impl AptosVM {
                     txn_limits_request,
                     meter_balance,
                     &NoopBlockSynchronizationKillSwitch {},
-                    self.timed_features()
-                        .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
+                    self.timed_features(),
                 ))
             },
             auxiliary_info,
@@ -2510,8 +2526,7 @@ impl AptosVM {
                     txn_limits_request,
                     meter_balance,
                     block_synchronization_kill_switch,
-                    self.timed_features()
-                        .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
+                    self.timed_features(),
                 )
             },
             auxiliary_info,
@@ -2857,7 +2872,7 @@ impl AptosVM {
         block_epilogue: BlockEpiloguePayload,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        let (block_id, fee_distribution) = match block_epilogue {
+        let (block_id, fee_distribution, to_make_hot) = match block_epilogue {
             BlockEpiloguePayload::V0 { .. } => {
                 let status = TransactionStatus::Keep(ExecutionStatus::Success);
                 let output = VMOutput::empty_with_status(status);
@@ -2865,14 +2880,18 @@ impl AptosVM {
             },
             BlockEpiloguePayload::V1 {
                 block_id,
+                block_end_info,
                 fee_distribution,
-                ..
-            }
-            | BlockEpiloguePayload::V2 {
+            } => {
+                let (_, to_make_hot) = block_end_info.into_parts();
+                (block_id, fee_distribution, to_make_hot)
+            },
+            BlockEpiloguePayload::V2 {
                 block_id,
                 fee_distribution,
+                to_make_hot,
                 ..
-            } => (block_id, fee_distribution),
+            } => (block_id, fee_distribution, to_make_hot),
         };
 
         let mut gas_meter = UnmeteredGasMeter;
@@ -2896,7 +2915,7 @@ impl AptosVM {
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
 
-        let output = match session
+        let mut output = match session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
                 BLOCK_EPILOGUE,
@@ -2925,9 +2944,10 @@ impl AptosVM {
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        // TODO(HotState): generate an output according to the block end info in the
-        //   transaction. (maybe resort to the move resolver, but for simplicity I would
-        //   just include the full slot in both the transaction and the output).
+        // Taken from the payload rather than recomputed, so re-execution during state sync
+        // reproduces the promotions decided when the block was executed. `AptosExecutorTask`
+        // then adds the keys the epilogue itself reads.
+        output.set_hotness(to_make_hot);
         Ok((VMStatus::Executed, output))
     }
 
@@ -2946,10 +2966,7 @@ impl AptosVM {
             type_args,
             arguments,
             max_gas_amount,
-            |gas_feature_version,
-             vm_gas_params,
-             storage_gas_params,
-             meter_value_nodes_on_deserialize| {
+            |gas_feature_version, vm_gas_params, storage_gas_params, timed_features| {
                 make_prod_gas_meter(
                     gas_feature_version,
                     vm_gas_params,
@@ -2957,7 +2974,7 @@ impl AptosVM {
                     None,
                     max_gas_amount.into(),
                     &NoopBlockSynchronizationKillSwitch {},
-                    meter_value_nodes_on_deserialize,
+                    timed_features,
                 )
             },
         );
@@ -2996,10 +3013,7 @@ impl AptosVM {
             type_args,
             arguments,
             max_gas_amount,
-            |gas_feature_version,
-             vm_gas_params,
-             storage_gas_params,
-             meter_value_nodes_on_deserialize| {
+            |gas_feature_version, vm_gas_params, storage_gas_params, timed_features| {
                 let gas_meter = make_prod_gas_meter_impl::<_, M>(
                     gas_feature_version,
                     vm_gas_params,
@@ -3007,7 +3021,7 @@ impl AptosVM {
                     None,
                     max_gas_amount.into(),
                     &NoopBlockSynchronizationKillSwitch {},
-                    meter_value_nodes_on_deserialize,
+                    timed_features,
                 );
                 modify_gas_meter(gas_meter)
             },
@@ -3027,7 +3041,7 @@ impl AptosVM {
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
         max_gas_amount: u64,
-        make_gas_meter: impl FnOnce(u64, VMGasParameters, StorageGasParameters, bool) -> G,
+        make_gas_meter: impl FnOnce(u64, VMGasParameters, StorageGasParameters, &TimedFeatures) -> G,
     ) -> (ViewFunctionOutput, Option<G>) {
         let env = AptosEnvironment::new(state_view);
         let vm = AptosVM::new(&env);
@@ -3065,8 +3079,7 @@ impl AptosVM {
             vm.gas_feature_version(),
             vm_gas_params,
             storage_gas_params,
-            vm.timed_features()
-                .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
+            vm.timed_features(),
         );
 
         let resolver = state_view.as_move_resolver();
@@ -3663,8 +3676,7 @@ impl VMValidator for AptosVM {
             txn_data.txn_limits.as_ref(),
             initial_balance,
             &NoopBlockSynchronizationKillSwitch {},
-            self.timed_features()
-                .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
+            self.timed_features(),
         );
         let storage = TraversalStorage::new();
 

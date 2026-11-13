@@ -106,7 +106,9 @@ def _write_screening_report(
                  "target": r.get("target") or r.get("package_module_target"),
                  "passed": True,
                  "apparatus_ok": True,
-                 "reference_sha256": "d" * 64}
+                 "reference_sha256": "d" * 64,
+                 "task_tree_sha256": r.get("prepared_sha256")
+                 or tree_hash(corpus_root / package)}
                 for r in records
                 if r.get("screening_status", "ready") == "ready"
             ],
@@ -906,7 +908,7 @@ class MutantManifestResolution(unittest.TestCase):
             _write_mutants(root / "a", ["m1"])
             with self.assertRaises(FileNotFoundError) as caught:
                 _resolve_mutant_manifests(
-                [{"task_id": t, "snapshot": str(_mutant_package(root))} for t in ("a", "b")],
+                [_mutant_task(root, t) for t in ("a", "b")],
                 root,
             )
             self.assertIn("b", str(caught.exception))
@@ -918,7 +920,7 @@ class MutantManifestResolution(unittest.TestCase):
             _write_mutants(root / "b", [])
             with self.assertRaises(FileNotFoundError):
                 _resolve_mutant_manifests(
-                [{"task_id": t, "snapshot": str(_mutant_package(root))} for t in ("a", "b")],
+                [_mutant_task(root, t) for t in ("a", "b")],
                 root,
             )
 
@@ -928,7 +930,7 @@ class MutantManifestResolution(unittest.TestCase):
             _write_mutants(root / "a", ["m1"])
             _write_mutants(root / "b", ["m2"])
             digests, fingerprints = _resolve_mutant_manifests(
-                [{"task_id": t, "snapshot": str(_mutant_package(root))} for t in ("a", "b")],
+                [_mutant_task(root, t) for t in ("a", "b")],
                 root,
             )
             self.assertEqual(digests["a"], sha256_file(root / "a" / "mutants.json"))
@@ -939,10 +941,39 @@ class MutantManifestResolution(unittest.TestCase):
             root = Path(temporary)
             _write_mutants(root / "a", ["first", "second"])
             digests, _ = _resolve_mutant_manifests(
-                [{"task_id": "a", "snapshot": str(_mutant_package(root))}],
+                [_mutant_task(root, "a")],
                 root,
             )
             self.assertEqual(digests["a"], sha256_file(root / "a" / "mutants.json"))
+
+    def test_mutants_are_anchored_in_the_tree_the_task_starts_from(self) -> None:
+        # The preparation patch inserts a contract above the mutated code, so
+        # the anchor only describes the patched tree, not the snapshot.
+        patch = (
+            "diff --git a/sources/m.move b/sources/m.move\n"
+            "--- a/sources/m.move\n"
+            "+++ b/sources/m.move\n"
+            "@@ -1 +1,2 @@\n"
+            "+// spec placeholder\n"
+            " module m { fun f(): u64 { 1 } }\n"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory = root / "a"
+            directory.mkdir()
+            patched = "// spec placeholder\n" + MUTANT_SOURCE
+            (directory / "mutants.json").write_text(
+                json.dumps({"mutants": [{
+                    "mutant_id": "one",
+                    "file": "sources/m.move",
+                    "anchor": {"offset": patched.index("1"), "length": 1,
+                               "sha256": hashlib.sha256(b"1").hexdigest()},
+                    "edit": {"at": 0, "kind": "substitute", "length": 1, "to": "2"},
+                }]}),
+                encoding="utf-8",
+            )
+            _, fingerprints = _resolve_mutant_manifests([_mutant_task(root, "a", patch)], root)
+            self.assertEqual(len(fingerprints["a"]), 1)
 
     def test_a_manifest_cannot_repeat_a_mutant_id(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -950,7 +981,7 @@ class MutantManifestResolution(unittest.TestCase):
             _write_mutants(root / "a", ["same", "same"])
             with self.assertRaisesRegex(ValueError, "repeats mutant id"):
                 _resolve_mutant_manifests(
-                    [{"task_id": "a", "snapshot": str(_mutant_package(root))}],
+                    [_mutant_task(root, "a")],
                     root,
                 )
 
@@ -962,8 +993,16 @@ def _mutant_package(root: Path) -> Path:
     """A package the fixture mutants can be anchored against."""
     package = root / "snapshot"
     (package / "sources").mkdir(parents=True, exist_ok=True)
+    (package / "Move.toml").write_text("[package]\nname = \"m\"\n", encoding="utf-8")
     (package / "sources" / "m.move").write_text(MUTANT_SOURCE, encoding="utf-8")
     return package
+
+
+def _mutant_task(root: Path, task_id: str, patch: str = "") -> dict:
+    """A scheduled task over `_mutant_package`, with a preparation patch."""
+    patch_path = root / f"{task_id}.patch"
+    patch_path.write_text(patch, encoding="utf-8")
+    return {"task_id": task_id, "snapshot": str(_mutant_package(root)), "patch": str(patch_path)}
 
 
 def _write_mutants(directory: Path, mutant_ids: list[str]) -> None:

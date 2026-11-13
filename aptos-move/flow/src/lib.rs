@@ -56,6 +56,12 @@ pub struct GlobalOpts {
     /// overrides MOVE_FLOW_FEEDBACK_LEVEL; the default is acceptance.
     #[arg(long, value_enum, global = true)]
     pub feedback_level: Option<FeedbackLevel>,
+
+    /// Report an abort characterization which WP cannot make exact as an
+    /// error rather than emitting `aborts_if_is_partial`. The CLI overrides
+    /// MOVE_FLOW_ABORTS_IF_IS_STRICT.
+    #[arg(long, global = true)]
+    pub aborts_if_is_strict: bool,
 }
 
 impl GlobalOpts {
@@ -64,6 +70,7 @@ impl GlobalOpts {
             self.inference_tactic,
             self.evaluation_mode,
             self.feedback_level,
+            self.aborts_if_is_strict,
         )
     }
 }
@@ -114,7 +121,8 @@ impl FlowCli {
             FlowCommand::Hook(cmd) => hooks::run(cmd, &self.global),
             FlowCommand::Experiment(args) => {
                 let args = args.clone();
-                tokio::task::spawn_blocking(move || experiment::run(&args))
+                let global = self.global.clone();
+                tokio::task::spawn_blocking(move || experiment::run(&args, &global))
                     .await
                     .context("experiment task panicked")?
             },

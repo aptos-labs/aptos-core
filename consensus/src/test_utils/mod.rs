@@ -2,6 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![allow(clippy::unwrap_used)]
+// The fuzzer only uses a few mocks from here.
+#![cfg_attr(not(test), allow(dead_code))]
 use crate::{
     block_storage::{BlockReader, BlockStore},
     liveness::{

@@ -1,5 +1,10 @@
-inference succeeded, wrote spec files for 1 file(s) (read the files to see the changes):
+inference succeeded, wrote spec files for 1 file(s); the inferred specification blocks as they now read:
 - <TEMPDIR>/filegen.spec.move
+    3 |     spec add_one(x: u64): u64 {
+    4 |         pragma opaque = true;
+    5 |         ensures [inferred] result == x + 1;
+    6 |         aborts_if [inferred] x == MAX_U64;
+    7 |     }
 
 === source (untouched) ===
 module 0xCAFE::filegen {

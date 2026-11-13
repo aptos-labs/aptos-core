@@ -59,13 +59,16 @@ architectures and memory hierarchies.
   call.
 
 Xfer slot candidacy: A value may be assigned directly to `Xfer(i)` as an
-outgoing call argument if:
+outgoing argument of a direct call if:
 - it is a temp SSA value
 - it has a single reaching def in the same block
 - there is no intervening call between def and use
 - its last use is that call instruction
 - it is not already committed to a conflicting coalescing decision
 
-A call result may stay in `Xfer(i)` if:
+Closure-call arguments never use transfer slots: the runtime copies them in
+from the caller's frame around the captured values.
+
+A call result (direct or closure) may stay in `Xfer(i)` if:
 - it is only used within the same basic block
 - no later call clobbers it before its last use

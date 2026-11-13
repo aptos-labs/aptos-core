@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_behavioral_frame_deferral.move:53:9
+   │
+53 │         ensures global<Counter>(a).n == old(global<Counter>(a).n);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_behavioral_frame_deferral.move:43: claims_unchanged
+   =         c = <redacted>
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/lambda_behavioral_frame_deferral.move:44: claims_unchanged
+   =         f = <redacted>
+   =     at tests/sources/functional/closures/lambda_behavioral_frame_deferral.move:17: apply (spec)
+   =     at tests/sources/functional/closures/lambda_behavioral_frame_deferral.move:49: claims_unchanged
+   =         result = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/lambda_behavioral_frame_deferral.move:53: claims_unchanged (spec)

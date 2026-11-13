@@ -206,17 +206,6 @@ pub(crate) mod macros {
 /// (likely driven by gas limits).
 const MAX_SINGLE_ALLOCATION_SIZE: usize = DEFAULT_HEAP_SIZE;
 
-/// True if `bump_ptr + size` still lies within the heap buffer (or one
-/// byte past the end). Compares integer addresses to avoid forming an
-/// out-of-bounds raw pointer through `add`.
-fn fits_in_buffer(heap: &Heap, size: usize) -> bool {
-    let bump_addr = heap.bump_ptr as usize;
-    let end_addr = heap.buffer.as_ptr() as usize + heap.buffer.len();
-    bump_addr
-        .checked_add(size)
-        .is_some_and(|end| end <= end_addr)
-}
-
 /// Heap state for a single interpreter context.
 pub struct Heap {
     /// Backing memory. Swapped with a fresh `MemoryRegion` on every GC
@@ -615,12 +604,7 @@ pub(crate) fn heap_alloc(
         }));
     }
 
-    // Bound check uses integer arithmetic on addresses rather than
-    // `bump_ptr.add(aligned_size)` against `buffer.as_ptr().add(buffer.len())`:
-    // pointer arithmetic that produces a result more than one byte past
-    // the end of the buffer is UB, so we cannot legally form the
-    // out-of-bounds pointer just to compare it.
-    if !fits_in_buffer(heap, aligned_size) {
+    if !heap.buffer.contains_range(heap.bump_ptr, aligned_size) {
         return Err(AllocationError::OutOfHeapMemory {
             requested: aligned_size,
         });
@@ -973,9 +957,9 @@ pub(crate) enum TopFrame<'a> {
 /// interpreter and the micro-op verifier:
 ///
 /// - **Frame metadata integrity**: each frame's saved `fp`, `func_ptr`,
-///   and `pc` are written by [`MicroOp::Return`], [`MicroOp::CallDirect`],
-///   [`MicroOp::CallIndirect`] and never modified by user-visible micro-ops.
-///   A corrupted saved `fp` leads to out-of-bounds stack reads (UB).
+///   and `pc` are written only by frame initialization and the call protocol,
+///   never by user-visible data operations. A corrupted saved `fp` leads to
+///   out-of-bounds stack reads (UB).
 /// - **Pointer-slot accuracy**: `Function::frame_layout` (and the
 ///   matching `safe_point_layouts` entry, if any) together list every
 ///   frame offset that may hold a live heap pointer, and *only* those

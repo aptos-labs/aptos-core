@@ -43,6 +43,7 @@ pub mod exp_generator;
 pub mod exp_rewriter;
 pub mod exp_simplifier;
 pub mod intrinsics;
+pub mod lambda_specialization;
 pub mod memory_labels;
 pub mod metadata;
 pub mod model;

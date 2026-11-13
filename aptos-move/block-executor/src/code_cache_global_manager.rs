@@ -4,9 +4,10 @@
 use crate::{
     code_cache_global::GlobalModuleCache,
     counters::{
-        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES, GLOBAL_MODULE_CACHE_NUM_MODULES,
-        GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_MODULE_IDS, NUM_INTERNED_TYPES,
-        NUM_INTERNED_TYPE_VECS, STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
+        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES, GLOBAL_LAYOUT_CACHE_SIZE_IN_BYTES,
+        GLOBAL_MODULE_CACHE_NUM_MODULES, GLOBAL_MODULE_CACHE_SIZE_IN_BYTES,
+        NUM_INTERNED_MODULE_IDS, NUM_INTERNED_TYPES, NUM_INTERNED_TYPE_VECS,
+        STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
 };
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
@@ -22,7 +23,6 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use cfg_if::cfg_if;
-use mono_move_aptos_transaction_executor::AptosTransactionExecutor;
 use mono_move_global_context::GlobalContext;
 use move_binary_format::{
     errors::{Location, VMError},
@@ -36,11 +36,9 @@ use move_vm_types::code::WithSize;
 use parking_lot::{Mutex, MutexGuard};
 use std::{hash::Hash, ops::Deref, sync::Arc};
 
-/// A global context with everything the MonoMove executor reads preinstalled.
+/// A global context for the MonoMove executor.
 fn new_global_context(num_workers: usize) -> Arc<GlobalContext> {
-    let mut ctx = GlobalContext::with_num_execution_workers(num_workers);
-    AptosTransactionExecutor::preinstall(&mut ctx);
-    Arc::new(ctx)
+    Arc::new(GlobalContext::with_num_execution_workers(num_workers))
 }
 
 /// Raises an alert with the specified message. In case we run in testing mode, instead prints the
@@ -173,12 +171,13 @@ where
             self.module_cache.flush_all_caches();
         }
 
-        // If there are too many layouts: flush only them.
-        let num_layout_entries = self.module_cache.num_cached_layouts();
-        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES.set(num_layout_entries as i64);
-        if num_layout_entries > config.max_layout_cache_size {
-            self.module_cache.flush_layout_cache();
-        }
+        // Layout cache size is bounded on every insertion (it is flushed if the new layout does
+        // not fit), here we only set the bound and record metrics.
+        self.module_cache
+            .set_max_layout_cache_size_in_bytes(config.max_layout_cache_size_in_bytes);
+        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES.set(self.module_cache.num_cached_layouts() as i64);
+        GLOBAL_LAYOUT_CACHE_SIZE_IN_BYTES
+            .set(self.module_cache.layout_cache_size_estimate_in_bytes() as i64);
 
         Ok(())
     }
@@ -613,7 +612,7 @@ mod test {
             max_struct_name_index_map_num_entries: 2,
             max_interned_tys: 100,
             max_interned_ty_vecs: 100,
-            max_layout_cache_size: 10,
+            max_layout_cache_size_in_bytes: 1024,
             max_interned_module_ids: 100,
         };
 
@@ -785,16 +784,16 @@ mod test {
         // Add 3 types and 3 type vectors.
         runtime_environment
             .ty_pool()
-            .intern_ty_args(&[Type::Vector(triomphe::Arc::new(Type::Signer)), Type::U8]);
+            .intern_ty_args(&[Type::vector(Type::Signer), Type::U8])
+            .unwrap();
         runtime_environment
             .ty_pool()
-            .intern_ty_args(&[Type::U8, Type::Vector(triomphe::Arc::new(Type::Address))]);
-        runtime_environment.ty_pool().intern_ty_args(&[
-            Type::Signer,
-            Type::Vector(triomphe::Arc::new(Type::Vector(triomphe::Arc::new(
-                Type::Address,
-            )))),
-        ]);
+            .intern_ty_args(&[Type::U8, Type::vector(Type::Address)])
+            .unwrap();
+        runtime_environment
+            .ty_pool()
+            .intern_ty_args(&[Type::Signer, Type::vector(Type::vector(Type::Address))])
+            .unwrap();
 
         assert_eq!(runtime_environment.module_id_pool().len(), 3);
         assert_eq!(runtime_environment.struct_name_index_map_size().unwrap(), 3);
@@ -905,6 +904,24 @@ mod test {
             num_interned_tys_before,
             num_interned_ty_vecs_before,
         );
+    }
+
+    #[test]
+    fn test_check_ready_does_not_flush_ty_tag_cache() {
+        let (_, _, mut manager) = cache_manager_for_test();
+        let state_view = MockStateView::empty();
+        let metadata_2 = TransactionSliceMetadata::block_from_u64(1, 2);
+
+        assert_ok!(manager.check_ready(
+            AptosEnvironment::new(&state_view),
+            &BlockExecutorModuleCacheLocalConfig {
+                prefetch_framework_code: false,
+                ..Default::default()
+            },
+            metadata_2
+        ));
+        let runtime_environment = manager.environment.as_ref().unwrap().runtime_environment();
+        assert_eq!(runtime_environment.ty_tag_cache().len(), 3);
     }
 
     #[test]

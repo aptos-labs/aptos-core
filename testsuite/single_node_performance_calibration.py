@@ -93,16 +93,27 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--metric",
+        choices=["overall", "inner", "move-e2e"],
+        default="overall",
+        help="Which calibration file to refresh: end-to-end single-node tps, "
+        "inner block executor tps, or move e2e wall time",
+    )
+
+    parser.add_argument(
         "--move-e2e",
         action="store_true",
-        help="Calibrate move e2e test",
+        help="Deprecated alias for --metric move-e2e",
     )
 
     parser.add_argument(
         "--time-interval", default="5d", help="Time interval to look at humio for"
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.move_e2e:
+        args.metric = "move-e2e"
+    return args
 
 
 def query_humio(query_string, time_interval):
@@ -123,6 +134,8 @@ def query_humio(query_string, time_interval):
             "Content-Type": "application/json",
         },
     )
+    # Without this an expired token's error body is parsed as result rows.
+    resp.raise_for_status()
 
     return resp.text.strip()
 
@@ -141,7 +154,7 @@ def _load_existing_tsv(path, key_columns_count):
     return rows
 
 
-def format_changelog_entry(date_str, is_move_e2e, triggers, unparseable):
+def format_changelog_entry(date_str, metric, triggers, unparseable):
     """Render one recalibration event as a markdown table.
 
     `triggers` is a list of (key, old, new, kind, runs) tuples, where `key` is the tuple of
@@ -152,7 +165,7 @@ def format_changelog_entry(date_str, is_move_e2e, triggers, unparseable):
     change of the calibrated metric -- tps for single-node (so a regression is negative),
     wall-time microseconds for move-e2e (so a regression is positive); new rows show "new".
     """
-    if is_move_e2e:
+    if metric == "move-e2e":
         headers = ["transaction_type", "runs", "wall-time % change"]
     else:
         headers = [
@@ -160,7 +173,7 @@ def format_changelog_entry(date_str, is_move_e2e, triggers, unparseable):
             "module_working_set",
             "executor",
             "runs",
-            "tps % change",
+            "inner tps % change" if metric == "inner" else "tps % change",
         ]
 
     lines = [f"## {date_str}", ""]
@@ -182,14 +195,21 @@ def format_changelog_entry(date_str, is_move_e2e, triggers, unparseable):
     return "\n".join(lines) + "\n"
 
 
-def changelog_header(is_move_e2e):
+def changelog_header(metric):
     """The fixed title/legend block at the top of a changelog (created on first write)."""
-    if is_move_e2e:
+    if metric == "move-e2e":
         return (
             "# Move e2e-benchmark calibration log\n\n"
             "Recalibration history, newest first. Each entry lists the tests whose "
             "calibrated value drifted out of band, as a signed `wall-time % change` "
             "(positive means slower); new tests show `new`.\n"
+        )
+    if metric == "inner":
+        return (
+            "# Single-node inner block executor calibration log\n\n"
+            "Recalibration history, newest first. Each entry lists the tests whose "
+            "calibrated value drifted out of band, as a signed `inner tps % change` "
+            "(negative means slower); new tests show `new`.\n"
         )
     return (
         "# Single-node execution-performance calibration log\n\n"
@@ -199,7 +219,7 @@ def changelog_header(is_move_e2e):
     )
 
 
-def update_changelog(tsv_path, is_move_e2e, triggers, unparseable):
+def update_changelog(tsv_path, metric, triggers, unparseable):
     """Insert a recalibration entry into the changelog beside `tsv_path`.
 
     Only called when this run actually rewrote the `.tsv`, so the changelog only ever changes
@@ -215,10 +235,10 @@ def update_changelog(tsv_path, is_move_e2e, triggers, unparseable):
     if os.path.exists(changelog_path):
         with open(changelog_path) as f:
             current = f.read()
-    content = current if current.strip() else changelog_header(is_move_e2e)
+    content = current if current.strip() else changelog_header(metric)
     entry = format_changelog_entry(
         datetime.date.today().isoformat(),
-        is_move_e2e,
+        metric,
         triggers,
         unparseable,
     )
@@ -236,8 +256,9 @@ def update_changelog(tsv_path, is_move_e2e, triggers, unparseable):
 
 def main():
     args = parse_args()
+    is_move_e2e = args.metric == "move-e2e"
 
-    if args.move_e2e:
+    if is_move_e2e:
         prefix = (
             """
         github.job.name = "single-node-performance"
@@ -271,7 +292,7 @@ def main():
         | format("%.3f", field=min_ratio, as="min_ratio")
         | format("%.3f", field=max_ratio, as="max_ratio")
         | format("%.3f", field=offset_avg_from_expected, as="offset_median_from_expected")
-        | table([transaction_type, count, min_ratio, max_ratio, median, expected], sortby=test_index, reverse=false)
+        | table([transaction_type, count, min_ratio, max_ratio, median, expected], sortby=test_index, reverse=false, limit=1000)
         """
         )
 
@@ -309,23 +330,44 @@ def main():
         """
         )
 
+        if args.metric == "inner":
+            # Only the two fractions exist across the whole history, so derive
+            # the metric from them rather than reading the inner_tps field.
+            # count(field=...) so the sample count matches the stats: where a
+            # fraction is zero the assignment yields no value, but a bare
+            # count() would still include the event.
+            metric = "inner_tps"
+            derive = (
+                "        | inner_tps := tps / fraction_in_execution"
+                " / fraction_of_execution_in_inner_block_executor\n"
+            )
+            count_fn = 'count(field=inner_tps, as="count")'
+            expected_field = "inner_expected_tps"
+            output_file_name = "testsuite/single_node_performance_inner_values.tsv"
+        else:
+            metric = "tps"
+            derive = ""
+            count_fn = 'count(as="count")'
+            expected_field = "expected_tps"
+            output_file_name = "testsuite/single_node_performance_values.tsv"
+
         query_string = (
             prefix
+            + derive
             + """
-        | groupBy([test_index, transaction_type, module_working_set_size, executor_type, code_perf_version], function=[count(as="count"), avg(expected_tps, as="expected"), avg(tps, as="avg_tps"), min(tps, as="min_tps"), max(tps, as="max_tps"), percentile(field=tps, accuracy=0.001, percentiles=[50])])
-        | min_ratio := min_tps / _50
-        | avg_ratio := avg_tps / _50
-        | max_ratio := max_tps / _50
+        | groupBy([transaction_type, module_working_set_size, executor_type], function=[{count_fn}, max(test_index, as="test_index"), avg({expected_field}, as="expected"), avg({metric}, as="avg_metric"), min({metric}, as="min_metric"), max({metric}, as="max_metric"), percentile(field={metric}, accuracy=0.001, percentiles=[50])])
+        | min_ratio := min_metric / _50
+        | avg_ratio := avg_metric / _50
+        | max_ratio := max_metric / _50
         | offset_avg_from_expected := _50 / expected
         | format("%.1f", field=_50, as="median")
-        | format("%.1f", field=avg_tps, as="avg_tps")
-        | format("%.1f", field=min_tps, as="min_tps")
-        | format("%.1f", field=max_tps, as="max_tps")
         | format("%.3f", field=min_ratio, as="min_ratio")
         | format("%.3f", field=max_ratio, as="max_ratio")
         | format("%.3f", field=offset_avg_from_expected, as="offset_median_from_expected")
-        | table([transaction_type, module_working_set_size, executor_type, count, min_ratio, max_ratio, median], sortby=test_index, reverse=false)
-        """
+        | table([transaction_type, module_working_set_size, executor_type, count, min_ratio, max_ratio, median], sortby=test_index, reverse=false, limit=1000)
+        """.format(
+                count_fn=count_fn, expected_field=expected_field, metric=metric
+            )
         )
 
         columns = [
@@ -342,17 +384,22 @@ def main():
         def split_line(line):
             return line.strip().split(", ")
 
-        output_file_name = "testsuite/single_node_performance_values.tsv"
-
     response_text = query_humio(query_string, time_interval=args.time_interval)
 
     parsed = [
         {
             (parts := key_value.split("->"))[0]: parts[1]
             for key_value in split_line(line)
+            if "->" in key_value
         }
         for line in response_text.split("\n")
+        if line.strip()
     ]
+    parsed = [row for row in parsed if row]
+    if not parsed:
+        raise SystemExit(
+            f"Humio returned no rows for {output_file_name}; refusing to rewrite it."
+        )
 
     existing = _load_existing_tsv(output_file_name, key_columns_count)
 
@@ -370,15 +417,17 @@ def main():
     # Existing rows whose drift was ignored as too-few-samples: keep their old values when
     # the file is rewritten (a recalibration triggered by other rows must not bake these in).
     keep_old = set()
+    # Rows that survived extraction, keyed for the rewrite. A row that failed
+    # above must not reach the write loop, where projecting it raises KeyError.
+    writable = {}
 
     for new_row in parsed:
         try:
             key = tuple(new_row[c] for c in columns[:key_columns_count])
             # Move-e2e rows do not carry an executor_type column; the gate
             # below only applies to the non-move-e2e path.
-            executor_type = (
-                None if args.move_e2e else new_row["executor_type"]
-            )
+            executor_type = None if is_move_e2e else new_row["executor_type"]
+            row_cells = [new_row[column] for column in columns]
         except KeyError as e:
             print(f"Row missing required column {e}; "
                   f"treating as unparseable.")
@@ -386,11 +435,13 @@ def main():
             needs_update = True
             continue
 
+        writable[key] = row_cells
+
         # Non-blocking executor types are warning-only in the perf gate, so
         # their drift must not be the reason a calibration PR opens. They
         # are still refreshed alongside production rows when a write does
         # happen.
-        if not args.move_e2e and executor_type in NON_BLOCKING_EXECUTOR_TYPES:
+        if not is_move_e2e and executor_type in NON_BLOCKING_EXECUTOR_TYPES:
             experimental_skipped += 1
             continue
 
@@ -415,7 +466,7 @@ def main():
             needs_update = True
             continue
 
-        if args.move_e2e:
+        if is_move_e2e:
             lo, hi = wall_time_band(old_expected, old_min_ratio, old_max_ratio)
         else:
             lo, hi = tps_band(
@@ -445,20 +496,29 @@ def main():
     )
 
     if needs_update:
+        dropped = [key for key in existing if key not in writable]
+        if dropped:
+            # A test that did not run in the window, or a partial Humio
+            # response, would otherwise delete the row -- and the benchmark
+            # asserts every test has a calibrated value.
+            print(
+                f"{len(dropped)} row(s) absent from the query; "
+                f"keeping their existing values: {sorted(dropped)}"
+            )
         with open(output_file_name, "w") as f:
-            for line in parsed:
-                key = tuple(line[c] for c in columns[:key_columns_count])
+            for key, row in writable.items():
                 if key in keep_old:
                     # A too-few-samples drift keeps its previously calibrated row.
                     row = existing[key]
-                else:
-                    row = [line[column] for column in columns]
                 f.write("\t".join(row))
+                f.write("\n")
+            for key in dropped:
+                f.write("\t".join(existing[key]))
                 f.write("\n")
         print(f"Written to {output_file_name}")
         # Record the recalibration in the changelog. Only done here -- never on a run that
         # leaves the .tsv unchanged -- so the workflow never opens a PR for an empty changelog.
-        update_changelog(output_file_name, args.move_e2e, triggers, unparseable)
+        update_changelog(output_file_name, args.metric, triggers, unparseable)
     else:
         print(
             f"No production rows outside band; "

@@ -1,0 +1,62 @@
+{
+ "guessable": 3,
+ "held_back": {},
+ "keep_redundant": true,
+ "loops": 14,
+ "max_guessable": 3,
+ "modules": 12,
+ "near_duplicate_targets": [
+  {
+   "similarity": 0.551,
+   "tasks": [
+    "TR-cancel-026",
+    "TR-nonzero-031"
+   ]
+  }
+ ],
+ "schema_version": 1,
+ "selected": [
+  "DM-keepalive-035",
+  "DM-valid-036",
+  "EA-scheme-041",
+  "JW-upsert-049",
+  "MS-capacity-048",
+  "MS-pending-046",
+  "MS-timelock-047",
+  "PT-taker-034",
+  "QP-part-025",
+  "RL-refill-037",
+  "RL-request-043",
+  "SM-select-022",
+  "SU-split-045",
+  "TL-build-039",
+  "TL-enough-044",
+  "TL-find-040",
+  "TL-tiers-038",
+  "TL-update-050",
+  "TR-cancel-026",
+  "TR-discard-011",
+  "TR-match-029",
+  "TR-nonzero-031",
+  "TR-order-010",
+  "TR-reinsert-030",
+  "TR-sanitize-028",
+  "VR-range-042"
+ ],
+ "size": 26,
+ "source_similarity_threshold": 0.5,
+ "strata_covered": 32,
+ "strata_lost": [],
+ "strata_total": 32,
+ "unique_stratum_carriers": [
+  "MS-capacity-048",
+  "QP-part-025",
+  "RL-refill-037",
+  "SM-select-022",
+  "TL-enough-044",
+  "TL-update-050",
+  "TR-reinsert-030",
+  "TR-sanitize-028",
+  "VR-range-042"
+ ]
+}

@@ -53,8 +53,9 @@ module 0x42::function_calls {
         f(x)
     }
     spec apply(f: |u64|u64, x: u64): u64 {
-        pragma opaque = true, aborts_if_is_partial = true;
-        ensures [inferred = sathard] result == result_of<f>(x);
+        pragma opaque = true;
+        ensures [inferred] result == result_of<f>(x);
+        aborts_if [inferred] aborts_of<f>(x);
     }
 
 
@@ -152,17 +153,8 @@ module 0x42::function_calls {
 }
 /*
 Inference diagnostics:
-warning: WP could not characterize the aborts of `function_calls::apply` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = a dynamic call has no trusted complete abort summary
-   ┌─ tests/inference/function_calls.move:30:5
-   │
-30 │ ╭     fun apply(f: |u64| u64, x: u64): u64 {
-31 │ │         f(x)
-32 │ │     }
-   │ ╰─────^
-
 warning: WP could not characterize the aborts of `function_calls::test_higher_order` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = callee `0x42::function_calls::apply` has no trusted complete abort summary
+  = an abort condition passes a closure to a behavioral predicate, which has no source-level spelling
    ┌─ tests/inference/function_calls.move:35:5
    │
 35 │ ╭     fun test_higher_order(x: u64): u64 {

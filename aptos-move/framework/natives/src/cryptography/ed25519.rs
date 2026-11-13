@@ -19,7 +19,7 @@ use move_core_types::gas_algebra::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 #[cfg(feature = "testing")]
-use rand_core::OsRng;
+use rand::rngs::OsRng;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, convert::TryFrom};
 

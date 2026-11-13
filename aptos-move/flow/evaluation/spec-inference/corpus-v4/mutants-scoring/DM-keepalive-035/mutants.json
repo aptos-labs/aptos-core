@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 27,
+        "offset": 3582,
+        "sha256": "3a0217003ee455b04dd44fb3ee9d6ea15495adc1b6cdd608e1554fa4e83c6979"
+      },
+      "edit": {
+        "at": 20,
+        "kind": "substitute",
+        "length": 4,
+        "to": "== 1"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-keepalive-035-disable-on-one",
+      "obligation_category": "normal-result",
+      "rationale": "A timeout of one disables the switch and zero is treated as a timeout.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 45,
+        "offset": 4355,
+        "sha256": "606cf8f2743d8e9b5569c436784cdd33890442e2d5de495944abb3473e5e768d"
+      },
+      "edit": {
+        "at": 32,
+        "kind": "substitute",
+        "length": 12,
+        "to": "state.expiration_time_secs"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-keepalive-035-session-restarts-at-expiry",
+      "obligation_category": "normal-result",
+      "rationale": "A new session starts at the old expiration instead of now.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 53,
+        "offset": 3953,
+        "sha256": "b1474c91e045cee9b13e1bc8829fabd4c24574fc713e571263a9e5ca017d581b"
+      },
+      "edit": {
+        "at": 22,
+        "kind": "substitute",
+        "length": 15,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-keepalive-035-expiration-not-offset",
+      "obligation_category": "normal-result",
+      "rationale": "The expiration is the timeout itself rather than now plus the timeout.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "46d84ea3b60893371baad70db1d57cb71db63e8de4ac72e63ce215cb74aae6be",
+  "task_id": "DM-keepalive-035"
+}

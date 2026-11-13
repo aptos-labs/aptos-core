@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 52,
+        "offset": 3736,
+        "sha256": "ce6b5cafb4d6498bd15e031430e7f68fd0abc68149a0d34658191ea0fd35cf3f"
+      },
+      "edit": {
+        "at": 16,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-keepalive-035-minimum-exclusive",
+      "obligation_category": "abort",
+      "rationale": "A timeout equal to the minimum is rejected.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 48,
+        "offset": 4189,
+        "sha256": "31496801abb86c97b19b418112a28fe8eeff7cc0ec59325fe0cf1f625f686e2b"
+      },
+      "edit": {
+        "at": 17,
+        "kind": "substitute",
+        "length": 1,
+        "to": ">="
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-keepalive-035-expiry-inclusive",
+      "obligation_category": "normal-result",
+      "rationale": "Renewing exactly at expiry starts a new session.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 88,
+        "offset": 4861,
+        "sha256": "1a8e4f58aa45abe2f1d31234573dadade0f1c6b9a51b4d6739fbea55ba440b78"
+      },
+      "edit": {
+        "at": 61,
+        "kind": "substitute",
+        "length": 26,
+        "to": "session_start_time_secs: current_time"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-keepalive-035-first-session-starts-now",
+      "obligation_category": "normal-result",
+      "rationale": "A first keep-alive invalidates the account's existing orders.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "46d84ea3b60893371baad70db1d57cb71db63e8de4ac72e63ce215cb74aae6be",
+  "task_id": "DM-keepalive-035"
+}

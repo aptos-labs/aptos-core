@@ -174,9 +174,11 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64,
         contract_creation_seed: vector<u8>
     ): address {
+        pragma opaque;
         pragma verify_duration_estimate = 120;
         pragma aborts_if_is_partial;
         include PreconditionsInCreateContract;
+        ensures exists<stake::ValidatorSet>(@aptos_framework);
 
         let amount = coins.value;
         include CreateStakingContractWithCoinsAbortsIfAndEnsures { amount };

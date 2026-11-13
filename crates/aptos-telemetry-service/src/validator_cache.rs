@@ -229,7 +229,7 @@ mod tests {
         validator_config::ValidatorConfig, validator_info::ValidatorInfo, PeerId,
     };
     use httpmock::MockServer;
-    use rand_core::OsRng;
+    use rand::rngs::OsRng;
     use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 
     #[tokio::test]

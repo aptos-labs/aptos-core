@@ -1,0 +1,18 @@
+# Configuration for the custom lints in devtools/lints (run with
+# `cargo dylint --all`). Each lint is scoped to crate names; a lint not
+# naming a crate does nothing there.
+#
+# This file must stay at the workspace root: dylint reads `dylint.toml` from
+# the root of the workspace being linted (like `clippy.toml`), not from the
+# lint library's directory.
+
+[aptos_lints.no_std_hash_map]
+# Consensus-critical: anything that executes a transaction.
+crates = ["mono-move-*", "specializer"]
+# Tooling: order-dependence cannot affect a committed result.
+exempt = [
+    "mono-move-testsuite",
+    "mono-move-replay-benchmark",
+    "mono-move-lean-link",
+    "vm-comparison",
+]

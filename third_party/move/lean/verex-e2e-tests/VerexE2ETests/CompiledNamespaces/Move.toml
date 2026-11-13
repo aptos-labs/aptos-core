@@ -1,0 +1,12 @@
+# Copyright © Aptos Foundation
+# SPDX-License-Identifier: Apache-2.0
+#
+# A package verified over compiled namespaces (`scripts/smoke.sh`): `client`
+# imports `base`, and a clause of `base` fails where `client` inlines it.
+
+[package]
+name = "CompiledNamespaces"
+version = "0.0.0"
+
+[addresses]
+fixture = "0x42"

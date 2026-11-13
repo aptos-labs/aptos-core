@@ -1,0 +1,66 @@
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:4:1: error: `no panic when aborts at call 1 of abs` is not established: the call `value.abs()` at VerexE2ETests/SourceVerify/library_integer_ops_errors.rs:5:5 may panic
+  from: value.val = -2147483648
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `magnitude` failed; provide a proof in the module:
+  verify magnitude by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of abs => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:8:3: error: the specification clause `ensures result is Some` is not established
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `quotient` failed; provide a proof in the module:
+  verify quotient by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:11:3: error: the specification clause `ensures left == -7 && right == 2 ==> result is Some && result.0 == -4` is not established
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `signed_quotient` failed; provide a proof in the module:
+  verify signed_quotient by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:13:1: error: `no panic when aborts at call 1 of rem_euclid` is not established: the call `left.rem_euclid(right)` at VerexE2ETests/SourceVerify/library_integer_ops_errors.rs:17:5 may panic
+  from: right.val = 0
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:13:6: error: verex verification failed: the automatic verification of `wrapped` failed; provide a proof in the module:
+  verify wrapped by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of rem_euclid => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:18:3: error: the specification clause `ensures left == -7 && right == 2 ==> result == -1` is not established
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `signed_wrapped` failed; provide a proof in the module:
+  verify signed_wrapped by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:21:3: error: the specification clause `ensures result == (∃ (k in 1 .. 8), value == (1 << k))` is not established
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:20:6: error: verex verification failed: the automatic verification of `single_bit` failed; provide a proof in the module:
+  verify single_bit by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:24:3: error: the specification clause `ensures value == 0 ==> result == 7` is not established
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:23:6: error: verex verification failed: the automatic verification of `high_zeros` failed; provide a proof in the module:
+  verify high_zeros by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:27:3: error: the specification clause `ensures value == 0 ==> result == 7` is not established
+VerexE2ETests/SourceVerify/library_integer_ops_errors.spec.lean:26:6: error: verex verification failed: the automatic verification of `low_zeros` failed; provide a proof in the module:
+  verify low_zeros by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

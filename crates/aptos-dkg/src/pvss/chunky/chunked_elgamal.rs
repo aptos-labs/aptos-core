@@ -366,7 +366,7 @@ pub fn correlated_randomness<F, R>(
 ) -> Vec<F>
 where
     F: PrimeField, // need `PrimeField` here because of `sample_field_element()`
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     let mut r_vals = vec![F::zero(); num_chunks];
     let mut remaining = *target_sum;

@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/proof_where_missing.proof.lean:9:1: error: in a proof file, `verify` items follow `verex proofs where`

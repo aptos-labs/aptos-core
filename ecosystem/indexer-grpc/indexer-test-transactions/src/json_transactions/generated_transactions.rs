@@ -679,12 +679,14 @@ pub const ALL_SCRIPTED_TRANSACTIONS: &[&[u8]] = &[
 
 pub fn get_transaction_name(const_data: &[u8]) -> Option<&'static str> {
     match const_data {
-        SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT4 => Some("simple_user_script4"),
-        SCRIPTED_TRANSACTIONS_FA_DOUBLE_TRANSFER => Some("fa_double_transfer"),
-        SCRIPTED_TRANSACTIONS_FA_MINT_TRANSFER_BURN => Some("fa_mint_transfer_burn"),
-        SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT2 => Some("simple_user_script2"),
-        SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT3 => Some("simple_user_script3"),
-        SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT1 => Some("simple_user_script1"),
+        _ if const_data == SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT4 => Some("simple_user_script4"),
+        _ if const_data == SCRIPTED_TRANSACTIONS_FA_DOUBLE_TRANSFER => Some("fa_double_transfer"),
+        _ if const_data == SCRIPTED_TRANSACTIONS_FA_MINT_TRANSFER_BURN => {
+            Some("fa_mint_transfer_burn")
+        },
+        _ if const_data == SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT2 => Some("simple_user_script2"),
+        _ if const_data == SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT3 => Some("simple_user_script3"),
+        _ if const_data == SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT1 => Some("simple_user_script1"),
         _ => None,
     }
 }

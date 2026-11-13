@@ -1,319 +1,281 @@
 # CLAUDE.md
 
-This file gives repository-local guidance for working in
-`third_party/move/lean`. Also follow the Aptos Core guidance in
-[`../../../CLAUDE.md`](../../../CLAUDE.md) and the applicable `AGENTS.md`.
+Repository-local guidance for working in `third_party/move/lean`. Also follow
+the Aptos Core guidance in [`../../../CLAUDE.md`](../../../CLAUDE.md).
+[`README.md`](README.md) describes the project, its packages, and the build
+and verification commands; this file holds the working rules.
 
-## Project overview
+## Rules of the tree
 
-This directory contains experimental Lean 4 implementations of a shared
-language-neutral IR, semantic profiles for Move and Rust, a Lean-authored Move
-language and verifier, a logical Move bytecode model, and source frontends and
-end-to-end tests around them.
+- The current codebase is the verex stack: `verex-ir`, `verex-move`,
+  `verex-rust` (with `rust-exporter`), and `verex-e2e-tests`. The `move`,
+  `move-model`, and `transpiler` packages under `v0/` are **deprecated**,
+  reference only: do not add functionality or tests to them, do not include
+  their suites in test runs or CI, and do not root new work in them.
+- Keep three claims separate: `verify f` proves a theorem about the generated
+  source semantics of a function; the compiler lowers supported declarations to
+  XIR and production Move bytecode; a compiler-correctness theorem connecting
+  the two is future work. Do not describe source verification as verification
+  of the emitted bytecode.
+- There is no root Lake workspace. Every top-level component is an independent
+  Lake package with its own `lakefile.toml`, manifest, and pinned
+  `lean-toolchain`; run `lake` from the package directory. All packages pin Lean
+  `v4.32.2`, and the exporter pins `nightly-2026-07-23`
+  ([`rust-toolchain.toml`](verex-rust/rust-exporter/rust-toolchain.toml)). Never
+  change a version in only one package.
+- Keep production dependencies one-way:
+  `verex-ir <- verex-move`, `verex-ir <- verex-rust <- rust-exporter`, and both
+  `<- verex-e2e-tests`. `verex-e2e-tests` is deliberately test-only and may
+  depend on every layer it exercises. Put source/result tests that genuinely
+  cross layers there, and keep assertion-style unit tests in the owning
+  package's `Tests` tree instead of adding a reverse dependency.
+- Within a package, the root `Foo.lean` is the public import, source modules
+  live under `Foo/`, and tests are either under `Foo/Tests/` or exposed through
+  a test library listed in `lakefile.toml`. `.lake/` is build output, not source.
+- Every source file in this tree, Lean and Rust alike, carries the Apache
+  header (`Copyright © Aptos Foundation` / `SPDX-License-Identifier:
+  Apache-2.0`), not the Innovation-Enabling header used elsewhere in the
+  repository. The Rust fixtures' headers are exported as comments, so a header
+  change regenerates the RawUnit and Rust e2e baselines.
+- Do not add `sorry`, axioms, or other admissions to make a proof compile unless
+  the design explicitly models an assumption and the change is requested.
 
-The current codebase is the leaner stack: `leaner-ir`, `leaner-move`,
-`leaner-rust` (with `rust-exporter`), and `leaner-e2e-tests`. The `move`,
-`move-model`, and `transpiler` packages under `v0/` are **deprecated**: they exist only as
-reference for solutions being rebuilt on the leaner codebase. Do not add
-functionality or tests to them, do not include their suites in test runs or
-CI, and do not root new work in them. The Move exchange frontend and LIR
-adapter formerly hosted by the transpiler now live in
-`leaner-move/LeanerMove/Frontend`. No leaner package links the deprecated
-packages; only compiler-v2's Lean integration still elaborates `.lean`
-sources against `v0/move`, so CI builds that library (not its suites) for
-the compiler-v2 tests.
+## Documentation (`doc/`)
 
-Keep these claims separate:
+Read the design for the layer being changed; the index is
+[`doc/README.md`](doc/README.md). Designs hold the model and the decisions, not
+status: what is open is in [`doc/plan/roadmap.md`](doc/plan/roadmap.md), and
+state that the source does not show is in [`doc/status/`](doc/status/).
 
-1. `verify f` proves a theorem about the generated source semantics of a
-   Lean-authored function.
-2. The compiler lowers supported declarations to XIR and production Move
-   bytecode.
-3. A compiler-correctness theorem connecting the source theorem to emitted
-   bytecode is future work. Do not describe source verification as verification
-   of the emitted bytecode.
+## Exchange frontend
 
-There is no root Lake workspace. Every top-level component is an independent
-Lake package with its own `lakefile.toml`, manifest, and pinned
-`lean-toolchain`. Run `lake` commands from the package directory, or in a
-subshell as shown below.
-
-## Dependency shape
-
-The principal one-way dependencies are:
-
-```text
-leaner-ir <- leaner-move <- leaner-e2e-tests
-          <- leaner-rust <- rust-exporter
-             leaner-rust <- leaner-e2e-tests
-
-move-model <- move <- transpiler        (deprecated, reference only)
-```
-
-`leaner-e2e-tests` is deliberately test-only and may depend on every layer it
-exercises. Avoid introducing reverse dependencies into production packages.
-
-## Tree map
-
-| Path | Contents |
-|---|---|
-| [`README.md`](README.md) | Tree-level overview, architecture, setup, and the main build/test path. Start here. |
-| [`designs/`](designs/) | The current cross-package design documents: unified LIR, LIR elaboration/verification, the LeanerLang surface, the Rust MIR frontend, and the MonoVM differential-testing link. |
-| [`leaner-ir/`](leaner-ir/) | Shared typed LIR, versioned RawUnit JSON import, validation, structured semantics, interpreter, proofs, and unit tests. It owns the neutral IR boundary. |
-| [`leaner-move/`](leaner-move/) | Move semantic profile and intrinsic registry over `leaner-ir`, plus the Move exchange frontend (`LeanerMove/Frontend`): CLI invocation, XAST decoding, and LIR encoding. |
-| [`leaner-rust/`](leaner-rust/) | Rust semantic profile, source backend, registry, Lean-owned import CLI, and Lean integration tests. |
-| [`leaner-rust/rust-exporter/`](leaner-rust/rust-exporter/) | Standalone Rust crate using the pinned Rustc Public API to export borrow-checked optimized MIR as RawUnit JSON. Fixtures and JSON baselines live under `tests/`. |
-| [`v0/move-model/`](v0/move-model/) | **Deprecated, reference only.** Logical model of Move stackless bytecode: IR, execution semantics, checking, interpreter, reference elimination, prover stages, XIR, and source/masm frontends. |
-| [`v0/move/`](v0/move/) | **Deprecated, reference only.** The original Leaner Move surface language, source semantics, contracts, `verify`, compiler lowering, and `Move/Tests` regressions, being rebuilt over the unified LIR. |
-| [`v0/transpiler/`](v0/transpiler/) | **Deprecated, reference only.** `aptos move exchange --format ast` decoder, Move-to-Leaner printer, intrinsic handling, reporting, CLI, and printer/elaboration baselines. Its exchange frontend and LIR adapter were ported to `leaner-move`. |
-| [`leaner-e2e-tests/`](leaner-e2e-tests/) | Discoverable Move-to-LeanerLang and Rust-to-LeanerLang source/result baselines. Assertion-style legacy tests remain with their owning packages. |
-| [`scripts/`](scripts/) | The Rust pipeline benchmark (`bench-rust-pipeline.sh`). |
-| [`v0/`](v0/) | **Deprecated, reference only.** The original stack: `move`, `move-model`, `transpiler`, and their `scripts/` proof-cost tools. No leaner package links them; CI builds only the `v0/move` library, for compiler-v2's Lean integration tests. |
-
-Within each package, the root `Foo.lean` is the public import, source modules
-live under `Foo/`, and tests are either under `Foo/Tests/` or exposed through a
-test library listed in that package's `lakefile.toml`. `.lake/` contains local
-build output and is not source.
-
-## Design and architecture documents
-
-Read the document for the layer being changed; many contain explicit status,
-non-goals, deferred-work registers, and testing requirements.
-
-### Current designs (`designs/`)
-
-The current cross-package designs live in [`designs/`](designs/). The design
-documents kept inside `v0/` (`move/`, `move-model/`, `transpiler/`) describe the
-older source-specific work those packages own.
-
-- [`designs/roadmap.md`](designs/roadmap.md): the priority ordering across the
-  current designs and the items deliberately not scheduled.
-- [`designs/lir-design.md`](designs/lir-design.md): the master design — unified
-  LIR ownership, stages, profiles, validation, serialization, frontend/backend
-  contracts, deferred-work register, and phase roadmap.
-- [`designs/elaboration-design.md`](designs/elaboration-design.md): LIR
-  elaboration, verification, execution, runtime semantics, and migration plan.
-- [`designs/denotation.md`](designs/denotation.md): the current
-  verification design — one `denote` of validated LIR into `Spec` and one
-  agreement theorem against `BigStep`, replacing per-target generated
-  agreement proofs; milestones D0–D4 with their fixture gates.
-- [`designs/test-organization.md`](designs/test-organization.md): verification
-  checks as baselines under `leaner-e2e-tests/LeanerE2ETests/Check/` and
-  the ledger of v0 tests ported so far.
-- [`designs/leaner-lang.md`](designs/leaner-lang.md): the profile-aware Leaner
-  source language over the shared IR, generalizing the Move-profile surface.
-- [`designs/prophetic-references.md`](designs/prophetic-references.md):
-  prophecy-based ownership model for references in validated LIR — the
-  RustHorn encoding run by the interpreter, big-step relation, and
-  verifier alike, with loan elimination in validation and milestones.
-- [`designs/rust-mir-design.md`](designs/rust-mir-design.md): Rustc Public
-  frontend decision, Rust profile, structured LIR boundary, Rust source
-  backend, references, generics, unsafe boundary, and milestones.
-- [`designs/monovm-link-design.md`](designs/monovm-link-design.md): linking
-  MonoVM into Lean test executables for differential execution testing.
-- [`designs/unsafe-pointers.md`](designs/unsafe-pointers.md): proposal for
-  the Rust unsafe profile over the prophetic model, not yet scheduled.
-- [`leaner-rust/rust-exporter/README.md`](leaner-rust/rust-exporter/README.md):
-  exact exporter scope, supported MIR fixtures, commands, and known boundaries.
-
-Executed or superseded designs move to
-[`designs/historical/`](designs/historical/) (`verification-v2.md`,
-`certifying-execution.md`, `generic-route.md`, and
-`verification-perf-audit.md`, all replaced by `denotation.md`); they are
-reference only and are not updated.
-
-### Leaner Move source and verification (deprecated packages)
-
-- [`v0/move/Move/README.md`](v0/move/Move/README.md): example-driven architecture
-  and module tour.
-- [`v0/move/Move/leaner-move.md`](v0/move/Move/leaner-move.md): language reference,
-  grammar, types, expressions, functions, specifications, verification, and
-  compilation.
-- [`v0/move/Move/verification-design.md`](v0/move/Move/verification-design.md):
-  relational source semantics, effects, references, contracts, verification
-  interface, tests, and proof obligations.
-- [`v0/move/Move/design-plan.md`](v0/move/Move/design-plan.md): lowering from Leaner
-  Move through LIR and MoveModel IR to XIR and bytecode.
-- [`v0/move/Move/project-plan.md`](v0/move/Move/project-plan.md): implemented source
-  features, unsupported language coverage, diagnostics, and roadmap.
-- [`v0/move/Move/loop-design.md`](v0/move/Move/loop-design.md): loop syntax, lowering,
-  fixed-point verification, and diagnostics.
-- [`v0/move/Move/invariant-design.md`](v0/move/Move/invariant-design.md): data and
-  global invariants and where proof obligations arise.
-- [`v0/move/Move/address-design.md`](v0/move/Move/address-design.md): address surface
-  model and compiler representation.
-- [`v0/move/Move/unified-int-design.md`](v0/move/Move/unified-int-design.md) and
-  [`v0/move/Move/int-widening-design.md`](v0/move/Move/int-widening-design.md): integer
-  representation, operations, and specification coercion policy.
-- [`v0/move/Move/structural-equality-design.md`](v0/move/Move/structural-equality-design.md):
-  runtime structural equality and the remaining verification-model gap.
-- [`v0/move/Move/performance-analysis.md`](v0/move/Move/performance-analysis.md) and
-  [`v0/move/Move/proof-simplification-plan.md`](v0/move/Move/proof-simplification-plan.md):
-  proof cost, simplifier behavior, benchmarks, and proof cleanup.
-- [`v0/move/Move/overview.md`](v0/move/Move/overview.md): short conceptual overview.
-
-### Move model and transpilation (deprecated packages)
-
-- [`v0/move-model/MoveModel/README.md`](v0/move-model/MoveModel/README.md): model
-  overview and links to the detailed
-  [`IR`](v0/move-model/MoveModel/IR/README.md),
-  [`Frontend`](v0/move-model/MoveModel/Frontend/README.md), and
-  [`Prover`](v0/move-model/MoveModel/Prover/README.md) guides.
-- [`v0/transpiler/transpile-design.md`](v0/transpiler/transpile-design.md): XAST
-  exchange format, export stage, decoding/printing, semantic mapping,
-  validation, baselines, and feature scoreboard.
-- [`v0/transpiler/intrinsic-design.md`](v0/transpiler/intrinsic-design.md): generic
-  intrinsic-map representation, lowering, diagnostics, and acceptance tests.
-- [`leaner-e2e-tests/README.md`](leaner-e2e-tests/README.md): source/result
-  baseline conventions for the two cross-language paths.
-
-## Toolchains and setup
-
-All Lake packages pin Lean `v4.32.2`. Use the checked-in toolchain files; do
-not silently change the Lean version in only one package. The Rust exporter
-separately pins `nightly-2026-07-23` with `rustc-dev`, `rust-src`, and
-`llvm-tools-preview` in
-[`rust-toolchain.toml`](leaner-rust/rust-exporter/rust-toolchain.toml).
-
-From the Aptos Core repository root, install the Lean prerequisites with:
-
-```bash
-./scripts/dev_setup.sh -p -l
-source "$HOME/.profile"
-```
-
-Core Lean libraries build without an Aptos CLI. The E2E test driver owns the
-freshness of its exchange frontend: once per suite invocation, inside a
-checkout, it runs the locked ci-profile Cargo build of the standalone `move`
-CLI (`cargo build --locked --profile ci -p aptos-move-cli --features binary
---bin move`), which Cargo's own freshness check makes cheap when nothing
-changed. With no variables set, the driver uses the binary it just built
-(`<workspace>/target/ci/move`). **The contract for `APTOS_MOVE_CLI` is that
-it names a Cargo ci-profile build of the standalone CLI** — normally exactly
-that managed binary, which the driver's build keeps fresh; pointing anywhere
+Core Lean libraries build without an Aptos CLI. **The contract for
+`APTOS_MOVE_CLI` is that it names a Cargo ci-profile build of the standalone
+`move` CLI** (`cargo build --locked --profile ci -p aptos-move-cli --features
+binary --bin move` → `<workspace>/target/ci/move`), which the E2E driver runs
+and uses by default, once per suite invocation; pointing the variable anywhere
 else draws a warning because this checkout's build cannot freshen it.
-`APTOS_CLI=<path-to-full-aptos-cli>` selects the full CLI as an unmanaged
-escape hatch whose freshness its setter owns. The standalone command receives
-`exchange` directly; the full CLI receives `aptos move exchange`. An
-unrelated `move` executable on `PATH` is never a substitute.
-
-```bash
-# Optional: the same build the driver runs, for use outside the E2E suite.
-cargo build --locked --profile ci -p aptos-move-cli --features binary --bin move
-export APTOS_MOVE_CLI="$(git rev-parse --show-toplevel)/target/ci/move"
-```
+`APTOS_CLI=<path-to-full-aptos-cli>` is the unmanaged escape hatch whose
+freshness its setter owns, and receives `aptos move exchange` where the
+standalone CLI receives `exchange`. An unrelated `move` executable on `PATH` is
+never a substitute.
 
 ## Build and test
 
-Build or test the package you changed from its own directory. These four
-suites are the test matrix; the deprecated packages' suites are not part of
-test runs or CI:
+Build or test the package you changed from its own directory. These four suites
+are the test matrix:
 
 ```bash
-(cd leaner-ir        && lake build && lake test)
-(cd leaner-move      && lake build && lake test)
-(cd leaner-rust      && lake build && lake test)
-(cd leaner-e2e-tests && lake build && lake test)
+(cd verex-ir        && lake build && lake test)
+(cd verex-move      && lake build && lake test)
+(cd verex-rust      && lake build && lake test)
+(cd verex-e2e-tests && lake build && lake test)
 ```
 
-`leaner-ir`'s suite includes a verification-cost benchmark
-(`LeanerLang/Tests/DenotePerformance.lean`) that gates every `verify`
-target against `DenotePerformance.exp` on elaborator heartbeats and
-proof-term size. A deliberate cost change is recorded with
-`lake build && UB=1 lake env lean LeanerLang/Tests/DenotePerformance.lean`;
-review the diff, which should name only the targets the change was meant
-to move.
-The build belongs to the command: `lake env lean` only sets the module path,
-so regenerating without it records the cost of whatever imports happen to be
-built and commits a baseline that its own source does not reproduce.
-
-The package `testDriver` is declared in its `lakefile.toml`; `lake test` is
-the normal full package suite. The E2E driver manages its exchange frontend
-itself, as described above. Run downstream suites when changing a shared
-boundary:
+Run downstream suites when changing a shared boundary:
 
 | Changed area | Minimum relevant verification |
 |---|---|
-| `leaner-ir` schema, validation, or semantics | `leaner-ir`, `leaner-move`, `leaner-rust`, and `leaner-e2e-tests` tests |
-| Rust profile/import/source backend | `leaner-rust` tests plus Rust exporter tests when its code or fixtures are involved |
-| Move profile or the exchange frontend/LIR adapter | `leaner-move` and `leaner-e2e-tests` tests |
+| `verex-ir` schema, validation, or semantics | `verex-ir`, `verex-move`, `verex-rust`, and `verex-e2e-tests` tests |
+| Rust profile/import/source backend | `verex-rust` tests plus Rust exporter tests when its code or fixtures are involved |
+| Move profile or the exchange frontend/VIR adapter | `verex-move` and `verex-e2e-tests` tests |
 
 For a fast check of one Lean file, run it from its package directory so imports
-and relative test assets resolve correctly:
+and relative test assets resolve correctly (`cd verex-ir && lake env lean
+VerexIR/Tests/Validation.lean`).
 
-```bash
-cd leaner-ir
-lake env lean LeanerIR/Tests/Validation.lean
-```
+### Editing through the language server
 
-Do not add `sorry`, axioms, or other admissions to make a proof compile unless
-the design explicitly models an assumption and the change is requested.
+A built package can also be edited through the Lean language server, which
+re-elaborates only from the first changed command instead of redoing the file.
+It needs the package built once; nothing in the server builds imports, and the
+`.lake` of one worktree does not serve another. Prefer it over a `lake env lean`
+run per attempt, and prefer `lake build <Module>` over a whole-package build
+when a rebuild is needed.
+
+**A file's diagnostics are trustworthy only when no file it transitively imports
+has been edited.** Imports resolve against built `.olean` files, so after an
+edit upstream the diagnostics of a downstream file describe the *previous*
+upstream: they can be falsely red (naming an API that now exists) and falsely
+green (missing a break the edit caused). `lake env lean` reads the same stale
+oleans, so this is the build model, not a property of the editor. Decide which
+mode a task is in before starting it, and do not drift between them:
+
+- *Within one module*: iterate edit/diagnose freely, with no rebuild.
+- *Across modules*: make every coordinated edit without consulting diagnostics,
+  rebuild the changed modules, and only then read diagnostics for the set. Each
+  rebuild is a generation boundary.
+
+Reuse is by prefix: everything from the edit point onward re-elaborates, so an
+edit early in a file of several thousand lines costs the whole file while one
+late in it costs a declaration. That is a cost to expect, not a reason to place
+a declaration anywhere but in the part of its topic. Read this tree through the
+server's own queries (file outline, hover, declaration, references, symbol
+search) rather than by opening whole modules; the largest files here are
+thousands of lines, and the saving is the context the rest of the task needs.
+No package in this stack depends on Mathlib, so Mathlib search and the lemma
+names it suggests do not apply.
+
+The Move Prover's lean gate (`MVP_TEST_FEATURE=lean cargo test -p move-prover
+--test testsuite`) builds `verex-move` itself and runs a private copy of it
+under `target/tmp`, so a concurrent Lake build cannot change what a test loads,
+and a harness failure of the verifier is never written as a baseline; see
+`doc/designs/source-verification.md` ("From the Move Prover").
+
+### Between turns: the smoke suite
+
+Between edit batches, run `scripts/smoke.sh`, described in
+[`.cursor/skills/verex-smoke/SKILL.md`](../../../.cursor/skills/verex-smoke/SKILL.md):
+it builds in place and runs the fixtures that catch this stack's regressions,
+read-only against their `.exp`, and refuses `UB=1`. `--rust` runs the Rust path
+instead, `--no-exe` skips the executable and the two items needing it. Green
+smoke is not the commit gate; the four suites and the Move Prover's lean gate
+are.
+
+While iterating, build libraries, not executables: `lake build` in `verex-ir`,
+`lake build VerexMove` in `verex-move`, and `lake build VerexE2ETests` in
+`verex-e2e-tests`. The default targets of the last two also build the
+`verex-move` executable and the e2e driver, whose C compilation and linking the
+Lean fixtures do not need (10–30 s after an edit of one part of the solver). The
+smoke suite builds the executable beside its Lean fixtures. To verify a Move
+package while iterating,
+`scripts/verify-modules.py <package> [--filter <part>]` runs one `verex-move
+verify` process per module, several at a time.
+
+For repeated verifier measurements, build the native executable once per source
+revision and use `verex-move elaborate <file>` or
+`scripts/verex-bench.py run --only …`; `lake env lean` interprets the verifier,
+so its timings and heartbeats are not directly comparable. Isolate a slow target
+with `scripts/isolate-target.py <file> <module> <target> -o <out>` and run
+`verex-move elaborate <out>` before repeating a whole suite. See
+[`doc/designs/performance.md`](doc/designs/performance.md) for profiling and
+measurement details.
+
+The solver, the contract generator and `verify` are split into parts for build
+time, listed in [`doc/designs/performance.md`](doc/designs/performance.md)
+("Modules split for edits"); the last part of each keeps the original module
+name, so importers are unchanged. Put a new declaration in the part of its
+topic; one that another part uses cannot be `private`. Keep the import
+boundaries: `Solve.Normal` and `Solve.Decide` independent of each other, and
+`Verify.Contracts` free of the solver, so that an edit of one rebuilds neither
+the other nor that part.
+
+When writing or extending large metaprogram functions, prefer coherent helper
+functions over a single growing body. Smaller functions can reduce optimization
+and code-generation work in both Lean and the C compiler; this is a build-time
+consideration as well as a readability choice. Profile before refactoring for
+speed, and measure Lean compilation, C compilation, and verifier runtime
+separately: inlining can undo the split, and function boundaries can affect
+runtime performance. Splitting functions within a module does not by itself
+enable parallel compilation or finer incremental rebuilds; those benefits
+require suitable module boundaries and independent dependencies.
+
+### Parallel agents on one worktree
+
+Several agents can work this tree at once if the worktree itself stays green
+and buildable between their landings. The rules that make that hold:
+
+- **Partition by file, along the split modules.** Each agent owns a disjoint
+  set of source files and treats every other file as read-only. A change
+  needed in someone else's file is requested with its exact shape (statement,
+  home, reason), not made. The module split for build time doubles as the
+  ownership boundary, so one agent's edits never rebuild another's part.
+- **Iterate in a copy outside the repository.** Copy the package to scratch
+  space and seed its `.lake` from the worktree's built state (in a worktree
+  `.lake` is a symlink; copy its resolved target). Build, probe, and measure
+  in the copy. Re-sync files you do not own from the worktree before each
+  round of work, since others land theirs meanwhile.
+- **Port whole files, only green.** When the copy builds and the item's
+  fixtures meet their gates, copy the owned files back whole-file and run one
+  verification build in the worktree. Never port a partial state; a
+  half-landed cross-file change is the one thing that breaks everyone else.
+- **Long sweeps read a snapshot.** A build deletes and rewrites oleans under
+  a running reader, so a fixture sweep runs against an rsync snapshot of
+  `.lake/build`, never the live tree, and nobody builds in the worktree
+  while a snapshot is being taken.
+- **Checkpoint on green.** A checkpoint commit requires the four packages
+  building and the owning suites green, with the diff checked for admissions.
+  Report cost before/after for leaf-pipeline changes, and follow the baseline
+  rules below — in particular, a clean fixture has no `.exp` at all, so never
+  record an empty one.
+
+For the inner loop inside one module, prefer the language server (previous
+section); `lake build` remains the gate before any port.
+
+### Diagnosing a failure
+
+A probe is expensive here: a scratch file that imports `VerexSL` and runs
+`verify` interprets the verifier and takes minutes, and a rebuild after an edit
+of the solver or of `Types.lean` takes longer. Analyse the code first, and
+spend a probe only on a question the source cannot answer.
+
+- **Read before running.** Start from the message and the code that emits it
+  (`grep` the text), then read the definitions on the path through the language
+  server's queries. State the hypothesis the probe is to decide before writing
+  it; a probe run to "see what happens" usually has to be run again.
+- **Compare the sides.** After a merge or a restack, `git show <rev>:<file>`
+  and `git diff` of the two parents answer most questions without elaborating
+  anything: which side a binder, an arity, or a match arm comes from. A branch
+  tip is not evidence that a test passed there; check that it built.
+- **Check the signature, not the source text.** Section `variable`s reach a
+  declaration by use: a theorem takes every instance variable whose
+  dependencies it has, and a definition also takes one its body's proofs use,
+  which `omit` does not prevent. `#check @name` on the built package is the
+  cheap, decisive query; metaprograms that build the application with
+  `mkAppN` or test it with `isAppOfArity` must agree with what it prints.
+- **Positional names move.** Equation lemmas (`f.eq_12`) and constructor
+  indices are numbered by arm order, so inserting an arm silently retargets a
+  metaprogram that names one. Search for such names when adding a constructor.
+- **Reducible definitions hide from the simplifier's index.** `NTy.subst`,
+  `NRow.subst` and `NTy.unmark` are reducible, so a closed application of one
+  is indexed by what it reduces to: a `simproc` on the unreduced pattern does
+  not fire, and "made no progress" on such a term is not a defect. A residue
+  like `(NTy.int 64 false).unmark` is the same type to a tactic and a different
+  term to a metaprogram that matches syntax.
+- **Make the one probe small.** Isolate the target
+  (`scripts/isolate-target.py`), set `pragma verify = false` and verify the one
+  function, and print the one hypothesis or argument in question rather than
+  the whole goal. Prefer the built executable (`verex-move elaborate`) over
+  `lake env lean` for anything repeated.
+
+### Baselines and generated fixtures
+
+`verex-ir`'s suite includes a verification-cost benchmark
+(`VerexSL/Tests/DenotePerformance.lean`) that gates every `verify` target
+against `DenotePerformance.exp` on elaborator heartbeats and proof-term size. A
+deliberate cost change is recorded with `lake build && UB=1 lake env lean
+VerexSL/Tests/DenotePerformance.lean`; review the diff, which should name only
+the targets the change was meant to move. The build belongs to the command:
+`lake env lean` only sets the module path, so regenerating without it records
+the cost of whatever imports happen to be built and commits a baseline that its
+own source does not reproduce.
+
+E2E baselines are regenerated with `UB=1 lake test` (or a `UB=1` driver run)
+from `verex-e2e-tests/`; review every diff before committing. Rust exporter
+inputs and their `.exp.json` baselines live under
+`verex-rust/rust-exporter/tests/`, described in its
+[`README.md`](verex-rust/rust-exporter/README.md); regenerate with `UB=1 cargo
+test --features rustc-public`, inspect the semantic diff, and commit an update
+only when the format or mapped MIR is intentionally changing. The Rust and Lean
+suites both validate these artifacts.
 
 ### Rust exporter
 
-Run the project-owned exporter checks from its standalone crate:
-
-```bash
-cd leaner-rust/rust-exporter
-cargo test --features rustc-public
-cargo fmt --check
-cargo clippy --features rustc-public --all-targets
-```
-
-Build and invoke it directly with the matching sysroot library path:
-
-```bash
-cargo build --features rustc-public
-LD_LIBRARY_PATH="$(rustc --print sysroot)/lib" \
-  target/debug/leaner-rust-export --output /tmp/basic.raw.json -- \
-  tests/raw-unit/basic.rs --crate-type=lib --edition=2024
-```
-
-Normally prefer the Lean-owned driver because it builds the pinned exporter,
-tracks cache inputs, and validates RawUnit before writing it:
-
-```bash
-cd leaner-rust
-lake exe leaner-rust -- import-file rust-exporter/tests/raw-unit/basic.rs \
-  --output .lake/leaner-rust/basic.raw.json
-
-lake exe leaner-rust -- import-crate Tests/CargoFixture/Cargo.toml \
-  --package leaner-rust-cargo-fixture \
-  --features extra --no-default-features \
-  --output .lake/leaner-rust/cargo-fixture.raw.json
-```
-
-`LEANER_RUST_EXPORTER`, `LEANER_RUST_SYSROOT`, and `LEANER_RUST_CACHE` override
-the development exporter, paired sysroot, and managed cache respectively.
-
-## Developer tools and generated fixtures
-
-E2E baselines are regenerated with `UB=1 lake test` (or a `UB=1` driver run)
-from `leaner-e2e-tests/`; review every diff before committing. The deprecated
-transpiler CLI and its printer baselines remain usable for reference but are
-not maintained.
-
-Positive Rust exporter inputs and their side-by-side `.exp.json` baselines are
-in `leaner-rust/rust-exporter/tests/raw-unit/`; rejection and API-probe inputs
-remain under `tests/fixtures/`. The baseline driver discovers every `.rs` in
-`raw-unit` automatically. Use `UB=1 cargo test --features rustc-public` to
-update expectations, inspect the semantic diff, and commit an update only when
-the format or mapped MIR is intentionally changing. The Rust and Lean suites
-both validate these artifacts.
-
-The `v0/scripts/` proof-analysis tools and the Account XIR regeneration entry
-point target the deprecated `move` package and are kept for reference only.
-
-## License headers
-
-Every source file in this tree, Lean and Rust alike, carries the Apache
-header (`Copyright © Aptos Foundation` / `SPDX-License-Identifier:
-Apache-2.0`), not the Innovation-Enabling header used elsewhere in the
-repository. The Rust fixtures' headers are exported as comments, so a
-header change regenerates the RawUnit and Rust e2e baselines.
+Run the project-owned checks from its standalone crate: `cargo test --features
+rustc-public`, `cargo fmt --check`, and `cargo clippy --features rustc-public
+--all-targets`. Prefer the Lean-owned driver (`lake exe verex-rust -- import-file
+…` / `import-crate …`) over invoking the exporter binary, because it builds the
+pinned exporter, tracks cache inputs, and validates RawUnit before writing it;
+its commands and the `VEREX_RUST_EXPORTER`, `VEREX_RUST_SYSROOT` and
+`VEREX_RUST_CACHE` overrides are in the crate's
+[`README.md`](verex-rust/rust-exporter/README.md).
 
 ## Change discipline
 
+- Keep documentation focused on behavior, rationale, open work and reproducible
+  measurements. Put validation results in PRs and benchmark artifacts. Do not
+  append session diaries, branch/worktree state, temporary log locations or
+  dated test-run snapshots to design documents.
 - Lean source metaprograms are trusted. We do not defend against adversarial
   `run_cmd` code tampering with verifier registries or environments. Preserve
   proof correctness and the explicit assumption ledger, but do not expand CI
@@ -324,9 +286,6 @@ header change regenerates the RawUnit and Rust e2e baselines.
 - Keep RawUnit JSON versioned, deterministic, and canonical. Validation is the
   trust boundary: frontends may produce raw data, but semantic consumers should
   use checked/validated forms.
-- Keep production dependencies one-way. Put source/result tests that genuinely
-  cross several layers in `leaner-e2e-tests`; keep assertion-style unit tests in
-  the owning package's `Tests` tree instead of adding a reverse dependency.
 - Generated Lean, JSON, XIR, and report files are reviewable test assets. Change
   them only through the owning generator and include them with the source change.
 - Ordinary `lake build` must not write source-tree artifacts. Use explicit

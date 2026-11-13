@@ -1,0 +1,50 @@
+Move prover returns: exiting with verification errors
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+   ┌─ tests/sources/functional/closures/result_of_transition_let_post.move:30:22
+   │
+30 │     fun bump_no_call(a: address): u64 {
+   │                      ^
+
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+   ┌─ tests/sources/functional/closures/result_of_transition_let_post.move:55:22
+   │
+55 │     fun direct_false(a: address): u64 {
+   │                      ^
+
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+   ┌─ tests/sources/functional/closures/result_of_transition_let_post.move:84:26
+   │
+84 │     fun transitive_false(a: address): u64 {
+   │                          ^
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_let_post.move:63:9
+   │
+63 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:55: direct_false
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:60: direct_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:61: direct_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:55: direct_false
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:56: direct_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:62: direct_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:63: direct_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_let_post.move:92:9
+   │
+92 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:84: transitive_false
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:89: transitive_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:90: transitive_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:84: transitive_false
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:85: transitive_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:91: transitive_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_let_post.move:92: transitive_false (spec)

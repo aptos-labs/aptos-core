@@ -18,39 +18,32 @@
 
 pub(crate) use crate::sharded_jmt_merkle_db::{LeafNode, Node};
 use crate::{
+    common::{HOT_STATE_MERKLE_DB_FOLDER_NAME, STATE_MERKLE_DB_FOLDER_NAME},
     db_options::gen_state_merkle_cfds,
+    sharded_db_layout::{ShardedDbNames, ShardedDbOpenOptions},
     sharded_jmt_merkle_db::ShardedJmtMerkleDb,
     utils::truncation_helper::{get_state_merkle_commit_progress, truncate_state_merkle_db_shards},
 };
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
 use aptos_jellyfish_merkle::{node_type::NodeKey, TreeReader, TreeWriter};
-use aptos_logger::prelude::*;
-use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{Cache, Env, DB};
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
-use aptos_types::{
-    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
-    transaction::Version,
-};
-use std::{
-    ops::Deref,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use aptos_schemadb::{Cache, Env};
+use aptos_storage_interface::Result;
+use aptos_types::{state_store::state_key::StateKey, transaction::Version};
+use std::{ops::Deref, path::Path};
 
-fn db_folder_name(is_hot: bool) -> &'static str {
+fn names(is_hot: bool) -> ShardedDbNames {
     if is_hot {
-        "hot_state_merkle_db"
+        ShardedDbNames {
+            folder: HOT_STATE_MERKLE_DB_FOLDER_NAME,
+            metadata_db: "hot_state_merkle_metadata_db",
+            shard_db_prefix: "hot_state_merkle_db_shard",
+        }
     } else {
-        "state_merkle_db"
-    }
-}
-
-fn metadata_db_name(is_hot: bool) -> &'static str {
-    if is_hot {
-        "hot_state_merkle_metadata_db"
-    } else {
-        "state_merkle_metadata_db"
+        ShardedDbNames {
+            folder: STATE_MERKLE_DB_FOLDER_NAME,
+            metadata_db: "state_merkle_metadata_db",
+            shard_db_prefix: "state_merkle_db_shard",
+        }
     }
 }
 
@@ -118,24 +111,11 @@ impl StateMerkleDb {
             is_hot,
             /* delete_on_restart = */ false,
         )?;
-        let cp_state_merkle_db_path = cp_root_path.as_ref().join(db_folder_name(is_hot));
-
-        info!("Creating state_merkle_db checkpoint at: {cp_state_merkle_db_path:?}");
-
-        std::fs::remove_dir_all(&cp_state_merkle_db_path).unwrap_or(());
-        std::fs::create_dir_all(&cp_state_merkle_db_path).unwrap_or(());
-
-        state_merkle_db
-            .metadata_db()
-            .create_checkpoint(Self::metadata_db_path(cp_root_path.as_ref(), is_hot))?;
-
-        for shard_id in 0..NUM_STATE_SHARDS {
-            state_merkle_db
-                .db_shard(shard_id)
-                .create_checkpoint(Self::db_shard_path(cp_root_path.as_ref(), shard_id, is_hot))?;
-        }
-
-        Ok(())
+        names(is_hot).create_checkpoint(
+            state_merkle_db.metadata_db(),
+            state_merkle_db.shards(),
+            cp_root_path.as_ref(),
+        )
     }
 
     fn open(
@@ -148,74 +128,31 @@ impl StateMerkleDb {
         is_hot: bool,
         delete_on_restart: bool,
     ) -> Result<Self> {
-        let state_merkle_metadata_db_path = Self::metadata_db_path(
-            if is_hot {
-                db_paths.hot_state_merkle_db_metadata_root_path()
-            } else {
-                db_paths.state_merkle_db_metadata_root_path()
-            },
-            is_hot,
-        );
-
-        let (metadata_db, shards) = std::thread::scope(|s| {
-            let metadata_handle = s.spawn(|| {
-                let db = Self::open_db(
-                    state_merkle_metadata_db_path.clone(),
-                    metadata_db_name(is_hot),
-                    &state_merkle_db_config,
+        let (metadata_db, state_merkle_db_shards) = names(is_hot)
+            .open(
+                if is_hot {
+                    db_paths.hot_state_merkle_db_metadata_root_path()
+                } else {
+                    db_paths.state_merkle_db_metadata_root_path()
+                },
+                |shard_id| {
+                    if is_hot {
+                        db_paths.hot_state_merkle_db_shard_root_path(shard_id)
+                    } else {
+                        db_paths.state_merkle_db_shard_root_path(shard_id)
+                    }
+                    .as_path()
+                },
+                &ShardedDbOpenOptions {
+                    rocksdb_config: &state_merkle_db_config,
                     env,
                     block_cache,
                     readonly,
                     delete_on_restart,
-                )
-                .unwrap_or_else(|e| panic!("Failed to open state merkle metadata db: {e:?}."));
-                Arc::new(db)
-            });
-
-            let shard_handles: Vec<_> = (0..NUM_STATE_SHARDS)
-                .map(|shard_id| {
-                    s.spawn(move || {
-                        let shard_root_path = if is_hot {
-                            db_paths.hot_state_merkle_db_shard_root_path(shard_id)
-                        } else {
-                            db_paths.state_merkle_db_shard_root_path(shard_id)
-                        };
-                        let db = Self::open_shard(
-                            shard_root_path,
-                            shard_id,
-                            &state_merkle_db_config,
-                            env,
-                            block_cache,
-                            readonly,
-                            is_hot,
-                            delete_on_restart,
-                        )
-                        .unwrap_or_else(|e| {
-                            panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
-                        });
-                        Arc::new(db)
-                    })
-                })
-                .collect();
-
-            // Joined in shard-id order so each array index matches its shard id.
-            let shards = shard_handles
-                .into_iter()
-                .map(|handle| {
-                    handle
-                        .join()
-                        .expect("State merkle shard open thread panicked")
-                })
-                .collect::<Vec<_>>();
-            let metadata_db = metadata_handle
-                .join()
-                .expect("State merkle metadata open thread panicked");
-            (metadata_db, shards)
-        });
-
-        let state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS] = shards
-            .try_into()
-            .expect("Collected exactly NUM_STATE_SHARDS shards");
+                },
+                gen_state_merkle_cfds,
+            )
+            .unwrap_or_else(|e| panic!("Failed to open state merkle db: {e:?}."));
 
         let db_tag: &'static str = if is_hot { "hot" } else { "cold" };
         let inner = ShardedJmtMerkleDb::new(
@@ -239,79 +176,6 @@ impl StateMerkleDb {
         }
 
         Ok(state_merkle_db)
-    }
-
-    fn open_shard<P: AsRef<Path>>(
-        db_root_path: P,
-        shard_id: usize,
-        state_merkle_db_config: &RocksdbConfig,
-        env: Option<&Env>,
-        block_cache: Option<&Cache>,
-        readonly: bool,
-        is_hot: bool,
-        delete_on_restart: bool,
-    ) -> Result<DB> {
-        let db_name = if is_hot {
-            format!("hot_state_merkle_db_shard_{}", shard_id)
-        } else {
-            format!("state_merkle_db_shard_{}", shard_id)
-        };
-        Self::open_db(
-            Self::db_shard_path(db_root_path, shard_id, is_hot),
-            &db_name,
-            state_merkle_db_config,
-            env,
-            block_cache,
-            readonly,
-            delete_on_restart,
-        )
-    }
-
-    fn open_db(
-        path: PathBuf,
-        name: &str,
-        state_merkle_db_config: &RocksdbConfig,
-        env: Option<&Env>,
-        block_cache: Option<&Cache>,
-        readonly: bool,
-        delete_on_restart: bool,
-    ) -> Result<DB> {
-        if delete_on_restart {
-            ensure!(!readonly, "Should not reset DB in read-only mode.");
-            info!("delete_on_restart is true. Removing {path:?} entirely.");
-            std::fs::remove_dir_all(&path).unwrap_or(());
-        }
-
-        Ok(if readonly {
-            DB::open_cf_readonly(
-                gen_rocksdb_options(state_merkle_db_config, env, true),
-                path,
-                name,
-                gen_state_merkle_cfds(state_merkle_db_config, block_cache),
-            )?
-        } else {
-            DB::open_cf(
-                gen_rocksdb_options(state_merkle_db_config, env, false),
-                path,
-                name,
-                gen_state_merkle_cfds(state_merkle_db_config, block_cache),
-            )?
-        })
-    }
-
-    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize, is_hot: bool) -> PathBuf {
-        let shard_sub_path = format!("shard_{}", shard_id);
-        db_root_path
-            .as_ref()
-            .join(db_folder_name(is_hot))
-            .join(Path::new(&shard_sub_path))
-    }
-
-    fn metadata_db_path<P: AsRef<Path>>(db_root_path: P, is_hot: bool) -> PathBuf {
-        db_root_path
-            .as_ref()
-            .join(db_folder_name(is_hot))
-            .join("metadata")
     }
 }
 

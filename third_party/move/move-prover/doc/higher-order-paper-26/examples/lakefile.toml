@@ -1,0 +1,11 @@
+# Copyright © Aptos Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+# The workspace the proof files of the paper's examples open in, so that their header,
+# `import VerexMove.Proofs`, resolves; see
+# `third_party/move/lean/designs/proof-file-editing.md`.
+name = "paper-example-proofs"
+
+[[require]]
+name = "verex-move"
+path = "../../../../lean/verex-move"

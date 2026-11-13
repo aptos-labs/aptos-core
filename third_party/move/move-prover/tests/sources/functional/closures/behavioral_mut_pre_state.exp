@@ -1,0 +1,30 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_mut_pre_state.move:36:9
+   │
+36 │         ensures ensures_of<inc_b>(old(s), update_field(s, a, 7)); // error: the post-state keeps `a`
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_mut_pre_state.move:31: only_call_wrong
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_mut_pre_state.move:32: only_call_wrong
+   =     at tests/sources/functional/closures/behavioral_mut_pre_state.move:31: only_call_wrong
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_mut_pre_state.move:37: only_call_wrong (spec)
+   =     at tests/sources/functional/closures/behavioral_mut_pre_state.move:36: only_call_wrong (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_mut_pre_state.move:56:9
+   │
+56 │         ensures ensures_of<inc_b>(old(s), s); // error: the write to `a` follows the call
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_mut_pre_state.move:50: call_then_write_wrong
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_mut_pre_state.move:51: call_then_write_wrong
+   =     at tests/sources/functional/closures/behavioral_mut_pre_state.move:52: call_then_write_wrong
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_mut_pre_state.move:50: call_then_write_wrong
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_mut_pre_state.move:57: call_then_write_wrong (spec)
+   =     at tests/sources/functional/closures/behavioral_mut_pre_state.move:56: call_then_write_wrong (spec)

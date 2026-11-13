@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 89,
+        "offset": 1869,
+        "sha256": "7eb38209785fea625ff3ef4bf8461649eb4254b3573ed3a54ef410e31c9ebaea"
+      },
+      "edit": {
+        "at": 55,
+        "kind": "substitute",
+        "length": 33,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-refill-037-fraction-ignored",
+      "obligation_category": "normal-result",
+      "rationale": "The carried fraction is dropped from the accumulation.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 78,
+        "offset": 2365,
+        "sha256": "61aa33ab8e88b4c7c6d37911bb5e4e2709910a6c662f1e8f83591686609f09f7"
+      },
+      "edit": {
+        "at": 52,
+        "kind": "substitute",
+        "length": 1,
+        "to": "/"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-refill-037-fraction-is-quotient",
+      "obligation_category": "normal-result",
+      "rationale": "The carried fraction is the quotient instead of the remainder.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 62,
+        "offset": 1967,
+        "sha256": "7055d2cc037099e577b09ba083e3e0766c2b649de4f2e2e8db3060f94b4d0db2"
+      },
+      "edit": {
+        "at": 38,
+        "kind": "substitute",
+        "length": 23,
+        "to": "(limiter.refill_interval + 1)"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-refill-037-interval-off-by-one",
+      "obligation_category": "normal-result",
+      "rationale": "Tokens are counted against an interval one second longer.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "b6dcddbf64696687c8871357247833b914344d17356192d0b325b25800cd325c",
+  "task_id": "RL-refill-037"
+}

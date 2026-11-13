@@ -48,12 +48,12 @@ fn bench_hasher<H: CryptoHasher>(
     h2: &HashValue,
 ) {
     g.bench_function(BenchmarkId::new("optimized", name), |b| {
-        b.iter(|| H::hash_two_children(criterion::black_box(h1), criterion::black_box(h2)))
+        b.iter(|| H::hash_two_children(std::hint::black_box(h1), std::hint::black_box(h2)))
     });
 
     g.bench_function(BenchmarkId::new("generic", name), |b| {
         b.iter(|| {
-            hash_two_children_generic::<H>(criterion::black_box(h1), criterion::black_box(h2))
+            hash_two_children_generic::<H>(std::hint::black_box(h1), std::hint::black_box(h2))
         })
     });
 }
