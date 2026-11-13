@@ -73,6 +73,10 @@ mutual
         (length_matches : VectorLengthMatches length values.size)
         (elements_typed : ValuesHaveType unit tables values.toList elementType) :
         ValueHasType unit tables (.vector values) typeId
+    | slice {tables : Tables} (typeId elementType : TypeId) (values : Array RuntimeValue)
+        (type_eq : tables.types[typeId.index]? = some (.slice elementType))
+        (elements_typed : ValuesHaveType unit tables values.toList elementType) :
+        ValueHasType unit tables (.vector values) typeId
     /-- A nominal value is typed against its declaration: the spelling the
     type names, the variant it declares, and every field at the type the
     declaration gives it under this use's generic arguments.  Field types are
@@ -89,7 +93,7 @@ mutual
           = some (declaringNamespace, declared))
         (fieldTypes_eq : declared.toList.mapM (fun field =>
             Validation.instantiatePlaceFieldType? declaringNamespace arguments
-              field.type.typeId) = some fieldTypes)
+              (declaringNamespace.typeId field.type.typeId)) = some fieldTypes)
         (fields_typed : ValuesHaveTypes unit declaringNamespace.tables
           fields.toList fieldTypes) :
         ValueHasType unit tables (.nominal source variant fields) typeId
@@ -108,7 +112,8 @@ mutual
           arguments.size)
         (captures_typed : ValuesHaveTypes unit targetNs.tables captures.toList
           (ClosureMask.extract mask true (declaration.signature.parameters.toList.map fun parameter =>
-            SemanticOperations.instantiatedTypeId typeInstantiation parameter.typeUse.typeId))) :
+            SemanticOperations.instantiatedTypeId typeInstantiation
+              (targetNs.typeId parameter.typeUse.typeId)))) :
         ValueHasType unit tables (.closure function mask typeInstantiation captures) typeId
     | borrow {tables : Tables} (typeId : TypeId) (loan : Nat) (current : RuntimeValue)
         (referenceType : ReferenceType)
@@ -171,12 +176,12 @@ variable {unit : ValidatedUnit}
 /-- Frame typing against one declaration's local table: every initialized
 local holds a value of its declared type. Under prophetic ownership there is
 no heap; borrows and holes are values and type structurally. -/
-def TypedFrame (unit : ValidatedUnit) (tables : Tables)
+def TypedFrame (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (locals : Array LocalDecl) (frame : RuntimeFrame) : Prop :=
   frame.locals.size = locals.size ∧
     ∀ (index : Nat) (declaration : LocalDecl), locals[index]? = some declaration →
       ∀ value, frame.locals[index]? = some (some value) →
-        ValueHasType unit tables value declaration.type.typeId
+        ValueHasType unit ns.tables value (ns.typeId declaration.type.typeId)
 
 /-- State typing: global memory is well formed.  Every published resource
 holds a value of the resource type its key names, and holds a value rather
@@ -257,13 +262,13 @@ theorem valuesHaveTypes_nil {tables : Tables} {values : List RuntimeValue}
 
 
 /-- Reading an initialized local yields a value of its declared type. -/
-theorem readLocal?_typed {tables : Tables}
+theorem readLocal?_typed {ns : ValidatedNamespace}
     {locals : Array LocalDecl} {frame : RuntimeFrame}
     {localId : LocalId} {declaration : LocalDecl} {value : RuntimeValue}
-    (frame_typed : TypedFrame unit tables locals frame)
+    (frame_typed : TypedFrame unit ns locals frame)
     (declaration_eq : locals[localId.index]? = some declaration)
     (read_eq : readLocal? frame localId = some value) :
-    ValueHasType unit tables value declaration.type.typeId := by
+    ValueHasType unit ns.tables value (ns.typeId declaration.type.typeId) := by
   obtain ⟨-, entries⟩ := frame_typed
   simp only [readLocal?] at read_eq
   rw [Option.join_eq_some_iff] at read_eq
@@ -271,7 +276,7 @@ theorem readLocal?_typed {tables : Tables}
 
 /-- The initial frame of a call is typed when the arguments are typed at the
 declared parameter types, which occupy the leading locals. -/
-theorem initialFrame?_typed {tables : Tables}
+theorem initialFrame?_typed {ns : ValidatedNamespace}
     {declaration : FunctionDecl Validation.FunctionBody}
     {arguments : Array RuntimeValue} {frame : RuntimeFrame}
     (locals_parameters : ∀ (index : Nat) (parameter : Parameter),
@@ -282,9 +287,9 @@ theorem initialFrame?_typed {tables : Tables}
         (parameter : Parameter),
       arguments[index]? = some argument →
       declaration.signature.parameters[index]? = some parameter →
-      ValueHasType unit tables argument parameter.typeUse.typeId)
+      ValueHasType unit ns.tables argument (ns.typeId parameter.typeUse.typeId))
     (frame_eq : initialFrame? declaration arguments = some frame) :
-    TypedFrame unit tables declaration.locals frame := by
+    TypedFrame unit ns declaration.locals frame := by
   simp only [initialFrame?] at frame_eq
   cases arity_eq : arguments.size != declaration.signature.parameters.size with
   | true => simp [arity_eq] at frame_eq
@@ -409,10 +414,10 @@ theorem freeze_typed {tables : Tables} {loan : Nat}
 
 /-- Leaving a hole in an initialized local preserves frame typing: a hole
 is typed wherever the taken value was. -/
-theorem typedFrame_set_loanHole {tables : Tables} {locals : Array LocalDecl}
+theorem typedFrame_set_loanHole {ns : ValidatedNamespace} {locals : Array LocalDecl}
     {frame : RuntimeFrame} {index loan : Nat}
-    (frame_typed : TypedFrame unit tables locals frame) :
-    TypedFrame unit tables locals
+    (frame_typed : TypedFrame unit ns locals frame) :
+    TypedFrame unit ns locals
       { frame with locals := frame.locals.set! index (some (.loanHole loan)) } := by
   obtain ⟨size_eq, entries⟩ := frame_typed
   refine ⟨by simpa using size_eq, ?_⟩
@@ -423,7 +428,7 @@ theorem typedFrame_set_loanHole {tables : Tables} {locals : Array LocalDecl}
     split at value_eq
     · rw [Option.some.injEq, Option.some.injEq] at value_eq
       rw [← value_eq]
-      exact .loanHole declaration.type.typeId loan
+      exact .loanHole (ns.typeId declaration.type.typeId) loan
     · cases value_eq
   · rw [Array.set!, Array.getElem?_setIfInBounds_ne (by omega)] at value_eq
     exact entries slot declaration declaration_eq value value_eq
@@ -603,6 +608,7 @@ theorem constValue?_hasType {tables : Tables} {literal : ConstValue}
               cases ty <;> simp_all [isFirstSliceConst, isFirstSliceType]
               exact .bytes typeId bs ty_eq
           | profile p => simp [constValue?] at value_eq
+          | «opaque» _ => simp [constValue?] at value_eq
           | vector elements =>
               simp only [constValue?] at value_eq
               cases out_eq : Array.mapM (fun x => constValue? x.val) elements.attach with

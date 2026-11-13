@@ -1,3 +1,7 @@
+`pick` uses concrete verification: Given interpretation does not yet support data invariant interpretation: #[({ namespaceId := { index := 0 }, structId := 0 },
+   "its given data invariant requires behavioral or storage interpretation")]
+`generic_at` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+`created_at` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
 VerexE2ETests/Check/Closures/Known.lean:97:4: error: the specification clause `ensures result == x + y + 1` is not established
 VerexE2ETests/Check/Closures/Known.lean:96:7: error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in the module:
   verify wrong by lean =>

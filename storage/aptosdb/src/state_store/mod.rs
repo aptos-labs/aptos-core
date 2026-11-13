@@ -1069,9 +1069,8 @@ impl StateStore {
         self.state_merkle_db.get_range_proof(rightmost_key, version)
     }
 
-    /// Without the executor and execution pipeline, the State and StateSummary for both the
-    /// latest version and the last checkpoint version need to be calculated before committing
-    /// to the DB.
+    /// Without the executor and execution pipeline, the State and StateSummary need to be
+    /// calculated before committing to the DB.
     #[cfg(test)]
     pub fn calculate_state_and_put_updates(
         &self,
@@ -1116,13 +1115,13 @@ impl StateStore {
             self.get_usage(base_version)?,
             EffectiveHotStateConfig::from_local(HotStateConfig::default()),
         );
-        let (new_state, reads, _hot_state_updates) = LedgerState::new(base.clone(), base.clone())
+        let (new_state, reads, _hot_state_updates) = LedgerState::new(base.clone())
             .update_with_db_reader(
-            &base,
-            Arc::new(EmptyHotState),
-            state_update_refs,
-            self.state_db.clone(),
-        )?;
+                &base,
+                Arc::new(EmptyHotState),
+                state_update_refs,
+                self.state_db.clone(),
+            )?;
 
         self.put_stats_and_indices(
             &base,
@@ -1187,8 +1186,8 @@ impl StateStore {
             })
     }
 
-    // TODO(HotState): multiple writes to the same key are batched (within `for_last_checkpoint`
-    // and `for_latest`) and only the last one is persisted. Revisit later if necessary.
+    // TODO(HotState): multiple writes to the same key are batched (within `for_last_checkpoint`)
+    // and only the last one is persisted. Revisit later if necessary.
     pub fn put_hot_state_updates(
         hot_state_updates: &HotStateUpdates,
         sharded_hot_state_kv_batches: &mut ShardedStateKvSchemaBatch,
@@ -1266,9 +1265,6 @@ impl StateStore {
         if let Some(updates) = &hot_state_updates.for_last_checkpoint {
             write_shard_updates(updates, sharded_hot_state_kv_batches)?;
         }
-        if let Some(updates) = &hot_state_updates.for_latest {
-            write_shard_updates(updates, sharded_hot_state_kv_batches)?;
-        }
 
         Ok(())
     }
@@ -1308,13 +1304,8 @@ impl StateStore {
 
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_stats_and_indices__put_usage"]);
-            if latest_state.last_checkpoint().next_version() > current_state.next_version() {
-                // has a checkpoint in the chunk
+            if latest_state.next_version() > current_state.next_version() {
                 Self::put_usage(latest_state.last_checkpoint(), batch)?;
-            }
-            if !latest_state.is_checkpoint() {
-                // latest state isn't a checkpoint
-                Self::put_usage(latest_state, batch)?;
             }
             STATE_ITEMS.set(latest_state.usage().items() as i64);
             TOTAL_STATE_BYTES.set(latest_state.usage().bytes() as i64);

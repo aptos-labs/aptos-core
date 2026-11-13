@@ -3,7 +3,7 @@
 //# publish
 module 0x66::public_entry {
     struct Work has store, key {
-        _0: |u64|(u64) has store,
+        _0: |u64|u64 has store,
     }
     entry fun exec(p0: address): u64
         acquires Work
@@ -28,7 +28,7 @@ module 0x66::public_entry {
 //# publish
 module 0x66::persistent_entry {
     struct Work has store, key {
-        _0: |u64|(u64) has store,
+        _0: |u64|u64 has store,
     }
     entry fun exec(p0: address): u64
         acquires Work

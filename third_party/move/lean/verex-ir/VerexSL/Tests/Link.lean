@@ -57,21 +57,29 @@ private def compileSource (source : String) : CommandElabM ValidatedUnit := do
   | .ok unit => pure unit
   | .error _ => throwError "the source did not compile"
 
--- Extracted, the namespace keeps only the entries it uses; assembled into a
--- unit of its own, it renders as it did and extracts to itself.
+-- Extracted from the unit it was validated in, the namespace keeps only the
+-- entries it uses; assembled into a unit of its own, it renders as it did and
+-- extracts to itself.
 run_cmd do
   let env ← getEnv
+  let validated ← compileSource "verex module 0x42::validated where
+  use std::vector
+  struct Counter has Key, Drop where
+    value : u64
+  fun has_one(values : &Vector<u64>) -> Bool := values.contains(&1)"
+  let .ok extracted := extract validated ⟨0⟩ | throwError "extraction failed"
+  unless extracted.tables.locations.size < validated.tables.locations.size do
+    throwError "extraction kept locations the namespace does not use"
   let some unit := registeredUnit? env `«0x42».linked | throwError "missing module"
   let .ok object := extract unit ⟨0⟩ | throwError "extraction failed"
   unless object.path == #["0x42", "linked"] do throwError s!"extracted at {object.path}"
-  unless object.tables.locations.size < unit.tables.locations.size do
-    throwError "extraction kept locations the namespace does not use"
   let relinked ← match assemble unit.profiles #[object] with
     | .ok relinked => pure relinked
     | .error message => throwError message
   let .ok original := Print.render env unit | throwError "the module did not render"
   let .ok printed := Print.render env relinked | throwError "the linked module did not render"
   unless original == printed do throwError s!"relocation changed the rendering:\n{printed}"
+  unless relinked.linksConsistent do throwError "the linked unit's links are inconsistent"
   let .ok again := extract relinked ⟨0⟩ | throwError "extraction of the linked unit failed"
   unless again == object do throwError "relocation is not lossless"
 
@@ -110,5 +118,37 @@ run_cmd do
       unless message == "`0x42::linked` does not declare the function `pick`" do
         throwError s!"unexpected boundary message: {message}"
   | .ok _ => throwError "a missing function linked"
+
+-- Preparation reports a nested type argument at the location the namespace
+-- wrote it, linked or not: the unit's type table is location-free, so a
+-- linked namespace reads its types' locations from its own entries.
+verex module 0x42::nested_arguments where
+  pragma verify = false
+  struct Box {T} has Drop where
+    value : T
+  fun keep(first : u64, boxed : Box<Box<Int> >) -> Unit := ()
+
+run_cmd do
+  let some unit := registeredUnit? (← getEnv) `«0x42».nested_arguments | throwError "missing module"
+  let .ok object := extract unit ⟨0⟩ | throwError "extraction failed"
+  let relinked ← match assemble unit.profiles #[object] with
+    | .ok relinked => pure relinked
+    | .error message => throwError message
+  let located (unit : ValidatedUnit) : Array (String × Option VerexIR.Location) :=
+    match prepareExecution #[] unit with
+    | .error diagnostics => diagnostics.map fun d =>
+        (d.code, d.primary.bind fun loc => (unit.namespaces[0]?).bind (·.location? loc))
+    | .ok _ => #[]
+  -- The inner argument `Int` of `Box<Box<Int> >`, as the namespace wrote it.
+  let inner := object.tables.types.findSome? fun
+    | .nominal _ #[.typeArg value] =>
+        if object.tables.types[value.typeId.index]? matches some (.integer .unbounded _) then
+          object.tables.locations[value.loc.index]? else none
+    | _ => none
+  let some inner := inner | throwError "the inner type argument is missing"
+  unless (located relinked).any (·.2 == some inner) do
+    throwError "the linked unit does not report the inner type argument at its location"
+  unless located unit == located relinked do
+    throwError "linking changed where preparation reports"
 
 end VerexSL.Tests.Link

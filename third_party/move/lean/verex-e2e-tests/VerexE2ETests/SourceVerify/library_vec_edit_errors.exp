@@ -1,0 +1,56 @@
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:4:6: error: the continuation after `alloc::vec::Vec::insert` is not established
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `insert_at` failed; provide a proof in the module:
+  verify insert_at by lean =>
+    verex_obligations
+    verex_on
+    | after_insert => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:9:3: error: the specification clause `panics_if at > old(values).length` is not established
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:8:6: error: verex verification failed: the automatic verification of `remove_at` failed; provide a proof in the module:
+  verify remove_at by lean =>
+    verex_obligations
+    verex_on
+    | panics_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:12:3: error: the specification clause `ensures values.length == 2` is not established
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:11:6: error: verex verification failed: the automatic verification of `keep_two` failed; provide a proof in the module:
+  verify keep_two by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:15:3: error: the specification clause `ensures values == old(values)` is not established
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:14:6: error: verex verification failed: the automatic verification of `clear_all` failed; provide a proof in the module:
+  verify clear_all by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:18:3: error: the specification clause `ensures result.length == 0` is not established
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:17:6: error: verex verification failed: the automatic verification of `whole` failed; provide a proof in the module:
+  verify whole by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:21:3: error: the specification clause `ensures values.length == old(values).length` is not established
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:20:6: error: verex verification failed: the automatic verification of `append` failed; provide a proof in the module:
+  verify append by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:24:3: error: the specification clause `ensures ∀ (k in 0 .. count), result[k] == 8` is not established
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:23:6: error: verex verification failed: the automatic verification of `filled` failed; provide a proof in the module:
+  verify filled by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

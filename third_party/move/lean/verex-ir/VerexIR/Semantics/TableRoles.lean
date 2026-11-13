@@ -136,12 +136,12 @@ def optionalLayout? (ns : ValidatedNamespace) (declaration : StructDecl) : Optio
   guard declaration.ghosts.isEmpty
   if declaration.variants.isEmpty then
     let #[field] := declaration.fields | none
-    let some (.vector _) := ns.tables.types[field.type.typeId.index]? | none
+    let some (.vector _) := (ns.typeOf field.type.typeId) | none
     return .vector
   guard (declaration.variants.size == 2)
   let empty ← declaration.variants.find? (·.fields.isEmpty)
   let present ← declaration.variants.find? (·.fields.size == 1)
-  return .variants (← ns.tables.names[empty.name.index]?).name (← ns.tables.names[present.name.index]?).name
+  return .variants (← (ns.nameOf empty.name)).name (← (ns.nameOf present.name)).name
 
 def OptionalLayout.encode (layout : OptionalLayout) (owner : StructHandle)
     (value : Option RuntimeValue) : RuntimeValue :=
@@ -155,7 +155,7 @@ def roleOptional (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : FunctionDecl FunctionBody) (value : Option RuntimeValue) :
     Option RuntimeValue := do
   let result ← declaration.signature.results[0]?
-  let .nominal name _ ← ns.tables.types[result.typeId.index]? | none
+  let .nominal name _ ← (ns.typeOf result.typeId) | none
   let owner ← resolveNominal? unit ns name
   let target ← unit.namespaces[owner.namespaceId.index]?
   let declaration ← target.structs[owner.structId]?
@@ -172,14 +172,14 @@ structure IteratorShape where
 def iteratorShape? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : FunctionDecl FunctionBody) : Option IteratorShape := do
   let parameter ← declaration.signature.parameters[0]?
-  let .nominal name _ ← ns.tables.types[parameter.typeUse.typeId.index]? | none
+  let .nominal name _ ← (ns.typeOf parameter.typeUse.typeId) | none
   let (namespaceId, structId) ← nominalDeclarationId? unit ns name
   let target ← unit.namespaces[namespaceId.index]?
   let iterator ← target.structs[structId]?
   let variant ← iterator.variants.find? (·.fields.size == 1)
-  let named ← target.tables.names[variant.name.index]?
+  let named ← (target.nameOf variant.name)
   let field ← variant.fields[0]?
-  let keyed := target.tables.types[field.type.typeId.index]? == some (.typeParameter 0)
+  let keyed := (target.typeOf field.type.typeId) == some (.typeParameter 0)
   pure { variant := named.name, keyed }
 
 /-- The key an iterator's payload names in a map: the payload itself, or the
