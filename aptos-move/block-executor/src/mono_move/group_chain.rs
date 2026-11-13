@@ -18,10 +18,11 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError},
-    write_set::WriteOp,
+    state_store::state_value::StateValueMetadata,
+    write_set::{WriteOp, WriteOpKind},
 };
 use bytes::Bytes;
-use mono_move_core::GroupSize;
+use mono_move_core::{GroupSize, GroupSlot};
 use std::{
     collections::BTreeMap,
     fmt::Debug,
@@ -49,10 +50,6 @@ impl GroupView {
         self.0.get(tag)
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
     pub(crate) fn size(&self) -> GroupSize {
         GroupSize::from_members(self.0.iter().map(|(tag, bytes)| (tag.len(), bytes.len())))
     }
@@ -74,20 +71,6 @@ impl GroupView {
             };
         }
         Self(members)
-    }
-
-    /// The write for the group's slot: creation, modification or deletion by
-    /// whether the group existed before and has members now.
-    //
-    // TODO(correctness): ops carry no `StateValueMetadata` (slot deposits,
-    // refunds, creation time); the legacy VM's `WriteOpConverter` fills these.
-    pub(crate) fn write_op(&self, existed: bool) -> Result<WriteOp, PanicError> {
-        Ok(match (existed, self.is_empty()) {
-            (false, false) => WriteOp::legacy_creation(self.encode()),
-            (true, false) => WriteOp::legacy_modification(self.encode()),
-            (true, true) => WriteOp::legacy_deletion(),
-            (false, true) => return Err(code_invariant_error("An empty group emitted a write")),
-        })
     }
 
     /// BCS-encodes the group: the member count, then each entry's tag and
@@ -121,11 +104,11 @@ pub struct GroupMetadata<K> {
     /// Their new values are that transaction's entries under these keys.
     /// Empty for the stored group.
     changes: Vec<K>,
-    /// The group's size before these changes, as the transaction that wrote
+    /// The group's slot before these changes, as the transaction that wrote
     /// this entry read it.
-    size_before: GroupSize,
-    /// The group's size after these changes.
-    size: GroupSize,
+    slot_before: GroupSlot,
+    /// The group's slot after these changes.
+    slot: GroupSlot,
     /// The group's members after these changes. Built when the stored group is
     /// initialized, or once for a transaction's entry.
     current: Mutex<GroupViewState>,
@@ -141,13 +124,17 @@ pub struct GroupMetadata<K> {
 }
 
 impl<K> GroupMetadata<K> {
-    /// The metadata for the group as storage holds it.
-    pub(crate) fn from_storage(view: GroupView) -> Self {
-        let size = view.size();
+    /// The metadata for the group as storage holds it, with the metadata of
+    /// its slot, or [`None`] if no group is stored.
+    pub(crate) fn from_storage(view: GroupView, slot_metadata: Option<StateValueMetadata>) -> Self {
+        let slot = GroupSlot {
+            size: view.size(),
+            metadata: slot_metadata,
+        };
         Self {
             changes: vec![],
-            size_before: size,
-            size,
+            slot_before: slot.clone(),
+            slot,
             current: Mutex::new(GroupViewState::Built(Arc::new(view))),
             pending_post_commits: AtomicU8::new(0),
             before: OnceLock::new(),
@@ -155,12 +142,12 @@ impl<K> GroupMetadata<K> {
     }
 
     /// The metadata for one transaction's changes to the group, which take its
-    /// size from `size_before` to `size`.
-    pub(crate) fn from_changes(changes: Vec<K>, size_before: GroupSize, size: GroupSize) -> Self {
+    /// slot from `slot_before` to `slot`.
+    pub(crate) fn from_changes(changes: Vec<K>, slot_before: GroupSlot, slot: GroupSlot) -> Self {
         Self {
             changes,
-            size_before,
-            size,
+            slot_before,
+            slot,
             current: Mutex::new(GroupViewState::None),
             pending_post_commits: AtomicU8::new(2),
             before: OnceLock::new(),
@@ -171,12 +158,37 @@ impl<K> GroupMetadata<K> {
         &self.changes
     }
 
-    pub(crate) fn size_before(&self) -> GroupSize {
-        self.size_before
+    pub(crate) fn slot_before(&self) -> &GroupSlot {
+        &self.slot_before
+    }
+
+    pub(crate) fn slot(&self) -> &GroupSlot {
+        &self.slot
     }
 
     pub(crate) fn size(&self) -> GroupSize {
-        self.size
+        self.slot.size
+    }
+
+    /// What this entry does to the group's slot. The stored group's entry is
+    /// a modification, or a deletion if no group is stored.
+    pub(crate) fn write_kind(&self) -> WriteOpKind {
+        match (&self.slot_before.metadata, &self.slot.metadata) {
+            (None, Some(_)) => WriteOpKind::Creation,
+            (Some(_), Some(_)) => WriteOpKind::Modification,
+            (Some(_) | None, None) => WriteOpKind::Deletion,
+        }
+    }
+
+    /// The write for the group's slot, where these changes take the group's
+    /// members to `view`.
+    pub(crate) fn write_op(&self, view: &GroupView) -> Result<WriteOp, PanicError> {
+        Ok(match (&self.slot_before.metadata, &self.slot.metadata) {
+            (None, Some(metadata)) => WriteOp::creation(view.encode(), metadata.clone()),
+            (Some(_), Some(metadata)) => WriteOp::modification(view.encode(), metadata.clone()),
+            (Some(metadata), None) => WriteOp::deletion(metadata.clone()),
+            (None, None) => return Err(code_invariant_error("An empty group emitted a write")),
+        })
     }
 
     /// Records the group's members before this entry's changes.
@@ -305,9 +317,9 @@ pub(crate) fn finish_group_post_commit<K: Hash + Clone + Debug + Eq + Send + Syn
     Ok(())
 }
 
-/// Whether the group's size just before `idx` is still the size `metadata` was
+/// Whether the group's slot just before `idx` is still the slot `metadata` was
 /// built on.
-pub(crate) fn validate_size_before<K: Hash + Clone + Debug + Eq + Send + Sync>(
+pub(crate) fn validate_slot_before<K: Hash + Clone + Debug + Eq + Send + Sync>(
     data: &VersionedData<K, MonoValue<K>>,
     group_key: &K,
     idx: TxnIndex,
@@ -315,7 +327,7 @@ pub(crate) fn validate_size_before<K: Hash + Clone + Debug + Eq + Send + Sync>(
 ) -> bool {
     match data.fetch_data_no_record(group_key, idx) {
         Ok(MVDataOutput::Versioned(_, MonoValue::GroupMetadata { group })) => {
-            group.size() == metadata.size_before()
+            group.slot() == metadata.slot_before()
         },
         Ok(MVDataOutput::Versioned(_, MonoValue::Write { .. } | MonoValue::Deletion))
         | Err(MVDataError::Uninitialized | MVDataError::Dependency(_)) => false,
@@ -377,6 +389,7 @@ fn write_uleb128(out: &mut Vec<u8>, mut value: usize) {
 mod tests {
     use super::*;
     use aptos_mvhashmap::MVHashMap;
+    use aptos_types::on_chain_config::CurrentTimeMicroseconds;
     use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 
     fn tag(idx: TxnIndex) -> Bytes {
@@ -408,7 +421,7 @@ mod tests {
     fn views_are_released_once_no_post_commit_reads_them() {
         let map = MVHashMap::<u32, (), MonoValue<u32>, DelayedFieldID>::new();
         let data = map.data();
-        let stored = Arc::new(GroupMetadata::from_storage(GroupView::default()));
+        let stored = Arc::new(GroupMetadata::from_storage(GroupView::default(), None));
         data.set_base_value(
             0,
             MonoValue::GroupMetadata {
@@ -420,8 +433,8 @@ mod tests {
             // Sizes are not under test here.
             let metadata = Arc::new(GroupMetadata::from_changes(
                 vec![idx],
-                GroupSize::default(),
-                GroupSize::default(),
+                GroupSlot::default(),
+                GroupSlot::default(),
             ));
             data.write(0, idx, 0, MonoValue::GroupMetadata {
                 group: metadata.clone(),
@@ -498,5 +511,52 @@ mod tests {
         let mut empty = GroupSize::default();
         assert!(empty.remove_member(tag_len, 0).is_none());
         assert_eq!(empty.bcs_size(), 0);
+    }
+
+    #[test]
+    fn write_op_follows_the_slot() {
+        let metadata = |creation_time_usecs| {
+            StateValueMetadata::new(1, 2, &CurrentTimeMicroseconds {
+                microseconds: creation_time_usecs,
+            })
+        };
+        let slot = |view: &GroupView, metadata: Option<StateValueMetadata>| GroupSlot {
+            size: view.size(),
+            metadata,
+        };
+        let entry = |before: &GroupSlot, after: &GroupSlot| {
+            GroupMetadata::<u32>::from_changes(vec![], before.clone(), after.clone())
+        };
+        let empty = GroupView::default();
+        let one_member = GroupView::new([(tag(1), Bytes::from(vec![7; 3]))]);
+        let two_members = one_member.with_changes([(tag(2), Some(Bytes::from(vec![7; 5])))]);
+
+        let absent = slot(&empty, None);
+        let created = slot(&one_member, Some(metadata(5)));
+        let modified = slot(&two_members, Some(metadata(6)));
+
+        let creation = entry(&absent, &created);
+        assert_eq!(creation.write_kind(), WriteOpKind::Creation);
+        assert_eq!(
+            creation.write_op(&one_member).unwrap(),
+            WriteOp::creation(one_member.encode(), metadata(5))
+        );
+
+        let modification = entry(&created, &modified);
+        assert_eq!(modification.write_kind(), WriteOpKind::Modification);
+        assert_eq!(
+            modification.write_op(&two_members).unwrap(),
+            WriteOp::modification(two_members.encode(), metadata(6))
+        );
+
+        // A deletion carries the metadata the slot had.
+        let deletion = entry(&modified, &absent);
+        assert_eq!(deletion.write_kind(), WriteOpKind::Deletion);
+        assert_eq!(
+            deletion.write_op(&empty).unwrap(),
+            WriteOp::deletion(metadata(6))
+        );
+
+        assert!(entry(&absent, &absent).write_op(&empty).is_err());
     }
 }

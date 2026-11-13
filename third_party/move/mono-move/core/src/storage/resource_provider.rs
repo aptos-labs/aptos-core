@@ -8,7 +8,9 @@ use crate::{
     IntoExecutionError, VMInternalError,
 };
 use anyhow::anyhow;
-use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
+use aptos_types::state_store::{
+    state_key::StateKey, state_value::StateValueMetadata, table::TableHandle as AptosTableHandle,
+};
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, value::size_u32_as_uleb128,
 };
@@ -211,6 +213,9 @@ pub enum StorageRead {
         ptr: NonNull<u8>,
         /// Size of the value's BCS encoding.
         bcs_size: usize,
+        /// Metadata of the storage slot holding the value. A resource group
+        /// member has no slot of its own and carries no metadata.
+        metadata: StateValueMetadata,
         /// Version of this read from Block-STM. Used for read-set validation.
         version: Version,
         /// Keeps the arena `ptr` points into alive while this read is retained.
@@ -301,6 +306,15 @@ impl GroupSize {
     }
 }
 
+/// A resource group's storage slot: the size of the group stored in it, and
+/// its metadata.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct GroupSlot {
+    pub size: GroupSize,
+    /// [`None`] if no group is stored in the slot.
+    pub metadata: Option<StateValueMetadata>,
+}
+
 /// What one member adds to its group's encoding.
 fn member_size(tag_len: usize, value_len: usize) -> usize {
     tag_len + size_u32_as_uleb128(value_len) + value_len
@@ -324,13 +338,13 @@ pub trait ResourceProvider {
         group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError>;
 
-    /// Returns the size of the resource group at `group_key`, an
+    /// Returns the slot of the resource group at `group_key`, an
     /// [`InMemoryStorageKey::ResourceGroup`], as this transaction sees it.
-    /// A group that does not exist has size zero.
-    fn get_resource_group_size(
+    /// A group that does not exist has size zero and no metadata.
+    fn get_resource_group_slot(
         &self,
         group_key: &InMemoryStorageKey,
-    ) -> Result<GroupSize, ResourceProviderError>;
+    ) -> Result<GroupSlot, ResourceProviderError>;
 }
 
 /// Empty storage with no resources.
@@ -345,10 +359,10 @@ impl ResourceProvider for NoResourceProvider {
         Ok(StorageRead::DoesNotExist { version: None })
     }
 
-    fn get_resource_group_size(
+    fn get_resource_group_slot(
         &self,
         _group_key: &InMemoryStorageKey,
-    ) -> Result<GroupSize, ResourceProviderError> {
-        Ok(GroupSize::default())
+    ) -> Result<GroupSlot, ResourceProviderError> {
+        Ok(GroupSlot::default())
     }
 }

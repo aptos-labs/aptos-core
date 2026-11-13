@@ -18,7 +18,7 @@ use mono_move_core::{
     value_layout::LayoutProvider,
 };
 use mono_move_output::to_contract_events;
-use mono_move_runtime::{serialize, SessionEffects, WriteClass};
+use mono_move_runtime::{serialize, GroupEntry, SessionEffects, WriteClass};
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
 use shared_dsa::UnorderedMap;
 use std::{collections::BTreeMap, ptr::NonNull};
@@ -152,20 +152,18 @@ fn resource_writes(
 ) -> Result<Vec<(StateKey, WriteOp)>, Vec<String>> {
     let convert = |key: &InMemoryStorageKey, class: WriteClass| -> Result<_, String> {
         let state_key = key.as_state_key().map_err(|e| format!("{e:#}"))?;
-        // TODO(correctness): ops carry no `StateValueMetadata` (slot deposits,
-        // refunds, creation time); the legacy VM's `WriteOpConverter` fills
-        // these.
-        //
         // SAFETY: written pointers refer to live values in the effects' frozen
         // heap, `layouts` describes their interned types, and no GC runs here.
         let op = match class {
-            WriteClass::Creation { ptr, .. } => {
-                WriteOp::legacy_creation(unsafe { written_bytes(layouts, ptr, key.value_ty()) }?)
-            },
-            WriteClass::Modification { ptr, .. } => WriteOp::legacy_modification(unsafe {
-                written_bytes(layouts, ptr, key.value_ty())
-            }?),
-            WriteClass::Deletion => WriteOp::legacy_deletion(),
+            WriteClass::Creation { ptr, metadata, .. } => WriteOp::creation(
+                unsafe { written_bytes(layouts, ptr, key.value_ty()) }?,
+                metadata,
+            ),
+            WriteClass::Modification { ptr, metadata, .. } => WriteOp::modification(
+                unsafe { written_bytes(layouts, ptr, key.value_ty()) }?,
+                metadata,
+            ),
+            WriteClass::Deletion { metadata } => WriteOp::deletion(metadata),
         };
         Ok((state_key, op))
     };
@@ -227,7 +225,7 @@ pub(crate) fn group_writes(
             WriteClass::Creation { ptr, .. } | WriteClass::Modification { ptr, .. } => {
                 Some(unsafe { written_bytes(layouts, ptr, key.value_ty()) }?)
             },
-            WriteClass::Deletion => None,
+            WriteClass::Deletion { .. } => None,
         };
         let member_tag = nominal_tag(key.value_ty()).map_err(|e| format!("{e:#}"))?;
         group_ops
@@ -249,10 +247,11 @@ pub(crate) fn group_writes(
     // sorts the failures, so the order does not reach the result.
     let mut writes = vec![];
     for (group_key, member_ops) in group_ops.into_iter_unordered() {
-        let merged = merge_group(provider, &group_key, member_ops).and_then(|op| {
-            let state_key = group_key.as_state_key().map_err(|e| format!("{e:#}"))?;
-            Ok((state_key, op))
-        });
+        let merged = effects
+            .read_write_set()
+            .written_group(&group_key)
+            .ok_or_else(|| format!("written group {group_key:?} was not recorded"))
+            .and_then(|group| merge_group(provider, &group_key, group, member_ops));
         match merged {
             Ok(write) => writes.push(write),
             Err(e) => failures.push(e),
@@ -265,7 +264,9 @@ pub(crate) fn group_writes(
     }
 }
 
-/// Merges a group's member ops into a single write for the group's slot.
+/// Merges a group's member ops into a single write for the group's slot:
+/// creation, modification or deletion by the group's slot before and after the
+/// transaction, which `group` records.
 ///
 /// The stored blob is canonical in struct-tag order.
 ///
@@ -277,15 +278,20 @@ pub(crate) fn group_writes(
 fn merge_group(
     provider: &dyn AptosDataProvider,
     group_key: &InMemoryStorageKey,
+    group: &GroupEntry,
     member_ops: BTreeMap<StructTag, MemberOp>,
-) -> Result<WriteOp, String> {
-    let old = provider
-        .group_members(group_key)
+) -> Result<(StateKey, WriteOp), String> {
+    let stored = provider
+        .stored_group(group_key)
         .map_err(|e| format!("failed to read the members of group {group_key:?}: {e:#}"))?;
-    let existed = old.is_some();
+    let state_key = group_key.as_state_key().map_err(|e| format!("{e:#}"))?;
+    let slot = group
+        .slot
+        .as_ref()
+        .ok_or_else(|| format!("the size of group {group_key:?} does not add up"))?;
 
     // Members the transaction wrote take precedence; removals are left out.
-    let mut members = old.unwrap_or_default();
+    let mut members = stored.map(|stored| stored.members).unwrap_or_default();
     for (tag, op) in member_ops {
         match op {
             Some(bytes) => {
@@ -296,29 +302,18 @@ fn merge_group(
             },
         }
     }
-    if members.is_empty() {
-        group_op(existed, None)
-    } else {
-        let blob = bcs::to_bytes(&members)
-            .map_err(|e| format!("failed to encode the members of group {group_key:?}: {e}"))?;
-        group_op(existed, Some(Bytes::from(blob)))
-    }
-}
-
-/// Builds the write op for a resource-group slot: creation/modification/
-/// deletion by whether the group existed before and has members after.
-//
-// TODO(correctness): ops carry no `StateValueMetadata` (slot deposits, refunds,
-// creation time); the legacy VM's `WriteOpConverter` fills these.
-fn group_op(existed: bool, new_bytes: Option<Bytes>) -> Result<WriteOp, String> {
-    Ok(match (existed, new_bytes) {
-        (false, Some(bytes)) => WriteOp::legacy_creation(bytes),
-        (true, Some(bytes)) => WriteOp::legacy_modification(bytes),
-        (true, None) => WriteOp::legacy_deletion(),
-        (false, None) => {
-            // Unreachable: a member deletion implies the member (and so the
-            // group) existed in storage.
-            return Err("an empty group emitted a write".to_string());
-        },
-    })
+    let encode = || {
+        bcs::to_bytes(&members)
+            .map(Bytes::from)
+            .map_err(|e| format!("failed to encode the members of group {group_key:?}: {e}"))
+    };
+    let op = match (&group.slot_before.metadata, &slot.metadata) {
+        (None, Some(metadata)) => WriteOp::creation(encode()?, metadata.clone()),
+        (Some(_), Some(metadata)) => WriteOp::modification(encode()?, metadata.clone()),
+        (Some(metadata), None) => WriteOp::deletion(metadata.clone()),
+        // Unreachable: a member deletion implies the member (and so the
+        // group) existed in storage.
+        (None, None) => return Err("an empty group emitted a write".to_string()),
+    };
+    Ok((state_key, op))
 }

@@ -29,6 +29,7 @@ use aptos_types::{
         AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction, Transaction,
         TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
+    write_set::TransactionWrite,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewResourceProvider};
@@ -223,6 +224,18 @@ fn compare_outputs(
     let mut num_diffs = 0;
     for (key, v1_op) in &v1_writes {
         let v2_op = &v2_writes[*key];
+        // Gas does not reach a slot's metadata: the fee changes no value's
+        // size.
+        assert_eq!(
+            v1_op.write_op_kind(),
+            v2_op.write_op_kind(),
+            "write kinds differ for {key:?}"
+        );
+        assert_eq!(
+            v1_op.metadata(),
+            v2_op.metadata(),
+            "state value metadata differs for {key:?}"
+        );
         if v1_op.bytes() == v2_op.bytes() {
             continue;
         }
@@ -2204,8 +2217,7 @@ fn block_metadata_with_randomness_seed(
 }
 
 /// Both system-transaction outputs must be fee-free and match byte-for-byte,
-/// except state-value metadata (slot deposits, creation time), which V2 does
-/// not stamp yet.
+/// state-value metadata included.
 fn compare_system_outputs(v1_output: &TransactionOutput, v2_output: &TransactionOutput) {
     assert_eq!(v2_output.status(), v1_output.status());
     assert_eq!(v1_output.gas_used(), 0);
@@ -2219,7 +2231,6 @@ fn compare_system_outputs(v1_output: &TransactionOutput, v2_output: &Transaction
         "the two VMs wrote different sets of state keys"
     );
     for (key, v1_op) in &v1_writes {
-        use aptos_types::write_set::TransactionWrite;
         let v2_op = &v2_writes[*key];
         assert_eq!(
             v1_op.write_op_kind(),
@@ -2230,6 +2241,11 @@ fn compare_system_outputs(v1_output: &TransactionOutput, v2_output: &Transaction
             v1_op.bytes(),
             v2_op.bytes(),
             "write bytes differ for {key:?}"
+        );
+        assert_eq!(
+            v1_op.metadata(),
+            v2_op.metadata(),
+            "state value metadata differs for {key:?}"
         );
     }
     assert_eq!(v1_output.events(), v2_output.events(), "events differ");

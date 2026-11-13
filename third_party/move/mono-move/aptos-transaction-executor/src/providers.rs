@@ -1,11 +1,15 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_types::on_chain_config::OnChainConfig;
+use aptos_types::{
+    on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
+    state_store::state_value::StateValueMetadata,
+};
 use bytes::Bytes;
 use mono_move_core::{
     storage::resource_provider::{InMemoryStorageKey, ResourceProvider, ResourceProviderError},
     types::InternedType,
+    FrameworkSymbols,
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{serialize, InterpreterContext};
@@ -18,13 +22,13 @@ use std::collections::BTreeMap;
 /// Trait extending the runtime's [`ResourceProvider`] interface with additional capabilities to
 /// handle resource groups.
 pub trait AptosDataProvider: ResourceProvider {
-    /// The stored members of the group behind `group_key`, as execution read
-    /// them, or `None` if no group is stored there. `group_key` must be an
+    /// The group stored behind `group_key`, as execution read it, or `None`
+    /// if no group is stored there. `group_key` must be an
     /// [`InMemoryStorageKey::ResourceGroup`].
-    fn group_members(
+    fn stored_group(
         &self,
         group_key: &InMemoryStorageKey,
-    ) -> Result<Option<GroupMembers>, ResourceProviderError>;
+    ) -> Result<Option<StoredGroup>, ResourceProviderError>;
 }
 
 /// Checks that `group_key` names a resource group's slot, as
@@ -78,6 +82,20 @@ pub(crate) fn read_config<T: OnChainConfig>(
         .transpose()
 }
 
+/// The chain's time, which stamps the slots a session creates, or zero if the
+/// chain has no time yet. Read unmetered. As a session's first read, it is the
+/// time before the transaction.
+pub(crate) fn read_creation_time_usecs(
+    interp: &mut InterpreterContext<'_>,
+    guard: &ExecutionGuard<'_>,
+    symbols: &FrameworkSymbols,
+) -> Result<u64, ResourceProviderError> {
+    let time = interp.unmetered(|interp| {
+        read_config::<CurrentTimeMicroseconds>(interp, guard, symbols.current_time_microseconds)
+    })?;
+    Ok(time.map_or(0, |time| time.microseconds))
+}
+
 /// Reads the resource `T`, whose interned type is `ty`, at `address` through
 /// `interp`.
 pub(crate) fn read_resource<T: MoveStructType + DeserializeOwned>(
@@ -98,6 +116,14 @@ pub(crate) fn read_resource<T: MoveStructType + DeserializeOwned>(
 //
 // TODO(cleanup): consider using interned types and unordered map.
 pub type GroupMembers = BTreeMap<StructTag, Bytes>;
+
+/// A resource group as storage holds it.
+#[derive(Clone)]
+pub struct StoredGroup {
+    pub members: GroupMembers,
+    /// Metadata of the group's slot.
+    pub metadata: StateValueMetadata,
+}
 
 /// Decodes a group's stored blob.
 pub fn decode_group_members(blob: &[u8]) -> Result<GroupMembers, ResourceProviderError> {

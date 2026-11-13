@@ -27,9 +27,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         _aux_info: &AuxiliaryInfo,
     ) -> TxnOutcome {
         let txn_data = SystemTxnMetadata::for_block_metadata(block_metadata);
-        let mut interp = self.system_session(&txn_data);
+        let (mut interp, creation_time_usecs) = match self.system_session(&txn_data) {
+            Ok(session) => session,
+            Err(e) => return TxnOutcome::Panic(e),
+        };
         match run_block_prologue(&mut interp, self.symbols, block_metadata) {
-            Ok(()) => system_txn_outcome(interp),
+            Ok(()) => system_txn_outcome(interp, creation_time_usecs),
             Err(failure) => {
                 // The prologue failure already aborts the block, so a failure
                 // while closing the session adds nothing.
@@ -57,9 +60,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             return self.execute_block_metadata_transaction(block_metadata, aux_info);
         }
         let txn_data = SystemTxnMetadata::for_block_metadata_ext(block_metadata_ext);
-        let mut interp = self.system_session(&txn_data);
+        let (mut interp, creation_time_usecs) = match self.system_session(&txn_data) {
+            Ok(session) => session,
+            Err(e) => return TxnOutcome::Panic(e),
+        };
         match run_block_prologue_ext(&mut interp, self.symbols, block_metadata_ext) {
-            Ok(()) => system_txn_outcome(interp),
+            Ok(()) => system_txn_outcome(interp, creation_time_usecs),
             Err(failure) => {
                 // The prologue failure already aborts the block, so a failure
                 // while closing the session adds nothing.

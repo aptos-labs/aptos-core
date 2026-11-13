@@ -61,8 +61,8 @@ pub use prepared_module::{
 };
 pub use root_pool::{ObjectHandle, ReferenceHandle, RootPool};
 pub use storage::{
-    nominal_tag, GroupSize, ModuleProvider, NoModuleProvider, NoResourceProvider, ReadPin,
-    ResourceProvider, ResourceProviderError, StorageRead,
+    nominal_tag, GroupSize, GroupSlot, ModuleProvider, NoModuleProvider, NoResourceProvider,
+    ReadPin, ResourceProvider, ResourceProviderError, SlotMetadataContext, StorageRead,
 };
 pub use types::{convert_mut_to_immut_ref, is_assignable, is_nominal, strip_ref};
 pub use value_format::FormatOptions;
