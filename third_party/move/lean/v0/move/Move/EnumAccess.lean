@@ -17,7 +17,7 @@ Move reaches the payload of an enum value through its variants:
   (`Move.borrowVariantField`, in `Move.Syntax`): the VM fails on any other
   variant.
 * `match r with …` through a reference to an enum binds the selected
-  variant's payload by reference.  Leaner writes it as a plain `match` whose
+  variant's payload by reference.  Verex writes it as a plain `match` whose
   scrutinee is a local of type `Ref E` / `MutRef E`: the elaborators here
   turn it into a variant dispatch on the referent (`testVariantRef`) whose
   alternatives borrow their payload fields through the reference

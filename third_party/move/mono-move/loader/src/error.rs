@@ -3,7 +3,7 @@
 
 //! Loader subsystem error types.
 
-use mono_move_core::{ExecutionErrorKind, IntoExecutionError};
+use mono_move_core::{ExecutionErrorKind, IntoExecutionError, VerificationError};
 use move_binary_format::errors::VMError;
 use move_core_types::account_address::AccountAddress;
 use thiserror::Error;
@@ -40,6 +40,16 @@ pub enum LoaderError {
     #[error("Resource type layout is not derivable")]
     ResourceLayoutNotDerivable,
 
+    /// A registered native shares the qualified name of a function with a Move
+    /// body. Lowering would run the native instead of the body, bypassing the
+    /// Move frame and its reentrancy checks.
+    #[error("Native registered for {address}::{module}::{name}, which has a Move body")]
+    NativeShadowsMoveFunction {
+        address: AccountAddress,
+        module: String,
+        name: String,
+    },
+
     #[error("Script does not deserialize: {message}")]
     ScriptDeserializationFailed { message: String },
 
@@ -74,9 +84,20 @@ impl IntoExecutionError for LoaderError {
                 ExecutionErrorKind::Placeholder
             },
 
-            InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+            NativeShadowsMoveFunction { .. } | InvariantViolation(_) => {
+                ExecutionErrorKind::InvariantViolation
+            },
         }
     }
+}
+
+/// Joins the verifier's findings into a single diagnostic line.
+fn format_verification_errors(errors: &[VerificationError]) -> String {
+    errors
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 /// Read-set state-machine and cache-consistency assertions raised by the
@@ -136,6 +157,13 @@ pub enum LoaderInvariantViolation {
 
     #[error("Mandatory dependencies must always be lazy")]
     MandatoryDepsNotLazy,
+
+    // ---- lowering ----
+    /// The specializer produced a function the micro-op verifier rejects.
+    /// The bytecode already passed the Move bytecode verifier, so this is a
+    /// bug in the lowering pipeline, not in the user's code.
+    #[error("Lowered function failed micro-op verification: {}", format_verification_errors(.errors))]
+    MicroOpVerificationFailed { errors: Vec<VerificationError> },
 }
 
 /// Returns from the enclosing function with a [`LoaderError::InvariantViolation`]

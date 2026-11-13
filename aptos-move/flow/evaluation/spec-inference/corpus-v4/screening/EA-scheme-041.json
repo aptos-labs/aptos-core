@@ -1,0 +1,22 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_ethereum_derivable_account",
+  "reference_proved": true,
+  "reference_sha256": "d5edf101fde30edada2f5087d0d0807f9285d5ef6d1ee4317187a8d4fee0aeab",
+  "schema_version": 2,
+  "target": "aptos_framework::extracted_ethereum_derivable_account::validate_scheme",
+  "task_id": "EA-scheme-041",
+  "task_tree_sha256": "c7d76c786d1a0622a2b16937e235149c6a995fd9a81b88d929ce0d619579b40b",
+  "threshold_seconds": 20,
+  "wall_seconds": 5.0,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

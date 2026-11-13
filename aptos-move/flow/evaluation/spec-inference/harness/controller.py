@@ -55,7 +55,7 @@ from .mutants import (
     score_mutants,
 )
 from .compatibility import changed_stages, tool_executables
-from .materialize import materialize_task
+from .materialize import materialize_task, materialized_task
 
 
 def _within(root: Path, relative: str) -> Path:
@@ -552,10 +552,11 @@ class Controller:
         """Fingerprints of the mutations this run may be shown, if any."""
         if self.refutation_mutants is None:
             return []
-        return sorted(
-            mutation_fingerprint(case, self.run.shared_package)
-            for case in load_object(self.refutation_mutants)["mutants"]
-        )
+        with materialized_task(self.run.shared_package, self.run.task_patch) as tree:
+            return sorted(
+                mutation_fingerprint(case, tree)
+                for case in load_object(self.refutation_mutants)["mutants"]
+            )
 
     def _initial_prompt(self) -> str:
         """Activate the selected plugin skill, then state the arm-blind task.
@@ -1114,11 +1115,12 @@ def _require_disjoint_from_scoring(run_spec: Any, refutation: Path | None) -> No
             "overlapping refutation set could not be detected; reschedule the "
             "round with a current pilot build"
         )
-    overlap = overlapping_mutations(
-        load_object(refutation)["mutants"],
-        set(run_spec.spec.mutant_identities),
-        run_spec.shared_package,
-    )
+    with materialized_task(run_spec.shared_package, run_spec.task_patch) as tree:
+        overlap = overlapping_mutations(
+            load_object(refutation)["mutants"],
+            set(run_spec.spec.mutant_identities),
+            tree,
+        )
     if overlap:
         raise SystemExit(
             f"{refutation} repeats mutation(s) this round is scored on "

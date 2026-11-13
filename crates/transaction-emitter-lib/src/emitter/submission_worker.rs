@@ -148,6 +148,16 @@ impl SubmissionWorker {
 
                 let txn_offset_time = Arc::new(AtomicU64::new(0));
 
+                let orderless_start_version = if account_to_orderless_txns.is_empty() {
+                    None
+                } else {
+                    self.client()
+                        .get_ledger_information()
+                        .await
+                        .ok()
+                        .map(|response| response.into_inner().version)
+                };
+
                 join_all(
                     requests
                         .chunks(self.params.max_submit_batch_size)
@@ -190,6 +200,7 @@ impl SubmissionWorker {
                     txn_offset_time.load(Ordering::Relaxed) / (requests.len() as u64),
                     account_to_start_and_end_seq_num,
                     account_to_orderless_txns,
+                    orderless_start_version,
                     // skip latency if asked to check seq_num only once
                     // even if we check more often due to stop (to not affect sampling)
                     self.skip_latency_stats,
@@ -296,6 +307,7 @@ impl SubmissionWorker {
         avg_txn_offset_time: u64,
         account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
         account_to_orderless_txns: HashMap<AccountAddress, HashSet<HashValue>>,
+        orderless_start_version: Option<u64>,
         skip_latency_stats: bool,
         txn_expiration_ts_secs: u64,
         check_account_sleep_duration: Duration,
@@ -316,6 +328,7 @@ impl SubmissionWorker {
                 start_time,
                 self.client(),
                 &account_to_orderless_txns,
+                orderless_start_version,
                 txn_expiration_ts_secs,
                 check_account_sleep_duration,
             )

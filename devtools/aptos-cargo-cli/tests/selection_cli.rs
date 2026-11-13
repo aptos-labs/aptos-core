@@ -358,3 +358,77 @@ fn policy_change_cannot_ignore_itself_or_remove_full_e2e_coverage() {
     );
     assert_eq!(plan["e2e_tests"], repo.plan("legacy")["e2e_tests"]);
 }
+
+#[test]
+fn workspace_lockfile_changes_seed_subsystems_before_metadata_regenerates_lock() {
+    let repo = Repo::new();
+    let config_path = repo.root().join(".config/test-subsystems.toml");
+    let config = fs::read_to_string(&config_path).unwrap();
+    repo.write(
+        ".config/test-subsystems.toml",
+        &format!(
+            "global_test_inputs = ['Cargo.lock']\n{}",
+            config.replace("roots = ['move']", "roots = ['move', 'api']")
+        ),
+    );
+    let old_sha = String::from_utf8(repo.git(&["rev-parse", "HEAD"]).stdout).unwrap();
+    repo.git(&["add", "Cargo.lock", ".config/test-subsystems.toml"]);
+    repo.git(&[
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "-qm",
+        "track lockfile",
+    ]);
+    let sha = String::from_utf8(repo.git(&["rev-parse", "HEAD"]).stdout).unwrap();
+    fs::copy(
+        repo.root().join(format!(
+            "target/aptos-x-tool/metadata-{}.json",
+            old_sha.trim()
+        )),
+        repo.root()
+            .join(format!("target/aptos-x-tool/metadata-{}.json", sha.trim())),
+    )
+    .unwrap();
+    let lock = fs::read_to_string(repo.root().join("Cargo.lock")).unwrap();
+    repo.write("Cargo.lock", &lock.replace(" \"move-core\",\n", ""));
+    let plan = repo.plan("subsystem");
+    assert_eq!(plan["changed_paths"], serde_json::json!(["Cargo.lock"]));
+    assert_eq!(plan["packages"], serde_json::json!(["test-api"]));
+    assert_eq!(
+        plan["e2e_tests"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .collect::<Vec<_>>(),
+        vec!["cli-e2e"]
+    );
+    assert!(plan["subsystems"]["move"]["seeds"]
+        .as_array()
+        .unwrap()
+        .contains(&serde_json::json!("test-api")));
+    // Compare mode uses the same refinement, while still executing legacy.
+    repo.write("Cargo.lock", &lock.replace(" \"move-core\",\n", ""));
+    let compared = repo.plan("compare");
+    assert!(compared["e2e_legacy_only"]
+        .as_array()
+        .unwrap()
+        .contains(&serde_json::json!("smoke-tests")));
+    // An unavailable base lockfile must keep global coverage.
+    repo.git(&["rm", "Cargo.lock"]);
+    repo.git(&[
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "-qm",
+        "remove lockfile",
+    ]);
+    repo.write("Cargo.lock", &lock);
+    repo.git(&["add", "Cargo.lock"]);
+    let fallback = repo.plan("subsystem");
+    assert!(fallback["e2e_tests"].get("smoke-tests").is_some());
+}

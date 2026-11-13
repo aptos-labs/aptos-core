@@ -4,7 +4,7 @@ Status: **implemented design**.
 
 ## Objective
 
-Leaner specifications should use Move Specification Language's mathematical
+Verex specifications should use Move Specification Language's mathematical
 integer domain without requiring authors or the transpiler to spell
 representation conversions:
 
@@ -173,4 +173,4 @@ This change does not:
 - eliminate representation views from the implementation of proof tactics.
 
 Those broader changes had substantial compatibility and soundness costs and
-are unnecessary for the actual objective: conversion-free Leaner specs.
+are unnecessary for the actual objective: conversion-free Verex specs.

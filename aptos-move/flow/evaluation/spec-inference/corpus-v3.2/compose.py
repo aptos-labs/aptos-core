@@ -47,13 +47,13 @@ sys.path.insert(0, str(ROOT.parent))
 sys.path.append(str(ROOT))
 
 from build_references import assemble  # noqa: E402
-from harness.identifiers import require_plain_name  # noqa: E402
+from harness.identifiers import module_name, require_plain_name  # noqa: E402
 from harness.mutants import apply_mutant  # noqa: E402
 
 
 def module_file(module: str) -> Path:
     """Locate the generated source of a fully qualified module."""
-    name = module.rsplit("::", 1)[-1]
+    name = module_name(module)
     matches = sorted(PACKAGE.glob(f"sources/*/{name}.move"))
     if len(matches) != 1:
         raise SystemExit(f"expected exactly one source for `{module}`, found {matches}")
@@ -131,7 +131,7 @@ def compose_task(record: dict, output: Path, assembled: dict[str, Path]) -> dict
     directory.mkdir(parents=True)
     shutil.copyfile(source, directory / source.name)
 
-    name = module.rsplit("::", 1)[-1]
+    name = module_name(module)
     reference = None
     patch = PATCHES / f"{name}.patch"
     if patch.is_file():

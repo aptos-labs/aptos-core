@@ -24,6 +24,8 @@ mod decryption;
 #[cfg(test)]
 mod execution;
 #[cfg(test)]
+mod fast_sync_api;
+#[cfg(test)]
 mod full_nodes;
 #[cfg(test)]
 mod fullnode;
@@ -55,6 +57,8 @@ mod state_sync;
 mod state_sync_utils;
 #[cfg(test)]
 mod storage;
+#[cfg(test)]
+mod storage_native_position;
 #[cfg(test)]
 mod sui_derivable_account;
 #[cfg(test)]

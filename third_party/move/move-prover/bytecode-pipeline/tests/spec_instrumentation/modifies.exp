@@ -414,41 +414,40 @@ public fun B::mutate_S_test1_incorrect($t0|addr1: address, $t1|addr2: address) {
      var $t7: bool
      var $t8: u64
      var $t9: bool
-  0: assume Neq<address>($t0, $t1)
-  1: $t4 := opaque begin: A::read_at($t1)
-  2: assume Identical($t5, Not(exists<0x0::A::S>($t1)))
-  3: if ($t5) goto 4 else goto 7
-  4: label L3
-  5: trace_abort($t6)
-  6: goto 33
-  7: label L2
-  8: assume WellFormed($t4)
-  9: assume Eq<u64>($t4, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
- 10: $t4 := opaque end: A::read_at($t1)
- 11: opaque begin: A::mutate_at($t0)
- 12: assume Identical($t7, Not(exists<0x0::A::S>($t0)))
- 13: if ($t7) goto 14 else goto 17
- 14: label L5
- 15: trace_abort($t6)
- 16: goto 33
- 17: label L4
- 18: modifies global<0x0::A::S>($t0)
- 19: assume Eq<u64>(select A::S.x<0x0::A::S>(global<0x0::A::S>($t0)), 2)
- 20: opaque end: A::mutate_at($t0)
- 21: $t8 := opaque begin: A::read_at($t1)
- 22: assume Identical($t9, Not(exists<0x0::A::S>($t1)))
- 23: if ($t9) goto 24 else goto 27
- 24: label L7
- 25: trace_abort($t6)
- 26: goto 33
- 27: label L6
- 28: assume WellFormed($t8)
- 29: assume Eq<u64>($t8, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
- 30: $t8 := opaque end: A::read_at($t1)
- 31: assert Eq<u64>($t4, $t8)
- 32: return ()
- 33: label L1
- 34: abort($t6)
+  0: $t4 := opaque begin: A::read_at($t1)
+  1: assume Identical($t5, Not(exists<0x0::A::S>($t1)))
+  2: if ($t5) goto 3 else goto 6
+  3: label L3
+  4: trace_abort($t6)
+  5: goto 32
+  6: label L2
+  7: assume WellFormed($t4)
+  8: assume Eq<u64>($t4, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+  9: $t4 := opaque end: A::read_at($t1)
+ 10: opaque begin: A::mutate_at($t0)
+ 11: assume Identical($t7, Not(exists<0x0::A::S>($t0)))
+ 12: if ($t7) goto 13 else goto 16
+ 13: label L5
+ 14: trace_abort($t6)
+ 15: goto 32
+ 16: label L4
+ 17: modifies global<0x0::A::S>($t0)
+ 18: assume Eq<u64>(select A::S.x<0x0::A::S>(global<0x0::A::S>($t0)), 2)
+ 19: opaque end: A::mutate_at($t0)
+ 20: $t8 := opaque begin: A::read_at($t1)
+ 21: assume Identical($t9, Not(exists<0x0::A::S>($t1)))
+ 22: if ($t9) goto 23 else goto 26
+ 23: label L7
+ 24: trace_abort($t6)
+ 25: goto 32
+ 26: label L6
+ 27: assume WellFormed($t8)
+ 28: assume Eq<u64>($t8, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+ 29: $t8 := opaque end: A::read_at($t1)
+ 30: assert Eq<u64>($t4, $t8)
+ 31: return ()
+ 32: label L1
+ 33: abort($t6)
 }
 
 

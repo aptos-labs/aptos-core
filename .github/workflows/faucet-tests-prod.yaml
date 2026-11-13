@@ -16,7 +16,7 @@ on:
         type: string
 
   pull_request_target:
-    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+    types: [labeled, opened, synchronize, reopened]
   push:
     branches:
       - main

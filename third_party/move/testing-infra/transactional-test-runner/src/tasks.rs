@@ -99,7 +99,7 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
         r"^\s*//(\s|[\x20-\x22]|[[\x24-\x7E]])"
     };
     let re_comment = Regex::new(comment_pattern).unwrap();
-    // Checks for transactional commands. Leaner sources may use `--#`, which
+    // Checks for transactional commands. Verex sources may use `--#`, which
     // is also a valid Lean line comment; retain `//#` for compatibility.
     // cutting leading/trailing whitespace
     // capturing the command text
@@ -220,7 +220,7 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
         } else {
             let content = file_text_vec.join("\n");
             // Preserve the test's source extension. Compiler frontends use it
-            // to distinguish Move, MASM, and Leaner source blocks.
+            // to distinguish Move, MASM, and Verex source blocks.
             let suffix = filename
                 .extension()
                 .and_then(|ext| ext.to_str())
@@ -274,7 +274,7 @@ impl<T> TaskInput<T> {
 pub enum SyntaxChoice {
     Source,
     ASM,
-    Leaner,
+    Verex,
 }
 
 /// When printing bytecode, the input program must either be a script or a module.
@@ -291,7 +291,7 @@ pub struct PrintBytecodeCommand {
     /// The kind of input: either a script, or a module.
     #[clap(long = "input", value_enum, ignore_case = true, default_value_t = PrintBytecodeInputChoice::Script)]
     pub input: PrintBytecodeInputChoice,
-    /// Select Move source ("move"), Move Assembler ("masm"), or Leaner
+    /// Select Move source ("move"), Move Assembler ("masm"), or Verex
     /// source ("lean"). Is inferred
     /// from filename if absent.
     #[clap(long = "syntax")]
@@ -484,7 +484,7 @@ impl fmt::Display for SyntaxChoice {
         f.write_str(match self {
             SyntaxChoice::Source => MOVE_EXTENSION,
             SyntaxChoice::ASM => MOVE_ASM_EXTENSION,
-            SyntaxChoice::Leaner => LEAN_EXTENSION,
+            SyntaxChoice::Verex => LEAN_EXTENSION,
         })
     }
 }
@@ -496,7 +496,7 @@ impl FromStr for SyntaxChoice {
         match s {
             MOVE_EXTENSION => Ok(SyntaxChoice::Source),
             MOVE_ASM_EXTENSION => Ok(SyntaxChoice::ASM),
-            LEAN_EXTENSION => Ok(SyntaxChoice::Leaner),
+            LEAN_EXTENSION => Ok(SyntaxChoice::Verex),
             _ => Err(anyhow!(
                 "Invalid syntax choice. Expected '{}', '{}', or '{}'",
                 MOVE_EXTENSION,

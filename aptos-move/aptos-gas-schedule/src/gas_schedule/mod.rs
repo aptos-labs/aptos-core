@@ -11,6 +11,7 @@ mod misc;
 mod move_stdlib;
 mod table;
 mod transaction;
+mod value_traversal;
 
 pub use aptos_framework::AptosFrameworkGasParameters;
 pub use instr::InstructionGasParameters;
@@ -18,12 +19,14 @@ pub use misc::{AbstractValueSizeGasParameters, MiscGasParameters};
 pub use move_stdlib::MoveStdlibGasParameters;
 pub use table::TableGasParameters;
 pub use transaction::TransactionGasParameters;
+pub use value_traversal::ValueTraversalGasParameters;
 
 pub mod gas_params {
     use super::*;
     pub use instr::gas_params as instr;
     pub use misc::gas_params as misc;
     pub use transaction::gas_params as txn;
+    pub use value_traversal::gas_params as value_traversal;
 
     pub mod natives {
         use super::*;

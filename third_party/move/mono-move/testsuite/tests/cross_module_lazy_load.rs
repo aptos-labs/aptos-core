@@ -6,7 +6,7 @@
 //! Compiles two Move modules from source, wires an [`InMemoryModuleProvider`]
 //! to a [`Loader`], and runs the entry function in the interpreter. The
 //! callee module is **not** preloaded — the test verifies that hitting
-//! `CallIndirect` at runtime lazily loads it through the interpreter
+//! `CallByName` at runtime lazily loads it through the interpreter
 //! context.
 
 use mono_move_core::{types::EMPTY_TYPE_LIST, GasMeter};
@@ -44,7 +44,7 @@ fn call_indirect_triggers_lazy_module_load() {
     );
 
     // This lazily loads `bar` (via the loader) and returns a pointer to
-    // `main`. `foo` is *not* loaded yet — its CallIndirect site inside
+    // `main`. `foo` is *not* loaded yet: its `CallByName` site inside
     // `bar::main` will trigger the lazy load when the interpreter executes.
     let bar_id = guard
         .intern_address_name(&AccountAddress::ONE, ident_str!("bar"))
@@ -62,7 +62,6 @@ fn call_indirect_triggers_lazy_module_load() {
         .load_function(bar_id, main_name, EMPTY_TYPE_LIST)
         .expect("bar::main should resolve");
     assert_eq!(interp.read_set().len(), 1, "only bar loaded so far");
-    mono_move_runtime::assert_verified(main_fn, &guard);
     let mut call = interp
         .build_call(main_fn)
         .expect("the root frame fits on the stack");

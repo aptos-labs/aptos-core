@@ -11,9 +11,9 @@ import Transpiler.Comments
 import Transpiler.Report
 import Transpiler.Print
 import Transpiler.Cli
-import Transpiler.LIR.Backend
-import Transpiler.LIR.Effects
-import Transpiler.LIR.Leaner
-import Transpiler.LIR.MoveNames
-import Transpiler.LIR.Report
+import Transpiler.VIR.Backend
+import Transpiler.VIR.Effects
+import Transpiler.VIR.Verex
+import Transpiler.VIR.MoveNames
+import Transpiler.VIR.Report
 import Transpiler.Driver

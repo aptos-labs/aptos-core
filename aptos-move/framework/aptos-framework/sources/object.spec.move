@@ -399,7 +399,11 @@ spec aptos_framework::object {
 
     spec generate_signer_for_extending {
         pragma opaque;
+        aborts_if false;
         ensures result == spec_generate_signer_for_extending(self);
+        // Not implied by the clause above: `spec_create_signer` is uninterpreted, so
+        // under `opaque` a caller cannot otherwise name the signer's address.
+        ensures signer::address_of(result) == self.self;
     }
 
     spec set_untransferable(self: &ConstructorRef) {

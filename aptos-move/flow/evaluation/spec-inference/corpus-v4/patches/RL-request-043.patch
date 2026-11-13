@@ -1,0 +1,62 @@
+diff --git a/sources/framework/extracted_rate_limiter.move b/sources/framework/extracted_rate_limiter.move
+index 2238140844..728ea49119 100644
+--- a/sources/framework/extracted_rate_limiter.move
++++ b/sources/framework/extracted_rate_limiter.move
+@@ -56,4 +56,57 @@ module aptos_framework::extracted_rate_limiter {
+         };
+         limiter.last_refill_timestamp = current_time;
+     }
++
++    spec module {
++        /// The clock as `refill` reads it.
++        fun now(): u64 {
++            aptos_framework::timestamp::spec_now_seconds()
++        }
++
++        fun elapsed(limiter: RateLimiter): num {
++            now() - limiter.last_refill_timestamp
++        }
++
++        fun accumulated(limiter: RateLimiter): num {
++            elapsed(limiter) * limiter.capacity + limiter.fractional_accumulated
++        }
++
++        fun fresh(limiter: RateLimiter): num {
++            accumulated(limiter) / limiter.refill_interval
++        }
++
++        /// Nothing requires the clock to have moved forward since the last
++        /// refill, or the interval to be positive.
++        fun refill_aborts(limiter: RateLimiter): bool {
++            !exists<aptos_framework::timestamp::CurrentTimeMicroseconds>(@aptos_framework)
++                || now() < limiter.last_refill_timestamp
++                || elapsed(limiter) * limiter.capacity > MAX_U64
++                || accumulated(limiter) > MAX_U64
++                || limiter.refill_interval == 0
++                || limiter.current_amount + fresh(limiter) > MAX_U64
++        }
++
++        /// Reaching capacity exactly also discards the fraction.
++        fun fills(limiter: RateLimiter): bool {
++            limiter.current_amount + fresh(limiter) >= limiter.capacity
++        }
++
++        fun refilled_amount(limiter: RateLimiter): num {
++            if (fills(limiter)) { limiter.capacity } else { limiter.current_amount + fresh(limiter) }
++        }
++
++        fun refilled_fraction(limiter: RateLimiter): num {
++            if (fills(limiter)) { 0 } else { accumulated(limiter) % limiter.refill_interval }
++        }
++    }
++
++    spec refill {
++        pragma opaque;
++        aborts_if refill_aborts(limiter);
++        ensures limiter.capacity == old(limiter.capacity);
++        ensures limiter.refill_interval == old(limiter.refill_interval);
++        ensures limiter.last_refill_timestamp == now();
++        ensures limiter.current_amount == refilled_amount(old(limiter));
++        ensures limiter.fractional_accumulated == refilled_fraction(old(limiter));
++    }
+ }

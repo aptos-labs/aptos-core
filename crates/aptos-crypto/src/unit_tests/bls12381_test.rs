@@ -8,8 +8,7 @@ use crate::{
     validatable::{Validatable, Validate},
     Signature, SigningKey, Uniform,
 };
-use rand::{distributions::Alphanumeric, Rng};
-use rand_core::OsRng;
+use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
 use std::{convert::TryFrom, iter::zip};
 
 /// Tests that an individual signature share computed correctly on a message m passes verification on m.

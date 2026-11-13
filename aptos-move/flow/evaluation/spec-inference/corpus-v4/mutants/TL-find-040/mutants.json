@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 46,
+        "offset": 2949,
+        "sha256": "121598a5058a482f054aa33a453485942442ea355ba7948b3715015f6db5631f"
+      },
+      "edit": {
+        "at": 25,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-find-040-covering-strict",
+      "obligation_category": "normal-result",
+      "rationale": "A tier with exactly the requested multiplier does not cover it.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 67,
+        "offset": 3006,
+        "sha256": "5b8814e4409f27c193daeadc64a2e3213ad96db05a6a2fc27edaf35fb74e590b"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 5,
+        "to": "!found"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-find-040-abort-inverted",
+      "obligation_category": "abort",
+      "rationale": "The lookup aborts when a covering tier exists.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 27,
+        "offset": 3074,
+        "sha256": "c11e1d8d48fe890db1994956f80adfd547953c491a82b2b258919807a76171f7"
+      },
+      "edit": {
+        "at": 17,
+        "kind": "substitute",
+        "length": 9,
+        "to": "multiplier_percent"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-find-040-returns-multiplier",
+      "obligation_category": "normal-result",
+      "rationale": "The covering tier's multiplier is returned instead of its stake.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "task_id": "TL-find-040"
+}

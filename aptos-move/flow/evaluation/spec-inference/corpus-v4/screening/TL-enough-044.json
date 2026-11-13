@@ -1,0 +1,22 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_transaction_limits",
+  "reference_proved": true,
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "schema_version": 2,
+  "target": "aptos_framework::extracted_transaction_limits::validate_enough_stake",
+  "task_id": "TL-enough-044",
+  "task_tree_sha256": "709edb26990d36e975ac5b2f3cb0d253af09bb68ae01c6036081cd0ac6d6aaea",
+  "threshold_seconds": 20,
+  "wall_seconds": 5.9,
+  "well_formed": true,
+  "wp_failure_kind": null,
+  "wp_hard": false,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

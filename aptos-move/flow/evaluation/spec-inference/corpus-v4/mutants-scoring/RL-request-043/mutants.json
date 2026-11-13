@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 52,
+        "offset": 1456,
+        "sha256": "289d3dcde2b34a357009fff96d84a7638164cac548ff2dc5e537affcaa06a24a"
+      },
+      "edit": {
+        "at": 4,
+        "kind": "substitute",
+        "length": 45,
+        "to": "num_token_requested >= limiter.current_amount"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-request-043-compares-backwards",
+      "obligation_category": "normal-result",
+      "rationale": "A request succeeds when it is at least the available amount.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 51,
+        "offset": 1568,
+        "sha256": "b7609f7b468aa9e8a1d969c021f91e9c8c4d3d8ceddf3f99fbffab3cbea28f40"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 4,
+        "to": "false"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-request-043-granted-reports-failure",
+      "obligation_category": "normal-result",
+      "rationale": "A granted request reports failure.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 46,
+        "offset": 1521,
+        "sha256": "bbb49cb677c0f04e8dece47c7792ca93ad53e0fc5cd33411c764eb05ad3c26c4"
+      },
+      "edit": {
+        "at": 26,
+        "kind": "substitute",
+        "length": 19,
+        "to": "1"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-request-043-takes-one",
+      "obligation_category": "normal-result",
+      "rationale": "A granted request takes a single token.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "b6dcddbf64696687c8871357247833b914344d17356192d0b325b25800cd325c",
+  "task_id": "RL-request-043"
+}

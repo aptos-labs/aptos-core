@@ -83,7 +83,8 @@ mod dbtool_tests {
     use aptos_config::config::HotStateConfig;
     use aptos_db::AptosDB;
     use aptos_executor_test_helpers::integration_test_impl::{
-        test_execution_with_storage_impl, test_execution_with_storage_impl_inner,
+        commit_blocks_with_onchain_features, test_execution_with_storage_impl,
+        test_execution_with_storage_impl_inner,
     };
     use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
@@ -583,6 +584,33 @@ mod dbtool_tests {
         )
         .unwrap();
         rt.shutdown_timeout(Duration::from_secs(1));
+    }
+
+    #[test]
+    fn test_replay_on_archive_with_onchain_features() {
+        let db_dir = TempPath::new();
+        db_dir.create_as_dir().unwrap();
+        let last_version = *commit_blocks_with_onchain_features(db_dir.path()).end();
+
+        Runtime::new()
+            .unwrap()
+            .block_on(
+                DBTool::try_parse_from([
+                    "aptos-db-tool",
+                    "replay-on-archive",
+                    "--start-version",
+                    "1",
+                    "--end-version",
+                    &last_version.to_string(),
+                    "--target-db-dir",
+                    db_dir.path().to_str().unwrap(),
+                    "--replay-concurrency-level",
+                    "1",
+                ])
+                .unwrap()
+                .run(),
+            )
+            .unwrap();
     }
 
     fn dir_size<P: AsRef<Path>>(path: P) -> u64 {

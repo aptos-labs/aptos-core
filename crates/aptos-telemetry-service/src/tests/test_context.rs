@@ -12,6 +12,7 @@ use aptos_crypto::{x25519, Uniform};
 use aptos_infallible::RwLock;
 use aptos_rest_client::aptos_api_types::mime_types;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use rand::SeedableRng;
 use reqwest::header::AUTHORIZATION;
 use serde_json::Value;
@@ -90,7 +91,7 @@ pub async fn new_test_context_with_multiple_contracts(
     };
 
     let peers = PeerStoreTuple::default();
-    let jwt_service = JsonWebTokenService::from_base64_secret(&base64::encode("jwt_secret_key"));
+    let jwt_service = JsonWebTokenService::from_base64_secret(&STANDARD.encode("jwt_secret_key"));
 
     // Build custom contract clients if configured
     let custom_contract_clients = if !config.custom_contract_configs.is_empty() {

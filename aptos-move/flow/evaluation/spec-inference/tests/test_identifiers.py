@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.identifiers import require_plain_name, resolve_within
+from harness.identifiers import module_name, require_plain_name, resolve_within
 
 
 class PlainNameTest(unittest.TestCase):
@@ -55,6 +55,23 @@ class PlainNameTest(unittest.TestCase):
         message = str(raised.exception)
         self.assertIn("task_id", message)
         self.assertIn("'/'", message)
+
+
+class ModuleNameTest(unittest.TestCase):
+    def test_returns_the_unqualified_name(self) -> None:
+        self.assertEqual(module_name("aptos_framework::extracted_jwks"), "extracted_jwks")
+        self.assertEqual(module_name("0x1::vector"), "vector")
+        self.assertEqual(module_name("lomuto_partition"), "lomuto_partition")
+
+    def test_refuses_a_last_segment_that_is_not_a_plain_name(self) -> None:
+        for qualified in ("0x1::..", "0x1::../../escape", "0x1::*", "0x1::", "0x1::a/b"):
+            with self.subTest(qualified=qualified):
+                with self.assertRaises(ValueError):
+                    module_name(qualified)
+
+    def test_refuses_a_non_string(self) -> None:
+        with self.assertRaises(ValueError):
+            module_name(None)
 
 
 class ResolveWithinTest(unittest.TestCase):

@@ -48,8 +48,10 @@ module 0x42::globals {
     }
     spec create_counter(account: &signer) {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies Counter[signer::address_of(account)];
+        ensures [inferred] publish<Counter>(signer::address_of(account), Counter{value: 0});
+        aborts_if [inferred] exists<Counter>(signer::address_of(account));
     }
 
 
@@ -91,8 +93,10 @@ module 0x42::globals {
     }
     spec create_with_value(account: &signer, init_value: u64) {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies Counter[signer::address_of(account)];
+        ensures [inferred] publish<Counter>(signer::address_of(account), Counter{value: init_value});
+        aborts_if [inferred] exists<Counter>(signer::address_of(account));
     }
 
 
@@ -131,24 +135,5 @@ module 0x42::globals {
 
 }
 /*
-Inference diagnostics:
-warning: WP could not characterize the aborts of `globals::create_counter` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition would have introduced a new module dependency
-   ┌─ tests/inference/globals.move:26:5
-   │
-26 │ ╭     fun create_counter(account: &signer) {
-27 │ │         move_to(account, Counter { value: 0 });
-28 │ │     }
-   │ ╰─────^
-
-warning: WP could not characterize the aborts of `globals::create_with_value` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition would have introduced a new module dependency
-   ┌─ tests/inference/globals.move:50:5
-   │
-50 │ ╭     fun create_with_value(account: &signer, init_value: u64) {
-51 │ │         move_to(account, Counter { value: init_value });
-52 │ │     }
-   │ ╰─────^
-
 Verification: Succeeded.
 */

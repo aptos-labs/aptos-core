@@ -1546,6 +1546,7 @@ where
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
+            module_cache_manager_guard.environment().hot_state_config(),
             num_txns,
         ));
         let block_epilogue_txn_idx = ExplicitSyncWrapper::new(None);
@@ -1743,6 +1744,7 @@ where
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
+            module_cache_manager_guard.environment().hot_state_config(),
             num_txns + 1,
         ));
         let shared_maybe_error = AtomicBool::new(false);
@@ -1893,16 +1895,6 @@ where
         }
 
         let mut amount = BTreeMap::new();
-
-        // TODO(HotState): there are three possible paths where the block epilogue
-        // output is passed to the DB:
-        //   1. a block from consensus is executed: the VM outputs the block end info
-        //      and the block epilogue transaction and output are generated here.
-        //   2. a chunk re-executed: The VM will see the block epilogue transaction and
-        //      should output the transaction output by looking at the block end info
-        //      embedded in the epilogue transaction (and maybe the state view).
-        //   3. a chunk replayed by transaction output: we get the transaction output
-        //      directly.
 
         for (i, output) in outputs.enumerate().take(epilogue_txn_idx as usize) {
             // TODO(grao): Also include other transactions that is "Keep" if we are confident
@@ -2073,6 +2065,7 @@ where
         let mut block_limit_processor = BlockGasLimitProcessor::<E::Key, E::Tag>::new(
             self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
+            environment.hot_state_config(),
             num_txns + 1,
         );
 
@@ -2289,8 +2282,10 @@ where
                     transaction_slice_metadata.append_state_checkpoint_to_block()
                 {
                     if !has_reconfig {
-                        let block_end_info = block_limit_processor
-                            .get_block_end_info(|k| executor.materialize_storage_key(k.clone()))?;
+                        let block_end_info = block_limit_processor.get_block_end_info(
+                            |k| executor.materialize_storage_key(k.clone()),
+                            T::promoted_key_size,
+                        )?;
                         block_epilogue_txn = Some(self.gen_block_epilogue(
                             block_id,
                             signature_verified_block,
@@ -2454,9 +2449,10 @@ where
         // like state sync or replay, the BlockEpilogue txn should already in the input
         // and we don't need to add one here.
         if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
-            let block_end_info = block_limit_processor
-                .acquire()
-                .get_block_end_info(|k| executor.materialize_storage_key(k.clone()))?;
+            let block_end_info = block_limit_processor.acquire().get_block_end_info(
+                |k| executor.materialize_storage_key(k.clone()),
+                T::promoted_key_size,
+            )?;
             let epilogue_txn = self.gen_block_epilogue(
                 block_id,
                 block,

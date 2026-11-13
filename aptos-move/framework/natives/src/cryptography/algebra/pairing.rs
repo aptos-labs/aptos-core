@@ -16,11 +16,26 @@ use aptos_native_interface::{
     safely_pop_arg, with_native_rayon, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use aptos_types::on_chain_config::FeatureFlag;
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::{
+    pairing::{Pairing, PairingOutput},
+    CurveGroup,
+};
 use move_core_types::gas_algebra::NumArgs;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
+
+// Returned only when the final exponentiation has no result. Previously this
+// case panicked in ark_ec::pairing::Pairing::multi_pairing.
+const MOVE_ABORT_CODE_PAIRING_FAILED: u64 = 0x01_0004;
+
+fn pairing_result_or_abort<P: Pairing>(
+    result: Option<PairingOutput<P>>,
+) -> SafeNativeResult<P::TargetField> {
+    result
+        .map(|output| output.0)
+        .ok_or_else(|| SafeNativeError::abort(MOVE_ABORT_CODE_PAIRING_FAILED))
+}
 
 fn feature_flag_of_pairing(
     g1_opt: Option<Structure>,
@@ -76,8 +91,12 @@ macro_rules! pairing_internal {
         $context.charge($g2_proj_to_affine_gas_cost)?;
         let g2_element_affine = g2_element.into_affine();
         $context.charge($pairing_gas_cost)?;
-        let new_element =
-            with_native_rayon(|| <$pairing>::pairing(g1_element_affine, g2_element_affine)).0;
+        let result = with_native_rayon(|| {
+            <$pairing>::final_exponentiation(<$pairing>::multi_miller_loop([g1_element_affine], [
+                g2_element_affine,
+            ]))
+        });
+        let new_element = pairing_result_or_abort::<$pairing>(result)?;
         let new_handle = store_element!($context, new_element)?;
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
@@ -121,9 +140,13 @@ macro_rules! multi_pairing_internal {
             $multi_pairing_base_gas
                 + $multi_pairing_per_pair_gas * NumArgs::from(num_entries as u64),
         )?;
-        let new_element =
-            with_native_rayon(|| <$pairing>::multi_pairing(g1_elements_affine, g2_elements_affine))
-                .0;
+        let result = with_native_rayon(|| {
+            <$pairing>::final_exponentiation(<$pairing>::multi_miller_loop(
+                g1_elements_affine,
+                g2_elements_affine,
+            ))
+        });
+        let new_element = pairing_result_or_abort::<$pairing>(result)?;
         let new_handle = store_element!($context, new_element)?;
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
@@ -205,5 +228,58 @@ pub fn pairing_internal(
             )
         },
         _ => Err(SafeNativeError::abort(MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ark_bls12_381::{Bls12_381, Fq12, G1Affine, G2Affine};
+    use ark_bn254::{Bn254, G1Affine as BnG1Affine, G2Affine as BnG2Affine};
+    use ark_ec::{pairing::MillerLoopOutput, AffineRepr};
+    use ark_ff::Zero;
+
+    #[test]
+    fn zero_final_exponentiation_aborts() {
+        // A zero Miller loop result has no final exponentiation. The native
+        // must return a Move abort instead of reaching Pairing::pairing's unwrap.
+        let result = Bls12_381::final_exponentiation(MillerLoopOutput::<Bls12_381>(Fq12::zero()));
+        assert!(matches!(
+            pairing_result_or_abort::<Bls12_381>(result),
+            Err(SafeNativeError::Abort {
+                abort_code: MOVE_ABORT_CODE_PAIRING_FAILED,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn valid_pairing_result_unchanged() {
+        let g1 = G1Affine::generator();
+        let g2 = G2Affine::generator();
+        let old = Bls12_381::pairing(g1, g2).0;
+        let result = Bls12_381::final_exponentiation(Bls12_381::multi_miller_loop([g1], [g2]));
+        assert_eq!(pairing_result_or_abort::<Bls12_381>(result).ok(), Some(old));
+
+        let old_multi = Bls12_381::multi_pairing([g1, g1], [g2, g2]).0;
+        let result =
+            Bls12_381::final_exponentiation(Bls12_381::multi_miller_loop([g1, g1], [g2, g2]));
+        assert_eq!(
+            pairing_result_or_abort::<Bls12_381>(result).ok(),
+            Some(old_multi)
+        );
+
+        let g1 = BnG1Affine::generator();
+        let g2 = BnG2Affine::generator();
+        let old = Bn254::pairing(g1, g2).0;
+        let result = Bn254::final_exponentiation(Bn254::multi_miller_loop([g1], [g2]));
+        assert_eq!(pairing_result_or_abort::<Bn254>(result).ok(), Some(old));
+
+        let old_multi = Bn254::multi_pairing([g1, g1], [g2, g2]).0;
+        let result = Bn254::final_exponentiation(Bn254::multi_miller_loop([g1, g1], [g2, g2]));
+        assert_eq!(
+            pairing_result_or_abort::<Bn254>(result).ok(),
+            Some(old_multi)
+        );
     }
 }

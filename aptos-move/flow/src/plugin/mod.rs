@@ -107,6 +107,11 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
     // shell exports and the MCP server as a JSON `env` block; a setting added
     // here reaches both.
     let evaluation_mode = if evaluation.evaluation_mode { "1" } else { "0" };
+    let aborts_if_is_strict = if evaluation.aborts_if_is_strict {
+        "1"
+    } else {
+        "0"
+    };
     let mut session_env: Vec<(&str, String)> = vec![
         (
             crate::evaluation::INFERENCE_TACTIC_ENV_VAR,
@@ -119,6 +124,10 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
         (
             crate::evaluation::FEEDBACK_LEVEL_ENV_VAR,
             evaluation.feedback_level.as_str().to_string(),
+        ),
+        (
+            crate::evaluation::ABORTS_IF_IS_STRICT_ENV_VAR,
+            aborts_if_is_strict.to_string(),
         ),
     ];
     session_env.push((
@@ -182,6 +191,10 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
             evaluation.feedback_level.as_str().to_string(),
         ),
         (
+            crate::evaluation::EXPECTED_ABORTS_IF_IS_STRICT_ENV_VAR,
+            aborts_if_is_strict.to_string(),
+        ),
+        (
             crate::evaluation::EXPECTED_TOOL_LIST_SHA256_ENV_VAR,
             tool_list_sha256.clone(),
         ),
@@ -232,6 +245,7 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
         "inference_tactic": evaluation.inference_tactic.as_str(),
         "evaluation_mode": evaluation.evaluation_mode,
         "feedback_level": evaluation.feedback_level.as_str(),
+        "aborts_if_is_strict": evaluation.aborts_if_is_strict,
         "no_wp_simplification": args.no_wp_simplification,
         "rendered_inference_skill_sha256": sha256_hex(rendered_skill.as_bytes()),
         "mcp_tool_list_sha256": tool_list_sha256,
@@ -288,6 +302,7 @@ mod tests {
                     inference_tactic: Some(tactic),
                     evaluation_mode: false,
                     feedback_level: None,
+                    aborts_if_is_strict: false,
                 };
                 run(&args, &global).unwrap();
                 let skill = std::fs::read_to_string(output.path().join("skills/move-inf/SKILL.md"))
@@ -326,6 +341,7 @@ mod tests {
             inference_tactic: None,
             evaluation_mode: false,
             feedback_level: None,
+            aborts_if_is_strict: false,
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
@@ -565,6 +581,7 @@ mod tests {
             inference_tactic: None,
             evaluation_mode: false,
             feedback_level: None,
+            aborts_if_is_strict: false,
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
@@ -619,6 +636,7 @@ mod tests {
             inference_tactic: Some(crate::evaluation::InferenceTactic::AgentOnly),
             evaluation_mode: true,
             feedback_level: None,
+            aborts_if_is_strict: false,
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
@@ -684,6 +702,7 @@ mod tests {
             inference_tactic: Some(crate::evaluation::InferenceTactic::HybridFlexible),
             evaluation_mode: true,
             feedback_level: None,
+            aborts_if_is_strict: false,
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
@@ -707,7 +726,8 @@ mod tests {
         assert!(!skill.contains("every function it did not name is finished"));
         // WP runs on any scope; the loop diagnostics are what guide the
         // invariant, so no arm is told to withhold the call.
-        assert!(skill.contains("It runs on any scope, loops included"));
+        assert!(skill.contains("It runs on any scope"));
+        assert!(skill.contains("characterizes a loop only once the loop carries"));
         assert!(!skill.contains("Do not call WP"));
         assert!(skill.contains("### WP tool"));
         assert!(skill.contains("Give the specification you author for the target `pragma opaque`"));

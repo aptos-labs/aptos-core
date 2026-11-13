@@ -4,8 +4,10 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    chunk_executor::chunk_result_verifier::ChunkResultVerifier,
-    metrics::CHUNK_OTHER_TIMERS,
+    chunk_executor::{
+        chunk_result_verifier::StateSyncChunkVerifier, transaction_chunk::TransactionChunk,
+    },
+    metrics::{CHUNK_OTHER_TIMERS, CHUNK_PARTIAL_BLOCK_TXNS},
     types::{
         executed_chunk::ExecutedChunk, partial_state_compute_result::PartialStateComputeResult,
     },
@@ -14,26 +16,32 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
     state_store::{
-        sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
+        collateral::CollateralOverlay, orders::OrderOverlay, positions::PositionOverlay,
+        sharded_jmt_state::NativeStateWithSummary, state::LedgerState,
         state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
     },
     DbReader, LedgerSummary,
 };
-use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
+use aptos_types::{
+    proof::accumulator::InMemoryTransactionAccumulator,
+    transaction::{TransactionInfo, Version},
+};
 use std::{collections::VecDeque, sync::Arc};
 
 pub(crate) struct ChunkToUpdateLedger {
     pub output: PartialStateComputeResult,
+    pub transaction_infos: Vec<TransactionInfo>,
 
     /// from the input -- can be checked / used only after the transaction accumulator
-    /// is updated.
-    pub chunk_verifier: Arc<dyn ChunkResultVerifier + Send + Sync>,
+    /// is updated. `None` for replayed chunks, which come without a proof, or if nothing is
+    /// executed.
+    pub chunk_verifier: Option<StateSyncChunkVerifier>,
 }
 
-/// It's a two stage pipeline:
+/// It's a two stage pipeline, fed with whole blocks:
 ///           (front)     (front)
 ///          /           /
-///    ... | to_commit | to_update_ledger | ---> (txn version increases)
+///    ... | to_commit | to_update_ledger | partial_block | ---> (txn version increases)
 ///                     \                \
 ///                      \                latest_state
 ///                       latest_state_summary
@@ -45,10 +53,40 @@ pub struct ChunkCommitQueue {
     latest_state_summary: LedgerStateSummary,
     /// Native-position summary chained across chunks (the parent the next
     /// chunk rebases from). `None` when native position is disabled.
-    latest_position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
+    latest_position_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
+    /// Native-collateral summary chained across chunks, as
+    /// `latest_position_state_summary` is.
+    latest_collateral_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
+    /// Native-order summary chained across chunks, as
+    /// `latest_position_state_summary` is.
+    latest_order_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
+    /// `PositionOverlay` chained across chunks — the parent the next
+    /// chunk extends from.
+    ///
+    /// Advanced at *enqueue*, unlike `latest_position_state_summary`,
+    /// which is a checkpoint-stage product and advances at ledger
+    /// update. They are deliberately out of step: a chunk's overlay
+    /// exists as soon as it is executed, and the next chunk may be
+    /// enqueued before this one's ledger update runs. `None` when native
+    /// position is disabled.
+    latest_positions: Option<PositionOverlay>,
+    /// Overlay of the last chunk actually committed, which is the safe
+    /// target to fold into the position base — `latest_positions` runs
+    /// ahead of it by whatever is still in the pipeline.
+    committed_positions: Option<PositionOverlay>,
+    /// The order overlays, tracked as `latest_positions` and
+    /// `committed_positions` are. `None` when trading-native storage is off.
+    latest_orders: Option<OrderOverlay>,
+    committed_orders: Option<OrderOverlay>,
+    /// The collateral overlays, tracked as the order overlays are.
+    latest_collateral: Option<CollateralOverlay>,
+    committed_collateral: Option<CollateralOverlay>,
     latest_txn_accumulator: Arc<InMemoryTransactionAccumulator>,
     to_commit: VecDeque<Option<ExecutedChunk>>,
     to_update_ledger: VecDeque<Option<ChunkToUpdateLedger>>,
+    /// Transactions after the last block end, held back until the next chunk completes the
+    /// block.
+    partial_block: Option<TransactionChunk>,
 }
 
 impl ChunkCommitQueue {
@@ -58,15 +96,57 @@ impl ChunkCommitQueue {
             state_summary,
             transaction_accumulator,
             position_state_summary,
+            order_state_summary,
+            collateral_state_summary,
+            positions,
+            orders,
+            collateral,
         } = db.get_pre_committed_ledger_summary()?;
+        // Read under separate locks from state. The overlay may lag state (a
+        // replayed gap with no position writes doesn't extend it) but never
+        // lead it, or the first chunk would extend positions past its parent.
+        if let Some(positions) = positions.as_ref() {
+            ensure!(
+                positions.next_version() <= state.next_version(),
+                "Position overlay at next version {} is ahead of state at {}.",
+                positions.next_version(),
+                state.next_version(),
+            );
+        }
+        if let Some(orders) = orders.as_ref() {
+            ensure!(
+                orders.next_version() <= state.next_version(),
+                "Order overlay at next version {} is ahead of state at {}.",
+                orders.next_version(),
+                state.next_version(),
+            );
+        }
+        if let Some(collateral) = collateral.as_ref() {
+            ensure!(
+                collateral.next_version() <= state.next_version(),
+                "Collateral overlay at next version {} is ahead of state at {}.",
+                collateral.next_version(),
+                state.next_version(),
+            );
+        }
+        CHUNK_PARTIAL_BLOCK_TXNS.set(0);
 
         Ok(Self {
             latest_state: state,
             latest_state_summary: state_summary,
             latest_position_state_summary: position_state_summary,
+            latest_order_state_summary: order_state_summary,
+            latest_collateral_state_summary: collateral_state_summary,
+            latest_positions: positions.clone(),
+            committed_positions: positions,
+            latest_orders: orders.clone(),
+            committed_orders: orders,
+            latest_collateral: collateral.clone(),
+            committed_collateral: collateral,
             latest_txn_accumulator: transaction_accumulator,
             to_commit: VecDeque::new(),
             to_update_ledger: VecDeque::new(),
+            partial_block: None,
         })
     }
 
@@ -75,18 +155,37 @@ impl ChunkCommitQueue {
     }
 
     pub(crate) fn expecting_version(&self) -> Version {
-        self.latest_state.next_version()
+        self.partial_block.as_ref().map_or_else(
+            || self.latest_state.next_version(),
+            TransactionChunk::next_version,
+        )
+    }
+
+    pub(crate) fn partial_block(&self) -> Option<&TransactionChunk> {
+        self.partial_block.as_ref()
     }
 
     pub(crate) fn enqueue_for_ledger_update(
         &mut self,
         chunk_to_update_ledger: ChunkToUpdateLedger,
+        partial_block: Option<TransactionChunk>,
     ) -> Result<()> {
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["enqueue_for_ledger_update"]);
 
         self.latest_state = chunk_to_update_ledger.output.result_state().clone();
+        // Advance alongside `latest_state`, not at ledger update: both are
+        // produced by execution, and the next chunk may be enqueued before
+        // this one's ledger update runs. Leaving it behind would hand that
+        // chunk a stale parent, so it would extend this chunk's parent
+        // instead of this chunk and silently drop these writes.
+        self.latest_positions = chunk_to_update_ledger.output.result_positions().cloned();
+        self.latest_orders = chunk_to_update_ledger.output.result_orders().cloned();
+        self.latest_collateral = chunk_to_update_ledger.output.result_collateral().cloned();
         self.to_update_ledger
             .push_back(Some(chunk_to_update_ledger));
+        CHUNK_PARTIAL_BLOCK_TXNS
+            .set(partial_block.as_ref().map_or(0, TransactionChunk::len) as i64);
+        self.partial_block = partial_block;
         Ok(())
     }
 
@@ -94,7 +193,9 @@ impl ChunkCommitQueue {
         &mut self,
     ) -> Result<(
         LedgerStateSummary,
-        Option<LedgerWithSummary<PositionStateWithSummary>>,
+        Option<LedgerWithSummary<NativeStateWithSummary>>,
+        Option<LedgerWithSummary<NativeStateWithSummary>>,
+        Option<LedgerWithSummary<NativeStateWithSummary>>,
         Arc<InMemoryTransactionAccumulator>,
         ChunkToUpdateLedger,
     )> {
@@ -108,6 +209,8 @@ impl ChunkCommitQueue {
         Ok((
             self.latest_state_summary.clone(),
             self.latest_position_state_summary.clone(),
+            self.latest_order_state_summary.clone(),
+            self.latest_collateral_state_summary.clone(),
             self.latest_txn_accumulator.clone(),
             chunk,
         ))
@@ -134,6 +237,16 @@ impl ChunkCommitQueue {
             .ensure_state_checkpoint_output()?
             .position_state_summary
             .clone();
+        self.latest_order_state_summary = chunk
+            .output
+            .ensure_state_checkpoint_output()?
+            .order_state_summary
+            .clone();
+        self.latest_collateral_state_summary = chunk
+            .output
+            .ensure_state_checkpoint_output()?
+            .collateral_state_summary
+            .clone();
         self.latest_txn_accumulator = chunk
             .output
             .ensure_ledger_update_output()?
@@ -143,6 +256,18 @@ impl ChunkCommitQueue {
         self.to_commit.push_back(Some(chunk));
 
         Ok(())
+    }
+
+    pub(crate) fn latest_positions(&self) -> Option<PositionOverlay> {
+        self.latest_positions.clone()
+    }
+
+    pub(crate) fn latest_orders(&self) -> Option<OrderOverlay> {
+        self.latest_orders.clone()
+    }
+
+    pub(crate) fn latest_collateral(&self) -> Option<CollateralOverlay> {
+        self.latest_collateral.clone()
     }
 
     pub(crate) fn next_chunk_to_commit(&mut self) -> Result<ExecutedChunk> {
@@ -156,14 +281,37 @@ impl ChunkCommitQueue {
         Ok(chunk)
     }
 
-    pub(crate) fn dequeue_committed(&mut self) -> Result<()> {
+    pub(crate) fn dequeue_committed(
+        &mut self,
+        committed_positions: Option<PositionOverlay>,
+        committed_orders: Option<OrderOverlay>,
+        committed_collateral: Option<CollateralOverlay>,
+    ) -> Result<()> {
         ensure!(!self.to_commit.is_empty(), "to_commit is empty.");
         ensure!(
             self.to_commit.front().unwrap().is_none(),
             "Head of to_commit has not been processed."
         );
         self.to_commit.pop_front();
+        // `None` throughout when native position is off, `Some` throughout
+        // when it is on, so this needs no guard.
+        self.committed_positions = committed_positions;
+        self.committed_orders = committed_orders;
+        self.committed_collateral = committed_collateral;
         Ok(())
+    }
+
+    /// The fold target: the last chunk whose write set is durable.
+    pub(crate) fn committed_positions(&self) -> Option<PositionOverlay> {
+        self.committed_positions.clone()
+    }
+
+    pub(crate) fn committed_orders(&self) -> Option<OrderOverlay> {
+        self.committed_orders.clone()
+    }
+
+    pub(crate) fn committed_collateral(&self) -> Option<CollateralOverlay> {
+        self.committed_collateral.clone()
     }
 
     pub(crate) fn is_empty(&self) -> bool {

@@ -8,12 +8,12 @@ use crate::{
     errors::{invariant_violation, MoveExecutionFailure, SystemTxnFailure},
     executor::AptosTransactionExecutor,
     outcome::TxnOutcome,
-    symbols::FrameworkSymbols,
 };
 use aptos_types::{
     block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt, randomness::Randomness,
     transaction::AuxiliaryInfo,
 };
+use mono_move_core::FrameworkSymbols;
 use mono_move_runtime::{CallBuilder, InterpreterContext};
 use move_core_types::account_address::AccountAddress;
 use move_value_view::IterAsMoveVector;

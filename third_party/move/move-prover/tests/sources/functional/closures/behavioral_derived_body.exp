@@ -1,0 +1,37 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_body.move:36:9
+   │
+36 │         ensures result == result_of<double>(x) + 2; // error: the body adds one
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:31: succ_double_wrong
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:32: succ_double_wrong
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:13: double
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:14: double
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:37: succ_double_wrong (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:38: succ_double_wrong (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:36: succ_double_wrong (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_body.move:55:9
+   │
+55 │         ensures ensures_of<inc_b>(old(s), update_field(s, a, 7)); // error: `a` is unchanged
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:50: bump_wrong
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:51: bump_wrong
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:17: inc_b
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:18: inc_b
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:17: inc_b
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:50: bump_wrong
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:56: bump_wrong (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_body.move:55: bump_wrong (spec)

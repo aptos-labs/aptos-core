@@ -34,6 +34,7 @@ ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-block-executor = { workspace = true }
+aptos-collateral-natives = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 aptos-framework-natives = { workspace = true }
@@ -46,6 +47,8 @@ aptos-memory-usage-tracker = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-mvhashmap = { workspace = true }
 aptos-native-interface = { workspace = true }
+aptos-order-natives = { workspace = true }
+aptos-position-natives = { workspace = true }
 aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-environment = { workspace = true }
@@ -85,5 +88,4 @@ aptos-types = { workspace = true, features = ["fuzzing", "testing"] }
 claims = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }
-rand_core = { workspace = true }
 test-case = { workspace = true }

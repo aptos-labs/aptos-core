@@ -3,7 +3,7 @@
 
 use crate::{
     refresh_cached_storage_summary,
-    storage::StorageReader,
+    storage::{StorageReader, StorageReaderInterface},
     tests::{
         mock,
         mock::{MockClient, MockDatabaseReader},
@@ -267,6 +267,36 @@ async fn test_get_storage_server_summary_notification() {
     }
 }
 
+#[tokio::test]
+async fn test_data_summary_without_synced_version() {
+    // Create a mock db for a node that holds a ledger info but hasn't committed
+    // anything behind it yet (i.e., a node that is still fast syncing)
+    let highest_ledger_info = utils::create_test_ledger_info_with_sigs(430, 1000);
+    let mut db_reader = mock::create_mock_db_reader();
+    let expected_ledger_info = highest_ledger_info.clone();
+    db_reader
+        .expect_get_latest_ledger_info()
+        .returning(move || Ok(highest_ledger_info.clone()));
+    db_reader
+        .expect_get_synced_version()
+        .returning(move || Ok(None));
+
+    // Fetch the data summary
+    let storage_reader = StorageReader::new(
+        StorageServiceConfig::default(),
+        Arc::new(db_reader),
+        TimeService::mock(),
+    );
+    let data_summary = storage_reader.get_data_summary().unwrap();
+
+    // The ledger info is still advertised (peers need it to establish
+    // provenance), but no data ranges are, because we cannot serve them
+    assert_eq!(data_summary.synced_ledger_info, Some(expected_ledger_info));
+    assert_eq!(data_summary.transactions, None);
+    assert_eq!(data_summary.transaction_outputs, None);
+    assert_eq!(data_summary.states, None);
+}
+
 /// Creates a mock database reader with the necessary
 /// expectations to satisfy the storage server summary request.
 fn create_db_reader_with_expectations(
@@ -278,9 +308,13 @@ fn create_db_reader_with_expectations(
     let mut db_reader = mock::create_mock_db_reader();
 
     // Set the read call expectations
+    let synced_version = highest_ledger_info.ledger_info().version();
     db_reader
         .expect_get_latest_ledger_info()
         .returning(move || Ok(highest_ledger_info.clone()));
+    db_reader
+        .expect_get_synced_version()
+        .returning(move || Ok(Some(synced_version)));
     db_reader
         .expect_get_first_txn_version()
         .returning(move || Ok(Some(lowest_version)));

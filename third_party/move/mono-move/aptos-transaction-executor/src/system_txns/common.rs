@@ -9,7 +9,6 @@ use crate::{
     executor::AptosTransactionExecutor,
     natives::extensions_with,
     outcome::TxnOutcome,
-    symbols::FrameworkSymbols,
 };
 use aptos_types::{
     block_metadata::BlockMetadata,
@@ -18,7 +17,8 @@ use aptos_types::{
     transaction::{BlockEpiloguePayload, SessionId},
 };
 use mono_move_core::{
-    interner::InternedIdentifier, types::EMPTY_TYPE_LIST, GasMeter, VMInternalError,
+    interner::InternedIdentifier, types::EMPTY_TYPE_LIST, FrameworkSymbols, GasMeter,
+    VMInternalError,
 };
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;

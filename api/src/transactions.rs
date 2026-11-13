@@ -672,9 +672,10 @@ impl TransactionsApi {
             let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
                 // Retrieve max possible gas units
                 let (_, gas_params) = context.get_gas_schedule(&ledger_info)?;
-                let min_number_of_gas_units =
-                    u64::from(gas_params.vm.txn.min_transaction_gas_units)
-                        / u64::from(gas_params.vm.txn.gas_unit_scaling_factor);
+                let min_number_of_gas_units = minimum_external_gas_units(
+                    u64::from(gas_params.vm.txn.min_transaction_gas_units),
+                    u64::from(gas_params.vm.txn.gas_unit_scaling_factor),
+                );
                 let max_number_of_gas_units =
                     u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
 
@@ -1342,7 +1343,7 @@ impl TransactionsApi {
                     ));
                 },
             },
-            TransactionPayload::EncryptedPayload(payload) => {
+            TransactionPayload::EncryptedPayload(_) => {
                 if !self.context.node_config.api.allow_encrypted_txns_submission {
                     return Err(SubmitTransactionError::bad_request_with_code(
                         "Encrypted Transaction submission is not allowed yet",
@@ -1351,40 +1352,15 @@ impl TransactionsApi {
                     ));
                 }
 
-                if !payload.is_encrypted() {
-                    return Err(SubmitTransactionError::bad_request_with_code(
-                        "Encrypted transaction must be in encrypted state",
-                        AptosErrorCode::InvalidInput,
-                        ledger_info,
-                    ));
-                }
-
-                if payload.extra_config().is_multisig() {
-                    return Err(SubmitTransactionError::bad_request_with_code(
-                        "Encrypted transactions do not support multisig",
-                        AptosErrorCode::InvalidInput,
-                        ledger_info,
-                    ));
-                }
-
-                let signer_auth_keys = signed_transaction
-                    .authenticator()
-                    .all_signer_auth_keys(signed_transaction.sender())
-                    .ok_or_else(|| {
+                signed_transaction
+                    .verify_encrypted_payload_for_submission()
+                    .map_err(|error| {
                         SubmitTransactionError::bad_request_with_code(
-                            "Encrypted transactions are not supported with this authenticator type",
+                            error.context("Encrypted transaction payload could not be verified"),
                             AptosErrorCode::InvalidInput,
                             ledger_info,
                         )
                     })?;
-
-                if let Err(e) = payload.verify(signed_transaction.sender(), signer_auth_keys) {
-                    return Err(SubmitTransactionError::bad_request_with_code(
-                        e.context("Encrypted transaction payload could not be verified"),
-                        AptosErrorCode::InvalidInput,
-                        ledger_info,
-                    ));
-                }
             },
         }
         Ok(())
@@ -1972,8 +1948,30 @@ fn override_gas_parameters(
     SignedTransaction::new_signed_transaction(raw_txn, signed_txn.authenticator())
 }
 
+/// Converts an internal gas amount to external gas units, rounding up to ensure the returned
+/// value is accepted by VM gas validation.
+fn minimum_external_gas_units(internal_gas_units: u64, gas_unit_scaling_factor: u64) -> u64 {
+    debug_assert_ne!(gas_unit_scaling_factor, 0);
+    internal_gas_units.div_ceil(gas_unit_scaling_factor)
+}
+
 enum GetByVersionResponse {
     VersionTooNew,
     VersionTooOld,
     Found(TransactionData),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::minimum_external_gas_units;
+
+    #[test]
+    fn minimum_external_gas_units_rounds_up() {
+        assert_eq!(minimum_external_gas_units(27_600_000, 1_000_000), 28);
+    }
+
+    #[test]
+    fn minimum_external_gas_units_preserves_exact_values() {
+        assert_eq!(minimum_external_gas_units(28_000_000, 1_000_000), 28);
+    }
 }

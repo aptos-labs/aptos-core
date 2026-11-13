@@ -40,7 +40,7 @@ use aptos_schemadb::{
 };
 #[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{db_ensure as ensure, Result};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -111,6 +111,10 @@ impl ShardedJmtMerkleDb {
 
     pub(crate) fn db_shard_arc(&self, shard_id: usize) -> Arc<DB> {
         Arc::clone(&self.shards[shard_id])
+    }
+
+    pub(crate) fn shards(&self) -> &[Arc<DB>; NUM_STATE_SHARDS] {
+        &self.shards
     }
 
     pub(crate) fn db(&self, shard_id: Option<usize>) -> &DB {

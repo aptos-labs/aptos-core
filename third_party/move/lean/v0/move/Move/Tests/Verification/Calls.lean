@@ -5,7 +5,7 @@
 import Move
 import MoveModel.Tests.Common
 
-/-! Calls between selected Leaner functions, including pure, effectful, and recursive helpers. -/
+/-! Calls between selected Verex functions, including pure, effectful, and recursive helpers. -/
 
 namespace Tests.MovePrograms
 

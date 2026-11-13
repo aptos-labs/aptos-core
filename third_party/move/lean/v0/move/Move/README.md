@@ -4,7 +4,7 @@ This is a working prototype for authoring Move modules in Lean. `Move` is the
 source programming model and compiler namespace, and the Lake package rooted
 at this directory; the [`MoveModel` package](../../move-model/MoveModel/README.md) it depends
 on holds the target IR, operational semantics, analyses, and prover. The
-compiler integration is still called Leaner.
+compiler integration is still called Verex.
 
 The same source has two distinct uses:
 
@@ -12,7 +12,7 @@ The same source has two distinct uses:
    function and `verify f` produces a theorem checked by the Lean kernel,
    directly over the authored function's generated source semantics.
 2. **Executable compilation.** Selected declarations are lowered through
-   typed base LCNF, `Move.Compiler.LIR`, and `MoveModel.IR` into versioned
+   typed base LCNF, `Move.Compiler.VIR`, and `MoveModel.IR` into versioned
    XIR, then compiled by the complete compiler-v2 pipeline and checked by the
    production Move bytecode verifier.
 
@@ -21,7 +21,7 @@ to the emitted bytecode remains future work; the prototype does not conflate
 those claims.
 
 This README is an example-based tour. The language itself is defined in
-[`leaner-move.md`](leaner-move.md); the verification design is in
+[`verex-move.md`](verex-move.md); the verification design is in
 [`verification-design.md`](verification-design.md); compiler and proof
 roadmaps are in [`design-plan.md`](design-plan.md) with a short overview in
 [`overview.md`](overview.md), loop lowering in
@@ -367,7 +367,7 @@ Move compiler v2 launches Lean with a private output path, reads the
 versioned XIR, and runs its normal checking, optimization, file-format, and
 bytecode-verification pipeline. Direct source lists and Move package source
 discovery both recognize `.lean` beside `.move`. Lean is launched from the
-Lake package root (`third_party/move/lean`); set `LEANER_ROOT` to point
+Lake package root (`third_party/move/lean`); set `VEREX_ROOT` to point
 elsewhere for a different checkout layout.
 
 For tests and transformations the compiled module is available as a Lean

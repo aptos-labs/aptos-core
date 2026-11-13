@@ -298,6 +298,11 @@ impl FrameworkUsageCollector {
             // usage record.
             return Ok(());
         };
+        // The replay is extended to block boundaries, beyond the reported range, so results from
+        // extra transactions are discarded.
+        if !(self.start_version..=self.end_version).contains(&version) {
+            return Ok(());
+        }
 
         state.transaction_usage_records = state
             .transaction_usage_records
@@ -655,6 +660,40 @@ mod tests {
     use aptos_types::transaction::TransactionStatus;
     use move_core_types::account_address::AccountAddress;
     use std::fs::File;
+
+    #[test]
+    fn ignores_versions_outside_range() {
+        let collector = FrameworkUsageCollector::new(10, 20);
+        let module_id = collector.target_modules.iter().next().unwrap().clone();
+        let call = aptos_vm::function_usage::FunctionCall {
+            caller: None,
+            callee: FunctionId {
+                module_id: Some(module_id),
+                function_name: "target".to_owned(),
+            },
+            kind: UsageCallKind::Call,
+        };
+        for (version, transaction_hash) in [(9, [1; 32]), (10, [2; 32]), (21, [3; 32])] {
+            let transaction_hash = HashValue::new(transaction_hash);
+            collector.record_transaction(TransactionFunctionUsage {
+                transaction_hash,
+                sender: AccountAddress::ONE,
+                multisig_address: None,
+                root_function: None,
+                status: TransactionStatus::Keep(ExecutionStatus::Success),
+                calls: vec![call.clone()],
+            });
+            collector.assign_version(transaction_hash, version).unwrap();
+        }
+
+        let state = collector.lock_state();
+        assert!(state.pending.is_empty());
+        assert_eq!(state.transaction_usage_records, 1);
+        let function_counts = state.function_usage.values().next().unwrap();
+        assert_eq!(function_counts.invocation_count, 1);
+        assert_eq!(function_counts.first_version, 10);
+        assert_eq!(function_counts.last_version, 10);
+    }
 
     #[test]
     fn aggregates_invocations_and_distinct_transactions() {

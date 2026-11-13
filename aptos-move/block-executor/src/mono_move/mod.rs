@@ -467,11 +467,6 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             &self.environment,
             usage,
         )
-        .map_err(|e| {
-            code_invariant_error(format!(
-                "MonoMove: failed to create Aptos transaction executor: {e}"
-            ))
-        })?
         .without_metering()
         .execute_transaction(inner_txn, auxiliary_info);
 
@@ -546,8 +541,9 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             })?;
 
         // Cache each group this transaction assembled so a later transaction
-        // touching the same group merges on top of it.
-        for (group_key, members) in groups {
+        // touching the same group merges on top of it. The groups come in an
+        // unspecified order, which is fine: each key is inserted once, into a map.
+        for (group_key, members) in groups.into_iter_unordered() {
             unsync_map.insert_group(group_key, members);
         }
 

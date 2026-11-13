@@ -9,12 +9,12 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+use aptos_types::move_stdlib::reflect::{is_forbidden_to_reflect, INVALID_IDENTIFIER};
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    account_address::AccountAddress, function::FunctionResolutionError, identifier::Identifier,
     language_storage::ModuleId,
 };
-use move_vm_runtime::native_functions::{FunctionResolutionError, NativeFunction};
+use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::PartialVMError,
@@ -22,14 +22,6 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, iter};
-
-const INVALID_IDENTIFIER: u16 = 0;
-
-/// Functions that reflection refuses to resolve, identified by `(module_name, function_name)` at the
-/// framework address `0x1`. A function is forbidden when its call-site rules are enforced by the
-/// bytecode verifier and therefore cannot be upheld for a dynamically-resolved function value.
-const FORBIDDEN_FRAMEWORK_FUNCTIONS: &[(&str, &str)] =
-    &[("event", "emit"), ("init", "internal_maybe_initialize")];
 
 fn native_resolve(
     context: &mut SafeNativeContext,
@@ -57,7 +49,7 @@ fn native_resolve(
     let addr = safely_pop_arg!(args, AccountAddress);
     let mod_id = ModuleId::new(addr, mod_name);
 
-    if is_forbidden_to_reflect(&mod_id, &fun_name) {
+    if is_forbidden_to_reflect(mod_id.address(), mod_id.name(), &fun_name) {
         return Ok(smallvec![result::err_result(pack_err(
             FunctionResolutionError::FunctionNotAccessible as u16
         ))]);
@@ -78,17 +70,6 @@ fn native_resolve(
         },
         Err(e) => Ok(smallvec![result::err_result(pack_err(e as u16))]),
     }
-}
-
-/// Returns true if reflection must refuse to resolve `mod_id::fun_name`, i.e., it is one of the
-/// `FORBIDDEN_FRAMEWORK_FUNCTIONS` at the framework address `0x1`.
-fn is_forbidden_to_reflect(mod_id: &ModuleId, fun_name: &IdentStr) -> bool {
-    mod_id.address() == &AccountAddress::ONE
-        && FORBIDDEN_FRAMEWORK_FUNCTIONS
-            .iter()
-            .any(|&(module, function)| {
-                mod_id.name().as_str() == module && fun_name.as_str() == function
-            })
 }
 
 /// Extract Identifier from a move value of type &String

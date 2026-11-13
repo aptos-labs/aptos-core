@@ -36,11 +36,11 @@ fun caller(r0): u64 {
     r3: u64
   code:
   L0:
-    0: [x0] := call fresh, [] @0
+    0: [x0] := call_exempt fresh, [] @0
     1: r1 := vec_pack u64, 0, [] @1
     2: r2 := mut_borrow_loc r1 @3
     3: vec_push_back u64, r2, r0 @5
-    4: [] := call take, [x0] @6
+    4: [] := call_exempt take, [x0] @6
     5: r2 := mut_borrow_loc r1 @7
     6: r3 := vec_pop_back u64, r2 @8
     7: ret [r3] @9
@@ -69,11 +69,11 @@ fun caller() {
   frame_data_size: 40
   entry_gas: 170
   code:
-    0: CallIndirect 0x66::vec_pushback_safe_point::fresh @0
+    0: CallByNameExempt 0x66::vec_pushback_safe_point::fresh @0
     1: VecNew [8] @1
     2: SlotBorrow [16] <- &[8] @3
     3: VecPushBack [16].push([0], size=8, desc=0) @5
-    4: CallIndirect 0x66::vec_pushback_safe_point::take @6
+    4: CallByNameExempt 0x66::vec_pushback_safe_point::take @6
     5: SlotBorrow [16] <- &[8] @7
     6: VecPopBack [32] <- [16].pop(size=8) @8
     7: Move8 [0] <- [32] @9

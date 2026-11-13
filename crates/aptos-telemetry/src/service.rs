@@ -16,8 +16,7 @@ use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
 use aptos_types::chain_id::ChainId;
 use futures::channel::mpsc::{self, Receiver};
 use once_cell::sync::Lazy;
-use rand::Rng;
-use rand_core::OsRng;
+use rand::{rngs::OsRng, Rng};
 use reqwest::Url;
 use std::{
     collections::BTreeMap,
@@ -50,7 +49,7 @@ static TELEMETRY_TOKEN: Lazy<String> = Lazy::new(|| {
 /// values are "true", "t", "1", "yes" or "y" (all case-insensitive). Any other
 /// values are considered false (including when the variable is not set).
 #[inline]
-fn is_env_variable_true(env_variable: &str) -> bool {
+pub fn is_env_variable_true(env_variable: &str) -> bool {
     match env::var(env_variable) {
         Ok(value) => {
             matches!(

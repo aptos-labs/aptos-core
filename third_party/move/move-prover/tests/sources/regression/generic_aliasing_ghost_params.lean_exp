@@ -1,0 +1,2 @@
+tests/sources/regression/generic_aliasing_ghost_params.move:7:1: info: `seven_writes` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/regression/generic_aliasing_ghost_params.move:7:1: info: `nine_writes_generic` uses concrete verification: Given interpretation does not yet support storage interpretation

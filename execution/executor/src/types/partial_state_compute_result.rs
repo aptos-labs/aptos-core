@@ -10,7 +10,8 @@ use aptos_executor_types::{
 };
 use aptos_storage_interface::{
     state_store::{
-        sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
+        collateral::CollateralOverlay, orders::OrderOverlay, positions::PositionOverlay,
+        sharded_jmt_state::NativeStateWithSummary, state::LedgerState,
         state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
     },
     LedgerSummary,
@@ -36,7 +37,12 @@ impl PartialStateComputeResult {
     pub fn new_empty(ledger_summary: LedgerSummary) -> Self {
         // Deliberately not reusing Self::new() here to make sure we don't leave
         // any OnceCell unset.
-        let execution_output = ExecutionOutput::new_empty(ledger_summary.state);
+        let execution_output = ExecutionOutput::new_empty(
+            ledger_summary.state,
+            ledger_summary.positions,
+            ledger_summary.orders,
+            ledger_summary.collateral,
+        );
         let ledger_update_output = OnceCell::new();
         ledger_update_output
             .set(LedgerUpdateOutput::new_empty(
@@ -48,6 +54,8 @@ impl PartialStateComputeResult {
             .set(StateCheckpointOutput::new_empty(
                 ledger_summary.state_summary,
                 ledger_summary.position_state_summary,
+                ledger_summary.order_state_summary,
+                ledger_summary.collateral_state_summary,
             ))
             .expect("First set.");
 
@@ -79,9 +87,35 @@ impl PartialStateComputeResult {
 
     pub fn ensure_result_position_state_summary(
         &self,
-    ) -> Result<Option<&LedgerWithSummary<PositionStateWithSummary>>> {
+    ) -> Result<Option<&LedgerWithSummary<NativeStateWithSummary>>> {
         self.ensure_state_checkpoint_output()
             .map(|out| out.position_state_summary.as_ref())
+    }
+
+    pub fn ensure_result_order_state_summary(
+        &self,
+    ) -> Result<Option<&LedgerWithSummary<NativeStateWithSummary>>> {
+        self.ensure_state_checkpoint_output()
+            .map(|out| out.order_state_summary.as_ref())
+    }
+
+    pub fn ensure_result_collateral_state_summary(
+        &self,
+    ) -> Result<Option<&LedgerWithSummary<NativeStateWithSummary>>> {
+        self.ensure_state_checkpoint_output()
+            .map(|out| out.collateral_state_summary.as_ref())
+    }
+
+    pub fn result_positions(&self) -> Option<&PositionOverlay> {
+        self.execution_output.positions.as_ref()
+    }
+
+    pub fn result_orders(&self) -> Option<&OrderOverlay> {
+        self.execution_output.orders.as_ref()
+    }
+
+    pub fn result_collateral(&self) -> Option<&CollateralOverlay> {
+        self.execution_output.collateral.as_ref()
     }
 
     pub fn set_state_checkpoint_output(&self, state_checkpoint_output: StateCheckpointOutput) {

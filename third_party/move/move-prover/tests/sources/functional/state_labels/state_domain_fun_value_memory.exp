@@ -1,0 +1,151 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:24:9
+   │
+24 │         ensures forall S in *: S |~ !aborts_of<_f>(_a); // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:20: lift_false
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:23: lift_false (spec)
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:20: lift_false
+   =         _f = <redacted>
+   =         _a = <redacted>
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:24: lift_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:44:9
+   │
+44 │         ensures exists S in *: S |~ !aborts_of<_f>(_a); // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:41: exists_false
+   =         _f = <redacted>
+   =         _a = <redacted>
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:44: exists_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:51:9
+   │
+51 │         ensures !aborts_of<_f>(_a); // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:47: exists_req_false
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:50: exists_req_false (spec)
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:47: exists_req_false
+   =         _f = <redacted>
+   =         _a = <redacted>
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:51: exists_req_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:66:9
+   │
+66 │         ensures forall S in *: forall T in *: (S |~ aborts_of<_f>(_a)) == (T |~ aborts_of<_f>(_a)); // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:62: nested_false
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:65: nested_false (spec)
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:62: nested_false
+   =         _f = <redacted>
+   =         _a = <redacted>
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:66: nested_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:76:9
+   │
+76 │         ensures forall S in *: S |~ !aborts_of<_c.g>(_a); // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:73: field_lift_false
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:75: field_lift_false (spec)
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:73: field_lift_false
+   =         _c = <redacted>
+   =         _a = <redacted>
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:76: field_lift_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:89:9
+   │
+89 │         ensures forall S in *: S |~ !aborts_of<g>(_a); // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:85: local_lift_false
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:87: local_lift_false (spec)
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:88: local_lift_false (spec)
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:85: local_lift_false
+   =         _c = <redacted>
+   =         _a = <redacted>
+   =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:89: local_lift_false (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:111:9
+    │
+111 │         ensures never_aborts(_f, _a); // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:107: spec_fun_lift_false
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:110: spec_fun_lift_false (spec)
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:107: spec_fun_lift_false
+    =         _f = <redacted>
+    =         _a = <redacted>
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:111: spec_fun_lift_false (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:129:9
+    │
+129 │         ensures forall S in *: S.. |~ result_of<_h>(_a); // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:125: pre_lift_false
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:128: pre_lift_false (spec)
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:125: pre_lift_false
+    =         _h = <redacted>
+    =         _a = <redacted>
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:129: pre_lift_false (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:144:9
+    │
+144 │         ensures forall S in *: (..S |~ result_of<_h>(_a)) || (S.. |~ result_of<_h>(_a)); // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:140: post_lift_false
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:143: post_lift_false (spec)
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:140: post_lift_false
+    =         _h = <redacted>
+    =         _a = <redacted>
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:144: post_lift_false (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:172:9
+    │
+172 │         ensures forall S in *: S |~ !aborts_of<_k>(_x); // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:170: nomem_false
+    =         _k = <redacted>
+    =         _x = <redacted>
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:172: nomem_false (spec)
+
+error: data invariant does not hold
+    ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:182:9
+    │
+182 │         invariant forall S in *, x: u64, y: u64: S.. |~ result_of<self.f>(x, y) <= x;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:204: pack_false
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:182
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/state_labels/state_domain_fun_value_memory.move:222:9
+    │
+222 │         ensures forall S in *: S.. |~ !aborts_of<_m>(_x, _a); // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:218: mixed_forall_false
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:221: mixed_forall_false (spec)
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:218: mixed_forall_false
+    =         _m = <redacted>
+    =         _x = <redacted>
+    =         _a = <redacted>
+    =         _x = <redacted>
+    =     at tests/sources/functional/state_labels/state_domain_fun_value_memory.move:222: mixed_forall_false (spec)

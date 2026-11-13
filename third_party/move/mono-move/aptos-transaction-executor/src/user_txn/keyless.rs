@@ -8,7 +8,6 @@
 use crate::{
     errors::DiscardReason,
     providers::{read_config, read_resource},
-    symbols::FrameworkSymbols,
 };
 use aptos_keyless_validation::KeylessStateView;
 use aptos_types::{
@@ -17,6 +16,7 @@ use aptos_types::{
     transaction::SignedTransaction,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
+use mono_move_core::FrameworkSymbols;
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::InterpreterContext;
 use move_core_types::account_address::AccountAddress;

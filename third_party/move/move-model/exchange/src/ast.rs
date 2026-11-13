@@ -46,22 +46,29 @@
 //!   [`XastModule::sources`]; declaration and expression nodes carry them.
 //! - Condition payloads are un-overloaded: kind-specific named fields replace
 //!   the model's positional `additional_exps`.
-//! - Function-typed parameters, their `Invoke` expressions, and the closed
-//!   family of behavior predicates are represented so retained specification
-//!   helpers can cross the boundary. Function-value construction (lambdas and
-//!   closures) remains out of scope and is rejected by the producer.
+//! - Function-typed parameters, their `Invoke` expressions, closure
+//!   construction, and the closed family of behavior predicates are
+//!   represented. Lambdas are rejected by the producer: the compiler lifts
+//!   them into closures before export.
 //!
 //! Version history: version 1 introduced this format; version 2 added function
 //! types and `Invoke` expressions for retained inline helpers; version 3 added
 //! resolved intrinsic-type function-role bindings; version 4 added behavior
-//! predicates over function values.
+//! predicates over function values; version 5 added closure construction;
+//! version 6 added the access declarations of function-typed parameters and
+//! fields (`modifies_of`, `reads_of`); version 7 added lemmas and proof
+//! blocks; version 8 names the variant of each field a variant field
+//! selection reads; version 9 names the module's state labels and ties a
+//! state-domain quantifier binder to the label it binds; version 10 preserves
+//! which numeric literals received the specification-mode default type;
+//! version 11 exports the ghost fields of structs and enums.
 
 use serde::{Deserialize, Serialize};
 
 /// Schema identifier of an XAST module document.
 pub const XAST_SCHEMA: &str = "move-xast-module";
 /// Current version of the XAST format.
-pub const XAST_VERSION: u64 = 4;
+pub const XAST_VERSION: u64 = 11;
 
 /// Index into [`XastModule::types`].
 pub type TypeId = usize;
@@ -81,6 +88,9 @@ pub type NameId = usize;
 pub struct Skipped {
     pub name: String,
     pub reason: String,
+    /// Whether the declaration is an inline function, or the specification
+    /// version of one: the compiler has expanded it where it is called.
+    pub inline: bool,
 }
 
 /// A Move module's typed AST.  The top-level object of an XAST document.
@@ -117,6 +127,12 @@ pub struct XastModule {
     pub spec_vars: Vec<SpecVar>,
     /// Module-level global invariants, update invariants, and axioms.
     pub invariants: Vec<Invariant>,
+    /// Lemmas (`spec module { lemma ... }`).
+    pub lemmas: Vec<Lemma>,
+    /// The state labels specifications name (`..S |~ …`, `exists S in *`),
+    /// by the numbers memory ranges and state-domain binders refer to.
+    #[serde(default)]
+    pub labels: Vec<StateLabel>,
     /// Declarations the producer left out, each with the reason: functions
     /// and spec functions that construct function values (lambdas or
     /// closures), which the format does not cover.
@@ -373,6 +389,10 @@ pub struct Struct {
     pub variants: Option<Vec<Variant>>,
     /// The struct spec: data invariants and pragmas.
     pub spec: Spec,
+    /// The ghost fields of the struct spec (`ghost g: T [= e];`): model-only
+    /// fields of every value, of every variant of an enum.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ghost_fields: Vec<GhostField>,
     /// A resolved intrinsic declaration. The model builder consumes the
     /// source's role properties while validating them, so they are carried
     /// separately from `spec.pragmas` rather than reconstructed by consumers.
@@ -412,6 +432,18 @@ pub struct Field {
     pub name: String,
     pub doc: String,
     pub ty: TypeId,
+}
+
+/// A ghost field. Its initializer reads the struct's fields as locals of
+/// their names; an enum's reads none. Without one, a pack leaves the ghost
+/// unconstrained.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GhostField {
+    pub name: String,
+    pub doc: String,
+    pub ty: TypeId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub init: Option<Exp>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -513,6 +545,72 @@ pub struct Invariant {
 }
 
 // =================================================================================================
+// Lemmas and proofs
+
+/// A lemma: `lemma name<T>(params) { requires ..; ensures ..; } proof { .. }`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Lemma {
+    pub name: String,
+    pub loc: LocId,
+    pub type_params: Vec<TypeParam>,
+    pub params: Vec<Param>,
+    /// The `requires` and `ensures` conditions.
+    pub conditions: Vec<Condition>,
+    /// The declared measure (`decreases`), if any.
+    pub decreases: Option<Vec<Exp>>,
+    pub proof: Option<Proof>,
+}
+
+/// A statement of a structured proof, mirroring the model's `Proof`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Proof {
+    /// `let name = exp;`
+    Let { loc: LocId, name: String, exp: Exp },
+    /// `if (cond) then_proof [else else_proof]`.
+    If {
+        loc: LocId,
+        cond: Exp,
+        then_proof: Box<Proof>,
+        else_proof: Option<Box<Proof>>,
+    },
+    /// `{ proofs }`.
+    Block { loc: LocId, proofs: Vec<Proof> },
+    /// `assert exp;`
+    Assert { loc: LocId, exp: Exp },
+    /// `assume [trusted] exp;`
+    Assume { loc: LocId, exp: Exp },
+    /// `apply lemma(args);`
+    Apply {
+        loc: LocId,
+        application: LemmaApplication,
+    },
+    /// `forall binders [triggers] [weight = n] apply lemma(args);`
+    ForallApply {
+        loc: LocId,
+        binders: Vec<Param>,
+        triggers: Vec<Vec<Exp>>,
+        weight: Option<u32>,
+        application: LemmaApplication,
+    },
+    /// `calc(e1 op e2 op ...)`: each step as the comparison it asserts.
+    Calc { loc: LocId, steps: Vec<Exp> },
+    /// `post proof`: run at each return instead of at entry.
+    Post { loc: LocId, proof: Box<Proof> },
+    /// `split exp;`
+    Split { loc: LocId, exp: Exp },
+}
+
+/// A lemma applied to arguments.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LemmaApplication {
+    pub lemma: NameId,
+    /// The lemma's type arguments, inferred from the arguments' types.
+    pub inst: Vec<TypeId>,
+    pub args: Vec<Exp>,
+}
+
+// =================================================================================================
 // Specifications
 
 /// A specification block (of a function, struct, spec function, or an
@@ -523,9 +621,33 @@ pub struct Spec {
     /// The block's own pragmas, raw (no inheritance applied).
     pub pragmas: Vec<Pragma>,
     pub conditions: Vec<Condition>,
-    /// The frame specification (`modifies`, `reads_of`/`modifies_of`
-    /// access declarations), if any.
+    /// The frame specification (`modifies`, `reads`), if any.
     pub frame: Option<Frame>,
+    /// The access declarations of the function-typed parameters of a
+    /// function, or the function-typed fields of a struct.
+    pub access_of: Vec<AccessOf>,
+    /// The `proof { ... }` block of a function specification.
+    pub proof: Option<Box<Proof>>,
+}
+
+/// The access declaration of a function-typed parameter or field `f`:
+/// `modifies_of<f>(formals) targets` and `reads_of<f> types`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccessOf {
+    pub loc: LocId,
+    /// The parameter or field the declaration is about.
+    pub name: String,
+    /// The formals of `modifies_of`, bound to an invocation's arguments.
+    pub formals: Vec<Param>,
+    /// `modifies_of` targets over the formals: `Global` calls with their
+    /// address.
+    pub modifies: Vec<Exp>,
+    /// Resource types declared as read.
+    pub reads: Vec<TypeId>,
+    /// `modifies_of<f> *`: any memory may be modified.
+    pub modifies_all: bool,
+    /// `reads_of<f> *`: any memory may be read.
+    pub reads_all: bool,
 }
 
 /// A frame specification.
@@ -636,6 +758,12 @@ pub enum ExpNode {
         /// producer recovers the name from the source span (an identifier
         /// naming a module constant of equal value).
         constant: Option<String>,
+        /// The compiler assigned this numeric literal its specification-mode
+        /// default type because no context determined its width. This source
+        /// fact distinguishes an adaptable literal from an explicit suffix;
+        /// it does not select a verifier's numeric representation.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        defaulted_num: bool,
     },
     /// A local variable (introduced by a `let`, a pattern, or a quantifier).
     Local {
@@ -731,6 +859,18 @@ pub enum QuantKind {
 pub struct QuantRange {
     pub pattern: Pattern,
     pub domain: Exp,
+    /// The state label a binder over the state domain (`exists S in *`)
+    /// binds, as the ranges of the body refer to it; `None` for any other
+    /// domain.
+    #[serde(default)]
+    pub label: Option<u64>,
+}
+
+/// A state label by its number and source name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StateLabel {
+    pub id: u64,
+    pub name: String,
 }
 
 /// A typed pattern node.
@@ -811,15 +951,31 @@ pub enum BehaviorKind {
     UnchangedOf,
     FoldsOf,
     WriteOf(usize),
+    TransitionOf,
+}
+
+/// A field of an enum variant.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VariantField {
+    pub variant: String,
+    pub field: String,
 }
 
 /// The operation of a call node, mirroring the model's `Operation` with
-/// qualified names in place of ids. Function-value construction via `Closure`
-/// is rejected by the producer; behavior predicates are transported directly.
+/// qualified names in place of ids; behavior predicates are transported
+/// directly.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Operation {
     MoveFunction(NameId),
+    /// A closure of a function: the call's arguments are the captured values,
+    /// bound to the parameters whose bit is set in `mask`, and its
+    /// instantiation is the function's.
+    Closure {
+        name: NameId,
+        mask: u64,
+    },
     Pack {
         name: NameId,
         variant: Option<String>,
@@ -829,9 +985,10 @@ pub enum Operation {
         name: NameId,
         field: String,
     },
+    /// The field of whichever listed variant the operand holds.
     SelectVariants {
         name: NameId,
-        fields: Vec<String>,
+        fields: Vec<VariantField>,
     },
     TestVariants {
         name: NameId,
@@ -998,6 +1155,7 @@ mod tests {
             node: ExpNode::Value {
                 value: Value::Number("5".to_string()),
                 constant: None,
+                defaulted_num: false,
             },
         };
         assert_eq!(
@@ -1091,6 +1249,8 @@ mod tests {
             spec_funs: vec![],
             spec_vars: vec![],
             invariants: vec![],
+            lemmas: vec![],
+            labels: vec![],
             skipped: vec![],
             comments: vec![],
             sources: vec![],

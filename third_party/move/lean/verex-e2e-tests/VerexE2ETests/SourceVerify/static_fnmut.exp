@@ -1,0 +1,4 @@
+VerexE2ETests/SourceVerify/static_fnmut.rs:13:1: info: `apply_mut` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/static_fnmut.rs:13:1: info: `forward` uses concrete verification: Given interpretation does not yet support behavioral contract interpretation
+VerexE2ETests/SourceVerify/static_fnmut.rs:13:1: info: `apply_bool` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/static_fnmut.rs:13:1: info: `apply_unit` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation

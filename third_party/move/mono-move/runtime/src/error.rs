@@ -5,11 +5,13 @@
 
 use mono_move_core::{
     BytecodeOffset, ExecutionErrorKind, FunctionDefinitionIndex, IntTy, IntoExecutionError,
-    ResourceProviderError,
+    ResourceProviderError, VMInternalError,
 };
 use move_core_types::{
     account_address::AccountAddress,
+    identifier::Identifier,
     int256::{I256, U256},
+    language_storage::ModuleId,
     vm_status::AbortLocation,
 };
 use std::{fmt, str::Utf8Error};
@@ -68,6 +70,28 @@ pub enum RuntimeError {
     #[error("MoveTo: resource already exists at {addr}")]
     ResourceAlreadyExists { addr: AccountAddress },
 
+    /// A call to `function` was rejected because it would re-enter `module`
+    /// while a module lock was held.
+    #[error(
+        "call: `{}::{function}` re-enters its module while a module lock is active",
+        .module.short_str_lossless()
+    )]
+    ReentrancyUnderModuleLock {
+        module: Box<ModuleId>,
+        function: Identifier,
+    },
+
+    /// A resource operation was rejected because its defining module was
+    /// re-entered.
+    #[error(
+        "resource `{}::{name}` is locked while its module is re-entered",
+        .module.short_str_lossless()
+    )]
+    ResourceAccessDuringReentrancy {
+        module: Box<ModuleId>,
+        name: Identifier,
+    },
+
     #[error("enum variant mismatch: runtime variant tag {tag} is not the expected variant")]
     EnumVariantMismatch { tag: u64 },
 
@@ -120,6 +144,22 @@ pub enum RuntimeError {
     #[error("BCS deserialize: cannot deserialize a signer")]
     BCSSignerNotDeserializable,
 
+    /// A `String` argument is not valid UTF-8.
+    #[error("argument check: a `String` is not valid UTF-8")]
+    MalformedStringArgument,
+
+    /// An `Object` argument names an address holding no object.
+    #[error("argument check: no object at the `Object` argument's address")]
+    ObjectArgumentDoesNotExist,
+
+    /// An `Object<T>` argument names an object holding no `T`.
+    #[error("argument check: the `Object` argument's address holds no resource of its type")]
+    ObjectArgumentLacksResource,
+
+    /// A storage read while checking an `Object` argument failed.
+    #[error("storage read failure during `Object` argument check: {0}")]
+    ArgumentStorageRead(VMInternalError),
+
     #[error("unsupported: {0}")]
     Unsupported(&'static str),
 }
@@ -141,10 +181,14 @@ impl RuntimeError {
             | BCSSequenceTooLong { .. }
             | BCSRemainingInput { .. }
             | BCSInvalidBool { .. }
-            | BCSInvalidEnumTag { .. }
-            | BCSSignerNotDeserializable => true,
+            | BCSSignerNotDeserializable
+            | BCSInvalidEnumTag { .. } => true,
 
-            ArithmeticOverflow { .. }
+            MalformedStringArgument
+            | ObjectArgumentDoesNotExist
+            | ObjectArgumentLacksResource
+            | ArgumentStorageRead(_)
+            | ArithmeticOverflow { .. }
             | ArithmeticUnderflow { .. }
             | DivisionByZero { .. }
             | ShiftAmountOutOfRange { .. }
@@ -157,6 +201,8 @@ impl RuntimeError {
             | VectorIndexOutOfBounds { .. }
             | ResourceDoesNotExist { .. }
             | ResourceAlreadyExists { .. }
+            | ReentrancyUnderModuleLock { .. }
+            | ResourceAccessDuringReentrancy { .. }
             | EnumVariantMismatch { .. }
             | StackOverflow
             | OutOfHeapMemory { .. }
@@ -190,6 +236,8 @@ impl IntoExecutionError for RuntimeError {
             | InvalidAbortMessage { .. }
             | ResourceDoesNotExist { .. }
             | ResourceAlreadyExists { .. }
+            | ReentrancyUnderModuleLock { .. }
+            | ResourceAccessDuringReentrancy { .. }
             | EnumVariantMismatch { .. } => ExecutionErrorKind::InvalidOperation,
 
             StackOverflow
@@ -204,8 +252,12 @@ impl IntoExecutionError for RuntimeError {
             | BCSSequenceTooLong { .. }
             | BCSRemainingInput { .. }
             | BCSInvalidBool { .. }
+            | BCSSignerNotDeserializable
             | BCSInvalidEnumTag { .. }
-            | BCSSignerNotDeserializable => ExecutionErrorKind::InvalidOperation,
+            | MalformedStringArgument
+            | ObjectArgumentDoesNotExist
+            | ObjectArgumentLacksResource => ExecutionErrorKind::InvalidOperation,
+            ArgumentStorageRead(err) => err.kind(),
 
             Unsupported(_) => ExecutionErrorKind::InvariantViolation,
 
@@ -459,6 +511,15 @@ pub enum RuntimeInvariantViolation {
 
     #[error("a root pool handle was still outstanding when the session was closed")]
     LiveRootAtSessionEnd,
+
+    #[error("reentrancy checker: return from a checked frame with no record to exit")]
+    ReentrancyExitWithoutRecord,
+
+    #[error("reentrancy checker: exiting a module that is not active")]
+    ReentrancyModuleNotActive,
+
+    #[error("reentrancy checker: module lock counter underflow")]
+    ReentrancyLockUnderflow,
 }
 
 /// Successful terminal outcomes from `Interpreter::run`.

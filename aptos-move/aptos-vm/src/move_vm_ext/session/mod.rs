@@ -8,6 +8,7 @@ use crate::{
     },
 };
 use aptos_aggregator::aggregator_v1_extension::{AGGREGATOR_V1_LAYOUT, AGGREGATOR_V1_SIZE};
+use aptos_collateral_natives::NativeCollateralContext;
 use aptos_framework_natives::{
     aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
@@ -18,12 +19,18 @@ use aptos_framework_natives::{
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
+use aptos_order_natives::NativeOrderContext;
+use aptos_position_natives::NativePositionContext;
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::Features,
-    state_store::{state_key::StateKey, state_value::StateValueMetadata},
+    state_store::{
+        native_position::NativePosition,
+        state_key::{inner::TradingNativeKey, StateKey},
+        state_value::StateValueMetadata,
+    },
     transaction::user_transaction_context::UserTransactionContext,
     write_set::WriteOp,
 };
@@ -237,9 +244,17 @@ where
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.legacy_into_events();
 
+        // Drain staged position writes into the VMChangeSet bucket.
+        let position_context: NativePositionContext = extensions.remove();
+        let position_writes_map = position_context.into_change_maps();
+        let order_context: NativeOrderContext = extensions.remove();
+        let order_writes_map = order_context.into_change_maps();
+        let collateral_context: NativeCollateralContext = extensions.remove();
+        let collateral_writes_map = collateral_context.into_change_maps();
+
         let woc = WriteOpConverter::new(resolver, is_storage_slot_metadata_enabled);
 
-        let change_set = Self::convert_change_set(
+        let mut change_set = Self::convert_change_set(
             &woc,
             change_set,
             resource_group_change_set,
@@ -249,6 +264,18 @@ where
             configs.legacy_resource_creation_as_modification(),
         )
         .map_err(|e| e.finish(Location::Undefined))?;
+
+        let position_bucket = build_position_writeset(&position_writes_map)
+            .map_err(|e| e.finish(Location::Undefined))?;
+        change_set
+            .set_position_bucket(position_bucket)
+            .map_err(|e| e.finish(Location::Undefined))?;
+        change_set
+            .set_order_bucket(build_trading_native_writeset(order_writes_map))
+            .map_err(|e| e.finish(Location::Undefined))?;
+        change_set
+            .set_collateral_bucket(build_trading_native_writeset(collateral_writes_map))
+            .map_err(|e| e.finish(Location::Undefined))?;
 
         Ok(change_set)
     }
@@ -612,5 +639,51 @@ where
     extensions.add(NativeStateStorageContext::new(data_view));
     extensions.add(NativeEventContext::default());
     extensions.add(NativeObjectContext::default());
+
+    extensions.add(NativePositionContext::new());
+    extensions.add(NativeOrderContext::new());
+    extensions.add(NativeCollateralContext::new());
+
     extensions
+}
+
+/// Convert staged trading-native writes (`None` = deletion) into a
+/// `StateKey -> WriteOp` map, with legacy creation/deletion as for positions.
+fn build_trading_native_writeset(
+    writes: BTreeMap<TradingNativeKey, Option<Bytes>>,
+) -> BTreeMap<StateKey, WriteOp> {
+    writes
+        .into_iter()
+        .map(|(key, value)| {
+            let op = match value {
+                Some(bytes) => WriteOp::legacy_creation(bytes),
+                None => WriteOp::legacy_deletion(),
+            };
+            (StateKey::trading_native(key), op)
+        })
+        .collect()
+}
+
+/// Convert staged position writes (`None` = deletion) into a
+/// `StateKey -> WriteOp` map. Uses legacy creation/deletion since the
+/// staging map doesn't track prior presence.
+fn build_position_writeset(
+    writes: &BTreeMap<TradingNativeKey, Option<NativePosition>>,
+) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
+    let mut out = BTreeMap::new();
+    for (key, maybe_position) in writes {
+        let state_key = StateKey::trading_native(key.clone());
+        let op = match maybe_position {
+            Some(pos) => {
+                let bytes = pos.serialize().map_err(|e| {
+                    PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                        .with_message(format!("failed to serialize NativePosition: {}", e))
+                })?;
+                WriteOp::legacy_creation(bytes.into())
+            },
+            None => WriteOp::legacy_deletion(),
+        };
+        out.insert(state_key, op);
+    }
+    Ok(out)
 }

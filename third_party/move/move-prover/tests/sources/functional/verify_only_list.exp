@@ -1,0 +1,20 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+  ┌─ tests/sources/functional/verify_only_list.move:8:9
+  │
+8 │         ensures result == 2; // error: `first` returns 1
+  │         ^^^^^^^^^^^^^^^^^^^^
+  │
+  =     at tests/sources/functional/verify_only_list.move:6: first
+  =         result = <redacted>
+  =     at tests/sources/functional/verify_only_list.move:8: first (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/verify_only_list.move:13:9
+   │
+13 │         ensures result == 3; // error: `second` returns 2
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_only_list.move:11: second
+   =         result = <redacted>
+   =     at tests/sources/functional/verify_only_list.move:13: second (spec)

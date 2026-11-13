@@ -72,7 +72,7 @@ inductive Ty where
   | vector (element : Ty)
   | struct (name : QualifiedName) (args : List Ty)
   /-- A Move function value. Its invocation is conservatively effectful in
-  Leaner, so the printer renders the result under `Action`. -/
+  Verex, so the printer renders the result under `Action`. -/
   | function (args result : Ty) (abilities : List Ability)
   | typeParam (index : Nat)
   | reference (mutable : Bool) (ty : Ty)

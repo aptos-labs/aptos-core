@@ -499,7 +499,8 @@ mod streaming_service_tests {
         error::Error,
         streaming_client::{
             DataStreamingClient, GetAllStatesRequest, NotificationAndFeedback,
-            NotificationFeedback, StreamRequest, StreamRequestMessage, TerminateStreamRequest,
+            NotificationFeedback, SnapshotKind, StreamRequest, StreamRequestMessage,
+            TerminateStreamRequest,
         },
         streaming_service::StreamUpdateNotification,
         tests,
@@ -513,7 +514,6 @@ mod streaming_service_tests {
     };
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
     use aptos_config::config::DataStreamingServiceConfig;
-    use aptos_storage_interface::StateKind;
     use futures::{
         channel::{oneshot, oneshot::Receiver},
         FutureExt, StreamExt,
@@ -809,7 +809,7 @@ mod streaming_service_tests {
         let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
             version: MIN_ADVERTISED_STATES,
             start_index: 0,
-            state_kind: StateKind::MainState,
+            snapshot_kind: SnapshotKind::MAIN_STATE,
         });
         create_request_message_and_receiver(stream_request)
     }

@@ -145,7 +145,7 @@ macro_rules! encryption_dlog_keys_impl {
         impl Uniform for DecryptPrivKey {
             fn generate<R>(rng: &mut R) -> Self
             where
-                R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+                R: rand::Rng + rand::CryptoRng,
             {
                 DecryptPrivKey {
                     dk: random_scalar(rng),

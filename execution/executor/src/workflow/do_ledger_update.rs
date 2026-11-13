@@ -42,6 +42,12 @@ impl DoLedgerUpdate {
             state_checkpoint_output
                 .position_state_checkpoint_hashes
                 .as_deref(),
+            state_checkpoint_output
+                .order_state_checkpoint_hashes
+                .as_deref(),
+            state_checkpoint_output
+                .collateral_state_checkpoint_hashes
+                .as_deref(),
         );
 
         // Calculate root hash
@@ -61,6 +67,8 @@ impl DoLedgerUpdate {
         state_checkpoint_hashes: &[Option<HashValue>],
         hot_state_checkpoint_hashes: Option<&[Option<HashValue>]>,
         position_state_checkpoint_hashes: Option<&[Option<HashValue>]>,
+        order_state_checkpoint_hashes: Option<&[Option<HashValue>]>,
+        collateral_state_checkpoint_hashes: Option<&[Option<HashValue>]>,
     ) -> (Vec<TransactionInfo>, Vec<HashValue>) {
         let _timer = OTHER_TIMERS.timer_with(&["assemble_transaction_infos"]);
 
@@ -106,6 +114,12 @@ impl DoLedgerUpdate {
                         .maybe_auxiliary_info_hash(auxiliary_info_hash)
                         .maybe_position_state_checkpoint_hash(
                             position_state_checkpoint_hashes.and_then(|p| p[i]),
+                        )
+                        .maybe_order_state_checkpoint_hash(
+                            order_state_checkpoint_hashes.and_then(|o| o[i]),
+                        )
+                        .maybe_collateral_state_checkpoint_hash(
+                            collateral_state_checkpoint_hashes.and_then(|c| c[i]),
                         )
                         .build()
                 } else {

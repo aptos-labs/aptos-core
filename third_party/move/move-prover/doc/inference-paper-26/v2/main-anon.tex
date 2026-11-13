@@ -1,17 +1,14 @@
-%% Double-blind submission build: anonymized author block and submission
-% line numbers. Same option the workshop template uses by default.
+%% Double-blind submission build: anonymized author block.
 %%
-%% Follows the NeurIPS 2026 VeriCodeGen workshop template
-%% (`neurips_2026_vericode_workshop.tex` with `neurips_2026_vericode.sty`).
+%% Springer LNCS format (llncs.cls, splncs04.bst) for TACAS 2027.
 %% The body lives in paper.tex, shared with main.tex.
 %%
 %% Built by `latexmk` (see latexmkrc); not part of the arXiv bundle.
 
-\documentclass{article}
+\documentclass[runningheads]{llncs}
 
-% The NeurIPS style loads natbib; ask for numeric, compressed citations.
-\PassOptionsToPackage{numbers, compress}{natbib}
-\usepackage{neurips_2026_vericode}
+\newif\ifAnonymous
+\Anonymoustrue
 
 \input{paper.tex}
 
