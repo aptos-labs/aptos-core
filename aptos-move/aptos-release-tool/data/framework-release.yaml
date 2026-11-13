@@ -2,15 +2,15 @@
 # Config for the regular framework releases.
 #
 # Replace `vX.YY.Z` with the actual version number to prepare for an actual release.
-name: "aptos-framework-v1.50.0-rc"
+name: "aptos-framework-v1.50.0"
 metadata:
-  title: "Multi-step proposal to upgrade testnet framework, version v1.50.0-rc"
-  description: "This includes changes in https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.50.1-rc"
+  title: "Multi-step proposal to upgrade mainnet framework, version v1.50.0"
+  description: "This includes changes in https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.50.1"
 update_sequence:
   - Gas:
       # The previous release's published gas schedule, looked up in aptos-networks
       # by version (e.g. v1.44.0). A full URL or local path also works.
-      old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/testnet-reset-2026-10-06.json
+      old: v1.49.0
       # The new schedule is the one from the current branch
       new: current
   - Framework:
