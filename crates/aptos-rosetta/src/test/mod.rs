@@ -21,7 +21,6 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey, SigningKey, Uniform,
 };
-use aptos_infallible::Mutex;
 use aptos_rest_client::aptos_api_types::{
     mime_types::BCS, BcsBlock, IndexResponseBcs, ResourceGroup, TransactionOnChainData,
     X_APTOS_BLOCK_HEIGHT, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_OLDEST_VERSION,
@@ -47,7 +46,12 @@ use aptos_types::{
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::StructTag};
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
+use std::{
+    collections::HashSet,
+    str::FromStr,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use url::Url;
 use warp::{
     http::{
@@ -1107,7 +1111,7 @@ async fn spawn_mock_fullnode(
             .and(warp::header::headers_cloned())
             .map(
                 move |method: Method, full_path: FullPath, headers: HeaderMap| {
-                    recorded.lock().push(RecordedNodeCall {
+                    recorded.lock().unwrap().push(RecordedNodeCall {
                         method,
                         path: full_path.as_str().to_string(),
                         headers,
@@ -1238,7 +1242,7 @@ async fn test_default_empty_allowlist_drops_incoming_headers() {
         spawn_rosetta_with_mock_node(chain_id, node_url, HashSet::new()).await;
 
     // Clear startup calls (e.g. bootstrap chain_id check)
-    recorded.lock().clear();
+    recorded.lock().unwrap().clear();
 
     let mut incoming_headers = HeaderMap::new();
     incoming_headers.insert("x-client-id", HeaderValue::from_static("caller-1"));
@@ -1252,7 +1256,7 @@ async fn test_default_empty_allowlist_drops_incoming_headers() {
         .await
         .unwrap();
 
-    let calls = recorded.lock();
+    let calls = recorded.lock().unwrap();
     assert!(
         calls.len() >= 3,
         "Expected /network/status to make at least 3 node calls, got {}",
@@ -1286,7 +1290,7 @@ async fn test_forward_allowlisted_headers_across_all_outbound_node_calls() {
     let (rosetta_url, rosetta_client, _rosetta_handle) =
         spawn_rosetta_with_mock_node(chain_id, node_url, allowlist).await;
 
-    recorded.lock().clear();
+    recorded.lock().unwrap().clear();
 
     // /account/balance triggers multiple outbound calls across both rest_client and block_cache:
     // 1) GET /v1 (get_ledger_information)
@@ -1316,7 +1320,7 @@ async fn test_forward_allowlisted_headers_across_all_outbound_node_calls() {
     assert_eq!(balance_resp.balances[0].value, "42000");
 
     {
-        let calls = recorded.lock();
+        let calls = recorded.lock().unwrap();
         assert_eq!(
             calls.len(),
             4,
@@ -1354,7 +1358,7 @@ async fn test_forward_allowlisted_headers_across_all_outbound_node_calls() {
     }
 
     // Also verify GET /-/healthy forwards allowlisted headers
-    recorded.lock().clear();
+    recorded.lock().unwrap().clear();
     let http_resp = reqwest::Client::new()
         .get(rosetta_url.join("-/healthy").unwrap())
         .header("x-client-id", "health-checker")
@@ -1363,7 +1367,7 @@ async fn test_forward_allowlisted_headers_across_all_outbound_node_calls() {
         .unwrap();
     assert_eq!(http_resp.status(), StatusCode::OK);
 
-    let calls = recorded.lock();
+    let calls = recorded.lock().unwrap();
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].path, "/v1/-/healthy");
     assert_eq!(
@@ -1386,7 +1390,7 @@ async fn test_per_request_header_isolation_no_cross_request_leakage() {
     let (_rosetta_url, rosetta_client, _rosetta_handle) =
         spawn_rosetta_with_mock_node(chain_id, node_url, allowlist).await;
 
-    recorded.lock().clear();
+    recorded.lock().unwrap().clear();
 
     let net_req = NetworkRequest {
         network_identifier: NetworkIdentifier::from(chain_id),
@@ -1454,7 +1458,7 @@ async fn test_per_request_header_isolation_no_cross_request_leakage() {
     }
 
     {
-        let calls = recorded.lock();
+        let calls = recorded.lock().unwrap();
         // 24 Rosetta /network/status requests * 3 outbound node calls each = 72 calls
         assert_eq!(calls.len(), 72);
 
@@ -1519,7 +1523,7 @@ async fn test_per_request_header_isolation_no_cross_request_leakage() {
     }
 
     // Phase 2: Sequential headered -> unheadered on the shared connection pool
-    recorded.lock().clear();
+    recorded.lock().unwrap().clear();
     let mut seq_headers = HeaderMap::new();
     seq_headers.insert("x-client-id", HeaderValue::from_static("seq-caller"));
     seq_headers.insert("x-request-id", HeaderValue::from_static("seq-req"));
@@ -1530,7 +1534,7 @@ async fn test_per_request_header_isolation_no_cross_request_leakage() {
         .unwrap();
     rosetta_client.network_status(&net_req).await.unwrap();
 
-    let calls = recorded.lock();
+    let calls = recorded.lock().unwrap();
     assert_eq!(calls.len(), 6);
     for call in &calls[0..3] {
         assert_eq!(
