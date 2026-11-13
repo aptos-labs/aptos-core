@@ -828,6 +828,7 @@ rustc-hash = "2"
 rustversion = "1.0.14"
 rusty-fork = "0.3.0"
 scopeguard = "1.2.0"
+semver = "1.0.21"
 serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde-big-array = "0.5.1"
 serde-generate = { version = "0.34.1", default-features = false, features = ["golang", "rust"] }
