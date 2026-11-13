@@ -8,7 +8,7 @@ use crate::{
 use anyhow::{anyhow, bail, Context, Result};
 use aptos_build_info::BUILD_OS;
 use self_update::{backends::github::Update, update::ReleaseUpdate};
-use std::path::PathBuf;
+use std::{env::consts::EXE_SUFFIX, path::PathBuf};
 
 #[cfg(target_arch = "x86_64")]
 pub fn get_arch() -> &'static str {
@@ -64,17 +64,22 @@ pub fn build_updater(
         None => "0.0.0",
     };
 
-    Update::configure()
-        .bin_install_dir(install_dir)
+    // Setting an install path other than the current executable makes self_update
+    // move the new binary there instead of replacing the running CLI.
+    let install_path = install_dir.join(format!("{}{}", binary_name, EXE_SUFFIX));
+
+    let updater = Update::configure()
+        .bin_install_path(install_path)
         .bin_name(binary_name)
         .repo_owner(&repo_owner)
         .repo_name(&repo_name)
         .current_version(current_version)
-        .target_version_tag(&format!("v{}", info.target_version))
+        .release_tag(format!("v{}", info.target_version))
         .target(&target)
         .no_confirm(assume_yes)
         .build()
-        .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))
+        .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))?;
+    Ok(Box::new(updater))
 }
 
 pub fn get_path(
@@ -90,7 +95,7 @@ pub fn get_path(
     }
 
     // See if it is present in the path where we usually install additional binaries.
-    let path = get_additional_binaries_dir().join(binary_name);
+    let path = get_additional_binaries_dir().join(format!("{}{}", binary_name, EXE_SUFFIX));
     if path.exists() && path.is_file() {
         return Ok(path);
     }

@@ -3,10 +3,9 @@
 
 use anyhow::{anyhow, Context, Result};
 use clap::Args;
-use self_update::{
-    backends::github::{ReleaseList, Update},
-    version::bump_is_greater,
-};
+use self_update::{backends::github::Update, errors::Error as UpdateError};
+
+const TAG_PREFIX: &str = "move-flow-";
 
 #[derive(Args, Debug, Clone)]
 pub struct UpdateArgs {
@@ -21,78 +20,52 @@ pub struct UpdateArgs {
     pub repo_name: String,
 }
 
-/// `bump_is_greater` only handles `x.y.z`; strip suffixes it can't parse.
-pub(crate) fn strip_prerelease(v: &str) -> &str {
-    if let Some(stem) = v.strip_suffix(".beta").or_else(|| v.strip_suffix(".rc")) {
-        stem
-    } else {
-        v
-    }
-}
-
 pub fn run(args: &UpdateArgs) -> Result<()> {
-    let releases = ReleaseList::configure()
-        .repo_owner(&args.repo_owner)
-        .repo_name(&args.repo_name)
-        .build()
-        .context("failed to configure release list")?
-        .fetch()
-        .context("failed to fetch releases from GitHub")?;
-
-    let latest = releases
-        .into_iter()
-        .find(|r| r.version.starts_with("move-flow-v"))
-        .ok_or_else(|| {
-            anyhow!(
-                "no move-flow release found in {}/{}",
-                args.repo_owner,
-                args.repo_name
-            )
-        })?;
-
-    let latest_version = &latest.version["move-flow-v".len()..];
     let current_version = env!("CARGO_PKG_VERSION");
-    let needs_update = bump_is_greater(current_version, strip_prerelease(latest_version))
-        .context("failed to compare versions")?;
-
-    if args.check {
-        if needs_update {
-            println!("Update available: v{latest_version}");
-        } else {
-            println!("Already up to date (v{current_version})");
-        }
-        return Ok(());
-    }
-
-    if !needs_update {
-        println!("Already up to date (v{current_version})");
-        return Ok(());
-    }
-
-    Update::configure()
+    let mut builder = Update::configure();
+    builder
         .repo_owner(&args.repo_owner)
         .repo_name(&args.repo_name)
         .bin_name("move-flow")
+        .tag_prefix(TAG_PREFIX)
         .current_version(current_version)
-        .target_version_tag(&latest.version)
-        .no_confirm(true)
+        .no_confirm(true);
+
+    // Only releases tagged with `TAG_PREFIX` and newer than the current version are
+    // returned, newest first.
+    let newer_releases = builder
+        .build()
+        .context("failed to configure updater")?
+        .get_newer_releases()
+        .context("failed to fetch releases from GitHub")?;
+
+    let Some(latest) = newer_releases.latest() else {
+        println!("Already up to date (v{current_version})");
+        return Ok(());
+    };
+    let latest_version = latest.version();
+
+    if args.check {
+        println!("Update available: v{latest_version}");
+        return Ok(());
+    }
+
+    builder
+        .release_tag(format!("{TAG_PREFIX}v{latest_version}"))
         .build()
         .context("failed to configure updater")?
         .update()
-        .map_err(|e| {
-            let msg = e.to_string();
-            if msg.contains("permission denied") || msg.contains("Access is denied") {
+        .map_err(|e| match e {
+            UpdateError::InstallPathNotWritable { .. } => {
                 anyhow!("cannot replace binary: permission denied (try sudo)")
-            } else if msg.contains("could not find binary") || msg.contains("no asset") {
-                anyhow!(
-                    "no release asset for the current platform — download manually from \
-                     https://github.com/{}/{}/releases",
-                    args.repo_owner,
-                    args.repo_name
-                )
-            } else {
-                anyhow!("update failed: {e:#}")
-            }
+            },
+            UpdateError::NoReleaseFound { .. } => anyhow!(
+                "no release asset for the current platform — download manually from \
+                 https://github.com/{}/{}/releases",
+                args.repo_owner,
+                args.repo_name
+            ),
+            e => anyhow!("update failed: {e:#}"),
         })?;
 
     println!("Updated move-flow v{current_version} → v{latest_version}");
