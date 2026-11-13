@@ -725,6 +725,7 @@ async fn test_hot_state_on_chain_config() {
         max_bytes_per_shard: vec![u64::MAX; NUM_STATE_SHARDS],
         refresh_interval_versions: 10,
         max_promotion_bytes_per_block,
+        defer_cold_writes_to_eviction: false,
     });
     set_hot_state_config_via_governance(&mut swarm, &mut cli, &validator_client, &config).await;
 

@@ -38,6 +38,7 @@ pub const NUM_STATE_SHARDS: usize = 16;
 pub enum StateKind {
     MainState,
     Position,
+    Order,
 }
 
 pub type StateViewResult<T, E = StateViewError> = std::result::Result<T, E>;

@@ -64,6 +64,7 @@ fn snapshot_metadata_key(kind: SnapshotKind) -> MetadataKey {
     match kind {
         SnapshotKind::MAIN_STATE => MetadataKey::StateSnapshotSync,
         SnapshotKind::POSITION => MetadataKey::PositionSnapshotSync,
+        SnapshotKind::ORDER => MetadataKey::OrderSnapshotSync,
         SnapshotKind::HOT_STATE => MetadataKey::HotStateSnapshotSync,
     }
 }
@@ -73,6 +74,7 @@ fn snapshot_metadata_value(kind: SnapshotKind, progress: StateSnapshotProgress) 
     match kind {
         SnapshotKind::MAIN_STATE => MetadataValue::StateSnapshotSync(progress),
         SnapshotKind::POSITION => MetadataValue::PositionSnapshotSync(progress),
+        SnapshotKind::ORDER => MetadataValue::OrderSnapshotSync(progress),
         SnapshotKind::HOT_STATE => MetadataValue::HotStateSnapshotSync(progress),
     }
 }
@@ -83,6 +85,7 @@ fn snapshot_progress(metadata_value: MetadataValue) -> (SnapshotKind, StateSnaps
     match metadata_value {
         MetadataValue::StateSnapshotSync(progress) => (SnapshotKind::MAIN_STATE, progress),
         MetadataValue::PositionSnapshotSync(progress) => (SnapshotKind::POSITION, progress),
+        MetadataValue::OrderSnapshotSync(progress) => (SnapshotKind::ORDER, progress),
         MetadataValue::HotStateSnapshotSync(progress) => (SnapshotKind::HOT_STATE, progress),
     }
 }
@@ -303,6 +306,7 @@ pub mod database_schema {
         StateSnapshotSync,    // A state snapshot sync that was started
         PositionSnapshotSync, // A native-position snapshot sync that was started
         HotStateSnapshotSync, // A hot state snapshot sync that was started
+        OrderSnapshotSync,    // A native-order snapshot sync that was started
     }
 
     /// A metadata value that can be inserted into the database
@@ -312,6 +316,7 @@ pub mod database_schema {
         StateSnapshotSync(StateSnapshotProgress), // A state snapshot sync progress marker
         PositionSnapshotSync(StateSnapshotProgress), // A native-position snapshot sync progress marker
         HotStateSnapshotSync(StateSnapshotProgress), // A hot state snapshot sync progress marker
+        OrderSnapshotSync(StateSnapshotProgress),    // A native-order snapshot sync progress marker
     }
 
     impl KeyCodec<MetadataSchema> for MetadataKey {

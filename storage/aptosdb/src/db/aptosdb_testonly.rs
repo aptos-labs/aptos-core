@@ -159,6 +159,7 @@ impl AptosDB {
             state_reads: &reads,
             hot_state_updates: &hot_state_updates,
             position_state_summary: None,
+            order_state_summary: None,
             collateral_state_summary: None,
             positions: None,
             orders: None,

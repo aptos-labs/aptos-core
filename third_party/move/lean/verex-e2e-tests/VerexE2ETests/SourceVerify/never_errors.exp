@@ -1,0 +1,16 @@
+VerexE2ETests/SourceVerify/never_errors.spec.lean:6:1: error: `no panic when aborts at abort 1` is not established: the panic `std::process::abort()` at VerexE2ETests/SourceVerify/never_errors.rs:5:5 may panic
+VerexE2ETests/SourceVerify/never_errors.spec.lean:6:6: error: verex verification failed: the automatic verification of `abort_now` failed; provide a proof in the module:
+  verify abort_now by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/never_errors.spec.lean:10:3: error: the specification clause `ensures result == value + 1` is not established
+VerexE2ETests/SourceVerify/never_errors.spec.lean:9:6: error: verex verification failed: the automatic verification of `spin_unless` failed; provide a proof in the module:
+  verify spin_unless by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -63,442 +63,58 @@ tests/sources/functional/closures/inline/vector_hofs_for_each.move:102:5: error:
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: verification failed with a residual obligation:
-case h_2.right
-registry✝ : VerexIR.Validation.SemanticsRegistry
-executable✝ : VerexIR.Validation.ExecutableUnit unit
-prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
-initialState✝ : VerexIR.Proofs.Denote.Memory unit
-old_v : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
-a : VerexIR.Proofs.Denote.NTy.address.carrier
-assumed : True
-recursive✝ :
-  VerexIR.Proofs.Denote.HEnv
-      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                        VerexIR.Proofs.Denote.NRow.nil))))))))) →
-    VerexIR.Proofs.Denote.Comp unit
-      (VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                          VerexIR.Proofs.Denote.NRow.nil)))))))))
-        Unit)
-state✝ : VerexIR.Proofs.Denote.Memory unit
-permitted_1 :
-  (initialState✝
-        {
-          type :=
-            VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              VerexIR.Proofs.Denote.NRow.nil
-              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil),
-          arguments := VerexIR.Proofs.Denote.NRow.nil }
-        (VerexIR.StorageKey.address a)).isSome =
-    true
-permitted_2 :
-  ∀ (i : Int),
-    0 ≤ i →
-      i < ↑old_v.values.size →
-        (old_v.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val +
-            ((initialState✝
-                      {
-                        type :=
-                          VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                            VerexIR.Proofs.Denote.NRow.nil
-                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                              VerexIR.Proofs.Denote.NRow.nil),
-                        arguments := VerexIR.Proofs.Denote.NRow.nil }
-                      (VerexIR.StorageKey.address a)).getD
-                  ({ val := 0, fits := ⋯ }, ())).fst.val ≤
-          18446744073709551615
-v : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
-i : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
-invariant_2 : ↑v.values.size = ↑old_v.values.size
-invariant_1 : i.val ≤ ↑old_v.values.size
-invariant_3 : ↑old_v.values.size = ↑v.values.size
-invariant_4 :
-  ∀ (j : Int),
-    i.val ≤ j →
-      j < ↑old_v.values.size →
-        (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
-          (old_v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val
-a✝ : ↑old_v.values.size ≤ i.val
-this✝ :
-  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 10 } }
-    ((old_v, v), a, ()) initialState✝
-verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
-    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                      VerexIR.Proofs.Denote.NRow.nil)))))))))
-    VerexIR.Proofs.Denote.NTy.unit.carrier →
-  VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
-verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
-    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                      VerexIR.Proofs.Denote.NRow.nil)))))))))
-    VerexIR.Proofs.Denote.NTy.unit.carrier →
-  VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
-verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
-    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                      VerexIR.Proofs.Denote.NRow.nil)))))))))
-    VerexIR.Proofs.Denote.NTy.unit.carrier →
-  VerexIR.Proofs.Denote.Memory unit → Prop :=
-  verexContinuation✝¹
-loopHypothesis✝ :
-  ∀
-    (env :
-      VerexIR.Proofs.Denote.HEnv
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                          VerexIR.Proofs.Denote.NRow.nil))))))))))
-    (state : VerexIR.Proofs.Denote.Memory unit),
-    env.fst = none →
-      env.snd.fst = some a →
-        (∃ a, env.snd.snd.fst = some a ∧ a.snd = v) →
-          env.snd.snd.snd.snd.fst = some (VerexIR.Proofs.Denote.vectorLength old_v) →
-            env.snd.snd.snd.snd.snd.fst = none →
-              env.snd.snd.snd.snd.snd.snd.snd.fst = none →
-                env.snd.snd.snd.snd.snd.snd.snd.snd.fst = none →
-                  (env.snd.snd.fst.elim False fun v =>
-                      env.snd.snd.snd.fst.elim False fun i =>
-                        env.snd.snd.snd.snd.fst.elim False fun n =>
-                          VerexIR.Proofs.Obligation
-                              "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13617
-                              13623 (i.val ≤ n.val) ∧
-                            VerexIR.Proofs.Obligation
-                                "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13640
-                                13688 (↑v.fst.values.size = ↑old_v.values.size) ∧
-                              VerexIR.Proofs.Obligation
-                                  "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13705
-                                  13718 (n.val = ↑v.fst.values.size) ∧
-                                VerexIR.Proofs.Obligation
-                                    "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
-                                    13735 13739 True ∧
-                                  VerexIR.Proofs.Obligation
-                                      "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
-                                      13756 13760 True ∧
-                                    VerexIR.Proofs.Obligation
-                                      "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
-                                      13777 13836
-                                      (∀ (j : Int),
-                                        i.val ≤ j →
-                                          j < n.val →
-                                            (v.fst.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
-                                              (old_v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val)) →
-                    VerexIR.Proofs.wp (recursive✝ env) verexContinuation✝
-                      (fun failure =>
-                        VerexIR.Proofs.Obligation
-                          "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13972 13987
-                          False)
-                      state
-verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
-    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                      VerexIR.Proofs.Denote.NRow.nil)))))))))
-    VerexIR.Proofs.Denote.NTy.unit.carrier →
-  VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
-x✝ : Option (VerexIR.Proofs.Denote.NTy.int 64 false).ref.carrier
-⊢ state✝ = initialState✝
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: verification failed with a residual obligation:
-case h_1.right
-registry✝ : VerexIR.Validation.SemanticsRegistry
-executable✝ : VerexIR.Validation.ExecutableUnit unit
-prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
-initialState✝ : VerexIR.Proofs.Denote.Memory unit
-old_v : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
-a : VerexIR.Proofs.Denote.NTy.address.carrier
-assumed : True
-recursive✝ :
-  VerexIR.Proofs.Denote.HEnv
-      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                        VerexIR.Proofs.Denote.NRow.nil))))))))) →
-    VerexIR.Proofs.Denote.Comp unit
-      (VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                          VerexIR.Proofs.Denote.NRow.nil)))))))))
-        Unit)
-state✝ : VerexIR.Proofs.Denote.Memory unit
-permitted_1 :
-  (initialState✝
-        {
-          type :=
-            VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              VerexIR.Proofs.Denote.NRow.nil
-              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil),
-          arguments := VerexIR.Proofs.Denote.NRow.nil }
-        (VerexIR.StorageKey.address a)).isSome =
-    true
-permitted_2 :
-  ∀ (i : Int),
-    0 ≤ i →
-      i < ↑old_v.values.size →
-        (old_v.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val +
-            ((initialState✝
-                      {
-                        type :=
-                          VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                            VerexIR.Proofs.Denote.NRow.nil
-                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                              VerexIR.Proofs.Denote.NRow.nil),
-                        arguments := VerexIR.Proofs.Denote.NRow.nil }
-                      (VerexIR.StorageKey.address a)).getD
-                  ({ val := 0, fits := ⋯ }, ())).fst.val ≤
-          18446744073709551615
-v : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
-i : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
-invariant_2 : ↑v.values.size = ↑old_v.values.size
-invariant_1 : i.val ≤ ↑old_v.values.size
-invariant_3 : ↑old_v.values.size = ↑v.values.size
-invariant_4 :
-  ∀ (j : Int),
-    i.val ≤ j →
-      j < ↑old_v.values.size →
-        (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
-          (old_v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val
-a✝ : ↑old_v.values.size ≤ i.val
-this✝ :
-  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 10 } }
-    ((old_v, v), a, ()) initialState✝
-verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
-    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                      VerexIR.Proofs.Denote.NRow.nil)))))))))
-    VerexIR.Proofs.Denote.NTy.unit.carrier →
-  VerexIR.Proofs.Denote.Memory unit → Prop :=
-  fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
-      (fun result final =>
-        VerexIR.Proofs.Obligation "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13992
-            14066
-            (∀ (i : Int),
-              0 ≤ i →
-                i < ↑(v, v).snd.values.size →
-                  ((v, v).snd.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val =
-                    (old_v.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val +
-                      ((final
-                                {
-                                  type :=
-                                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                                      VerexIR.Proofs.Denote.NRow.nil
-                                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                                        VerexIR.Proofs.Denote.NRow.nil),
-                                  arguments := VerexIR.Proofs.Denote.NRow.nil }
-                                (VerexIR.StorageKey.address a)).getD
-                            ({ val := 0, fits := ⋯ }, ())).fst.val) ∧
-          final = initialState✝)
-      (fun failure =>
-        VerexIR.Proofs.Obligation "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13972
-          13987 False)
-      state
-verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
-    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                      VerexIR.Proofs.Denote.NRow.nil)))))))))
-    VerexIR.Proofs.Denote.NTy.unit.carrier →
-  VerexIR.Proofs.Denote.Memory unit → Prop :=
-  fun flow state =>
-    match flow with
-    | VerexIR.Proofs.Denote.Flow.value value env =>
-      VerexIR.Proofs.wp
-        (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
-          (VerexIR.Proofs.Denote.Term.lit ()) env)
-        verexContinuation✝²
-        (fun failure =>
-          VerexIR.Proofs.Obligation "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
-            13972 13987 False)
-        state
-    | VerexIR.Proofs.Denote.Flow.return_ result env =>
-      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.return_ result env) state
-    | VerexIR.Proofs.Denote.Flow.break_ nest env =>
-      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.break_ nest env) state
-    | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
-      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
-verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
-    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                      VerexIR.Proofs.Denote.NRow.nil)))))))))
-    VerexIR.Proofs.Denote.NTy.unit.carrier →
-  VerexIR.Proofs.Denote.Memory unit → Prop :=
-  verexContinuation✝¹
-loopHypothesis✝ :
-  ∀
-    (env :
-      VerexIR.Proofs.Denote.HEnv
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                          VerexIR.Proofs.Denote.NRow.nil))))))))))
-    (state : VerexIR.Proofs.Denote.Memory unit),
-    env.fst = none →
-      env.snd.fst = some a →
-        (∃ a, env.snd.snd.fst = some a ∧ a.snd = v) →
-          env.snd.snd.snd.snd.fst = some (VerexIR.Proofs.Denote.vectorLength old_v) →
-            env.snd.snd.snd.snd.snd.fst = none →
-              env.snd.snd.snd.snd.snd.snd.snd.fst = none →
-                env.snd.snd.snd.snd.snd.snd.snd.snd.fst = none →
-                  (env.snd.snd.fst.elim False fun v =>
-                      env.snd.snd.snd.fst.elim False fun i =>
-                        env.snd.snd.snd.snd.fst.elim False fun n =>
-                          VerexIR.Proofs.Obligation
-                              "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13617
-                              13623 (i.val ≤ n.val) ∧
-                            VerexIR.Proofs.Obligation
-                                "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13640
-                                13688 (↑v.fst.values.size = ↑old_v.values.size) ∧
-                              VerexIR.Proofs.Obligation
-                                  "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13705
-                                  13718 (n.val = ↑v.fst.values.size) ∧
-                                VerexIR.Proofs.Obligation
-                                    "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
-                                    13735 13739 True ∧
-                                  VerexIR.Proofs.Obligation
-                                      "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
-                                      13756 13760 True ∧
-                                    VerexIR.Proofs.Obligation
-                                      "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
-                                      13777 13836
-                                      (∀ (j : Int),
-                                        i.val ≤ j →
-                                          j < n.val →
-                                            (v.fst.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
-                                              (old_v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val)) →
-                    VerexIR.Proofs.wp (recursive✝ env) verexContinuation✝
-                      (fun failure =>
-                        VerexIR.Proofs.Obligation
-                          "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13972 13987
-                          False)
-                      state
-verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
-    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
-                      VerexIR.Proofs.Denote.NRow.nil)))))))))
-    VerexIR.Proofs.Denote.NTy.unit.carrier →
-  VerexIR.Proofs.Denote.Memory unit → Prop :=
-  fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.Flow.iterate recursive✝ value) verexContinuation✝
-      (fun failure =>
-        VerexIR.Proofs.Obligation "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13972
-          13987 False)
-      state
-x✝ : Option (VerexIR.Proofs.Denote.NTy.int 64 false).ref.carrier
-reference✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).ref.carrier
-x : reference✝.fst = reference✝.snd
-⊢ state✝ = initialState✝
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:149:13: error: the loop invariant `∀ (j in 0 .. i), v[j] == with_state_anchor!(15, old(v))[j] + 1` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:150:13: error: the loop invariant `∀ (j in 0 .. i), !(with_state_anchor!(15, old(v))[j] == MAX_U64)` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:167:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:165:5: error: verex verification failed: the automatic verification of `increment_all` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
+  verify increment_all by lean =>
+    verex_obligations
+    verex_on
+    | invariant_4_step => verex_prepare; sorry
+    | invariant_5_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:149:13: error: the loop invariant `∀ (j in 0 .. i), v[j] == with_state_anchor!(19, old(v))[j] * k` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:183:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:181:5: error: verex verification failed: the automatic verification of `scale_all` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
+  verify scale_all by lean =>
+    verex_obligations
+    verex_on
+    | invariant_4_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:149:13: error: the loop invariant `∀ (j in 0 .. i), v[j] == with_state_anchor!(16, old(v))[j] + 1` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:150:13: error: the loop invariant `∀ (j in 0 .. i),
+        !(with_state_anchor!(16, old(v))[j] > 18446744073709551614)` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:196:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:194:5: error: verex verification failed: the automatic verification of `increment_all_inferred` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
+  verify increment_all_inferred by lean =>
+    verex_obligations
+    verex_on
+    | invariant_4_step => verex_prepare; sorry
+    | invariant_5_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:245:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:246:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), v[i] == old(v)[i] + global<Limit>(a).max` is not established
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: verex verification failed: the automatic verification of `bump_all` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
   verify bump_all by lean =>
     verex_obligations
     verex_on
-    | leaf => verex_prepare; sorry
     | aborts_if_1 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:266:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:267:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), v[i] == old(v)[i] + global<Limit>(a).max` is not established
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:263:5: error: verex verification failed: the automatic verification of `bump_all_via_call` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
   verify bump_all_via_call by lean =>
     verex_obligations
     verex_on
+    | aborts_if_1 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

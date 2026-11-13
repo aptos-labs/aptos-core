@@ -455,6 +455,143 @@ private def discriminantFixture : RawUnit :=
         origin := ⟨0⟩
         alignment := ⟨0⟩ } }] }
 
+/-- Reading the tag needs the enum storage, not its moved payload. The
+whole-value read and the payload read remain invalid after the same move. -/
+private def readDiscriminantFixture (mode : Nat := 0) : RawUnit :=
+  let raw := discriminantFixture
+  let ns := raw.namespaces[0]!
+  let tag : Expr := {
+    loc := ⟨15⟩, typeId := ⟨3⟩,
+    kind := .operation (.readDiscriminant ⟨0⟩) #[] #[] }
+  let consume : Expr := {
+    loc := ⟨14⟩, typeId := if mode == 2 || mode == 6 then ⟨2⟩ else ⟨0⟩,
+    kind := .operation (.move (if mode == 2 then ⟨0⟩ else if mode == 6 then ⟨1⟩ else ⟨2⟩)) #[] #[] }
+  let result := if mode == 3 then ⟨13⟩ else if mode == 4 then ⟨17⟩ else ⟨15⟩
+  { raw with namespaces := #[{ ns with
+    places := #[.localVar ⟨0⟩, .downcast ⟨0⟩ ⟨6⟩, .field ⟨1⟩ choice ⟨7⟩]
+    expressions := ns.expressions ++ #[tag, consume,
+      { loc := ⟨15⟩, typeId := ⟨0⟩, kind := .operation (.read ⟨2⟩) #[] #[] },
+      { loc := ⟨15⟩, typeId := if mode == 4 then ⟨0⟩ else ⟨3⟩,
+        kind := .block (if mode == 1 then #[] else #[⟨11⟩, ⟨16⟩]) (some result) }]
+    functions := ns.functions.set! 1 { ns.functions[1]! with
+      signature := { results := #[typeUse (if mode == 4 then 0 else 3) 15] }
+      body := .structured ⟨18⟩ } }] }
+
+#guard constructorPatternPrepares readDiscriminantFixture
+#guard validationHasDiagnosticAt (readDiscriminantFixture 1)
+  "VIR-SEMANTIC-INITIALIZATION" ⟨15⟩
+#guard validationHasDiagnosticAt (readDiscriminantFixture 2)
+  "VIR-SEMANTIC-INITIALIZATION" ⟨15⟩
+#guard validationHasDiagnosticAt (readDiscriminantFixture 3)
+  "VIR-SEMANTIC-INITIALIZATION" ⟨15⟩
+#guard validationHasDiagnosticAt (readDiscriminantFixture 4)
+  "VIR-SEMANTIC-INITIALIZATION" ⟨15⟩
+#guard validationHasDiagnosticAt (readDiscriminantFixture 6)
+  "VIR-SEMANTIC-INITIALIZATION" ⟨15⟩
+
+private def invalidTagReadFixture (mode : Nat) : RawUnit :=
+  let raw := readDiscriminantFixture
+  let ns := raw.namespaces[0]!
+  let expression := ns.expressions[15]!
+  let operation := .readDiscriminant (if mode == 0 then ⟨2⟩ else ⟨0⟩)
+  { raw with namespaces := #[{ ns with expressions := ns.expressions.set! 15 {
+      expression with
+      typeId := if mode == 1 then ⟨0⟩ else expression.typeId
+      kind := .operation operation (if mode == 2 then #[.typeArg (typeUse 0 15)] else #[])
+        (if mode == 3 then #[⟨0⟩] else #[]) } }] }
+
+#guard validationHasDiagnosticAt (invalidTagReadFixture 0) "VIR-SEMANTIC-TYPE" ⟨15⟩
+#guard validationHasDiagnosticAt (invalidTagReadFixture 1) "VIR-SEMANTIC-TYPE" ⟨15⟩
+#guard validationHasDiagnosticAt (invalidTagReadFixture 2) "VIR-SEMANTIC-ARITY" ⟨15⟩
+#guard validationHasDiagnosticAt (invalidTagReadFixture 3) "VIR-SEMANTIC-ARITY" ⟨15⟩
+
+/-- Only a fresh, declared tag can exclude another variant's moved payload.
+Modes 1--4 invalidate provenance via replacement or an unknown scalar; mode 5
+moves the whole owner, whose uninitialized root fact must never be filtered. -/
+private def tagRefinementFixture (mode : Nat := 0) : RawUnit :=
+  let raw := readDiscriminantFixture
+  let ns := raw.namespaces[0]!
+  let patterns := ns.patterns ++ #[
+    { loc := ⟨15⟩, typeId := ⟨3⟩, kind := .literal (.integer 11) },
+    { loc := ⟨15⟩, typeId := ⟨3⟩, kind := .literal (.integer 29) }]
+  let arms : Array MatchArm := #[
+    { pattern := ⟨ns.patterns.size⟩, body := ⟨23⟩ },
+    { pattern := ⟨ns.patterns.size + 1⟩, body := ⟨22⟩ }]
+  let statements : Array ExprId := match mode with
+    | 1 => #[⟨26⟩, ⟨19⟩, ⟨11⟩, ⟨16⟩]
+    | 2 => #[⟨26⟩, ⟨19⟩, ⟨28⟩, ⟨11⟩, ⟨16⟩]
+    | 3 => #[⟨26⟩, ⟨19⟩, ⟨11⟩, ⟨16⟩, ⟨28⟩]
+    | 4 => #[⟨11⟩, ⟨16⟩, ⟨30⟩]
+    | 5 => #[⟨11⟩, ⟨19⟩, ⟨31⟩]
+    | _ => #[⟨11⟩, ⟨16⟩, ⟨19⟩]
+  { raw with namespaces := #[{ ns with
+    patterns
+    structs := if mode == 6 then ns.structs.modify 1 fun declaration =>
+      { declaration with variants := declaration.variants.modify 1 ({ · with discriminant := some 11 }) }
+      else ns.structs
+    places := ns.places ++ #[.localVar ⟨1⟩, .localVar ⟨2⟩]
+    expressions := ns.expressions ++ #[
+      { loc := ⟨15⟩, typeId := ⟨4⟩, kind := .assign ⟨3⟩ ⟨15⟩ },
+      { loc := ⟨15⟩, typeId := ⟨3⟩, kind := .operation (.copy ⟨3⟩) #[] #[] },
+      { loc := ⟨15⟩, typeId := ⟨4⟩, kind := .value .unit },
+      { loc := ⟨15⟩, typeId := ⟨3⟩, kind := .value (.integer 7) },
+      { loc := ⟨15⟩, typeId := ⟨3⟩, kind := .block #[⟨13⟩] (some ⟨22⟩) },
+      { loc := ⟨15⟩, typeId := ⟨3⟩, kind := .match_ ⟨20⟩ arms },
+      { loc := ⟨15⟩, typeId := ⟨2⟩,
+        kind := .operation (.call (.constructor choice (some "Left"))) #[] #[] },
+      { loc := ⟨15⟩, typeId := ⟨4⟩, kind := .assign ⟨0⟩ ⟨25⟩ },
+      { loc := ⟨15⟩, typeId := ⟨3⟩, kind := .operation (.copy ⟨4⟩) #[] #[] },
+      { loc := ⟨15⟩, typeId := ⟨4⟩, kind := .assign ⟨4⟩ ⟨20⟩ },
+      { loc := ⟨15⟩, typeId := ⟨3⟩, kind := .match_ ⟨27⟩ arms },
+      { loc := ⟨15⟩, typeId := ⟨4⟩, kind := .assign ⟨3⟩ ⟨22⟩ },
+      { loc := ⟨15⟩, typeId := ⟨2⟩, kind := .operation (.move ⟨0⟩) #[] #[] },
+      { loc := ⟨15⟩, typeId := ⟨3⟩,
+        kind := .block statements (some (if mode == 2 || mode == 3 then ⟨29⟩ else ⟨24⟩)) }]
+    functions := ns.functions.set! 1 { ns.functions[1]! with
+      locals := ns.functions[1]!.locals ++ #[
+        { id := ⟨1⟩, name := "tag", type := typeUse 3 15, mutable := true, loc := ⟨15⟩ },
+        { id := ⟨2⟩, name := "alias", type := typeUse 3 15, mutable := true, loc := ⟨15⟩ }]
+      body := .structured ⟨32⟩ } }] }
+
+#guard constructorPatternPrepares tagRefinementFixture
+#guard [1, 2, 3, 4, 5, 6].all fun mode =>
+  validationHasDiagnosticAt (tagRefinementFixture mode) "VIR-SEMANTIC-INITIALIZATION" ⟨15⟩
+
+/-- Taking either kind of reference to the enum permanently ends local tag
+provenance: writes through an escaped reference are outside this analysis.
+Even rereading the tag afterwards must not reenable variant refinement. -/
+private def borrowedTagRefinementFixture (mutable reread : Bool) : RawUnit :=
+  let raw := tagRefinementFixture
+  let ns := raw.namespaces[0]!
+  let referenceType : TypeId := ⟨raw.tables.types.size⟩
+  let borrow : ExprId := ⟨ns.expressions.size⟩
+  let statements : Array ExprId := #[⟨11⟩, ⟨19⟩, borrow, ⟨16⟩]
+  { raw with
+    tables := { raw.tables with
+      lifetimes := raw.tables.lifetimes.push { kind := .local, loc := ⟨15⟩ }
+      types := raw.tables.types.push (.reference {
+        profile := .move, kind := if mutable then .mutable else .shared,
+        referent := ⟨2⟩, lifetime := ⟨raw.tables.lifetimes.size⟩ }) }
+    namespaces := #[{ ns with
+      expressions := (ns.expressions.set! 32 {
+        ns.expressions[32]! with
+        kind := .block (if reread then statements.push ⟨19⟩ else statements) (some ⟨24⟩) }).push {
+          loc := ⟨15⟩, typeId := referenceType,
+          kind := .operation (.borrow (if mutable then .mutable else .immutable) ⟨0⟩) #[] #[] } }] }
+
+#guard [false, true].all fun mutable => [false, true].all fun reread =>
+  validationHasDiagnosticAt (borrowedTagRefinementFixture mutable reread)
+    "VIR-SEMANTIC-INITIALIZATION" ⟨15⟩
+
+private def outOfRangeTagFixture : RawUnit :=
+  let raw := readDiscriminantFixture
+  let ns := raw.namespaces[0]!
+  let declaration := ns.structs[1]!
+  { raw with namespaces := #[{ ns with structs := ns.structs.set! 1 {
+      declaration with variants := declaration.variants.modify 1 ({ · with discriminant := some 300 }) } }] }
+
+#guard validationHasDiagnosticAt outOfRangeTagFixture "VIR-SEMANTIC-TYPE" ⟨15⟩
+
 private def discriminantExecutable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] discriminantFixture).toOption
   (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
@@ -473,6 +610,14 @@ private def handle (functionId : Nat) : FunctionHandle := {
       | .ok (_, { value := .returned #[.integer 29], .. }) => true
       | _ => false
   | none => false
+
+#guard match validate #[schema] readDiscriminantFixture with
+  | .ok checked => match prepareExecution #[semantics] checked with
+      | .ok executable => match Interpreter.run executable 32 (handle 1) #[] with
+          | .ok (_, { value := .returned #[.integer 29], .. }) => true
+          | _ => false
+      | _ => false
+  | _ => false
 
 /-- The exemption above is specific to the immediate operand of discriminant
 inspection; returning the same non-Copy enum through an ordinary read remains

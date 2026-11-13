@@ -238,6 +238,12 @@ pub struct ResourceReadWriteSet {
     // TODO(correctness):
     //   Make sure we have a deterministic iteration API and write-set
     //   generation.
+    //
+    // Kept as a hash map: `InMemoryStorageKey` holds an `InternedType` (an
+    // arena pointer, not `Ord`), so a `BTreeMap` is not an option, and the
+    // iteration above rules out `UnorderedMap`. hashbrown for `entry_ref`,
+    // which only clones the key on a miss.
+    #[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
     entries: HashMap<InMemoryStorageKey, Entry>,
     /// Undo log of writes originating from older epochs. Used for rolling back
     /// to older checkpoints.
@@ -558,6 +564,8 @@ impl ResourceReadWriteSet {
 
 /// Looks up the resource entry, materializing it as a read and recording in
 /// the read-set.
+// The hash map is `ResourceReadWriteSet::entries`; see the rationale there.
+#[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
 fn get_or_create_resource_entry<'a>(
     entries: &'a mut HashMap<InMemoryStorageKey, Entry>,
     provider: &dyn ResourceProvider,
@@ -587,6 +595,7 @@ mod tests {
         ValueLayoutTable, OBJECT_HEADER_SIZE,
     };
     use move_core_types::account_address::AccountAddress;
+    use shared_dsa::UnorderedMap;
     use std::sync::Arc;
 
     // An `InternedType` is just an arena pointer; a `'static` node gives a
@@ -654,7 +663,7 @@ mod tests {
     /// resources; everything else does not exist.
     #[derive(Default)]
     struct Provider {
-        external: HashMap<InMemoryStorageKey, NonNull<u8>>,
+        external: UnorderedMap<InMemoryStorageKey, NonNull<u8>>,
     }
 
     impl Provider {
@@ -663,7 +672,7 @@ mod tests {
         }
 
         fn with(key: &InMemoryStorageKey, ptr: NonNull<u8>) -> Self {
-            let mut external = HashMap::new();
+            let mut external = UnorderedMap::new();
             external.insert(key.clone(), ptr);
             Self { external }
         }

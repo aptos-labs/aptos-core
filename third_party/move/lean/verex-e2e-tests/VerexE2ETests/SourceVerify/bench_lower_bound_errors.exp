@@ -1,0 +1,37 @@
+VerexE2ETests/SourceVerify/bench_lower_bound_errors.spec.lean:6:3: error: the specification clause `ensures ∀ (i in start .. result), entries[i].key < key` is not established
+VerexE2ETests/SourceVerify/bench_lower_bound_errors.spec.lean:7:3: error: the specification clause `ensures ∀ (i in result .. end), entries[i].key >= key` is not established
+VerexE2ETests/SourceVerify/bench_lower_bound_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `unsorted` failed; provide a proof in the module:
+  verify unsorted by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_lower_bound_errors.spec.lean:14:3: error: the specification clause `ensures ∀ (i in result .. end), entries[i].key > key` is not established
+VerexE2ETests/SourceVerify/bench_lower_bound_errors.spec.lean:11:6: error: verex verification failed: the automatic verification of `strict` failed; provide a proof in the module:
+  verify strict by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_lower_bound_errors.spec.lean:19:1: error: `no panic when aborts at op 4` is not established: the operation `mid` at bench_lower_bound_errors.rs.lean:67:20 may panic
+  from: VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 2 } } (argument_0, argument_1, argument_2, argument_3, ()) initialState✝; argument_2.val ≤ argument_3.val; ∀ (i : Int), argument_2.val ≤ i → i < argument_3.val → ∀ (j : Int), argument_2.val ≤ j → j < argument_3.val → i ≤ j → (argument_1.values[i.toNat]?.getD ((bench_lower_bound_errors.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant ⋯)).val.fst.val ≤ (argument_1.values[j.toNat]?.getD ((bench_lower_bound_errors.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).inhabitant ⋯)).val.fst.val; low.val ≤ high.val; argument_2.val ≤ low.val; high.val ≤ argument_3.val; low.val < high.val; named✝¹.val = high.val - low.val; 0 ≤ high.val - low.val; high.val - low.val ≤ 18446744073709551615; named✝.val = named✝¹.val / 2; 0 ≤ named✝¹.val / 2; named✝¹.val / 2 ≤ 18446744073709551615; named.val = low.val + named✝.val; 0 ≤ low.val + named✝.val; low.val + named✝.val ≤ 18446744073709551615; ¬(0 ≤ named.val ∧ named.val < ↑argument_1.values.size)
+VerexE2ETests/SourceVerify/bench_lower_bound_errors.spec.lean:19:6: error: verex verification failed: the automatic verification of `past_end` failed; provide a proof in the module:
+  verify past_end by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 4 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_lower_bound_errors.spec.lean:32:15: error: the loop invariant `∀ (i in start .. low + 1), entries[i].key < key` is not established at entry
+VerexE2ETests/SourceVerify/bench_lower_bound_errors.spec.lean:32:15: error: the loop invariant `∀ (i in start .. low + 1), entries[i].key < key` is not preserved by an iteration
+VerexE2ETests/SourceVerify/bench_lower_bound_errors.spec.lean:26:6: error: verex verification failed: the automatic verification of `wrong_invariant` failed; provide a proof in the module:
+  verify wrong_invariant by lean =>
+    verex_obligations
+    verex_on
+    | invariant_2_entry => verex_prepare; sorry
+    | invariant_2_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -74,8 +74,7 @@ private def validated? : Option ValidatedUnit := (validate #[schema] fixture).to
 validation. -/
 private def assembled (unit : ValidatedUnit) (ns : ValidatedNamespace) : ValidatedUnit :=
   Internal.mkValidatedUnit unit.tables unit.profiles #[ns] unit.dependencies unit.evidence
-    unit.indexes unit.structurizationWitnesses unit.resolution
-    unit.initializationCertificates unit.borrowCertificates
+    unit.indexes unit.resolution
 
 private def rejectedStatically (unit : ValidatedUnit) : Bool :=
   match prepareExecution #[semantics] unit with

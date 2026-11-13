@@ -9,7 +9,7 @@ import VerexIR.Validation.TableRoles
 # Spec form
 
 The native vocabulary of a goal printed as the specification writes it
-(`doc/plan/proof-language.md`, "Messages and templates"): the clause
+(`doc/designs/proof-language.md`, "Messages and templates"): the clause
 translator run backwards. A map's reading prints under its owner's role
 function (`SpecMap.keyAt m i` as `spec_key_at(m, i)`, `SpecMap.hasKey m k =
 true` as `spec_contains_key(m, k)`), an integer's value as the integer.

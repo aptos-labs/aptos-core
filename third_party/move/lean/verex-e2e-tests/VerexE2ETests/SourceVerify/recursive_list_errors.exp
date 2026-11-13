@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/recursive_list_errors.spec.lean:7:6: error: no denotation for `count`: recursion through `List` is not carried by the denotation
+VerexE2ETests/SourceVerify/recursive_list_errors.spec.lean:10:6: error: no denotation for `count_false`: recursion through `List` is not carried by the denotation

@@ -278,7 +278,7 @@ fn end_to_end_with_positions() {
         tgt_db
             .get_pre_committed_position_state_summary()
             .unwrap()
-            .latest()
+            .last_checkpoint()
             .root_hash(),
         committed_root
     );

@@ -6,4 +6,4 @@ import VerexSL
 verex namespace string_slice where
   fun identity(value : &string) -> &string := value
 
-  fun identity_mut(value : &mut string) -> &mut string := value
+  fun identity_mut(value : &mut string) -> &mut string := &mut *value

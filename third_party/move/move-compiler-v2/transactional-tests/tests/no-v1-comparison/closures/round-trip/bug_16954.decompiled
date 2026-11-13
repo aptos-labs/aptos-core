@@ -2,7 +2,7 @@
 
 //# publish
 module 0xc0ffee::m {
-    fun call(p0: ||(u64)): u64 {
+    fun call(p0: ||u64): u64 {
         p0()
     }
     public fun test1(): u8 {
@@ -37,11 +37,11 @@ module 0xc0ffee::m {
         p0 - 1
     }
     public fun test2(): u64 {
-        let _v0: ||(||(u64)) has copy + drop = || lambda__2__test2(1);
+        let _v0: ||(||u64) has copy + drop = || lambda__2__test2(1);
         let _v1 = _v0();
         _v1()
     }
-    fun lambda__2__test2(p0: u64): ||(u64) {
+    fun lambda__2__test2(p0: u64): ||u64 {
         || lambda__1__test2(p0)
     }
     public fun test3(): u64 {
@@ -54,11 +54,11 @@ module 0xc0ffee::m {
         _v1(_v0)
     }
     public fun test4(p0: u64): u64 {
-        let _v0: ||(||(u64)) has copy + drop = || lambda__2__test4(p0);
+        let _v0: ||(||u64) has copy + drop = || lambda__2__test4(p0);
         let _v1 = _v0();
         _v1()
     }
-    fun lambda__2__test4(p0: u64): ||(u64) {
+    fun lambda__2__test4(p0: u64): ||u64 {
         || lambda__1__test4(p0)
     }
     public fun test5(): u8 {

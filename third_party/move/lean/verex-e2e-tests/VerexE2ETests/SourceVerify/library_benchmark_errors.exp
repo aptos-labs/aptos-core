@@ -1,0 +1,66 @@
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:5:3: error: the specification clause `ensures result == a` is not established
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `larger` failed; provide a proof in the module:
+  verify larger by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:8:3: error: the specification clause `ensures result == b` is not established
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `smaller` failed; provide a proof in the module:
+  verify smaller by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:10:1: error: `no panic when aborts at call 1 of unwrap` is not established: the call `u64::try_from(value).unwrap()` at VerexE2ETests/SourceVerify/library_benchmark_errors.rs:15:5 may panic
+  from: VerexIR.Proofs.Denote.variantPlainName ["Ok", "Err"] (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons library_benchmark_errors.unit.nominal.namespace.1.declaration✝⁻⁰ VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) try_from_at_0_result.val = "Ok" ↔ value.val ≤ 18446744073709551615; VerexIR.Proofs.Denote.variantPlainName ["Ok", "Err"] (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons library_benchmark_errors.unit.nominal.namespace.1.declaration✝⁻⁰ VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) try_from_at_0_result.val = "Ok" → ((Option.map VerexIR.Proofs.Denote.Var.here.selectPlain (VerexIR.Proofs.Denote.Which.here.project? try_from_at_0_result.val)).getD { val := 0, fits := ⋯ }).val = value.val; VerexIR.Proofs.Denote.variantPlainName ["Ok", "Err"] (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons library_benchmark_errors.unit.nominal.namespace.1.declaration✝⁻⁰ VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) try_from_at_0_result.val = "Err"
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `narrow` failed; provide a proof in the module:
+  verify narrow by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of unwrap => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:15:3: error: the specification clause `ensures ∀ (k in 0 .. length), !result[k]` is not established
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:13:6: error: verex verification failed: the automatic verification of `repeated` failed; provide a proof in the module:
+  verify repeated by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:17:1: error: `no panic when aborts at call 1 of swap_remove` is not established: the call `values.swap_remove(position)` at VerexE2ETests/SourceVerify/library_benchmark_errors.rs:23:5 may panic
+  from: value.fst = value.snd.fst; values_final = value.snd.snd; ↑values.values.size ≤ position.val
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:17:6: error: verex verification failed: the automatic verification of `take` failed; provide a proof in the module:
+  verify take by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of swap_remove => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:22:3: error: the specification clause `ensures ∀ (k in position .. values.length), values[k] == old(values)[k + 1]` is not established
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:20:6: error: verex verification failed: the automatic verification of `keep_order` failed; provide a proof in the module:
+  verify keep_order by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:26:3: error: the specification clause `ensures values == old(values)` is not established
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:24:6: error: verex verification failed: the automatic verification of `exchange` failed; provide a proof in the module:
+  verify exchange by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:29:3: error: the specification clause `ensures ∀ (k in 0 .. values.length), values[k]` is not established
+VerexE2ETests/SourceVerify/library_benchmark_errors.spec.lean:28:6: error: verex verification failed: the automatic verification of `clear` failed; provide a proof in the module:
+  verify clear by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

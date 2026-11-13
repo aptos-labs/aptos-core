@@ -1,0 +1,29 @@
+VerexE2ETests/SourceVerify/fnonce_adapters_errors.rs:14:1: info: `shared_call` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_adapters_errors.rs:14:1: info: `mutable_call` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_adapters_errors.rs:14:1: info: `once` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_adapters_errors.spec.lean:22:3: error: the specification clause `ensures result != value` is not established
+VerexE2ETests/SourceVerify/fnonce_adapters_errors.spec.lean:21:6: error: verex verification failed: the automatic verification of `shared` failed; provide a proof in the module:
+  verify shared by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/fnonce_adapters_errors.spec.lean:31:3: error: the specification clause `ensures result == value` is not established
+VerexE2ETests/SourceVerify/fnonce_adapters_errors.spec.lean:30:6: error: verex verification failed: the automatic verification of `mutable` failed; provide a proof in the module:
+  verify mutable by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/fnonce_adapters_errors.spec.lean:42:3: error: the specification clause `ensures !spec.result[1]` is not established
+VerexE2ETests/SourceVerify/fnonce_adapters_errors.spec.lean:40:6: error: verex verification failed: the automatic verification of `pair` failed; provide a proof in the module:
+  verify pair by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/fnonce_adapters_errors.rs:14:1: info: `once_unit` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_adapters_errors.rs:14:1: info: `mutable_unit` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation

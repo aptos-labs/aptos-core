@@ -163,6 +163,7 @@ mod tests {
             max_bytes_per_shard,
             refresh_interval_versions,
             max_promotion_bytes_per_block: 0,
+            defer_cold_writes_to_eviction: false,
         });
         bcs::to_bytes(&bcs::to_bytes(&config).unwrap()).unwrap()
     }

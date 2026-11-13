@@ -26,7 +26,8 @@ use crate::{
     DescriptorId, MAX_ALIGN,
 };
 use bitflags::bitflags;
-use std::{collections::HashMap, fmt};
+use shared_dsa::UnorderedMap;
+use std::fmt;
 
 /// Typed index into the program's [`ValueLayout`] table.
 #[repr(transparent)]
@@ -575,14 +576,14 @@ pub trait LayoutProvider {
 /// [`LayoutProvider`].
 pub struct ValueLayoutTable {
     table: Vec<ValueLayout>,
-    by_ty: HashMap<InternedType, LayoutId>,
+    by_ty: UnorderedMap<InternedType, LayoutId>,
 }
 
 impl ValueLayoutTable {
     pub fn new() -> Self {
         Self {
             table: reserved_layouts(),
-            by_ty: HashMap::new(),
+            by_ty: UnorderedMap::new(),
         }
     }
 

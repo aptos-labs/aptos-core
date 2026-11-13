@@ -3,6 +3,7 @@
 
 import Lean
 import VerexIR.Semantics.Runtime
+import VerexIR.Validation.Link
 
 /-!
 # Quotation of validated units
@@ -137,6 +138,7 @@ deriving instance ToExpr for FieldDecl
 deriving instance ToExpr for VariantDecl
 deriving instance ToExpr for GhostFieldDecl
 deriving instance ToExpr for StructDecl
+deriving instance ToExpr for ShapeContract
 deriving instance ToExpr for FunctionDecl
 deriving instance ToExpr for AssociatedItemKind
 deriving instance ToExpr for AssociatedItemDecl
@@ -150,15 +152,16 @@ deriving instance ToExpr for SpecVarDecl
 deriving instance ToExpr for NamespaceInvariant
 deriving instance ToExpr for IntrinsicBinding
 deriving instance ToExpr for IntrinsicDecl
+deriving instance ToExpr for ScopeKind
+deriving instance ToExpr for ScopeDecl
 deriving instance ToExpr for Namespace
 deriving instance ToExpr for FunctionBody
+deriving instance ToExpr for LoanProjection
 deriving instance ToExpr for LoanDeath
 deriving instance ToExpr for ValueOrders
 deriving instance ToExpr for Holding
-deriving instance ToExpr for ValidatedNamespace
-deriving instance ToExpr for ValidatedNamespaceInterface
-deriving instance ToExpr for ValidatedImportEvidence
-deriving instance ToExpr for UnitIndexes
+deriving instance ToExpr for TableSizes
+deriving instance ToExpr for Links
 deriving instance ToExpr for StructurizedBlock
 deriving instance ToExpr for StructurizedEdge
 deriving instance ToExpr for StructurizedRegionKind
@@ -169,42 +172,85 @@ deriving instance ToExpr for ReferenceParameterFact
 deriving instance ToExpr for CheckedLoanFact
 deriving instance ToExpr for LifetimeRelationFact
 deriving instance ToExpr for BorrowCertificate
-deriving instance ToExpr for AnchorDeaths
 deriving instance ToExpr for VerexIR.Validation.Severity
 deriving instance ToExpr for VerexIR.Validation.RelatedLocation
 deriving instance ToExpr for VerexIR.Validation.Diagnostic
 deriving instance ToExpr for VerexIR.Validation.OwnedDiagnostic
+deriving instance ToExpr for ValidatedNamespace
+deriving instance ToExpr for RelocatableNamespace
+deriving instance ToExpr for ValidatedNamespaceInterface
+deriving instance ToExpr for ValidatedImportEvidence
+deriving instance ToExpr for UnitIndexes
+deriving instance ToExpr for AnchorDeaths
+deriving instance ToExpr for DeadPlaces
 deriving instance ToExpr for VerexIR.Validation.ResolutionIndex
 deriving instance ToExpr for FunctionHandle
 deriving instance ToExpr for StructHandle
 deriving instance ToExpr for RuntimeValue
 
-/-- A validated unit as a literal. Each namespace caches views of the unit's
-tables and value orders, most of a unit; equal views are quoted once and
-shared. The unit's constructor is private, so it is read from the
-environment. -/
-def quoteUnit [Monad m] [MonadEnv m] (unit : ValidatedUnit) : m Lean.Expr := do
-  let constructor := (getStructureCtor (← getEnv) ``ValidatedUnit).name
+/-- The definition of the relocatable namespace registered at a path: the
+namespace's body and validation results in its own tables, defined where it
+is registered, so a unit quotes a reference to it. -/
+def objectName (segments : Array String) : Name :=
+  Name.str (segments.foldl Name.str .anonymous) "object"
+
+/-- Where a namespace of a unit is: the path its own tables give it. -/
+private def objectPath (ns : ValidatedNamespace) : Array String :=
+  (ns.localTables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
+
+/-- Define a registered relocatable namespace (`objectName`), unless it is
+defined. -/
+def ensureObjectDefinition (object : RelocatableNamespace) : CoreM Unit := do
+  let name := objectName object.path
+  if (← getEnv).contains name then return
+  addDecl (.defnDecl {
+    name, levelParams := []
+    type := mkConst ``RelocatableNamespace
+    value := toExpr object
+    hints := .abbrev, safety := .safe })
+
+/-- A validated unit as a literal. Each namespace is its registered relocatable
+namespace (`objectName`) placed in the unit: the unit's tables and value
+orders, which each namespace views, and its links, equal views and links
+quoted once and shared. The unit's constructor is private, so it is read from
+the environment. `registered` is the relocatable namespace registered at a
+path. -/
+def quoteUnit [Monad m] [MonadEnv m] [MonadError m] (unit : ValidatedUnit)
+    (registered : Array String → Option RelocatableNamespace) : m Lean.Expr := do
+  let env ← getEnv
+  let constructor := (getStructureCtor env ``ValidatedUnit).name
   let tables := toExpr unit.tables
   let orders := unit.namespaces[0]?.map fun ns => (ns.orders, toExpr ns.orders)
+  let links := unit.namespaces[0]?.map fun ns => (ns.links, toExpr ns.links)
   let namespaceType := toTypeExpr ValidatedNamespace
   let nil := mkApp (mkConst ``List.nil [levelZero]) namespaceType
-  let namespaces := unit.namespaces.foldr (init := nil) fun ns rest =>
-    mkApp3 (mkConst ``List.cons [levelZero]) namespaceType
-      (mkAppN (mkConst ``ValidatedNamespace.mk) #[
-        toExpr ns.toNamespace,
+  let namespaces ← unit.namespaces.foldrM (init := nil) fun ns rest => do
+    let path := objectPath ns
+    let shown := "::".intercalate path.toList
+    let some object := registered path
+      | throwError m!"the namespace `{shown}` of the unit is not registered"
+    unless env.contains (objectName path) do
+      throwError m!"the registered namespace `{shown}` has no definition `{objectName path}`"
+    unless ns.toNamespace == object.body && ns.localTables == object.tables &&
+        ns.holders == object.holders && ns.witnesses == object.witnesses &&
+        ns.initializationCertificates == object.initializationCertificates &&
+        ns.borrowCertificates == object.borrowCertificates &&
+        ns.borrowRejections == object.borrowRejections do
+      throwError m!"the namespace `{shown}` of the unit is not its registered namespace"
+    return mkApp3 (mkConst ``List.cons [levelZero]) namespaceType
+      (mkAppN (mkConst ``RelocatableNamespace.place) #[mkConst (objectName path),
         if ns.tables == unit.tables then tables else toExpr ns.tables,
+        match links with
+        | some (shared, quoted) => if ns.links == shared then quoted else toExpr ns.links
+        | none => toExpr ns.links,
         match orders with
         | some (shared, quoted) => if ns.orders == shared then quoted else toExpr ns.orders
-        | none => toExpr ns.orders,
-        toExpr ns.holders])
+        | none => toExpr ns.orders])
       rest
   return mkAppN (mkConst constructor) #[tables, toExpr unit.profiles,
     mkApp2 (mkConst ``List.toArray [levelZero]) namespaceType namespaces,
     toExpr unit.dependencies, toExpr unit.evidence, toExpr unit.indexes,
-    toExpr unit.structurizationWitnesses, toExpr unit.resolution,
-    toExpr unit.initializationCertificates, toExpr unit.borrowCertificates,
-    toExpr unit.borrowRejections]
+    toExpr unit.resolution]
 
 /-- The definitions holding quoted value orders, by the hash of their
 literal. -/

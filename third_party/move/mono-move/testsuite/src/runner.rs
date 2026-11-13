@@ -12,10 +12,11 @@ use crate::{
         TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS, TEST_TXN_HASH,
     },
     matcher::check_output,
-    module_provider::InMemoryModuleProvider,
     parser::{Check, PrintSection, Step},
     print_sections,
-    resource_provider::features_blob,
+    resource_provider::{features_blob, storage_resource_provider},
+    transactional_session::resource_changes,
+    InMemoryModuleProvider,
 };
 use anyhow::{anyhow, bail};
 use aptos_framework_natives::{
@@ -48,6 +49,7 @@ use mono_move_output::{
 use move_binary_format::{errors::Location, file_format::FunctionDefinitionIndex, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
+    effects::{ChangeSet, Op},
     identifier::IdentStr,
     int256::{I256, U256},
     language_storage::{ModuleId, TypeTag},
@@ -159,7 +161,7 @@ fn render_v1_location(
 }
 
 /// Renders an error location as `undefined`, `script`, or a module ID.
-pub(crate) fn render_error_location(location: &Location) -> String {
+fn render_error_location(location: &Location) -> String {
     match location {
         Location::Undefined => "undefined".to_string(),
         Location::Script => "script".to_string(),
@@ -248,11 +250,13 @@ fn render_event(
     }
 }
 
-/// Combines return values and rendered events into the normalized output string
-/// that `CHECK` directives match against: a `results:` segment when the call
-/// returns values and an `events:` segment when it emits events, joined by
-/// ` | `. A void, event-free call renders as `results:`.
-fn render_execution_output(vals: &[String], events: &[String]) -> String {
+/// Combines return values, rendered events, and rendered writes into the
+/// normalized output string that `CHECK` directives match against: a
+/// `results:` segment when the call returns values, an `events:` segment when
+/// it emits events, and a `writes:` segment when the step renders its writes,
+/// joined by ` | `. A void, event-free call that does not render its writes
+/// renders as `results:`.
+fn render_execution_output(vals: &[String], events: &[String], writes: Option<&str>) -> String {
     let mut segments = Vec::new();
     if !vals.is_empty() {
         segments.push(format!("results: {}", vals.join(", ")));
@@ -260,10 +264,61 @@ fn render_execution_output(vals: &[String], events: &[String]) -> String {
     if !events.is_empty() {
         segments.push(format!("events: {}", events.join("; ")));
     }
+    if let Some(writes) = writes {
+        segments.push(format!("writes: {}", writes));
+    }
     if segments.is_empty() {
         return "results:".to_string();
     }
     segments.join(" | ")
+}
+
+/// Renders a committing step's output, with its writes as `writes: none`, a
+/// list of writes, or `writes: error: <message>` when they could not be
+/// collected. Returns the writes to commit, which are `None` on an error.
+fn render_with_writes(
+    vals: &[String],
+    events: &[String],
+    writes: Result<ChangeSet, String>,
+) -> (String, Option<ChangeSet>) {
+    match writes {
+        Ok(changes) => {
+            let rendered = render_writes(&changes);
+            let segment = if rendered.is_empty() {
+                "none".to_string()
+            } else {
+                rendered.join("; ")
+            };
+            (
+                render_execution_output(vals, events, Some(&segment)),
+                Some(changes),
+            )
+        },
+        Err(err) => (
+            render_execution_output(vals, events, Some(&format!("error: {}", err))),
+            None,
+        ),
+    }
+}
+
+/// Renders a change set's resource writes, ordered by address and then type,
+/// for cross-VM comparison.
+fn render_writes(changes: &ChangeSet) -> Vec<String> {
+    changes
+        .resources()
+        .map(|(address, tag, op)| {
+            let at = format!(
+                "{} at {}",
+                tag.to_canonical_string(),
+                address.to_hex_literal()
+            );
+            match op {
+                Op::New(bytes) => format!("create {} {}", at, render_bytes(bytes)),
+                Op::Modify(bytes) => format!("modify {} {}", at, render_bytes(bytes)),
+                Op::Delete => format!("delete {}", at),
+            }
+        })
+        .collect()
 }
 
 /// Renders the events emitted into the V1 VM's [`NativeEventContext`], in
@@ -377,6 +432,7 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                 function_name,
                 args,
                 heap_size,
+                commit,
                 checks,
             } => {
                 // Run only the VM(s) a step actually checks (via `CHECK-V1` /
@@ -393,10 +449,17 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                     .any(|c| matches!(c, Check::V2(..) | Check::GcCount(..) | Check::ErrorParity));
 
                 let v1 = needs_v1.then(|| {
-                    execute_function_v1(&storage, &address, &module_name, &function_name, &args)
+                    execute_function_v1(
+                        &storage,
+                        &address,
+                        &module_name,
+                        &function_name,
+                        &args,
+                        commit,
+                    )
                 });
 
-                let (v2_output, v2_gc_count) = if needs_v2 {
+                let v2 = needs_v2.then(|| {
                     // V2 needs the arg/return kinds. Reuse V1's if it ran,
                     // otherwise load the function (without running it) to size them.
                     let (param_kinds, return_kinds) = match &v1 {
@@ -408,9 +471,10 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                         args.len(),
                         "function requires a different number of arguments"
                     );
-                    let (v2_output, v2_gc_count) = execute_function_v2(
+                    execute_function_v2(
                         &guard,
                         &module_provider,
+                        &storage,
                         &address,
                         &module_name,
                         &function_name,
@@ -418,16 +482,26 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                         &param_kinds,
                         &return_kinds,
                         heap_size,
-                    );
-                    (v2_output, v2_gc_count)
-                } else {
-                    (Output::success(String::new()), 0)
-                };
+                        commit,
+                    )
+                });
 
-                let v1_output = v1
-                    .map(|v| v.output)
-                    .unwrap_or_else(|| Output::success(String::new()));
+                let (v2_output, v2_changes, v2_gc_count) = match v2 {
+                    Some(v2) => (v2.output, v2.changes, v2.gc_count),
+                    None => (Output::success(String::new()), None, 0),
+                };
+                // V1 is the reference: when it ran, its writes are the ones
+                // kept, even if it made none (e.g. it aborted).
+                let (v1_output, changes) = match v1 {
+                    Some(v1) => (v1.output, v1.changes),
+                    None => (Output::success(String::new()), v2_changes),
+                };
                 check_output(&checks, &v1_output, &v2_output, v2_gc_count)?;
+                if let Some(changes) = changes {
+                    storage
+                        .apply(changes)
+                        .map_err(|err| anyhow!("failed to commit the step's writes: {}", err))?;
+                }
             },
         }
     }
@@ -486,6 +560,8 @@ fn test_utils_modules() -> &'static [CompiledModule] {
 /// place args and read its result region with matching widths.
 struct V1Output {
     output: Output,
+    /// The writes to commit: present when the step commits and succeeded.
+    changes: Option<ChangeSet>,
     param_kinds: Vec<PrimitiveKind>,
     return_kinds: Vec<PrimitiveKind>,
 }
@@ -551,6 +627,7 @@ fn execute_function_v1(
     module_name: &IdentStr,
     function_name: &IdentStr,
     args: &[String],
+    commit: bool,
 ) -> V1Output {
     let mut gas_meter = UnmeteredGasMeter;
 
@@ -613,7 +690,7 @@ fn execute_function_v1(
     extensions.add(randomness);
 
     let mut data_cache = TransactionDataCache::empty();
-    let output = match MoveVM::execute_loaded_function(
+    let result = MoveVM::execute_loaded_function(
         function,
         serialized_args,
         &mut MoveVmDataCacheAdapter::new(&mut data_cache, storage, &loader),
@@ -621,7 +698,9 @@ fn execute_function_v1(
         &mut traversal_context,
         &mut extensions,
         &loader,
-    ) {
+    );
+    let mut changes = None;
+    let output = match result {
         Ok(result) => {
             let vals = result
                 .return_values
@@ -630,7 +709,16 @@ fn execute_function_v1(
                 .map(|((bytes, _layout), kind)| kind.render_bcs(bytes))
                 .collect::<Vec<_>>();
             let events = finalize_events_v1(&extensions);
-            Output::success(render_execution_output(&vals, &events))
+            if commit {
+                let writes = data_cache
+                    .into_effects(&module_storage)
+                    .map_err(|err| err.to_string());
+                let (display, change_set) = render_with_writes(&vals, &events, writes);
+                changes = change_set;
+                Output::success(display)
+            } else {
+                Output::success(render_execution_output(&vals, &events, None))
+            }
         },
         Err(err) if err.major_status() == StatusCode::ABORTED => {
             let code = err.sub_status().unwrap();
@@ -660,16 +748,26 @@ fn execute_function_v1(
     };
     V1Output {
         output,
+        changes,
         param_kinds,
         return_kinds,
     }
 }
 
-/// Executes a function via MonoMove VM. Returns the normalized output and the
-/// number of garbage collections that ran (for `CHECK-GC-COUNT`).
+/// Output of a MonoMove execution.
+struct V2Output {
+    output: Output,
+    /// The writes to commit: present when the step commits and succeeded.
+    changes: Option<ChangeSet>,
+    /// Number of garbage collections that ran (for `CHECK-GC-COUNT`).
+    gc_count: usize,
+}
+
+/// Executes a function via MonoMove VM over `storage`.
 fn execute_function_v2(
     guard: &ExecutionGuard<'_>,
     module_provider: &InMemoryModuleProvider,
+    storage: &InMemoryStorage,
     address: &AccountAddress,
     module_name: &IdentStr,
     function_name: &IdentStr,
@@ -677,53 +775,83 @@ fn execute_function_v2(
     arg_kinds: &[PrimitiveKind],
     return_kinds: &[PrimitiveKind],
     heap_size: Option<usize>,
-) -> (Output, usize) {
+    commit: bool,
+) -> V2Output {
     // For differential tests, treat transaction as a user transaction.
     let extensions = seed_extensions(true);
+    let resource_provider = storage_resource_provider(guard, storage);
 
     // Run through the shared pipeline engine. Argument placement and result
     // reading mirror mono-move's frame slot layout.
     let mut gc_count = 0;
-    let outcome = crate::engine::with_mono_function(
+    let mut changes = None;
+    let outcome = crate::engine::mono_runner(
         guard,
         module_provider,
+        &resource_provider,
         *address,
         module_name,
         function_name,
         extensions,
         heap_size,
-        |runner| {
-            // Split the directive's arguments in order: signers back the
-            // entry's signer parameters, the rest are placed as typed values.
-            let mut signers = Vec::new();
-            let mut values = Vec::new();
-            for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
-                match kind.to_move_value(arg) {
-                    MoveValue::Signer(addr) => signers.push(addr),
-                    value => values.push(value),
-                }
+    )
+    .map(|mut runner| {
+        // Split the directive's arguments in order: signers back the
+        // entry's signer parameters, the rest are placed as typed values.
+        let mut signers = Vec::new();
+        let mut values = Vec::new();
+        for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
+            match kind.to_move_value(arg) {
+                MoveValue::Signer(addr) => signers.push(addr),
+                value => values.push(value),
             }
-            let result = runner.run(
-                &signers,
-                |call, index| call.arg(&values[index]),
-                |call| {
-                    let vals = call
-                        .bcs_serialize_return_values()?
-                        .iter()
-                        .zip(return_kinds)
-                        .map(|((_, bytes), kind)| kind.render_bcs(bytes))
-                        .collect::<Vec<_>>();
-                    // SAFETY: the heap (and every pointer the events embed) is
-                    // live while the interpreter is.
-                    let events =
-                        unsafe { finalize_events_v2(call.interpreter().extensions(), guard) };
-                    Ok((vals, events))
-                },
-            );
-            gc_count = runner.gc_count();
-            result
-        },
-    );
+        }
+        let result = runner.run(
+            &signers,
+            |call, index| call.arg(&values[index]),
+            |call| {
+                let vals = call
+                    .bcs_serialize_return_values()?
+                    .iter()
+                    .zip(return_kinds)
+                    .map(|((_, bytes), kind)| kind.render_bcs(bytes))
+                    .collect::<Vec<_>>();
+                // SAFETY: the heap (and every pointer the events embed) is
+                // live while the interpreter is.
+                let events = unsafe { finalize_events_v2(call.interpreter().extensions(), guard) };
+                Ok((vals, events))
+            },
+        );
+        gc_count = runner.gc_count();
+        match result {
+            RunResult::Success((vals, events)) if commit => {
+                // Writes that left a resource unchanged are dropped when
+                // the session ends, so they are rendered from its effects.
+                let writes = runner
+                    .finish()
+                    .map_err(|err| err.to_string())
+                    .and_then(|effects| {
+                        resource_changes(guard, &effects).map_err(|err| err.to_string())
+                    });
+                let (display, change_set) = render_with_writes(&vals, &events, writes);
+                changes = change_set;
+                RunResult::Success(display)
+            },
+            RunResult::Success((vals, events)) => {
+                RunResult::Success(render_execution_output(&vals, &events, None))
+            },
+            RunResult::Aborted {
+                code,
+                message,
+                location,
+            } => RunResult::Aborted {
+                code,
+                message,
+                location,
+            },
+            RunResult::Error(err) => RunResult::Error(err),
+        }
+    });
 
     let output = match outcome {
         // Setup failure (loading, lowering). `{:#}` renders the whole chain;
@@ -749,11 +877,13 @@ fn execute_function_v2(
             };
             Output::aborted(render_abort(code, message.as_deref(), &location))
         },
-        Ok(RunResult::Success((vals, events))) => {
-            Output::success(render_execution_output(&vals, &events))
-        },
+        Ok(RunResult::Success(display)) => Output::success(display),
     };
-    (output, gc_count)
+    V2Output {
+        output,
+        changes,
+        gc_count,
+    }
 }
 
 /// Renders an abort outcome. Both VMs go through this so the abort location

@@ -1,0 +1,192 @@
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:31:3: error: the specification clause `ensures result == true` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:30:6: error: verex verification failed: the automatic verification of `idx_len_field_false` failed; provide a proof in the module:
+  verify idx_len_field_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:34:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:33:6: error: verex verification failed: the automatic verification of `idx_len_field_vacuous` failed; provide a proof in the module:
+  verify idx_len_field_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:40:3: error: the specification clause `ensures result == a` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:39:6: error: verex verification failed: the automatic verification of `view_of_ref_false` failed; provide a proof in the module:
+  verify view_of_ref_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:43:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:42:6: error: verex verification failed: the automatic verification of `view_of_ref_vacuous` failed; provide a proof in the module:
+  verify view_of_ref_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:49:3: error: the specification clause `ensures result == m + 1` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:48:6: error: verex verification failed: the automatic verification of `double_ref_false` failed; provide a proof in the module:
+  verify double_ref_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:52:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:51:6: error: verex verification failed: the automatic verification of `double_ref_vacuous` failed; provide a proof in the module:
+  verify double_ref_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:58:3: error: the specification clause `ensures result == a` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:57:6: error: verex verification failed: the automatic verification of `view_callee_false` failed; provide a proof in the module:
+  verify view_callee_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:61:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:60:6: error: verex verification failed: the automatic verification of `view_callee_vacuous` failed; provide a proof in the module:
+  verify view_callee_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:67:3: error: the specification clause `ensures result == a` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:66:6: error: verex verification failed: the automatic verification of `two_phase_false` failed; provide a proof in the module:
+  verify two_phase_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:70:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:69:6: error: verex verification failed: the automatic verification of `two_phase_vacuous` failed; provide a proof in the module:
+  verify two_phase_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:77:3: error: the specification clause `ensures spec.result[1] == a` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:76:6: error: verex verification failed: the automatic verification of `method_calls_view_false` failed; provide a proof in the module:
+  verify method_calls_view_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:80:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:79:6: error: verex verification failed: the automatic verification of `method_calls_view_vacuous` failed; provide a proof in the module:
+  verify method_calls_view_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:86:3: error: the specification clause `ensures result == 7` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:85:6: error: verex verification failed: the automatic verification of `view_misses_later_write_false` failed; provide a proof in the module:
+  verify view_misses_later_write_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:89:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:88:6: error: verex verification failed: the automatic verification of `view_misses_later_write_vacuous` failed; provide a proof in the module:
+  verify view_misses_later_write_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:95:3: error: the specification clause `ensures result == 0` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:94:6: error: verex verification failed: the automatic verification of `vec_len_holder_false` failed; provide a proof in the module:
+  verify vec_len_holder_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:98:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:97:6: error: verex verification failed: the automatic verification of `vec_len_holder_vacuous` failed; provide a proof in the module:
+  verify vec_len_holder_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:104:3: error: the specification clause `ensures v.length == old(v).length` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:103:6: error: verex verification failed: the automatic verification of `vec_push_len_false` failed; provide a proof in the module:
+  verify vec_push_len_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:107:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:106:6: error: verex verification failed: the automatic verification of `vec_push_len_vacuous` failed; provide a proof in the module:
+  verify vec_push_len_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:116:3: error: the specification clause `ensures result == a + 1` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:115:6: error: verex verification failed: the automatic verification of `unit_under_view_false` failed; provide a proof in the module:
+  verify unit_under_view_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:119:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:118:6: error: verex verification failed: the automatic verification of `unit_under_view_vacuous` failed; provide a proof in the module:
+  verify unit_under_view_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:125:3: error: the specification clause `ensures result == a + 1` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:124:6: error: verex verification failed: the automatic verification of `generic_at_unit_false` failed; provide a proof in the module:
+  verify generic_at_unit_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:128:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:127:6: error: verex verification failed: the automatic verification of `generic_at_unit_vacuous` failed; provide a proof in the module:
+  verify generic_at_unit_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:134:3: error: the specification clause `ensures result == a` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:133:6: error: verex verification failed: the automatic verification of `generic_at_reference_false` failed; provide a proof in the module:
+  verify generic_at_reference_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:137:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/shared_views_errors.spec.lean:136:6: error: verex verification failed: the automatic verification of `generic_at_reference_vacuous` failed; provide a proof in the module:
+  verify generic_at_reference_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
