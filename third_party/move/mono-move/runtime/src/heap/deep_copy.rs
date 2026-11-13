@@ -40,10 +40,7 @@ impl Heap {
         let src_desc_id = DescriptorId(unsafe { read_descriptor(src.as_ptr()) });
         debug_assert!(src_size >= OBJECT_HEADER_SIZE);
 
-        let new_raw = heap_alloc(self, src_size, src_desc_id)?;
-        // SAFETY: `heap_alloc` returns non-null on success and this is an
-        // object pointer that cannot be null.
-        let new = unsafe { NonNull::new_unchecked(new_raw) };
+        let new = heap_alloc(self, src_size, src_desc_id)?;
 
         // SAFETY: regions don't overlap (different allocations).
         unsafe {

@@ -24,18 +24,19 @@ use crate::{
         DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
         VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
+    value_conv::bcs::deserialize_into,
 };
 use mono_move_core::{
     align_max, checked_align_max,
     native::{NativeABI, NativeExtensions},
     types::InternedType,
-    DescriptorId, DescriptorProvider, FrameOffset, Function, ObjectDescriptorInner, ReadPin,
-    RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
+    DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
+    ReadPin, RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
     FRAME_METADATA_SIZE, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
-use std::{cell::RefCell, ptr::NonNull};
+use std::{cell::RefCell, ptr::NonNull, sync::Arc};
 
 // ---------------------------------------------------------------------------
 // Macros
@@ -200,10 +201,8 @@ pub(crate) mod macros {
 /// allocation sizes (e.g. a corrupted descriptor or attacker-controlled
 /// capacity in `alloc_vec`) before we compute a bump-pointer offset.
 ///
-/// Tied to [`DEFAULT_HEAP_SIZE`] — anything larger could never succeed
-/// regardless. The constant exists so the bound can be detached from
-/// `DEFAULT_HEAP_SIZE` once heaps become per-context configurable
-/// (likely driven by gas limits).
+/// Set to the largest buffer the runtime creates, a session heap, so it rejects
+/// only sizes no heap could ever serve. Arena segments are the same size.
 const MAX_SINGLE_ALLOCATION_SIZE: usize = DEFAULT_HEAP_SIZE;
 
 /// Heap state for a single interpreter context.
@@ -267,15 +266,15 @@ impl Heap {
 
     /// Bump-allocates one object of `total_size` bytes (header + payload), stamps the header with
     /// `descriptor_id`, and returns the data pointer (payload start; the header occupies the
-    /// preceding [`OBJECT_HEADER_SIZE`](mono_move_core::OBJECT_HEADER_SIZE) bytes). Returns `None` if
-    /// the heap is full. Does not run GC.
+    /// preceding [`OBJECT_HEADER_SIZE`](mono_move_core::OBJECT_HEADER_SIZE) bytes). Fails with
+    /// [`RuntimeError::OutOfHeapMemory`] if the heap is full. Does not run GC.
     pub fn alloc_object(
         &mut self,
         total_size: usize,
         descriptor_id: DescriptorId,
-    ) -> Option<std::ptr::NonNull<u8>> {
-        let ptr = heap_alloc(self, total_size, descriptor_id).ok()?;
-        std::ptr::NonNull::new(ptr)
+    ) -> VMResult<NonNull<u8>> {
+        heap_alloc(self, total_size, descriptor_id)
+            .map_err(|e| VMInternalError::new(e.into_runtime_error()))
     }
 }
 
@@ -300,34 +299,138 @@ impl FrozenHeap {
 // A frozen session heap pins reads that other transactions take against it.
 impl ReadPin for FrozenHeap {}
 
-/// A [`Heap`] that can be shared and appended to through a shared reference.
-///
-/// Storage providers materialize values lazily into a long-lived arena but hand
-/// out reads pinned by an `Arc`. This newtype gives them interior-mutable,
-/// append-only allocation while the arena stays shared. It is never
-/// garbage-collected or reset, so allocated objects never move and the pointers
-/// handed out stay valid for the arena's whole life.
-pub struct SharedArena {
+/// One [`SegmentedArena`] segment: a [`Heap`] appended to through a shared
+/// reference. It is never garbage-collected or reset, so allocated objects
+/// never move and pointers into it stay valid while it is pinned.
+struct Segment {
     heap: RefCell<Heap>,
 }
 
-impl SharedArena {
-    /// Creates a shared arena backed by a fresh buffer of `size` bytes.
-    pub fn new(size: usize) -> Self {
+impl ReadPin for Segment {}
+
+/// Size of one [`SegmentedArena`] segment, and so the largest value it can
+/// hold. Equal to a session heap's capacity: anything a transaction can hold in
+/// its heap, and so write, fits in a fresh segment and can be read back.
+const SEGMENT_BYTES: usize = DEFAULT_HEAP_SIZE;
+
+/// An append-only arena that grows by adding fixed-size segments.
+///
+/// Values materialized from storage stay reachable long after the transaction
+/// that read them finished, so nothing here is ever reset or collected while
+/// the block runs. Each allocation hands back the segment it landed in, and the
+/// value pins that segment.
+///
+/// A segment is interior-mutable and `!Sync`, yet a pin on a segment may
+/// be held by another thread. That is sound only because [`ReadPin`] exposes no
+/// methods: a pin holder cannot reach the heap, and the arena's owner is the
+/// only one that ever allocates in it.
+//
+// TODO(security): nothing caps the arena's total size. Every segment stays
+// alive until the arena is dropped, so a block can grow it without bound by
+// reading many large pre-block values.
+pub struct SegmentedArena {
+    segments: RefCell<Vec<Arc<Segment>>>,
+}
+
+impl SegmentedArena {
+    /// Creates an arena with no segments. The first is allocated on the first
+    /// allocation, so an owner that never allocates reserves nothing.
+    pub fn new() -> Self {
         Self {
-            heap: RefCell::new(Heap::new(size)),
+            segments: RefCell::new(vec![]),
         }
     }
 
-    /// Runs `f` with exclusive access to the inner heap for one allocation
-    /// episode. A pointer `f` returns outlives the borrow: the arena is
-    /// append-only, so the object it points to is never moved or freed.
-    pub fn with_heap_mut<R>(&self, f: impl FnOnce(&mut Heap) -> R) -> R {
-        f(&mut self.heap.borrow_mut())
+    /// Deserializes `blob`, the BCS encoding of a value of type `ty`, into one
+    /// segment. Returns the value and the segment to pin it by.
+    pub fn deserialize(
+        &self,
+        guard: &ExecutionGuard<'_>,
+        ty: InternedType,
+        blob: &[u8],
+    ) -> VMResult<(NonNull<u8>, Arc<dyn ReadPin>)> {
+        let Some(layout) = guard.layout_by_ty(ty) else {
+            invariant_violation!(ValueLayoutNotFound);
+        };
+        let Some(descriptor) = guard.struct_descriptor(ty) else {
+            invariant_violation!(Unreachable(
+                "stored value's type has no GC descriptor".to_string()
+            ));
+        };
+        let total_size = OBJECT_HEADER_SIZE + layout.size as usize;
+
+        // The flat root and everything nested under it must land in one
+        // segment, so they are allocated together and retried together.
+        let (obj, segment) = self.alloc_in(|heap| {
+            let obj = heap.alloc_object(total_size, descriptor)?;
+            // SAFETY: `obj` is a freshly reserved object sized for the value's
+            // layout; `deserialize_into` writes the flat value there and puts
+            // the nested allocations in the same heap.
+            unsafe { deserialize_into(guard, heap, ty, blob, obj.as_ptr()) }?;
+            Ok(obj)
+        })?;
+        Ok((obj, segment as Arc<dyn ReadPin>))
+    }
+
+    /// Runs `alloc` in the current segment, or in a fresh one when the current
+    /// segment has too little room left. Returns what `alloc` produced together
+    /// with the segment to pin it by.
+    ///
+    /// Only [`RuntimeError::OutOfHeapMemory`] is retried; any other error is
+    /// returned as is. If the value does not fit even in a fresh segment, that
+    /// segment's error is returned. `alloc` may run twice, and whatever it
+    /// allocated in a segment it then failed in is left behind as unreachable
+    /// slack.
+    ///
+    /// Whether this succeeds must not depend on how much the owner allocated
+    /// before, or two Block-STM schedules could disagree on whether the same
+    /// value can be read. Hence the retry starts from an empty segment of a
+    /// fixed size.
+    fn alloc_in<T>(&self, alloc: impl Fn(&mut Heap) -> VMResult<T>) -> VMResult<(T, Arc<Segment>)> {
+        let mut segments = self.segments.borrow_mut();
+
+        if let Some(current) = segments.last().cloned() {
+            let result = alloc(&mut current.heap.borrow_mut());
+            match result {
+                Ok(value) => return Ok((value, current)),
+                Err(e) if is_out_of_heap_memory(&e) => {},
+                Err(e) => return Err(e),
+            }
+        }
+
+        // Too little room left, or no segment yet: retire the current one and
+        // grow. A value that does not fit in a fresh segment is rejected.
+        //
+        // TODO(completeness): ensure MonoMove limits any allocation size to
+        // some fixed constant.
+        let fresh = new_segment(SEGMENT_BYTES);
+        let value = alloc(&mut fresh.heap.borrow_mut())?;
+        segments.push(fresh.clone());
+        Ok((value, fresh))
     }
 }
 
-impl ReadPin for SharedArena {}
+impl Default for SegmentedArena {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Whether the error is the heap running out of room, which a fresh segment
+/// can fix.
+fn is_out_of_heap_memory(e: &VMInternalError) -> bool {
+    matches!(
+        e.downcast_ref::<RuntimeError>(),
+        Some(RuntimeError::OutOfHeapMemory { .. })
+    )
+}
+
+fn new_segment(size: usize) -> Arc<Segment> {
+    #[allow(clippy::arc_with_non_send_sync)]
+    Arc::new(Segment {
+        heap: RefCell::new(Heap::new(size)),
+    })
+}
 
 /// Outcome of a bump-allocation attempt.
 #[derive(Debug)]
@@ -371,13 +474,15 @@ pub(crate) fn alloc_or_gc(
     extensions: &NativeExtensions,
     fp: *mut u8,
     top_frame: TopFrame<'_>,
-    try_alloc: impl Fn(&mut Heap) -> AllocationResult<*mut u8>,
+    try_alloc: impl Fn(&mut Heap) -> AllocationResult<NonNull<u8>>,
 ) -> VMResult<*mut u8> {
     match try_alloc(heap) {
-        Ok(ptr) => Ok(ptr),
+        Ok(ptr) => Ok(ptr.as_ptr()),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
             gc_collect(heap, guard, rws, extra_roots, extensions, fp, top_frame)?;
-            try_alloc(heap).map_err(|e| VMInternalError::new(e.into_runtime_error()))
+            try_alloc(heap)
+                .map(NonNull::as_ptr)
+                .map_err(|e| VMInternalError::new(e.into_runtime_error()))
         },
         Err(e) => Err(VMInternalError::new(e.into_runtime_error())),
     }
@@ -587,7 +692,7 @@ pub(crate) fn heap_alloc(
     heap: &mut Heap,
     total_size: usize,
     descriptor_id: DescriptorId,
-) -> AllocationResult<*mut u8> {
+) -> AllocationResult<NonNull<u8>> {
     // Round up to MAX_ALIGN with overflow protection; the
     // `MAX_SINGLE_ALLOCATION_SIZE` check below then applies to the
     // *aligned* size so the rounding can't smuggle an oversize allocation
@@ -632,7 +737,9 @@ pub(crate) fn heap_alloc(
         std::ptr::write_bytes(header_start, 0, aligned_size);
         let obj_ptr = header_start.add(OBJECT_HEADER_SIZE);
         write_object_header(obj_ptr, descriptor_id, aligned_size as u32);
-        Ok(obj_ptr)
+        // SAFETY: `obj_ptr` lies inside the heap's buffer, a live allocation,
+        // so it is not null.
+        Ok(NonNull::new_unchecked(obj_ptr))
     }
 }
 
@@ -712,7 +819,7 @@ pub(crate) fn alloc_vec_no_gc(
     elem_size: u32,
     len: u64,
 ) -> AllocationResult<*mut u8> {
-    let vec_ptr = heap_alloc(heap, vec_alloc_size(len, elem_size)?, descriptor_id)?;
+    let vec_ptr = heap_alloc(heap, vec_alloc_size(len, elem_size)?, descriptor_id)?.as_ptr();
     // SAFETY: the allocation stores the vector length at this offset.
     unsafe { write_u64(vec_ptr, VEC_LENGTH_OFFSET, len) };
     Ok(vec_ptr)
@@ -730,7 +837,8 @@ pub(crate) fn alloc_enum_no_gc(
         heap,
         OBJECT_HEADER_SIZE + max_size_across_variants,
         descriptor_id,
-    )?;
+    )?
+    .as_ptr();
     // SAFETY: the allocation has enough size to write the tag.
     unsafe { write_enum_tag(obj_ptr, tag) };
     Ok(obj_ptr)
@@ -1397,7 +1505,7 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::global_storage::WriteClass;
+    use crate::{global_storage::WriteClass, types::DEFAULT_HEAP_SIZE};
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
         storage::resource_provider::{InMemoryStorageKey, NoResourceProvider},
@@ -1503,5 +1611,66 @@ mod tests {
         assert_ne!(moved, live);
         // SAFETY: the write now points at the copy in the evacuated heap.
         assert_eq!(unsafe { read_u64(moved.as_ptr(), 0usize) }, SENTINEL);
+    }
+}
+
+#[cfg(test)]
+mod segmented_arena_tests {
+    use super::*;
+
+    const PAYLOAD: usize = SEGMENT_BYTES / 2;
+
+    fn alloc_in_heap(heap: &mut Heap, payload: usize) -> VMResult<NonNull<u8>> {
+        heap.alloc_object(OBJECT_HEADER_SIZE + payload, DescriptorId(0))
+    }
+
+    fn alloc(arena: &SegmentedArena, payload: usize) -> Option<NonNull<u8>> {
+        arena
+            .alloc_in(|heap| alloc_in_heap(heap, payload))
+            .map(|(ptr, _)| ptr)
+            .ok()
+    }
+
+    /// Leaves the arena's newest segment without room for another `PAYLOAD`.
+    fn fill_newest_segment(arena: &SegmentedArena) {
+        // The arena starts empty, so allocate once to bring a segment into
+        // existence before filling it.
+        alloc(arena, PAYLOAD).expect("A fresh arena serves the first allocation");
+        let segment = arena.segments.borrow().last().unwrap().clone();
+        while alloc_in_heap(&mut segment.heap.borrow_mut(), PAYLOAD).is_ok() {}
+    }
+
+    #[test]
+    fn a_fresh_arena_reserves_nothing() {
+        assert!(SegmentedArena::new().segments.borrow().is_empty());
+    }
+
+    #[test]
+    fn grows_past_a_full_segment() {
+        let arena = SegmentedArena::new();
+        fill_newest_segment(&arena);
+        assert!(alloc(&arena, PAYLOAD).is_some());
+        assert_eq!(arena.segments.borrow().len(), 2);
+    }
+
+    #[test]
+    fn success_does_not_depend_on_prior_allocations() {
+        // The point of growing: the same value must be admissible no matter how
+        // full the arena was, or two Block-STM schedules could disagree on
+        // whether it can be read.
+        let fresh = SegmentedArena::new();
+        assert!(alloc(&fresh, PAYLOAD).is_some());
+
+        let used = SegmentedArena::new();
+        fill_newest_segment(&used);
+        assert!(alloc(&used, PAYLOAD).is_some());
+    }
+
+    #[test]
+    fn value_larger_than_a_segment_is_rejected() {
+        let arena = SegmentedArena::new();
+        alloc(&arena, PAYLOAD).expect("A fresh arena serves the first allocation");
+        assert!(alloc(&arena, SEGMENT_BYTES + 1).is_none());
+        assert_eq!(arena.segments.borrow().len(), 1);
     }
 }

@@ -20,6 +20,7 @@ use aptos_block_executor::{
     types::InputOutputKey,
     Materializer,
 };
+use aptos_logger::error;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
@@ -444,15 +445,32 @@ impl<
                 Transaction::GenesisTransaction(_)
             );
 
-        // TODO(correctness): Remove when parallel execution is supported.
-        let mut config = config;
         let is_mono_move = !is_genesis
             && module_cache_manager_guard
                 .environment()
                 .features()
                 .is_mono_move_enabled();
+
+        // MonoMove workers each take one arena out of the global context, which
+        // was sized when the module cache manager was built. A caller passing a
+        // higher concurrency level than that would leave a worker with no arena.
+        // Hence, we adjust the concurrency level to one that is supported.
+        //
+        // TODO(completeness): have a MonoMove resource config that we can read
+        // without `AptosEnvironment`.
+        let mut config = config;
         if is_mono_move {
-            config.local.concurrency_level = 1;
+            let num_workers = module_cache_manager_guard
+                .global_context()
+                .num_execution_workers();
+            if config.local.concurrency_level > num_workers {
+                error!(
+                    "MonoMove: concurrency level {} exceeds the {} workers the global \
+                     context was built for, capping it",
+                    config.local.concurrency_level, num_workers
+                );
+                config.local.concurrency_level = num_workers;
+            }
         }
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
 

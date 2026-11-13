@@ -1,10 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_types::{on_chain_config::OnChainConfig, state_store::state_key::StateKey};
+use aptos_types::on_chain_config::OnChainConfig;
 use bytes::Bytes;
 use mono_move_core::{
-    storage::resource_provider::{ResourceProvider, ResourceProviderError},
+    storage::resource_provider::{InMemoryStorageKey, ResourceProvider, ResourceProviderError},
     types::InternedType,
 };
 use mono_move_global_context::ExecutionGuard;
@@ -13,18 +13,31 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, move_resource::MoveStructType,
 };
 use serde::de::DeserializeOwned;
-use shared_dsa::UnorderedMap;
 use std::collections::BTreeMap;
 
 /// Trait extending the runtime's [`ResourceProvider`] interface with additional capabilities to
 /// handle resource groups.
 pub trait AptosDataProvider: ResourceProvider {
     /// The stored members of the group behind `group_key`, as execution read
-    /// them, or `None` if no group is stored there.
+    /// them, or `None` if no group is stored there. `group_key` must be an
+    /// [`InMemoryStorageKey::ResourceGroup`].
     fn group_members(
         &self,
-        group_key: &StateKey,
+        group_key: &InMemoryStorageKey,
     ) -> Result<Option<GroupMembers>, ResourceProviderError>;
+}
+
+/// Checks that `group_key` names a resource group's slot, as
+/// [`AptosDataProvider::group_members`] requires.
+pub fn check_group_key(group_key: &InMemoryStorageKey) -> Result<(), ResourceProviderError> {
+    match group_key {
+        InMemoryStorageKey::ResourceGroup { .. } => Ok(()),
+        InMemoryStorageKey::Resource { .. } | InMemoryStorageKey::TableItem { .. } => {
+            Err(ResourceProviderError::InvariantViolation(format!(
+                "{group_key:?} is not a resource group"
+            )))
+        },
+    }
 }
 
 /// The BCS bytes of the resource of interned type `ty` at `address`, read
@@ -85,14 +98,6 @@ pub(crate) fn read_resource<T: MoveStructType + DeserializeOwned>(
 //
 // TODO(cleanup): consider using interned types and unordered map.
 pub type GroupMembers = BTreeMap<StructTag, Bytes>;
-
-/// The resource groups a transaction assembled during materialization, keyed by
-/// group slot. `None` marks a group the transaction deleted.
-///
-/// Unordered: a caller merges it into its own cache, which does not depend on
-/// order. The default hasher is fine because `StateKey` hashes its
-/// cryptographic digest.
-pub type MaterializedGroups = UnorderedMap<StateKey, Option<GroupMembers>>;
 
 /// Decodes a group's stored blob.
 pub fn decode_group_members(blob: &[u8]) -> Result<GroupMembers, ResourceProviderError> {

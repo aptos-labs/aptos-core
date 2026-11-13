@@ -39,9 +39,12 @@ jobs:
           BRANCH: ${{ inputs.branch }}
           TIME_INTERVAL: ${{ inputs.time-interval || '60h' }}
         run: |
-          python3 third_party/move/mono-move/testsuite/e2e-perf/calibrate_e2e_perf_test.py \
-            ${BRANCH:+--branch "$BRANCH"} \
-            --time-interval "$TIME_INTERVAL"
+          for mode in "" "--parallel"; do
+            python3 third_party/move/mono-move/testsuite/e2e-perf/calibrate_e2e_perf_test.py \
+              ${BRANCH:+--branch "$BRANCH"} \
+              --time-interval "$TIME_INTERVAL" \
+              $mode
+          done
 
       - name: Create Pull Request
         id: create-pr
@@ -52,11 +55,14 @@ jobs:
           base: main
           title: "[ci] Calibrate mono-move e2e performance speedups"
           body: |
-            Auto-generated calibration update for the mono-move e2e performance job.
+            Auto-generated calibration update for the mono-move e2e performance jobs,
+            sequential and parallel.
 
             Updates:
             - `third_party/move/mono-move/testsuite/e2e-perf/e2e_perf_speedup.tsv`
             - `third_party/move/mono-move/testsuite/e2e-perf/e2e_perf_speedup_changelog.md`
+            - `third_party/move/mono-move/testsuite/e2e-perf/e2e_perf_speedup_parallel.tsv`
+            - `third_party/move/mono-move/testsuite/e2e-perf/e2e_perf_speedup_parallel_changelog.md`
 
             The changelog entry shows each workload's speedup as `old -> new`, so the
             diff is readable without opening the .tsv.

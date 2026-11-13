@@ -56,15 +56,16 @@
 //! never relocated.
 
 use crate::{
-    error::{GlobalStorageOp, RuntimeError},
+    error::{GlobalStorageOp, RuntimeError, RuntimeInvariantViolation},
     heap::RootScanner,
     invariant_violation,
     value_cmp::equals,
 };
 use hashbrown::{hash_map::EntryRef, HashMap};
 use mono_move_core::{
-    storage::resource_provider::InMemoryStorageKey, types::InternedType, LayoutProvider,
-    ResourceProvider, StorageRead, VMResult,
+    storage::resource_provider::{InMemoryStorageKey, Version},
+    types::InternedType,
+    LayoutProvider, ResourceProvider, StorageRead, VMResult,
 };
 use std::ptr::NonNull;
 
@@ -143,7 +144,7 @@ impl Entry {
     pub(crate) fn exists(&self) -> bool {
         match self.write {
             StorageWrite::NotModified => match self.read {
-                StorageRead::DoesNotExist => false,
+                StorageRead::DoesNotExist { .. } => false,
                 StorageRead::ExternalHeap { .. } => true,
             },
             StorageWrite::Deleted { .. } => false,
@@ -157,13 +158,13 @@ impl Entry {
         match self.write {
             StorageWrite::NotModified => None,
             StorageWrite::LocalHeap { ptr, .. } => Some(match self.read {
-                StorageRead::DoesNotExist => WriteClass::Creation(ptr),
+                StorageRead::DoesNotExist { .. } => WriteClass::Creation(ptr),
                 StorageRead::ExternalHeap { .. } => WriteClass::Modification(ptr),
             }),
             StorageWrite::Deleted { .. } => match self.read {
                 // Published and then removed in the same transaction: the
                 // on-chain slot never existed, so this is not a write.
-                StorageRead::DoesNotExist => None,
+                StorageRead::DoesNotExist { .. } => None,
                 StorageRead::ExternalHeap { .. } => Some(WriteClass::Deletion),
             },
         }
@@ -175,7 +176,7 @@ impl Entry {
     pub(crate) fn as_ptr(&self) -> Option<NonNull<u8>> {
         match self.write {
             StorageWrite::NotModified => match self.read {
-                StorageRead::DoesNotExist => None,
+                StorageRead::DoesNotExist { .. } => None,
                 StorageRead::ExternalHeap { ptr, .. } => Some(ptr),
             },
             StorageWrite::Deleted { .. } => None,
@@ -192,7 +193,7 @@ impl Entry {
     pub(crate) fn as_ptr_mut(&self, current_epoch: CheckpointCounter) -> Option<EntryPtr> {
         match self.write {
             StorageWrite::NotModified => match self.read {
-                StorageRead::DoesNotExist => None,
+                StorageRead::DoesNotExist { .. } => None,
                 StorageRead::ExternalHeap { ptr, .. } => Some(EntryPtr::NonWritable(ptr)),
             },
             StorageWrite::Deleted { .. } => None,
@@ -227,17 +228,14 @@ struct Checkpoint {
 pub struct ResourceReadWriteSet {
     /// Reads and writes to the global storage.
     ///
-    /// This is a hash map, so iteration order is non-deterministic. Every place
-    /// that iterates `entries` must not depend on that order:
-    ///   - read-set validation (Block-STM) only checks each entry, so order
-    ///     does not matter;
-    ///   - aggregation (such as gas) must use a commutative combine so the
-    ///     result is order-independent;
-    ///   - producing the final write set must sort the entries into a
-    ///     deterministic order before emitting them.
-    // TODO(correctness):
-    //   Make sure we have a deterministic iteration API and write-set
-    //   generation.
+    /// This is a hash map, so iteration order is non-deterministic. Both
+    /// iteration APIs, [`Self::reads_unordered`] and [`Self::writes_unordered`],
+    /// say so in their name, and every consumer either collects into an
+    /// order-independent container or sorts before emitting:
+    ///   - read-set validation (Block-STM) checks each entry independently;
+    ///   - the write set is collected into a `BTreeMap` keyed by state key
+    ///     before it becomes a `WriteSet`;
+    ///   - aggregation (such as gas) must use a commutative combine.
     //
     // Kept as a hash map: `InMemoryStorageKey` holds an `InternedType` (an
     // arena pointer, not `Ord`), so a `BTreeMap` is not an option, and the
@@ -245,6 +243,14 @@ pub struct ResourceReadWriteSet {
     // which only clones the key on a miss.
     #[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
     entries: HashMap<InMemoryStorageKey, Entry>,
+    /// The keys of the members of each resource group this transaction
+    /// touched, by the group's own key. Narrowed to the members it wrote when
+    /// the session ends.
+    //
+    // A hash map for the same reasons as `entries`. Each member is recorded
+    // once, when its entry is created.
+    #[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
+    groups: HashMap<InMemoryStorageKey, Vec<InMemoryStorageKey>>,
     /// Undo log of writes originating from older epochs. Used for rolling back
     /// to older checkpoints.
     journal: Vec<JournalEntry>,
@@ -266,7 +272,16 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<bool, RuntimeError> {
-        Ok(get_or_create_resource_entry(&mut self.entries, provider, key, group)?.exists())
+        Ok(
+            get_or_create_resource_entry(
+                &mut self.entries,
+                &mut self.groups,
+                provider,
+                key,
+                group,
+            )?
+            .exists(),
+        )
     }
 
     /// Returns the pointer to the resource, or `None` if it does not exist or
@@ -277,7 +292,16 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<Option<NonNull<u8>>, RuntimeError> {
-        Ok(get_or_create_resource_entry(&mut self.entries, provider, key, group)?.as_ptr())
+        Ok(
+            get_or_create_resource_entry(
+                &mut self.entries,
+                &mut self.groups,
+                provider,
+                key,
+                group,
+            )?
+            .as_ptr(),
+        )
     }
 
     /// Returns the pointer to the resource. Returns an error if the resource
@@ -288,7 +312,7 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<NonNull<u8>, RuntimeError> {
-        get_or_create_resource_entry(&mut self.entries, provider, key, group)?
+        get_or_create_resource_entry(&mut self.entries, &mut self.groups, provider, key, group)?
             .as_ptr()
             .ok_or_else(|| RuntimeError::ResourceDoesNotExist {
                 op: GlobalStorageOp::BorrowGlobal,
@@ -309,7 +333,7 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<EntryPtr, RuntimeError> {
-        get_or_create_resource_entry(&mut self.entries, provider, key, group)?
+        get_or_create_resource_entry(&mut self.entries, &mut self.groups, provider, key, group)?
             .as_ptr_mut(self.current_epoch)
             .ok_or_else(|| RuntimeError::ResourceDoesNotExist {
                 op: GlobalStorageOp::BorrowGlobalMut,
@@ -353,7 +377,13 @@ impl ResourceReadWriteSet {
         group: Option<InternedType>,
         ptr: NonNull<u8>,
     ) -> Result<(), RuntimeError> {
-        let entry = get_or_create_resource_entry(&mut self.entries, provider, key, group)?;
+        let entry = get_or_create_resource_entry(
+            &mut self.entries,
+            &mut self.groups,
+            provider,
+            key,
+            group,
+        )?;
         if entry.exists() {
             return Err(RuntimeError::ResourceAlreadyExists {
                 addr: key.address(),
@@ -380,7 +410,13 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<EntryPtr, RuntimeError> {
-        let entry = get_or_create_resource_entry(&mut self.entries, provider, key, group)?;
+        let entry = get_or_create_resource_entry(
+            &mut self.entries,
+            &mut self.groups,
+            provider,
+            key,
+            group,
+        )?;
         let ptr = entry.as_ptr_mut(self.current_epoch).ok_or_else(|| {
             RuntimeError::ResourceDoesNotExist {
                 op: GlobalStorageOp::MoveFrom,
@@ -447,7 +483,7 @@ impl ResourceReadWriteSet {
 
     /// Demotes to `NotModified` every local copy that still equals the value
     /// it was copied from, so a mutable borrow that changed nothing is not a
-    /// write.
+    /// write, then narrows each resource group to the members written.
     ///
     /// Terminal: it discards state the undo journal would need, so no rollback
     /// may follow.
@@ -476,7 +512,47 @@ impl ResourceReadWriteSet {
                 entry.write = StorageWrite::NotModified;
             }
         }
+        self.retain_written_group_members();
         Ok(())
+    }
+
+    /// Keeps, for each resource group, only the members this transaction
+    /// wrote, and drops the groups it wrote none of.
+    fn retain_written_group_members(&mut self) {
+        let entries = &self.entries;
+        self.groups.retain(|_, members| {
+            members.retain(|key| {
+                entries
+                    .get(key)
+                    .is_some_and(|entry| entry.write_class().is_some())
+            });
+            !members.is_empty()
+        });
+    }
+
+    /// Yields each resource group this transaction wrote, by the group's own
+    /// key, with the keys of the members it wrote. Exact once the session
+    /// ended; before that it also holds members that were only read. Callers
+    /// must not depend on the order.
+    pub fn written_groups_unordered(
+        &self,
+    ) -> impl Iterator<Item = (&InMemoryStorageKey, &[InMemoryStorageKey])> {
+        self.groups
+            .iter()
+            .map(|(group_key, members)| (group_key, members.as_slice()))
+    }
+
+    /// Yields every key the transaction read, with the version it observed and
+    /// the resource-group container it was read from ([`None`] for an own slot).
+    ///
+    /// Every entry carries a read: an entry is only created by fetching from the
+    /// provider, and neither rollback nor any later write ever clears one.
+    pub fn reads_unordered(
+        &self,
+    ) -> impl Iterator<Item = (&InMemoryStorageKey, Version, Option<InternedType>)> {
+        self.entries
+            .iter()
+            .map(|(key, entry)| (key, entry.read.version(), entry.group))
     }
 
     /// Save the current state and advance the epoch. A subsequent roll back
@@ -568,14 +644,34 @@ impl ResourceReadWriteSet {
 #[cfg_attr(dylint_lib = "aptos_lints", allow(no_std_hash_map))]
 fn get_or_create_resource_entry<'a>(
     entries: &'a mut HashMap<InMemoryStorageKey, Entry>,
+    groups: &mut HashMap<InMemoryStorageKey, Vec<InMemoryStorageKey>>,
     provider: &dyn ResourceProvider,
     key: &InMemoryStorageKey,
     group: Option<InternedType>,
 ) -> Result<&'a mut Entry, RuntimeError> {
     match entries.entry_ref(key) {
-        EntryRef::Occupied(entry) => Ok(entry.into_mut()),
+        EntryRef::Occupied(entry) => {
+            // The write set places a write by the group recorded on the entry,
+            // so a key that resolved to two different groups would silently
+            // write to the wrong slot.
+            if entry.get().group != group {
+                return Err(RuntimeError::InvariantViolation(
+                    RuntimeInvariantViolation::Unreachable(format!(
+                        "resource at {} was read both inside and outside a resource group",
+                        key.address()
+                    )),
+                ));
+            }
+            Ok(entry.into_mut())
+        },
         EntryRef::Vacant(entry) => {
             let read = provider.get_resource(key, group)?;
+            if let Some(group_ty) = group {
+                groups
+                    .entry(InMemoryStorageKey::resource_group(key.address(), group_ty))
+                    .or_default()
+                    .push(key.clone());
+            }
             Ok(entry.insert(Entry {
                 read,
                 write: StorageWrite::NotModified,
@@ -654,9 +750,13 @@ mod tests {
     fn ext_read(ptr: NonNull<u8>) -> StorageRead {
         StorageRead::ExternalHeap {
             ptr,
-            version: 0,
+            version: None,
             pin: Arc::new(TestPin),
         }
+    }
+
+    fn dne() -> StorageRead {
+        StorageRead::DoesNotExist { version: None }
     }
 
     /// Minimal in-crate provider: keys present here are external (committed)
@@ -686,7 +786,7 @@ mod tests {
         ) -> Result<StorageRead, ResourceProviderError> {
             Ok(match self.external.get(key) {
                 Some(&ptr) => ext_read(ptr),
-                None => StorageRead::DoesNotExist,
+                None => dne(),
             })
         }
     }
@@ -705,14 +805,10 @@ mod tests {
     fn exists_reflects_read_and_write_state() {
         let p = fake_ptr(0x10);
         // An unmodified entry follows its read.
-        assert!(!entry(StorageRead::DoesNotExist, StorageWrite::NotModified).exists());
+        assert!(!entry(dne(), StorageWrite::NotModified).exists());
         assert!(entry(ext_read(p), StorageWrite::NotModified).exists());
         // A local write means present, regardless of the read.
-        assert!(entry(StorageRead::DoesNotExist, StorageWrite::LocalHeap {
-            ptr: p,
-            epoch: 0
-        })
-        .exists());
+        assert!(entry(dne(), StorageWrite::LocalHeap { ptr: p, epoch: 0 }).exists());
         // Deletion shadows any read.
         assert!(!entry(ext_read(p), StorageWrite::Deleted { epoch: 0 }).exists());
     }
@@ -728,17 +824,14 @@ mod tests {
             Some(ext)
         );
         assert_eq!(
-            entry(StorageRead::DoesNotExist, StorageWrite::LocalHeap {
+            entry(dne(), StorageWrite::LocalHeap {
                 ptr: local,
                 epoch: 0
             })
             .as_ptr(),
             Some(local)
         );
-        assert_eq!(
-            entry(StorageRead::DoesNotExist, StorageWrite::NotModified).as_ptr(),
-            None
-        );
+        assert_eq!(entry(dne(), StorageWrite::NotModified).as_ptr(), None);
         assert_eq!(
             entry(ext_read(ext), StorageWrite::Deleted { epoch: 0 }).as_ptr(),
             None
@@ -757,7 +850,7 @@ mod tests {
         // A local write in the current epoch is writable in place.
         assert!(matches!(
             entry(
-                StorageRead::DoesNotExist,
+                dne(),
                 StorageWrite::LocalHeap { ptr: local, epoch: 5 }
             )
             .as_ptr_mut(5),
@@ -766,19 +859,17 @@ mod tests {
         // A local write from an older epoch needs a copy.
         assert!(matches!(
             entry(
-                StorageRead::DoesNotExist,
+                dne(),
                 StorageWrite::LocalHeap { ptr: local, epoch: 4 }
             )
             .as_ptr_mut(5),
             Some(EntryPtr::NonWritable(p)) if p == local
         ));
         // Deleted / absent have no pointer.
-        assert!(entry(StorageRead::DoesNotExist, StorageWrite::Deleted {
-            epoch: 0
-        })
-        .as_ptr_mut(0)
-        .is_none());
-        assert!(entry(StorageRead::DoesNotExist, StorageWrite::NotModified)
+        assert!(entry(dne(), StorageWrite::Deleted { epoch: 0 })
+            .as_ptr_mut(0)
+            .is_none());
+        assert!(entry(dne(), StorageWrite::NotModified)
             .as_ptr_mut(0)
             .is_none());
     }
@@ -879,6 +970,31 @@ mod tests {
             rws.try_borrow_global_mut(&provider, &k, None),
             Ok(EntryPtr::Writable(p)) if p == local
         ));
+    }
+
+    #[test]
+    fn groups_keep_only_written_members() {
+        // Any interned type stands in for the group's container type.
+        static GROUP_TY: Type = Type::U8;
+        let group = GlobalArenaPtr::from_static(&GROUP_TY);
+        let provider = Provider::empty();
+        let mut rws = ResourceReadWriteSet::new();
+        // At address 1, one member is only read and another is published.
+        rws.exists(&provider, &key_a(1), Some(group)).unwrap();
+        rws.move_to(&provider, &key_b(1), Some(group), fake_ptr(0x70))
+            .unwrap();
+        // At address 2, the group is only read.
+        rws.exists(&provider, &key_a(2), Some(group)).unwrap();
+
+        rws.retain_written_group_members();
+        let groups = rws
+            .written_groups_unordered()
+            .map(|(group_key, members)| (group_key.clone(), members.to_vec()))
+            .collect::<Vec<_>>();
+        assert_eq!(groups, vec![(
+            InMemoryStorageKey::resource_group(addr(1), group),
+            vec![key_b(1)]
+        )]);
     }
 
     #[test]
@@ -1110,11 +1226,11 @@ mod tests {
         let deleted = || StorageWrite::Deleted { epoch: 0 };
 
         // Untouched / read-only: no write.
-        assert!(class_of(StorageRead::DoesNotExist, StorageWrite::NotModified).is_none());
+        assert!(class_of(dne(), StorageWrite::NotModified).is_none());
         assert!(class_of(ext(), StorageWrite::NotModified).is_none());
         // Published this txn -> Creation.
         assert!(matches!(
-            class_of(StorageRead::DoesNotExist, local()),
+            class_of(dne(), local()),
             Some(WriteClass::Creation(_))
         ));
         // Pre-existing + local write -> Modification.
@@ -1128,7 +1244,7 @@ mod tests {
             Some(WriteClass::Deletion)
         ));
         // Published then removed within the txn: net no-op, not a write.
-        assert!(class_of(StorageRead::DoesNotExist, deleted()).is_none());
+        assert!(class_of(dne(), deleted()).is_none());
     }
 
     /// Borrows `key` mutably over a stored `before`, commits `copy` as the
@@ -1158,7 +1274,7 @@ mod tests {
         let mut rws = ResourceReadWriteSet::new();
         rws.entries.insert(
             key_a(1),
-            entry(StorageRead::DoesNotExist, StorageWrite::LocalHeap {
+            entry(dne(), StorageWrite::LocalHeap {
                 ptr: u64_ptr(&value),
                 epoch: 0,
             }),
@@ -1216,7 +1332,7 @@ mod tests {
             group: None,
         });
         rws.entries.insert(k_local.clone(), Entry {
-            read: StorageRead::DoesNotExist,
+            read: dne(),
             write: StorageWrite::LocalHeap {
                 ptr: local,
                 epoch: 0,
@@ -1229,7 +1345,7 @@ mod tests {
         // The external read is owned by the provider and must not be relocated.
         match rws.entries[&k_ext].read {
             StorageRead::ExternalHeap { ptr, .. } => assert_eq!(ptr, ext),
-            StorageRead::DoesNotExist => panic!("external read must survive the scan"),
+            StorageRead::DoesNotExist { .. } => panic!("external read must survive the scan"),
         }
         // The local write is relocated into to-space, payload preserved.
         match rws.entries[&k_local].write {

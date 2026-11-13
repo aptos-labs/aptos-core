@@ -93,10 +93,12 @@ fn internal_error_to_status(err: &VMInternalError) -> VMStatus {
 
 /// Converts a discard reason into the `VMStatus` the transaction is rejected
 /// with.
-pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
+pub(crate) fn discard_to_vm_status(reason: &DiscardReason) -> VMStatus {
     match reason {
         DiscardReason::InvalidSignature => VMStatus::error(StatusCode::INVALID_SIGNATURE, None),
-        DiscardReason::KeylessValidationFailure(err) => VMStatus::from(err),
+        DiscardReason::KeylessValidationFailure(err) => {
+            VMStatus::error(err.status_code(), Some(err.to_string()))
+        },
         DiscardReason::Unsupported(msg) => unsupported_status(msg),
         DiscardReason::Deprecated(what) => VMStatus::error(
             StatusCode::FEATURE_UNDER_GATING,
@@ -108,7 +110,7 @@ pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
         ),
         DiscardReason::PreExecutionCheck(failure) => pre_execution_check_status(failure),
         DiscardReason::InvalidTypeArgument(detail) => {
-            VMStatus::error(StatusCode::TYPE_RESOLUTION_FAILURE, Some(detail))
+            VMStatus::error(StatusCode::TYPE_RESOLUTION_FAILURE, Some(detail.clone()))
         },
         DiscardReason::Failure {
             stage: ExecutionStage::Prologue,
@@ -119,18 +121,18 @@ pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
         DiscardReason::Failure {
             stage: stage @ ExecutionStage::MeteredPrologue,
             failure,
-        } => failure_status(&stage, &failure),
+        } => failure_status(stage, failure),
         DiscardReason::Failure { stage, failure } => {
-            stage_failure_status(&stage, &format!("{failure:?}"))
+            stage_failure_status(stage, &format!("{failure:?}"))
         },
         DiscardReason::InvariantViolation(detail) => invariant_status(detail),
     }
 }
 
 /// Converts a violated pre-execution bound into the legacy validation status.
-fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
+fn pre_execution_check_status(failure: &PreExecutionCheckFailure) -> VMStatus {
     use PreExecutionCheckFailure as F;
-    let code = match &failure {
+    let code = match failure {
         F::TransactionTooLarge { .. } => StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
         F::GasBudgetAboveBound { .. } => StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
         F::GasBudgetBelowIntrinsicCost { .. } => {
@@ -227,7 +229,7 @@ fn failure_status(stage: &ExecutionStage, failure: &MoveExecutionFailure) -> VMS
 }
 
 /// An executor-internal invariant violation.
-fn invariant_status(detail: String) -> VMStatus {
+fn invariant_status(detail: &str) -> VMStatus {
     VMStatus::error(
         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
         Some(format!("[aptos_txn_executor] {detail}")),
@@ -249,13 +251,13 @@ fn unsupported_status(msg: &str) -> VMStatus {
 // TODO(completeness): V1 also recognizes aborts from the multisig account
 // module. They are not reachable here yet, so they land in the
 // unexpected-abort branch below.
-fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
+fn prologue_failure_to_status(failure: &MoveExecutionFailure) -> VMStatus {
     let (code, message, location) = match failure {
         MoveExecutionFailure::Abort {
             code,
             message,
             location,
-        } => (code, message, location),
+        } => (*code, message.clone(), location.clone()),
         MoveExecutionFailure::RuntimeError(err) => {
             return unexpected_validation_error("prologue", err.to_string())
         },
