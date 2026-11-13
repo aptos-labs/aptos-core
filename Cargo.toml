@@ -555,7 +555,7 @@ async-trait = "0.1.92"
 axum = "0.8.9"
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.77"
-base64 = "0.13.0"
+base64 = "0.23.1"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = { version = "0.2.1", features = ["derive"] }
 bigdecimal = { version = "0.4.0", features = ["serde"] }
@@ -666,7 +666,7 @@ get_if_addrs = "0.5.3"
 getrandom = "0.2.2"
 git2 = { version = "0.21.0", features = ["https", "ssh"] }
 glob = "0.3.0"
-goldenfile = "1.5.2"
+goldenfile = "1.11.0"
 google-cloud-storage = "0.13.0"
 group = "0.13"
 guppy = "0.19.1"
@@ -682,7 +682,7 @@ http = "0.2.9"
 http-body-util = "0.1.1"
 httpmock = "0.9.0"
 hyper = { version = "0.14.18", features = ["full"] }
-hyper-util = { version = "0.1.3", features = ["client-legacy"] }
+hyper-util = { version = "0.1.17", features = ["client-legacy"] }
 # The default `avif` feature is an AV1 encoder (rav1e). AVIF images are passed
 # through, never re-encoded.
 image = { version = "0.25.10", default-features = false, features = [
@@ -726,7 +726,7 @@ libc = "0.2.191"
 libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 libtest-mimic = "0.8.2"
-log = "0.4.17"
+log = "0.4.35"
 lru = "0.19.0"
 lz4 = "1.28.0"
 maplit = "1.0.2"
@@ -772,7 +772,7 @@ percent-encoding = "2.1.0"
 petgraph = "0.8.3"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
-poem = { version = "3.1.3", features = ["anyhow", "compression", "rustls"] }
+poem = { version = "3.1.7", features = ["anyhow", "compression", "rustls"] }
 poem-openapi = { version = "5.1.2", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "5.1.1"
 pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
@@ -830,9 +830,9 @@ rusty-fork = "0.3.0"
 scopeguard = "1.2.0"
 serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde-big-array = "0.5.1"
-serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }
-serde-name = "0.2.1"
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }
+serde-generate = { version = "0.34.1", default-features = false, features = ["golang", "rust"] }
+serde-name = "0.3.0"
+serde-reflection = "0.6.0"
 serde_bytes = "0.11.6"
 serde_json = { version = "1.0.81", features = [
     "preserve_order",
@@ -871,7 +871,7 @@ thiserror = "2.0.21"
 thousands = "0.2.0"
 thread_local = "1.1.10"
 threadpool = "1.8.1"
-tiny-bip39 = "0.8.2"
+tiny-bip39 = "2.0.0"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tokio = { version = "1.54.1", features = ["full"] }
 tokio-io-timeout = "1.2.0"
@@ -917,8 +917,8 @@ vm-comparison = { path = "third_party/move/mono-move/vm-comparison" }
 walkdir = "2.5.0"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
-wasm-bindgen = "0.2.100"
-wasm-bindgen-futures = "0.4.50"
+wasm-bindgen = "0.2.106"
+wasm-bindgen-futures = "0.4.56"
 whoami = "2.1.0"
 # This allows for zeroize 1.6 to be used. Version 1.2.0 of x25519-dalek locks zeroize to 1.3.
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e" }
@@ -1047,7 +1047,6 @@ opt-level = 3
 [patch.crates-io]
 # version 0.6 at commit 444eb13579c733089453806743b19f1ea2dce1c0 did not expose 'run_bench_with_bencher' as a public function, which we need
 dudect-bencher = { git = "https://github.com/aptos-labs/dudect-bencher", rev = "9515677c83c58884c1a8c764251753269d46fc0e" }
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-channel = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
