@@ -23,12 +23,7 @@ use move_binary_format::{
     },
 };
 use move_core_types::vm_status::StatusCode;
-use petgraph::{
-    algo::kosaraju_scc,
-    graph::{EdgeIndex, NodeIndex},
-    visit::EdgeRef,
-    Graph,
-};
+use petgraph::{algo::kosaraju_scc, graph::NodeIndex, visit::EdgeRef, Graph};
 use std::collections::{hash_map, HashMap, HashSet};
 
 /// Data attached to each node.
@@ -37,7 +32,7 @@ use std::collections::{hash_map, HashMap, HashSet};
 struct Node(FunctionDefinitionIndex, TypeParameterIndex);
 
 /// Data attached to each edge. Indicating the type of the edge.
-enum Edge<'a> {
+enum Edge {
     /// This type of edge from type formal T1 to T2 means the type bound to T1 is used to
     /// instantiate T2 unmodified, thus the name `Identity`.
     ///
@@ -58,15 +53,15 @@ enum Edge<'a> {
     /// //    struct Baz<T> {}
     /// //    foo<T>() { bar<Baz<T>>(); return; }
     /// //
-    /// //    edge: foo_T --TyConApp(Baz<T>)--> bar_T
+    /// //    edge: foo_T --TyConApp--> bar_T
     /// ```
-    TyConApp(&'a SignatureToken),
+    TyConApp,
 }
 
 pub struct InstantiationLoopChecker<'a> {
     module: &'a CompiledModule,
 
-    graph: Graph<Node, Edge<'a>>,
+    graph: Graph<Node, Edge>,
     node_map: HashMap<Node, NodeIndex>,
     func_handle_def_map: HashMap<FunctionHandleIndex, FunctionDefinitionIndex>,
 }
@@ -93,35 +88,10 @@ impl<'a> InstantiationLoopChecker<'a> {
     fn verify_module_impl(module: &'a CompiledModule) -> PartialVMResult<()> {
         let mut checker = Self::new(module);
         checker.build_graph();
-        let mut components = checker.find_non_trivial_components();
-
-        match components.pop() {
-            None => Ok(()),
-            Some((nodes, edges)) => {
-                let mut msg_edges = edges
-                    .into_iter()
-                    .filter_map(
-                        |edge_idx| match checker.graph.edge_weight(edge_idx).unwrap() {
-                            Edge::TyConApp(_) => Some(checker.format_edge(edge_idx)),
-                            _ => None,
-                        },
-                    )
-                    .collect::<Vec<_>>();
-                msg_edges.sort();
-                let msg_edges = msg_edges.join(", ");
-                let mut msg_nodes = nodes
-                    .into_iter()
-                    .map(|node_idx| checker.format_node(node_idx))
-                    .collect::<Vec<_>>();
-                msg_nodes.sort();
-                let msg_nodes = msg_nodes.join(", ");
-                let msg = format!(
-                    "edges with constructors: [{}], nodes: [{}]",
-                    msg_edges, msg_nodes
-                );
-                Err(PartialVMError::new(StatusCode::LOOP_IN_INSTANTIATION_GRAPH).with_message(msg))
-            },
+        if checker.has_type_growing_cycle() {
+            return Err(PartialVMError::new(StatusCode::LOOP_IN_INSTANTIATION_GRAPH));
         }
+        Ok(())
     }
 
     /// Retrieves the node corresponding to the specified type formal.
@@ -153,7 +123,7 @@ impl<'a> InstantiationLoopChecker<'a> {
 
     /// Helper function that creates an edge from one given node to the other.
     /// If a node does not exist, create one.
-    fn add_edge(&mut self, node_from: Node, node_to: Node, edge: Edge<'a>) {
+    fn add_edge(&mut self, node_from: Node, node_to: Node, edge: Edge) {
         let node_from_idx = self.get_or_add_node(node_from);
         let node_to_idx = self.get_or_add_node(node_to);
         self.graph.add_edge(node_from_idx, node_to_idx, edge);
@@ -182,7 +152,7 @@ impl<'a> InstantiationLoopChecker<'a> {
                         self.add_edge(
                             Node(caller_idx, type_param),
                             Node(callee_idx, formal_idx),
-                            Edge::TyConApp(ty),
+                            Edge::TyConApp,
                         );
                     }
                 },
@@ -335,56 +305,28 @@ impl<'a> InstantiationLoopChecker<'a> {
         }
     }
 
-    /// Computes the strongly connected components of the graph built and keep the ones that
-    /// contain at least one `TyConApp` edge. Such components indicate there exists a loop such
-    /// that an input type can get "bigger" infinitely many times along the loop, also creating
-    /// infinitely many types. This is precisely the kind of constructs we want to forbid.
-    fn find_non_trivial_components(&self) -> Vec<(Vec<NodeIndex>, Vec<EdgeIndex>)> {
-        kosaraju_scc(&self.graph)
-            .into_iter()
-            .filter_map(move |nodes| {
-                let node_set: HashSet<_> = nodes.iter().cloned().collect();
-
-                let edges: Vec<_> = nodes
-                    .iter()
-                    .flat_map(|node_idx| {
-                        self.graph.edges(*node_idx).filter_map(|edge| {
-                            if node_set.contains(&edge.target()) {
-                                Some(edge.id())
-                            } else {
-                                None
-                            }
-                        })
-                    })
-                    .collect();
-
-                if edges.iter().any(
-                    |edge_idx| match self.graph.edge_weight(*edge_idx).unwrap() {
-                        Edge::Identity => false,
-                        Edge::TyConApp(_) => true,
-                    },
-                ) {
-                    Some((nodes, edges))
-                } else {
-                    None
+    /// Returns whether some `TyConApp` edge connects two nodes of the same strongly connected
+    /// component, i.e., lies on a cycle. Along such a cycle an input type can get "bigger"
+    /// infinitely many times, also creating infinitely many types. This is precisely the kind of
+    /// constructs we want to forbid.
+    fn has_type_growing_cycle(&self) -> bool {
+        let mut component_of = vec![0; self.graph.node_count()];
+        // Uses `kosaraju_scc` because it is iterative: graph depth is bounded only by module size.
+        for (component, nodes) in kosaraju_scc(&self.graph).into_iter().enumerate() {
+            for node_idx in nodes {
+                if let Some(slot) = component_of.get_mut(node_idx.index()) {
+                    *slot = component;
                 }
-            })
-            .collect()
-    }
-
-    fn format_node(&self, node_idx: NodeIndex) -> String {
-        let Node(def_idx, param_idx) = self.graph.node_weight(node_idx).unwrap();
-        format!("f{}#{}", def_idx, param_idx)
-    }
-
-    fn format_edge(&self, edge_idx: EdgeIndex) -> String {
-        let (node_idx_1, node_idx_2) = self.graph.edge_endpoints(edge_idx).unwrap();
-        let node_1 = self.format_node(node_idx_1);
-        let node_2 = self.format_node(node_idx_2);
-
-        match self.graph.edge_weight(edge_idx).unwrap() {
-            Edge::TyConApp(ty) => format!("{} --{:?}--> {}", node_1, ty, node_2,),
-            Edge::Identity => format!("{} ----> {}", node_1, node_2),
+            }
         }
+        self.graph
+            .edge_references()
+            .any(|edge| match edge.weight() {
+                Edge::Identity => false,
+                Edge::TyConApp => {
+                    component_of.get(edge.source().index())
+                        == component_of.get(edge.target().index())
+                },
+            })
     }
 }
