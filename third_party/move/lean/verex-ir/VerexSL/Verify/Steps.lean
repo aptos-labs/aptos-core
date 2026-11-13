@@ -9,7 +9,7 @@ import VerexIR.Proofs.Denote.FunctionValueLemmas
 # The proof language
 
 `verify f by block` lowers the steps of its block to the tactics a script
-writes (`doc/plan/proof-language.md`, "Semantics and lowering"): the
+writes (`doc/designs/proof-language.md`, "Semantics and lowering"): the
 lowering is a translation, not a tactic of its own.
 -/
 
@@ -19,7 +19,7 @@ open Lean Elab Command
 open VerexIR.Validation (ValidatedUnit ValidatedNamespace)
 open VerexSL.Contract (findFunction?)
 
-/-- How a step's fact is proved (`doc/plan/proof-language.md`, "Closers"). -/
+/-- How a step's fact is proved (`doc/designs/proof-language.md`, "Closers"). -/
 declare_syntax_cat verexCloser (behavior := symbol)
 /-- The bounded deciders over the facts in scope; the default closer. -/
 syntax (name := closerDecide) &"decide" : verexCloser
@@ -45,13 +45,17 @@ syntax verexStepBlock := "{" ppIndent((ppLine verexProofStep)*) ppLine "}"
 /-- The block's steps under the fact's negation, until `decide` finds the
 contradiction. -/
 syntax (name := closerContradiction) &"contradiction" verexStepBlock : verexCloser
+/-- `assert (∃ x, φ) by witness e, …`: the assert's existential at the witnesses,
+each at its own type and coerced to the binder's; its body by `decide`. -/
+syntax (name := closerWitness) &"witness" verexExpr,+ : verexCloser
 
 /-- `on k, … when d, … { … }` proves the obligations it names, on the paths
 its selector takes. -/
 syntax (name := stepOn) &"on" verexKey,+ (&"when" verexDecision,+)? verexStepBlock :
   verexProofStep
-/-- `on _ { … }` proves every obligation no earlier `on` names. -/
-syntax (name := stepOnDefault) &"on" "_" verexStepBlock : verexProofStep
+/-- `on _ { … }` proves every obligation no earlier `on` names, `on _ when d,
+… { … }` those on the paths its selector takes. -/
+syntax (name := stepOnDefault) &"on" "_" (&"when" verexDecision,+)? verexStepBlock : verexProofStep
 /-- `at p { … }` places facts at a program point (`at entry`, `at exit`,
 `at loop k entry|step`): owed once there, inherited by every obligation
 after it. -/
@@ -64,6 +68,9 @@ syntax (name := stepLet) "let " ident " := " verexExpr : verexProofStep
 /-- `let V { f, … } := e` owes `e is V` and binds each listed field `f` of
 its payload for the following steps. -/
 syntax (name := stepLetVariant) "let " ident " { " ident,+ " }" " := " verexExpr : verexProofStep
+/-- `let x : T where φ` owes `exists x : T: φ`, proved by `decide`, and gives
+`φ` with `x` in scope for the following steps. -/
+syntax (name := stepLetWhere) "let " verexQuantifierBinder " where " verexExpr : verexProofStep
 /-- `assert e by c` owes `e`, proved by `c` (`decide` without `by`), and gives
 it to the following steps. -/
 syntax (name := stepAssert) &"assert" verexExpr (" by " verexCloser)? : verexProofStep
@@ -72,6 +79,11 @@ reported as unsupported until it has a lowering. -/
 syntax (name := stepAssume) &"assume" verexExpr : verexProofStep
 /-- `apply L(a), …` owes each premise by `decide` and gives the conclusions. -/
 syntax (name := stepApply) &"apply" verexExpr,+ : verexProofStep
+/-- Compute vector lengths and reads after updates, where established bounds
+identify the affected position. Leaves unresolved reads unchanged. -/
+syntax (name := stepCompute) &"compute" : verexProofStep
+/-- Close the remaining obligations with a core closer. -/
+syntax (name := stepFinish) &"finish" " by " verexCloser : verexProofStep
 /-- `split e` continues once per case of a Boolean or a variant value. -/
 syntax (name := stepSplit) &"split" verexExpr (&"in" verexExpr)? : verexProofStep
 /-- `calc(e₁ op e₂ op …)` asserts each step of the chain and gives its
@@ -172,7 +184,7 @@ structure LemmaParameter where
   binder : Name
   deriving Inhabited
 
-/-- A lemma of intrinsic maps (`doc/plan/proof-language.md`, "Lemmas"): its
+/-- A lemma of intrinsic maps (`doc/designs/proof-language.md`, "Lemmas"): its
 name from the owner's role functions, the `SpecMap` theorem it is, the roles
 it reads, and its parameters. Its statement is the theorem's, at an
 application's arguments (`lemmaInstance`); the `spec lemma` item a module's
@@ -240,6 +252,8 @@ def mapLemmas : Array MapLemma :=
       roles := #[.rank], parameters := #[map, key "a" `a, key "b" `b] },
     { name := fun r => lemmaName [r .keyAt, "lt"], theorem_ := ``VerexIR.SpecMap.keyAt_lt_of_lt
       roles := #[.keyAt], parameters := #[map, int "first" `first, int "second" `second] },
+    { name := fun _ => "lemma_valid_slice", theorem_ := ``VerexIR.SpecMap.valid_slice
+      roles := #[.keyAt, .len], parameters := #[map, int "offset" `offset] },
     { name := fun r => lemmaName [r .keyAt, r .set, "before"],
       theorem_ := ``VerexIR.SpecMap.keyAt_update_before
       roles := #[.keyAt, .set, .rank], parameters := #[map, key "k", value, int "i" `index] },
@@ -247,7 +261,7 @@ def mapLemmas : Array MapLemma :=
       theorem_ := ``VerexIR.SpecMap.keyAt_update_after
       roles := #[.keyAt, .set, .rank], parameters := #[map, key "k", value, int "i" `index] }]
 
-/-- A built-in lemma over integers and vectors (`doc/plan/proof-language.md`,
+/-- A built-in lemma over integers and vectors (`doc/designs/proof-language.md`,
 "Lemmas"): its name, its theorem, and its parameters. Its statement is the
 theorem's at an application's arguments (`lemmaInstance`). -/
 structure BuiltinLemma where
@@ -275,6 +289,7 @@ def builtinLemmas : Array BuiltinLemma :=
     entry "lemma_div_mul_le" `div_mul_le (ints ["x", "c"]),
     entry "lemma_div_add_mul" `div_add_mul (ints ["x", "b", "c"]),
     entry "lemma_mod_small" `mod_small (ints ["x", "c"]),
+    entry "lemma_div_mod" `div_mod (ints ["x", "c"]),
     entry "lemma_shl_mul" `shl_mul (ints ["x", "k"]),
     entry "lemma_shr_div" `shr_div (ints ["x", "k"]),
     entry "lemma_vector_len_remove" `vector_len_remove #[v, param "i" .int],
@@ -318,7 +333,7 @@ def builtinLemmaItem (lemma : BuiltinLemma) : String :=
 `SpecMap` theorem: those whose roles an owner binds. -/
 def namespaceMapLemmaNames (ns : ValidatedNamespace) : Array (String × Name) := Id.run do
   let nameOf (reference : VerexIR.QualifiedRef) : Option String :=
-    (ns.tables.names[reference.name.index]?).map (·.name)
+    (ns.nameOf reference.name).map (·.name)
   let mut found := #[]
   for intrinsic in ns.intrinsics do
     unless intrinsic.model == "map" do continue
@@ -340,7 +355,7 @@ def specRoles (unit : ValidatedUnit) : String := Id.run do
     for intrinsic in ns.intrinsics do
       unless intrinsic.model == "map" do continue
       for binding in intrinsic.specBindings do
-        let some name := (ns.tables.names[binding.target.name.index]?).map (·.name) | continue
+        let some name := (ns.nameOf binding.target.name).map (·.name) | continue
         if conflicting.contains binding.role then continue
         match bound.find? (·.1 == binding.role) with
         | none => bound := bound.push (binding.role, name)
@@ -358,7 +373,7 @@ def namespaceMapLemmas (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (printing : ValidatedNamespace := ns) (included : VerexIR.NameId → Bool := fun _ => true) :
     Except String (Array (String × Name × String)) := do
   let nameOf (reference : VerexIR.QualifiedRef) : Option String :=
-    (ns.tables.names[reference.name.index]?).map (·.name)
+    (ns.nameOf reference.name).map (·.name)
   let mut found := #[]
   for intrinsic in ns.intrinsics do
     unless intrinsic.model == "map" && included intrinsic.owner do continue
@@ -368,15 +383,15 @@ def namespaceMapLemmas (unit : ValidatedUnit) (ns : ValidatedNamespace)
     -- The map, key and value types, from the reading of a value.
     let some get := bound .get | continue
     let some getFunction := ns.specFunctions.find? fun declaration =>
-        (ns.tables.names[declaration.name.index]?.map (·.name)) == some get | continue
+        ((ns.nameOf declaration.name).map (·.name)) == some get | continue
     let generics := getFunction.signature.generics
     let typeText (id : VerexIR.TypeId) := Print.specificationTypeText unit printing generics id
     let some mapParameter := getFunction.signature.parameters[0]? | continue
     let some keyParameter := getFunction.signature.parameters[1]? | continue
     let some valueResult := getFunction.signature.results[0]? | continue
-    let mapType ← typeText mapParameter.typeUse.typeId
-    let keyType ← typeText keyParameter.typeUse.typeId
-    let valueType ← typeText valueResult.typeId
+    let mapType ← typeText (ns.typeId mapParameter.typeUse.typeId)
+    let keyType ← typeText (ns.typeId keyParameter.typeUse.typeId)
+    let valueType ← typeText (ns.typeId valueResult.typeId)
     let typeOf : LemmaParameterKind → String
       | .map => mapType | .key | .element => keyType | .value => valueType | .int => "Int"
       | .vector => s!"Vector<{keyType}>"
@@ -474,19 +489,64 @@ def quantifiedFormula? (formula : Syntax) : Option (Array (String × Syntax) × 
   guard (!typed.isEmpty)
   pure (typed, formula[formula.getNumArgs - 1])
 
+/-- The function `f` of `f.unfold(a)`, an `apply` of the unfolding of a
+recursive specification function. -/
+def unfoldedFunction? (application : Syntax) : Option Name := do
+  guard (application.isOfKind ``verexPrimitiveExpr ||
+    application.isOfKind ``verexDirectGenericCallExpr)
+  let path := application[0]
+  guard (path.isOfKind ``verexPathSyntax)
+  let last := match path[1].getArgs.back? with
+    | some segment => segment[1]
+    | none => path[0]
+  let .str function "unfold" := last.getId | none
+  guard (!function.isAnonymous)
+  pure function
+
+/-- `f.unfold(a)` as the application `f(a)` it unfolds, at the same range. -/
+private def unfoldedCall (application : Syntax) (function : Name) : Syntax :=
+  let path := application[0]
+  let rename (ident : Syntax) := match ident with
+    | .ident info raw _ preresolved => .ident info raw function preresolved
+    | other => other
+  let renamed := if path[1].getNumArgs > 0 then
+      let segments := path[1].getArgs
+      let last := segments.size - 1
+      path.setArg 1 (path[1].setArgs (segments.set! last (segments[last]!.setArg 1
+        (rename segments[last]![1]))))
+    else path.setArg 0 (rename path[0])
+  application.setArg 0 renamed
+
 /-- The expressions of an `apply` formula: its guards, Boolean, and the
-lemma application they guard. -/
+lemma application they guard, or the application an unfolding is of, lowered
+for its type. -/
 private def applyExpressions (lets : Array (Name × Syntax)) (binders : Array (String × Syntax))
     (formula : Syntax) : Array StepExpression :=
   let (introduced, formula) := (quantifiedFormula? formula).getD (#[], formula)
   let binders := binders ++ introduced
   let (guards, application) := formulaGuards formula
-  guards.map (fun guard => { expression := stepExpression lets guard, binders }) |>.push
-    { expression := stepExpression lets application, binders, apply := true }
+  guards.map (fun guard => { expression := stepExpression lets guard, binders }) |>.push <|
+    match unfoldedFunction? application with
+    | some function =>
+        { expression := stepExpression lets (unfoldedCall application function), binders,
+          type := none }
+    | none => { expression := stepExpression lets application, binders, apply := true }
 
 /-- The steps of a block or of a nested block. -/
 def blockSteps (block : Syntax) : Array Syntax :=
   if block.isOfKind ``verexProofBlock then block[0].getArgs else block[1].getArgs
+
+/-- Whether a block continues with clause-specific sub-blocks. -/
+private def hasNestedOn (block : Syntax) : Bool :=
+  (blockSteps block).any fun step => step.isOfKind ``stepOn || step.isOfKind ``stepOnDefault
+
+/-- Obligation blocks at every nesting depth, for lowering their expressions
+and recording the binders each child clause introduces. -/
+private partial def obligationBlocks (block : Syntax) : Array Syntax :=
+  (blockSteps block).flatMap fun step =>
+    if step.isOfKind ``stepOn || step.isOfKind ``stepOnDefault then
+      #[step] ++ obligationBlocks step[3]
+    else #[]
 
 /-- The relations of a `calc` chain, with their symbols. -/
 private def chainRelations : Array (SyntaxNodeKind × String) := #[
@@ -546,9 +606,15 @@ def variantField (value field : Syntax) : Syntax :=
   mkNode ``verexFieldExpr #[mkNode ``verexParenExpr #[atom "(", value, atom ")"], atom ".",
     mkNode ``verexNamedFieldIdentifier #[field]]
 
-/-- The binders of a `forall` step: their names and types. -/
+/-- The existential `let x : T where φ` owes, at `φ`'s position. -/
+private def letWhereExists (step : Syntax) : Syntax :=
+  let atom (text : String) := Syntax.atom (SourceInfo.fromRef step[3] (canonical := true)) text
+  mkNode ``verexQuantifierExpr
+    #[atom "∃", atom "(", step[1], mkNullNode, atom ")", atom ",", step[3]]
+
+/-- The binders of a `forall` or `let … where` step: their names and types. -/
 private def forallBinders (step : Syntax) : Array (String × Syntax) :=
-  step[1].getSepArgs.filterMap fun binder => do
+  (if step.isOfKind ``stepLetWhere then #[step[1]] else step[1].getSepArgs).filterMap fun binder => do
     guard (binder.isOfKind ``verexQuantifierTypeBinderSyntax)
     let pattern := binder[0]
     guard (pattern.isOfKind ``verexVariableBindingPattern)
@@ -556,24 +622,30 @@ private def forallBinders (step : Syntax) : Array (String × Syntax) :=
 
 /-- The expressions of a block's steps, in order: what `assert`, `calc`, a
 guard and a split of an expression state, and the witnesses of an
-`on` block's obligation, at the types `witnesses` gives that block. A split
-of a name splits the value in scope; it lowers nothing. -/
+`on` block's obligation, at the types `witnesses` gives that block, else at
+their own. A split of a name splits the value in scope; it lowers nothing. -/
 partial def blockExpressions (block : Syntax) (lets : Array (Name × Syntax) := #[])
     (binders : Array (String × Syntax) := #[]) (witnesses : Syntax → Array String := fun _ => #[])
     (types : Array String := #[]) (keyBinders : Syntax → Array (String × Syntax) := fun _ => #[]) :
     Array StepExpression := Id.run do
   let mut found := #[]
   let mut lets := lets
+  let mut binders := binders
   for step in blockSteps block do
     let expression (stx : Syntax) : StepExpression :=
       { expression := stepExpression lets stx, binders }
     if step.isOfKind ``stepOn then
       found := found ++ blockExpressions step[3] lets (binders ++ keyBinders step) witnesses
         (witnesses step)
-    else if step.isOfKind ``stepOnDefault || step.isOfKind ``stepAt || step.isOfKind ``stepAfter then
+    else if step.isOfKind ``stepOnDefault then
+      found := found ++ blockExpressions step[3] lets binders witnesses
+    else if step.isOfKind ``stepAt || step.isOfKind ``stepAfter then
       found := found ++ blockExpressions step[2] lets binders witnesses
     else if step.isOfKind ``stepLet then
       lets := lets.push (step[1].getId, stepExpression lets step[3])
+    else if step.isOfKind ``stepLetWhere then
+      found := found.push (expression (letWhereExists step))
+      binders := binders ++ forallBinders step
     else if step.isOfKind ``stepLetVariant then
       -- The value, untyped; the test it owes; each field, whose lowering
       -- checks that the variant has it.
@@ -589,6 +661,9 @@ partial def blockExpressions (block : Syntax) (lets : Array (Name × Syntax) := 
         found := found ++ step[2][1][1].getSepArgs.flatMap (applyExpressions lets binders)
       if step[2].getNumArgs == 2 && step[2][1].isOfKind ``closerContradiction then
         found := found ++ blockExpressions step[2][1][1] lets binders
+      if step[2].getNumArgs == 2 && step[2][1].isOfKind ``closerWitness then
+        found := found ++ step[2][1][1].getSepArgs.map fun witness =>
+          { expression witness with type := none }
     else if step.isOfKind ``stepApply then
       found := found ++ step[1].getSepArgs.flatMap (applyExpressions lets binders)
     else if step.isOfKind ``stepSplit then
@@ -602,7 +677,7 @@ partial def blockExpressions (block : Syntax) (lets : Array (Name × Syntax) := 
         if links.size > 1 then found := found.push (expression conclusion)
     else if step.isOfKind ``stepWitness then
       found := found ++ step[1].getSepArgs.zipIdx.map fun (witness, position) =>
-        { expression witness with type := some ((types[position]?).getD "Bool") }
+        { expression witness with type := types[position]? }
     else if step.isOfKind ``stepIf then
       found := found.push (expression step[1])
       found := found ++ blockExpressions step[2] lets binders
@@ -666,7 +741,7 @@ def calleeDeclaration? (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : Valid
       if let some handle := VerexIR.SemanticOperations.resolveFunction? unit ⟨namespaceIndex⟩ reference then
         if let some calleeNs := unit.namespaces[handle.namespaceId.index]? then
           if let some callee := calleeNs.functions[handle.functionId.index]? then
-            if (calleeNs.tables.names[callee.name.index]?).map (·.name) == some name then
+            if (calleeNs.nameOf callee.name).map (·.name) == some name then
               return some (calleeNs, callee)
     pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
   return none
@@ -683,16 +758,16 @@ def clauseOf? (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : ValidatedNames
   let index ← key.index
   if key.kind == "requires" then
     let (calleeNs, callee) ← calleeDeclaration? unit namespaceIndex ns declaration (← key.callee)
-    let (range, _) ← (preconditionNumbers unit callee).find? (·.2 == index)
+    let (range, _) ← (preconditionNumbers calleeNs callee).find? (·.2 == index)
     let condition ← callee.contract.conditions.find? fun condition =>
-      condition.kind == .requires && Contract.locRange unit condition.loc == range
+      condition.kind == .requires && Contract.locRange calleeNs condition.loc == range
     return (calleeNs, callee, condition.expression)
   let (range, _) ← (clauseNames unit ns declaration).find? (·.2 == s!"{key.kind}_{index}")
   let inBody := match declaration.body with
     | .structured root => (bodySpecifications ns root fun _ => true).flatMap (·.2.conditions)
     | _ => #[]
   let condition ← (declaration.contract.conditions ++ inBody).find? fun condition =>
-    Contract.locRange unit condition.loc == range
+    Contract.locRange ns condition.loc == range
   pure (ns, declaration, condition.expression)
 
 /-- Whether an expression reads a map: it or a subexpression has an intrinsic
@@ -706,7 +781,7 @@ def readsMapValue (unit : ValidatedUnit) (ns : ValidatedNamespace) (root : Verex
       if visited.contains id.index then continue
       visited := visited.insert id.index
       let some expression := ns.expressions[id.index]? | continue
-      if let some type := unit.tables.types[expression.typeId.index]? then
+      if let some type := ns.typeOf expression.typeId then
         if (Contract.mapModel? unit type).isSome then return true
       pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
     return false
@@ -757,7 +832,7 @@ partial def stateBinders (ns : ValidatedNamespace) (clause : VerexIR.ExprId) : A
   | some { kind := .quantifier .forall binders _ _ body, .. } =>
       let names := binders.filterMap fun binder => do
         let label ← binder.label
-        (ns.tables.names[label]?).map (·.name)
+        (ns.nameOf label).map (·.name)
       names ++ stateBinders ns body
   | some { kind := .operation (.primitive .implies) _ #[_, body] _, .. } => stateBinders ns body
   | _ => #[]
@@ -782,7 +857,7 @@ def dataInvariantBinderTypes (unit : ValidatedUnit) : CommandElabM (Array (Strin
           let text := if (stateBinders ns condition.expression).contains localDecl.name then
               some "StateDomain"
             else printing.bind fun printing => (printing.specificationTypeText unit
-              declaration.generics localDecl.type.typeId).toOption
+              declaration.generics (ns.typeId localDecl.type.typeId)).toOption
           let some text := text | continue
           let .ok type := Parser.runParserCategory (← getEnv) `verexType text | continue
           found := found.push (name, type)
@@ -793,7 +868,7 @@ leaf, the binders of the data invariants. -/
 def clauseNeeds (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (key : VerexIR.Proofs.Denote.ObligationKey) : ClauseNeeds :=
-  if key.kind == "data invariant" then
+  if key.kind == "data invariant" || key.kind == "stored invariant" then
     { reads := none, binders := dataInvariantBinders unit } else
   match clauseOf? unit namespaceIndex ns declaration key with
   | some (clauseNs, owner, clause) =>
@@ -827,7 +902,7 @@ where
       | return #[]
     let types ← binders.mapM fun binder => do
       let some pattern := ns.patterns[binder.pattern.index]? | throw "a binder has no pattern"
-      typeText pattern.typeId
+      typeText (ns.typeId pattern.typeId)
     return types ++ (← existentials body)
 
 /-- The type arguments of the `call`-th call of `callee` in a function's body,
@@ -849,11 +924,11 @@ def calleeTypeArguments? (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : Val
       if let some handle := VerexIR.SemanticOperations.resolveFunction? unit ⟨namespaceIndex⟩ reference then
         if let some calleeNs := unit.namespaces[handle.namespaceId.index]? then
           if let some decl := calleeNs.functions[handle.functionId.index]? then
-            if (calleeNs.tables.names[decl.name.index]?).map (·.name) == some callee then
-              let arguments := instantiations.filterMap fun
+            if (calleeNs.nameOf decl.name).map (·.name) == some callee then
+              let arguments := (ns.genericArguments instantiations).filterMap fun
                 | .typeArg typeUse => some typeUse.typeId
                 | _ => none
-              found := found.push ((Contract.locRange unit expression.loc).startByte, arguments)
+              found := found.push ((Contract.locRange ns expression.loc).startByte, arguments)
     pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
   let ordered := found.qsort (·.1 < ·.1)
   match call with
@@ -873,11 +948,23 @@ private def spliceAll (replacements : Array (Name × Syntax)) (stx : Syntax) : S
 private def splice (expression : Syntax) : Syntax → Syntax :=
   spliceAll #[(placeholder, expression)]
 
+/-- The heads of the scope items around a declaration of a scope, outermost
+first. -/
+private def scopeHeads (ns : ValidatedNamespace) (scope : Array String) : Array String :=
+  (Array.range scope.size).filterMap fun depth => do
+    let path := scope.take (depth + 1)
+    let declared ← ns.scopes.find? (·.path == path)
+    let name ← path.back?
+    pure s!"{Print.scopeKeywordText declared.kind} {Print.sourceIdentifier name}"
+
 /-- The item a step's expression lowers in, named `«f__step_k»`: a
 specification function whose body is the expression, or, for a lemma
-formula, a lemma whose proof applies it; its parameters are the scope. -/
+formula, a lemma whose proof applies it; its parameters are the scope. It
+stands in the scope items `heads`, where the function is declared, so that a
+path in the expression resolves as one in the function does. -/
 private def stepItem (function : String) (index : Nat) (binders : String)
-    (scope : Array (String × String)) (step : StepExpression) : CommandElabM Syntax := do
+    (scope : Array (String × String)) (step : StepExpression) (heads : Array String := #[]) :
+    CommandElabM Syntax := do
   let binders := if binders.isEmpty then "" else " " ++ binders
   let stepBinders := step.binders.map fun (name, type) =>
     (name, (type.reprint.getD "Int").trimAscii.toString)
@@ -889,6 +976,8 @@ private def stepItem (function : String) (index : Nat) (binders : String)
     else
       let result := (step.type.map (" : " ++ ·)).getD ""
       s!"spec fun «{function}__step_{index}»{binders}({declared}){result} := {placeholder}"
+  let text := heads.foldr (init := text) fun head text =>
+    s!"{head} where\n" ++ "\n".intercalate ((text.splitOn "\n").map ("  " ++ ·))
   match Parser.runParserCategory (← getEnv) `verexItem text with
   | .ok item => return splice step.expression (atRangeOf step.expression item)
   | .error message => throwErrorAt step.expression m!"the step's scope does not parse: {message}"
@@ -914,14 +1003,22 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
     -- The witnesses of an `on` block's obligation have the types of its
     -- existential's binders.
     let mut witnessed : Array (Nat × Array String) := #[]
-    for step in blockSteps block do
+    for step in obligationBlocks block do
       unless step.isOfKind ``stepOn do continue
       unless (blockSteps step[3]).any (·.isOfKind ``stepWitness) do continue
       let keys := step[1].getSepArgs
+      -- The clause of a data or stored invariant is the one the leaf
+      -- instantiates: a witness has its own type, coerced at the leaf. One
+      -- `witness` applies to every obligation its `on` names, each stating
+      -- the existential; `witness` reports one that does not.
+      let patterns ← keys.mapM VerexIR.Proofs.Denote.keyPattern
+      if patterns.all (fun key => key.kind == "data invariant" || key.kind == "stored invariant") then
+        continue
       -- A selector takes paths of the one clause: its existential is the
       -- same on each of them.
       unless keys.size == 1 do
-        throwErrorAt step "an `on` block with a `witness` names one obligation"
+        throwErrorAt step "an `on` block with a `witness` names one clause, or the sites of a \
+          data invariant's"
       let key ← VerexIR.Proofs.Denote.keyPattern keys[0]!
       let some (clauseNs, owner, clause) := clauseOf? unit namespaceIndex ns declaration key
         | throwErrorAt keys[0]! "a `witness` supplies a clause's existential; this key names no clause"
@@ -943,7 +1040,7 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
         | .error message => throwErrorAt keys[0]! message
       if let some position := step.getPos? then witnessed := witnessed.push (position.byteIdx, types)
     -- What each `on` step's obligations need (`OnNeeds`).
-    for step in blockSteps block do
+    for step in obligationBlocks block do
       let some position := step.getPos? | continue
       if step.isOfKind ``stepOn then
         let mut joined : ClauseNeeds := { reads := some false }
@@ -968,9 +1065,10 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
         for (_, callee, _, _) in (match declaration.body with
             | .structured root => callSites unit ns namespaceIndex root
             | _ => #[]) do
-          let some (_, calleeDeclaration) := calleeDeclaration? unit namespaceIndex ns declaration callee
+          let some (calleeNs, calleeDeclaration) :=
+              calleeDeclaration? unit namespaceIndex ns declaration callee
             | continue
-          for (_, index) in preconditionNumbers unit calleeDeclaration do
+          for (_, index) in preconditionNumbers calleeNs calleeDeclaration do
             let key : VerexIR.Proofs.Denote.ObligationKey :=
               { kind := "requires", index := some index, callee := some callee }
             table := table.push (key, clauseNeeds unit namespaceIndex ns declaration key)
@@ -984,14 +1082,16 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
     -- An `on data invariant` block reads the data invariants' binders.
     let invariantBinders ← dataInvariantBinderTypes unit
     let keyBinders (step : Syntax) : Array (String × Syntax) :=
-      if step[1].getSepArgs.any (·.isOfKind ``VerexIR.Proofs.Denote.keyDataInvariant) then
+      if step[1].getSepArgs.any fun key => key.isOfKind ``VerexIR.Proofs.Denote.keyDataInvariant ||
+          key.isOfKind ``VerexIR.Proofs.Denote.keyStoredInvariant then
         invariantBinders.filter fun (name, _) => !scope.any (·.1 == name)
       else #[]
     for step in blockExpressions block (witnesses := witnesses) (keyBinders := keyBinders) do
       let index := synthesized.size
       -- In the proof file's band: its positions are not the module's.
       synthesized := synthesized.push
-        (shifted proofBand (← stepItem function index binders scope step))
+        (shifted proofBand (← stepItem function index binders scope step
+          (scopeHeads ns (((ns.nameOf declaration.name).map (·.scope)).getD #[]))))
       pending := pending.push (step, s!"{function}__step_{index}", file)
       pendingItems := pendingItems.push index
   -- A lemma item is a `spec lemma` of the copy, its clauses at their places
@@ -1037,7 +1137,7 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
   -- arithmetic and vector lemmas; a name the module declares stays its own.
   let some own := unit.namespaces[0]? | return
   let declared := (own.lemmas.map (·.name) ++ own.specFunctions.map (·.name) ++
-    own.functions.map (·.name)).filterMap fun name => (unit.tables.names[name.index]?).map (·.name)
+    own.functions.map (·.name)).filterMap fun name => (own.nameOf name).map (·.name)
   let nominalOf? (type : VerexIR.TypeId) : Option VerexIR.NameId :=
     match unit.tables.types[type.index]? with
     | some (.nominal name _) => some name
@@ -1046,11 +1146,11 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
       | _ => none
     | _ => none
   let held (owner : VerexIR.NameId) : Bool :=
-    own.expressions.any fun expression => nominalOf? expression.typeId == some owner
+    own.expressions.any fun expression => nominalOf? (own.typeId expression.typeId) == some owner
   let mut moduleLemmas : Array (String × Name × String) := #[]
   for ns in unit.namespaces do
     let found ← match namespaceMapLemmas unit ns own
-        (if ns.identity == own.identity then fun _ => true else held) with
+        (if ns.unitIdentity == own.unitIdentity then fun _ => true else held ∘ ns.nameId) with
       | .ok found => pure found
       | .error message => throwErrorAt moduleCommand message
     for entry@(name, _, _) in found do
@@ -1130,77 +1230,116 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
     let at? := ((pending.find? fun (step, _, _) => holds step.expression range).map
       (·.1.expression)) <|> ((lemmaDeclarations.find? fun (_, item, _) => holds item range).map (·.2.1))
     logAt (at?.getD moduleCommand) message severity
-  let some (copy, _, _) := lowered | return
+  let some (copy, _, _, _) := lowered | return
   let some ns := copy.namespaces[0]? | return
-  let nameOf (name : VerexIR.NameId) := (copy.tables.names[name.index]?).map (·.name)
-  let mut recorded := #[]
-  -- What each lemma item's steps apply: its recursion group.
-  let lemmaReference (name : String) : Option VerexIR.QualifiedRef :=
-    (ns.lemmas.find? (nameOf ·.name == some name)).map fun lemma => { namespaceId := ⟨0⟩, name := lemma.name }
-  let mut stepApplications : StepApplications := #[]
-  for ((step : StepExpression), (name : String), (file : String)) in lowerable do
-    let some key := stepKey file step.expression | continue
-    if step.apply then
-      let some lemma := ns.lemmas.find? (nameOf ·.name == some name) | continue
-      let some condition := lemma.proof[0]? | continue
-      -- The lemma it applies: a map lemma is proved where it is applied.
-      let applied : Option VerexIR.QualifiedRef :=
-        (ns.expressions[condition.expression.index]?).bind fun expression =>
-          match expression.kind with
-          | .operation (.specification (.lemma reference _)) .. => some reference
-          | _ => none
-      let builtin := applied.bind fun reference => do
-        let appliedName ← nameOf reference.name
-        (moduleLemmas.find? (·.1 == appliedName)).map (·.2.1)
-      -- A lemma of the module is applied by its definitions, which its own
-      -- verification declared; a built-in lemma is expanded where it is
-      -- applied.
-      if let (some reference, none) := (applied, builtin) then
-        try discard <| liftTermElabM (Contract.ensureLemmaDefinitions copy reference)
-        catch error =>
-          logErrorAt step.expression m!"the lemma's statement does not translate: \
-            {error.toMessageData}"
-          continue
-        -- A step of a lemma item applying a lemma.
-        if let some (owner, _, _) := lemmaDeclarations.find? fun (owner, _, _) =>
-            name.startsWith s!"{owner}__step_" then
-          if let some ownerReference := lemmaReference owner then
-            stepApplications := match stepApplications.findIdx? (·.1 == ownerReference) with
-              | some position => stepApplications.modify position fun (o, applied) =>
-                  (o, if applied.contains reference then applied else applied.push reference)
-              | none => stepApplications.push (ownerReference, #[reference])
-      recorded := recorded.push (key,
-        { unit := copy, expression := condition.expression, locals := lemma.locals, builtin })
-    else
-      let some function := ns.specFunctions.find? (nameOf ·.name == some name) | continue
-      let some body := function.body | continue
-      recorded := recorded.push (key, { unit := copy, expression := body, locals := function.locals })
-  modifyEnv (loweredStepsExtension.modifyState · (· ++ recorded))
-  -- The lemma items, proved by their blocks, before the `verify` items that
-  -- apply them.
-  let roots := lemmaDeclarations.filterMap fun (name, _, _) => lemmaReference name
-  let blocks := lemmaDeclarations.filterMap fun (name, item, _) =>
-    (lemmaReference name).map (·, item[10])
-  verifyLemmas copy #[] roots (lemmaDeclarations.map fun (name, item, _) => (name, item[1]))
-    moduleCommand blocks stepApplications
+  let nameOf (name : VerexIR.NameId) := (ns.nameOf name).map (·.name)
+  -- The augmented copy owns proof-only expressions and lemmas, but its
+  -- native types belong to the registered source unit. It is not a new
+  -- registered namespace and must not be quoted as one.
+  let some original := unit.namespaces[0]? | return
+  let some path := unit.tables.namespaces[original.unitIdentity.index]? | return
+  let segments := path.segments
+  let unitName ← Contract.ensureUnitDefinition segments unit
+  VerexIR.Proofs.Denote.withNominalUnitCommand unitName do
+    let mut recorded := #[]
+    -- What each lemma item's steps apply: its recursion group.
+    let lemmaReference (name : String) : Option VerexIR.QualifiedRef :=
+      (ns.lemmas.find? (nameOf ·.name == some name)).map fun lemma =>
+        { namespaceId := ns.unitIdentity, name := ns.nameId lemma.name }
+    let mut stepApplications : StepApplications := #[]
+    for ((step : StepExpression), (name : String), (file : String)) in lowerable do
+      let some key := stepKey file step.expression | continue
+      if step.apply then
+        let some lemma := ns.lemmas.find? (nameOf ·.name == some name) | continue
+        let some condition := lemma.proof[0]? | continue
+        -- The lemma it applies: a map lemma is proved where it is applied.
+        let applied : Option VerexIR.QualifiedRef :=
+          (ns.expressions[condition.expression.index]?).bind fun expression =>
+            match expression.kind with
+            | .operation (.specification (.lemma reference _)) .. => some reference
+            | _ => none
+        let builtin := applied.bind fun reference => do
+          let appliedName ← nameOf reference.name
+          (moduleLemmas.find? (·.1 == appliedName)).map (·.2.1)
+        -- A lemma of the module is applied by its definitions, which its own
+        -- verification declared; a built-in lemma is expanded where it is
+        -- applied.
+        if let (some reference, none) := (applied, builtin) then
+          try discard <| liftTermElabM (Contract.ensureLemmaDefinitions copy reference)
+          catch error =>
+            logErrorAt step.expression m!"the lemma's statement does not translate: \
+              {error.toMessageData}"
+            continue
+          -- A step of a lemma item applying a lemma.
+          if let some (owner, _, _) := lemmaDeclarations.find? fun (owner, _, _) =>
+              name.startsWith s!"{owner}__step_" then
+            if let some ownerReference := lemmaReference owner then
+              stepApplications := match stepApplications.findIdx? (·.1 == ownerReference) with
+                | some position => stepApplications.modify position fun (o, applied) =>
+                    (o, if applied.contains reference then applied else applied.push reference)
+                | none => stepApplications.push (ownerReference, #[reference])
+        recorded := recorded.push (key,
+          { unit := copy, expression := condition.expression, locals := lemma.locals, builtin })
+      else
+        let some function := ns.specFunctions.find? (nameOf ·.name == some name) | continue
+        let some body := function.body | continue
+        recorded := recorded.push (key, { unit := copy, expression := body, locals := function.locals })
+    modifyEnv (loweredStepsExtension.modifyState · (· ++ recorded))
+    -- The lemma items, proved by their blocks, before the `verify` items that
+    -- apply them.
+    let roots := lemmaDeclarations.filterMap fun (name, _, _) => lemmaReference name
+    let blocks := lemmaDeclarations.filterMap fun (name, item, _) =>
+      (lemmaReference name).map (·, item[10])
+    verifyLemmas copy segments roots (lemmaDeclarations.map fun (name, item, _) => (name, item[1]))
+      moduleCommand blocks stepApplications
 
 /-! ## Steps at a leaf -/
 
 open Meta Tactic VerexIR.Proofs.Denote
 
+
+/-- The family a local's type or a hypothesis names: a certified value's
+(`NTy.carrier`), a plain value's, which names the family through its lent
+layer (`NTy.plainOf Carriers.toPlain`), or the data invariants of a plain
+value (`NTy.deepHolds`).  A leaf whose certified values the preparation
+opened holds the plain row and its invariants in place of the certified
+value, and the family is the same one
+(`doc/designs/data-invariants.md`). -/
+private def declCarriers? (type : Lean.Expr) : Option Lean.Expr :=
+  if type.isAppOfArity ``NTy.carrier 2 || type.isAppOfArity ``NTy.deepHolds 3 then
+    some (type.getArg! 0).consumeMData
+  else if type.isAppOfArity ``NTy.plainOf 2 then
+    let plain := (type.getArg! 0).consumeMData
+    if plain.isAppOfArity ``Carriers.toPlain 1 then some (plain.getArg! 0).consumeMData else none
+  else none
+
 /-- The carriers the leaf's native values are at: those of a local of a
-native type, else the target's family's, where the leaf holds its values
-typed only. -/
+native type or of its plain layer (`declCarriers?`), else the target's
+family's, where the leaf holds its values typed only, else the runtime
+frame's, where the only native values are read from the store
+(`Carriers.runtime`) by a function with no parameters or where none is left
+(a parameter read as its typed map, its results substituted). -/
 private def leafCarriers? : MetaM (Option Lean.Expr) := do
   let mut family := none
+  let mut runtime := none
   for decl in ← getLCtx do
     if decl.isImplementationDetail then continue
     let type ← instantiateMVars decl.type
-    if type.isAppOfArity ``NTy.carrier 2 then return some (type.getArg! 0)
+    if let some carriers := declCarriers? type then
+      if (Contract.carriersFrame? carriers).isSome ||
+          carriers.isAppOfArity ``GivenFrame.toCarriers 1 then
+        return some carriers
+      if runtime.isNone && carriers.isAppOfArity ``Carriers.runtime 2 then
+        let unit := carriers.getArg! 0
+        let functions := carriers.getArg! 1
+        runtime := some (mkApp3 (mkConst ``Skolems.toCarriers) unit functions
+          (← Contract.runtimeFrameOf unit functions))
     if family.isNone && type.isAppOfArity ``Skolems 2 then
       family := some (mkApp3 (mkConst ``Skolems.toCarriers) (type.getArg! 0) (type.getArg! 1)
         decl.toExpr)
-  return family
+    if runtime.isNone && type.isAppOf ``VerexIR.Validation.ExecutableUnit then
+      runtime := some (← Contract.frameCarriers (← Contract.executableRuntime decl.toExpr))
+  return family <|> runtime
 
 /-- The last local of a name that is no hypothesis: where a leaf holds the
 name's value. -/
@@ -1300,6 +1439,25 @@ private def scopeEntries : MetaM (Array (String × Lean.Expr)) := do
     if bindings.any (·.1 == oldName) then none else some (oldName, value)
   return latest ++ entryValues
 
+/-- The given interpretation a leaf of a generic body is at
+(`withGivenInterpretation`): its carriers a given frame's, with the unit and
+state its interpreter operations name and the unit's function values. -/
+private def givenInterpretation? (carriers : Lean.Expr) :
+    MetaM (Option Contract.TranslationFrame) := do
+  unless carriers.isAppOfArity ``GivenFrame.toCarriers 1 do return none
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail then continue
+    let type ← instantiateMVars decl.type
+    unless type.isAppOfArity ``InterpreterOps 3 && (type.getArg! 1).consumeMData == carriers do
+      continue
+    let unit := type.getArg! 0
+    let state := type.getArg! 2
+    for functions in ← getLCtx do
+      if (← instantiateMVars functions.type) == mkApp (mkConst ``FunctionCarriers) unit then
+        return some (Contract.TranslationFrame.ofGiven unit functions.toExpr
+          (carriers.getArg! 0) state)
+  return none
+
 /-- The translation context of a step's module at a goal's frame, no name
 bound. -/
 def stepBaseContext (step : LoweredStep) (reference : Syntax) : MetaM Contract.Context := do
@@ -1307,6 +1465,13 @@ def stepBaseContext (step : LoweredStep) (reference : Syntax) : MetaM Contract.C
   -- A lemma over integers alone holds no native value: its steps read none.
   let some carriers ← leafCarriers?
     | return { unit := step.unit, namespaceId := ⟨0⟩, ns, locals := #[], results := #[] }
+  if carriers.isAppOfArity ``GivenFrame.toCarriers 1 then
+    -- A given leaf without its interpreter operations reads no native value.
+    let some interpretation ← givenInterpretation? carriers
+      | return { unit := step.unit, namespaceId := ⟨0⟩, ns, locals := #[], results := #[] }
+    return {
+      unit := step.unit, namespaceId := ⟨0⟩, ns, locals := #[], results := #[],
+      interpretation := some interpretation, types := some interpretation.types }
   let some (_, _, frame) := Contract.carriersFrame? carriers
     | throwErrorAt reference "the obligation's carriers have no frame"
   let executable ← (← getLCtx).foldlM (init := none) fun found decl => do
@@ -1327,13 +1492,13 @@ def stepContext (step : LoweredStep) (reference : Syntax) : MetaM Contract.Conte
     if entries.any (·.1 == localDecl.name) then continue
     let some carriers ← leafCarriers? | continue
     if (← partsValue (some step.unit) carriers localDecl.name
-        (← base.nativeType localDecl.type.typeId)).isNone then
+        (← base.nativeType (base.ns.typeId localDecl.type.typeId))).isNone then
       throwErrorAt reference m!"`{localDecl.name}` is not in scope at this obligation; in scope: \
         {", ".intercalate ((entries.map (·.1)).filter (!·.contains '$')).toList}"
   let mut locals := #[]
   let mut localTypes := #[]
   for localDecl in step.locals do
-    let some type := base.valueTypeOf? localDecl.type.typeId
+    let some type := base.valueTypeOf? (base.ns.typeId localDecl.type.typeId)
       | throwErrorAt reference m!"the type of `{localDecl.name}` is unknown"
     localTypes := localTypes.push type
     -- An entry holds a leaf's native value, or a binder's value of its
@@ -1343,7 +1508,7 @@ def stepContext (step : LoweredStep) (reference : Syntax) : MetaM Contract.Conte
       | some (_, value) => pure (some (pairProjections value))
       | none => do
           let some carriers ← leafCarriers? | pure none
-          partsValue (some step.unit) carriers localDecl.name (← base.nativeType localDecl.type.typeId)
+          partsValue (some step.unit) carriers localDecl.name (← base.nativeType (base.ns.typeId localDecl.type.typeId))
     let value? ← native?.mapM fun value => do
       if ← isDefEq (← inferType value) (mkConst ``Int) then pure value
       else (Contract.domainOf type).binderOfNative value
@@ -1354,13 +1519,14 @@ def stepContext (step : LoweredStep) (reference : Syntax) : MetaM Contract.Conte
   let oldState := (entries.find? (·.1 == "old_" ++ stateScopeName)).map (·.2) <|> state
   -- A name in scope holding a memory, a data invariant's binder over the
   -- state domain, is the state label of its name (`S |~ e`).
-  let mut stateLabels : List (Nat × Contract.LabelState) := []
+  let mut stateLabels : List (VerexIR.NameId × Contract.LabelState) := []
   for localDecl in step.locals, value? in locals do
     let some value := value? | continue
     unless (← whnfR (← inferType value)).isAppOf ``VerexIR.Proofs.Denote.Memory do continue
-    let some label := step.unit.tables.names.findIdx? (·.name == localDecl.name) | continue
+    -- A label is a name of the step's namespace, as its body spells it.
+    let some label := base.ns.localTables.names.findIdx? (·.name == localDecl.name) | continue
     let labelState : Contract.LabelState := { memory := value, locals }
-    stateLabels := (label, labelState) :: stateLabels
+    stateLabels := (⟨label⟩, labelState) :: stateLabels
   return { base with
     locals, localTypes, oldLocals := locals, localNames := step.locals.map (·.name),
     state, oldState, stateLabels }
@@ -1423,6 +1589,138 @@ elab "verex_negation_conflict" : tactic => focusGoal do
         return
     throwError "no hypothesis contradicts another"
 
+/-- Project an equality of certified integers only when the arithmetic goal
+reads one of their values. Connected equalities supply the other values as
+well; the original carrier equations remain available for substitution. -/
+private def scalarProjectionFacts (goal : MVarId) : MetaM MVarId := do
+  let facts ← goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
+    unless (target.find? (·.isAppOfArity ``VerexIR.SpecInt.val 3)).isSome do return #[]
+    let mut wanted : Array Lean.Expr := #[]
+    let mut used : Array FVarId := #[]
+    let mut facts : Array (Lean.Expr × Lean.Expr) := #[]
+    let mut progress := true
+    while progress do
+      progress := false
+      for decl in ← getLCtx do
+        if decl.isImplementationDetail || used.contains decl.fvarId then continue
+        let some (type, lhs, rhs) := (← instantiateMVars decl.type).eq? | continue
+        let demanded (side : Lean.Expr) := wanted.contains side ||
+          (target.find? fun part => part.isAppOfArity ``VerexIR.SpecInt.val 3 &&
+            part.appArg! == side).isSome
+        unless demanded lhs || demanded rhs do continue
+        unless (← whnfR type).isAppOfArity ``VerexIR.SpecInt 2 do continue
+        let proof ← withDefault do
+          let reading ← mkAppM ``VerexIR.SpecInt.eq_iff_val #[lhs, rhs]
+          mkAppM ``Iff.mp #[reading, decl.toExpr]
+        facts := facts.push (← inferType proof, proof)
+        wanted := wanted.push lhs |>.push rhs
+        used := used.push decl.fvarId
+        progress := true
+    pure facts
+  if facts.isEmpty then return goal
+  let (_, next) ← goal.assertHypotheses (facts.mapIdx fun index (statement, proof) =>
+    { userName := Name.mkSimple s!"scalar_projection_{index}", type := statement, value := proof })
+  return next
+
+/-- Evaluate zero products and quotients across named scalar equations. The
+bindings stay in the context: only their zero values are passed to arithmetic. -/
+private def scalarZeroFacts (goal : MVarId) : MetaM MVarId := goal.withContext do
+  let zero := mkIntLit 0
+  let mut known : Std.HashMap Lean.Expr Lean.Expr := {}
+  let mut equations : Array (Lean.Expr × Lean.Expr × Lean.Expr) := #[]
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail then continue
+    let some (type, lhs, rhs) := (← instantiateMVars decl.type).eq? | continue
+    unless type.isConstOf ``Int do continue
+    if rhs == zero then known := known.insert lhs decl.toExpr
+    else equations := equations.push (lhs, rhs, decl.toExpr)
+  let zeroValue (value : Lean.Expr) (known : Std.HashMap Lean.Expr Lean.Expr) :
+      MetaM (Option Lean.Expr) := do
+    let operand (part : Lean.Expr) : MetaM (Option Lean.Expr) := do
+      if part == zero then return some (← mkEqRefl zero)
+      return known[part]?
+    if let some proof ← operand value then return some proof
+    if value.isAppOfArity ``HMul.hMul 6 &&
+        (#[0, 1, 2].all fun index => (value.getArg! index).isConstOf ``Int) then
+      unless ← withDefault <| isDefEq value
+          (mkApp2 (mkConst ``Int.mul) (value.getArg! 4) (value.getArg! 5)) do return none
+      for index in [4, 5] do
+        let some proof ← operand (value.getArg! index) | continue
+        let operation ← withLocalDeclD `factor (mkConst ``Int) fun factor =>
+          mkLambdaFVars #[factor] (mkAppN value.getAppFn (value.getAppArgs.set! index factor))
+        let rewritten ← mkAppM ``congrArg #[operation, proof]
+        let reduced ← if index == 4 then mkAppM ``Int.zero_mul #[value.getArg! 5]
+          else mkAppM ``Int.mul_zero #[value.getArg! 4]
+        return some (← mkEqTrans rewritten reduced)
+    if value.isAppOfArity ``HDiv.hDiv 6 &&
+        (#[0, 1, 2].all fun index => (value.getArg! index).isConstOf ``Int) then
+      unless ← withDefault <| isDefEq value
+          (mkApp2 (mkConst ``Int.ediv) (value.getArg! 4) (value.getArg! 5)) do return none
+      let some proof ← operand (value.getArg! 4) | return none
+      let operation ← withLocalDeclD `numerator (mkConst ``Int) fun numerator =>
+        mkLambdaFVars #[numerator] (mkAppN value.getAppFn (value.getAppArgs.set! 4 numerator))
+      let rewritten ← mkAppM ``congrArg #[operation, proof]
+      return some (← mkEqTrans rewritten (← mkAppM ``Int.zero_ediv #[value.getArg! 5]))
+    return none
+  let mut facts : Array (Lean.Expr × Lean.Expr) := #[]
+  for _ in [:equations.size] do
+    let mut progress := false
+    for (lhs, rhs, equation) in equations do
+      if known.contains lhs then continue
+      let some proof ← zeroValue rhs known | continue
+      let proof ← mkEqTrans equation proof
+      known := known.insert lhs proof
+      facts := facts.push (← inferType proof, proof)
+      progress := true
+    unless progress do break
+  if facts.isEmpty then return goal
+  let (_, next) ← goal.assertHypotheses (facts.mapIdx fun index (statement, proof) =>
+    { userName := Name.mkSimple s!"scalar_zero_{index}", type := statement, value := proof })
+  return next
+
+/-- Read truncating divisions under the arithmetic decision's current facts.
+A later sign fact can make an earlier quotient Euclidean, so the participating
+hypotheses and target must be read together before linear arithmetic. -/
+private def scalarDivisionNormalForm (goal : MVarId) : TacticM (Option MVarId) := do
+  let hasDivision (expression : Lean.Expr) : Bool :=
+    (expression.find? fun part => part.isAppOfArity ``Int.tdiv 2 ||
+      part.isAppOfArity ``Int.tmod 2).isSome
+  let (facts, target) ← goal.withContext do
+    let facts ← (← goal.getNondepPropHyps).filterM fun fact => do
+      return hasDivision (← instantiateMVars (← fact.getType))
+    return (facts, hasDivision (← instantiateMVars (← goal.getType)))
+  if facts.isEmpty && !target then return some goal
+  let { ctx, simprocs, .. } ← mkSimpContext
+    (← `(tactic| simp only [tdivOfNonnegative, tmodOfNonnegative, Int.reduceLE]))
+    (eraseLocal := false)
+  let ctx ← Simp.mkContext { ctx.config with failIfUnchanged := false }
+    ctx.simpTheorems ctx.congrTheorems
+  let context ← goalDischarge goal
+  let discharge : Simp.Discharge := fun condition => do
+    if let some proof ← Simp.dischargeDefault? condition then return some proof
+    context condition
+  let (result, _) ← simpGoal goal ctx simprocs
+    (discharge? := some discharge)
+    (simplifyTarget := target) (fvarIdsToSimp := facts)
+  return result.map (·.2)
+
+/-- `omega` over a goal's context without the hypotheses holding an existential
+below their top, a fact under `if` or a disjunct: `omega` would open it in one
+case split and read its witness as an atom of the others. -/
+elab "verex_block_omega" : tactic => focusGoal do
+  let goal ← getMainGoal
+  let held ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      let type := (← instantiateMVars decl.type).consumeMData
+      if type.isAppOf ``Exists || type.isAppOf ``And then return found
+      return if (type.find? (·.isAppOf ``Exists)).isSome then found.push decl.fvarId else found
+  let goal ← scalarZeroFacts (← scalarProjectionFacts (← goal.tryClearMany held))
+  let some goal ← scalarDivisionNormalForm goal | replaceMainGoal []; return
+  replaceMainGoal [goal]
+  evalTactic (← `(tactic| omega))
+
 /-- `decide` at a step or an obligation of a block, on its normal form: the
 goal is a hypothesis or reflexive by its spelling, contradicts the context
 (a proposition and its negation, a Boolean both true and false), is an
@@ -1447,7 +1745,83 @@ private def positionalMembership? (e : Lean.Expr) : MetaM (Option (Lean.Expr × 
   let some (_, positional) := (← inferType reading).iff? | return none
   return if ← withReducible (isDefEq positional e) then some (xs, t) else none
 
-/-- Close a goal its context states, by spelling (`doc/plan/proof-language.md`,
+private theorem lt_of_le_literal {a b c : Int} (stated : a ≤ b) (literal : b + 1 = c) : a < c := by
+  omega
+
+private theorem le_of_lt_literal {a b c : Int} (stated : a < b) (literal : c + 1 = b) : a ≤ c := by
+  omega
+
+private theorem literal_lt_of_le {a b c : Int} (stated : b ≤ a) (literal : c + 1 = b) : c < a := by
+  omega
+
+private theorem literal_le_of_lt {a b c : Int} (stated : b < a) (literal : b + 1 = c) : c ≤ a := by
+  omega
+
+/-- An integer comparison with a literal bound in its other form (`a < k` as
+`a ≤ k − 1`, `a ≤ k` as `a < k + 1`, `k < a` as `k + 1 ≤ a`, `k ≤ a` as `k − 1 < a`),
+and the comparison's proof from a proof of that form. -/
+private def literalBoundForm? (target : Lean.Expr) :
+    MetaM (Option (Lean.Expr × (Lean.Expr → MetaM Lean.Expr))) := do
+  let literal (lower upper : Int) : MetaM Lean.Expr := do
+    mkDecideProof (← mkEq (← mkAppM ``HAdd.hAdd #[toExpr lower, toExpr (1 : Int)]) (toExpr upper))
+  match_expr target with
+  | LT.lt α _ a b =>
+      unless α.isConstOf ``Int do return none
+      if let some k := b.int? then
+        return some (← mkAppM ``LE.le #[a, toExpr (k - 1)], fun stated => do
+          return mkApp5 (mkConst ``lt_of_le_literal) a (toExpr (k - 1)) b stated (← literal (k - 1) k))
+      let some k := a.int? | return none
+      return some (← mkAppM ``LE.le #[toExpr (k + 1), b], fun stated => do
+        return mkApp5 (mkConst ``literal_lt_of_le) b (toExpr (k + 1)) a stated (← literal k (k + 1)))
+  | LE.le α _ a b =>
+      unless α.isConstOf ``Int do return none
+      if let some k := b.int? then
+        return some (← mkAppM ``LT.lt #[a, toExpr (k + 1)], fun stated => do
+          return mkApp5 (mkConst ``le_of_lt_literal) a (toExpr (k + 1)) b stated (← literal k (k + 1)))
+      let some k := a.int? | return none
+      return some (← mkAppM ``LT.lt #[toExpr (k - 1), b], fun stated => do
+        return mkApp5 (mkConst ``literal_le_of_lt) b (toExpr (k - 1)) a stated (← literal (k - 1) k))
+  | _ => return none
+
+/-- Reduce representation definitions while keeping the equation's observed
+functions opaque. Matching their arguments must not evaluate a recursive spec. -/
+private def withEquationHeads {α : Type} (statement : Lean.Expr) (action : MetaM α) : MetaM α := do
+  let some (_, lhs, rhs) := statement.eq? | return ← withReducible action
+  let heads := #[lhs.getAppFn.constName?, rhs.getAppFn.constName?]
+  withDefault <| withCanUnfoldPred (fun cfg info => do
+    if heads.contains (some info.name) then return false
+    canUnfoldDefault cfg info) action
+
+/-- The same statement, up to its instances' and annotations' spelling. -/
+private def sameStatement (type wanted : Lean.Expr) : MetaM Bool := do
+  if type == wanted then return true
+  -- A binder has no application head: getAppFn would compare the entire
+  -- quantified statement before its definitionally equal types are read.
+  if type.isForall && wanted.isForall then
+    return ← withReducible (isDefEq type wanted)
+  unless type.getAppFn == wanted.getAppFn && type.getAppNumArgs == wanted.getAppNumArgs do
+    return false
+  if type.isAppOf ``Eq || type.isAppOf ``LE.le || type.isAppOf ``LT.lt then
+    let lhs := type.getArg! (type.getAppNumArgs - 2)
+    let rhs := type.appArg!
+    let lhs' := wanted.getArg! (wanted.getAppNumArgs - 2)
+    let rhs' := wanted.appArg!
+    if lhs.getAppFn == lhs'.getAppFn && rhs.getAppFn == rhs'.getAppFn then
+      -- Compare the arguments and their carrier types, without unfolding
+      -- a symbolic specification function merely to compare two calls.
+      let heads := #[lhs.getAppFn.constName?, rhs.getAppFn.constName?]
+      return ← withDefault <| withCanUnfoldPred (fun cfg info => do
+        if heads.contains (some info.name) then return false
+        canUnfoldDefault cfg info) (isDefEq type wanted)
+  withReducible (isDefEq type wanted)
+
+/-- An absent vector element cannot occur at any position, including a
+position outside the vector. -/
+private theorem read_ne_some_of_not_mem {α : Type} (xs : Array α) (i : Nat) (x : α)
+    (missing : ¬x ∈ xs) : xs[i]? ≠ some x :=
+  fun found => missing (Array.mem_of_getElem? found)
+
+/-- Close a goal its context states, by spelling (`doc/designs/proof-language.md`,
 "Closers": the facts decide what they state): a hypothesis of the goal's
 statement, a reflexive equation, `True`, or a hypothesis `False` or `¬True`,
 as a case a split refutes leaves. One pass over the context. -/
@@ -1463,28 +1837,39 @@ private partial def statedProof? (target : Lean.Expr) : MetaM (Option Lean.Expr)
       return some (mkApp3 (mkConst ``Or.inl) left right proof)
     if let some proof ← statedProof? right then
       return some (mkApp3 (mkConst ``Or.inr) left right proof)
-  -- The same statement, up to its instances' and annotations' spelling.
-  let same (type wanted : Lean.Expr) : MetaM Bool := do
-    if type == wanted then return true
-    unless type.getAppFn == wanted.getAppFn && type.getAppNumArgs == wanted.getAppNumArgs do
-      return false
-    withReducible (isDefEq type wanted)
   for decl in ← getLCtx do
     if decl.isImplementationDetail then continue
     let type := (← instantiateMVars decl.type).consumeMData
-    if ← same type target then return some decl.toExpr
+    if ← sameStatement type target then return some decl.toExpr
     -- An equation stated the other way round.
     if let some (_, lhs, rhs) := target.eq? then
       if let some (_, lhs', rhs') := type.eq? then
-        if lhs' == rhs && rhs' == lhs then return some (← mkEqSymm decl.toExpr)
+        if (lhs' == rhs && rhs' == lhs) ||
+            (← sameStatement type (← mkEq rhs lhs)) then
+          return some (← mkEqSymm decl.toExpr)
     -- A disequation stated the other way round.
     if target.isAppOfArity ``Not 1 && type.isAppOfArity ``Not 1 then
       if let some (_, lhs, rhs) := target.appArg!.eq? then
         if let some (_, lhs', rhs') := type.appArg!.eq? then
-          if lhs' == rhs && rhs' == lhs then return some (← mkAppM ``Ne.symm #[decl.toExpr])
+          -- As the equation above: the two sides are compared up to the
+          -- spelling of their instances and annotations, which a typed
+          -- statement fixes and the normal form does not (`sameStatement`).
+          if (lhs' == rhs && rhs' == lhs) ||
+              (← sameStatement type.appArg! (← mkEq rhs lhs)) then
+            return some (← mkAppM ``Ne.symm #[decl.toExpr])
     if type.isConstOf ``False then return some (← mkFalseElim target decl.toExpr)
     if type.isAppOfArity ``Not 1 && type.appArg!.isConstOf ``True then
       return some (← mkFalseElim target (mkApp decl.toExpr (mkConst ``True.intro)))
+  -- A hypothesis read up to negation (`negationReadings`).
+  for reading in ← contextNegationReadings do
+    let statement ← inferType reading
+    if ← sameStatement (← whnfR statement) target then return some reading
+  -- A literal bound in its other form.
+  if let some (form, proof) ← literalBoundForm? target then
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail then continue
+      if ← sameStatement (← instantiateMVars decl.type).consumeMData form then
+        return some (← proof decl.toExpr)
   -- A membership, an atom in the block's normal form, stated by its
   -- positions, as the leaf's normalization reads it, and the converse.
   if target.isAppOfArity ``Membership.mem 5 && (target.getArg! 1).isAppOf ``Array then
@@ -1523,6 +1908,33 @@ private partial def statedProof? (target : Lean.Expr) : MetaM (Option Lean.Expr)
         let reading ← mkAppM ``VerexIR.Proofs.Denote.mem_iff_exists_int_index #[xs, t]
         let proof ← mkAppM ``Iff.mp #[reading, decl.toExpr]
         return some (← mkExpectedTypeHint proof target)
+  -- A nonmembership fact rules out the optional read directly, without
+  -- an in-bounds premise or speculative positional instantiation.
+  let negativeEquality := if target.isAppOfArity ``Ne 3 then
+    some (target.getArg! 0, target.getArg! 1, target.getArg! 2)
+    else target.not?.bind Lean.Expr.eq?
+  if let some (_, lookup, value) := negativeEquality then
+    if lookup.isAppOfArity ``GetElem?.getElem? 7 && value.isAppOfArity ``Option.some 2 then
+      let xs := lookup.getArg! 5
+      if (← whnfR (← inferType xs)).isAppOf ``Array &&
+          (← whnfR (← inferType (lookup.getArg! 6))).isConstOf ``Nat then
+        let missing := mkNot (← mkAppM ``Membership.mem #[xs, value.appArg!])
+        if let some proof ← statedProof? missing then
+          let proof ← mkAppM ``read_ne_some_of_not_mem
+            #[xs, lookup.getArg! 6, value.appArg!, proof]
+          if ← withReducible (isDefEq (← inferType proof) target) then return some proof
+  -- A conjunction part by part, as a disjunct states one.
+  if let some (left, right) := target.and? then
+    let some first ← statedProof? left | return none
+    let some second ← statedProof? right | return none
+    return some (mkApp4 (mkConst ``And.intro) left right first second)
+  -- An existential at a local a destructured fact left, its body stated there.
+  let_expr Exists α body := target | return none
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail then continue
+    unless (← instantiateMVars decl.type) == α do continue
+    if let some proof ← statedProof? (body.beta #[decl.toExpr]) then
+      return some (← mkAppOptM ``Exists.intro #[α, body, decl.toExpr, proof])
   return none
 
 /-- Close a goal its context states (`statedProof?`). -/
@@ -1550,7 +1962,10 @@ syntax (name := blockRingTactic) "verex_block_ring" : tactic
 def closerTactic (closer : Syntax) : TacticM (TSyntax `tactic) := do
   if closer.isOfKind ``closerDecide then blockDecide
   else if closer.isOfKind ``closerArith then `(tactic| verex_omega_unsplit)
-  else if closer.isOfKind ``closerEval then `(tactic| verex_typed_close)
+  else if closer.isOfKind ``closerEval then `(tactic| first
+    | rfl
+    | verex_ground_arithmetic
+    | verex_typed_close)
   else if closer.isOfKind ``closerSolve then `(tactic| verex_solve)
   else if closer.isOfKind ``closerCongr then `(tactic| verex_block_congr)
   else if closer.isOfKind ``closerRing then `(tactic| verex_block_ring)
@@ -1638,7 +2053,7 @@ private def markFact (goal : MVarId) (fact : FVarId) : MetaM MVarId := do
   goal.setFVarKind mark .implDetail
   return goal
 
-/-- The block's normal form of a fact or goal (`doc/plan/proof-language.md`,
+/-- The block's normal form of a fact or goal (`doc/designs/proof-language.md`,
 "Closers"): a named map's carrier read as the map (`x_read`), then, with the
 denotation's normal form, the leaf's definitions of named values folded to
 their names (`m'_eq` right to left) and the block's earlier facts as the
@@ -1680,6 +2095,8 @@ value. -/
 private def sideRank (e : Lean.Expr) : Nat :=
   if (localName? e).isSome then 1
   else if e.int?.isSome || e.nat?.isSome || e.isConstOf ``Bool.true || e.isConstOf ``Bool.false then 0
+  -- A bounded integer built at a literal is that value.
+  else if e.isAppOfArity ``VerexIR.SpecInt.mk 4 && (e.getArg! 2).int?.isSome then 0
   else 2
 
 /-- How a fact of the block rewrites: left to right, right to left, or not
@@ -1688,11 +2105,13 @@ private inductive FactRule where
   | forward | reversed | none
   deriving BEq
 
-/-- The rewriting of a fact (`doc/plan/proof-language.md`, "Closers"): an
+/-- The rewriting of a fact (`doc/designs/proof-language.md`, "Closers"): an
 equation from its higher side to its lower (`sideRank`), of two names
 toward the one declared first; no rewriting for a name equated to a term
 holding it (`a = C[a]`), whose rewriting would not end. -/
 private def factRule (statement : Lean.Expr) : MetaM FactRule := do
+  -- A fact under a guard or a binder is an implication, never a rule.
+  if statement.isForall then return .none
   let some (_, lhs, rhs) := statement.eq? | return .forward
   let holds (side other : Lean.Expr) : Bool :=
     match localName? side with | some x => other.containsFVar x | none => false
@@ -1774,6 +2193,10 @@ where
       if type.isConstOf ``Bool && (rhs.isConstOf ``Bool.true || rhs.isConstOf ``Bool.false) &&
           !lhs.isFVar then
         return { rules with booleans := rules.booleans.push decl.fvarId }
+      -- A term equated to a built value, as a path's split states it (`xs[k]? =
+      -- some v`): a rule toward the value.
+      if ← (pure (localName? lhs).isNone <&&> isConstructorApp rhs <&&> (not <$> isConstructorApp lhs)) then
+        return { rules with definitionsForward := rules.definitionsForward.push decl.fvarId }
       -- A name or term equated to a literal, as a case split states it: a
       -- rule toward the literal (substitution in a leaf is total).
       if sideRank lhs ≥ 1 && sideRank rhs == 0 then
@@ -1832,18 +2255,45 @@ private def stepPositional : Array Name :=
   #[``VerexIR.Proofs.Denote.mem_iff_exists_int_index, ``VerexIR.Proofs.Denote.findIndex?_eq_none_iff,
     ``VerexIR.Proofs.Denote.findIndex?_isSome_iff]
 
+/-- The declarations the theorems a `simp only` call listed name: `simp`
+lifts a theorem it preprocesses into an auxiliary lemma of the declaration
+being elaborated (`Lean.Meta.mkAuxLemma`), and an attempt that is undone
+takes that lemma with it, so a context held across attempts stands only
+while the environment still holds them.  The listed theorems are the first
+set of the call's theorems; the sets an attribute contributes are the
+attribute's own, and nothing a proof does removes them. -/
+private partial def listedConstants (theorems : SimpTheoremsArray) : Array Name :=
+  match theorems[0]? with
+  | none => #[]
+  | some listed => trie (trie #[] listed.pre) listed.post
+where
+  trie (found : Array Name) (tree : DiscrTree SimpTheorem) : Array Name :=
+    tree.root.foldl (init := found) fun found _ node => inNode found node
+  inNode (found : Array Name) : DiscrTree.Trie SimpTheorem → Array Name
+    | .node values children =>
+        let found := values.foldl (init := found) fun found theorem_ =>
+          found ++ theorem_.proof.getUsedConstants
+        children.foldl (init := found) fun found (_, child) => inNode found child
+
 /-- A simp call's context and simprocs, built once per target. -/
 private def cachedSimpContext (call : StepCall) : TacticM (Simp.Context × Simp.SimprocsArray) := do
   let key := match call with | .rules => 0 | .transport => 1 | .normal => 2
   let cache := (← targetState).stepSimpContexts
   if let some (_, context, simprocs) := (← cache.get).find? (·.1 == key) then
-    return (context, simprocs)
+    -- The entry stands while the environment holds what its theorems name
+    -- (`listedConstants`); an attempt that was undone took an auxiliary
+    -- lemma of a listed theorem with it, and the call is built again.
+    if (listedConstants context.simpTheorems).all (← getEnv).contains then
+      return (context, simprocs)
+    cache.modify (·.filter (·.1 != key))
   let syntax_ ← match call with
-    | .rules => `(tactic| simp only [])
+    -- A rule's value may leave a literal position in a read.
+    | .rules => `(tactic| simp only [VerexIR.Proofs.Denote.literalToNat])
     | .transport => `(tactic| simp only [vir_transport])
     -- Membership an atom (`stepPositional`), a search for an element read
     -- as the atom.
     | .normal => `(tactic| simp only [vir_denote, vir_denote_norm, vir_denote_spec, vir_denote_eval,
+        Int.add_sub_cancel, Int.reduceAdd, Int.reduceSub, Int.reduceMul, Int.reduceTDiv,
         Prod.fst, Prod.snd, reduceStatedIte, VerexIR.Proofs.Denote.findIndex?_eq_none_mem_iff,
         VerexIR.Proofs.Denote.findIndex?_isSome_mem_iff, VerexIR.Proofs.Denote.exists_mem_val_eq_iff, VerexIR.Proofs.Denote.forall_mem_val_ne_iff,
         VerexIR.Proofs.Denote.exists_position_some_iff, VerexIR.Proofs.Denote.forall_position_some_ne_iff, VerexIR.Proofs.Denote.exists_position_eq_iff,
@@ -1886,13 +2336,53 @@ private def withRules (call : StepCall) (rules reversed : Array FVarId)
     for theorem_ in ← ruleTheorems rule true !preReversed do extra := extra.addSimpTheorem theorem_
   return (← Simp.mkContext config (ctx.simpTheorems.push extra) ctx.congrTheorems, simprocs)
 
-/-- A side condition from the step's rules, else as the leaf's normalization
-decides it (`goalDischarge`): one normal form for steps and leaves. -/
+/-- A side condition by spelling (`doc/designs/proof-language.md`, "Facts"): stated
+(`statedProof?`), part by part, or its negation stated in canonical form (`b ≤
+a` of `¬a < b`). No arithmetic: an arithmetic premise is stated by the proof. -/
+private partial def statedCondition? (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let condition := (← instantiateMVars condition).consumeMData
+  if let some proof ← statedProof? condition then return some proof
+  if let some (left, right) := condition.and? then
+    let some first ← statedCondition? left | return none
+    let some second ← statedCondition? right | return none
+    return some (mkApp4 (mkConst ``And.intro) left right first second)
+  let_expr Not inner := condition | return none
+  let reading? ← match_expr inner.consumeMData with
+    | LT.lt type _ a b =>
+        if ← isDefEq type (mkConst ``Int) then
+          pure (some (← mkAppOptM ``Int.not_lt #[a, b])) else pure none
+    | LE.le type _ a b =>
+        if ← isDefEq type (mkConst ``Int) then
+          pure (some (← mkAppOptM ``Int.not_le #[a, b])) else pure none
+    | _ => pure none
+  let some reading := reading? | return none
+  let some (_, canonical) := (← inferType reading).iff? | return none
+  let some proof ← statedProof? canonical | return none
+  return some (← mkAppM ``Iff.mpr #[reading, proof])
+
+/-- A side condition from the step's rules, else by its spelling
+(`statedCondition?`), else, where it is no arithmetic, as the leaf's normalization
+decides it (`goalDischarge`): a lemma's premise in the context's normal form; or
+the premise's normal form by its spelling. -/
 private def stepDischarge (goal : MVarId) : MetaM Simp.Discharge := do
-  let context ← goalDischarge goal
+  let context ← goalDischarge goal (arithmetic := false)
+  let normalizing ← IO.mkRef false
   return fun condition => do
     if let some proof ← Simp.dischargeDefault? condition then return some proof
-    context condition
+    if let some proof ← statedCondition? condition then return some proof
+    if let some proof ← context condition then return some proof
+    -- A premise in the normal form, stated by its spelling: no arithmetic; one
+    -- level, as a premise of that normal form's rules is read as it stands.
+    if ← normalizing.get then return none
+    normalizing.set true
+    try
+      let normal ← Simp.simp (← instantiateMVars condition)
+      if normal.expr == condition then return none
+      let some proof ← statedCondition? normal.expr | return none
+      match normal.proof? with
+      | some equation => return some (← mkEqMPR equation proof)
+      | none => return some proof
+    finally normalizing.set false
 
 /-- `simp` at a goal's hypotheses and, when asked, its target, by a cached
 call with rules. The goal after, none where it is closed. -/
@@ -2005,6 +2495,15 @@ private def keepsDefinition (name : String) : CoreM Bool := do
   | some reads => return reads.contains name
   | none => return true
 
+/-- Scalar names in a scoped value, including the fields of a native row. -/
+private partial def scopedComponents (value : Lean.Expr) : Array FVarId :=
+  match localName? value with
+  | some x => #[x]
+  | none =>
+    if value.isAppOfArity ``Prod.mk 4 then
+      scopedComponents (value.getArg! 2) ++ scopedComponents (value.getArg! 3)
+    else #[]
+
 /-- The leaf's definitions of named values in normal form with each other:
 each one's term with the others folded to their names. -/
 private def reduceDefinitions (goal : MVarId) (changed : Option (Array Name) := none) :
@@ -2041,9 +2540,10 @@ private def reduceDefinitions (goal : MVarId) (changed : Option (Array Name) := 
     (← getLCtx).foldlM (init := #[]) fun found decl => do
       let some (name, _, value) := scopeEntry? (← instantiateMVars decl.type) | return found
       unless ← keepsDefinition name do return found
-      return match localName? value with
-        | some x => found.push x
-        | none => found
+      -- A structure's scope entry is a row of field values. Preserve their
+      -- definitions too, rather than folding two equal field values into
+      -- each other and losing their common defining expression.
+      return found ++ scopedComponents value
   let definesScoped (definition : FVarId) : MetaM Bool := goal.withContext do
     let some (_, lhs, rhs) := (← instantiateMVars (← definition.getType)).eq? | return false
     return [lhs, rhs].any fun side => (localName? side).any scopedNames.contains
@@ -2125,7 +2625,7 @@ private def substituteFact (goal : MVarId) (fact : FVarId) : MetaM (Option MVarI
     let rightLater ← if lhs.isFVar && rhs.isFVar then
         pure (decide ((← rhs.fvarId!.getDecl).index > (← lhs.fvarId!.getDecl).index))
       else pure true
-    if rightLater && (← eliminable rhs lhs) then
+    if ← (pure rightLater <&&> eliminable rhs lhs) then
       return (← substCore? goal fact (symm := true)).map (·.2)
     else if ← eliminable lhs rhs then
       return (← substCore? goal fact (symm := false)).map (·.2)
@@ -2222,10 +2722,56 @@ private def settleFact (goal : MVarId) (name : Name) : TacticM (Option MVarId) :
   if (← next.getDecl).lctx.contains fact then return some (← markFact next fact)
   return some next
 
+/-- A fact that its normal form states as an existential or a
+conjunction, taken apart: the witnesses locals, each part a fact of the block,
+`name`, `name_1`, …, as a model value a case reads (`∃ a, o = some a ∧ …`) is
+named for the facts that read it. The goal and the parts' names. -/
+private partial def takeFactApart (goal : MVarId) (name : Name) (next : Nat := 1) :
+    TacticM (MVarId × Array Name) := do
+  let some fact ← goal.withContext do return (← getLCtx).findFromUserName? name
+    | return (goal, #[])
+  let type ← goal.withContext do whnfR (← instantiateMVars fact.type)
+  if type.isAppOfArity ``Exists 2 then
+    let witness ← mkFreshUserName `witness
+    let #[case] ← goal.cases fact.fvarId #[{ varNames := [witness, name] }] | return (goal, #[name])
+    return ← takeFactApart case.mvarId name next
+  if type.isAppOfArity ``And 2 then
+    let rest := Name.mkSimple s!"{name}_{next}"
+    let #[case] ← goal.cases fact.fvarId #[{ varNames := [name, rest] }] | return (goal, #[name])
+    let some restFact ← case.mvarId.withContext do return (← getLCtx).findFromUserName? rest
+      | return (case.mvarId, #[name])
+    let goal ← markFact case.mvarId restFact.fvarId
+    let (goal, restParts) ← takeFactApart goal rest (next + 1)
+    let (goal, parts) ← takeFactApart goal name (next + 1)
+    return (goal, parts ++ restParts)
+  return (goal, #[name])
+
+/-- A fact taken apart (`takeFactApart`), then, under the bounds of the
+values its parts read, each part normalized and settled. The goal after,
+none where it is closed. -/
+private def destructureFact (goal : MVarId) (name : Name) (always : Bool := false) :
+    TacticM (Option MVarId) := do
+  let existential ← goal.withContext do
+    match (← getLCtx).findFromUserName? name with
+    | some fact => return (← whnfR (← instantiateMVars fact.type)).isAppOfArity ``Exists 2
+    | none => return false
+  let (goal, parts) ← takeFactApart goal name
+  if parts.size ≤ 1 && !existential && !always then return some goal
+  setGoals [goal]
+  evalTactic (← `(tactic| verex_type_bounds))
+  let [goal] ← getGoals | return none
+  let mut goal := goal
+  for part in parts do
+    let some next ← normalizeFact goal (some part) | return none
+    let some next ← settleFact next part | return none
+    goal := next
+  return some goal
+
 /-- Give a goal the fact `name : statement`, proved by `proof`, in normal
 form: an equation of a local and a term not holding it is substituted once
-over the context; any other fact is a rule of the block's normal form and
-rewrites no hypothesis. The goal after, none where the fact refutes it. -/
+over the context; an existential is taken apart (`destructureFact`); any other
+fact is a rule of the block's normal form and rewrites no hypothesis. The goal
+after, none where the fact refutes it. -/
 private def giveFact (goal : MVarId) (name : Name) (statement proof : Lean.Expr) :
     TacticM (Option MVarId) := do
   if statement.isConstOf ``True then return some goal
@@ -2233,6 +2779,7 @@ private def giveFact (goal : MVarId) (name : Name) (statement proof : Lean.Expr)
     goal.assign (← goal.withContext (mkFalseElim (← goal.getType) proof))
     return none
   let (_, next) ← (← goal.assert name statement proof).intro1P
+  if statement.isAppOfArity ``Exists 2 then return ← destructureFact next name
   settleFact next name
 
 /-- A fact's proof carried along the equation of its statement to its normal
@@ -2308,11 +2855,11 @@ private def renormalizeFacts (goal : MVarId) : TacticM (Option MVarId) := do
       | _ => pure ()
   return some goal
 
-/-- What the context's implications and equivalences give where their
-premises are stated (`statedProof?`) or true in the block's normal form:
-their conclusions, as facts (`implied_k`). Only a conclusion that shares a
-local with the goal, or any where the goal is `False`. The goal after, none
-where a conclusion refutes it. -/
+/-- What the context's implications, equivalences and disjunctions give where
+their premises, or a disjunct's negation, are stated (`statedProof?`) or true
+in the block's normal form: their conclusions, as facts (`implied_k`). Only a
+conclusion that shares a local with the goal, or any where the goal is
+`False`. The goal after, none where a conclusion refutes it. -/
 private def impliedFacts (goal : MVarId) : TacticM (Option MVarId) := do
   let rules ← blockRules goal
   let target ← goal.withContext do instantiateMVars (← goal.getType)
@@ -2341,6 +2888,15 @@ private def impliedFacts (goal : MVarId) : TacticM (Option MVarId) := do
         if let some proof ← premiseProof right then
           implied := implied.push (left, ← goal.withContext (mkAppM ``Iff.mpr #[hypothesis, proof]))
       continue
+    if let some (left, right) := type.app2? ``Or then
+      if relevant right then
+        if let some proof ← premiseProof (mkNot left) then
+          implied := implied.push (right, mkApp4 (mkConst ``Or.resolve_left) left right hypothesis proof)
+          continue
+      if relevant left then
+        if let some proof ← premiseProof (mkNot right) then
+          implied := implied.push (left, mkApp4 (mkConst ``Or.resolve_right) left right hypothesis proof)
+      continue
     -- An implication of propositions, its premises in order.
     let mut premises := #[]
     let mut conclusion := type
@@ -2368,10 +2924,248 @@ private def impliedFacts (goal : MVarId) : TacticM (Option MVarId) := do
     goal := next
   return some goal
 
+/-- The literal positions a term reads a collection at (`xs[3]?`). -/
+private def literalPositions (target : Lean.Expr) : Array Nat :=
+  Id.run do
+    let mut found := #[]
+    let mut pending := #[target]
+    while let some e := pending.back? do
+      pending := pending.pop
+      if e.isAppOfArity ``GetElem?.getElem? 7 then
+        if let some position := (e.getArg! 6).nat? then
+          unless found.contains position do found := found.push position
+      match e with
+      | .app f a => pending := (pending.push f).push a
+      | .mdata _ b | .proj _ _ b => pending := pending.push b
+      | .lam _ t b _ | .forallE _ t b _ => pending := (pending.push t).push b
+      | _ => pure ()
+    return found
+
+/-- The reads of collections in a term, with the position each reads at. -/
+private def readSites (e : Lean.Expr) : Array (Lean.Expr × Lean.Expr) :=
+  (sitesWhere (·.isAppOfArity ``GetElem?.getElem? 7) #[e]).map fun read =>
+    (read.getArg! 5, read.getArg! 6)
+
+/-- A read's position as an integer: its argument under `Int.toNat`, a literal. -/
+private def integerPosition (position : Lean.Expr) : Lean.Expr :=
+  if position.isAppOfArity ``Int.toNat 1 then position.getArg! 0
+  else match position.nat? with
+    | some literal => toExpr (Int.ofNat literal)
+    | none => mkApp3 (mkConst ``Nat.cast [0]) (mkConst ``Int) (mkConst ``instNatCastInt) position
+
+/-- The binder a position is solved for and its value, where the position is the
+binder at a literal offset: `i − c` against `t` gives `i := t + c`, `i + c` gives
+`i := t − c`. -/
+private def solvePosition (pattern t : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+  let pattern := (← instantiateMVars pattern).consumeMData
+  if pattern.isMVar then return some (pattern, t)
+  let offset (binder literal : Lean.Expr) (negate : Bool) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+    let binder := binder.consumeMData
+    let some c := literal.int? | return none
+    unless binder.isMVar do return none
+    let c := if negate then -c else c
+    if let some value := t.int? then return some (binder, toExpr (value + c))
+    if c < 0 then return some (binder, ← mkAppM ``HSub.hSub #[t, toExpr (-c)])
+    return some (binder, ← mkAppM ``HAdd.hAdd #[t, toExpr c])
+  if pattern.isAppOfArity ``HSub.hSub 6 then
+    return ← offset (pattern.getArg! 4) (pattern.getArg! 5) false
+  if pattern.isAppOfArity ``HAdd.hAdd 6 then
+    return ← offset (pattern.getArg! 4) (pattern.getArg! 5) true
+  return none
+
+/-- A term with its instantiated positions normalized: `k + c − c` is `k`,
+`k − c + c` is `k`. -/
+private def offsetsCancelled (e : Lean.Expr) : MetaM Simp.Result := do
+  let mut theorems : SimpTheorems := {}
+  theorems ← theorems.addConst ``Int.add_sub_cancel
+  theorems ← theorems.addConst ``Int.sub_add_cancel
+  let context ← Simp.mkContext (simpTheorems := #[theorems])
+    (congrTheorems := ← getSimpCongrTheorems)
+  return (← simp e context).1
+
+/-- Match a premise that is a read or an equation against a stated hypothesis of
+that shape; a position is solved up to its literal offset (`solvePosition`). -/
+private def matchStated (premise stated : Lean.Expr) : MetaM Bool := do
+  let some (_, lookup, value) := (← instantiateMVars premise).eq? | return false
+  let some (_, lookup', value') := stated.eq? | return false
+  if lookup.isAppOfArity ``GetElem?.getElem? 7 && lookup'.isAppOfArity ``GetElem?.getElem? 7 then
+    unless ← withReducible (isDefEq (lookup.getArg! 5) (lookup'.getArg! 5)) do return false
+    let position := integerPosition (lookup.getArg! 6)
+    if (← instantiateMVars position).hasExprMVar then
+      let some (binder, solved) ← solvePosition position (integerPosition (lookup'.getArg! 6))
+        | return false
+      unless ← isDefEq binder solved do return false
+    else
+      let position := (← offsetsCancelled (← instantiateMVars position)).expr
+      unless ← withReducible (isDefEq position (integerPosition (lookup'.getArg! 6))) do return false
+    return ← withReducible (isDefEq value value')
+  unless lookup.getAppFn == lookup'.getAppFn do return false
+  withReducible (isDefEq (← mkEq lookup value) (← mkEq lookup' value'))
+
+private theorem read_in_bounds {α : Type} (values : Array α) (position : Nat) (fallback : α)
+    (bound : position < values.size) :
+    values[position]? = some (values[position]?.getD fallback) := by
+  rw [Array.getElem?_eq_getElem bound]
+  rfl
+
+/-- A premise that an in-bounds read is the value its `getD` gives
+(`xs[k]? = some (xs[k]?.getD d)`): by the position's bounds, whose `toNat` omega
+reads. Whether it closes the goal. -/
+private def readInBounds (goal : MVarId) : TacticM Bool := goal.withContext do
+  let some (_, lookup, value) := (← instantiateMVars (← goal.getType)).eq? | return false
+  let_expr Option.some _ read := value.consumeMData | return false
+  unless lookup.isAppOfArity ``GetElem?.getElem? 7 && read.isAppOfArity ``Option.getD 3 do return false
+  unless ← withReducible (isDefEq lookup (read.getArg! 1)) do return false
+  let values := lookup.getArg! 5
+  unless (← inferType values).isAppOf ``Array do return false
+  let position := lookup.getArg! 6
+  let bound ← mkFreshExprSyntheticOpaqueMVar
+    (← mkAppM ``LT.lt #[position, ← mkAppM ``Array.size #[values]])
+  setGoals [bound.mvarId!]
+  evalTactic (← `(tactic| verex_block_omega))
+  goal.assign (← mkAppM ``read_in_bounds #[values, position, read.appArg!, bound])
+  return true
+
+/-- An instance of a quantified fact whose binders the goal and the stated facts
+determine (`doc/designs/proof-language.md`, "Closers"): a premise that is a read or
+an equation is matched against a stated hypothesis of that shape, an integer binder
+in a position against the positions the goal and the stated reads read that
+collection at; a read no statement holds takes its value from the goal, and is owed
+in bounds. The instance's conclusion in the block's normal form is the goal;
+the remaining premises as `blockInstance` proves them. Whether it closes the goal. -/
+private partial def determinedInstance (goal : MVarId) (candidate : Lean.Expr) : TacticM Bool := do
+  let rules ← blockRules goal
+  let (target, stated) ← goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
+    let stated ← (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      let type := (← instantiateMVars decl.type).consumeMData
+      let some (_, lhs, _) := type.eq? | return found
+      return if lhs.getAppFn.isConst || lhs.getAppFn.isFVar then found.push (decl.toExpr, type)
+        else found
+    return (target, stated)
+  let statedReads := stated.flatMap fun (_, type) => match type.eq? with
+    | some (_, lookup, _) => if lookup.isAppOfArity ``GetElem?.getElem? 7
+        then #[(lookup.getArg! 5, lookup.getArg! 6)] else #[]
+    | none => #[]
+  let positions := readSites target ++ statedReads
+  let (arguments, _, conclusion) ← goal.withContext do
+    withReducible (forallMetaTelescopeReducing (← inferType candidate))
+  if arguments.isEmpty then return false
+  let attempts ← IO.mkRef (32 : Nat)
+  let skippedReads ← IO.mkRef (#[] : Array Lean.Expr)
+  let finishDetermined : TacticM Bool := do
+    let conclusion ← instantiateMVars conclusion
+    if conclusion.hasExprMVar then return false
+    let cancelled ← goal.withContext do offsetsCancelled (← instantiateMVars conclusion)
+    let (normal, equality?) ← normalForm goal cancelled.expr rules
+    let (wanted, wantedEquality?) ← normalForm goal target rules
+    unless ← goal.withContext (sameStatement normal.consumeMData wanted.consumeMData) do
+      return false
+    for argument in arguments do
+      if ← argument.mvarId!.isAssigned then continue
+      let type ← goal.withContext (instantiateMVars (← inferType argument))
+      unless ← goal.withContext (isProp type) do return false
+      if type.hasExprMVar then return false
+      let premise ← goal.withContext (mkFreshExprSyntheticOpaqueMVar type)
+      argument.mvarId!.assign premise
+      let readBound ← do
+        let saved ← saveState
+        try readInBounds premise.mvarId! catch _ => saved.restore; pure false
+      if readBound then continue
+      let some next ← normalizeFact premise.mvarId! none | continue
+      setGoals [next]
+      try evalTactic (← `(tactic| first | verex_assumption | verex_block_omega))
+      catch _ => return false
+      unless (← getUnsolvedGoals).isEmpty do return false
+    goal.withContext do
+      let instance_ ← instantiateMVars (mkAppN candidate arguments)
+      if instance_.hasExprMVar then return false
+      let read ← cancelled.mkEqMP instance_
+      let read ← match equality? with
+        | some equality => mkEqMP equality read
+        | none => pure read
+      goal.assign (← match wantedEquality? with
+        | some equality => mkEqMPR equality read
+        | none => pure read)
+      return true
+  let finish : TacticM Bool := do
+    let conclusion ← instantiateMVars conclusion
+    unless conclusion.hasExprMVar do return ← finishDetermined
+    -- One side of an equation can determine its binders even when a frame
+    -- equation must rewrite the other side. Each match is only a candidate:
+    -- finishDetermined checks the entire normalized conclusion and premises.
+    let mut matchings := #[withEquationHeads target (isDefEq conclusion target)]
+    if let some (_, lhs, rhs) := conclusion.eq? then
+      if let some (_, wantedLhs, wantedRhs) := target.eq? then
+        matchings := matchings.push (withEquationHeads target (isDefEq lhs wantedLhs))
+        matchings := matchings.push (withEquationHeads target (isDefEq rhs wantedRhs))
+    for matching in matchings do
+      let saved ← saveState
+      if ← goal.withContext matching then
+        if ← finishDetermined then return true
+      let names ← getNGen
+      saved.restore
+      setNGen names
+    return false
+  let rec search : TacticM Bool := do
+    let left ← attempts.get
+    if left == 0 then return false
+    attempts.set (left - 1)
+    -- A premise reading or equating a binder's value: by a stated hypothesis.
+    let skipped ← skippedReads.get
+    let triggers ← goal.withContext do arguments.filterM fun argument => do
+      if skipped.contains argument then return false
+      if ← argument.mvarId!.isAssigned then return false
+      let type ← instantiateMVars (← inferType argument)
+      let some (_, lhs, _) := type.eq? | return false
+      return type.hasExprMVar && (lhs.getAppFn.isConst || lhs.getAppFn.isFVar)
+    if let some trigger := triggers[0]? then
+      let premise ← goal.withContext (inferType trigger)
+      for (proof, type) in stated do
+        let saved ← saveState
+        if ← goal.withContext (matchStated premise type) then
+          trigger.mvarId!.assign proof
+          if ← search then return true
+        let names ← getNGen
+        saved.restore
+        setNGen names
+      -- A read no statement holds takes its value from the goal.
+      let isRead ← goal.withContext do
+        match (← instantiateMVars premise).eq? with
+        | some (_, lookup, _) => pure (lookup.isAppOfArity ``GetElem?.getElem? 7)
+        | none => pure false
+      unless isRead do return false
+      skippedReads.modify (·.push trigger)
+      let found ← search
+      skippedReads.modify (·.pop)
+      return found
+    -- An integer binder in a position, by the positions read of that collection.
+    let open_ ← goal.withContext do
+      let parts ← arguments.mapM fun argument => do instantiateMVars (← inferType argument)
+      let sites := readSites (← instantiateMVars conclusion) ++ parts.flatMap readSites
+      sites.filterM fun (_, position) => do
+        return (← instantiateMVars position).hasExprMVar
+    let some (collection, position) := open_[0]? | return ← finish
+    for (other, read) in positions do
+      let saved ← saveState
+      if ← goal.withContext do
+        unless ← withReducible (isDefEq collection other) do return false
+        let some (binder, solved) ← solvePosition (integerPosition position) (integerPosition read)
+          | return false
+        isDefEq binder solved
+      then
+        if ← search then return true
+      let names ← getNGen
+      saved.restore
+      setNGen names
+    return false
+  search
+
 /-- The goal as an instance of a quantified fact, each premise of the
 instance in the block's normal form, then stated by a hypothesis or decided by
 arithmetic: the premise matching a lemma's premises have
-(`doc/plan/proof-language.md`, "Closers"). Whether it closes the goal. -/
+(`doc/designs/proof-language.md`, "Closers"). Whether it closes the goal. -/
 private partial def blockInstance (goal : MVarId) : TacticM Bool := do
   if ← blockInstanceAt goal then return true
   -- A function value's result the normal form names, read as the
@@ -2422,10 +3216,20 @@ where
         if decl.isImplementationDetail then return found
         return if (← whnfR (← instantiateMVars decl.type)).isForall then found.push decl.toExpr
           else found
-    for candidate in candidates.reverse do
+    -- A position the normal form evaluated: `xs[k.toNat]?` at the literal `0`
+    -- is the instance `k := 0`, read at the instance's transparency.
+    let instances ← goal.withContext do
+      candidates.flatMapM fun candidate => do
+        let .forallE _ domain _ _ ← whnfR (← inferType candidate) | return #[]
+        unless domain.isConstOf ``Int do return #[]
+        return (literalPositions target).map fun (position : Nat) =>
+          (mkApp candidate (toExpr (Int.ofNat position)), true)
+    let attempts := candidates.reverse.map (·, false) ++ instances
+    for (candidate, literal) in attempts do
       let saved ← saveState
       try
-        let premises ← withReducible (goal.apply candidate)
+        let premises ← if literal then goal.apply candidate
+          else withEquationHeads target (goal.apply candidate)
         let mut closed := true
         for premise in premises do
           if ← premise.isAssigned then continue
@@ -2434,7 +3238,7 @@ where
             break
           let some normal ← normalizeFact premise none | continue
           setGoals [normal]
-          try evalTactic (← `(tactic| first | verex_assumption | omega))
+          try evalTactic (← `(tactic| first | verex_assumption | verex_block_omega))
           catch _ => pure ()
           unless (← getUnsolvedGoals).isEmpty do
             closed := false
@@ -2443,6 +3247,17 @@ where
       catch _ => pure ()
       -- The names the attempt drew stay drawn: the step caches are keyed by
       -- goal and must not meet a goal of the same name.
+      let names ← getNGen
+      saved.restore
+      setNGen names
+    -- Instances whose binders the goal and the stated facts determine, on the
+    -- hypotheses as they stand and read up to negation.
+    let readings ← goal.withContext contextNegationReadings
+    for candidate in candidates.reverse ++ readings do
+      let saved ← saveState
+      try
+        if ← determinedInstance goal candidate then return true
+      catch _ => pure ()
       let names ← getNGen
       saved.restore
       setNGen names
@@ -2461,7 +3276,7 @@ private partial def witnessParts (e : Lean.Expr) : MetaM (Option Lean.Expr) := d
 /-- An existential whose body the context states at one of its locals: the
 witness a case split or a destructured fact left, each conjunct of the body
 stated by a hypothesis (`statedProof?`). Whether it closes the goal. -/
-private def statedWitness (goal : MVarId) : MetaM Bool := goal.withContext do
+private def statedWitness (goal : MVarId) : TacticM Bool := goal.withContext do
   let target ← instantiateMVars (← goal.getType)
   let target ← if target.isAppOf ``VerexIR.Proofs.Obligation then whnfD target else whnfR target
   let_expr Exists α body := target | return false
@@ -2472,12 +3287,131 @@ private def statedWitness (goal : MVarId) : MetaM Bool := goal.withContext do
     if let some proof ← witnessParts instantiated then
       goal.assign (← mkAppOptM ``Exists.intro #[α, body, decl.toExpr, proof])
       return true
+  -- A constructor named by the goal determines its plain row. Prove the
+  -- certificate and body by normalization and stated facts, as for a local
+  -- witness; this adds no search to the block's deterministic closer.
+  let saved ← saveState
+  try
+    let some (witness, certificate) ←
+        VerexIR.Proofs.Denote.determinedCertifiedWitness? α body
+      | return false
+    unless ← certificate.isAssigned do
+      if let some normal ← normalizeFact certificate none then
+        unless ← closeByStatement normal do throwError "the certificate is not stated"
+    let witnessed ← mkFreshExprSyntheticOpaqueMVar (body.beta #[witness])
+    if let some normal ← normalizeFact witnessed.mvarId! none then
+      unless ← closeByStatement normal do throwError "the witness body is not stated"
+    let witness ← instantiateMVars witness
+    let proof ← instantiateMVars witnessed
+    if witness.hasExprMVar || proof.hasExprMVar then throwError "unfinished witness"
+    goal.assign (← mkAppOptM ``Exists.intro #[α, body, witness, proof])
+    return true
+  catch _ =>
+    let names ← getNGen
+    saved.restore
+    setNGen names
+    return false
+
+/-- A goal `False` whose context negates an instance of a quantified hypothesis
+(`¬P a` or `b = false` beside `∀ x, … → P x`), the instance's premises as
+`blockInstance` proves them. Whether it closes the goal. -/
+private def instanceRefutation (goal : MVarId) : TacticM Bool := do
+  let negated ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      let type ← instantiateMVars decl.type
+      if let some inner := type.not? then return found.push (inner, decl.toExpr)
+      if let some (domain, value, literal) := type.eq? then
+        if domain.isConstOf ``Bool && literal.isConstOf ``Bool.false then
+          return found.push (← mkEq value (mkConst ``Bool.true),
+            ← mkAppM ``Iff.mp #[← mkAppOptM ``Bool.eq_false_iff #[some value], decl.toExpr])
+      return found
+  for (statement, refutes) in negated do
+    let owed ← goal.withContext (mkFreshExprSyntheticOpaqueMVar statement)
+    let saved ← saveState
+    if ← blockInstance owed.mvarId! then
+      goal.assign (← goal.withContext do
+        mkAbsurd (← goal.getType) (← instantiateMVars owed) refutes)
+      return true
+    let names ← getNGen
+    saved.restore
+    setNGen names
   return false
+
+private theorem not_exists_of_forall.{u} {α : Sort u} {p : α → Prop} (held : ∀ x, ¬p x) : ¬∃ x, p x :=
+  fun ⟨x, holds⟩ => held x holds
+
+private theorem not_and_of_imp {a b : Prop} (held : a → ¬b) : ¬(a ∧ b) :=
+  fun ⟨left, right⟩ => held left right
+
+/-- `decide` reads a goal up to negation, as it reads a hypothesis: `¬¬A` as `A`,
+`¬(A ∨ B)` as its parts, `¬∃ x, φ` as `∀ x, ¬φ`, `¬(A ∧ B)` as `A → ¬B`; no normal
+form rewrites a negation. The goals the reading leaves, the goal itself where it
+reads none. -/
+private def readNegatedGoal (goal : MVarId) : MetaM (List MVarId) := goal.withContext do
+  let target ← whnfR (← instantiateMVars (← goal.getType))
+  let some inner := target.not? | return [goal]
+  let inner ← whnfR inner
+  if inner.isAppOfArity ``Not 1 then
+    return ← goal.apply (mkConst ``not_not_intro)
+  if inner.isAppOfArity ``Or 2 then
+    return ← goal.apply (mkConst ``not_or_intro)
+  if inner.isAppOfArity ``Exists 2 then
+    let [next] ← goal.apply (← mkConstWithFreshMVarLevels ``not_exists_of_forall) | return [goal]
+    let (_, next) ← next.intro1
+    return [next]
+  if inner.isAppOfArity ``And 2 then
+    let [next] ← goal.apply (mkConst ``not_and_of_imp) | return [goal]
+    let (_, next) ← next.intro1
+    return [next]
+  return [goal]
+
+/-- `decide`'s alternative at a goal `False` (`instanceRefutation`). -/
+elab "verex_instance_refutation" : tactic => focusGoal do
+  unless ← instanceRefutation (← getMainGoal) do
+    throwError "no hypothesis negates an instance of a quantified hypothesis"
+  replaceMainGoal []
+
+/-- A group's conjunction, part by part. -/
+private def conjunctionParts (goal : MVarId) (fuel : Nat := 64) : MetaM (List MVarId) := do
+  match fuel with
+  | 0 => return [goal]
+  | fuel + 1 =>
+    let target ← goal.withContext do whnfR (← instantiateMVars (← goal.getType))
+    unless target.isAppOfArity ``And 2 do return [goal]
+    let halves ← goal.apply (mkConst ``And.intro)
+    halves.flatMapM (conjunctionParts · fuel)
 
 @[tactic blockDecideTactic] def evalBlockDecide : Tactic := fun _ => do
   let goal ← getMainGoal
-  if (← closeByStatement goal) || (← statedWitness goal) then
+  if ← closeByStatement goal then
     replaceMainGoal []
+    return
+  if ← statedWitness goal then
+    replaceMainGoal []
+    return
+  -- A goal read up to negation; a reading that does not close keeps the goal.
+  let saved ← saveState
+  let names ← getNGen
+  let parts ← readNegatedGoal goal
+  unless parts == [goal] do
+    try
+      for part in parts do
+        let some part ← normalizeFact part none | continue
+        setGoals [part]
+        evalTactic (← blockDecide)
+      setGoals []
+      return
+    catch _ =>
+      saved.restore
+      setNGen names
+  -- A conjunction part by part: each part is one bounded check.
+  if ← goal.withContext do return (← whnfR (← instantiateMVars (← goal.getType))).isAppOfArity ``And 2 then
+    let parts ← conjunctionParts goal
+    for part in parts do
+      setGoals [part]
+      evalTactic (← blockDecide)
+    setGoals []
     return
   let some goal ← impliedFacts goal | replaceMainGoal []
   replaceMainGoal [goal]
@@ -2491,17 +3425,33 @@ private def statedWitness (goal : MVarId) : MetaM Bool := goal.withContext do
     term.isAppOf ``VerexIR.SpecMap.keyAt || term.isAppOf ``VerexIR.SpecMap.valueAt ||
       term.isAppOf ``VerexIR.SpecMap.rank || term.isAppOf ``VerexIR.SpecMap.hasKey).isSome
   if target.isConstOf ``False then
-    evalTactic (← `(tactic| first | verex_negation_conflict | omega | verex_bool_conflict |
-      verex_instance))
-  else if readsMap then
-    evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | verex_instance |
-      omega))
+    evalTactic (← `(tactic| first
+      | verex_negation_conflict | verex_block_omega | verex_bool_conflict | verex_instance
+      | verex_instance_refutation))
   else
     try
-      evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | omega |
-        verex_instance))
+      if readsMap then
+        evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | verex_instance |
+          verex_block_omega))
+      else
+        evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | verex_block_omega |
+          verex_instance))
     catch failure =>
-      unless ← blockInstance goal do throw failure
+      -- Instantiate against the normalized goal, including map reads whose
+      -- source statement still contains typed-map or integer bridges; then,
+      -- as a last alternative, an obligation whose two sides differ only by
+      -- the equations the other side states, which the automatic leaf ends
+      -- with as well (`verex_certified_congr`).
+      unless ← blockInstance goal do
+        let saved ← saveState
+        setGoals [goal]
+        let closed ← (try
+            evalTactic (← `(tactic| verex_certified_congr))
+            pure (← getGoals).isEmpty
+          catch _ => pure false)
+        unless closed do
+          saved.restore
+          throw failure
       setGoals []
 
 /-- Settle the equations of names and values a case split leaves in a goal's
@@ -2573,6 +3523,9 @@ run_meta do
             `{parameter.binder}`"
       for binder in binders, name in names do
         if parameters.any (·.binder == name) then continue
+        -- The slice is inferred from the validity obligation, independently
+        -- of the parent map's value type.
+        if theorem_ == ``VerexIR.SpecMap.valid_slice && name == `slice then continue
         unless ← lemmaBinderFilled name (← inferType binder) do
           throwError "built-in lemma {theorem_}: binder `{name}` is filled by nothing"
 
@@ -2631,7 +3584,7 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
     let owner ← Contract.nativeOwner (← context.carriers) (← context.exprType mapArgument)
       (← Contract.translate context mapArgument)
     let some ownerType := (context.ns.expressions[mapArgument.index]?).bind fun expression =>
-        context.valueTypeOf? expression.typeId
+        context.valueTypeOf? (context.ns.typeId expression.typeId)
       | throwErrorAt reference "the lemma's map has no type"
     let some model := Contract.mapModel? step.unit ownerType
       | throwErrorAt reference "the lemma's map is not an intrinsic map"
@@ -2673,7 +3626,9 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
       | _, none => throwErrorAt reference "a map lemma is applied at no map"
     values := values.push (parameter.binder, value)
   let theorem_ ← mkConstWithFreshMVarLevels lemmaTheorem
-  let (holes, _, statement) ← forallMetaTelescopeReducing (← inferType theorem_)
+  -- Only the declared binders are inputs. Reducing the conclusion would
+  -- turn a negation into an additional premise and a conclusion of False.
+  let (holes, _, statement) ← forallMetaTelescope (← inferType theorem_)
   -- The binders' names, read from the theorem's statement.
   let rec binderNames : Lean.Expr → List Name
     | .forallE name _ body _ => name :: binderNames body
@@ -2684,6 +3639,12 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
       unless ← isDefEq hole value do
         throwErrorAt reference m!"the lemma's `{name}` does not fit its theorem: {← inferType value} \
           against {← inferType hole}"
+  if lemmaTheorem == ``VerexIR.SpecMap.valid_slice then
+    let mut target ← instantiateMVars (← goal.getType)
+    while target.isAppOf ``VerexIR.Proofs.Obligation do
+      target := target.appArg!
+    unless ← isDefEq statement target do
+      throwErrorAt reference "the slice lemma requires an ordered-map validity obligation"
   for hole in holes, name in names do
     if name == `fallback || name == `read || name == `injective || name == `eq ||
         name == `sound then
@@ -2740,9 +3701,9 @@ def blockScope (file : String) (block : Syntax) :
       let some localDecl := step.locals[index]? | continue
       if names.any (·.1 == localDecl.name) || expression.binders.any (·.1 == localDecl.name) then
         continue
-      let some type := base.valueTypeOf? localDecl.type.typeId | continue
+      let some type := base.valueTypeOf? (base.ns.typeId localDecl.type.typeId) | continue
       names := names.push (localDecl.name, Contract.domainOf type,
-        ← base.nativeType localDecl.type.typeId)
+        ← base.nativeType (base.ns.typeId localDecl.type.typeId))
   return names
 
 /-- A step's lowered expression, as `loweredStepsExtension` records it. -/
@@ -2799,6 +3760,9 @@ private def proveReadingWhy (reference : Syntax) (goal : MVarId) (prove : Tactic
   let goal ← readBounds goal
   setGoals [goal]
   readUnmarked
+  -- Step expressions can introduce fresh native reads after the path was
+  -- prepared. Compare them at the same family spelling as its hypotheses.
+  evalTactic (← `(tactic| all_goals verex_canonical_families))
   if (← getUnsolvedGoals).isEmpty then return none
   try
     withRef reference prove
@@ -2823,7 +3787,12 @@ private def statedInstance (goal : MVarId) (fact : Lean.Expr) (equality? : Optio
     match equality? with
     | some equality => mkEqMP equality (← instantiateMVars stated)
     | none => instantiateMVars stated
-  unless ← goal.withContext (isDefEq owed proof) do saved.restore; return false
+  -- Comparing proof terms can succeed by proof irrelevance without assigning
+  -- the opaque metavariable. Check the statement, then install the proof.
+  unless ← goal.withContext (isDefEq (← inferType owed) (← inferType proof)) do
+    saved.restore
+    return false
+  owed.mvarId!.assign proof
   return true
 
 /-- `fact` normalized as the leaf is, proved by `prove` from the goal's
@@ -2875,7 +3844,7 @@ private def frameConclusion (application : Syntax) (closer : TSyntax `tactic) (g
       let e := e.consumeMData
       if e.isAppOf ``VerexIR.Proofs.Obligation then peel e.appArg! fuel else e
   let target := peel (← instantiateMVars (← goal.getType)) 8
-  unless target.isAppOf ``MemoryInvariants do
+  unless target.isAppOf ``DataInvariants do
     throwErrorAt application m!"the frame lemma concludes the stored invariants: the obligation \
       states none:{indentExpr target}"
   let owed ← mkFreshExprSyntheticOpaqueMVar target
@@ -2886,7 +3855,7 @@ private def frameConclusion (application : Syntax) (closer : TSyntax `tactic) (g
   let rank (premise : MVarId) : MetaM Nat := do
     let type ← instantiateMVars (← premise.getType)
     if !(← isProp type) then return 3
-    if type.isAppOf ``MemoryInvariants then return 1
+    if type.isAppOf ``DataInvariants then return 1
     if type.isForall && (type.bindingBody!.find? (·.isAppOf ``Ne)).isSome then return 0
     return 2
   let ranked ← premises.toArray.mapM fun premise => return (← rank premise, premise)
@@ -2909,6 +3878,61 @@ private def frameConclusion (application : Syntax) (closer : TSyntax `tactic) (g
     throwErrorAt application "the frame lemma does not match the obligation"
   return (proof, target)
 
+/-- `f.unfold(a)` at the goal: `f`'s unfolding equation at the arguments, its
+domain and the condition its body branches on first decided by `closer`, the
+equation at the branch taken. A name the compiler generated (`$`) has no
+source to be stated against, so it is no valid `f`. -/
+private def unfoldConclusion (application : Syntax) (function : Name) (closer : TSyntax `tactic)
+    (goal : MVarId) (rules : BlockRules) : TacticM (Lean.Expr × Lean.Expr) := do
+  if (toString function).contains '$' then
+    throwErrorAt application m!"`{function}` is a specialization the compiler generated; \
+      only a recursive specification function named in the source unfolds by `apply`"
+  let lowered ← loweredAt application
+  let (site, unfold) ← goal.withContext do
+    let translated ← translateStep lowered application
+    let env ← getEnv
+    let sites := sitesWhere (fun e => (specUnfolding? env e).isSome && !e.hasLooseBVars) #[translated]
+    let some site := sites[0]?
+      | throwErrorAt application m!"`{function}` is no recursive specification function"
+    let some unfold := specUnfolding? env site
+      | throwErrorAt application m!"`{function}` is no recursive specification function"
+    return (site, unfold)
+  let (proof, statement) ← goal.withContext (specUnfoldingInstance unfold site)
+  -- A condition proved by the closer, one attempt per reading, its failure kept.
+  let decided (condition : Lean.Expr) : TacticM (Option Lean.Expr) := do
+    let saved ← saveState
+    try
+      let (_, owed, equality?) ← proveNormal application goal condition (evalTactic closer) rules
+      goal.withContext do
+        match equality? with
+        | some equality => return some (← mkEqMPR equality owed)
+        | none => return some owed
+    catch _ =>
+      saved.restore
+      return none
+  let branches (e : Lean.Expr) := e.isAppOfArity ``ite 5 || e.isAppOfArity ``dite 5
+  let mut proof := proof
+  let mut statement := statement
+  repeat
+    let some (_, _, rhs) := statement.eq? | break
+    unless branches rhs do break
+    let condition := rhs.getArg! 1
+    let domain := rhs.isAppOfArity ``dite 5 &&
+      (match rhs.getArg! 3 with | .lam name .. => name == `bounds | _ => false)
+    let held ← decided condition
+    let (certificate, holds) ← match held with
+      | some certificate => pure (certificate, true)
+      | none =>
+          let refuted ← if domain then pure none else decided (mkNot condition)
+          let some certificate := refuted
+            | goal.withContext <| withSpecForm <| throwErrorAt application
+                m!"`decide` does not settle the guard of `{function}`'s unfolding; state it or its \
+                  negation:{indentExpr condition}"
+          pure (certificate, false)
+    (proof, statement) ← goal.withContext (unfoldingBranch proof certificate holds)
+    unless domain do break
+  return (proof, statement)
+
 /-- A lemma application's conclusion at the goal, in its context: the
 application translated (`LemmaApplication owes gives`). A map lemma's
 conclusion is proved by its theorem, its premises by `closer`; a declared
@@ -2916,6 +3940,8 @@ lemma's premise is proved by `closer` and its theorem gives its conclusion
 (`lemmaFacts`). The proof and the conclusion. -/
 private def lemmaConclusion (application : Syntax) (closer : TSyntax `tactic) (goal : MVarId)
     (rules : BlockRules) : TacticM (Lean.Expr × Lean.Expr) := do
+  if let some function := unfoldedFunction? application then
+    return ← unfoldConclusion application function closer goal rules
   let lowered ← loweredAt application
   match lowered.builtin with
   | some ``VerexIR.Proofs.Denote.StepLemmas.stored_invariants_frame =>
@@ -2926,7 +3952,7 @@ private def lemmaConclusion (application : Syntax) (closer : TSyntax `tactic) (g
       let (proof, statement, premises) ← lemmaInstance goal lowered application mapLemma
       for premise in premises do
         let some premise ← normalizeFact premise none rules | continue
-        unless ← proveReading application premise (evalTactic closer) do
+        unless ← proveReading application premise (evalTactic (← `(tactic| (repeat intro); $closer:tactic))) do
           withSpecForm <| throwErrorAt application m!"the lemma's premise is not proved:\
             {indentD (MessageData.ofGoal premise)}"
       return (proof, statement)
@@ -2980,7 +4006,7 @@ private def guardedConclusion (formula : Syntax) (closer : TSyntax `tactic) (goa
       return (← mkLambdaFVars held (← instantiateMVars proof),
         ← mkForallFVars held (← instantiateMVars statement))
 
-/-- `∀ (x : T; …), c ==> L(a)` at the goal (`doc/plan/proof-language.md`,
+/-- `∀ (x : T; …), c ==> L(a)` at the goal (`doc/designs/proof-language.md`,
 "Steps": `apply ∀ xs. ψ` gives the implication under the binders): each
 binder a local of its specification type named in the step's scope, the
 guarded conclusion proved under them, then closed over them; the proof and
@@ -2996,8 +4022,8 @@ private def quantifiedConclusion (formula : Syntax) (closer : TSyntax `tactic) (
     let types ← binders.mapM fun (name, _) => do
       let some localDecl := lowered.locals.findRev? (·.name == name)
         | throwErrorAt formula m!"the binder `{name}` is not lowered"
-      return (name, ← context.binderType localDecl.type.typeId,
-        context.valueTypeOf? localDecl.type.typeId)
+      return (name, ← context.binderType (context.ns.typeId localDecl.type.typeId),
+        context.valueTypeOf? (context.ns.typeId localDecl.type.typeId))
     -- A binder of a bounded integer type ranges over its type's values.
     let rangeOf (type : Option VerexIR.Ty) (x : Lean.Expr) : MetaM (Option Lean.Expr) := do
       let some (.integer (.bits width) signed) := type | return none
@@ -3137,6 +4163,67 @@ def assertStep (step : Syntax) (index : String)
       remaining := remaining.push next
   setGoals remaining.toList
 
+/-- The value a conjunct of `φ` equates to its binder at index `depth`, under
+the membership a body reading the binder natively binds (`fits`). -/
+private partial def definingValue? (depth : Nat) (part : Lean.Expr) : Option Lean.Expr := do
+  let part := part.consumeMData
+  if part.isAppOfArity ``And 2 then
+    return ← definingValue? depth (part.getArg! 0) <|> definingValue? depth (part.getArg! 1)
+  if part.isAppOfArity ``Exists 2 then
+    let .lam _ _ inner _ := part.appArg!.consumeMData | none
+    return ← definingValue? (depth + 1) inner
+  let some (_, lhs, rhs) := part.eq? | none
+  if lhs == .bvar depth && !rhs.hasLooseBVars then return rhs
+  if rhs == .bvar depth && !lhs.hasLooseBVars then return lhs
+  none
+
+/-- The integer `∃ x : Int, φ` defines, `v` of a conjunct `x = v` or `v = x` of
+`φ`, `v` not holding `x`, and `φ`. -/
+private def definedInteger? (fact : Lean.Expr) : Option (Lean.Expr × Lean.Expr) := do
+  let fact := fact.consumeMData
+  guard (fact.isAppOfArity ``Exists 2 && (fact.getArg! 0).isConstOf ``Int)
+  let .lam _ _ body _ := fact.appArg!.consumeMData | none
+  return (← definingValue? 0 body, body)
+
+/-- `let x : T where φ` at each goal. Where `φ` defines `x` by an equation with
+an integer term `v`, `x` is the scope name of `v`, and `φ` at `v` with `x`'s
+range is owed by `decide` and given as the facts `fact.k`, `fact.k_1`, …: no
+witness local, no substitution. Otherwise `exists x : T: φ` is proved by
+`decide` and opened, the witness the local `x` in scope, `φ` the facts, in the
+normal form; `x` itself is never substituted. -/
+def letWhereStep (step : Syntax) (index : String) : TacticM Unit := do
+  let statement := letWhereExists step
+  let lowered ← loweredAt statement
+  let some (x, _) := (forallBinders step)[0]?
+    | throwErrorAt step[1] "`let … where` binds a name at its type: `let x : T where φ`"
+  let decide ← blockDecide
+  let name := blockFactName "fact" index
+  let mut remaining := #[]
+  for goal in ← getGoals do
+    let fact ← goal.withContext (translateStep lowered statement)
+    if let some (value, body) := definedInteger? fact then
+      let (normal, proof, _) ← proveNormal step goal (body.instantiate1 value) (evalTactic decide)
+        (← blockRules goal)
+      let named ← hideEntries (← addScopeEntries goal #[(x, value)])
+      let (_, opened) ← (← named.assert name normal proof).intro1P
+      if let some next ← destructureFact opened name (always := true) then
+        remaining := remaining.push next
+      continue
+    let (_, owed, equality?) ← proveNormal step goal fact (evalTactic decide) (← blockRules goal)
+    let proof ← goal.withContext do
+      match equality? with
+      | some equality => mkEqMPR equality owed
+      | none => pure owed
+    let (hypothesis, next) ← (← goal.assert name fact proof).intro1P
+    let #[case] ← next.cases hypothesis #[{ varNames := [Name.mkSimple x, name] }]
+      | throwErrorAt step "the existential did not open"
+    let some witness := case.fields[0]? | throwErrorAt step "the existential did not open"
+    let opened ← hideEntries (← addScopeEntries case.mvarId #[(x, witness)])
+    let some opened ← normalizeFact opened (some name) | continue
+    if let some next ← destructureFact opened name (always := true) then
+      remaining := remaining.push next
+  setGoals remaining.toList
+
 /-- A `calc` step's links and conclusion. -/
 private def calcChainOf (step : Syntax) : TacticM (Array Syntax × Syntax) :=
   match calcChain step[2] with
@@ -3256,7 +4343,7 @@ no cases. -/
 private def splitKind? (lowered : LoweredStep) : Option SplitKind := do
   let ns ← lowered.unit.namespaces[0]?
   let expression ← ns.expressions[lowered.expression.index]?
-  match ← lowered.unit.tables.types[(Contract.specTypeId lowered.unit expression.typeId).index]? with
+  match ← lowered.unit.tables.types[(Contract.specTypeId lowered.unit (ns.typeId expression.typeId)).index]? with
   | .bool => some .boolean
   | .nominal name _ =>
       let handle ← VerexIR.SemanticOperations.resolveNominal? lowered.unit ns name
@@ -3267,46 +4354,6 @@ private def splitKind? (lowered : LoweredStep) : Option SplitKind := do
         some .optional
       else none
   | _ => none
-
-/-- A case fact that its normal form states as an existential or a
-conjunction, taken apart: the witnesses locals, each part a fact of the block,
-`name`, `name_1`, …, as a model value a case reads (`∃ a, o = some a ∧ …`) is
-named for the facts that read it. The goal and the parts' names. -/
-private partial def takeFactApart (goal : MVarId) (name : Name) (next : Nat := 1) :
-    TacticM (MVarId × Array Name) := do
-  let some fact ← goal.withContext do return (← getLCtx).findFromUserName? name
-    | return (goal, #[])
-  let type ← goal.withContext do whnfR (← instantiateMVars fact.type)
-  if type.isAppOfArity ``Exists 2 then
-    let witness ← mkFreshUserName `witness
-    let #[case] ← goal.cases fact.fvarId #[{ varNames := [witness, name] }] | return (goal, #[name])
-    return ← takeFactApart case.mvarId name next
-  if type.isAppOfArity ``And 2 then
-    let rest := Name.mkSimple s!"{name}_{next}"
-    let #[case] ← goal.cases fact.fvarId #[{ varNames := [name, rest] }] | return (goal, #[name])
-    let some restFact ← case.mvarId.withContext do return (← getLCtx).findFromUserName? rest
-      | return (case.mvarId, #[name])
-    let goal ← markFact case.mvarId restFact.fvarId
-    let (goal, restParts) ← takeFactApart goal rest (next + 1)
-    let (goal, parts) ← takeFactApart goal name (next + 1)
-    return (goal, parts ++ restParts)
-  return (goal, #[name])
-
-/-- A case fact taken apart (`takeFactApart`), then, under the bounds of the
-values its parts read, each part normalized and settled. The goal after,
-none where it is closed. -/
-private def destructureFact (goal : MVarId) (name : Name) : TacticM (Option MVarId) := do
-  let (goal, parts) ← takeFactApart goal name
-  if parts.size ≤ 1 then return some goal
-  setGoals [goal]
-  evalTactic (← `(tactic| verex_type_bounds))
-  let [goal] ← getGoals | return none
-  let mut goal := goal
-  for part in parts do
-    let some next ← normalizeFact goal (some part) | return none
-    let some next ← settleFact next part | return none
-    goal := next
-  return some goal
 
 /-- The hypotheses of a goal that hold a term, which a split of the term
 generalizes with the goal, so that each case reads them at its value. -/
@@ -3369,6 +4416,23 @@ private def splitVariant (goal : MVarId) (expression : Syntax) (term : Lean.Expr
   evalTactic (← `(tactic| all_goals verex_map_positions))
   return (← getGoals).toArray
 
+/-- A branch decides existing conditional facts as well as the facts its
+steps introduce. Read each such fact in the branch's normal form once. -/
+private def normalizeCaseConditionals (goal : MVarId) : TacticM (Option MVarId) := do
+  let names ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      let type ← instantiateMVars decl.type
+      unless (type.find? fun term => term.isAppOf ``ite || term.isAppOf ``dite).isSome do
+        return found
+      unless ← isProp type do return found
+      return found.push decl.userName
+  let mut goal := goal
+  for name in names do
+    let some next ← normalizeFact goal (some name) | return none
+    goal := next
+  return some goal
+
 /-- `split e` at each goal: a variant local of the leaf once per variant, its
 scope entries reading the variant's value; a value of an enum type once per variant;
 a Boolean once true, once false; the case a hypothesis `split.k`. -/
@@ -3405,7 +4469,9 @@ def splitStep (step : Syntax) (index : String) : TacticM Unit := do
             if let some next ← settleFact next name then cases := cases.push next
   -- A case's new values and equations, such as a variant's payload, enter
   -- the definitions' normal form.
-  setGoals (← (← prepareCases cases).mapM reduceDefinitions)
+  let preparedCases ← prepareCases cases
+  let conditionalCases ← preparedCases.filterMapM normalizeCaseConditionals
+  setGoals (← conditionalCases.mapM reduceDefinitions)
 
 /-- `let V { f, … } := e` at each goal: `e is V` owed by `decide`, the fact
 `fact.k`, then `e` split by its variant, the cases but `V` refuted by it; the
@@ -3426,16 +4492,6 @@ def letVariantStep (step : Syntax) (index : String) : TacticM Unit := do
     cases := cases ++ (← splitVariant goal step[6] term (blockFactName "let" index))
   setGoals (← (← prepareCases cases).mapM reduceDefinitions)
 
-/-- A group's conjunction, part by part. -/
-private def conjunctionParts (goal : MVarId) (fuel : Nat := 64) : MetaM (List MVarId) := do
-  match fuel with
-  | 0 => return [goal]
-  | fuel + 1 =>
-    let target ← goal.withContext do whnfR (← instantiateMVars (← goal.getType))
-    unless target.isAppOfArity ``And 2 do return [goal]
-    let halves ← goal.apply (mkConst ``And.intro)
-    halves.flatMapM (conjunctionParts · fuel)
-
 /-- An obligation's target in the block's normal form: the block's rules,
 then the denotation's normal form, whose conditional rules (a quotient's
 spelling) decide by the facts the steps gave. The goal after, none where it
@@ -3446,14 +4502,54 @@ def normalizeTarget (goal : MVarId) : TacticM (Option MVarId) := do
   let some next ← simpCached goal .rules forward reversed #[] true | return none
   normalizeFact next none
 
+/-- Compose the context's equalities through applications without unfolding
+specification functions. Only local equations are rewrite rules; a bounded
+attempt that leaves a goal restores its state for the other closers. -/
+private def closeByEqualityChain (goal : MVarId) : TacticM Bool := do
+  let saved ← saveState
+  try
+    let closed ← goal.withContext do
+      let mut equations : SimpTheorems := {}
+      for decl in ← getLCtx do
+        if decl.isImplementationDetail then continue
+        let statement := (← instantiateMVars decl.type).consumeMData
+        unless statement.isAppOfArity ``Eq 3 do continue
+        let direction ← factRule statement
+        if direction == .none then continue
+        for theorem_ in ← mkSimpTheoremFromExpr (.fvar decl.fvarId) #[] decl.toExpr
+            (inv := direction == .reversed) do
+          equations := equations.addSimpTheorem theorem_
+      let { ctx, simprocs, .. } ← mkSimpContext
+        (← `(tactic| simp (config := { maxSteps := 512 }) only)) (eraseLocal := false)
+      let ctx ← Simp.mkContext ctx.config (ctx.simpTheorems.push equations) ctx.congrTheorems
+      let (remaining, _) ← withReducible <| simpGoal goal ctx simprocs
+        (fvarIdsToSimp := #[])
+      return remaining.isNone
+    if closed then return true
+  catch _ => pure ()
+  let names ← getNGen
+  saved.restore
+  setNGen names
+  return false
+
 @[tactic blockCongrTactic] def evalBlockCongr : Tactic := fun _ => do
   let (_, goal) ← (← getMainGoal).intros
+  if ← closeByEqualityChain goal then
+    replaceMainGoal []
+    return
   let some goal ← normalizeTarget goal | replaceMainGoal []
   let mut open_ := #[]
   for part in ← conjunctionParts goal do
     let (_, part) ← part.intros
     setGoals [part]
-    evalTactic (← `(tactic| lia (splits := 0)))
+    if ← closeByEqualityChain part then
+      setGoals []
+      continue
+    -- Preserve opaque observations when a single congruence step and stated
+    -- equalities suffice; the arithmetic engine may unfold their definitions.
+    evalTactic (← `(tactic| first
+      | (congr 1 <;> assumption)
+      | lia (splits := 0)))
     open_ := open_ ++ (← getUnsolvedGoals).toArray
   setGoals open_.toList
 
@@ -3557,17 +4653,55 @@ where
 /-- Close the goals by `decide` in the block's normal form, their premises
 introduced and a conjunction part by part. The goals left open. -/
 def closeByDecide : TacticM (Array MVarId) := do
-  let normalized ← (← getGoals).filterMapM fun goal => do
+  let normalized ← (← getGoals).flatMapM fun goal => do
     let (_, goal) ← goal.intros
-    let some goal ← foldLeafHypotheses goal | return none
-    normalizeTarget goal
+    setGoals [goal]
+    -- A fact already states some clauses verbatim. Finish those before
+    -- extracting certificates and normalizing new facts from the context.
+    if ← VerexIR.Proofs.Denote.closesBy goal (← `(tactic| verex_assumption)) then
+      return []
+    let known ← goal.withContext do
+      return (← getLCtx).foldl (init := (#[] : Array FVarId)) fun found decl =>
+        found.push decl.fvarId
+    VerexIR.Proofs.Denote.assertCertifiedClauses
+      (fun statement => return (← VerexIR.Proofs.Denote.canonicalFamilyResult statement).expr)
+    evalTactic (← `(tactic| all_goals verex_split_hypotheses))
+    -- Exposing a certificate can split the path. Normalize its new facts
+    -- in every resulting context and retain every remaining obligation.
+    let branches ← getGoals
+    let mut prepared := #[]
+    for branch in branches do
+      setGoals [branch]
+      VerexIR.Proofs.Denote.normalizeContext (target := false)
+        (select := fun id => !known.contains id)
+      evalTactic (← `(tactic| all_goals verex_split_hypotheses))
+      prepared := prepared ++ (← getGoals).toArray
+    prepared.toList.filterMapM fun goal => do
+      let some goal ← foldLeafHypotheses goal | return none
+      normalizeTarget goal
   setGoals (← normalized.flatMapM (conjunctionParts ·))
   let mut open_ := #[]
   for goal in ← getGoals do
-    let (_, normal) ← goal.intros
+    let started ← IO.getNumHeartbeats
+    let (introduced, normal) ← goal.intros
     setGoals [normal]
-    try evalTactic (← blockDecide)
+    if !introduced.isEmpty then
+      -- Grouped clauses keep their premises inside their own conjunct.
+      -- Read certificates only for newly introduced values; the path's
+      -- existing values were prepared before its clauses were split.
+      VerexIR.Proofs.Denote.assertCertifiedClauses
+        (fun statement => return (← VerexIR.Proofs.Denote.canonicalFamilyResult statement).expr)
+        (some (introduced.map Lean.mkFVar))
+      -- Propagate these new facts before deciding that conjunct.
+      evalTactic (← `(tactic| all_goals verex_canonical_families))
+      evalTactic (← `(tactic| all_goals verex_split_hypotheses))
+      evalTactic (← `(tactic| all_goals verex_subst_vars))
+      evalTactic (← `(tactic| all_goals verex_reduce_projections))
+      evalTactic (← `(tactic| all_goals verex_type_bounds))
+    let decide ← blockDecide
+    try evalTactic (← `(tactic| all_goals ($decide:tactic)))
     catch _ => pure ()
+    stageLog s!"decide goal: {((← IO.getNumHeartbeats) - started) / 1000}k"
     open_ := open_ ++ (← getUnsolvedGoals).toArray
   setGoals open_.toList
   return open_
@@ -3639,9 +4773,9 @@ partial def guardedStatement (guarded : GuardedBlock) : TacticM (Option (Lean.Ex
   let types ← guarded.binders.mapM fun (name, _) => do
     let some localDecl := lowered.locals.findRev? (·.name == name)
       | throwErrorAt guarded.reference m!"the binder `{name}` is not lowered"
-    let some type := context.valueTypeOf? localDecl.type.typeId
+    let some type := context.valueTypeOf? (context.ns.typeId localDecl.type.typeId)
       | throwErrorAt guarded.reference m!"the type of `{name}` is unknown"
-    return (name, ← context.binderType localDecl.type.typeId, type)
+    return (name, ← context.binderType (context.ns.typeId localDecl.type.typeId), type)
   let rec bind (index : Nat) (bound : Array Lean.Expr) (ranges : Array Lean.Expr) :
       TacticM (Option (Lean.Expr × Nat)) := do
     if h : index < types.size then
@@ -3739,7 +4873,8 @@ private def coerceWitness (goal : MVarId) (α value : Lean.Expr) (lowered : Lowe
   if ← goal.withContext (isDefEq valueType α) then return value
   -- An integer at a bounded integer's carrier needs no frame: a clause's
   -- carriers are read only for the views and native values below.
-  if carrier.isAppOfArity ``VerexIR.SpecInt 2 && (← goal.withContext (isDefEq valueType (mkConst ``Int))) then
+  if ← (pure (carrier.isAppOfArity ``VerexIR.SpecInt 2) <&&>
+      goal.withContext (isDefEq valueType (mkConst ``Int))) then
     let (width, signed) := (carrier.getArg! 0, carrier.getArg! 1)
     let fits ← witnessOwes goal (mkApp3 (mkConst ``VerexIR.IntegerValueFits) width signed value) witness
       "the witness is not in its type's range"
@@ -3748,7 +4883,7 @@ private def coerceWitness (goal : MVarId) (α value : Lean.Expr) (lowered : Lowe
     let context ← stepContext lowered witness
     let some expression := context.ns.expressions[lowered.expression.index]?
       | throwErrorAt witness "the witness is not lowered"
-    return (← context.carriers, ← context.nativeType expression.typeId)
+    return (← context.carriers, ← context.nativeType (context.ns.typeId expression.typeId))
   let typed? ← goal.withContext do
     let some view ← NativeMaps.typedView? carriers (← Contract.quoteNTy τ) | return none
     unless ← isDefEq view.type α do return none
@@ -3837,6 +4972,27 @@ def witnessStep (step : Syntax) : TacticM Unit := do
     if let some normal ← normalizeFact goal none then remaining := remaining.push normal
   setGoals remaining.toList
 
+/-- `assert (∃ x, φ) by witness e, …` at each goal: `witness`'s step at the owed
+existential, its body by `decide`, then a hypothesis `fact.k` of the goal. -/
+def assertWitnessStep (step : Syntax) (index : String) : TacticM Unit := do
+  let lowered ← loweredAt step[1]
+  let decide ← blockDecide
+  let prove : TacticM Unit := do
+    witnessStep step[2][1]
+    let mut open_ := #[]
+    for owed in ← getGoals do
+      setGoals [owed]
+      evalTactic decide
+      open_ := open_ ++ (← getUnsolvedGoals).toArray
+    setGoals open_.toList
+  let name := blockFactName "fact" index
+  let mut remaining := #[]
+  for goal in ← getGoals do
+    let fact ← goal.withContext (translateStep lowered step[1])
+    if let some next ← addFact step goal name fact prove false then
+      remaining := remaining.push next
+  setGoals remaining.toList
+
 /-- The unit a block's expressions are lowered in: the module's copy. -/
 private def blockUnit? (block : Syntax) : TacticM (Option ValidatedUnit) := do
   let some expression := (blockExpressions block)[0]? | return none
@@ -3885,7 +5041,7 @@ private def readsMap (goal : MVarId) : MetaM Bool := goal.withContext do
   return found
 
 /-- An `assert e` of a point step, the `number`-th at its point
-(`doc/plan/proof-language.md`, "Points"): `e` is owed as an obligation of its
+(`doc/designs/proof-language.md`, "Points"): `e` is owed as an obligation of its
 own, `assert k of p`, which the walk queues as a leaf (`.pointAssert`), and
 given to the goal as the fact `name`. The goals after, and the owed ones. -/
 private def pointAssertStep (step : Syntax) (point : ProgramPointKey) (number : Nat)
@@ -3908,20 +5064,47 @@ private def pointAssertStep (step : Syntax) (point : ProgramPointKey) (number : 
 partial def runSteps (block : Syntax) (path : String := "") : TacticM Unit := do
   for step in blockSteps block, position in [0:(blockSteps block).size] do
     let index := s!"{path}{position}"
-    if step.isOfKind ``stepAssert then
+    let started ← IO.getNumHeartbeats
+    if step.isOfKind ``stepAssert && step[2].getNumArgs == 2 && step[2][1].isOfKind ``closerWitness then
+      assertWitnessStep step index
+    else if step.isOfKind ``stepAssert then
       assertStep step index fun block path => do runSteps block path; closeByDecide
     else if step.isOfKind ``stepLet then pure ()
     else if step.isOfKind ``stepLetVariant then letVariantStep step index
+    else if step.isOfKind ``stepLetWhere then letWhereStep step index
     else if step.isOfKind ``stepSplit then splitStep step index
     else if step.isOfKind ``stepApply then
       applyStep step[1].getSepArgs (← blockDecide) index
+    else if step.isOfKind ``stepCompute then
+      evalTactic (← `(tactic| all_goals verex_lookups_after_writes))
+    else if step.isOfKind ``stepFinish then
+      if ← atPoint then
+        throwErrorAt step "`finish` closes an obligation; use `assert` for facts at a program point"
+      let closer := step[2]
+      unless [``closerDecide, ``closerArith, ``closerEval, ``closerSolve,
+          ``closerCongr, ``closerRing].contains closer.getKind do
+        throwErrorAt closer "`finish by` accepts decide, arith, eval, solve, congr or ring"
+      let tactic ← closerTactic closer
+      for goal in ← getGoals do
+        -- Unlike an assertion, finish introduces no new source expression or
+        -- native reads. Its obligation already has the block's prepared bounds.
+        setGoals [goal]
+        let why ← try
+          withRef step (evalTactic tactic)
+          pure (if (← getUnsolvedGoals).isEmpty then none else some none)
+        catch failure => pure (some (some failure.toMessageData))
+        if let some why := why then
+          withSpecForm <| throwErrorAt step m!"`finish` did not close the obligation:\
+            {indentD (MessageData.ofGoal ((← getUnsolvedGoals).head?.getD goal))}\
+            {why.map (fun reason => m!"\n{reason}") |>.getD m!""}"
+      setGoals []
     else if step.isOfKind ``stepCalc then calcStep step index
     else if step.isOfKind ``stepForall || step.isOfKind ``stepIf then
       guardedStep step index fun block path => runSteps block path
     else if step.isOfKind ``stepAssume then
       throwErrorAt step "`assume` in a proof file is not supported yet: an assumption of an \
         obligation has no place in the target's theorem (`doc/plan/proof-language.md`, \
-        \"Semantics and lowering\"); a `spec assume` in the Move proof block is an in-body \
+        \"A proof-file `assume`\"); a `spec assume` in the Move proof block is an in-body \
         assumption"
     else if step.isOfKind ``stepWitness then
       unless path.isEmpty do
@@ -3931,6 +5114,8 @@ partial def runSteps (block : Syntax) (path : String := "") : TacticM Unit := do
       let script : TSyntax ``Lean.Parser.Tactic.tacticSeq := ⟨step[2]⟩
       evalTactic (← `(tactic| all_goals $script))
     else throwErrorAt step "this step is not supported yet"
+    stageLog s!"step {index} at line {(← getFileMap).toPosition (step.getPos?.getD 0) |>.line}: \
+      {((← IO.getNumHeartbeats) - started) / 1000}k, {(← getGoals).length} goals"
 
 /-- A lemma item's steps over its theorem's goal, its premise taken apart:
 each parameter's binder entered under the parameter's name, the bounds of
@@ -3956,6 +5141,9 @@ for the conclusion. -/
   setGoals entered.toList
   evalTactic (← `(tactic| all_goals verex_type_bounds))
   setGoals (← (← getGoals).mapM reduceDefinitions)
+  -- The conclusion in the normal form under the premises: one spelling of a quotient
+  -- for the steps (`doc/designs/proof-language.md`, "One spelling of a quotient").
+  setGoals (← (← getGoals).filterMapM fun goal => normalizeFact goal none)
   runSteps block
   let open_ ← closeByDecide
   for goal in open_ do
@@ -3974,42 +5162,163 @@ elab "verex_unmark" : tactic => focusGoal do
   let unmark (e : Lean.Expr) : MetaM Lean.Expr :=
     Core.transform e (post := fun e =>
       return if e.isAppOfArity ``VerexIR.Proofs.Obligation 4 then .done e.appArg! else .continue)
-  let mut goal ← getMainGoal
-  for decl in ← goal.withContext getLCtx do
-    if decl.isImplementationDetail || decl.isLet then continue
-    let type ← goal.withContext (instantiateMVars decl.type)
-    unless (type.find? (·.isAppOfArity ``VerexIR.Proofs.Obligation 4)).isSome do continue
-    goal ← goal.replaceLocalDeclDefEq decl.fvarId (← goal.withContext (unmark type))
+  let mut goal ← unmarkPathHypotheses (← getMainGoal)
   let target ← goal.withContext (instantiateMVars (← goal.getType))
   if (target.find? (·.isAppOfArity ``VerexIR.Proofs.Obligation 4)).isSome then
     goal ← goal.replaceTargetDefEq (← goal.withContext (unmark target))
   replaceMainGoal [goal]
 
-@[tactic verexStepObligation] def evalStepObligation : Tactic := fun stx => do
-  let step := stx[1]
-  let block := if step.isOfKind ``stepOn then step[3] else step[2]
+/-- The path's hypotheses holding a conditional a clause's premise decides, which
+the path prepared without it, with the conditional reduced (`reduceStatedIte`)
+and the branch read at the caller's family. -/
+elab "verex_premise_conditionals" : tactic => focusGoal do
+  let goal ← getMainGoal
+  let decided ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      let sites := sitesWhere (fun e => e.isAppOfArity ``ite 5 && !e.hasLooseBVars)
+        #[← instantiateMVars decl.type]
+      return if ← sites.anyM (fun site => return (← statedDecision? (site.getArg! 1)).isSome)
+        then found.push decl.fvarId else found
+  if decided.isEmpty then return
+  goal.withContext do
+    let ctx ← Simp.mkContext { failIfUnchanged := false } #[] (← getSimpCongrTheorems)
+    let simprocs ← ({} : Simprocs).add ``reduceStatedIte (post := true)
+    -- A branch reads a callee's results at the caller's family, as the path does.
+    let simprocs ← simprocs.add ``VerexIR.Proofs.Denote.whichProjectFamily (post := true)
+    let (result, _) ← simpGoal goal ctx #[simprocs] (simplifyTarget := false) (fvarIdsToSimp := decided)
+    replaceMainGoal (result.map (·.2) |>.toList)
+
+/-- A clause's identity survives shared case splits and normalization. Its
+statement remains definitionally the original obligation. -/
+def SharedClause (_label : String) (statement : Prop) : Prop := statement
+
+private def wrapSharedClause (goal : MVarId) : TacticM MVarId := do
+  let (key, tag) ← leafKeyOf goal
+  let label := tag.toString
+  (← targetState).leafKeys.modify (·.insert (Name.mkSimple label) key)
+  goal.withContext do
+    goal.replaceTargetDefEq (mkApp2 (mkConst ``SharedClause) (mkStrLit label) (← goal.getType))
+
+/-- Split only the shared conjunction. A clause's own conjunctions and
+quantifiers stay inside its marker until its nested block is entered. -/
+private partial def sharedClauseParts (goal : MVarId) : TacticM (Array (MVarId × ObligationKey)) := do
+  let target ← goal.withContext do pure (← instantiateMVars (← goal.getType)).consumeMData
+  if target.isAppOfArity ``SharedClause 2 then
+    let .lit (.strVal label) := target.getArg! 0 | throwError "a shared clause lost its label"
+    let tag := Name.mkSimple label
+    let some key := (← (← targetState).leafKeys.get)[tag]?
+      | throwError "a shared clause lost its source key"
+    let next ← goal.replaceTargetDefEq target.appArg!.consumeMData
+    next.setTag tag
+    return #[(next, key)]
+  if let some (left, right) := target.and? then
+    -- Preserve wrappers syntactically; `apply And.intro` can reduce the
+    -- child types while unifying its implicit proposition arguments.
+    let (lhs, rhs) ← goal.withContext do
+      let lhs ← mkFreshExprSyntheticOpaqueMVar left (← goal.getTag)
+      let rhs ← mkFreshExprSyntheticOpaqueMVar right (← goal.getTag)
+      goal.assign (mkApp4 (mkConst ``And.intro) left right lhs rhs)
+      return (lhs.mvarId!, rhs.mvarId!)
+    return (← sharedClauseParts lhs) ++ (← sharedClauseParts rhs)
+  throwError "a nested `on` block lost its clause boundary"
+
+mutual
+
+private partial def runOnBlock (step : Syntax) (finish : Bool) (path : String) (continuing : Bool := false) : TacticM Unit := do
+  let block := if step.isOfKind ``stepOn || step.isOfKind ``stepOnDefault then step[3] else step[2]
   let started ← IO.getNumHeartbeats
   -- The values prepared, the maps named (their size bounds and typed reads)
   -- where the block or the obligation reads a map: on a path prepared once
   -- for all its obligations (`verex_step_prepare`), only what the clause adds,
   -- its binders and premises.
+  -- A clause can package several paths under binders. Expose their saved
+  -- contexts before testing the path marker; otherwise an already prepared
+  -- path would run the full authored preparation again.
+  evalTactic (← `(tactic| all_goals verex_paths))
   let prepared ← (← getGoals).allM fun goal => pathPrepared goal
+  if finish && prepared && step.isOfKind ``stepOnDefault && (blockSteps block).isEmpty then
+    -- An empty fallback contributes no steps or source-local bindings. The
+    -- bounded leaf deciders can consume the path's prepared facts directly.
+    let mut open_ := []
+    for goal in ← getGoals do
+      let restoreCaches ← saveWalkCaches
+      -- The path is canonical, but a clause can still introduce premises
+      -- (including a final tuple equality). Expose these before the bounded
+      -- deciders; no map naming or authored fact normalization is needed.
+      -- A map's length is a count independently of naming its carrier.
+      unless ← closesBy goal (← `(tactic| (
+          verex_unmark
+          verex_intro_any
+          all_goals verex_split_hypotheses
+          all_goals verex_subst_vars
+          all_goals verex_reduce_projections
+          all_goals verex_unmark
+          all_goals first
+            | exact VerexIR.SpecMap.size_nonneg _
+            | verex_decide))) do
+        restoreCaches
+        open_ := open_ ++ [goal]
+    stageLog s!"step block at line {(← getFileMap).toPosition (step.getPos?.getD 0) |>.line}: \
+      preparation 0k, steps 0k, decide {((← IO.getNumHeartbeats) - started) / 1000}k"
+    setGoals open_
+    if open_.isEmpty then return
+    -- Some leaves still need the block's normal form (for example, a
+    -- contract's conditional map reads). Only those continue below.
+  let mut clausePremises := #[]
+  let mut reuse := continuing
   if prepared then
-    evalTactic (← `(tactic| verex_paths))
-    evalTactic (← `(tactic| all_goals verex_intro_any))
-    -- The path was prepared with its markers, which name the leaves; the
-    -- leaf reads its clauses unmarked, as a leaf prepared alone does, and a
-    -- substitution into them leaves projections of pairs to reduce.
-    evalTactic (← `(tactic| all_goals verex_unmark))
-    -- The clause's premises read at the caller's family, as the path's.
-    evalTactic (← `(tactic| all_goals verex_canonical_families))
-    evalTactic (← `(tactic| all_goals (try simp only [VerexIR.Proofs.Denote.whichProjectFamily] at *)))
-    evalTactic (← `(tactic| all_goals verex_split_hypotheses))
-    evalTactic (← `(tactic| all_goals verex_subst_vars))
-    evalTactic (← `(tactic| all_goals verex_reduce_projections))
-    evalTactic (← `(tactic| all_goals verex_type_bounds))
-    evalTactic (← `(tactic| all_goals verex_finish_prepare))
+    let mut introducedGoals := []
+    for goal in ← getGoals do
+      let before ← goal.withContext do
+        (← getLCtx).foldlM (init := ({} : Std.HashSet FVarId)) fun found decl =>
+          pure (found.insert decl.fvarId)
+      if reuse then
+        let conditional ← goal.withContext do
+          (← getLCtx).anyM fun decl => do
+            if decl.isImplementationDetail then return false
+            return ((← instantiateMVars decl.type).find? (·.isAppOf ``ite)).isSome
+        if conditional then reuse := false
+      setGoals [goal]
+      evalTactic (← `(tactic| verex_intro_any))
+      for next in ← getGoals do
+        let names ← next.withContext do
+          (← getLCtx).foldlM (init := #[]) fun found decl => do
+            if before.contains decl.fvarId || decl.isImplementationDetail then return found
+            return if ← isProp decl.type then found.push decl.userName else found
+        if reuse then
+          let scalarDelta ← next.withContext do
+            (← getLCtx).allM fun decl => do
+              if before.contains decl.fvarId || decl.isImplementationDetail then return true
+              let type ← instantiateMVars decl.type
+              if ← isProp type then
+                -- Equalities can substitute an older path value; leave that
+                -- dependency to ordinary context preparation.
+                return (type.find? fun e => e.isAppOf ``Eq || e.isAppOf ``Iff).isNone
+              return type.isConstOf ``Int || type.isConstOf ``Nat || type.isConstOf ``Bool
+          unless scalarDelta do reuse := false
+        clausePremises := clausePremises ++ names
+        introducedGoals := introducedGoals ++ [next]
+    setGoals introducedGoals
+    let mut preparedGoals := []
+    for goal in ← getGoals do
+      let delta ← pathHasDelta goal
+      setGoals [goal]
+      evalTactic (← `(tactic| verex_unmark))
+      if delta && !reuse then
+        -- A new premise can rewrite a path fact; retain context-wide work
+        -- for that dependency rather than assuming the old normal form.
+        evalTactic (← `(tactic| all_goals verex_canonical_families))
+        evalTactic (← `(tactic| all_goals (try simp only [VerexIR.Proofs.Denote.whichProjectFamily] at *)))
+        evalTactic (← `(tactic| all_goals verex_split_hypotheses))
+        evalTactic (← `(tactic| all_goals verex_subst_vars))
+        evalTactic (← `(tactic| all_goals verex_reduce_projections))
+        evalTactic (← `(tactic| all_goals verex_type_bounds))
+      evalTactic (← `(tactic| all_goals verex_finish_prepare))
+      preparedGoals := preparedGoals ++ (← getGoals)
+    setGoals preparedGoals
   else
+    reuse := false
     evalTactic (← `(tactic| verex_prepare values))
     evalTactic (← `(tactic| all_goals (try simp only [VerexIR.Proofs.Denote.whichProjectFamily] at *)))
   let names ← blockScope (← getFileName) block
@@ -4037,46 +5346,90 @@ elab "verex_unmark" : tactic => focusGoal do
       let goal ← if key.kind == "ensures" || key.kind == "data invariant" then bindFinals goal
         else pure goal
       -- An abort condition reads the entry state.
-      let goal ← if key.kind == "aborts_if" || key.kind == "aborts_with" then
+      let goal ← if key.isFailureClause || key.kind == "aborts_with" || key.isNoFailure then
           match ← goal.withContext do
               return (← scopeEntries).find? (·.1 == "old_" ++ stateScopeName) with
           | some (_, entry) => bindStateEntry goal entry
           | none => pure goal
         else pure goal
       let needs ← leafNeeds goal
+      -- Read new premises using the shared facts before refreshing those
+      -- facts: a fact can become tautological in the new normal form while
+      -- still being needed to put a fresh premise into that form.
+      let mut live := some goal
+      for name in clausePremises.reverse do
+        if let some current := live then live ← normalizeFact current (some name)
+      let some goal := live | continue
       -- The obligation reads a map where its clause does; a key naming no
       -- clause by its statement.
       let reads ← match needs.bind (·.reads) with
         | some reads => pure reads
         | none => readsMap goal
       let mut goals := [goal]
-      if blockReadsMaps || reads then
+      if !reuse && (blockReadsMaps || reads) then
         setGoals [goal]
         evalTactic (← `(tactic| verex_name_maps))
         goals := ← getGoals
       for goal in goals do
         let goal ← nameBinders goal ((needs.map (·.binders)).getD #[])
-        let some goal ← normalizeBridges goal | continue
+        let some goal ← if reuse then pure (some goal) else normalizeBridges goal | continue
         -- The facts placed at points before the obligation in the normal form
         -- of its leaf, whose names the walk bound after them.
-        let some goal ← renormalizeFacts goal | continue
+        let some goal ← if reuse then pure (some goal) else renormalizeFacts goal | continue
         prepared := prepared.push (← hideEntries goal)
     setGoals prepared.toList
-    setGoals (← (← getGoals).mapM reduceDefinitions)
+    unless reuse do
+      setGoals (← (← getGoals).mapM reduceDefinitions)
+      evalTactic (← `(tactic| all_goals verex_premise_conditionals))
     let preparedAt ← IO.getNumHeartbeats
-    runSteps block
+    runOnSteps block path
     let stepsAt ← IO.getNumHeartbeats
     -- Its premises introduced, `decide` reads it in the block's normal form,
     -- the conjunction of a group normalized once.
-    let open_ ← closeByDecide
+    let open_ ← if finish then closeByDecide else pure (← getGoals).toArray
     return (preparedAt, stepsAt, open_)
   stageLog s!"step block at line {(← getFileMap).toPosition (step.getPos?.getD 0) |>.line}: \
     preparation {(preparedAt - started) / 1000}k, steps {(stepsAt - preparedAt) / 1000}k, \
     decide {((← IO.getNumHeartbeats) - stepsAt) / 1000}k"
-  for goal in open_ do
+  for goal in (if finish then open_ else #[]) do
     withSpecForm <| logErrorAt step m!"`decide` does not close the obligation from the block's facts:\
       {indentD (MessageData.ofGoal goal)}"
   setGoals open_.toList
+
+private partial def runOnSteps (block : Syntax) (path : String) : TacticM Unit := do
+  let steps := blockSteps block
+  -- Structured steps maintain their facts' normal form. An unrestricted
+  -- Lean escape or primitive computation can expose new expressions, so
+  -- their children prepare normally.
+  let reusable := (block.find? fun step =>
+    step.isOfKind ``verexLeanStep || step.isOfKind ``stepCompute).isNone
+  let firstChild := steps.findIdx? fun step => step.isOfKind ``stepOn || step.isOfKind ``stepOnDefault
+  let some start := firstChild | runSteps block path
+  let prefixBlock := block.setArg 1 (mkNullNode (steps.extract 0 start))
+  runSteps prefixBlock path
+  let mut completed := #[]
+  for goal in ← getGoals do
+    for (part, key) in ← sharedClauseParts goal do
+      setGoals [part]
+      let mut matched := false
+      for child in steps.extract start steps.size, index in [0:steps.size - start] do
+        let takes ← if child.isOfKind ``stepOnDefault then pure (!matched)
+          else do
+            let patterns ← child[1].getSepArgs.mapM keyPattern
+            pure (patterns.any (·.selects key))
+        unless takes do continue
+        matched := true
+        if (← getGoals).isEmpty then break
+        if hasNestedOn child[3] then
+          setGoals (← (← getGoals).mapM wrapSharedClause)
+        runOnBlock child false s!"{path}on{index}_" reusable
+      completed := completed ++ (← getGoals).toArray
+  setGoals completed.toList
+
+end
+
+@[tactic verexStepObligation] def evalStepObligation : Tactic := fun stx =>
+  runOnBlock stx[1] true ""
 
 /-- The values of a frame's slots, by declaration index: the components of an
 environment literal, `none` for a slot not written. -/
@@ -4090,11 +5443,11 @@ private partial def frameSlots (env : Lean.Expr) : Array (Option Lean.Expr) :=
   | _, _ => #[]
 
 /-- At a program point, the locals the body has bound there, each its scope
-entry under its source name, where it has none (`doc/plan/proof-language.md`,
-"Obligation addressing": facts after a site name the variables in scope
-there): the slots of the environment the walk carries at the point; a
-mutable reference's entry holds its current value. The entries stay with the
-walk, so the obligations after the point read them. -/
+entry under its source name, where it has none (`doc/designs/proof-language.md`,
+"Obligation addressing and provenance": facts after a site name the
+variables in scope there): the slots of the environment the walk carries at
+the point; a mutable reference's entry holds its current value. The entries
+stay with the walk, so the obligations after the point read them. -/
 private def bindFrameLocals (goal : MVarId) : TacticM MVarId := goal.withContext do
   let some (names, _) ← scopeTable? | return goal
   let locals ← (← targetState).scopeLocals.get
@@ -4209,56 +5562,118 @@ def pointAssertNumbers {m : Type → Type} [Monad m] [MonadError m] (steps : Arr
 `verify f by block`), as `verex_on` routes them to its alternatives. -/
 syntax (name := verexStepRoute) "verex_step_route" verexProofBlock : tactic
 
-/-- The leaves an `on` of several keys takes, those of one path joined in one
-goal (as `verex_group` joins them): prepared once, their steps run once, and
-each leaf its part of the conjunction. -/
+/-- Contexts compared modulo local identities, preserving the source names
+and declaration kinds that proof steps observe. -/
+private def stepContextKey (goal : MVarId) :
+    MetaM (Array (Lean.Expr × Option Lean.Expr × BinderInfo × Name × Bool)) := goal.withContext do
+  let mut vars := #[]
+  let mut key := #[]
+  for decl in ← getLCtx do
+    key := key.push ((← instantiateMVars decl.type).abstract vars,
+      ← decl.value?.mapM fun value => return (← instantiateMVars value).abstract vars,
+      decl.binderInfo, decl.userName.eraseMacroScopes, decl.isImplementationDetail)
+    vars := vars.push decl.toExpr
+  return key
+
+/-- The path prefix ends at its preparation marker. With no shared path,
+only identical complete contexts can share steps. -/
+private def preparedPrefixSize (goal : MVarId) : MetaM Nat := goal.withContext do
+  let mut size := 0
+  let mut prepared := none
+  for decl in ← getLCtx do
+    size := size + 1
+    if decl.type.isConstOf ``PathPrepared then prepared := some size
+  return prepared.getD size
+
+/-- Keep the common context and put only the clause-specific suffix back
+under that clause's binders. Shared late facts remain available to preparation. -/
+private def restorePreparedPath (goal : MVarId) (keep : Nat) : MetaM MVarId := do
+  let locals ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => pure (found.push decl.fvarId)
+  let suffix := locals.extract keep locals.size
+  if suffix.isEmpty then return goal
+  let (_, next) ← goal.revert suffix (preserveOrder := true)
+  let state ← targetState
+  if let some decisions := (← state.leafDecisions.get)[goal]? then
+    state.leafDecisions.modify (·.insert next decisions)
+  if let some origin := (← state.leafOrigins.get)[goal]? then
+    state.leafOrigins.modify (·.insert next origin)
+  return next
+
+/-- Join an on-block's clauses by their prepared path. Retain the longest
+common context, including common late premises; abstract only the differing
+suffixes. Every original goal receives its own projection at its own locals. -/
 private def groupLeaves (alternatives : Array RouteAlternative) : TacticM Unit := do
-  unless alternatives.any (fun alternative => alternative.items.any (·.size ≥ 2)) do return
-  -- Only the goals an `on` of several keys names are taken into paths.
+  let nested (alternative : RouteAlternative) := hasNestedOn alternative.reference[3]
+  unless alternatives.any (fun alternative => alternative.items.any (·.size ≥ 2) || nested alternative) do return
   let grouped (goal : MVarId) : TacticM Bool := do
     let some index ← chosenAlternative alternatives goal | return false
-    return alternatives[index]!.items.any (·.size ≥ 2)
+    return alternatives[index]!.items.any (·.size ≥ 2) || nested alternatives[index]!
   let mut split := #[]
   for goal in ← getGoals do
     if ← grouped goal then split := split ++ (← splitPaths goal) else split := split.push goal
-  setGoals split.toList
-  let chosen (goal : MVarId) : TacticM (Option Nat) := chosenAlternative alternatives goal
-  let keyOf (goal : MVarId) : TacticM (ObligationKey × Name) := leafKeyOf goal
   let decisionsOf ← (← targetState).leafDecisions.get
   let mut remaining := #[]
-  let mut classes : Array (Nat × Array (FVarId × Lean.Expr × Option Lean.Expr) × Array MVarId) := #[]
-  for goal in ← getGoals do
-    let some index ← chosen goal | remaining := remaining.push goal; continue
-    unless alternatives[index]!.items.any (·.size ≥ 2) do
+  let mut classes : Array (Nat × Array (Lean.Expr × Option Lean.Expr × BinderInfo × Name × Bool) ×
+      Array MVarId) := #[]
+  for goal in split do
+    let some index ← chosenAlternative alternatives goal | remaining := remaining.push goal; continue
+    unless alternatives[index]!.items.any (·.size ≥ 2) || nested alternatives[index]! do
       remaining := remaining.push goal
       continue
-    let context ← goalContextKey goal
-    match classes.findIdx? fun (other, otherContext, _) => other == index && otherContext == context with
+    let context ← stepContextKey goal
+    let pathContext := context.extract 0 (← preparedPrefixSize goal)
+    match classes.findIdx? fun (other, otherContext, _) => other == index && otherContext == pathContext with
     | some position => classes := classes.modify position fun (i, c, members) => (i, c, members.push goal)
-    | none => classes := classes.push (index, context, #[goal])
-  for (_, _, members) in classes do
+    | none => classes := classes.push (index, pathContext, #[goal])
+  for (index, _, members) in classes do
     if members.size == 1 then
-      remaining := remaining.push members[0]!
+      let goal ← if nested alternatives[index]! then wrapSharedClause members[0]! else pure members[0]!
+      remaining := remaining.push goal
       continue
     let first := members[0]!
-    let statements ← members.mapM fun goal => goal.withContext do instantiateMVars (← goal.getType)
-    let mut statement := statements.back!
-    for part in statements.pop.reverse do statement := mkAnd part statement
-    let decl ← first.getDecl
-    let (key, _) ← keyOf first
+    let contexts ← members.mapM fun goal => stepContextKey goal
+    let mut keep := 0
+    while keep < contexts[0]!.size && contexts.all (fun context =>
+        context[keep]? == contexts[0]![keep]?) do
+      keep := keep + 1
+    let (key, _) ← leafKeyOf first
     let tag := Name.mkSimple s!"group_{(← first.getTag).components.head?.getD .anonymous}"
-    let combined ← mkFreshExprMVarAt decl.lctx decl.localInstances statement .syntheticOpaque tag
-    for goal in members, index in [0:members.size] do
-      let mut part := combined
-      for _ in [0:index] do part := .proj ``And 1 part
-      if index + 1 < members.size then part := .proj ``And 0 part
-      goal.assign part
+    setGoals (← members.toList.mapM fun goal => restorePreparedPath goal keep)
+    if nested alternatives[index]! then
+      setGoals (← (← getGoals).mapM wrapSharedClause)
+    evalTactic (← `(tactic| verex_group_contexts))
+    let [combined] ← getGoals | throwError "the shared path's contexts did not agree"
+    combined.setTag tag
     (← targetState).leafKeys.modify (·.insert tag key)
-    (← targetState).leafDecisions.modify (·.insert combined.mvarId! (decisionsOf[first]?.getD #[]))
-    remaining := remaining.push combined.mvarId!
+    (← targetState).leafDecisions.modify (·.insert combined (decisionsOf[first]?.getD #[]))
+    remaining := remaining.push combined
   setGoals remaining.toList
 
+/-- Nested blocks refine the parent's clause set. Sibling blocks run in
+source order, so overlapping keys accumulate their facts. -/
+private partial def validateNestedOn (block : Syntax)
+    (parents : Option (Array ObligationKey) := none) (inside : Bool := false) : TacticM Unit := do
+  let mut children := false
+  for step in blockSteps block do
+    if step.isOfKind ``stepOn || step.isOfKind ``stepOnDefault then
+      children := true
+      if inside && step[2].getNumArgs != 0 then
+        throwErrorAt step "put a path selector (`when`) on the shared parent block"
+      let keys ← if step.isOfKind ``stepOn then
+          some <$> step[1].getSepArgs.mapM keyPattern
+        else pure parents
+      if inside then
+        if let (some outer, some inner) := (parents, keys) then
+          for key in inner do
+            unless outer.any (·.selects key) do
+              throwErrorAt step "the nested `on` names a clause outside its parent block"
+      validateNestedOn step[3] keys true
+    else if inside && children then
+      throwErrorAt step "shared steps precede nested `on` blocks"
+
 @[tactic verexStepRoute] def evalStepRoute : Tactic := fun stx => do
+  validateNestedOn stx[1]
   -- Point steps are hooks of the obligations' walk (`lowerProofBlock`).
   let routed := (blockSteps stx[1]).filter fun step =>
     !step.isOfKind ``stepAt && !step.isOfKind ``stepAfter
@@ -4271,7 +5686,9 @@ private def groupLeaves (alternatives : Array RouteAlternative) : TacticM Unit :
         else pure #[]
       return ({ items := some items, selector, reference := step, steps } : RouteAlternative)
     else if step.isOfKind ``stepOnDefault then
-      return { items := none, selector := #[], reference := step, steps }
+      let selector ← if step[2].getNumArgs == 2 then step[2][1].getSepArgs.mapM decisionPattern
+        else pure #[]
+      return { items := none, selector, reference := step, steps }
     else throwErrorAt step "at the top of a proof, a step is an `on`, `at` or `after` block or \
       `lean =>`"
   -- A point's `assert e by c` is shorthand for `on assert k of p { assert e by c }`,

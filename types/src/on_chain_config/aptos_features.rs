@@ -240,6 +240,11 @@ pub enum FeatureFlag {
     /// types such as `|&T|u64` for phantom `T`. Enabling this also prevents loading previously
     /// published modules that violate the check.
     CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES = 131,
+    /// When enabled, the bytecode verifier checks the signature shape of every function
+    /// handle with a borrow field struct API attribute, rejecting mismatches with
+    /// `INVALID_STRUCT_API_CODE`. Gated because it changes the recorded status of
+    /// transactions that fail either way.
+    CHECK_BORROW_FIELD_HANDLE_SHAPE = 132,
 }
 
 /// Environment variable that adds [`FeatureFlag::ENABLE_MONO_MOVE`] to the default
@@ -373,6 +378,7 @@ impl FeatureFlag {
             Self::ENCRYPTED_TRANSACTIONS,
             Self::CHECK_FUNCTION_TYPE_ABILITIES,
             Self::CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES,
+            Self::CHECK_BORROW_FIELD_HANDLE_SHAPE,
         ];
         if mono_move_env_enabled() {
             features.push(Self::ENABLE_MONO_MOVE);

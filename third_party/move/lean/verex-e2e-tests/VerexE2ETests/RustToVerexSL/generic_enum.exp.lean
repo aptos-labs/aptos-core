@@ -9,6 +9,6 @@ verex namespace generic_enum where
     | Some (0 : T) = 1
 
   fun unwrap_or(value : Maybe<u32>, fallback : u32) -> u32 :=
-    match discriminant[Maybe<u32>, isize](value) with
+    match core.readDiscriminant[isize](value) with
       | 0 => fallback
       | 1 => value.0

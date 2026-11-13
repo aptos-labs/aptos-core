@@ -1,0 +1,115 @@
+error: `std::collections::HashMap` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:9:17
+   |
+LL | type Alias<V> = HashMap<u32, V>;
+   |                 ^^^^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+   = note: `#[deny(no_std_hash_map)]` on by default
+
+error: `std::collections::HashMap` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:12:10
+   |
+LL |     map: HashMap<u32, u64>,
+   |          ^^^^^^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashSet` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:13:10
+   |
+LL |     set: HashSet<String>,
+   |          ^^^^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashMap` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:14:24
+   |
+LL |     nested: Vec<Option<HashMap<u8, u8>>>,
+   |                        ^^^^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashMap` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:20:14
+   |
+LL | fn takes(m: &HashMap<u32, u64>) -> HashSet<u32> {
+   |              ^^^^^^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashSet` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:20:36
+   |
+LL | fn takes(m: &HashMap<u32, u64>) -> HashSet<u32> {
+   |                                    ^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashSet` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:21:5
+   |
+LL |     HashSet::new()
+   |     ^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashMap` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:25:5
+   |
+LL |     let a = HashMap::<u32, u32>::new();
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashMap` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:26:12
+   |
+LL |     let b: HashMap<u32, u32> = Default::default();
+   |            ^^^^^^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashSet` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:27:5
+   |
+LL |     let c = HashSet::<u32>::with_capacity(4);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashMap` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:28:5
+   |
+LL |     let d = <HashMap<u32, u32>>::default();
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashMap` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:30:5
+   |
+LL |     let mut e = Default::default();
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashMap` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:33:12
+   |
+LL |     let f: Alias<u8> = Alias::new();
+   |            ^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: `std::collections::HashMap` has nondeterministic iteration order
+  --> $DIR/no_std_hash_map.rs:35:5
+   |
+LL |     let g = (0..3).map(|i| (i, i)).collect::<HashMap<_, _>>();
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use `shared_dsa::UnorderedMap` / `UnorderedSet` (no iteration), or `BTreeMap` / `BTreeSet` when ordered iteration is needed
+
+error: aborting due to 14 previous errors
+

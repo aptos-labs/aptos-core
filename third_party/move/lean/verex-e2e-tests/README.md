@@ -8,6 +8,10 @@ Move source -> compiler-v2 XAST -> validated Move VIR -> VerexSL or error
 Rust source -> rustc MIR exporter -> validated Rust VIR -> VerexSL or error
 ```
 
+A Rust baseline also lowers its rendering back and compiles each function
+to its denotation, as verification does; a function with none is listed after
+the source with the construct that stops it (`-- no denotation for …`).
+
 Inputs and expectations are side by side in feature directories:
 
 ```text
@@ -61,12 +65,12 @@ feature (`Scalars/`, `Structs/`, `Enums/`, `Vectors/`, `Control/`,
 `References/`, `Storage/`, `Calls/`, `Generics/`, `Specifications/`,
 `Modules/`), with larger programs under `Examples/`; a file whose name ends
 in `Errors` holds negative cases. The ledger is the
-[roadmap's test section](../designs/roadmap.md#tests). Everything
+[roadmap](../doc/plan/roadmap.md). Everything
 under `Check/` is VerexSL; the frontend paths keep their own directories.
 
 `VerexE2ETests/SourceVerify/` verifies Move and Rust sources as
 `verex-move verify` and `verex-rust verify` do
-([`doc/designs/source-verification.md`](../designs/source-verification.md)): every
+([`doc/designs/source-verification.md`](../doc/designs/source-verification.md)): every
 `.move` and `.rs` file there, a Rust file with the `.spec.lean` items beside
 it and a Move file with its proof file, is rendered as VerexSL and
 elaborated, and its messages, in the coordinates of the Move, Rust,

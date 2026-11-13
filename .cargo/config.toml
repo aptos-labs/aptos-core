@@ -48,7 +48,9 @@ CC_x86_64_unknown_linux_gnu = "clang"
 CXX_x86_64_unknown_linux_gnu = "clang++"
 CFLAGS_x86_64_unknown_linux_gnu = "-march=x86-64-v3"
 # Need `-mpclmul` for RocksDB to build until its build script is fixed.
-CXXFLAGS_x86_64_unknown_linux_gnu = "-march=x86-64-v3 -mpclmul"
+# `librocksdb-sys` doesn't define `ROCKSDB_MALLOC_USABLE_SIZE` like RocksDB's
+# CMake does, which RocksDB needs for accurate memory accounting.
+CXXFLAGS_x86_64_unknown_linux_gnu = "-march=x86-64-v3 -mpclmul -DROCKSDB_MALLOC_USABLE_SIZE"
 
 # 64 bit MSVC
 [target.x86_64-pc-windows-msvc]

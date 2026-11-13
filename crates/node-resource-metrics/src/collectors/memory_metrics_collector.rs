@@ -24,7 +24,7 @@ const SYSTEM_SWAP_FREE: &str = "system_swap_free";
 
 /// A Collector for exposing system memory metrics
 pub(crate) struct MemoryMetricsCollector {
-    system: Arc<Mutex<System>>,
+    system: Option<Arc<Mutex<System>>>,
 
     mem_total: Desc,
     mem_used: Desc,
@@ -37,9 +37,11 @@ pub(crate) struct MemoryMetricsCollector {
 
 impl MemoryMetricsCollector {
     fn new() -> Self {
-        let system = Arc::new(Mutex::new(System::new_with_specifics(
+        let system = System::new_with_specifics(
             RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()),
-        )));
+        )
+        .ok()
+        .map(|system| Arc::new(Mutex::new(system)));
 
         let mem_total = Opts::new(SYSTEM_MEM_TOTAL, "Memory total.")
             .namespace(NAMESPACE)
@@ -101,7 +103,10 @@ impl Collector for MemoryMetricsCollector {
     fn collect(&self) -> Vec<MetricFamily> {
         let _measure = MeasureLatency::new("memory".into());
 
-        let mut system = self.system.lock();
+        let Some(system) = &self.system else {
+            return Vec::new();
+        };
+        let mut system = system.lock();
         system.refresh_memory();
 
         let mem_total =

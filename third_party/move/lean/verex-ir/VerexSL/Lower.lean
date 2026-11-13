@@ -5,6 +5,7 @@ import VerexIR
 import VerexSL.Builtins
 import VerexSL.Diagnostic
 import VerexSL.Frame
+import VerexSL.SpecEffects
 import Lean.Util.SCC
 
 /-!
@@ -41,7 +42,7 @@ def ProfileName.config : ProfileName → ProfileConfig
   | .rust => {
       profile := .rust
       name := "rust"
-      version := 2
+      version := 5
       options := #[
         ("panic", "abort"),
         ("unsafe", "reject"),
@@ -76,16 +77,16 @@ private def namespaceId? (tables : Tables) (segments : Array String) : Option Na
   (arrayIndex? tables.namespaces { segments }).map (fun index => ⟨index⟩)
 
 private def nameId? (tables : Tables) (namespaceId : NamespaceId)
-    (name : String) : Option NameId :=
-  (arrayIndex? tables.names { namespaceId, name }).map (fun index => ⟨index⟩)
+    (name : String) (scope : Array String := #[]) : Option NameId :=
+  (arrayIndex? tables.names { namespaceId, name, scope }).map (fun index => ⟨index⟩)
 
 private def internName (tables : Tables) (namespaceId : NamespaceId)
-    (name : String) : Tables × NameId :=
-  match nameId? tables namespaceId name with
+    (name : String) (scope : Array String := #[]) : Tables × NameId :=
+  match nameId? tables namespaceId name scope with
   | some id => (tables, id)
   | none =>
       let id : NameId := ⟨tables.names.size⟩
-      ({ tables with names := tables.names.push { namespaceId, name } }, id)
+      ({ tables with names := tables.names.push { namespaceId, name, scope } }, id)
 
 /-- The Move address alias a module's path was spelled with in the unit. -/
 private def aliasOf (unit : CompilationUnit) (segments : Array String) : Option String :=
@@ -112,7 +113,7 @@ private def expandedUsePath? (sourceNs : Namespace)
 
 private partial def sourceTypeIsVector : Ty → Bool
   | .reference _ referent _ => sourceTypeIsVector referent.value
-  | .vector .. => true
+  | .vector .. | .slice .. => true
   | _ => false
 
 /-- Resolve receiver syntax for a standard function through either a module
@@ -137,10 +138,12 @@ private def ghostFieldsOf (contract : Array ContractClause) : Array FieldDecl :=
     | .ghost name type _ span => some { name, type, span }
     | _ => none
 
-private def predeclareItemNames (tables : Tables) (namespaceId : NamespaceId)
-    (item : Item) : Tables :=
-  let add (tables : Tables) (name : String) := (internName tables namespaceId name).1
+private partial def predeclareItemNames (tables : Tables) (namespaceId : NamespaceId)
+    (scope : Array String) (item : Item) : Tables :=
+  let add (tables : Tables) (name : String) := (internName tables namespaceId name scope).1
   match item with
+  | .scope name _ items _ =>
+      items.foldl (predeclareItemNames · namespaceId (scope.push name) ·) tables
   | .constant declaration => add tables declaration.name
   | .function declaration => add tables declaration.name
   | .specFunction declaration => add tables declaration.name
@@ -171,17 +174,147 @@ private def initialTables (unit : CompilationUnit) : Result Tables := do
     files := #[{ name := unit.sourceName }] ++ unit.sources.map ({ name := · })
     namespaces := namespaceRefs }
   return unit.namespaces.zipIdx.foldl (fun tables (sourceNs, index) =>
-    sourceNs.items.foldl (predeclareItemNames · ⟨index⟩ ·) tables) base
+    sourceNs.items.foldl (predeclareItemNames · ⟨index⟩ #[] ·) tables) base
+
+private def sourceFunction? (sourceNs : Namespace) (scope : Array String) (name : String) :
+    Option FunctionDecl :=
+  findInScope sourceNs.items scope.toList fun
+    | .function declaration => if declaration.name == name then some declaration else none
+    | _ => none
+
+private def sourceConstant? (sourceNs : Namespace) (scope : Array String) (name : String) :
+    Option ConstantDecl :=
+  findInScope sourceNs.items scope.toList fun
+    | .constant declaration => if declaration.name == name then some declaration else none
+    | _ => none
+
+private def sourceSpecFunction? (sourceNs : Namespace) (scope : Array String) (name : String) :
+    Option SpecFunctionDecl :=
+  findInScope sourceNs.items scope.toList fun
+    | .specFunction declaration => if declaration.name == name then some declaration else none
+    | _ => none
+
+private def sourceLemma? (sourceNs : Namespace) (scope : Array String) (name : String) :
+    Option LemmaDecl :=
+  findInScope sourceNs.items scope.toList fun
+    | .lemma declaration => if declaration.name == name then some declaration else none
+    | _ => none
+
+/-- A namespace and the scope in it that a declaration is written in, whose
+names it spells: unqualified, by a path from that scope, or through the
+namespace's `use` paths. -/
+private abbrev NamingContext := Namespace × Array String
+
+private structure SourceNominal where
+  name : String
+  generics : Array GenericBinder := #[]
+  fields : Array FieldDecl := #[]
+  variants : Array VariantDecl := #[]
+  /-- The ghost fields of every value, which specifications read
+  (`doc/designs/ghost-fields.md`). -/
+  ghosts : Array FieldDecl := #[]
+  abilities : Array Ability := #[]
+  /-- A nominal another compilation unit declares. This unit knows its
+  identity, which is what naming and constructing it need; its fields and
+  variants belong to the declaring unit, so operations that read them report
+  that boundary rather than guessing a shape. -/
+  external : Bool := false
+  /-- A dependency's type whose shape the crate does not see. -/
+  isOpaque : Bool := false
+  /-- Where this nominal was declared. Its field and variant types are spelled
+  in that naming context. -/
+  owner : Option NamingContext := none
+
+private def sourceNominal? (sourceNs : Namespace) (scope : Array String) (name : String) :
+    Option SourceNominal :=
+  findInScope sourceNs.items scope.toList fun
+    | .struct declaration => if declaration.name == name then some {
+        name, generics := declaration.generics, fields := declaration.fields
+        ghosts := ghostFieldsOf declaration.contract
+        abilities := declaration.abilities, isOpaque := declaration.isOpaque
+        owner := some (sourceNs, scope) }
+      else none
+    | .enum declaration => if declaration.name == name then some {
+        name, generics := declaration.generics, variants := declaration.variants
+        ghosts := ghostFieldsOf declaration.contract
+        abilities := declaration.abilities, owner := some (sourceNs, scope) }
+      else none
+    | _ => none
+
+/-- Whether a namespace declares a name in a scope, as an item of any kind. -/
+private def declaresAny (sourceNs : Namespace) (scope : Array String) (name : String) : Bool :=
+  (findInScope sourceNs.items scope.toList fun
+    | .constant declaration => guard (declaration.name == name)
+    | .struct declaration => guard (declaration.name == name)
+    | .enum declaration => guard (declaration.name == name)
+    | .function declaration => guard (declaration.name == name)
+    | .specFunction declaration => guard (declaration.name == name)
+    | .lemma declaration => guard (declaration.name == name)
+    | .namespaceInvariants _ | .scope .. => none).isSome
+
+/-- The declaration a path names: a namespace by its path, a scope in it, and
+a name there. -/
+private structure PathTarget where
+  owner : Array String
+  scope : Array String := #[]
+  name : String
+
+/-- The target of a path that is not relative to a scope: a namespace of the
+unit by its path, longest first, with a scope declaring the name or none; else
+a namespace this unit does not hold. -/
+private def absoluteTarget (unit : CompilationUnit) (segments : Array String)
+    (declares : Namespace → Array String → String → Bool) : PathTarget := Id.run do
+  let name := segments.back?.getD ""
+  let leading := segments.pop
+  for depth in [0:leading.size] do
+    let path := leading.take (leading.size - depth)
+    let some held := unit.namespaces.find? (·.path == path) | continue
+    let scope := leading.drop path.size
+    if scope.isEmpty || declares held scope name then
+      return { owner := path, scope, name }
+  return { owner := leading, name }
+
+/-- The target of a path written in a naming context. It resolves from the
+innermost scope outward, then at the namespace root after the namespace's `use`
+paths, then as a path from another namespace. `declares` says which kind of
+declaration the path means. A bare name that nothing declares stays at the
+root, for the caller to report. -/
+private def pathTarget (unit : CompilationUnit) (context : NamingContext) (segments : Array String)
+    (declares : Namespace → Array String → String → Bool) : PathTarget := Id.run do
+  let (declaring, scope) := context
+  let name := segments.back?.getD ""
+  let leading := segments.pop
+  for depth in [0:scope.size] do
+    let candidate := scope.take (scope.size - depth) ++ leading
+    if declares declaring candidate name then
+      return { owner := declaring.path, scope := candidate, name }
+  let segments := (expandedUsePath? declaring segments).getD segments
+  let name := segments.back?.getD ""
+  let leading := segments.pop
+  if leading.isEmpty || declares declaring leading name then
+    return { owner := declaring.path, scope := leading, name }
+  absoluteTarget unit segments declares
+
+private def declaresNominal (sourceNs : Namespace) (scope : Array String) (name : String) : Bool :=
+  (sourceNominal? sourceNs scope name).isSome
+
+private def declaresFunction (sourceNs : Namespace) (scope : Array String) (name : String) : Bool :=
+  (sourceFunction? sourceNs scope name).isSome
+
+private def declaresSpecFunction (sourceNs : Namespace) (scope : Array String) (name : String) :
+    Bool :=
+  (sourceSpecFunction? sourceNs scope name).isSome
+
+private def declaresLemma (sourceNs : Namespace) (scope : Array String) (name : String) : Bool :=
+  (sourceLemma? sourceNs scope name).isSome
 
 private structure TypeContext where
   binders : Array (String × Nat) := #[]
   lifetimeBinders : Array (String × Nat) := #[]
-  /-- The namespace that wrote the types this context lowers. A declaration
-  spells its own nominals the way its own source did — unqualified, or through
-  its own `use` paths — so a signature borrowed from another namespace must
-  resolve its names there, not in the namespace reading it. `none` means the
-  namespace currently being lowered. -/
-  owner : Option Namespace := none
+  /-- Where the types this context lowers were written. A signature borrowed
+  from another scope or namespace must resolve its names there, not where it
+  is read. `none` means the declaration currently being lowered. -/
+  owner : Option NamingContext := none
 
 private structure ScopedLocal where
   span : Span
@@ -200,6 +333,9 @@ private structure ExprContext where
   references to their referents: what `final` checks. -/
   declaredResultType : Option TypeId := none
   specification : Bool := false
+  /-- Whether this is the derived specification reading of a function's body,
+  which the impurity scan has found free of effects. -/
+  projectedBody : Bool := false
   /-- Only a genuine function-tail return may become a fallthrough value.
   A nested block's tail can still exit enclosing statements or loops. -/
   functionTail : Bool := false
@@ -219,6 +355,8 @@ private structure ExprContext where
 private structure BuildState where
   source : CompilationUnit
   sourceNamespace : Namespace
+  /-- The scope of the namespace whose items are being lowered. -/
+  scope : Array String := #[]
   namespaceId : NamespaceId
   tables : Tables
   output : RawNamespace
@@ -227,12 +365,34 @@ private structure BuildState where
   discard their output restore these fields alongside it. -/
   temporaryLocalBase : Nat := 0
   temporaryLocals : Array VerexIR.LocalDecl := #[]
-  /-- The one lifetime a Move namespace's references are inferred at: Move
-  references carry no lifetimes, so a call's result borrows from every
-  reference argument. -/
+  /-- The one lifetime a namespace's elided lifetimes are: Move references
+  carry none, and a Rust body's regions are erased at export. -/
   inferenceLifetime : Option LifetimeId := none
+  /-- The functions known to have no effect a specification reading erases
+  (`impurityOf`). -/
+  pureFunctions : Std.HashSet String := {}
+  /-- The functions known to have one, with its cause. -/
+  impureFunctions : Std.HashMap String String := {}
 
 private abbrev LowerM := StateT BuildState Result
+
+/-- The naming context of the declaration being lowered. -/
+private def BuildState.naming (state : BuildState) : NamingContext :=
+  (state.sourceNamespace, state.scope)
+
+/-- The target of a path in the declaration being lowered. -/
+private def BuildState.target (state : BuildState) (segments : Array String)
+    (declares : Namespace → Array String → String → Bool) : PathTarget :=
+  pathTarget state.source state.naming segments declares
+
+/-- A result of `find` for a bare name, from the innermost scope of the
+declaration being lowered outward, with the scope that gave it. -/
+private def BuildState.visible? (state : BuildState) (find : Namespace → Array String → Option α) :
+    Option (Array String × α) := Id.run do
+  for depth in [0:state.scope.size + 1] do
+    let scope := state.scope.take (state.scope.size - depth)
+    if let some found := find state.sourceNamespace scope then return some (scope, found)
+  return none
 
 private def failAt (code message : String) (span : Option Span := none) : LowerM α :=
   throw #[.error code message span]
@@ -369,17 +529,16 @@ private def pushPlace (place : VerexIR.Place) : LowerM PlaceId := do
 private def lookupTypeBinder? (context : TypeContext) (name : String) : Option Nat :=
   (context.binders.find? (·.1 == name)).map (·.2)
 
-/-- The lifetime of an inferred reference: a Move namespace's one inference
-lifetime, otherwise a fresh one. -/
+/-- An elided lifetime: the namespace's one inference lifetime, the single
+region a rendered Rust unit has for everything `_` spells, as its export has. -/
 private def inferenceLifetime (loc : LocId) : LowerM LifetimeId := do
   let state ← get
-  let move := state.sourceNamespace.profile == .move
-  if move then if let some lifetime := state.inferenceLifetime then return lifetime
+  if let some lifetime := state.inferenceLifetime then return lifetime
   let lifetime : LifetimeId := ⟨state.tables.lifetimes.size⟩
   set { state with
     tables := { state.tables with
       lifetimes := state.tables.lifetimes.push { kind := .inference, loc } }
-    inferenceLifetime := if move then some lifetime else state.inferenceLifetime }
+    inferenceLifetime := some lifetime }
   return lifetime
 
 private def lowerLifetime (context : TypeContext) (source : SourceLifetime)
@@ -395,6 +554,10 @@ private def lowerLifetime (context : TypeContext) (source : SourceLifetime)
           | failAt "VEREX-LIFETIME-NAME" s!"unknown lifetime `{name}`" (some span)
         pure (.parameter index, some name)
   let state ← get
+  -- One lifetime per name: a declared lifetime is the same at each mention.
+  if let some index := state.tables.lifetimes.findIdx? (fun lifetime =>
+      lifetime.kind == kind && lifetime.name == name) then
+    return ⟨index⟩
   let id : LifetimeId := ⟨state.tables.lifetimes.size⟩
   set { state with tables := { state.tables with
     lifetimes := state.tables.lifetimes.push { kind, loc, name } } }
@@ -425,6 +588,7 @@ private partial def lowerTypeId (context : TypeContext) (source : Ty) : LowerM T
   | .tuple elements =>
       let elements ← elements.mapM fun element => lowerTypeId context element.value
       internType (.tuple elements)
+  | .slice element => internType (.slice (← lowerTypeId context element.value))
   | .vector element length =>
       if let some length := length then
         if length < 0 then
@@ -448,23 +612,18 @@ private partial def lowerTypeId (context : TypeContext) (source : Ty) : LowerM T
         if let some index := lookupTypeBinder? context segments[0]! then
           return ← internType (.typeParameter index)
       let state ← get
-      let declaring := context.owner.getD state.sourceNamespace
-      let segments := (expandedUsePath? declaring segments).getD segments
-      let (ownerSegments, localName) :=
-        if segments.size <= 1 then
-          (declaring.path, segments[0]?.getD "")
-        else
-          (segments.extract 0 (segments.size - 1), segments.back!)
-      let (tables, owner) := internNamespace state.source state.tables ownerSegments
+      let target := pathTarget state.source (context.owner.getD state.naming) segments
+        declaresNominal
+      let (tables, owner) := internNamespace state.source state.tables target.owner
       set { state with tables }
       let current ← get
-      let name ← match nameId? current.tables owner localName with
+      let name ← match nameId? current.tables owner target.name target.scope with
         | some name => pure name
         | none =>
             if owner == current.namespaceId then
-              failAt "VEREX-TYPE-NAME" s!"unknown nominal type `{localName}`"
+              failAt "VEREX-TYPE-NAME" s!"unknown nominal type `{target.name}`"
             else
-              let (tables, name) := internName current.tables owner localName
+              let (tables, name) := internName current.tables owner target.name target.scope
               set { current with tables }
               pure name
       let arguments ← arguments.mapM fun argument => match argument with
@@ -495,6 +654,7 @@ private partial def projectSpecTypeIdFuel (id : TypeId) (fuel : Nat) : LowerM Ty
   let state ← get
   match state.tables.types[id.index]? with
   | some (.integer _ _) => internType (.integer .unbounded true)
+  | some (.slice element) => internType (.vector element none)
   | some (.reference reference) => projectSpecTypeIdFuel reference.referent (fuel - 1)
   | some (.tuple elements) =>
       internType (.tuple (← elements.mapM (projectSpecTypeIdFuel · (fuel - 1))))
@@ -508,6 +668,7 @@ reference's referent, as specifications see through references. -/
 private partial def specReferentTypeId (id : TypeId) : LowerM TypeId := do
   match (← get).tables.types[id.index]? with
   | some (.reference reference) => specReferentTypeId reference.referent
+  | some (.slice element) => internType (.vector element none)
   | _ => return id
 
 private def specificationExprContext (context : ExprContext) : LowerM ExprContext := do
@@ -525,14 +686,22 @@ private def specificationExprContext (context : ExprContext) : LowerM ExprContex
     specification := true
     loopResults := ← context.loopResults.mapM projectSpecTypeId }
 
-private def lowerBinder (binder : GenericBinder) : LowerM VerexIR.GenericBinder := do
+private def lowerBinder (context : TypeContext) (binder : GenericBinder) : LowerM VerexIR.GenericBinder := do
   let loc ← addLoc binder.span
   let type ← if binder.kind == .const then
       some <$> lowerTypeUse {} (binder.type.getD { value := .uptr, span := binder.span })
     else pure none
   -- The phantom marker is a profile predicate: Move's `phantom` parameter.
-  let predicates : Array VerexIR.GenericPredicate := if binder.phantom then
+  let mut predicates : Array VerexIR.GenericPredicate := if binder.phantom then
       #[.profile { profile := .move, tag := "typeParameter.phantom" }] else #[]
+  unless binder.outlives.isEmpty do
+    unless binder.kind == .lifetime do
+      failAt "VEREX-LIFETIME-BOUND" "only a lifetime binder may declare outlives bounds" (some binder.span)
+    let longer ← lowerLifetime context (.parameter binder.name) binder.span
+    for shorter in binder.outlives do
+      if shorter matches .inference then
+        failAt "VEREX-LIFETIME-BOUND" "an outlives bound must name a lifetime" (some binder.span)
+      predicates := predicates.push (.lifetimeOutlives longer (← lowerLifetime context shorter binder.span))
   return {
     name := binder.name
     kind := binder.kind.toVIR
@@ -542,7 +711,7 @@ private def lowerBinder (binder : GenericBinder) : LowerM VerexIR.GenericBinder 
     loc }
 
 private def typeContext (binders : Array GenericBinder)
-    (owner : Option Namespace := none) : Result TypeContext := do
+    (owner : Option NamingContext := none) : Result TypeContext := do
   let duplicate := binders.zipIdx.find? fun (binder, index) =>
     binders.take index |>.any (·.name == binder.name)
   if let some (binder, _) := duplicate then
@@ -582,6 +751,13 @@ private structure SourceBinding where
   value : Option Expr
   /-- A quantifier binder, which ranges over its domain. -/
   quantifier : Bool := false
+  /-- Written in a specification expression, which reads specification
+  functions and logical values. -/
+  specification : Bool := false
+
+private def inSpecification (entry : SourceBinding × Array SourceBinding) :
+    SourceBinding × Array SourceBinding :=
+  ({ entry.1 with specification := true }, entry.2)
 
 private def forLowerName (span : Span) : String :=
   s!"$for_lb_{span.startByte}"
@@ -598,6 +774,7 @@ mutual
         .throw_ _ arguments _ => arguments.flatMap sourceBindings
     | .namedConstruct _ _ fields _ => fields.flatMap (sourceBindings ·.2)
     | .closure _ _ _ captures _ => (captures.filterMap id).flatMap sourceBindings
+    | .closureItem _ _ _ captures .. => captures.flatMap (sourceBindings ·.2.2)
     | .invoke callable arguments _ =>
         sourceBindings callable ++ arguments.flatMap sourceBindings
     | .genericCall _ _ arguments _ | .typedCall _ _ arguments _ |
@@ -609,9 +786,9 @@ mutual
     | .select _ _ value _ | .field value _ _ | .placeOperation _ value _ |
         .variantTest value _ _ |
         .selectVariants _ _ value _ |
-        .testVariants _ _ value _ | .discriminant _ _ value _ | .borrowValue _ value _ |
+        .testVariants _ _ value _ | .discriminant _ _ value _ | .readDiscriminant _ value _ | .borrowValue _ value _ |
         .rawBorrowValue _ value _ |
-        .freezeReference _ value _ | .dereference value _ | .return_ value _ =>
+        .freezeReference _ value _ | .unsize value _ | .subslice value _ _ _ _ | .dereference value _ | .return_ value _ =>
         sourceBindings value
     | .storageIndex _ index _ => sourceBindings index
     | .index value index _ | .membership value index _ | .updateField value _ index _ =>
@@ -658,7 +835,7 @@ mutual
           guard.toArray.flatMap sourceBindings ++ sourceBindings body
     | .unit .. | .bool .. | .char .. | .integer .. | .typedInteger .. |
         .address .. | .string .. | .bytes .. |
-        .local .. | .borrowPlace .. | .dropPlace .. | .continue_ .. => #[]
+        .local .. | .borrowPlace .. | .dropPlace .. | .downcast .. | .continue_ .. => #[]
 
   /-- Immediate subexpressions, for checks that need no per-constructor
   meaning of their own. -/
@@ -671,12 +848,15 @@ mutual
         .specification _ _ arguments _ => arguments
     | .namedConstruct _ _ fields _ => fields.map (·.2)
     | .closure _ _ _ captures _ => captures.filterMap id
+    -- The body is a function of its own.
+    | .closureItem _ _ _ captures .. => captures.map (·.2.2)
     | .invoke callable arguments _ => #[callable] ++ arguments
     | .methodCall _ _ _ receiver arguments _ => #[receiver] ++ arguments
     | .select _ _ value _ | .field value _ _ | .placeOperation _ value _ |
         .variantTest value _ _ | .selectVariants _ _ value _ |
-        .testVariants _ _ value _ | .discriminant _ _ value _ |
+        .testVariants _ _ value _ | .discriminant _ _ value _ | .readDiscriminant _ value _ |
         .borrowValue _ value _ | .rawBorrowValue _ value _ | .freezeReference _ value _ |
+        .unsize value _ | .subslice value _ _ _ _ |
         .dereference value _ | .return_ value _ | .storageIndex _ value _ |
         .assign _ value _ | .assignPattern _ _ value _ | .loop value _ _ => #[value]
     | .index value index _ | .membership value index _ | .updateField value _ index _ |
@@ -697,7 +877,7 @@ mutual
         #[scrutinee] ++ arms.flatMap fun (_, guard, body) => guard.toArray ++ #[body]
     | .unit .. | .bool .. | .char .. | .integer .. | .typedInteger .. |
         .address .. | .string .. | .bytes .. | .local .. | .borrowPlace .. |
-        .dropPlace .. | .continue_ .. => #[]
+        .dropPlace .. | .downcast .. | .continue_ .. => #[]
 
   /-- Bindings of this expression, each paired with the bindings lexically in
   scope where it occurs. A nested block's declarations are visible to what
@@ -717,12 +897,13 @@ mutual
         collected ++ (result.map (scopedBindings scope)).getD #[]
     | .specBlock conditions _ _ =>
         (conditions.foldl (init := (#[], scope)) fun (collected, scope) (kind, value) =>
-          let nested := scopedBindings scope value
+          let nested := (scopedBindings scope value).map inSpecification
           match kind with
           | .let_ name =>
               let binding : SourceBinding := {
                 span := value.span, mutable := false
-                pattern := .variable name value.span, type := none, value }
+                pattern := .variable name value.span, type := none, value
+                specification := true }
               (collected ++ nested ++ #[(binding, scope)], scope.push binding)
           | _ => (collected ++ nested, scope)).1
     | .forRange iterator lower upper body span =>
@@ -761,8 +942,9 @@ mutual
             let binding : SourceBinding := {
               span := pattern.span, mutable := false, pattern, type := none
               value := some domain, quantifier := true }
-            (collected ++ scopedBindings scope domain ++ #[(binding, scope)], scope.push binding)
-        collected ++ scopedBindings inner body
+            (collected ++ (scopedBindings scope domain).map inSpecification ++
+              #[(binding, scope)], scope.push binding)
+        collected ++ (scopedBindings inner body).map inSpecification
     | source => (childExpressions source).flatMap (scopedBindings scope)
 
   /-- Does control leave this expression through a `return` written somewhere
@@ -801,20 +983,406 @@ mutual
         value.toArray.flatMap sourceBindings ++ #[{ span, mutable, pattern, type, value }]
 end
 
+/-- The expression with `f` applied to its immediate subexpressions. -/
+private partial def mapChildExpressions (f : Expr → Expr) : Expr → Expr
+  | .primitive operation arguments span => .primitive operation (arguments.map f) span
+  | .typedPrimitive operation result arguments span =>
+      .typedPrimitive operation result (arguments.map f) span
+  | .call name arguments span => .call name (arguments.map f) span
+  | .closure name types result captures span =>
+      .closure name types result (captures.map (·.map f)) span
+  | .closureItem name generics abilities captures attributes function functionGenerics parameters result
+      body span =>
+      .closureItem name generics abilities
+        (captures.map fun (field, type, value) => (field, type, f value))
+        attributes function functionGenerics parameters result body span
+  | .invoke callable arguments span => .invoke (f callable) (arguments.map f) span
+  | .genericCall name types arguments span => .genericCall name types (arguments.map f) span
+  | .typedCall name result arguments span => .typedCall name result (arguments.map f) span
+  | .typedGenericCall name result types arguments span =>
+      .typedGenericCall name result types (arguments.map f) span
+  | .methodCall name result types receiver arguments span =>
+      .methodCall name result types (f receiver) (arguments.map f) span
+  | .global operation resource arguments span => .global operation resource (arguments.map f) span
+  | .construct name arguments span => .construct name (arguments.map f) span
+  | .appliedConstruct owner variant arguments span =>
+      .appliedConstruct owner variant (arguments.map f) span
+  | .namedConstruct owner variant fields span =>
+      .namedConstruct owner variant (fields.map fun (name, value) => (name, f value)) span
+  | .select owner field value span => .select owner field (f value) span
+  | .field value name span => .field (f value) name span
+  | .storageIndex head index span => .storageIndex head (f index) span
+  | .index value index span => .index (f value) (f index) span
+  | .membership element collection span => .membership (f element) (f collection) span
+  | .variantTest value variants span => .variantTest (f value) variants span
+  | .selectVariants owner fields value span => .selectVariants owner fields (f value) span
+  | .testVariants owner variants value span => .testVariants owner variants (f value) span
+  | .updateField value field replacement span => .updateField (f value) field (f replacement) span
+  | .discriminant owner result value span => .discriminant owner result (f value) span
+  | .readDiscriminant result value span => .readDiscriminant result (f value) span
+  | .placeOperation operation place span => .placeOperation operation (f place) span
+  | .borrowValue mutable value span => .borrowValue mutable (f value) span
+  | .rawBorrowValue mutable value span => .rawBorrowValue mutable (f value) span
+  | .freezeReference explicit value span => .freezeReference explicit (f value) span
+  | .unsize value span => .unsize (f value) span
+  | .subslice value start stop fromEnd span => .subslice (f value) start stop fromEnd span
+  | .dereference value span => .dereference (f value) span
+  | .mutateReference reference value span => .mutateReference (f reference) (f value) span
+  | .quantifier kind binders body span =>
+      .quantifier kind (binders.map fun (pattern, domain) => (pattern, f domain)) (f body) span
+  | .specification operation types arguments span =>
+      .specification operation types (arguments.map f) span
+  | .labeled pre post body span => .labeled pre post (f body) span
+  | .specBlock conditions span proof =>
+      .specBlock (conditions.map fun (kind, value) => (kind, f value)) span proof
+  | .block statements result span =>
+      .block (statements.map fun
+          | .expression value => .expression (f value)
+          | .letDecl mutable pattern type value span => .letDecl mutable pattern type (value.map f) span)
+        (result.map f) span
+  | .ifElse condition thenBranch elseBranch span =>
+      .ifElse (f condition) (f thenBranch) (elseBranch.map f) span
+  | .match_ scrutinee arms span =>
+      .match_ (f scrutinee)
+        (arms.map fun (pattern, guard, body) => (pattern, guard.map f, f body)) span
+  | .forRange iterator lower upper body span =>
+      .forRange iterator (f lower) (f upper) (f body) span
+  | .loop body span label => .loop (f body) span label
+  | .break_ value span label => .break_ (value.map f) span label
+  | .assign place value span => .assign place (f value) span
+  | .assignExpression target value span => .assignExpression (f target) (f value) span
+  | .rawAssignExpression target value span => .rawAssignExpression (f target) (f value) span
+  | .assignPattern pattern type value span => .assignPattern pattern type (f value) span
+  | .return_ value span => .return_ (f value) span
+  | .throw_ kind arguments span => .throw_ kind (arguments.map f) span
+  | source@(.unit ..) | source@(.bool ..) | source@(.char ..) | source@(.integer ..) |
+      source@(.typedInteger ..) | source@(.address ..) | source@(.string ..) |
+      source@(.bytes ..) | source@(.local ..) | source@(.borrowPlace ..) |
+      source@(.dropPlace ..) | source@(.downcast ..) | source@(.continue_ ..) => source
+
+/-! ## Closure expressions
+
+A closure expression declares the struct of its captures and the body in the
+struct's scope, in the module around it, and constructs the struct where it stands.
+These are the items lowering goes on with. -/
+
+/-- The closure expressions of a body in module `module` of the function at `parent`,
+each with that function's path, and with those of its own body. -/
+private partial def closureExpressions (module parent : Array String) (source : Expr) :
+    Array (Array String × Expr) :=
+  let nested := (childExpressions source).flatMap (closureExpressions module parent)
+  match source with
+  | .closureItem name _ _ _ _ function _ _ _ body _ =>
+      nested ++ closureExpressions module ((module.push name).push function) body ++
+        #[(parent, source)]
+  | _ => nested
+
+/-- The body with its closure expressions as the constructions of their structs:
+the arguments of the construction are the type parameters of its function. -/
+private partial def constructClosures (source : Expr) : Expr :=
+  match mapChildExpressions constructClosures source with
+  | .closureItem name generics _ captures _ _ _ _ _ _ span =>
+      let arguments := generics.map fun binder =>
+        match binder.kind with
+        | .lifetime => TypeArgument.lifetime .inference
+        | _ => .type (.named #[binder.name] #[])
+      .namedConstruct { value := .named #[name] arguments, span } none
+        (captures.map fun (field, _, value) => (field, value)) span
+  | source => source
+
+/-- The bodies of a module's item with the paths of their functions: its own, and in
+an impl, trait or trait impl scope, those of the functions there. -/
+private def itemBodies (module : Array String) : Item → Array (Array String × Expr)
+  | .function declaration =>
+      (declaration.body.toArray).map ((module.push declaration.name), ·)
+  | .scope name kind nested _ =>
+      if kind matches .module then #[] else
+        nested.flatMap fun
+          | .function declaration =>
+              declaration.body.toArray.map (((module.push name).push declaration.name), ·)
+          | _ => #[]
+  | _ => #[]
+
+/-- A module's items with its closures among them. A scope of the struct's holds the
+contract authored for the body. -/
+private partial def closuresToItems (module : Array String) (items : Array Item) :
+    Array Item := Id.run do
+  let contractOf (closure function : String) : Option FunctionDecl :=
+    items.findSome? fun
+      | .scope name _ nested _ =>
+          if name != closure then none else nested.findSome? fun
+            | .function declaration =>
+                if declaration.contractOnly && declaration.name == function
+                then some declaration else none
+            | _ => none
+      | _ => none
+  let rewrite (declaration : FunctionDecl) :=
+    { declaration with body := declaration.body.map constructClosures }
+  let mut result := #[]
+  for item in items do
+    result := result.push <| match item with
+      | .function declaration => .function (rewrite declaration)
+      | .scope name .module nested span =>
+          .scope name .module (closuresToItems (module.push name) nested) span
+      | .scope name kind nested span =>
+          .scope name kind (nested.filterMap fun
+            | .function declaration =>
+                if declaration.contractOnly then none else some (.function (rewrite declaration))
+            | item => some item) span
+      | item => item
+    for (parent, body) in itemBodies module item do
+      for (closureParent, closure) in closureExpressions module parent body do
+        let .closureItem name generics abilities captures attributes function functionGenerics parameters
+            result_ closureBody span := closure | continue
+        result := result.push <| .struct {
+          name, closureParent := some closureParent, generics, abilities, span
+          fields := captures.map fun (field, type, _) =>
+            { name := field, type, span := type.span } }
+        let declaration : FunctionDecl := {
+          (contractOf name function).getD ({ name := function } : FunctionDecl) with
+          name := function, attributes, generics := functionGenerics, parameters, result := result_
+          body := some (constructClosures closureBody), contractOnly := false, span }
+        result := result.push <| .scope name .inherent #[.function declaration] span
+  return result
+
+/-- The bodies closure expressions declare under `items`: each function's scope, the
+struct's under its module, and its name. -/
+partial def closureFunctions (items : Array Item) (module : Array String := #[]) :
+    Array (Array String × String) :=
+  items.flatMap fun item =>
+    let declared := (itemBodies module item).flatMap fun (parent, body) =>
+      (closureExpressions module parent body).filterMap fun
+        | (_, .closureItem name _ _ _ _ function ..) => some (module.push name, function)
+        | _ => none
+    match item with
+    | .scope name .module nested _ => closureFunctions nested (module.push name)
+    | _ => declared
+
+/-- The loops of a body: a `for` is one, and a specification holds none. -/
+private partial def sourceLoops (source : Expr) : Array Expr :=
+  let nested := fun source => (childExpressions source).flatMap sourceLoops
+  match source with
+  | .specBlock .. => #[]
+  | .loop .. | .forRange .. => #[source] ++ nested source
+  | source => nested source
+
+/-- Whether in-body conditions are a loop's: its invariants, with the logical
+bindings they read. -/
+private def isLoopSpecification (conditions : Array (SpecificationConditionKind × Expr)) : Bool :=
+  !conditions.isEmpty &&
+    conditions.any (fun condition => condition.1 == .loopInvariant) &&
+    conditions.all fun condition => match condition.1 with
+      | .let_ _ | .loopInvariant => true
+      | _ => false
+
+/-- A loop holding a specification, as the Move Prover reads a loop's
+invariants: in the heading's condition of a `while`, at the head of the body
+of any other loop. -/
+private def attachLoopSpecification (loopExpr specExpr : Expr) : Expr :=
+  match loopExpr with
+  | .loop (.ifElse condition thenBranch (some stop@(.break_ none _ none)) ifSpan) span label =>
+      let condition := match condition with
+        | .block statements (some actual) blockSpan =>
+            .block (statements.push (.expression specExpr)) (some actual) blockSpan
+        | condition => .block #[.expression specExpr] (some condition) span
+      .loop (.ifElse condition thenBranch (some stop) ifSpan) span label
+  | .loop body span label =>
+      let body := match body with
+        | .block statements result blockSpan =>
+            .block (#[.expression specExpr] ++ statements) result blockSpan
+        | body => .block #[.expression specExpr] (some body) span
+      .loop body span label
+  | loopExpr => loopExpr
+
 /-- Whether a place reaches a field through a downcast. -/
 private def Place.hasDowncast : Place → Bool
   | .local .. => false
   | .deref base _ | .field base _ _ => base.hasDowncast
   | .downcast .. => true
 
-/-- Whether a body names a place through a downcast, which a specification
-reads with no selection: VIR selects a field by its name across the
-variants that have it. -/
-private partial def hasDowncastPlace (source : Expr) : Bool :=
+/-- Whether a body names a place a specification has no reading of: through a
+downcast, which it reads with no selection (VIR selects a field by its name
+across the variants that have it), or an unsize, a coercion a specification
+value does not have. -/
+private partial def hasBodyOnlyPlace (source : Expr) : Bool :=
   match source with
   | .borrowPlace _ place _ | .dropPlace place _ => place.hasDowncast
-  | .assign place value _ => place.hasDowncast || hasDowncastPlace value
-  | source => (childExpressions source).any hasDowncastPlace
+  | .downcast .. | .unsize .. | .subslice .. => true
+  | .assign place value _ => place.hasDowncast || hasBodyOnlyPlace value
+  | source => (childExpressions source).any hasBodyOnlyPlace
+
+/-! ## Effects a specification reading cannot express
+
+A function called in a specification is read as a value: its `&mut` is the
+referent, a mutation through one is nothing, and a call whose arguments have no
+effect has none. A function with an effect on a reference has no such reading, so
+calling it in a specification is an error, found on the source before any of that
+erases the effect, as `move-model/src/pureness_checker.rs` finds it for Move. This
+also rejects what that check accepts: a write of global memory, and a call of a
+function value, which may do either. A rebinding of a local is no effect: the
+reading threads it, and a specification's own state operations are values. -/
+
+/-- Whether a type holds a `&mut`, directly or in a part of it. A function type
+does not: it states what a value of that type takes when it is called. -/
+private partial def Ty.holdsMutableReference : Ty → Bool
+  | .reference mutable referent _ => mutable || referent.value.holdsMutableReference
+  | .tuple elements => elements.any (·.value.holdsMutableReference)
+  | .vector element _ | .slice element => element.value.holdsMutableReference
+  | .named _ arguments => arguments.any fun
+      | .type value => value.holdsMutableReference
+      | _ => false
+  | _ => false
+
+private def Place.throughReference (mutableLocals : Array String) : Place → Bool
+  | .local .. => false
+  | .deref .. => true
+  | .field base _ _ | .downcast base _ _ _ => match base with
+      | .local name _ => mutableLocals.contains name
+      | base => base.throughReference mutableLocals
+
+private def Place.root : Place → String
+  | .local name _ => name
+  | .deref base _ | .field base _ _ | .downcast base _ _ _ => base.root
+
+/-- Whether an assignment target writes through a reference. -/
+private partial def targetThroughReference (mutableLocals : Array String) : Expr → Bool
+  | .dereference .. => true
+  | .local name _ => mutableLocals.contains name
+  | .field value _ _ | .select _ _ value _ | .placeOperation _ value _ | .index value _ _ =>
+      match value with
+      | .local name _ => mutableLocals.contains name
+      | value => targetThroughReference mutableLocals value
+  | _ => false
+
+/-- What a source global operation does in VIR. -/
+private def GlobalOperation.kind : GlobalOperation → GlobalKind
+  | .contains => .contains
+  | .borrow mutable => .borrow (if mutable then .mutable else .immutable)
+  | .take => .take
+  | .publish => .publish
+
+private def globalWriteCause : GlobalKind → Option String
+  | .take => some "takes from global storage"
+  | .publish => some "publishes to global storage"
+  | .borrow .mutable | .borrow (.profile _) => some "borrows global storage mutably"
+  | .borrow .immutable | .contains => none
+
+/-- Whether an assignment target reaches global storage. -/
+private partial def targetInStorage : Expr → Bool
+  | .storageIndex .. => true
+  | .field value _ _ | .select _ _ value _ | .placeOperation _ value _ | .index value _ _ =>
+      targetInStorage value
+  | _ => false
+
+private def functionKey (context : NamingContext) (name : String) : String :=
+  "::".intercalate (context.1.path.toList ++ context.2.toList ++ [name])
+
+/-- The functions visited, assumed pure while they are, which breaks a cycle of
+calls as `pureness_checker` does. -/
+private abbrev ImpurityM := StateM (Std.HashSet String)
+
+mutual
+  /-- The first effect a body has on a reference, as a clause of the error. A
+  specification in a body is no part of its execution. -/
+  private partial def sourceImpurity (unit : CompilationUnit) (context : NamingContext)
+      (mutableLocals : Array String) (source : Expr) : ImpurityM (Option String) := do
+    let first (parts : Array Expr) : ImpurityM (Option String) :=
+      parts.findSomeM? (sourceImpurity unit context mutableLocals)
+    let called (segments : Array String) (parts : Array Expr) : ImpurityM (Option String) := do
+      if let some cause ← calleeImpurity unit context segments then return some cause
+      first parts
+    match source with
+    | .borrowPlace true .. | .borrowValue true .. | .rawBorrowValue true .. =>
+        return some "borrows `&mut`"
+    | .global operation _ arguments _ =>
+        if let some cause := globalWriteCause operation.kind then return some cause
+        first arguments
+    | .invoke .. => return some "calls a function value"
+    | .mutateReference .. => return some "mutates through a reference"
+    | .assign place value _ =>
+        if place.throughReference mutableLocals then
+          return some "mutates through a reference"
+        first #[value]
+    | .assignExpression target value _ | .rawAssignExpression target value _ =>
+        if targetThroughReference mutableLocals target then
+          return some "mutates through a reference"
+        if targetInStorage target then return some "writes global storage"
+        first #[target, value]
+    | .dropPlace place _ =>
+        return if mutableLocals.contains place.root then some "drops a `&mut`" else none
+    | .call segments arguments _ | .genericCall segments _ arguments _ =>
+        called segments arguments
+    | .closure segments _ _ captures _ => called segments (captures.filterMap id)
+    | .typedCall segments result arguments _ | .typedGenericCall segments result _ arguments _ =>
+        if result.value.holdsMutableReference then
+          return some s!"calls `{segments.back?.getD ""}`, which returns `&mut`"
+        first arguments
+    | .methodCall name result _ receiver arguments _ =>
+        if result.any (·.value.holdsMutableReference) then
+          return some s!"calls `{name}`, which returns `&mut`"
+        let target := pathTarget unit context #[name] declaresFunction
+        let held := (unit.namespaces.find? (·.path == target.owner)).bind fun sourceNs =>
+          sourceFunction? sourceNs target.scope target.name
+        -- A vector receiver may be a standard one, as `lowerMethodCallExpr` has it.
+        let heldForVector := held.any fun declaration =>
+          declaration.parameters[0]?.any (sourceTypeIsVector ·.type.value)
+        if held.isNone || heldForVector then
+          if let some (_, .mutable) := standardReceiverTarget? context.1 name then
+            return some s!"calls `{name}`, which takes `&mut`"
+        if let some cause ← calleeImpurity unit context #[name] then return some cause
+        first (#[receiver] ++ arguments)
+    | .specBlock .. | .specification .. | .labeled .. | .quantifier .. => return none
+    | source => first (childExpressions source)
+
+  /-- The effect of the function a path names, if the unit holds it. -/
+  private partial def calleeImpurity (unit : CompilationUnit) (context : NamingContext)
+      (segments : Array String) : ImpurityM (Option String) := do
+    let target := pathTarget unit context segments declaresFunction
+    let some sourceNs := unit.namespaces.find? (·.path == target.owner) | return none
+    let some declaration := sourceFunction? sourceNs target.scope target.name | return none
+    let cause ← functionImpurity unit (sourceNs, target.scope) declaration
+    return cause.map (s!"calls `{declaration.name}`, which {·}")
+
+  /-- A function with a body is what the body does; one without, a dependency's
+  or a native, is what its signature allows. -/
+  private partial def functionImpurity (unit : CompilationUnit) (context : NamingContext)
+      (declaration : FunctionDecl) : ImpurityM (Option String) := do
+    let key := functionKey context declaration.name
+    if (← get).contains key then return none
+    modify (·.insert key)
+    match declaration.body with
+    | some body =>
+        let mutableLocals := declaration.parameters.filterMap fun parameter =>
+          match parameter.type.value with
+          | .reference true .. => some parameter.name
+          | _ => none
+        sourceImpurity unit context mutableLocals body
+    | none =>
+        if declaration.parameters.any (·.type.value.holdsMutableReference) then
+          return some "takes `&mut`"
+        if declaration.result.value.holdsMutableReference then
+          return some "returns `&mut`"
+        return none
+end
+
+/-- The effect of a function on a reference. A function found pure leaves all it
+visited pure, as an effect of any of them would be its own. -/
+private def impurityOf (context : NamingContext) (declaration : FunctionDecl) :
+    LowerM (Option String) := do
+  let state ← get
+  let key := functionKey context declaration.name
+  if state.pureFunctions.contains key then return none
+  if let some cause := state.impureFunctions[key]? then return some cause
+  let (cause, visited) := (functionImpurity state.source context declaration).run
+    state.pureFunctions
+  match cause with
+  | some cause =>
+      modify fun state => { state with impureFunctions := state.impureFunctions.insert key cause }
+  | none => modify fun state => { state with pureFunctions := visited }
+  return cause
+
+private def impureCallMessage (name cause : String) : String :=
+  s!"cannot call impure function `{name}` ({cause})"
 
 private structure SourceQuantifierBinding where
   pattern : BindingPattern
@@ -844,6 +1412,7 @@ mutual
         .throw_ _ arguments _ => arguments.flatMap sourceQuantifierBindings
     | .namedConstruct _ _ fields _ => fields.flatMap (sourceQuantifierBindings ·.2)
     | .closure _ _ _ captures _ => (captures.filterMap id).flatMap sourceQuantifierBindings
+    | .closureItem _ _ _ captures .. => captures.flatMap (sourceQuantifierBindings ·.2.2)
     | .invoke callable arguments _ =>
         sourceQuantifierBindings callable ++ arguments.flatMap sourceQuantifierBindings
     | .genericCall _ _ arguments _ | .typedCall _ _ arguments _ |
@@ -855,9 +1424,9 @@ mutual
     | .select _ _ value _ | .field value _ _ | .placeOperation _ value _ |
         .variantTest value _ _ |
         .selectVariants _ _ value _ |
-        .testVariants _ _ value _ | .discriminant _ _ value _ | .borrowValue _ value _ |
+        .testVariants _ _ value _ | .discriminant _ _ value _ | .readDiscriminant _ value _ | .borrowValue _ value _ |
         .rawBorrowValue _ value _ |
-        .freezeReference _ value _ | .dereference value _ | .return_ value _ =>
+        .freezeReference _ value _ | .unsize value _ | .subslice value _ _ _ _ | .dereference value _ | .return_ value _ =>
         sourceQuantifierBindings value
     | .storageIndex _ index _ => sourceQuantifierBindings index
     | .index value index _ | .membership value index _ | .updateField value _ index _ =>
@@ -875,7 +1444,7 @@ mutual
           guard.toArray.flatMap sourceQuantifierBindings ++ sourceQuantifierBindings body
     | .unit .. | .bool .. | .char .. | .integer .. | .typedInteger .. |
         .address .. | .string .. | .bytes .. |
-        .local .. | .borrowPlace .. | .dropPlace .. | .continue_ .. => #[]
+        .local .. | .borrowPlace .. | .dropPlace .. | .downcast .. | .continue_ .. => #[]
 
   private partial def sourceStatementQuantifierBindings : Statement →
       Array SourceQuantifierBinding
@@ -912,6 +1481,7 @@ mutual
         .throw_ _ arguments _ => arguments.flatMap sourceMatchBindings
     | .namedConstruct _ _ fields _ => fields.flatMap (sourceMatchBindings ·.2)
     | .closure _ _ _ captures _ => (captures.filterMap id).flatMap sourceMatchBindings
+    | .closureItem _ _ _ captures .. => captures.flatMap (sourceMatchBindings ·.2.2)
     | .invoke callable arguments _ =>
         sourceMatchBindings callable ++ arguments.flatMap sourceMatchBindings
     | .genericCall _ _ arguments _ | .typedCall _ _ arguments _ |
@@ -923,9 +1493,9 @@ mutual
     | .select _ _ value _ | .field value _ _ | .placeOperation _ value _ |
         .variantTest value _ _ |
         .selectVariants _ _ value _ |
-        .testVariants _ _ value _ | .discriminant _ _ value _ | .borrowValue _ value _ |
+        .testVariants _ _ value _ | .discriminant _ _ value _ | .readDiscriminant _ value _ | .borrowValue _ value _ |
         .rawBorrowValue _ value _ |
-        .freezeReference _ value _ | .dereference value _ | .return_ value _ =>
+        .freezeReference _ value _ | .unsize value _ | .subslice value _ _ _ _ | .dereference value _ | .return_ value _ =>
         sourceMatchBindings value
     | .storageIndex _ index _ => sourceMatchBindings index
     | .index value index _ | .membership value index _ | .updateField value _ index _ =>
@@ -940,28 +1510,19 @@ mutual
           elseBranch.toArray.flatMap sourceMatchBindings
     | .unit .. | .bool .. | .char .. | .integer .. | .typedInteger .. |
         .address .. | .string .. | .bytes .. |
-        .local .. | .borrowPlace .. | .dropPlace .. | .continue_ .. => #[]
+        .local .. | .borrowPlace .. | .dropPlace .. | .downcast .. | .continue_ .. => #[]
 
   private partial def sourceStatementMatchBindings : Statement → Array SourceMatchBinding
     | .expression value => sourceMatchBindings value
     | .letDecl _ _ _ value _ => value.toArray.flatMap sourceMatchBindings
 end
 
+private def sequenceElement? : VerexIR.Ty → Option TypeId
+  | .vector element _ | .slice element => some element
+  | _ => none
+
 private def typeNode? (id : TypeId) : LowerM (Option VerexIR.Ty) := do
   return (← get).tables.types[id.index]?
-
-/-- The place a local mutable reference refers to, outside the Move profile,
-whose references alone are `Copy`: reading or writing through such a local
-uses the place, not a copy of the reference. -/
-private def referentPlace? (context : ExprContext) (source : Expr) :
-    LowerM (Option (PlaceId × TypeId)) := do
-  if (← get).sourceNamespace.profile == .move then return none
-  let .local name _ := source | return none
-  let some (localId, typeId) := lookupLocal? context name | return none
-  let some (.reference reference) ← typeNode? typeId | return none
-  unless reference.kind == .mutable do return none
-  let base ← pushPlace (.localVar localId)
-  return some (← pushPlace (.deref base), reference.referent)
 
 /-- Whether a source field path is rooted at a local mutable reference. -/
 private partial def throughMutableReference (context : ExprContext) : Expr → LowerM Bool
@@ -987,7 +1548,7 @@ private def sourceMatchPatternType (context : ExprContext)
           | failAt "VEREX-MATCH-SCRUTINEE"
               s!"unknown match scrutinee local `{name}`" (some span)
         pure (some typeId)
-    | .discriminant _ result _ _ => do
+    | .discriminant _ result _ _ | .readDiscriminant result _ _ => do
         pure (some (← lowerTypeUse context.types result).typeId)
     | .specification .old _ #[value] _ => infer value
     | .dereference value _ => infer value
@@ -1014,21 +1575,18 @@ private partial def compatibleType (expected actual : TypeId) (fuel : Nat) : Low
   if expected == actual then return true
   if fuel == 0 then return false
   let state ← get
+  -- Types do not relate lifetimes: the borrow analysis does.
   match state.tables.types[expected.index]?, state.tables.types[actual.index]? with
   | some (.reference expectedRef), some (.reference actualRef) =>
-      let expectedLifetime := state.tables.lifetimes[expectedRef.lifetime.index]?
-      let actualLifetime := state.tables.lifetimes[actualRef.lifetime.index]?
-      let compatibleLifetime := expectedRef.lifetime == actualRef.lifetime ||
-        (expectedLifetime.any (fun value => value.kind == .inference) &&
-          actualLifetime.any (fun value => value.kind == .inference))
-      if expectedRef.profile != actualRef.profile || expectedRef.kind != actualRef.kind ||
-          !compatibleLifetime then
+      if expectedRef.profile != actualRef.profile || expectedRef.kind != actualRef.kind then
         return false
       compatibleType expectedRef.referent actualRef.referent (fuel - 1)
   | some (.tuple expectedElements), some (.tuple actualElements) =>
       if expectedElements.size != actualElements.size then return false
       (expectedElements.zip actualElements).allM fun (expected, actual) =>
         compatibleType expected actual (fuel - 1)
+  | some (.slice expectedElement), some (.slice actualElement) =>
+      compatibleType expectedElement actualElement (fuel - 1)
   | some (.vector expectedElement expectedLength), some (.vector actualElement actualLength) =>
       if expectedLength != actualLength then return false
       compatibleType expectedElement actualElement (fuel - 1)
@@ -1052,7 +1610,7 @@ private partial def compatibleType (expected actual : TypeId) (fuel : Nat) : Low
         | .typeArg expected, .typeArg actual =>
             compatibleType expected.typeId actual.typeId (fuel - 1)
         | .const expected, .const actual => pure (expected == actual)
-        | .lifetime expected, .lifetime actual => pure (expected == actual)
+        | .lifetime _, .lifetime _ => pure true
         | .evidence expected, .evidence actual => pure (expected == actual)
         | _, _ => pure false
   | _, _ => return false
@@ -1065,7 +1623,7 @@ private def nominalDescription? (typeId : TypeId) : LowerM (Option String) := do
   let tables := (← get).tables
   let some qualified := tables.names[name.index]? | return none
   let some owner := tables.namespaces[qualified.namespaceId.index]? | return none
-  return some <| "::".intercalate (owner.segments.push qualified.name).toList
+  return some <| "::".intercalate ((owner.segments ++ qualified.scope).push qualified.name).toList
 
 /-- Whether two aggregate types agree at the specification projection: as
 vectors or tuples whose integer components differ only in width, which a
@@ -1075,10 +1633,17 @@ private partial def specAggregatesAgree (expected actual : TypeId) (fuel : Nat) 
   if fuel == 0 then return false
   let componentsAgree (expected actual : TypeId) : LowerM Bool := do
     if ← compatibleType expected actual fuel then return true
+    -- A specification sees through references.
+    let expected ← specReferentTypeId expected
+    let actual ← specReferentTypeId actual
+    if ← compatibleType expected actual fuel then return true
     match ← typeNode? expected, ← typeNode? actual with
     | some (.integer _ _), some (.integer _ _) => return true
     | _, _ => specAggregatesAgree expected actual (fuel - 1)
   match ← typeNode? expected, ← typeNode? actual with
+  | some (.slice expectedElement), some (.slice actualElement)
+  | some (.slice expectedElement), some (.vector actualElement none)
+  | some (.vector expectedElement none), some (.slice actualElement)
   | some (.vector expectedElement none), some (.vector actualElement none) =>
       componentsAgree expectedElement actualElement
   | some (.tuple expectedElements), some (.tuple actualElements) =>
@@ -1226,89 +1791,31 @@ private def isBooleanPrimitive : Primitive → Bool
       .identical => true
   | _ => false
 
-private def sourceFunction? (sourceNs : Namespace) (name : String) : Option FunctionDecl :=
-  sourceNs.items.findSome? fun
-    | .function declaration => if declaration.name == name then some declaration else none
-    | _ => none
-
-private def sourceConstant? (sourceNs : Namespace) (name : String) : Option ConstantDecl :=
-  sourceNs.items.findSome? fun
-    | .constant declaration => if declaration.name == name then some declaration else none
-    | _ => none
-
-private def sourceSpecFunction? (sourceNs : Namespace) (name : String) : Option SpecFunctionDecl :=
-  sourceNs.items.findSome? fun
-    | .specFunction declaration => if declaration.name == name then some declaration else none
-    | _ => none
-
-private def sourceLemma? (sourceNs : Namespace) (name : String) : Option LemmaDecl :=
-  sourceNs.items.findSome? fun
-    | .lemma declaration => if declaration.name == name then some declaration else none
-    | _ => none
-
 /-- The lemma a path names, in whichever namespace of this compilation unit
 declares it. -/
 private def lemmaForPath? (state : BuildState) (segments : Array String) :
     Option LemmaDecl := do
-  let segments := (expandedUsePath? state.sourceNamespace segments).getD segments
-  let localName ← segments.back?
-  let owner := if segments.size == 1 then state.sourceNamespace.path else segments.pop
-  let sourceNs ← state.source.namespaces.find? (·.path == owner)
+  let target := state.target segments declaresLemma
+  let sourceNs ← state.source.namespaces.find? (·.path == target.owner)
   guard (sourceNs.profile == state.sourceNamespace.profile)
-  sourceLemma? sourceNs localName
+  sourceLemma? sourceNs target.scope target.name
 
 /-- The specification function a call path names, in whichever namespace of
 this compilation unit declares it. A `use` alias may point at another
 namespace, so the current one is not the only place to look. -/
 private def specFunctionForPath? (state : BuildState) (segments : Array String) :
     Option SpecFunctionDecl := do
-  let segments := (expandedUsePath? state.sourceNamespace segments).getD segments
-  let localName ← segments.back?
-  let owner := if segments.size == 1 then state.sourceNamespace.path else segments.pop
-  let sourceNs ← state.source.namespaces.find? (·.path == owner)
+  let target := state.target segments declaresSpecFunction
+  let sourceNs ← state.source.namespaces.find? (·.path == target.owner)
   guard (sourceNs.profile == state.sourceNamespace.profile)
-  sourceSpecFunction? sourceNs localName
-
-private structure SourceNominal where
-  name : String
-  generics : Array GenericBinder := #[]
-  fields : Array FieldDecl := #[]
-  variants : Array VariantDecl := #[]
-  /-- The ghost fields of every value, which specifications read
-  (`doc/designs/ghost-fields.md`). -/
-  ghosts : Array FieldDecl := #[]
-  abilities : Array Ability := #[]
-  /-- A nominal another compilation unit declares. This unit knows its
-  identity, which is what naming and constructing it need; its fields and
-  variants belong to the declaring unit, so operations that read them report
-  that boundary rather than guessing a shape. -/
-  external : Bool := false
-  /-- The namespace that declared this nominal. Its field and variant types are
-  spelled in that namespace's own naming context. -/
-  owner : Option Namespace := none
-
-private def sourceNominal? (sourceNs : Namespace) (name : String) : Option SourceNominal :=
-  sourceNs.items.findSome? fun
-    | .struct declaration => if declaration.name == name then some {
-        name, generics := declaration.generics, fields := declaration.fields
-        ghosts := ghostFieldsOf declaration.contract
-        abilities := declaration.abilities, owner := some sourceNs }
-      else none
-    | .enum declaration => if declaration.name == name then some {
-        name, generics := declaration.generics, variants := declaration.variants
-        ghosts := ghostFieldsOf declaration.contract
-        abilities := declaration.abilities, owner := some sourceNs }
-      else none
-    | _ => none
+  sourceSpecFunction? sourceNs target.scope target.name
 
 private def resolveLocalNominal (segments : Array String) :
     LowerM (QualifiedRef × SourceNominal) := do
   if segments.isEmpty then
     failAt "VEREX-NOMINAL-NAME" "a nominal operation must name its target"
   let state ← get
-  let segments := (expandedUsePath? state.sourceNamespace segments).getD segments
-  let localName := segments.back!
-  let owner := if segments.size == 1 then state.sourceNamespace.path else segments.pop
+  let { owner, scope, name := localName } := state.target segments declaresNominal
   let some sourceNs := state.source.namespaces.find? (·.path == owner)
     | -- The namespace belongs to a dependency: intern its identity the way an
       -- imported type name is interned, and leave its shape to its own unit.
@@ -1319,11 +1826,11 @@ private def resolveLocalNominal (segments : Array String) :
   unless sourceNs.profile == state.sourceNamespace.profile do
     failAt "VEREX-CROSS-PROFILE"
       "cross-profile nominal operations require a validated boundary adapter"
-  let some declaration := sourceNominal? sourceNs localName
+  let some declaration := sourceNominal? sourceNs scope localName
     | failAt "VEREX-NOMINAL-NAME" s!"unknown nominal type `{localName}`"
   let some namespaceId := namespaceId? state.tables owner
     | failAt "VEREX-NOMINAL-NAME" s!"nominal namespace `{"::".intercalate owner.toList}` was not interned"
-  let some name := nameId? state.tables namespaceId localName
+  let some name := nameId? state.tables namespaceId localName scope
     | failAt "VEREX-NOMINAL-NAME" s!"nominal type `{localName}` was not interned"
   return ({ namespaceId, name }, declaration)
 
@@ -1332,9 +1839,20 @@ private def resolveLocalConstructor (segments : Array String) :
   if segments.isEmpty then
     failAt "VEREX-CONSTRUCTOR-NAME" "a constructor expression must name its target"
   let state ← get
-  let directPrefix := segments.extract 0 (segments.size - 1)
-  if (segments.size == 1 || directPrefix == state.sourceNamespace.path) &&
-      (sourceNominal? state.sourceNamespace segments.back!).isSome then
+  let target := state.target segments declaresNominal
+  let names := state.source.namespaces.find? (·.path == target.owner) |>.any fun sourceNs =>
+    declaresNominal sourceNs target.scope target.name
+  if names then
+    let (reference, declaration) ← resolveLocalNominal segments
+    return (reference, declaration, none)
+  -- A nominal of another module, which a specification may construct, named
+  -- by a `use` or by its path.
+  let expanded := (expandedUsePath? state.sourceNamespace segments).getD segments
+  if expanded.size ≥ 2 && (state.source.namespaces.find? (·.path == expanded.pop)).any
+      (fun ns => (sourceNominal? ns #[] expanded.back!).isSome) then
+    let (reference, declaration) ← resolveLocalNominal segments
+    return (reference, declaration, none)
+  if segments.size == 1 && (expandedUsePath? state.sourceNamespace segments).isSome then
     let (reference, declaration) ← resolveLocalNominal segments
     return (reference, declaration, none)
   if segments.size < 2 then
@@ -1386,6 +1904,15 @@ private def fieldsNamed (declaration : SourceNominal) (field : String) : Array F
     if declaration.variants.isEmpty then declaration.fields.filter (·.name == field)
     else declaration.variants.filterMap fun variant => variant.fields.find? (·.name == field)
 
+private def instantiateLifetime (instantiations : Array GenericArgument)
+    (lifetime : LifetimeId) : LowerM LifetimeId := do
+  match (← get).tables.lifetimes[lifetime.index]? with
+  | some { kind := .parameter index, .. } =>
+      match instantiations[index]? with
+      | some (.lifetime value) => pure value
+      | _ => pure lifetime
+  | _ => pure lifetime
+
 private partial def instantiateTypeIdFuel (instantiations : Array GenericArgument)
     (id : TypeId) (fuel : Nat) (span : Span) : LowerM TypeId := do
   if fuel == 0 then
@@ -1401,6 +1928,8 @@ private partial def instantiateTypeIdFuel (instantiations : Array GenericArgumen
             s!"type parameter {index} has no type instantiation" (some span)
   | .tuple elements =>
       internType (.tuple (← elements.mapM (instantiateTypeIdFuel instantiations · (fuel - 1) span)))
+  | .slice element =>
+      internType (.slice (← instantiateTypeIdFuel instantiations element (fuel - 1) span))
   | .vector element length =>
       internType (.vector (← instantiateTypeIdFuel instantiations element (fuel - 1) span) length)
   | .typeDomain nested =>
@@ -1414,6 +1943,8 @@ private partial def instantiateTypeIdFuel (instantiations : Array GenericArgumen
         | .typeArg value => do
             let typeId ← instantiateTypeIdFuel instantiations value.typeId (fuel - 1) span
             pure (.typeArg { value with typeId })
+        | .lifetime lifetime => do
+            pure (.lifetime (← instantiateLifetime instantiations lifetime))
         | value => pure value
       internType (.nominal name arguments)
   | .function arguments result abilities =>
@@ -1422,18 +1953,59 @@ private partial def instantiateTypeIdFuel (instantiations : Array GenericArgumen
       internType (.function arguments result abilities)
   | .reference reference =>
       let referent ← instantiateTypeIdFuel instantiations reference.referent (fuel - 1) span
-      let lifetime := match (← get).tables.lifetimes[reference.lifetime.index]? with
-        | some { kind := .parameter index, .. } =>
-            match instantiations[index]? with
-            | some (.lifetime lifetime) => lifetime
-            | _ => reference.lifetime
-        | _ => reference.lifetime
+      let lifetime ← instantiateLifetime instantiations reference.lifetime
       internType (.reference { reference with referent, lifetime })
   | type => internType type
 
 private def instantiateTypeId (instantiations : Array GenericArgument)
     (id : TypeId) (span : Span) : LowerM TypeId := do
   instantiateTypeIdFuel instantiations id ((← get).tables.types.size + 1) span
+
+/-- Whether a constructor's generic arguments are its binders', a type at a
+type binder and a lifetime at a lifetime binder. -/
+private def constructorArgumentsMatch (binders : Array GenericBinder)
+    (arguments : Array GenericArgument) : Bool :=
+  binders.size == arguments.size && (binders.zip arguments).all fun
+    | (binder, .typeArg _) => binder.kind == .type
+    | (binder, .lifetime _) => binder.kind == .lifetime
+    | _ => false
+
+/-- The generic arguments of a call, whose lifetime binders it does not spell:
+the elided lifetime at each of those, and `type` at each type binder, by its
+position among the type binders or among all the binders. -/
+private def callInstantiations (binders : Array GenericBinder) (loc : LocId)
+    (type : Nat → Nat → Option TypeId) : LowerM (Array GenericArgument) := do
+  let mut instantiations := #[]
+  let mut typePosition := 0
+  for (binder, index) in binders.zipIdx do
+    if binder.kind == .lifetime then
+      instantiations := instantiations.push (.lifetime (← inferenceLifetime loc))
+    else
+      let some typeId := type typePosition index
+        | failAt "VEREX-CALL-GENERICS" "a call does not determine a type binder of its function"
+      instantiations := instantiations.push (.typeArg { typeId, loc })
+      typePosition := typePosition + 1
+  return instantiations
+
+/-- A type with its integers logical at any depth: what two types that a
+specification reads alike share, whichever holds the representation. -/
+private partial def logicalShapeFuel (id : TypeId) (fuel : Nat) : LowerM TypeId := do
+  if fuel == 0 then return id
+  let visit := (logicalShapeFuel · (fuel - 1))
+  match (← typeNode? id) with
+  | some (.integer _ _) => internType (.integer .unbounded true)
+  | some (.reference reference) => visit reference.referent
+  | some (.tuple elements) => internType (.tuple (← elements.mapM visit))
+  | some (.slice element) => internType (.slice (← visit element))
+  | some (.vector element length) => internType (.vector (← visit element) length)
+  | some (.nominal name arguments) =>
+      internType (.nominal name (← arguments.mapM fun
+        | .typeArg use => do return .typeArg { use with typeId := ← visit use.typeId }
+        | argument => pure argument))
+  | _ => return id
+
+private def logicalShape (id : TypeId) : LowerM TypeId := do
+  logicalShapeFuel id ((← get).tables.types.size + 1)
 
 /-- Infer specification-function type arguments through the full parameter
 shape. Move specs routinely mention a binder below a nominal constructor (for
@@ -1455,16 +2027,18 @@ private partial def inferTypeArgumentsFuel (specification : Bool)
               (some span)
       if let some previous := slot then
         if specification then
-          let projectedPrevious ← projectSpecTypeId previous
-          let projectedActual ← projectSpecTypeId actual
-          ensureType projectedPrevious projectedActual span
-          -- A direct scalar gives only its logical type, while a later
-          -- nominal/vector occurrence fixes the physical representation.
-          -- Refine `Int` to that representation before instantiating the
-          -- full parameters; otherwise argument order invents Choice<Int>
-          -- for a call whose actual choice is Choice<u64>.
-          if previous == projectedActual && actual != projectedActual then
+          -- A direct scalar gives only its logical type, and a call's result
+          -- `Choice<Int>` built from one, while a later nominal/vector occurrence
+          -- fixes the physical representation. Refine the logical type to that
+          -- representation before instantiating the full parameters; otherwise
+          -- argument order invents Choice<Int> for a call whose actual choice is
+          -- Choice<u64>.
+          let logicalActual ← logicalShape actual
+          if previous == logicalActual && actual != logicalActual then
             return inferred.set! index (some actual)
+          -- One already holds the logical type of the other's representation.
+          unless actual == logicalActual && (← logicalShape previous) == logicalActual do
+            ensureType (← projectSpecTypeId previous) (← projectSpecTypeId actual) span
         else ensureType previous actual span
         pure inferred
       else
@@ -1473,6 +2047,7 @@ private partial def inferTypeArgumentsFuel (specification : Bool)
       if patterns.size != actuals.size then pure inferred else
       (patterns.zip actuals).foldlM (init := inferred) fun inferred (pattern, actual) =>
         inferTypeArgumentsFuel specification inferred pattern actual (fuel - 1) span
+  | some (.slice pattern), some (.slice actual)
   | some (.vector pattern _), some (.vector actual _) =>
       inferTypeArgumentsFuel specification inferred pattern actual (fuel - 1) span
   | some (.nominal patternName patterns), some (.nominal actualName actuals) =>
@@ -1538,7 +2113,7 @@ private def resolveNominalField (baseType : TypeId) (field : String) (span : Spa
   unless ownerNs.profile == state.sourceNamespace.profile do
     failAt "VEREX-CROSS-PROFILE"
       "cross-profile field places require a validated boundary adapter" (some span)
-  let some declaration := sourceNominal? ownerNs ownerName.name
+  let some declaration := sourceNominal? ownerNs ownerName.scope ownerName.name
     | failAt "VEREX-PLACE-FIELD" s!"unknown nominal type `{ownerName.name}`" (some span)
   let selected ← match variant with
     | none => pure (fieldsNamed declaration field)
@@ -1559,13 +2134,23 @@ private def resolveNominalField (baseType : TypeId) (field : String) (span : Spa
     failAt "VEREX-PLACE-FIELD"
       s!"field `{field}` has different types across enum variants" (some span)
   let current ← get
-  let fieldName ← match nameId? current.tables ownerName.namespaceId field with
+  let fieldName ← match nameId? current.tables ownerName.namespaceId field ownerName.scope with
     | some name => pure name
     | none =>
-        let (tables, name) := internName current.tables ownerName.namespaceId field
+        let (tables, name) := internName current.tables ownerName.namespaceId field ownerName.scope
         set { current with tables }
         pure name
   return ({ namespaceId := ownerName.namespaceId, name := owner }, fieldName, typeId, declaration)
+
+/-- Whether a field path from a nominal type passes through an enum. -/
+private def projectionCrossesEnum (base : TypeId) (fields : Array String) (span : Span) :
+    LowerM Bool := do
+  let mut referent := base
+  for field in fields do
+    let (_, _, fieldType, declaration) ← resolveNominalField referent field span
+    unless declaration.variants.isEmpty do return true
+    referent := fieldType
+  return false
 
 private def nominalPatternDeclaration (typeId : TypeId) (span : Span) :
     LowerM (SourceNominal × Array GenericArgument) := do
@@ -1579,7 +2164,7 @@ private def nominalPatternDeclaration (typeId : TypeId) (span : Span) :
   let ownerPath := (state.tables.namespaces[qualified.namespaceId.index]?).map (·.segments)
   let ownerNamespace? := state.source.namespaces.find? fun candidate =>
     some candidate.path == ownerPath
-  let some declaration := ownerNamespace?.bind (sourceNominal? · qualified.name)
+  let some declaration := ownerNamespace?.bind (sourceNominal? · qualified.scope qualified.name)
     | if qualified.namespaceId == state.namespaceId then
         failAt "VEREX-PATTERN-TYPE" "a constructor pattern owner does not resolve" (some span)
       else
@@ -1806,7 +2391,7 @@ private partial def lowerAssignmentPattern (context : ExprContext)
       let some qualified := state.tables.names[ownerName.index]?
         | failAt "VEREX-PATTERN-TYPE"
             "a constructor assignment pattern has a missing owner" (some span)
-      let some declaration := sourceNominal? state.sourceNamespace qualified.name
+      let some declaration := sourceNominal? state.sourceNamespace qualified.scope qualified.name
         | failAt "VEREX-PATTERN-TYPE"
             "a constructor assignment pattern owner does not resolve" (some span)
       let declaredFields : Array FieldDecl ← match variant with
@@ -1834,6 +2419,19 @@ private partial def lowerAssignmentPattern (context : ExprContext)
       pushPattern { loc, typeId, kind :=
         .constructor ownerName instantiations variant children }
 
+/-- The element a numeric field names on a tuple. -/
+private def tupleElementPlace? (base : PlaceId) (baseType : TypeId) (field : String) (span : Span) :
+    LowerM (Option (PlaceId × TypeId)) := do
+  let some (.tuple elements) ← typeNode? baseType | return none
+  let some position := field.toNat? | return none
+  let some elementType := elements[position]?
+    | failAt "VEREX-INDEX-BOUNDS"
+        s!"tuple index {position} is out of bounds for {elements.size} elements" (some span)
+  let loc ← addLoc span
+  let indexType ← internType (.integer (.bits 32) false)
+  let index ← pushExpression loc indexType (.value (.integer (Int.ofNat position)))
+  return some (← pushPlace (.index base index), elementType)
+
 /-- Lower an authored storage path and recover its static type.  This is kept
 separate from expression lowering because dereference/field projections are
 arena `Place` nodes in VIR, not value-producing operations. -/
@@ -1847,10 +2445,14 @@ private partial def lowerPlace (context : ExprContext) (source : Place) :
       return (← pushPlace (.localVar localId), typeId)
   | .deref base _ =>
       let (base, baseType) ← lowerPlace context base
-      let some (.reference reference) ← typeNode? baseType
-        | failAt "VEREX-PLACE-DEREF" "a dereferenced place must contain a reference"
-            (some span)
-      return (← pushPlace (.deref base), reference.referent)
+      match ← typeNode? baseType with
+      | some (.reference reference) => return (← pushPlace (.deref base), reference.referent)
+      | _ =>
+          -- The specification reading holds a reference as its referent.
+          unless context.specification do
+            failAt "VEREX-PLACE-DEREF" "a dereferenced place must contain a reference"
+              (some span)
+          return (base, baseType)
   | .field base field _ =>
       let variant := match base with
         | .downcast _ _ variant _ => some variant
@@ -1860,6 +2462,7 @@ private partial def lowerPlace (context : ExprContext) (source : Place) :
         | some (.reference reference) =>
             pure (← pushPlace (.deref base), reference.referent)
         | _ => pure (base, baseType)
+      if let some result ← tupleElementPlace? base baseType field span then return result
       let (owner, fieldName, typeId, declaration) ← resolveNominalField baseType field span variant
       -- A ghost field is the verification model's (`doc/designs/ghost-fields.md`).
       let place := if declaration.ghosts.any (·.name == field) then
@@ -1886,10 +2489,10 @@ private partial def lowerPlace (context : ExprContext) (source : Place) :
       let state ← get
       let some ownerName := state.tables.names[owner.index]?
         | failAt "VEREX-PLACE-VARIANT" "a downcast place references a missing enum" (some span)
-      let variantName ← match nameId? state.tables ownerName.namespaceId variant with
+      let variantName ← match nameId? state.tables ownerName.namespaceId variant ownerName.scope with
         | some name => pure name
         | none =>
-            let (tables, name) := internName state.tables ownerName.namespaceId variant
+            let (tables, name) := internName state.tables ownerName.namespaceId variant ownerName.scope
             set { state with tables }
             pure name
       return (← pushPlace (.downcast base variantName), baseType)
@@ -1917,9 +2520,31 @@ private partial def expressionPlace? : Expr → Option Place
   | .local name span => some (.local name span)
   | .field value field span => do
       some (.field (← expressionPlace? value) field span)
+  -- A reference read to be dereferenced at once refers where its place does.
+  | .dereference (.placeOperation .copy value _) span => do
+      some (.deref (← expressionPlace? value) span)
   | .dereference value span => do
       some (.deref (← expressionPlace? value) span)
+  | .downcast place _ => some place
   | _ => none
+
+/-- The place a mutable reference held by a local, or by a field of one,
+refers to, outside the Move profile, whose references alone are `Copy`: reading
+or writing through it uses the place, not a copy of the reference. -/
+private def referentPlace? (context : ExprContext) (source : Expr) :
+    LowerM (Option (PlaceId × TypeId)) := do
+  if (← get).sourceNamespace.profile == .move then return none
+  let (base, typeId) ← match source with
+    | .local name _ =>
+        let some (localId, typeId) := lookupLocal? context name | return none
+        pure (← pushPlace (.localVar localId), typeId)
+    | .field .. | .dereference .. =>
+        let some place := expressionPlace? source | return none
+        lowerPlace context place
+    | _ => return none
+  let some (.reference reference) ← typeNode? typeId | return none
+  unless reference.kind == .mutable do return none
+  return some (← pushPlace (.deref base), reference.referent)
 
 /-- Borrow a field of a mutable reference as a place: through the source's
 own place when it names one, otherwise through a hidden holder of the
@@ -1965,16 +2590,14 @@ private def resolveLocalRef (segments : Array String) (span : Span) :
   if segments.isEmpty then
     failAt "VEREX-CALL-NAME" "a function call must name a target" (some span)
   let state ← get
-  let segments := (expandedUsePath? state.sourceNamespace segments).getD segments
-  let localName := segments.back!
-  let owner := if segments.size == 1 then state.sourceNamespace.path else segments.pop
+  let { owner, scope, name := localName } := state.target segments declaresFunction
   let some sourceNs := state.source.namespaces.find? (·.path == owner)
     | failAt "VEREX-CALL-NAME" s!"unknown function namespace `{"::".intercalate owner.toList}`"
         (some span)
   unless sourceNs.profile == state.sourceNamespace.profile do
     failAt "VEREX-CROSS-PROFILE"
       "cross-profile calls require a validated boundary adapter" (some span)
-  let some declaration := sourceFunction? sourceNs localName
+  let some declaration := sourceFunction? sourceNs scope localName
     | failAt "VEREX-CALL-NAME" s!"unknown function `{localName}`" (some span)
   -- Another Move module's function is callable as Move allows: a public one,
   -- a friend one from a module it names a friend, and a package one from a
@@ -1994,7 +2617,7 @@ private def resolveLocalRef (segments : Array String) (span : Span) :
   let some namespaceId := namespaceId? state.tables owner
     | failAt "VEREX-CALL-NAME" s!"function namespace `{"::".intercalate owner.toList}` was not interned"
         (some span)
-  let some name := nameId? state.tables namespaceId localName
+  let some name := nameId? state.tables namespaceId localName scope
     | failAt "VEREX-CALL-NAME" s!"function `{localName}` was not interned" (some span)
   return ({ namespaceId, name }, declaration)
 
@@ -2007,25 +2630,42 @@ private def namespaceOfRef? (reference : QualifiedRef) : LowerM (Option Namespac
     | return none
   return state.source.namespaces.find? (·.path == path)
 
+/-- The naming context a resolved reference's declaration is written in. -/
+private def namingOfRef? (reference : QualifiedRef) : LowerM (Option NamingContext) := do
+  let scope := ((← get).tables.names[reference.name.index]?.map (·.scope)).getD #[]
+  return (← namespaceOfRef? reference).map (·, scope)
+
+/-- A specification may not call a function with an effect on a reference. -/
+private def rejectImpureCall (context : ExprContext) (reference : QualifiedRef)
+    (declaration : FunctionDecl) (span : Span) : LowerM Unit := do
+  unless context.specification do return
+  let some naming ← namingOfRef? reference | return
+  if let some cause ← impurityOf naming declaration then
+    failAt "VEREX-SPEC-IMPURE-CALL" (impureCallMessage declaration.name cause) (some span)
+
+/-- A call of a function the unit does not hold states only its result. -/
+private def rejectImpureExternalCall (context : ExprContext) (segments : Array String)
+    (result : Located Ty) (span : Span) : LowerM Unit := do
+  if context.specification && result.value.holdsMutableReference then
+    let name := segments.back?.getD ""
+    failAt "VEREX-SPEC-IMPURE-CALL" (impureCallMessage name "returns `&mut`") (some span)
+
 /-- Whether a call names a function of a namespace this unit does not hold.
 Only such a call states its result type: a held namespace declares the
 callee, whose signature and visibility apply to the call. -/
 private def isExternalPath (segments : Array String) : LowerM Bool := do
   let state ← get
-  let segments := (expandedUsePath? state.sourceNamespace segments).getD segments
-  if segments.size <= 1 then return false
-  return !state.source.namespaces.any (·.path == segments.pop)
+  let target := state.target segments declaresFunction
+  return !state.source.namespaces.any (·.path == target.owner)
 
 private def resolveExternalRef (segments : Array String) : LowerM QualifiedRef := do
-  let sourceNs := (← get).sourceNamespace
-  let segments := (expandedUsePath? sourceNs segments).getD segments
-  if segments.size <= 1 then
-    failAt "VEREX-CALL-NAME" "an external call must carry a qualified name"
-  let owner := segments.extract 0 (segments.size - 1)
-  let localName := segments.back!
   let state ← get
-  let (tables, namespaceId) := internNamespace state.source state.tables owner
-  let (tables, name) := internName tables namespaceId localName
+  let expanded := (expandedUsePath? state.sourceNamespace segments).getD segments
+  if expanded.size <= 1 then
+    failAt "VEREX-CALL-NAME" "an external call must carry a qualified name"
+  let target := state.target segments declaresFunction
+  let (tables, namespaceId) := internNamespace state.source state.tables target.owner
+  let (tables, name) := internName tables namespaceId target.name target.scope
   set { state with tables }
   return { namespaceId, name }
 
@@ -2044,21 +2684,19 @@ private def resolveLocalSpecRef (segments : Array String) :
   if segments.isEmpty then
     failAt "VEREX-SPEC-CALL-NAME" "a specification-function call must name a target"
   let state ← get
-  let segments := (expandedUsePath? state.sourceNamespace segments).getD segments
-  let localName := segments.back!
-  let owner := if segments.size == 1 then state.sourceNamespace.path else segments.pop
+  let { owner, scope, name := localName } := state.target segments declaresSpecFunction
   let some sourceNs := state.source.namespaces.find? (·.path == owner)
     | failAt "VEREX-SPEC-CALL-NAME"
         s!"unknown specification-function namespace `{"::".intercalate owner.toList}`"
   unless sourceNs.profile == state.sourceNamespace.profile do
     failAt "VEREX-CROSS-PROFILE"
       "cross-profile specification calls require a validated boundary adapter"
-  let some declaration := sourceSpecFunction? sourceNs localName
+  let some declaration := sourceSpecFunction? sourceNs scope localName
     | failAt "VEREX-SPEC-CALL-NAME" s!"unknown specification function `{localName}`"
   let some namespaceId := namespaceId? state.tables owner
     | failAt "VEREX-SPEC-CALL-NAME"
         s!"specification-function namespace `{"::".intercalate owner.toList}` was not interned"
-  let some name := nameId? state.tables namespaceId localName
+  let some name := nameId? state.tables namespaceId localName scope
     | failAt "VEREX-SPEC-CALL-NAME"
         s!"specification function `{localName}` was not interned"
   return ({ namespaceId, name }, declaration)
@@ -2066,16 +2704,15 @@ private def resolveLocalSpecRef (segments : Array String) :
 private def resolveLocalLemmaRef (segments : Array String) (span : Span) :
     LowerM (QualifiedRef × LemmaDecl) := do
   let state ← get
-  let segments := (expandedUsePath? state.sourceNamespace segments).getD segments
-  let some localName := segments.back?
-    | failAt "VEREX-LEMMA-NAME" "a lemma application must name a lemma" (some span)
-  let owner := if segments.size == 1 then state.sourceNamespace.path else segments.pop
+  if segments.isEmpty then
+    failAt "VEREX-LEMMA-NAME" "a lemma application must name a lemma" (some span)
+  let { owner, scope, name := localName } := state.target segments declaresLemma
   let some declaration := lemmaForPath? state segments
     | failAt "VEREX-LEMMA-NAME" s!"unknown lemma `{localName}`" (some span)
   let some namespaceId := namespaceId? state.tables owner
     | failAt "VEREX-LEMMA-NAME"
         s!"lemma namespace `{"::".intercalate owner.toList}` was not interned" (some span)
-  let some name := nameId? state.tables namespaceId localName
+  let some name := nameId? state.tables namespaceId localName scope
     | failAt "VEREX-LEMMA-NAME" s!"lemma `{localName}` was not interned" (some span)
   return ({ namespaceId, name }, declaration)
 
@@ -2111,9 +2748,10 @@ private def addArbitrarySpecValue (context : ExprContext) (typeId : TypeId)
     | .typeArg =>
         let parameterType ← internType (.typeParameter index)
         pure <| GenericArgument.typeArg { typeId := parameterType, loc }
+    | .lifetime => pure <| GenericArgument.lifetime (← inferenceLifetime loc)
     | _ => do
         failAt "VEREX-ARBITRARY-GENERICS"
-          "arbitrary specification values currently require type-only generic binders" (some span)
+          "arbitrary specification values currently require type and lifetime binders" (some span)
   let declaration : VerexIR.SpecFunctionDecl := {
     loc
     name
@@ -2131,15 +2769,15 @@ private def addArbitrarySpecValue (context : ExprContext) (typeId : TypeId)
 
 /-- The name a state label is in VIR: interned in the unit's names, under the
 namespace of the specification. -/
-private def labelName (name : String) : LowerM Nat := do
+private def labelName (name : String) : LowerM NameId := do
   let state ← get
   let (tables, id) := internName state.tables state.namespaceId name
   set { state with tables }
-  return id.index
+  return id
 
 /-- The state a one-state read under the enclosing labels reads: the
 post-state's label, else the pre-state's. -/
-private def stateLabel (context : ExprContext) : Option Nat :=
+private def stateLabel (context : ExprContext) : Option NameId :=
   context.stateRange.post <|> context.stateRange.pre
 
 private def runtimeIndexType : LowerM TypeId := do
@@ -2171,10 +2809,10 @@ private def storageIndexLocalBase? (context : ExprContext) (head : Located Ty) :
 /-- Constants are values too: `C[i]` must not invent a resource family C.
 Move constants cannot contain nominal values, so a bare constant is the
 only additional head the storage/value ambiguity needs to recognize. -/
-private def storageIndexConstantBase? (sourceNs : Namespace) (head : Located Ty) :
+private def storageIndexConstantBase? (state : BuildState) (head : Located Ty) :
     Option Expr := do
   let .named #[name] #[] := head.value | none
-  let _ ← sourceConstant? sourceNs name
+  let _ ← state.visible? (sourceConstant? · · name)
   some (.local name head.span)
 
 private def storageIndexLocalName? (context : ExprContext) (head : Located Ty) :
@@ -2206,21 +2844,73 @@ private partial def localStoragePlace? (context : ExprContext) : Expr → Option
       some (.field (← localStoragePlace? context base) field span)
   | .index base index span => do
       some (.index (← localStoragePlace? context base) index span)
+  | .subslice base start stop fromEnd span => do
+      some (.subslice (← localStoragePlace? context base) start stop fromEnd span)
+  | .unsize base span => do
+      some (.unsize (← localStoragePlace? context base) span)
   | .storageIndex head index span => do
       let base ← storageIndexLocalBase? context head
       some (.index base index span)
   | _ => none
 
+/-- Whether a place expression starts at a local shared reference: what it reaches is
+a shared view. -/
+private partial def isShareViewed (context : ExprContext) : Expr → LowerM Bool
+  | .local name _ => do
+      let some (_, typeId) := lookupLocal? context name | return false
+      match ← typeNode? typeId with
+      | some (.reference reference) => return reference.kind == .shared
+      | _ => return false
+  | .field value _ _ | .index value _ _ | .dereference value _ =>
+      isShareViewed context value
+  | _ => return false
+
+/-- The declared type of what a place expression holds, a reference as itself, where
+the specification reading projects it to its referent. -/
+private partial def heldType? (context : ExprContext) : Expr → LowerM (Option TypeId)
+  | .local name _ => do
+      if let some (_, typeId) := lookupLocal? context name then return some typeId
+      -- The implicit result of a specification, at its declared type: a
+      -- projection of it holds whatever that type holds, so `final` reads a
+      -- mutable reference the result carries as well as one it is.
+      if context.specification && name == "result" then
+        return context.declaredResultType
+      return none
+  | .specification .old _ #[value] _ => heldType? context value
+  | .dereference value _ => do
+      let some held ← heldType? context value | return none
+      match ← typeNode? held with
+      | some (.reference reference) => return some reference.referent
+      | _ => return some held
+  | .field value field span => do
+      let some held ← heldType? context value | return none
+      let owner ← match ← typeNode? held with
+        | some (.reference reference) => pure reference.referent
+        | _ => pure held
+      let (_, _, typeId, _) ← resolveNominalField owner field span
+      return some typeId
+  | _ => return none
+
 /-- Lower expression-shaped Move 2 places. Index expressions are lowered by
 the caller so this helper can remain outside the mutually recursive source
-expression lowering function. Field and index projection through a reference
-insert the implicit dereference prescribed by Move's place syntax. -/
+expression lowering function, a vector's index at `indexType` and a tuple's,
+a literal selecting a component, at its own type. Field and index projection
+through a reference insert the implicit dereference prescribed by Move's place
+syntax. With `localRoot` a local's observation is the local itself, whose access
+validation infers from the chain above it, for a chain read as a value. -/
 private partial def lowerExpressionPlaceWith
-    (lowerIndex : Expr → LowerM (ExprId × TypeId)) (context : ExprContext)
-    (source : Expr) (checkBounds : Bool := true) (captureLiteralIndexes : Bool := false) :
+    (lowerIndex : Option TypeId → Expr → LowerM (ExprId × TypeId)) (indexType : Option TypeId)
+    (context : ExprContext)
+    (source : Expr) (checkBounds : Bool := true) (captureLiteralIndexes : Bool := false)
+    (localRoot : Bool := false) :
     LowerM (PlaceId × TypeId × Array (PatternId × ExprId) × LowerM ExprId) := do
   let sourceSpan := source.span
   let loc ← addLoc sourceSpan
+  -- A place through a variant selects its fields by that variant.
+  if let some sourcePlace := expressionPlace? source then
+    if sourcePlace.hasDowncast then
+      let (place, typeId) ← lowerPlace context sourcePlace
+      return (place, typeId, #[], pushExpression loc typeId (.operation (.read place) #[] #[]))
   match source with
   | .local name _ =>
       let some (localId, typeId) := lookupLocal? context name
@@ -2228,45 +2918,88 @@ private partial def lowerExpressionPlaceWith
       let place ← pushPlace (.localVar localId)
       let kind ← match ← typeNode? typeId with
         | some (.reference ..) => pure (ExprKind.localVar localId)
-        | _ => pure (.operation (.read place) #[] #[])
+        | _ => pure (if localRoot then ExprKind.localVar localId
+            else .operation (.read place) #[] #[])
       return (place, typeId, #[],
         pushExpression loc typeId kind)
-  | .dereference base _ =>
+  | .dereference baseSource _ =>
       let (base, baseType, bindings, observe) ← lowerExpressionPlaceWith
-        lowerIndex context base checkBounds captureLiteralIndexes
-      let some (.reference reference) ← typeNode? baseType
-        | failAt "VEREX-PLACE-DEREF"
-            "a dereferenced place must contain a reference" (some sourceSpan)
-      return (← pushPlace (.deref base), reference.referent, bindings, do
-        pushExpression loc reference.referent
-          (.operation (.reference .dereference) #[] #[← observe]))
+        lowerIndex indexType context baseSource checkBounds captureLiteralIndexes localRoot
+      match ← typeNode? baseType with
+      | some (.reference reference) =>
+          let dereferenced ← pushPlace (.deref base)
+          -- Under a shared view a mutable reference holds what it refers to: a
+          -- dereference of it reads the place, not a borrow.
+          let viewed ← isShareViewed context baseSource
+          return (dereferenced, reference.referent, bindings, do
+            if reference.kind == .mutable && viewed then
+              pushExpression loc reference.referent (.operation (.read dereferenced) #[] #[])
+            else
+              pushExpression loc reference.referent
+                (.operation (.reference .dereference) #[] #[← observe]))
+      | _ =>
+          -- The specification reading holds a reference as its referent, so
+          -- dereferencing it is the identity, as for a dereference expression.
+          unless context.specification do
+            failAt "VEREX-PLACE-DEREF"
+              "a dereferenced place must contain a reference" (some sourceSpan)
+          return (base, baseType, bindings, observe)
+  | .subslice base start stop fromEnd _ => do
+      let (base, baseType, bindings, _) ← lowerExpressionPlaceWith
+        lowerIndex indexType context base checkBounds captureLiteralIndexes
+      let some element := (← typeNode? baseType).bind sequenceElement?
+        | failAt "VEREX-PLACE-SUBSLICE" "a subslice place requires an array, vector, or slice base"
+            (some sourceSpan)
+      let typeId ← internType (.slice element)
+      let place ← pushPlace (.subslice base start stop fromEnd)
+      return (place, typeId, bindings, pushExpression loc typeId (.operation (.read place) #[] #[]))
+  | .unsize base _ =>
+      let (base, baseType, bindings, _) ← lowerExpressionPlaceWith
+        lowerIndex indexType context base checkBounds captureLiteralIndexes
+      let some (.vector element (some _)) ← typeNode? baseType
+        | failAt "VEREX-PLACE-UNSIZE" "an unsize place must have a fixed vector base"
+            (some sourceSpan)
+      let typeId ← internType (.slice element)
+      let place ← pushPlace (.unsize base)
+      return (place, typeId, bindings, pushExpression loc typeId (.operation (.read place) #[] #[]))
   | .field base field _ =>
       let (base, baseType, bindings, observe) ← lowerExpressionPlaceWith
-        lowerIndex context base checkBounds captureLiteralIndexes
+        lowerIndex indexType context base checkBounds captureLiteralIndexes localRoot
       let (base, baseType, observe) ← match ← typeNode? baseType with
         | some (.reference reference) =>
             pure (← pushPlace (.deref base), reference.referent, do
               pushExpression loc reference.referent
                 (.operation (.reference .dereference) #[] #[← observe]))
         | _ => pure (base, baseType, observe)
+      if let some (place, elementType) ← tupleElementPlace? base baseType field sourceSpan then
+        let loc ← addLoc sourceSpan
+        return (place, elementType, bindings,
+          pushExpression loc elementType (.operation (.read place) #[] #[]))
       let (owner, fieldName, typeId, declaration) ← resolveNominalField baseType field sourceSpan
       let ghost := declaration.ghosts.any (·.name == field)
       let place := if ghost then VerexIR.Place.ghostField base owner fieldName
         else .field base owner fieldName
       return (← pushPlace place, typeId, bindings, do
         pushExpression loc typeId (.operation (.data
-          (if ghost then .selectGhost owner field else .select owner field)) #[] #[← observe]))
+          (fieldSelection declaration owner field)) #[] #[← observe]))
   | .index base indexSource _ =>
       let (base, baseType, bindings, observe) ← lowerExpressionPlaceWith
-        lowerIndex context base checkBounds captureLiteralIndexes
+        lowerIndex indexType context base checkBounds captureLiteralIndexes localRoot
       let (base, baseType, observe) ← match ← typeNode? baseType with
         | some (.reference reference) =>
-            pure (← pushPlace (.deref base), reference.referent, do
-              pushExpression loc reference.referent
-                (.operation (.reference .dereference) #[] #[← observe]))
+            let referent ← pushPlace (.deref base)
+            -- A Rust `&mut` is not `Copy`: its referent is read in place.
+            let inPlace := reference.kind == .mutable &&
+              (← get).sourceNamespace.profile == .rust && !context.specification
+            pure (referent, reference.referent, do
+              if inPlace then
+                pushExpression loc reference.referent (.operation (.read referent) #[] #[])
+              else
+                pushExpression loc reference.referent
+                  (.operation (.reference .dereference) #[] #[← observe]))
         | _ => pure (base, baseType, observe)
       let typeId ← match ← typeNode? baseType with
-        | some (.vector elementType _) => pure elementType
+        | some (.vector elementType _) | some (.slice elementType) => pure elementType
         | some (.tuple elements) =>
             let some position := literalIndex? indexSource
               | failAt "VEREX-INDEX-TYPE"
@@ -2279,13 +3012,14 @@ private partial def lowerExpressionPlaceWith
         | _ => do
             failAt "VEREX-INDEX-TYPE"
               "an indexed place requires a vector or tuple base" (some sourceSpan)
-      let index ← lowerIndex indexSource
+      let index ← lowerIndex
+        (if (← typeNode? baseType) matches some (.tuple _) then none else indexType) indexSource
       let output := (← get).output
       -- Indexed assignments use the same typed local-index path for literal
       -- and computed vector indexes. Tuple projection stays a literal since
       -- its index selects a statically different element type.
       let captureLiteral := captureLiteralIndexes &&
-        ((← typeNode? baseType).any fun | .vector .. => true | _ => false)
+        ((← typeNode? baseType).any fun | .vector .. | .slice .. => true | _ => false)
       let simple := match output.expressions[index.1.index]?.map (·.kind) with
         | some (.value ..) => !captureLiteral
         | some (.localVar ..) => true
@@ -2301,20 +3035,22 @@ private partial def lowerExpressionPlaceWith
           let read ← pushExpression loc index.2 (.localVar slot)
           pure (read, bindings.push (pattern, index.1))
       let bindings ← if checkBounds && !context.specification &&
-          (← get).sourceNamespace.profile == .move &&
-          ((← typeNode? baseType).any fun | .vector .. => true | _ => false) then do
+          ((← typeNode? baseType).any fun | .vector .. | .slice .. => true | _ => false) then do
           let unitType ← internType .unit
           -- This is a metadata observation, not a Copy of the elements.
           let collection ← observe
+          let failure : ThrowKind := match (← get).sourceNamespace.profile with
+            | .move => .moveVectorError
+            | _ => .panic
           let checked ← pushExpression loc unitType (.operation
-            (.primitive (.checkVectorIndex ThrowKind.moveVectorError.toVIR)) #[]
+            (.primitive (.checkVectorIndex failure.toVIR)) #[]
             #[collection, indexId])
           let pattern ← pushPattern { loc, typeId := unitType, kind := .wildcard }
           pure (bindings.push (pattern, checked))
         else pure bindings
       let place ← pushPlace (.index base indexId)
       let observe := match ← typeNode? baseType with
-        | some (.vector ..) => do
+        | some (.vector ..) | some (.slice ..) => do
             pushExpression loc typeId
               (.operation (.primitive .index) #[] #[← observe, indexId])
         | _ => pushExpression loc typeId (.operation (.read place) #[] #[])
@@ -2323,8 +3059,8 @@ private partial def lowerExpressionPlaceWith
       let some base := storageIndexLocalBase? context head
         | failAt "VEREX-PLACE-EXPRESSION"
             "a resource-storage index is not a local assignable place" (some sourceSpan)
-      lowerExpressionPlaceWith lowerIndex context
-        (.index base indexSource sourceSpan) checkBounds captureLiteralIndexes
+      lowerExpressionPlaceWith lowerIndex indexType context
+        (.index base indexSource sourceSpan) checkBounds captureLiteralIndexes localRoot
   | _ => do
       failAt "VEREX-PLACE-EXPRESSION"
         "move, copy, read, borrow, and assignment require an assignable place"
@@ -2434,17 +3170,13 @@ private def specificationResultType (context : ExprContext) (index : Nat)
     (span : Span) : LowerM TypeId := do
   let some resultType := context.resultType
     | failAt "VEREX-SPEC-RESULT" "`result` is unavailable in this specification" (some span)
-  let packed := (← get).sourceNamespace.profile == .move
   match ← typeNode? resultType with
   | some (.tuple components) =>
-      if packed then
-        let some component := components[index]?
-          | failAt "VEREX-SPEC-RESULT"
-              s!"specification result {index} is out of range; the function has {components.size} results"
-              (some span)
-        pure component
-      else if index == 0 then pure resultType
-      else failAt "VEREX-SPEC-RESULT" s!"the function has one result, not {index + 1}" (some span)
+      let some component := components[index]?
+        | failAt "VEREX-SPEC-RESULT"
+            s!"specification result {index} is out of range; the function has {components.size} results"
+            (some span)
+      pure component
   | _ =>
       if index == 0 then pure resultType
       else failAt "VEREX-SPEC-RESULT" s!"the function has one result, not {index + 1}" (some span)
@@ -2538,6 +3270,16 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
               ConstValue.integer (Int.ofNat byte.toNat)
             let id ← pushExpression loc expectedType (.value (.vector elements))
             return (id, expectedType)
+      -- Without a context asking for `Bytes`, a Move byte string is a vector:
+      -- the source language has no other type for one.
+      let expectsBytes ← match expected with
+        | some expected => pure ((← typeNode? expected) == some .bytes)
+        | none => pure false
+      if (← get).sourceNamespace.profile == .move && !expectsBytes then
+        let vectorType ← internType (.vector (← internType (.integer (.bits 8) false)) none)
+        if let some expected := expected then ensureType expected vectorType span
+        let elements := value.map fun byte => ConstValue.integer (Int.ofNat byte.toNat)
+        return (← pushExpression loc vectorType (.value (.vector elements)), vectorType)
       let typeId ← internType .bytes
       if let some expected := expected then ensureType expected typeId span
       return (← pushExpression loc typeId (.value (.bytes value)), typeId)
@@ -2558,9 +3300,9 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
   | .field source field _ =>
       lowerFieldExpr context expected span loc source field
   | .storageIndex head indexSource _ =>
-      let sourceNs := (← get).sourceNamespace
+      let state ← get
       if let some localBase := (storageIndexLocalBase? context head).orElse
-          (fun _ => storageIndexConstantBase? sourceNs head) then
+          (fun _ => storageIndexConstantBase? state head) then
         return ← lowerExpr context expected
           (.index localBase indexSource span)
       unless (← get).sourceNamespace.profile == .move do
@@ -2652,11 +3394,41 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       return (id, value.2)
   | .discriminant ownerType resultType value _ =>
       lowerDiscriminantExpr context expected span loc ownerType resultType value
+  | .readDiscriminant resultType sourcePlace _ =>
+      let resultTypeId := (← lowerTypeUse context.types resultType).typeId
+      unless (← typeNode? resultTypeId).any fun | .integer _ _ => true | _ => false do
+        failAt "VEREX-DISCRIMINANT-TYPE"
+          "a tag read result must be an integer" (some resultType.span)
+      let resultTypeId ← if context.specification then projectSpecTypeId resultTypeId
+        else pure resultTypeId
+      if let some expected := expected then ensureType expected resultTypeId span
+      if context.specification then
+        -- Logical bodies retain the value when executable code moves its
+        -- payload. Their tag observation is the existing value discriminant.
+        let value ← lowerExpr context none sourcePlace
+        let some (.nominal owner instantiations) ← typeNode? value.2
+          | failAt "VEREX-DISCRIMINANT-TYPE" "a tag read requires an enum" (some span)
+        let some ownerName := (← get).tables.names[owner.index]?
+          | failAt "VEREX-DISCRIMINANT-TYPE" "a tag read has no nominal owner" (some span)
+        let reference : QualifiedRef := { namespaceId := ownerName.namespaceId, name := owner }
+        let id ← pushExpression loc resultTypeId <| .operation
+          (.data (.discriminant reference)) instantiations #[value.1]
+        return (id, resultTypeId)
+      let (place, _, bindings, _) ← lowerExpressionPlaceWith
+        (lowerExpr context) none context sourcePlace
+      let id ← pushExpression loc resultTypeId <| .operation (.readDiscriminant place) #[] #[]
+      return (← bindPlaceIndices loc resultTypeId bindings id, resultTypeId)
+  | .downcast place _ =>
+      unless context.specification do
+        failAt "VEREX-PLACE-VARIANT" "a variant of a place is read through a field" (some span)
+      lowerSpecificationPlaceValue context place
+  | .unsize .. | .subslice .. =>
+      failAt "VEREX-PLACE-UNSIZE" "an unsize place is read only through a borrow" (some span)
   | .placeOperation operation sourcePlace _ =>
       if context.specification then
         return ← lowerExpr context expected sourcePlace
       let (place, placeType, bindings, _) ← lowerExpressionPlaceWith
-        (lowerExpr context none) context sourcePlace
+        (lowerExpr context) none context sourcePlace
       if let some expected := expected then ensureType expected placeType span
       let operation := match operation with
         | .move => VerexIR.Operation.move place
@@ -2665,10 +3437,29 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       let id ← pushExpression loc placeType <| .operation operation #[] #[]
       return (← bindPlaceIndices loc placeType bindings id, placeType)
   | .borrowPlace mutable place _ =>
+      -- A signer's address is a value, which no field place names.
+      if let .field (.local name localSpan) "address" fieldSpan := place then
+        if let some (_, baseType) := lookupLocal? context name then
+          let baseIsSigner ← match ← typeNode? baseType with
+            | some .signer => pure true
+            | some (.reference reference) =>
+                pure ((← typeNode? reference.referent) == some .signer)
+            | _ => pure false
+          if !mutable && baseIsSigner then
+            let address : Expr := .field (.local name localSpan) "address" fieldSpan
+            return ← lowerExpr context expected
+              (if context.specification then address else .borrowValue false address span)
       if context.specification then
+        if mutable && context.projectedBody then
+          failAt "VEREX-INTERNAL" "a projected body holds a `&mut` borrow" (some span)
         let value ← lowerSpecificationPlaceValue context place
         if let some expected := expected then ensureType expected value.2 span
         return value
+      -- A constant is a value, not a place: its borrow is a value borrow.
+      if let .local name localSpan := place then
+        if !mutable && (lookupLocal? context name).isNone &&
+            ((← get).visible? (sourceConstant? · · name)).isSome then
+          return ← lowerExpr context expected (.borrowValue false (.local name localSpan) span)
       let (place, placeType) ← lowerPlace context place
       let resultType ← match expected with
         | some resultType => pure resultType
@@ -2747,13 +3538,11 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       let unitType ← internType .unit
       if let some expected := expected then ensureType expected unitType span
       if context.specification then
-        let reference ← lowerExpr context none reference
-        let valueType ← match ← typeNode? reference.2 with
-          | some (.reference referenceType) => pure referenceType.referent
-          | _ => pure reference.2
-        let value ← lowerExpr context (some valueType) value
-        ensureType valueType value.2 span
-        return (← pushExpression loc unitType (.value .unit), unitType)
+        if context.projectedBody then
+          failAt "VEREX-INTERNAL" "a projected body holds a mutation through a reference"
+            (some span)
+        failAt "VEREX-SPEC-MUTATION" "a specification cannot mutate through a reference"
+          (some span)
       if let some (place, referent) ← referentPlace? context reference then
         let value ← lowerExpr context (some referent) value
         return (← pushExpression loc unitType (.assign place value.1), unitType)
@@ -2778,7 +3567,7 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
           -- A vector keeps its element representation in the specification
           -- domain, so a binder ranging over one binds that element type; a
           -- use of it in a logical position widens implicitly.
-          | some (.vector element _) => pure element
+          | some (.vector element _) | some (.slice element) => pure element
           | some .range => internType (.integer .unbounded true)
           -- `x : T` ranges over every value of a type.
           | some (.typeDomain element) => projectSpecTypeId element
@@ -2791,8 +3580,9 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
               failAt "VEREX-STATE-LABEL" "a binder over the state domain is one label" (some domain.span)
           | _, _ => pure none
         let loweredPattern ← lowerBindingPattern active pattern patternType
-        let boundLocals ← bindingPatternLocals active pattern
-        active := withBoundLocals active boundLocals
+        -- A state label binds no value: the name still reads an enclosing one.
+        if label.isNone then
+          active := withBoundLocals active (← bindingPatternLocals active pattern)
         loweredBinders := loweredBinders.push {
           pattern := loweredPattern, domain := domainValue.1, label }
       let boolType ← internType .bool
@@ -2918,6 +3708,9 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       return (id, resultType)
   | .methodCall name result types receiver arguments _ =>
       lowerMethodCallExpr context expected source span loc name result types receiver arguments
+  | .closureItem name .. =>
+      failAt "VEREX-CLOSURE-PLACE"
+        s!"closure `{name}` stands outside a function body of a Rust namespace" (some span)
   | .closure segments types result captures _ =>
       let (reference, declaration) ← resolveLocalRef segments span
       unless declaration.generics.size == types.size &&
@@ -2927,7 +3720,7 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       let instantiations ← types.mapM fun argument => do
         pure <| GenericArgument.typeArg (← lowerTypeUse context.types argument)
       let declarationTypes ← liftM <|
-        typeContext declaration.generics (← namespaceOfRef? reference)
+        typeContext declaration.generics (← namingOfRef? reference)
       let parameterTypes ← declaration.parameters.mapM fun parameter => do
         let declared := (← lowerTypeUse declarationTypes parameter.type).typeId
         let instantiated ← instantiateTypeId instantiations declared span
@@ -2974,6 +3767,7 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       unless ← isExternalPath segments do
         failAt "VEREX-TYPED-CALL"
           "explicit call result types are reserved for external functions" (some span)
+      rejectImpureExternalCall context segments result span
       let reference ← resolveExternalRef segments
       let resultType := (← lowerTypeUse context.types result).typeId
       let resultType ← if context.specification then projectSpecTypeId resultType
@@ -2999,6 +3793,7 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       unless ← isExternalPath segments do
         failAt "VEREX-TYPED-CALL"
           "explicit call result types are reserved for external functions" (some span)
+      rejectImpureExternalCall context segments result span
       let reference ← resolveExternalRef segments
       let instantiations ← typeArguments.mapM fun argument => do
         pure <| GenericArgument.typeArg (← lowerTypeUse context.types argument)
@@ -3095,7 +3890,7 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       let indexType ← if context.specification then internType (.integer .unbounded true)
         else runtimeIndexType
       let (place, placeType, bindings, _) ← lowerExpressionPlaceWith
-        (lowerExpr context (some indexType)) context placeSource false true
+        (lowerExpr context) (some indexType) context placeSource false true
       let placeType ← if context.specification then projectSpecTypeId placeType
         else pure placeType
       let value ← lowerExpr context (some placeType) value
@@ -3157,6 +3952,16 @@ private partial def lowerLocalExpr (context : ExprContext) (expected : Option Ty
   -- A local named `result` shadows the specification's implicit result,
   -- exactly as an ordinary binding shadows any other name.
   if context.specification && name == "result" && (lookupLocal? context name).isNone then
+    -- A Rust function's tuple result is one value, of the components
+    -- `spec.result[i]` reads; Move's several results have no such value.
+    if (← get).sourceNamespace.profile != .move then
+      if let some resultType := context.resultType then
+        if let some (.tuple components) ← typeNode? resultType then
+          let parts ← components.zipIdx.mapM fun (component, index) =>
+            pushExpression loc component <| .operation (.specification (.result index)) #[] #[]
+          if let some expected := expected then ensureType expected resultType span
+          let id ← pushExpression loc resultType <| .operation (.primitive .tuple) #[] parts
+          return (id, resultType)
     let typeId ← specificationResultType context 0 span
     if let some expected := expected then ensureType expected typeId span
     let id ← pushExpression loc typeId <| .operation
@@ -3164,13 +3969,13 @@ private partial def lowerLocalExpr (context : ExprContext) (expected : Option Ty
     return (id, typeId)
   let some (localId, typeId) := lookupLocal? context name | do
     let state ← get
-    let some declaration := sourceConstant? state.sourceNamespace name | do
+    let some (constantScope, declaration) := state.visible? (sourceConstant? · · name) | do
       if context.specification then
         if let some value := specificationBound? name then
           return ← lowerExpr context expected (.integer value span)
       failAt "VEREX-LOCAL-NAME" s!"unknown local or constant `{name}`" (some span)
     let physicalType := (← lowerTypeUse context.types declaration.type).typeId
-    let some constantName := nameId? state.tables state.namespaceId name
+    let some constantName := nameId? state.tables state.namespaceId name constantScope
       | failAt "VEREX-CONSTANT-NAME" s!"constant `{name}` was not interned" (some span)
     let constant ← pushExpression loc physicalType <|
       .constant { namespaceId := state.namespaceId, name := constantName }
@@ -3220,7 +4025,7 @@ private partial def lowerLocalExpr (context : ExprContext) (expected : Option Ty
       let converted ← pushExpression loc expected <|
         .operation (.specification .intToBitVector) #[] #[localExpr]
       return (converted, expected)
-    ensureType expected typeId span
+    ensureTypeIn context expected typeId span
   return (localExpr, typeId)
 
 private partial def lowerTypedPrimitiveExpr (context : ExprContext) (expected : Option TypeId)
@@ -3305,6 +4110,7 @@ private partial def lowerPrimitiveExpr (context : ExprContext) (expected : Optio
       (.primitive .tuple) #[] (lowered.map (·.1))
     return (id, typeId)
   if operation == .vector then
+    let expected ← if context.specification then expected.mapM projectSpecTypeId else pure expected
     let expectedElement ← match expected with
       | some expected => match ← typeNode? expected with
         | some (.vector element _) => pure (some element)
@@ -3338,7 +4144,7 @@ private partial def lowerPrimitiveExpr (context : ExprContext) (expected : Optio
   if operation == .length then
     let value ← lowerExpr context none arguments[0]!
     match ← typeNode? value.2 with
-    | some (.vector ..) | some .string | some .bytes => pure ()
+    | some (.vector ..) | some (.slice ..) | some .string | some .bytes => pure ()
     | _ => failAt "VEREX-LENGTH-TYPE" "`length` needs a vector, string, or bytes" (some span)
     let typeId ← if context.specification then internType (.integer .unbounded true)
       else runtimeIndexType
@@ -3385,7 +4191,7 @@ private partial def lowerPrimitiveExpr (context : ExprContext) (expected : Optio
     return (id, typeId)
   if let .checkVectorIndex failure := operation then
     let collection ← lowerExpr context none arguments[0]!
-    let some (.vector ..) ← typeNode? collection.2
+    let some _ := (← typeNode? collection.2).bind sequenceElement?
       | failAt "VEREX-VECTOR-ACCESS-TYPE" "index check requires a vector" (some span)
     let indexType ← runtimeIndexType
     let index ← lowerExpr context (some indexType) arguments[1]!
@@ -3477,7 +4283,7 @@ private partial def lowerPrimitiveExpr (context : ExprContext) (expected : Optio
             (.operation (.reference .dereference) #[] #[collection.1])
           pure (read, reference.referent)
       | _ => pure collection
-    let some (.vector elementType _) ← typeNode? collection.2
+    let some elementType := (← typeNode? collection.2).bind sequenceElement?
       | failAt "VEREX-VECTOR-ACCESS-TYPE"
           "vector indexing and slicing require a vector operand" (some span)
     let indexType ← if context.specification then
@@ -3611,11 +4417,9 @@ private partial def lowerConstructExpr (context : ExprContext) (expected : Optio
   unless owner == reference.name do
     failAt "VEREX-CONSTRUCTOR-CONTEXT"
       s!"constructor `{declaration.name}` does not match its expected nominal type" (some span)
-  unless declaration.generics.size == instantiations.size &&
-      declaration.generics.all (·.kind == .type) &&
-      instantiations.all fun | .typeArg _ => true | _ => false do
+  unless constructorArgumentsMatch declaration.generics instantiations do
     failAt "VEREX-CONSTRUCTOR-GENERICS"
-      "constructor generic arguments do not match its type binders" (some span)
+      "constructor generic arguments do not match its binders" (some span)
   let some fields := constructorFields? declaration variant
     | failAt "VEREX-CONSTRUCTOR-SHAPE"
         s!"constructor `{declaration.name}` does not select a valid shape" (some span)
@@ -3663,11 +4467,9 @@ private partial def lowerAppliedConstructExpr (context : ExprContext) (expected 
   unless owner == reference.name do
     failAt "VEREX-CONSTRUCTOR-CONTEXT"
       s!"constructor `{declaration.name}` does not match its named owner type" (some span)
-  unless declaration.generics.size == instantiations.size &&
-      declaration.generics.all (·.kind == .type) &&
-      instantiations.all fun | .typeArg _ => true | _ => false do
+  unless constructorArgumentsMatch declaration.generics instantiations do
     failAt "VEREX-CONSTRUCTOR-GENERICS"
-      "constructor generic arguments do not match its type binders" (some span)
+      "constructor generic arguments do not match its binders" (some span)
   let some fields := constructorFields? declaration resolvedVariant
     | failAt "VEREX-CONSTRUCTOR-SHAPE"
         s!"constructor `{declaration.name}` does not select a valid shape" (some span)
@@ -3711,11 +4513,9 @@ private partial def lowerNamedConstructExpr (context : ExprContext) (expected : 
   unless owner == reference.name do
     failAt "VEREX-CONSTRUCTOR-CONTEXT"
       s!"constructor `{declaration.name}` does not match its named owner type" (some span)
-  unless declaration.generics.size == instantiations.size &&
-      declaration.generics.all (·.kind == .type) &&
-      instantiations.all fun | .typeArg _ => true | _ => false do
+  unless constructorArgumentsMatch declaration.generics instantiations do
     failAt "VEREX-CONSTRUCTOR-GENERICS"
-      "constructor generic arguments do not match its type binders" (some span)
+      "constructor generic arguments do not match its binders" (some span)
   let some declaredFields := constructorFields? declaration resolvedVariant
     | failAt "VEREX-CONSTRUCTOR-SHAPE"
         s!"constructor `{declaration.name}` does not select a valid shape" (some span)
@@ -3807,6 +4607,12 @@ private partial def lowerFieldExpr (context : ExprContext) (expected : Option Ty
         let (place, placeType) ← lowerPlace context sourcePlace
         if let some expected := expected then ensureType expected placeType span
         return (← pushExpression loc placeType (.operation (.read place) #[] #[]), placeType)
+  -- A field of an element reads through the element's bounds check, in one
+  -- chain, as `v[i]` does.
+  if !context.specification && (← get).sourceNamespace.profile == .rust &&
+      field != "length" && (expressionPlace? source).isNone then
+    if let some placeSource := localStoragePlace? context (.field source field span) then
+      return ← lowerCheckedRustRead context expected span loc placeSource
   -- Rust source leaves scalar `Copy` loads implicit. Preserve their place
   -- projection in VIR so selecting a scalar field does not become a
   -- non-consuming read of the whole (possibly non-`Copy`) owner.
@@ -3822,12 +4628,34 @@ private partial def lowerFieldExpr (context : ExprContext) (expected : Option Ty
         if let some expected := expected then ensureType expected placeType span
         let id ← pushExpression loc placeType <| .operation (.copy place) #[] #[]
         return (id, placeType)
-  let value ← lowerExpr context none source
+  -- `.length` reads its receiver's referent. A Rust mutable reference has no
+  -- `Copy`, so a receiver place holding one is read through, not copied.
+  let throughMutable ← if !context.specification &&
+      (← get).sourceNamespace.profile == .rust && field == "length" then
+    match expressionPlace? source with
+    | some sourcePlace =>
+        if ← throughMutableReference context source then
+          let (place, placeType) ← lowerPlace context sourcePlace
+          match ← typeNode? placeType with
+          | some (.reference reference) =>
+              let referent ← pushPlace (.deref place)
+              pure (some (← pushExpression loc reference.referent
+                (.operation (.read referent) #[] #[]), reference.referent))
+          | some (.vector ..) | some (.slice ..) =>
+              pure (some (← pushExpression loc placeType
+                (.operation (.read place) #[] #[]), placeType))
+          | _ => pure none
+        else pure none
+    | none => pure none
+  else pure none
+  let value ← match throughMutable with
+    | some value => pure value
+    | none => lowerExpr context none source
   let valueType ← typeNode? value.2
   let vectorElement? ← match valueType with
-    | some (.vector element _) => pure (some element)
+    | some (.vector element _) | some (.slice element) => pure (some element)
     | some (.reference reference) => match ← typeNode? reference.referent with
-        | some (.vector element _) => pure (some element)
+        | some (.vector element _) | some (.slice element) => pure (some element)
         | _ => pure none
     | _ => pure none
   if field == "address" then
@@ -3902,6 +4730,16 @@ private partial def lowerFieldExpr (context : ExprContext) (expected : Option Ty
   let (baseType, sourceReference) ← match ← typeNode? value.2 with
     | some (.reference reference) => pure (reference.referent, some reference)
     | _ => pure (value.2, none)
+  -- A tuple element is a place of the tuple.
+  if (← typeNode? baseType) matches some (.tuple _) && field.toNat?.isSome then
+    let some base := expressionPlace? source
+      | failAt "VEREX-PLACE-FIELD" "a tuple element place must have a place-based base" (some span)
+    let (place, elementType) ← lowerPlace context (.field base field span)
+    let elementType ← if context.specification then projectSpecTypeId elementType
+      else pure elementType
+    if let some expected := expected then ensureType expected elementType span
+    let id ← pushExpression loc elementType (.operation (.read place) #[] #[])
+    return (id, elementType)
   let (reference, _, fieldType, declaration) ← resolveNominalField baseType field span
   -- A specification reads a field in the logical domain, unless the
   -- consumer asks for its physical value, as a vector element pushed into a
@@ -3952,17 +4790,64 @@ private partial def lowerFieldExpr (context : ExprContext) (expected : Option Ty
         (.reference .dereference) #[] #[selected]
       return (id, resultType)
 
+/-- A Rust read of a place through an element: a panic outside the vector, as
+the bounds check rustc emits, before the read. -/
+private partial def lowerCheckedRustRead (context : ExprContext) (expected : Option TypeId)
+    (span : Span) (loc : LocId) (placeSource : Expr) : LowerM (ExprId × TypeId) := do
+  let indexType ← runtimeIndexType
+  let lowerIndex : Option TypeId → Expr → LowerM (ExprId × TypeId) := fun expected candidate =>
+    match candidate with
+    | .typedInteger .. => lowerExpr context none candidate
+    | _ => lowerExpr context expected candidate
+  let (_, resultType, bindings, observe) ← lowerExpressionPlaceWith lowerIndex (some indexType)
+    context placeSource (localRoot := true)
+  if let some expected := expected then ensureType expected resultType span
+  return (← bindPlaceIndices loc resultType bindings (← observe), resultType)
+
+/-- A Rust element read: a panic outside the vector, as the bounds check rustc
+emits, before the read. A place reads through `lowerCheckedRustRead`; any other
+vector is first held in a temporary. `saved` is the state before `value` was
+lowered, as a place lowers afresh. -/
+private partial def lowerCheckedRustIndex (context : ExprContext) (expected : Option TypeId)
+    (span : Span) (loc : LocId) (source indexSource : Expr)
+    (value : ExprId × TypeId) (elementType : TypeId) (saved : BuildState) :
+    LowerM (ExprId × TypeId) := do
+  if let some placeSource := localStoragePlace? context source then
+    set saved
+    return ← lowerCheckedRustRead context expected span loc placeSource
+  let indexType ← runtimeIndexType
+  let index ← lowerExpr context (some indexType) indexSource
+  if let some expected := expected then ensureType expected elementType span
+  let holder ← pushTemporaryLocal value.2 loc
+  let holderPattern ← pushPattern { loc, typeId := value.2, kind := .variable holder }
+  let holderPlace ← pushPlace (.localVar holder)
+  let observe : LowerM ExprId := pushExpression loc value.2 (.operation (.read holderPlace) #[] #[])
+  let slot ← pushTemporaryLocal index.2 loc
+  let slotPattern ← pushPattern { loc, typeId := index.2, kind := .variable slot }
+  let read ← pushExpression loc index.2 (.localVar slot)
+  let unitType ← internType .unit
+  let failure : ThrowKind := .panic
+  let checked ← pushExpression loc unitType (.operation
+    (.primitive (.checkVectorIndex failure.toVIR)) #[] #[← observe, read])
+  let checkPattern ← pushPattern { loc, typeId := unitType, kind := .wildcard }
+  let element ← pushExpression loc elementType
+    (.operation (.primitive .index) #[] #[← observe, read])
+  let body ← bindPlaceIndices loc elementType
+    #[(holderPattern, value.1), (slotPattern, index.1), (checkPattern, checked)] element
+  return (body, elementType)
+
 private partial def lowerIndexExpr (context : ExprContext) (expected : Option TypeId)
     (source : Expr) (span : Span) (loc : LocId) (valueSource : Expr) (indexSource : Expr) :
     LowerM (ExprId × TypeId) := do
   if (← get).sourceNamespace.profile == .move then
     if let some (head, index, fields) := storageProjection? context source then
-      if fields.isEmpty && (storageIndexConstantBase? (← get).sourceNamespace head).isNone then
+      if fields.isEmpty && (storageIndexConstantBase? (← get) head).isNone then
         return ← lowerExpr context expected (.storageIndex head index span)
+  let saved ← get
   let value ← lowerExpr context none valueSource
   let value ← match ← typeNode? value.2 with
     | some (.reference reference) => match ← typeNode? reference.referent with
-        | some (.vector ..) => do
+        | some (.vector ..) | some (.slice ..) | some (.tuple ..) => do
             let id ← pushExpression loc reference.referent <| .operation
               (.reference .dereference) #[] #[value.1]
             pure (id, reference.referent)
@@ -3977,19 +4862,38 @@ private partial def lowerIndexExpr (context : ExprContext) (expected : Option Ty
           s!"tuple index {position} is out of bounds for {elements.size} elements" (some span)
     let resultType ← if context.specification then projectSpecTypeId elementType
       else pure elementType
-    let some sourcePlace := expressionPlace? valueSource
-      | failAt "VEREX-INDEX-PLACE"
-          "tuple indexing currently requires an assignable source value" (some span)
-    let (base, baseType) ← lowerPlace context sourcePlace
-    ensureType value.2 baseType span
+    -- A component of an element reads through the element's bounds check.
+    if !context.specification && (← get).sourceNamespace.profile == .rust &&
+        (expressionPlace? valueSource).isNone then
+      if let some placeSource := localStoragePlace? context source then
+        set saved
+        return ← lowerCheckedRustRead context expected span loc placeSource
+    let (base, baseType) ← match expressionPlace? valueSource,
+        localStoragePlace? context valueSource with
+      | some sourcePlace, _ => lowerPlace context sourcePlace
+      | none, some placeSource =>
+          -- A component of a component: tuple indexes are literals and bind nothing.
+          let (base, baseType, _, _) ← lowerExpressionPlaceWith (lowerExpr context) none context
+            placeSource
+          pure (base, baseType)
+      | none, none =>
+          failAt "VEREX-INDEX-PLACE"
+            "tuple indexing currently requires an assignable source value" (some span)
+    let (base, baseType) ← match ← typeNode? baseType with
+      | some (.reference reference) => pure (← pushPlace (.deref base), reference.referent)
+      | _ => pure (base, baseType)
+    ensureTypeIn context value.2 baseType span
     let index ← lowerExpr context none indexSource
     let place ← pushPlace (.index base index.1)
     if let some expected := expected then ensureType expected resultType span
     let id ← pushExpression loc resultType <|
       .operation (.read place) #[] #[]
     return (id, resultType)
-  let some (.vector elementType _) ← typeNode? value.2
+  let some elementType := (← typeNode? value.2).bind sequenceElement?
     | failAt "VEREX-INDEX-TYPE" "indexing requires a vector or tuple value" (some span)
+  if (← get).sourceNamespace.profile == .rust && !context.specification then
+    return ← lowerCheckedRustIndex context expected span loc source indexSource
+      value elementType saved
   let index ← if context.specification then do
       if indexSource matches .primitive .range _ _ then
         lowerExpr context none indexSource
@@ -4058,7 +4962,7 @@ private partial def lowerVariantTestExpr (context : ExprContext) (expected : Opt
   unless ownerNs.profile == state.sourceNamespace.profile do
     failAt "VEREX-CROSS-PROFILE"
       "cross-profile variant testing requires a validated boundary adapter" (some span)
-  let some declaration := sourceNominal? ownerNs ownerName.name
+  let some declaration := sourceNominal? ownerNs ownerName.scope ownerName.name
     | failAt "VEREX-VARIANT-TEST-TYPE"
         s!"unknown nominal type `{ownerName.name}`" (some span)
   for variant in variants do
@@ -4151,6 +5055,9 @@ private partial def lowerDiscriminantExpr (context : ExprContext) (expected : Op
   unless (← typeNode? resultTypeId).any fun | .integer _ _ => true | _ => false do
     failAt "VEREX-DISCRIMINANT-TYPE"
       "a discriminant result must be an integer" (some resultType.span)
+  -- A specification reads every integer unbounded.
+  let resultTypeId ← if context.specification then projectSpecTypeId resultTypeId
+    else pure resultTypeId
   if let some expected := expected then ensureType expected resultTypeId span
   let id ← pushExpression loc resultTypeId <| .operation
     (.data (.discriminant reference)) instantiations #[value.1]
@@ -4160,7 +5067,13 @@ private partial def lowerBorrowValueExpr (context : ExprContext) (expected : Opt
     (source : Expr) (span : Span) (loc : LocId) (mutable : Bool) (value : Expr) :
     LowerM (ExprId × TypeId) := do
   if context.specification then
+    if mutable && context.projectedBody then
+      failAt "VEREX-INTERNAL" "a projected body holds a `&mut` borrow" (some span)
     return ← lowerExpr context expected value
+  -- `slice` computes a copy, so a write through this borrow would reach no lender.
+  if mutable && value matches .primitive .slice .. then
+    failAt "VIR-SEMANTIC-BORROW-UNSIZED-HOLE"
+      "a mutable slice of a vector is not yet supported" (some span)
   let expectedKind := if mutable then ReferenceKind.mutable else .shared
   if (← get).sourceNamespace.profile == .move then
     if let some (head, index, fields) := storageProjection? context value then
@@ -4172,11 +5085,12 @@ private partial def lowerBorrowValueExpr (context : ExprContext) (expected : Opt
         let mut referenceType ← inferredReferenceType expectedKind referent loc
         let borrowed ← pushExpression loc referenceType <| .operation
           (.global (.borrow borrowKind)) #[.typeArg resource] #[key.1]
-        if mutable && !fields.isEmpty then
-          -- A field-focused mutable storage borrow reborrows the
-          -- projected place through a synthesized holder local: place
-          -- resolution is the runtime meaning of a projection, and a
-          -- value-level selection of a mutable reference has none.
+        if !fields.isEmpty && (mutable || (← projectionCrossesEnum referent fields span)) then
+          -- A field-focused storage borrow reborrows the projected place
+          -- through a synthesized holder local: place resolution is the
+          -- runtime meaning of a projection, and a value-level selection of a
+          -- mutable reference, or of an enum's field through a reference, has
+          -- none.
           let holder ← pushTemporaryLocal referenceType loc
           let pattern ← pushPattern
             { loc, typeId := referenceType, kind := .variable holder }
@@ -4188,7 +5102,7 @@ private partial def lowerBorrowValueExpr (context : ExprContext) (expected : Opt
             place ← pushPlace (.field place owner fieldName)
           referenceType ← inferredReferenceType expectedKind referent loc
           let focused ← pushExpression loc referenceType <| .operation
-            (.borrow .mutable place) #[] #[]
+            (.borrow borrowKind place) #[] #[]
           let id ← pushExpression loc referenceType <|
             .letDecl pattern (some borrowed) focused
           if let some expected := expected then ensureType expected referenceType span
@@ -4202,10 +5116,22 @@ private partial def lowerBorrowValueExpr (context : ExprContext) (expected : Opt
             (.data (.select owner field)) #[] #[selected]
         if let some expected := expected then ensureType expected referenceType span
         return (selected, referenceType)
-  if let some placeSource := localStoragePlace? context value then
+  -- A signer's address is a value, not a field to borrow in place.
+  let signerAddress ← match value with
+    | .field base "address" _ => match expressionPlace? base with
+        | some place => do
+            let (_, baseType) ← lowerPlace context place
+            match ← typeNode? baseType with
+            | some .signer => pure true
+            | some (.reference reference) =>
+                pure ((← typeNode? reference.referent) == some .signer)
+            | _ => pure false
+        | none => pure false
+    | _ => pure false
+  if let some placeSource := if signerAddress then none else localStoragePlace? context value then
     let indexType ← runtimeIndexType
     let (place, placeType, bindings, _) ← lowerExpressionPlaceWith
-      (lowerExpr context (some indexType)) context placeSource
+      (lowerExpr context) (some indexType) context placeSource
       (!(source matches .rawBorrowValue ..))
     let resultType ← match expected with
       | some resultType => pure resultType
@@ -4227,7 +5153,19 @@ private partial def lowerBorrowValueExpr (context : ExprContext) (expected : Opt
         unless reference.kind == expectedKind do
           failAt "VEREX-BORROW-TYPE"
             "value-borrow kind differs from its expected reference type" (some span)
-        let value ← lowerExpr context (some reference.referent) value
+        -- A shared slice literal owns fixed backing storage; the unsized
+        -- Slice is only its borrowed view, never an owned literal value.
+        let operandExpected ← if mutable then pure reference.referent else
+          match ← typeNode? reference.referent with
+          | some (.slice element) =>
+              match value with
+              | .primitive .vector elements _ =>
+                  internType (.vector element (some (.integer elements.size)))
+              | .bytes bytes _ =>
+                  internType (.vector element (some (.integer bytes.size)))
+              | _ => pure reference.referent
+          | _ => pure reference.referent
+        let value ← lowerExpr context (some operandExpected) value
         pure (value, resultType)
     | none => do
         let value ← lowerExpr context none value
@@ -4236,6 +5174,25 @@ private partial def lowerBorrowValueExpr (context : ExprContext) (expected : Opt
   let kind := if mutable then BorrowKind.mutable else .immutable
   let id ← pushExpression loc resultType <| .operation
     (.reference (.borrow kind)) #[] #[value.1]
+  return (id, resultType)
+
+/-- A specification operation over strings and characters, of fixed types. -/
+private partial def lowerTextSpecification (context : ExprContext) (expected : Option TypeId)
+    (span : Span) (loc : LocId) (operation : SpecOperation)
+    (types : Array (Located Ty)) (arguments : Array Expr)
+    (parameterTypes : Array TypeId) (resultType : TypeId) : LowerM (ExprId × TypeId) := do
+  unless types.isEmpty do
+    failAt "VEREX-SPEC-GENERICS" "a string specification operation has no type arguments"
+      (some span)
+  unless arguments.size == parameterTypes.size do
+    failAt "VEREX-SPEC-ARITY"
+      s!"a string specification operation expects {parameterTypes.size} argument(s), got {arguments.size}"
+      (some span)
+  let lowered ← (arguments.zip parameterTypes).mapM fun (argument, parameterType) =>
+    lowerExpr context (some parameterType) argument
+  if let some expected := expected then ensureType expected resultType span
+  let id ← pushExpression loc resultType <| .operation (.specification operation) #[]
+    (lowered.map (·.1))
   return (id, resultType)
 
 private partial def lowerSpecificationExpr (context : ExprContext) (expected : Option TypeId)
@@ -4325,7 +5282,7 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
             .result _ | .inlineCallSummary | .emptyVector | .singletonVector |
             .updateVector | .concatVector | .indexOfVector | .containsVector |
             .lengthVector | .indexVector | .sliceVector | .bitVectorToInt |
-            .intToBitVector |
+            .intToBitVector | .stringConcat | .stringBytes | .charEncode |
             .inRange | .inVectorRange | .vectorRange => unreachable!
       let id ← pushExpression loc boolType <|
         .operation (.specification operation) #[] #[]
@@ -4432,6 +5389,18 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
       let id ← pushExpression loc resource.typeId <|
         .operation (.specification (.global (stateLabel context))) #[.typeArg resource] #[key.1]
       return (id, resource.typeId)
+  | .stringConcat => do
+      let stringType ← internType .string
+      lowerTextSpecification context expected span loc .stringConcat types arguments
+        #[stringType, stringType] stringType
+  | .stringBytes => do
+      let bytes ← internType (.vector (← internType (.integer (.bits 8) false)) none)
+      lowerTextSpecification context expected span loc .stringBytes types arguments
+        #[← internType .string] bytes
+  | .charEncode => do
+      let bytes ← internType (.vector (← internType (.integer (.bits 8) false)) none)
+      lowerTextSpecification context expected span loc .charEncode types arguments
+        #[← internType .character] bytes
   | .emptyVector | .singletonVector | .updateVector | .concatVector |
       .indexOfVector | .containsVector | .lengthVector | .indexVector |
       .sliceVector | .inVectorRange | .vectorRange =>
@@ -4449,7 +5418,7 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
             let fromExpected ← match expected with
               | some expectedType => do
                   match ← typeNode? expectedType with
-                  | some (.vector element _) => pure (some element)
+                  | some (.vector element _) | some (.slice element) => pure (some element)
                   | _ => pure none
               | none => pure none
             match fromExpected with
@@ -4489,8 +5458,9 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
         | .vectorRange => (.vectorRange, #[vectorType], rangeType)
         | .behavior .. | .old | .saveStateAnchor _ | .withStateAnchor _ |
             .foldsCaptureAnchor _ | .stateDomain | .publish | .remove | .update |
-            .global | .typeDomain | .result _ | .inlineCallSummary |
-            .bitVectorToInt | .intToBitVector | .inRange => unreachable!
+            .global | .typeDomain | .result _ | .inlineCallSummary | .stringConcat |
+            .stringBytes | .charEncode | .bitVectorToInt | .intToBitVector |
+            .inRange => unreachable!
       unless arguments.size == parameterTypes.size do
         failAt "VEREX-SPEC-ARITY"
           s!"specification vector operation expects {parameterTypes.size} argument(s), got {arguments.size}"
@@ -4575,7 +5545,7 @@ private partial def lowerMethodCallExpr (context : ExprContext) (expected : Opti
   -- interfaces carry authoritative signatures, the shared builtin table
   -- provides the same information for the standard vector module.
   let state ← get
-  let localDeclaration := sourceFunction? state.sourceNamespace name
+  let localDeclaration := (state.visible? (sourceFunction? · · name)).map (·.2)
   let standardTarget := standardReceiverTarget? state.sourceNamespace name
   let before ← get
   let receiverProbe ← lowerExpr context none receiver
@@ -4584,7 +5554,7 @@ private partial def lowerMethodCallExpr (context : ExprContext) (expected : Opti
     | some (.reference reference) => (reference.referent, true)
     | _ => (receiverProbe.2, false)
   let receiverIsVector := (← typeNode? receiverBaseType).any fun
-    | .vector .. => true
+    | .vector .. | .slice .. => true
     | _ => false
   set before
   let localVectorReceiver := localDeclaration.any fun declaration =>
@@ -4596,6 +5566,8 @@ private partial def lowerMethodCallExpr (context : ExprContext) (expected : Opti
     let some (path, receiverMode) := standardTarget
       | failAt "VEREX-RECEIVER-NAME"
           s!"standard receiver `{name}` has no imported target" (some span)
+    if context.specification && receiverMode == .mutable then
+      failAt "VEREX-SPEC-IMPURE-CALL" (impureCallMessage name "takes `&mut`") (some span)
     unless types.isEmpty do
       failAt "VEREX-RECEIVER-GENERICS"
         "standard receiver calls infer their type argument from `self`" (some span)
@@ -4722,7 +5694,7 @@ private partial def lowerGenericCallExpr (context : ExprContext) (expected : Opt
       let instantiations ← typeArguments.mapM fun argument => do
         pure <| GenericArgument.typeArg (← lowerTypeUse context.types argument)
       let declarationTypes ← liftM <|
-        typeContext declaration.generics (← namespaceOfRef? reference)
+        typeContext declaration.generics (← namingOfRef? reference)
       let parameterTypes ← declaration.parameters.mapM fun parameter => do
         let declared := (← lowerTypeUse declarationTypes parameter.type).typeId
         projectSpecTypeId (← instantiateTypeId instantiations declared span)
@@ -4741,14 +5713,18 @@ private partial def lowerGenericCallExpr (context : ExprContext) (expected : Opt
           (lowered.map (·.1))
       return ← finishCall context expected id resultType loc span
   let (reference, declaration) ← resolveLocalRef segments span
-  unless declaration.generics.size == typeArguments.size &&
-      declaration.generics.all (·.kind == .type) do
+  rejectImpureCall context reference declaration span
+  let typeBinders := declaration.generics.filter (·.kind == .type)
+  unless typeBinders.size == typeArguments.size && declaration.generics.all
+      (fun binder => binder.kind == .type || binder.kind == .lifetime) do
     failAt "VEREX-CALL-GENERICS"
       "generic call arguments do not match the function's type binders" (some span)
-  let instantiations ← typeArguments.mapM fun argument => do
-    pure <| GenericArgument.typeArg (← lowerTypeUse context.types argument)
+  let explicit ← typeArguments.mapM fun argument => do
+    pure (← lowerTypeUse context.types argument).typeId
+  let instantiations ← callInstantiations declaration.generics loc
+    fun position _ => explicit[position]?
   let declarationTypes ← liftM <|
-    typeContext declaration.generics (← namespaceOfRef? reference)
+    typeContext declaration.generics (← namingOfRef? reference)
   let parameterTypes ← declaration.parameters.mapM fun parameter => do
     let declared := (← lowerTypeUse declarationTypes parameter.type).typeId
     let instantiated ← instantiateTypeId instantiations declared span
@@ -4778,7 +5754,7 @@ private partial def lowerLemmaInstance (context : ExprContext) (expected : Optio
     LowerM (ExprId × TypeId) := do
   let (reference, declaration) ← resolveLocalLemmaRef segments span
   let argumentContext := { context with lemmaInstances := false }
-  let sourceTypes ← typeContext declaration.generics (← namespaceOfRef? reference)
+  let sourceTypes ← typeContext declaration.generics (← namingOfRef? reference)
   if arguments.size != declaration.parameters.size then
     failAt "VEREX-LEMMA-ARITY"
       s!"lemma `{declaration.name}` expects {declaration.parameters.size} argument(s), got {arguments.size}"
@@ -4859,8 +5835,8 @@ private partial def lowerCallExpr (context : ExprContext) (expected : Option Typ
       return (id, value.2)
   let state ← get
   let hasDeclaredTarget :=
-    (sourceFunction? state.sourceNamespace localName).isSome ||
-      (sourceSpecFunction? state.sourceNamespace localName).isSome ||
+    (state.visible? (sourceFunction? · · localName)).isSome ||
+      (state.visible? (sourceSpecFunction? · · localName)).isSome ||
       (expandedUsePath? state.sourceNamespace segments).isSome
   let specificationBuiltin? : Option SpecOperation :=
     if context.specification && segments.size == 1 && !hasDeclaredTarget then
@@ -4882,7 +5858,7 @@ private partial def lowerCallExpr (context : ExprContext) (expected : Option Typ
     let rangeType ← internType .range
     let expectedVectorElement : Option TypeId ← match expected with
       | some expected => match ← typeNode? expected with
-        | some (.vector element _) => pure (some element)
+        | some (.vector element _) | some (.slice element) => pure (some element)
         | _ => pure none
       | none => pure none
     if operation == .final then
@@ -4890,11 +5866,25 @@ private partial def lowerCallExpr (context : ExprContext) (expected : Option Typ
       unless arguments.size == 1 do
         failAt "VEREX-SPEC-ARITY" "`final` expects one operand" (some span)
       let reference ← lowerExpr context none arguments[0]!
-      let notReturned := "`final` reads a returned mutable reference"
+      let notReturned := "`final` reads a mutable reference: `result`, or in a loop invariant a \
+        place holding one"
       let some index := match (← get).output.expressions[reference.1.index]?.map (·.kind) with
           | some (.operation (.specification (.result index)) _ _ _) => some index
           | _ => none
-        | failAt "VEREX-SPEC-FINAL" notReturned (some span)
+        | do
+            if ← isShareViewed context arguments[0]! then
+              failAt "VEREX-SPEC-FINAL" "a shared view holds no prophecy: `final` reads what \
+                a mutable reference will hold" (some span)
+            let some held ← heldType? context arguments[0]!
+              | failAt "VEREX-SPEC-FINAL" notReturned (some span)
+            let some (.reference referenceType) ← typeNode? held
+              | failAt "VEREX-SPEC-FINAL" notReturned (some span)
+            unless referenceType.kind == .mutable do
+              failAt "VEREX-SPEC-FINAL" notReturned (some span)
+            if let some expected := expected then ensureType expected reference.2 span
+            let id ← pushExpression loc reference.2 <| .operation
+              (.specification .final) #[] #[reference.1]
+            return (id, reference.2)
       let some declared := context.declaredResultType
         | failAt "VEREX-SPEC-FINAL" notReturned (some span)
       let declared ← match ← typeNode? declared with
@@ -4974,7 +5964,7 @@ private partial def lowerCallExpr (context : ExprContext) (expected : Option Typ
   match explicitSpec with
   | some _ =>
       let (reference, declaration) ← resolveLocalSpecRef segments
-      let sourceTypes ← typeContext declaration.generics (← namespaceOfRef? reference)
+      let sourceTypes ← typeContext declaration.generics (← namingOfRef? reference)
       if arguments.size != declaration.parameters.size then
         failAt "VEREX-SPEC-CALL-ARITY"
           s!"specification function `{declaration.name}` expects {declaration.parameters.size} argument(s), got {arguments.size}"
@@ -5025,10 +6015,12 @@ private partial def lowerCallExpr (context : ExprContext) (expected : Option Typ
       finishCall context expected id resultType loc span
   | none =>
       let (reference, declaration) ← resolveLocalRef segments span
-      unless declaration.generics.all (·.kind == .type) do
+      rejectImpureCall context reference declaration span
+      unless declaration.generics.all
+          (fun binder => binder.kind == .type || binder.kind == .lifetime) do
         failAt "VEREX-CALL-GENERICS"
           "only inferred type arguments are supported on direct function calls" (some span)
-      let sourceTypes ← typeContext declaration.generics (← namespaceOfRef? reference)
+      let sourceTypes ← typeContext declaration.generics (← namingOfRef? reference)
       let physicalParameterTypes ← declaration.parameters.mapM fun parameter =>
         (lowerTypeUse sourceTypes parameter.type).map (·.typeId)
       if arguments.size != physicalParameterTypes.size then
@@ -5053,12 +6045,13 @@ private partial def lowerCallExpr (context : ExprContext) (expected : Option Typ
       if let some expected := expected then
         inferred ← inferTypeArguments context.specification inferred
           projectedResult expected span
-      unless inferred.all (·.isSome) do
+      unless (declaration.generics.zip inferred).all fun (binder, type) =>
+          binder.kind == .lifetime || type.isSome do
         failAt "VEREX-CALL-INFERENCE"
           s!"cannot infer every type argument of function `{declaration.name}`" (some span)
       let instantiationLoc ← addLoc span
-      let instantiations := inferred.map fun type =>
-        GenericArgument.typeArg { typeId := type.get!, loc := instantiationLoc }
+      let instantiations ← callInstantiations declaration.generics instantiationLoc
+        fun _ index => inferred[index]?.join
       -- Projection does not commute with instantiation: a type parameter
       -- projects to itself, so projecting `V` and then substituting `u64`
       -- keeps a physical type where the call denotes a logical value.
@@ -5087,17 +6080,10 @@ private partial def lowerBlockExpr (context : ExprContext) (expected : Option Ty
     LowerM (ExprId × TypeId) := do
   let unitType ← internType .unit
   -- Source attaches a loop specification after the loop (`spec do`), or as
-  -- a `while`'s trailing `where` region. VIR holds it in the loop, as the
-  -- Move Prover reads a loop's invariants: in the heading's condition of a
-  -- `while`, at the head of the body of any other loop. A specification
-  -- before a loop is no loop's, so that a loop nested at the head of
-  -- another's body cannot take the outer loop's invariants.
-  let isLoopSpecification (conditions : Array (SpecificationConditionKind × Expr)) : Bool :=
-    !conditions.isEmpty &&
-      conditions.any (fun condition => condition.1 == .loopInvariant) &&
-      conditions.all fun condition => match condition.1 with
-        | .let_ _ | .loopInvariant => true
-        | _ => false
+  -- a `while`'s trailing `where` region. VIR holds it in the loop
+  -- (`attachLoopSpecification`). A specification before a loop is no loop's,
+  -- so that a loop nested at the head of another's body cannot take the outer
+  -- loop's invariants.
   -- A final specification is parsed as the block result. Include it
   -- in the same normalization as statement-position annotations.
   let (statements, result) := match result with
@@ -5106,26 +6092,11 @@ private partial def lowerBlockExpr (context : ExprContext) (expected : Option Ty
           (statements.push (.expression spec), none)
         else (statements, result)
     | _ => (statements, result)
-  let attachSpecification (loopExpr specExpr : Expr) : Expr :=
-    match loopExpr with
-    | .loop (.ifElse condition thenBranch (some stop@(.break_ none _ none)) ifSpan) span label =>
-        let condition := match condition with
-          | .block statements (some actual) blockSpan =>
-              .block (statements.push (.expression specExpr)) (some actual) blockSpan
-          | condition => .block #[.expression specExpr] (some condition) span
-        .loop (.ifElse condition thenBranch (some stop) ifSpan) span label
-    | .loop body span label =>
-        let body := match body with
-          | .block statements result blockSpan =>
-              .block (#[.expression specExpr] ++ statements) result blockSpan
-          | body => .block #[.expression specExpr] (some body) span
-        .loop body span label
-    | loopExpr => loopExpr
   let rec normalizeLoopSpecifications : List Statement → List Statement
     | .expression loopExpr@(.loop ..) ::
         .expression specExpr@(.specBlock conditions _ _) :: rest =>
         if isLoopSpecification conditions then
-          .expression (attachSpecification loopExpr specExpr) ::
+          .expression (attachLoopSpecification loopExpr specExpr) ::
             normalizeLoopSpecifications rest
         else
           .expression loopExpr :: normalizeLoopSpecifications
@@ -5736,7 +6707,7 @@ private partial def lowerAssignExpressionExpr (context : ExprContext) (expected 
   let indexType ← if context.specification then internType (.integer .unbounded true)
     else runtimeIndexType
   let (place, placeType, bindings, _) ← lowerExpressionPlaceWith
-    (lowerExpr context (some indexType)) context placeSource true true
+    (lowerExpr context) (some indexType) context placeSource true true
   let placeType ← if context.specification then projectSpecTypeId placeType
     else pure placeType
   let value ← lowerExpr context (some placeType) value
@@ -5771,6 +6742,11 @@ private partial def lowerArgument (context : ExprContext) (parameterType : TypeI
 
 end
 
+/-- Whether a quantifier binder of this type binds a value name, which a state
+label does not (`doc/designs/state-labels.md`). -/
+private def bindsValue (patternType : TypeId) : LowerM Bool :=
+  return (← typeNode? patternType) != some .stateDomain
+
 private def sourceQuantifierPatternType (context : ExprContext) (domain : Expr) :
     LowerM TypeId := do
   -- Domains routinely contain field selection and specification calls (for
@@ -5786,7 +6762,7 @@ private def sourceQuantifierPatternType (context : ExprContext) (domain : Expr) 
     temporaryLocals := before.temporaryLocals }
   let domainType := inferred.2
   let patternType ← match ← typeNode? domainType with
-    | some (.vector element _) => pure element
+    | some (.vector element _) | some (.slice element) => pure element
     | some .range => internType (.integer .unbounded true)
     | some (.typeDomain element) => projectSpecTypeId element
     | some .stateDomain => internType .stateDomain
@@ -5816,14 +6792,33 @@ private def clauseKind? : ContractClause → Option ConditionKind
   | .ensures .. => some .ensures
   | .abortsIf .. => some .abortsIf
   | .abortsWith .. => some .abortsWith
+  -- A panic is the Rust profile's only failure, so its clause is that of the
+  -- exceptional outcome, without a code.
+  | .panicsIf .. => some .abortsIf
   | .invariant .. => some .structInvariant
   | .modifies .. | .modifiesAll .. | .reads .. | .readsAll .. | .modifiesOf .. |
       .modifiesOfAll .. | .ghost .. => none
 
+/-- The name a contract clause binds. -/
+private def contractBindingName? : ContractClause → Option String
+  | .letPre name .. | .letPost name .. => some name
+  | _ => none
+
+/-- The type of an expression, discarding what lowering it leaves. -/
+private def probedType (context : ExprContext) (source : Expr) : LowerM TypeId := do
+  let before ← get
+  let inferred ← lowerExpr context none source
+  let after ← get
+  set { after with
+    output := before.output
+    temporaryLocalBase := before.temporaryLocalBase
+    temporaryLocals := before.temporaryLocals }
+  return inferred.2
+
 private def clauseExpression? : ContractClause → Option Expr
   | .letPre _ expression .. | .letPost _ expression .. |
       .requires expression .. | .ensures expression .. | .abortsIf expression .. | .abortsWith expression .. |
-      .invariant expression .. | .modifies expression .. | .ghost _ _ (some expression) _ =>
+      .panicsIf expression .. | .invariant expression .. | .modifies expression .. | .ghost _ _ (some expression) _ =>
       some expression
   | .modifiesAll .. | .reads .. | .readsAll .. | .modifiesOf .. | .modifiesOfAll .. |
       .ghost _ _ none _ => none
@@ -5841,7 +6836,7 @@ private def clauseAuxiliary (context : ExprContext) : ContractClause →
 private def clauseProperties : ContractClause → Array Pragma
   | .letPre _ _ properties _ | .letPost _ _ properties _ |
       .requires _ properties _ | .ensures _ properties _ | .abortsIf _ _ properties _ | .abortsWith _ _ properties _ |
-      .invariant _ properties _ => properties
+      .panicsIf _ properties _ | .invariant _ properties _ => properties
   | .modifies .. | .modifiesAll .. | .reads .. | .readsAll .. | .modifiesOf .. |
       .modifiesOfAll .. | .ghost .. => #[]
 
@@ -5875,7 +6870,7 @@ private def pragmaAttribute (pragma : Pragma) : LowerM Attribute := do
 including annotations naming an intrinsic owner, remain ordinary metadata. -/
 private def isIntrinsicAttribute (source : Namespace) (attr : SourceAttribute) : Bool :=
   attr.name.startsWith "intrinsic_" || attr.name.startsWith "map_" ||
-    source.items.any fun item =>
+    (scopedItems source.items).any fun (_, item) =>
       let attributes := match item with
         | .struct declaration => declaration.attributes
         | .enum declaration => declaration.attributes
@@ -5891,14 +6886,27 @@ private partial def lowerSourceAttribute : SourceAttribute → LowerM Attribute
         | .number value => AttributeValue.constant (.integer value)
         | .string value => AttributeValue.constant (.string value)
         | .name value => AttributeValue.name none value
+        | .qualifiedName value => AttributeValue.qualifiedName value
       return .assign name value (some (← addLoc span))
 
 private def sourceAttributes (attributes : Array SourceAttribute) : LowerM (Array Attribute) := do
   let source := (← get).sourceNamespace
   (attributes.filter fun attr => !isIntrinsicAttribute source attr).mapM lowerSourceAttribute
 
+/-- A Rust nominal's `@[destructor]` is the profile's property, which the printer
+spells so: the attributes left, and the properties. -/
+private def nominalDestructor (attributes : Array SourceAttribute) :
+    LowerM (Array SourceAttribute × Array ProfileValue) := do
+  let isDestructor : SourceAttribute → Bool
+    | .call "destructor" #[] _ => true
+    | _ => false
+  if (← get).sourceNamespace.profile == .rust && attributes.any isDestructor then
+    return (attributes.filter (!isDestructor ·),
+      #[{ profile := Profile.rust, tag := VerexIR.Validation.destructorTag }])
+  return (attributes, #[])
+
 private def lowerContract (context : ExprContext) (clauses : Array ContractClause)
-    (span : Option Span) (pragmas : Array Attribute) (implicitRustNoPanic : Bool)
+    (span : Option Span) (pragmas : Array Attribute) (implicitNoPanicAt : Option Span)
     (nextLocalId : Nat) :
     LowerM (FunctionContract × Array LocalDecl) := do
   let boolType ← internType .bool
@@ -5962,6 +6970,17 @@ private def lowerContract (context : ExprContext) (clauses : Array ContractClaus
     -- A ghost field is a declaration (`lowerGhosts`), not a condition.
     | .ghost .. => continue
     | _ => pure ()
+    -- Each profile spells the failure clause of its own exceptional outcome
+    -- (`doc/designs/rust-verification.md`, "Failure contract").
+    match clause, (← get).sourceNamespace.profile with
+    | .abortsIf .., .rust | .abortsWith .., .rust =>
+        failAt "VEREX-FAILURE-CLAUSE-PROFILE"
+          "the Rust profile spells its failure clause `panics_if`, which takes no code"
+          (some clause.span)
+    | .panicsIf .., .move =>
+        failAt "VEREX-FAILURE-CLAUSE-PROFILE"
+          "the Move profile spells its failure clause `aborts_if`" (some clause.span)
+    | _, _ => pure ()
     let isBinding := match clause with
       | .letPre .. | .letPost .. => true
       | _ => false
@@ -5973,10 +6992,7 @@ private def lowerContract (context : ExprContext) (clauses : Array ContractClaus
     conditions := conditions.push {
       loc, kind := (clauseKind? clause).get!, properties,
       expression := expression.1, auxiliary }
-    let bindingName? := match clause with
-      | .letPre name .. | .letPost name .. => some name
-      | _ => none
-    if let some name := bindingName? then
+    if let some name := contractBindingName? clause then
       if (lookupLocal? context name).isSome then
         failAt "VEREX-CONTRACT-BINDING-DUPLICATE"
           s!"contract binding `{name}` shadows an existing local" (some clause.span)
@@ -5985,16 +7001,18 @@ private def lowerContract (context : ExprContext) (clauses : Array ContractClaus
         id, name, type := { typeId := expression.2, loc }, mutable := false, loc }
       bindingLocals := bindingLocals.push localDecl
       context := { context with locals := context.locals.push (name, id, expression.2) }
-  if implicitRustNoPanic then
-    let loc ← addLoc {}
-    let expression ← pushExpression loc boolType (.value (.bool false))
-    conditions := conditions.push { loc, kind := .abortsIf, expression }
   -- A contract is located at its `spec` item, which covers every clause; a
   -- `spec` item with pragmas alone is a contract too (an opaque native's,
-  -- stating nothing).
+  -- stating nothing). The implicit clause locates none.
   let loc ← match span with
     | some span => some <$> addLoc span
     | none => pure (conditions[0]?.map (·.loc))
+  if let some noPanicSpan := implicitNoPanicAt then
+    let noPanicLoc ← addLoc noPanicSpan
+    let expression ← pushExpression noPanicLoc boolType (.value (.bool false))
+    conditions := conditions.push {
+      loc := noPanicLoc, kind := .abortsIf, expression
+      properties := #[.assign implicitNoPanicProperty (.constant (.bool true))] }
   return ({
     loc
     conditions
@@ -6006,7 +7024,56 @@ private def lowerContract (context : ExprContext) (clauses : Array ContractClaus
     pragmas
     parameterFrames }, bindingLocals)
 
+/-- An expression with each loop at a listed span holding that span's
+specification. -/
+private partial def attachAtLoops (attached : Array (Span × Expr)) (source : Expr) : Expr :=
+  let source := mapChildExpressions (attachAtLoops attached) source
+  match source, attached.find? (·.1 == source.span) with
+  | .loop .., some (_, specification) => attachLoopSpecification source specification
+  | source, _ => source
+
+/-- A function's body with the conditions its `spec` item states of its loops
+in place, where an in-body specification of the loop goes. -/
+private def bodyWithLoopSpecifications (declaration : FunctionDecl) : LowerM (Option Expr) := do
+  if declaration.loopSpecifications.isEmpty then return declaration.body
+  -- In source order, as the proof language numbers them (`bodySites`).
+  let loops := ((declaration.body.map sourceLoops).getD #[]).qsort
+    (·.span.startByte < ·.span.startByte)
+  let mut attached : Array (Span × Expr) := #[]
+  let mut seen : Array Nat := #[]
+  for specification in declaration.loopSpecifications do
+    let number := specification.number
+    if seen.contains number then
+      failAt "VEREX-SPEC-LOOP" s!"loop {number} of `{declaration.name}` has more than one `loop` item"
+        (some specification.span)
+    seen := seen.push number
+    unless isLoopSpecification specification.conditions do
+      failAt "VEREX-SPEC-LOOP"
+        "a `loop` item holds invariants and the `let` bindings they read; facts and proof \
+          steps at a loop go in the proof file (`at loop k entry`, `at loop k step`)"
+        (some specification.span)
+    let some loop := loops[number - 1]?.filter (fun _ => number > 0)
+      | failAt "VEREX-SPEC-LOOP"
+          s!"`{declaration.name}` has no loop {number}: its body has {loops.size} \
+            loop{if loops.size == 1 then "" else "s"}"
+          (some specification.span)
+    if loop matches .forRange .. then
+      failAt "VEREX-SPEC-LOOP"
+        s!"loop {number} of `{declaration.name}` is a `for`, which holds no invariants"
+        (some specification.span)
+    attached := attached.push (loop.span,
+      .specBlock specification.conditions specification.span)
+  return declaration.body.map (attachAtLoops attached)
+
 private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
+  let declaration := { declaration with body := ← bodyWithLoopSpecifications declaration }
+  let shapeOnly := declaration.attributes.any fun
+    | .call "shape_only" #[] _ => true
+    | _ => false
+  if shapeOnly && !declaration.contract.isEmpty then
+    failAt "VEREX-SHAPE-REQUIRED"
+      "a dependency with promoted associated types requires a contract at a shape"
+      (some (declaration.contractSpan.getD declaration.span))
   if declaration.modifiers.isNative && declaration.modifiers.isOpaque then
     failAt "VEREX-FUNCTION-MODIFIER"
       "a function cannot be both `native` and `opaque`" (some declaration.span)
@@ -6017,10 +7084,10 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
        else "a regular function must have a body") (some declaration.span)
   let loc ← addLoc declaration.span
   let state ← get
-  let some name := nameId? state.tables state.namespaceId declaration.name
+  let some name := nameId? state.tables state.namespaceId declaration.name state.scope
     | failAt "VEREX-FUNCTION-NAME" s!"function `{declaration.name}` was not interned"
   let typeContext ← liftM <| typeContext declaration.generics
-  let generics ← declaration.generics.mapM lowerBinder
+  let generics ← declaration.generics.mapM (lowerBinder typeContext)
   let mut parameters := #[]
   let mut locals := #[]
   let mut localTypes := #[]
@@ -6068,24 +7135,33 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
       let some domain := binding.value
         | failAt "VEREX-QUANTIFIER-DOMAIN" "a quantifier has no domain" (some binding.span)
       let patternType ← sourceQuantifierPatternType predeclareContext domain
+      let bindsName ← bindsValue patternType
       let patternDeclarations ← predeclareBindingPattern typeContext false
         binding.pattern patternType locals.size
       for (localInfo, localDecl) in patternDeclarations do
         locals := locals.push localDecl
         declarations := declarations.push localInfo
         logicalLocals := logicalLocals.push localInfo.id
-        predeclared := predeclared.push
-          (binding.span, localInfo.name, localInfo.id, localInfo.typeId)
+        if bindsName then
+          predeclared := predeclared.push
+            (binding.span, localInfo.name, localInfo.id, localInfo.typeId)
       continue
     let typeId ← match binding.type with
       | some type => pure (← lowerTypeUse typeContext type).typeId
       | none => do
           let before ← get
+          let visible ← if binding.specification then
+              inferenceLocals.mapM fun (name, id, typeId) => do
+                let projected ← if logicalLocals.contains id then pure typeId
+                  else projectSpecTypeId typeId
+                pure (name, id, projected)
+            else pure inferenceLocals
           let inferenceContext : ExprContext := {
             types := typeContext
-            locals := inferenceLocals
+            locals := visible
             declarations
-            returnType := predeclareReturnType }
+            returnType := predeclareReturnType
+            specification := binding.specification }
           let some value := binding.value
             | failAt "VEREX-DECLARATION-TYPE"
                 "a declaration without initializer needs a type" (some binding.span)
@@ -6122,64 +7198,79 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
   let clauses := declaration.contract.filterMap clauseExpression?
   -- A clause's match arms bind in the projected domain, below.
   let clauseArmSpans := (clauses.flatMap sourceMatchBindings).map (·.pattern.span)
-  for (binding, scope) in clauses.flatMap (scopedBindings #[]) do
-    if declarations.any (·.span == binding.pattern.span) then continue
-    if clauseArmSpans.contains binding.pattern.span then continue
-    let visible := scope.reverse.flatMap (fun entry =>
-      clausePredeclared.filterMap fun (span, name, id, typeId) =>
-        if span == entry.span then some (name, id, typeId) else none) ++ clauseScope
-    -- A quantifier binder at its place, so that the bindings in its body
-    -- see it.
-    if binding.quantifier then
-      let some domain := binding.value | continue
-      let predeclareContext : ExprContext := {
+  -- A clause also sees the contract's bindings before it.
+  let mut clauseLets : Array (String × LocalId × TypeId) := #[]
+  for clause in declaration.contract do
+    let some expression := clauseExpression? clause | continue
+    for (binding, scope) in scopedBindings #[] expression do
+      if declarations.any (·.span == binding.pattern.span) then continue
+      if clauseArmSpans.contains binding.pattern.span then continue
+      let visible := scope.reverse.flatMap (fun entry =>
+        clausePredeclared.filterMap fun (span, name, id, typeId) =>
+          if span == entry.span then some (name, id, typeId) else none) ++ clauseScope ++ clauseLets
+      -- A quantifier binder at its place, so that the bindings in its body
+      -- see it.
+      if binding.quantifier then
+        let some domain := binding.value | continue
+        let predeclareContext : ExprContext := {
+          types := typeContext
+          locals := visible ++ quantifierLocals
+          declarations
+          returnType := predeclareReturnType
+          resultType := some predeclareResultType
+          specification := true }
+        let patternType ← sourceQuantifierPatternType predeclareContext domain
+        let bindsName ← bindsValue patternType
+        let patternDeclarations ← predeclareBindingPattern typeContext false
+          binding.pattern patternType locals.size
+        for (localInfo, localDecl) in patternDeclarations do
+          locals := locals.push localDecl
+          declarations := declarations.push localInfo
+          logicalLocals := logicalLocals.push localInfo.id
+          if bindsName then
+            clausePredeclared := clausePredeclared.push
+              (binding.pattern.span, localInfo.name, localInfo.id, localInfo.typeId)
+        continue
+      let typeId ← match binding.type with
+        | some type => projectSpecTypeId (← lowerTypeUse typeContext type).typeId
+        | none => do
+            let before ← get
+            let inferenceContext : ExprContext := {
+              types := typeContext
+              locals := visible
+              declarations
+              returnType := predeclareReturnType
+              resultType := some predeclareResultType
+              specification := true }
+            let some value := binding.value
+              | failAt "VEREX-DECLARATION-TYPE"
+                  "a declaration without initializer needs a type" (some binding.span)
+            let inferred ← lowerExpr inferenceContext none value
+            let after ← get
+            set { after with
+              output := before.output
+              temporaryLocalBase := before.temporaryLocalBase
+              temporaryLocals := before.temporaryLocals }
+            pure inferred.2
+      let patternDeclarations ← predeclareBindingPattern typeContext false
+        binding.pattern typeId locals.size
+      for (localInfo, localDecl) in patternDeclarations do
+        locals := locals.push localDecl
+        declarations := declarations.push localInfo
+        logicalLocals := logicalLocals.push localInfo.id
+        clausePredeclared := clausePredeclared.push
+          (binding.span, localInfo.name, localInfo.id, localInfo.typeId)
+    if let some name := contractBindingName? clause then
+      let bindingContext : ExprContext := {
         types := typeContext
-        locals := visible ++ quantifierLocals
+        locals := clauseScope ++ clauseLets
         declarations
         returnType := predeclareReturnType
         resultType := some predeclareResultType
         specification := true }
-      let patternType ← sourceQuantifierPatternType predeclareContext domain
-      let patternDeclarations ← predeclareBindingPattern typeContext false
-        binding.pattern patternType locals.size
-      for (localInfo, localDecl) in patternDeclarations do
-        locals := locals.push localDecl
-        localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
-        declarations := declarations.push localInfo
-        logicalLocals := logicalLocals.push localInfo.id
-        clausePredeclared := clausePredeclared.push
-          (binding.pattern.span, localInfo.name, localInfo.id, localInfo.typeId)
-      continue
-    let typeId ← match binding.type with
-      | some type => projectSpecTypeId (← lowerTypeUse typeContext type).typeId
-      | none => do
-          let before ← get
-          let inferenceContext : ExprContext := {
-            types := typeContext
-            locals := visible
-            declarations
-            returnType := predeclareReturnType
-            resultType := some predeclareResultType
-            specification := true }
-          let some value := binding.value
-            | failAt "VEREX-DECLARATION-TYPE"
-                "a declaration without initializer needs a type" (some binding.span)
-          let inferred ← lowerExpr inferenceContext none value
-          let after ← get
-          set { after with
-            output := before.output
-            temporaryLocalBase := before.temporaryLocalBase
-            temporaryLocals := before.temporaryLocals }
-          pure inferred.2
-    let patternDeclarations ← predeclareBindingPattern typeContext false
-      binding.pattern typeId locals.size
-    for (localInfo, localDecl) in patternDeclarations do
-      locals := locals.push localDecl
-      declarations := declarations.push localInfo
-      logicalLocals := logicalLocals.push localInfo.id
-      clausePredeclared := clausePredeclared.push
-        (binding.span, localInfo.name, localInfo.id, localInfo.typeId)
-  quantifierLocals := clausePredeclared.reverse.map (fun (_, name, id, typeId) =>
+      let bound ← probedType bindingContext expression
+      clauseLets := clauseLets.push (name, ⟨locals.size⟩, bound)
+  quantifierLocals := clauseLets ++ clausePredeclared.reverse.map (fun (_, name, id, typeId) =>
     (name, id, typeId)) ++ quantifierLocals
   let quantifierRoots := declaration.body.toArray ++ clauses
   for binding in quantifierRoots.flatMap sourceQuantifierBindings do
@@ -6192,13 +7283,13 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
       resultType := some predeclareResultType
       specification := true }
     let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+    let bindsName ← bindsValue patternType
     let patternDeclarations ← predeclareBindingPattern typeContext false
       binding.pattern patternType locals.size
     for (localInfo, localDecl) in patternDeclarations do
       locals := locals.push localDecl
-      localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
-      quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++
-        quantifierLocals
+      if bindsName then
+        quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++ quantifierLocals
       declarations := declarations.push localInfo
       logicalLocals := logicalLocals.push localInfo.id
   -- Specification clauses may also match: their arm patterns bind locals in
@@ -6261,7 +7352,9 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
   -- name, whatever value each one carries.
   let contractPragmaNames := declaration.pragmas.map (·.name)
   let (contract, contractLocals) ← lowerContract specContext declaration.contract
-    declaration.contractSpan contractPragmas (state.sourceNamespace.profile == .rust)
+    declaration.contractSpan contractPragmas
+    (if state.sourceNamespace.profile == .rust && !shapeOnly then
+      some (declaration.contractSpan.getD declaration.span) else none)
     executableLocals.size
   let pragmas := contract.pragmas ++
     (state.sourceNamespace.pragmas.zip inheritedPragmas).filterMap fun (inherited, lowered) =>
@@ -6279,12 +7372,26 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
     locals := executableLocals ++ contractLocals
     contract
     pragmas
+    -- A Rust function without a body is a dependency's, declared by its
+    -- signature.
+    profileData := (if declaration.modifiers.isNative && state.sourceNamespace.profile == .rust then
+      #[{ profile := .rust, tag := VerexIR.rustDependencyTag }] else #[]) ++
+      (if shapeOnly then #[{ profile := .rust, tag := VerexIR.rustShapeOnlyTag }] else #[]) ++
+      (if state.sourceNamespace.profile == .rust then
+        declaration.attributes.filterMap fun attr => match attr with
+          | .assign "refused" (.string reason) _ =>
+              some { profile := .rust, tag := VerexIR.rustRefusedTag, payload := reason }
+          | _ => none
+      else #[])
     attributes := modifierAttributes
       (if declaration.attributes.any (fun attr => match attr with
           | .call "move_public" #[] _ => true | _ => false) then
         { declaration.modifiers with visibility := .public_ } else declaration.modifiers) ++
       (← sourceAttributes (declaration.attributes.filter fun attr => match attr with
-        | .call "move_public" #[] _ => false | _ => true)) }
+        | .call "move_public" #[] _ => false
+        | .assign "refused" _ _ => state.sourceNamespace.profile != .rust
+        | .call "shape_only" #[] _ => false
+        | _ => true)) }
   modify fun state => { state with output := { state.output with
     functions := state.output.functions.push function } }
   if let some sourceBody := declaration.body then
@@ -6303,9 +7410,17 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
     -- function keeps a declared logical symbol with no derived body until the
     -- projection models control flow.
     let externallyModeled := externallyModeled || hasEarlyReturn true sourceBody ||
-      hasLoop sourceBody || hasDowncastPlace sourceBody
+      hasLoop sourceBody || hasBodyOnlyPlace sourceBody
+    -- Neither has one a body with an effect on a reference, whose call in a
+    -- specification is an error (`impurityOf`).
+    let externallyModeled := externallyModeled ||
+      (← impurityOf (← get).naming declaration).isSome
     let specBody ← if externallyModeled then pure none else do
-      let specBody ← lowerExpr { specContext with functionTail := true } (some resultSpecType) sourceBody
+      let specBody ← lowerExpr { specContext with functionTail := true, projectedBody := true }
+        (some resultSpecType) sourceBody
+      if let some effect := bodyDroppedEffect? (← get).output.expressions specBody.1 then
+        failAt "VEREX-INTERNAL"
+          s!"the derived reading of `{declaration.name}` would drop {effect}" (some sourceBody.span)
       ensureType resultSpecType specBody.2 sourceBody.span
       pure (some specBody.1)
     let specLocalDecls ← locals.mapM fun localDecl => do
@@ -6322,6 +7437,127 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
     modify fun state => { state with output := { state.output with
       specFunctions := state.output.specFunctions.push specFunction } }
 
+/-- The variables of a shape's types, by first occurrence: the bare names that
+are binders of the function, as in its signature. Any other bare name must name
+a type, so that a misspelled type is no variable applying at every type. -/
+private partial def shapeVariables (function : String) (binders : Array String) (span : Span)
+    (source : Ty) (found : Array String) : LowerM (Array String) := do
+  let visit := shapeVariables function binders span
+  match source with
+  | .tuple elements => elements.foldlM (fun found element => visit element.value found) found
+  | .vector element _ | .slice element => visit element.value found
+  | .function arguments result _ =>
+      let found ← arguments.foldlM (fun found argument => visit argument.value found) found
+      visit result.value found
+  | .reference _ referent _ => visit referent.value found
+  | .named segments arguments =>
+      if segments.size == 1 && arguments.isEmpty then
+        let name := segments[0]!
+        if binders.contains name then
+          return if found.contains name then found else found.push name
+        let state ← get
+        let target := state.target segments declaresNominal
+        let named := state.source.namespaces.find? (·.path == target.owner) |>.any fun sourceNs =>
+          declaresNominal sourceNs target.scope target.name
+        unless named do
+          failAt "VEREX-SHAPE-NAME" s!"`{name}` in a shape of `{function}` is neither a type nor a \
+            generic binder of the function, whose binders are \
+            {", ".intercalate (binders.toList.map (s!"`{·}`"))}" (some span)
+        return found
+      arguments.foldlM (init := found) fun found argument => match argument with
+        | .type value => visit value found
+        | _ => pure found
+  | _ => pure found
+
+/-- A surface type with type parameters replaced, at once, by what the row
+gives them, and the lifetime binders elided. -/
+private partial def substituteParameters (row : Array (String × Ty)) (lifetimes : Array String) :
+    Ty → Ty
+  | .tuple elements => .tuple (elements.map located)
+  | .vector element length => .vector (located element) length
+  | .slice element => .slice (located element)
+  | .function arguments result abilities =>
+      .function (arguments.map located) (located result) abilities
+  | .reference mutable referent lifetime =>
+      .reference mutable (located referent) (elided lifetime)
+  | .named segments arguments =>
+      if segments.size == 1 && arguments.isEmpty then
+        match row.find? (·.1 == segments[0]!) with
+        | some (_, value) => value
+        | none => .named segments arguments
+      else .named segments (arguments.map fun argument => match argument with
+        | .type value => .type (substituteParameters row lifetimes value)
+        | .lifetime value => .lifetime (elided value)
+        | other => other)
+  | type => type
+where
+  located (type : Located Ty) : Located Ty :=
+    { type with value := substituteParameters row lifetimes type.value }
+  elided : SourceLifetime → SourceLifetime
+    | .parameter name => if lifetimes.contains name then .inference else .parameter name
+    | other => other
+
+/-- A function's contracts at shapes of its generics, the function just
+lowered (the last of the namespace's). Each is lowered as the function read at
+the shape, a declaration over the shape's variables. -/
+private def lowerShapes (declaration : FunctionDecl) : LowerM Unit := do
+  if declaration.shapes.isEmpty then return
+  let mut shapes : Array VerexIR.ShapeContract := #[]
+  for shape in declaration.shapes do
+    let parameters := declaration.generics.filter (·.kind == .type)
+    let lifetimes := (declaration.generics.filter (·.kind == .lifetime)).map (·.name)
+    unless parameters.size + lifetimes.size == declaration.generics.size &&
+        parameters.size == shape.arguments.size do
+      failAt "VEREX-SHAPE-ARITY" s!"a shape of `{declaration.name}` needs a type for each of the \
+        function's {parameters.size} type parameters, its other generics being lifetimes; it has \
+        {shape.arguments.size}" (some shape.span)
+    if declaration.body.isSome then
+      failAt "VEREX-SHAPE-BODY" "a contract at a shape is of a function without a body: its \
+        callers assume it, and verifying a body at a shape is not supported" (some shape.span)
+    let variables ← shape.arguments.foldlM (init := #[]) fun found argument =>
+      shapeVariables declaration.name (parameters.map (·.name)) shape.span argument.value found
+    let binders : Array GenericBinder := variables.map fun name =>
+      { name, kind := .type, span := shape.span }
+    let row := (parameters.map (·.name)).zip (shape.arguments.map (·.value))
+    let atShape : FunctionDecl := { declaration with
+      attributes := declaration.attributes.filter fun
+        | .call "shape_only" #[] _ => false
+        | _ => true
+      generics := binders
+      parameters := declaration.parameters.map fun parameter =>
+        { parameter with type :=
+          { parameter.type with value := substituteParameters row lifetimes parameter.type.value } }
+      result := { declaration.result with
+        value := substituteParameters row lifetimes declaration.result.value }
+      contract := shape.contract
+      contractSpan := some shape.span
+      loopSpecifications := #[]
+      pragmas := shape.pragmas
+      shapes := #[]
+      span := shape.span }
+    lowerFunction atShape
+    let output := (← get).output
+    let some lowered := output.functions.back? | failAt "VEREX-SHAPE" "a shape was not lowered"
+    modify fun state => { state with output := { output with functions := output.functions.pop } }
+    let types ← liftM <| typeContext binders
+    let typeArguments ← shape.arguments.mapM (lowerTypeUse types)
+    let placeholder ← internType .unit
+    let mut position := 0
+    let mut arguments : Array VerexIR.TypeUse := #[]
+    for binder in declaration.generics do
+      if binder.kind == .type then
+        arguments := arguments.push typeArguments[position]!
+        position := position + 1
+      else
+        arguments := arguments.push { typeId := placeholder, loc := lowered.loc }
+    shapes := shapes.push { loc := lowered.loc, arguments, signature := lowered.signature
+                            locals := lowered.locals, contract := lowered.contract
+                            pragmas := lowered.pragmas }
+  let output := (← get).output
+  let some function := output.functions.back? | failAt "VEREX-SHAPE" "a shape has no function"
+  modify fun state => { state with output := { output with
+    functions := output.functions.pop.push { function with shapes? := some shapes } } }
+
 private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := do
   if declaration.isOpaque == declaration.body.isSome then
     failAt "VEREX-SPEC-FUNCTION-BODY"
@@ -6331,11 +7567,11 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
       (some declaration.span)
   let loc ← addLoc declaration.span
   let state ← get
-  let some name := nameId? state.tables state.namespaceId declaration.name
+  let some name := nameId? state.tables state.namespaceId declaration.name state.scope
     | failAt "VEREX-SPEC-FUNCTION-NAME"
         s!"specification function `{declaration.name}` was not interned"
   let typeContext ← liftM <| typeContext declaration.generics
-  let generics ← declaration.generics.mapM lowerBinder
+  let generics ← declaration.generics.mapM (lowerBinder typeContext)
   let mut parameters := #[]
   let mut locals := #[]
   let mut localTypes := #[]
@@ -6400,13 +7636,13 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
       returnType := predeclareReturnType
       specification := true }
     let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+    let bindsName ← bindsValue patternType
     let patternDeclarations ← predeclareBindingPattern typeContext false
       binding.pattern patternType locals.size
     for (localInfo, localDecl) in patternDeclarations do
       locals := locals.push localDecl
-      localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
-      quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++
-        quantifierLocals
+      if bindsName then
+        quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++ quantifierLocals
       declarations := declarations.push localInfo
   for binding in declaration.body.toArray.flatMap sourceMatchBindings do
     let predeclareContext : ExprContext := {
@@ -6436,8 +7672,12 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
   -- Without a declared result type, the body's type is the result.
   let (body, result) ← match declaration.body, declared with
     | some source, some result => do
-        let lowered ← lowerExpr context (some result.typeId) source
-        ensureType result.typeId lowered.2 source.span
+        -- A tuple's integers are logical, as its calls read them.
+        let bodyType ← match ← typeNode? result.typeId with
+          | some (.tuple _) => projectSpecTypeId result.typeId
+          | _ => pure result.typeId
+        let lowered ← lowerExpr context (some bodyType) source
+        ensureType bodyType lowered.2 source.span
         pure (some lowered.1, result)
     | some source, none => do
         let lowered ← lowerExpr context none source
@@ -6474,10 +7714,10 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
 private def lowerLemma (declaration : LemmaDecl) : LowerM Unit := do
   let loc ← addLoc declaration.span
   let state ← get
-  let some name := nameId? state.tables state.namespaceId declaration.name
+  let some name := nameId? state.tables state.namespaceId declaration.name state.scope
     | failAt "VEREX-LEMMA-NAME" s!"lemma `{declaration.name}` was not interned"
   let typeContext ← liftM <| typeContext declaration.generics
-  let generics ← declaration.generics.mapM lowerBinder
+  let generics ← declaration.generics.mapM (lowerBinder typeContext)
   let mut parameters := #[]
   let mut locals := #[]
   let mut localTypes := #[]
@@ -6501,21 +7741,35 @@ private def lowerLemma (declaration : LemmaDecl) : LowerM Unit := do
   let unitType ← internType .unit
   let mut declarations := #[]
   let mut quantifierLocals := localTypes
-  for binding in roots.flatMap sourceQuantifierBindings do
-    let predeclareContext : ExprContext := {
-      types := typeContext
-      locals := quantifierLocals
-      declarations
-      returnType := unitType
-      specification := true }
-    let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
-    let patternDeclarations ← predeclareBindingPattern typeContext false
-      binding.pattern patternType locals.size
-    for (localInfo, localDecl) in patternDeclarations do
-      locals := locals.push localDecl
-      quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++
-        quantifierLocals
-      declarations := declarations.push localInfo
+  let clauseRoots := declaration.contract.filterMap fun clause =>
+    (clauseExpression? clause).map (·, contractBindingName? clause)
+  let otherRoots := (declaration.decreases ++ declaration.proof.map (·.2)).map (·, none)
+  for (root, bound?) in clauseRoots ++ otherRoots do
+    for binding in sourceQuantifierBindings root do
+      let predeclareContext : ExprContext := {
+        types := typeContext
+        locals := quantifierLocals
+        declarations
+        returnType := unitType
+        specification := true }
+      let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+      let bindsName ← bindsValue patternType
+      let patternDeclarations ← predeclareBindingPattern typeContext false
+        binding.pattern patternType locals.size
+      for (localInfo, localDecl) in patternDeclarations do
+        locals := locals.push localDecl
+        if bindsName then
+          quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++ quantifierLocals
+        declarations := declarations.push localInfo
+    if let some name := bound? then
+      let bindingContext : ExprContext := {
+        types := typeContext
+        locals := quantifierLocals
+        declarations
+        returnType := unitType
+        specification := true }
+      let bound ← probedType bindingContext root
+      quantifierLocals := #[(name, ⟨locals.size⟩, bound)] ++ quantifierLocals
   for binding in roots.flatMap sourceMatchBindings do
     let predeclareContext : ExprContext := {
       types := typeContext
@@ -6538,7 +7792,7 @@ private def lowerLemma (declaration : LemmaDecl) : LowerM Unit := do
     declarations
     returnType := unitType
     specification := true }
-  let (contract, contractLocals) ← lowerContract context declaration.contract none #[] false
+  let (contract, contractLocals) ← lowerContract context declaration.contract none #[] none
     locals.size
   -- A recursive lemma's measure is a mathematical integer per component.
   let intType ← internType (.integer .unbounded true)
@@ -6575,7 +7829,7 @@ private def lowerLemma (declaration : LemmaDecl) : LowerM Unit := do
 private def lowerConstant (declaration : ConstantDecl) : LowerM Unit := do
   let loc ← addLoc declaration.span
   let state ← get
-  let some name := nameId? state.tables state.namespaceId declaration.name
+  let some name := nameId? state.tables state.namespaceId declaration.name state.scope
     | failAt "VEREX-CONSTANT-NAME" s!"constant `{declaration.name}` was not interned"
   let type ← lowerTypeUse {} declaration.type
   let context : ExprContext := { returnType := type.typeId }
@@ -6588,7 +7842,7 @@ private def lowerConstant (declaration : ConstantDecl) : LowerM Unit := do
 private def lowerField (context : TypeContext) (field : FieldDecl) : LowerM VerexIR.FieldDecl := do
   let loc ← addLoc field.span
   let state ← get
-  let some name := nameId? state.tables state.namespaceId field.name
+  let some name := nameId? state.tables state.namespaceId field.name state.scope
     | failAt "VEREX-FIELD-NAME" s!"field `{field.name}` was not interned"
   let type ← lowerTypeUse context field.type
   return { loc, name, type }
@@ -6601,7 +7855,7 @@ private def lowerGhosts (types : TypeContext) (context : ExprContext)
     | .ghost name type initializer span => do
         let loc ← addLoc span
         let state ← get
-        let some nameId := nameId? state.tables state.namespaceId name
+        let some nameId := nameId? state.tables state.namespaceId name state.scope
           | failAt "VEREX-FIELD-NAME" s!"ghost field `{name}` was not interned"
         let typeUse ← lowerTypeUse types type
         let initializer ← initializer.mapM fun source => do
@@ -6629,12 +7883,17 @@ private def ghostLocals (types : TypeContext) (contract : Array ContractClause)
   return (locals, localTypes)
 
 private def lowerStruct (declaration : StructDecl) : LowerM Unit := do
+  if declaration.isOpaque then
+    unless (← get).sourceNamespace.profile == .rust && declaration.fields.isEmpty do
+      failAt "VEREX-STRUCT-OPAQUE"
+        "an opaque struct declares a Rust dependency's type, without fields"
+        (some declaration.span)
   let loc ← addLoc declaration.span
   let state ← get
-  let some name := nameId? state.tables state.namespaceId declaration.name
+  let some name := nameId? state.tables state.namespaceId declaration.name state.scope
     | failAt "VEREX-STRUCT-NAME" s!"struct `{declaration.name}` was not interned"
   let context ← liftM <| typeContext declaration.generics
-  let generics ← declaration.generics.mapM lowerBinder
+  let generics ← declaration.generics.mapM (lowerBinder context)
   let fields ← declaration.fields.mapM (lowerField context)
   let boolType ← internType .bool
   let mut locals := #[]
@@ -6673,11 +7932,12 @@ private def lowerStruct (declaration : StructDecl) : LowerM Unit := do
       returnType := boolType
       specification := true }
     let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+    let bindsName ← bindsValue patternType
     let patternDeclarations ← predeclareBindingPattern context false
       binding.pattern patternType locals.size
     for (localInfo, localDecl) in patternDeclarations do
       locals := locals.push localDecl
-      localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
+      if bindsName then localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
       declarations := declarations.push localInfo
   for binding in declaration.contract.filterMap clauseExpression? |>.flatMap
       sourceMatchBindings do
@@ -6702,22 +7962,28 @@ private def lowerStruct (declaration : StructDecl) : LowerM Unit := do
     locals := localTypes
     declarations
     returnType := boolType
-    specification := true } declaration.contract declaration.contractSpan pragmas false
+    specification := true } declaration.contract declaration.contractSpan pragmas none
     locals.size
   let ghosts ← lowerGhosts context {
     types := context, locals := localTypes, declarations, returnType := boolType
     specification := true } declaration.contract
+  let (attributes, properties) ← nominalDestructor declaration.attributes
   let struct : VerexIR.StructDecl := {
     loc, name, generics, fields, ghosts, abilities := declaration.abilities.map Ability.toVIR
     locals := locals ++ contractLocals, contract
-    attributes := ← sourceAttributes declaration.attributes }
+    properties := (if declaration.isOpaque then
+      #[{ profile := .rust, tag := VerexIR.rustOpaqueTag }] else #[]) ++
+      (declaration.closureParent.map fun parent =>
+        { profile := .rust, tag := VerexIR.rustClosureTag,
+          payload := packStringPayload parent : ProfileValue }).toArray ++ properties
+    attributes := ← sourceAttributes attributes }
   modify fun state => { state with output := { state.output with
     structs := state.output.structs.push struct } }
 
 private def lowerEnum (declaration : EnumDecl) : LowerM Unit := do
   let loc ← addLoc declaration.span
   let state ← get
-  let some name := nameId? state.tables state.namespaceId declaration.name
+  let some name := nameId? state.tables state.namespaceId declaration.name state.scope
     | failAt "VEREX-ENUM-NAME" s!"enum `{declaration.name}` was not interned"
   -- VIR represents an enum by its variants: without one it would be a
   -- structure without fields.
@@ -6725,11 +7991,11 @@ private def lowerEnum (declaration : EnumDecl) : LowerM Unit := do
     failAt "VEREX-ENUM-EMPTY" s!"enum `{declaration.name}` declares no variant"
       (some declaration.span)
   let context ← liftM <| typeContext declaration.generics
-  let generics ← declaration.generics.mapM lowerBinder
+  let generics ← declaration.generics.mapM (lowerBinder context)
   let variants ← declaration.variants.mapM fun variant => do
     let loc ← addLoc variant.span
     let current ← get
-    let some name := nameId? current.tables current.namespaceId variant.name
+    let some name := nameId? current.tables current.namespaceId variant.name current.scope
       | failAt "VEREX-VARIANT-NAME" s!"variant `{variant.name}` was not interned"
     let fields ← variant.fields.mapM (lowerField context)
     return ({ loc, name, fields, discriminant := variant.discriminant } : VerexIR.VariantDecl)
@@ -6766,11 +8032,12 @@ private def lowerEnum (declaration : EnumDecl) : LowerM Unit := do
       returnType := boolType
       specification := true }
     let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+    let bindsName ← bindsValue patternType
     let patternDeclarations ← predeclareBindingPattern context false
       binding.pattern patternType locals.size
     for (localInfo, localDecl) in patternDeclarations do
       locals := locals.push localDecl
-      localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
+      if bindsName then localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
       declarations := declarations.push localInfo
   for binding in declaration.contract.filterMap clauseExpression? |>.flatMap
       sourceMatchBindings do
@@ -6795,18 +8062,19 @@ private def lowerEnum (declaration : EnumDecl) : LowerM Unit := do
     locals := localTypes
     declarations
     returnType := boolType
-    specification := true } declaration.contract declaration.contractSpan pragmas false
+    specification := true } declaration.contract declaration.contractSpan pragmas none
     locals.size
   let ghosts ← lowerGhosts context {
     types := context, locals := localTypes, declarations, returnType := boolType
     specification := true } declaration.contract
+  let (attributes, destructor) ← nominalDestructor declaration.attributes
   let properties := if state.sourceNamespace.profile == .move then #[{
       profile := Profile.move, tag := "struct.variants" }]
-    else #[]
+    else destructor
   let enum : VerexIR.StructDecl := {
     loc, name, generics, variants, ghosts, abilities := declaration.abilities.map Ability.toVIR
     properties, locals := locals ++ contractLocals, contract
-    attributes := ← sourceAttributes declaration.attributes }
+    attributes := ← sourceAttributes attributes }
   modify fun state => { state with output := { state.output with
     structs := state.output.structs.push enum } }
 
@@ -6827,11 +8095,12 @@ private def lowerNamespaceInvariants
         returnType := boolType
         specification := true }
       let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+      let bindsName ← bindsValue patternType
       let patternDeclarations ← predeclareBindingPattern typeContext false
         binding.pattern patternType locals.size
       for (localInfo, localDecl) in patternDeclarations do
         locals := locals.push localDecl
-        localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
+        if bindsName then localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
         scopedDeclarations := scopedDeclarations.push localInfo
     let context : ExprContext := {
       types := typeContext
@@ -6857,11 +8126,37 @@ private def lowerNamespaceInvariants
     modify fun state => { state with output := { state.output with
       invariants := state.output.invariants.push invariant } }
 
-private def lowerItem : Item → LowerM Unit
+private def ScopeKind.toVIR : ScopeKind → VerexIR.ScopeKind
+  | .module => .module
+  | .inherent => .inherent
+  | .implementation => .implementation
+  | .trait => .trait
+
+private partial def lowerItem : Item → LowerM Unit
+  | .scope name kind items span => do
+      let state ← get
+      unless state.sourceNamespace.profile == .rust do
+        failAt "VEREX-SCOPE-PROFILE" "a scope belongs to a Rust namespace" (some span)
+      let enclosing := state.scope
+      let path := enclosing.push name
+      match state.output.scopes.find? (·.path == path) with
+      | some declared =>
+          unless declared.kind == kind.toVIR do
+            failAt "VEREX-SCOPE-KIND"
+              s!"`{name}` reopens a scope of another kind, with another keyword" (some span)
+      | none =>
+          let loc ← addLoc span
+          modify fun state => { state with output := { state.output with
+            scopes := state.output.scopes.push { loc, path, kind := kind.toVIR } } }
+      modify fun state => { state with scope := path }
+      for item in items do lowerItem item
+      modify fun state => { state with scope := enclosing }
   | .constant declaration => lowerConstant declaration
   | .struct declaration => lowerStruct declaration
   | .enum declaration => lowerEnum declaration
-  | .function declaration => lowerFunction declaration
+  | .function declaration => do
+      lowerFunction declaration
+      lowerShapes declaration
   | .specFunction declaration => lowerSpecFunction declaration
   | .lemma declaration => lowerLemma declaration
   | .namespaceInvariants declarations => lowerNamespaceInvariants declarations
@@ -6872,13 +8167,15 @@ nominal, and `@[<role> (<Owner>)]` on a function or specification function
 adds one role binding. The reconstructed graphs flow through the same
 shared validation as frontend-imported ones. -/
 private def lowerIntrinsics (source : Namespace) : LowerM Unit := do
-  let ownedName (name : String) (span : Span) : LowerM VerexIR.NameId := do
+  let ownedName (scope : Array String) (name : String) (span : Span) :
+      LowerM VerexIR.NameId := do
     let state ← get
-    let some id := nameId? state.tables state.namespaceId name
+    let some id := nameId? state.tables state.namespaceId name scope
       | failAt "VEREX-ATTRIBUTE" s!"declaration `{name}` was not interned" (some span)
     pure id
+  let items := scopedItems source.items
   let mut owners : Array (String × String × VerexIR.NameId × VerexIR.LocId) := #[]
-  for item in source.items do
+  for (scope, item) in items do
     let ownerAttributes := match item with
       | .struct declaration => #[(declaration.name, declaration.attributes)]
       | .enum declaration => #[(declaration.name, declaration.attributes)]
@@ -6889,7 +8186,7 @@ private def lowerIntrinsics (source : Namespace) : LowerM Unit := do
           unless (match sourceAttribute with | .call _ #[] _ => true | _ => false) do
             failAt "VEREX-ATTRIBUTE"
               "an intrinsic owner attribute takes no arguments" (some sourceAttribute.span)
-          let owner ← ownedName declarationName sourceAttribute.span
+          let owner ← ownedName scope declarationName sourceAttribute.span
           owners := owners.push (declarationName,
             (sourceAttribute.name.drop "intrinsic_".length).toString, owner,
             ← addLoc sourceAttribute.span)
@@ -6897,7 +8194,7 @@ private def lowerIntrinsics (source : Namespace) : LowerM Unit := do
           failAt "VEREX-ATTRIBUTE"
             "an intrinsic role attribute must annotate a function or specification function"
             (some sourceAttribute.span)
-  let bindingOf (declarationName : String)
+  let bindingOf (scope : Array String) (declarationName : String)
       (sourceAttribute : SourceAttribute) : LowerM (String × VerexIR.IntrinsicBinding) := do
     let .call _ #[.call ownerName #[] _] _ := sourceAttribute
       | failAt "VEREX-ATTRIBUTE"
@@ -6907,7 +8204,7 @@ private def lowerIntrinsics (source : Namespace) : LowerM Unit := do
       failAt "VEREX-ATTRIBUTE"
         s!"attribute `{sourceAttribute.name}` names `{ownerName}`, which has no intrinsic marker"
         (some sourceAttribute.span)
-    let target ← ownedName declarationName sourceAttribute.span
+    let target ← ownedName scope declarationName sourceAttribute.span
     let state ← get
     pure (ownerName, {
       loc := ← addLoc sourceAttribute.span
@@ -6915,16 +8212,17 @@ private def lowerIntrinsics (source : Namespace) : LowerM Unit := do
       target := { namespaceId := state.namespaceId, name := target } })
   let mut executable : Array (String × VerexIR.IntrinsicBinding) := #[]
   let mut specification : Array (String × VerexIR.IntrinsicBinding) := #[]
-  for item in source.items do
+  for (scope, item) in items do
     match item with
     | .function declaration =>
         for sourceAttribute in declaration.attributes do
           if isIntrinsicAttribute source sourceAttribute then
-            executable := executable.push (← bindingOf declaration.name sourceAttribute)
+            executable := executable.push (← bindingOf scope declaration.name sourceAttribute)
     | .specFunction declaration =>
         for sourceAttribute in declaration.attributes do
           if isIntrinsicAttribute source sourceAttribute then
-            specification := specification.push (← bindingOf declaration.name sourceAttribute)
+            specification := specification.push
+              (← bindingOf scope declaration.name sourceAttribute)
     | _ => pure ()
   for (ownerName, model, owner, loc) in owners do
     let declaration : VerexIR.IntrinsicDecl := {
@@ -6967,11 +8265,10 @@ private def lowerNamespace (unit : CompilationUnit) (source : Namespace)
     -- inferred declarations even when a surface builtin consumes the only
     -- call site.
     for path in source.uses do
-      let owner := path.pop
-      let localName := path.back!
       let state ← get
-      let (tables, namespaceId) := internNamespace state.source state.tables owner
-      let (tables, _) := internName tables namespaceId localName
+      let target := absoluteTarget state.source path declaresAny
+      let (tables, namespaceId) := internNamespace state.source state.tables target.owner
+      let (tables, _) := internName tables namespaceId target.name target.scope
       set { state with tables }
     -- `friend` grants another namespace privileged access. Move records the
     -- relation as namespace profile metadata, whose payload names the friend
@@ -7013,7 +8310,7 @@ private structure InstantiationCall where
 
 private def instantiationTypeChildren : VerexIR.Ty → Array TypeId
   | .tuple elements => elements
-  | .vector element _ | .typeDomain element => #[element]
+  | .vector element _ | .slice element | .typeDomain element => #[element]
   | .resourceDomain _ arguments => arguments.getD #[]
   | .nominal _ arguments => arguments.filterMap fun
       | .typeArg value => some value.typeId
@@ -7110,6 +8407,14 @@ private def completeInvocationTypes (namespaces : Array RawNamespace)
 /-- Lower a resolved Verex source AST to the only public frontend boundary.
 The returned raw unit still requires ordinary shared VIR validation. -/
 def lower (unit : CompilationUnit) : Result RawUnit := do
+  for ns in unit.namespaces do
+    let closures := closureFunctions ns.items
+    if let some (scope, _) := closures.zipIdx.findSome? fun (closure, index) =>
+        if (closures.take index).any (·.1 == closure.1) then some closure else none then
+      throw #[.error "VEREX-CLOSURE-DUPLICATE"
+        s!"closure `{"::".intercalate scope.toList}` has two closure expressions" none]
+  let unit := { unit with namespaces := unit.namespaces.map fun ns =>
+    if ns.profile == .rust then { ns with items := closuresToItems #[] ns.items } else ns }
   let mut tables ← initialTables unit
   let mut namespaces := #[]
   for (sourceNs, index) in unit.namespaces.zipIdx do

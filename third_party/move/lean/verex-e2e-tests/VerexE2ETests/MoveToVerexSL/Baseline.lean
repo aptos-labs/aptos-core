@@ -149,13 +149,15 @@ private def checkRelocation (directory : System.FilePath)
     (unit : VerexIR.Validation.ValidatedUnit) : IO Unit := do
   let extractAll (unit : VerexIR.Validation.ValidatedUnit) :=
     unit.namespaces.mapM fun ns =>
-      match VerexIR.Validation.extract unit ns.identity with
+      match VerexIR.Validation.extract unit ns.unitIdentity with
       | .ok object => pure object
       | .error message => throw <| IO.userError s!"{directory}: extraction failed: {message}"
   let objects ← extractAll unit
   let relinked ← match VerexIR.Validation.link unit objects with
     | .ok relinked => pure relinked
     | .error message => throw <| IO.userError s!"{directory}: linking failed: {message}"
+  unless relinked.linksConsistent do
+    throw <| IO.userError s!"{directory}: the linked unit's links are inconsistent"
   let again ← extractAll relinked
   for (object, index) in objects.zipIdx do
     let some relinked := again[index]?
@@ -228,6 +230,8 @@ def testBaselines (environment : Lean.Environment) : IO Unit := do
     throw <| IO.userError s!"no Move-to-VerexSL baselines found under {featureDir}"
   for source in sources do
     testSource environment source
+  -- A selection of fixtures names sources alone.
+  if (← Baseline.selectedFixtures).isSome then return
   withDependencyInputs packages.toList do
     for directory in packages do
       unless (← testPackage environment directory) > 0 do

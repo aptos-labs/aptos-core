@@ -36,15 +36,20 @@ const SYSTEM_OS_VERSION: &str = "system_os_version";
 const GLOBAL_CPU_NAME: &str = "cpu";
 
 /// Global system singleton (to avoid recreations)
-pub static GLOBAL_SYSTEM: Lazy<Mutex<System>> = Lazy::new(|| {
-    Mutex::new(System::new_with_specifics(
+pub static GLOBAL_SYSTEM: Lazy<Option<Mutex<System>>> = Lazy::new(|| {
+    System::new_with_specifics(
         RefreshKind::nothing()
             .with_memory(MemoryRefreshKind::everything())
             .with_cpu(CpuRefreshKind::nothing().with_frequency()),
-    ))
+    )
+    .ok()
+    .map(Mutex::new)
 });
-static GLOBAL_DISKS: Lazy<Mutex<Disks>> =
-    Lazy::new(|| Mutex::new(Disks::new_with_refreshed_list_specifics(disk_refresh_kind())));
+static GLOBAL_DISKS: Lazy<Option<Mutex<Disks>>> = Lazy::new(|| {
+    Disks::new_with_refreshed_list_specifics(disk_refresh_kind())
+        .ok()
+        .map(Mutex::new)
+});
 
 fn disk_refresh_kind() -> DiskRefreshKind {
     DiskRefreshKind::nothing().with_kind().with_storage()
@@ -72,23 +77,20 @@ pub fn get_system_information() -> BTreeMap<String, String> {
 /// Collects the system info and appends it to the given map
 pub(crate) fn collect_system_info(system_information: &mut BTreeMap<String, String>) {
     // Note: this might be expensive, so it shouldn't be done often
-    GLOBAL_SYSTEM.lock().refresh_memory();
-    GLOBAL_DISKS
-        .lock()
-        .refresh_specifics(true, disk_refresh_kind());
-
-    // Collect relevant and available system information
-    collect_cpu_info(system_information, &GLOBAL_SYSTEM);
-    collect_disk_info(system_information, &GLOBAL_DISKS);
-    collect_memory_info(system_information, &GLOBAL_SYSTEM);
+    if let Some(system) = GLOBAL_SYSTEM.as_ref() {
+        system.lock().refresh_memory();
+        collect_cpu_info(system_information, system);
+        collect_memory_info(system_information, system);
+    }
+    if let Some(disks) = GLOBAL_DISKS.as_ref() {
+        disks.lock().refresh_specifics(true, disk_refresh_kind());
+        collect_disk_info(system_information, disks);
+    }
     collect_sys_info(system_information);
 }
 
 /// Collects the cpu info and appends it to the given map
-fn collect_cpu_info(
-    system_information: &mut BTreeMap<String, String>,
-    system: &Lazy<Mutex<System>>,
-) {
+fn collect_cpu_info(system_information: &mut BTreeMap<String, String>, system: &Mutex<System>) {
     // Collect the number of CPUs and cores
     let system_lock = system.lock();
     let cpus = system_lock.cpus();
@@ -96,7 +98,9 @@ fn collect_cpu_info(
     utils::insert_optional_value(
         system_information,
         CPU_CORE_COUNT,
-        System::physical_core_count().map(|count| count.to_string()),
+        System::physical_core_count()
+            .ok()
+            .map(|count| count.to_string()),
     );
 
     // Collect the overall CPU info. Brand and vendor are the same across CPUs.
@@ -112,10 +116,7 @@ fn collect_cpu_info(
 }
 
 /// Collects the disk info and appends it to the given map
-fn collect_disk_info(
-    system_information: &mut BTreeMap<String, String>,
-    disks: &Lazy<Mutex<Disks>>,
-) {
+fn collect_disk_info(system_information: &mut BTreeMap<String, String>, disks: &Mutex<Disks>) {
     // Collect the number of disks. Older sysinfo versions skipped disks without a known size.
     let disks_lock = disks.lock();
     let disks: Vec<_> = disks_lock
@@ -160,10 +161,7 @@ fn collect_disk_info(
 }
 
 /// Collects the memory info and appends it to the given map
-fn collect_memory_info(
-    system_information: &mut BTreeMap<String, String>,
-    system: &Lazy<Mutex<System>>,
-) {
+fn collect_memory_info(system_information: &mut BTreeMap<String, String>, system: &Mutex<System>) {
     // Collect the information for the memory
     let system_lock = system.lock();
     system_information.insert(
@@ -176,16 +174,20 @@ fn collect_memory_info(
 
 /// Collects the sys info and appends it to the given map
 fn collect_sys_info(system_information: &mut BTreeMap<String, String>) {
-    utils::insert_optional_value(system_information, SYSTEM_HOST_NAME, System::host_name());
+    utils::insert_optional_value(
+        system_information,
+        SYSTEM_HOST_NAME,
+        System::host_name().ok(),
+    );
     utils::insert_optional_value(
         system_information,
         SYSTEM_KERNEL_VERSION,
-        System::kernel_version(),
+        System::kernel_version().ok(),
     );
-    utils::insert_optional_value(system_information, SYSTEM_NAME, System::name());
+    utils::insert_optional_value(system_information, SYSTEM_NAME, System::name().ok());
     utils::insert_optional_value(
         system_information,
         SYSTEM_OS_VERSION,
-        System::long_os_version(),
+        System::long_os_version().ok(),
     );
 }

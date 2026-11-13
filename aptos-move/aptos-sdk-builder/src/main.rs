@@ -45,7 +45,11 @@ struct Options {
     module_name: Option<String>,
 
     /// Optional package name (Python) or module path (Go) of the Serde and BCS runtime dependencies.
-    #[clap(long)]
+    /// Generated Go code needs `VecBytes` from the aptos-labs Go runtime.
+    #[clap(
+        long,
+        default_value = "github.com/aptos-labs/serde-reflection/serde-generate/runtime/golang"
+    )]
     serde_package_name: Option<String>,
 
     /// Optional version number for the `aptos_types` module (useful in Rust).

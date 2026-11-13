@@ -54,6 +54,8 @@ impl PartialStateComputeResult {
             .set(StateCheckpointOutput::new_empty(
                 ledger_summary.state_summary,
                 ledger_summary.position_state_summary,
+                ledger_summary.order_state_summary,
+                ledger_summary.collateral_state_summary,
             ))
             .expect("First set.");
 
@@ -88,6 +90,20 @@ impl PartialStateComputeResult {
     ) -> Result<Option<&LedgerWithSummary<NativeStateWithSummary>>> {
         self.ensure_state_checkpoint_output()
             .map(|out| out.position_state_summary.as_ref())
+    }
+
+    pub fn ensure_result_order_state_summary(
+        &self,
+    ) -> Result<Option<&LedgerWithSummary<NativeStateWithSummary>>> {
+        self.ensure_state_checkpoint_output()
+            .map(|out| out.order_state_summary.as_ref())
+    }
+
+    pub fn ensure_result_collateral_state_summary(
+        &self,
+    ) -> Result<Option<&LedgerWithSummary<NativeStateWithSummary>>> {
+        self.ensure_state_checkpoint_output()
+            .map(|out| out.collateral_state_summary.as_ref())
     }
 
     pub fn result_positions(&self) -> Option<&PositionOverlay> {

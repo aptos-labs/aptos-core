@@ -1,0 +1,38 @@
+VerexE2ETests/SourceVerify/fn_forward_errors.rs:4:1: info: `__fn_to_fnmut_forward_0` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fn_forward_errors.rs:4:1: info: `__fn_to_fnmut_twice_0` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fn_forward_errors.rs:4:1: info: `apply_mut` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fn_forward_errors.rs:4:1: info: `forward` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fn_forward_errors.rs:4:1: info: `twice` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fn_forward_errors.spec.lean:26:3: error: the specification clause `ensures result == value` is not established
+VerexE2ETests/SourceVerify/fn_forward_errors.spec.lean:25:6: error: verex verification failed: the automatic verification of `scalar` failed; provide a proof in the module:
+  verify scalar by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/fn_forward_errors.spec.lean:35:3: error: the specification clause `ensures !spec.result[1]` is not established
+VerexE2ETests/SourceVerify/fn_forward_errors.spec.lean:34:6: error: verex verification failed: the automatic verification of `pair` failed; provide a proof in the module:
+  verify pair by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/fn_forward_errors.spec.lean:38:3: error: `no panic when aborts at op 1` is not established: the operation `value + x` at VerexE2ETests/SourceVerify/fn_forward_errors.rs:28:38 may panic
+  from: (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds self_value; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit; ¬(0 ≤ self_value.val + x.val ∧ self_value.val + x.val ≤ 18446744073709551615)
+VerexE2ETests/SourceVerify/fn_forward_errors.spec.lean:38:8: error: verex verification failed: the automatic verification of `panicking::{closure#0}::call` failed; provide a proof in the module:
+  verify «panicking::{closure#0}»::call by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/fn_forward_errors.spec.lean:48:5: error: the specification clause `ensures result == self.value` is not established
+VerexE2ETests/SourceVerify/fn_forward_errors.spec.lean:46:8: error: verex verification failed: the automatic verification of `wrong_body::{closure#0}::call` failed; provide a proof in the module:
+  verify «wrong_body::{closure#0}»::call by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

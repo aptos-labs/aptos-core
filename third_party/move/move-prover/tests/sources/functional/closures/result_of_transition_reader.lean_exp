@@ -1,0 +1,73 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/result_of_transition_reader.move:35:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_reader.move:33:5: error: verex verification failed: the automatic verification of `caller_ctrl` failed; provide a proof in the module:
+  verify caller_ctrl by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_reader.move:45:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_reader.move:41:5: error: verex verification failed: the automatic verification of `caller_single` failed; provide a proof in the module:
+  verify caller_single by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_reader.move:58:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_reader.move:53:5: error: verex verification failed: the automatic verification of `caller_two` failed; provide a proof in the module:
+  verify caller_two by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_reader.move:130:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_reader.move:128:5: error: verex verification failed: the automatic verification of `caller_ctrl` failed; provide a proof in the module:
+  verify caller_ctrl by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_reader.move:140:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_reader.move:136:5: error: verex verification failed: the automatic verification of `caller_single` failed; provide a proof in the module:
+  verify caller_single by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_reader.move:153:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_reader.move:148:5: error: verex verification failed: the automatic verification of `caller_two` failed; provide a proof in the module:
+  verify caller_two by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_reader.move:83:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_reader.move:81:5: error: verex verification failed: the automatic verification of `caller_ctrl` failed; provide a proof in the module:
+  verify caller_ctrl by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_reader.move:93:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_reader.move:89:5: error: verex verification failed: the automatic verification of `caller_single` failed; provide a proof in the module:
+  verify caller_single by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_reader.move:106:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_reader.move:101:5: error: verex verification failed: the automatic verification of `caller_two` failed; provide a proof in the module:
+  verify caller_two by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

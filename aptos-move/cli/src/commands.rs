@@ -62,6 +62,7 @@ use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use itertools::Itertools;
+use mono_move_unit_test_backend::MonoMoveBackendFactory;
 use move_binary_format::file_format_common::{write_u64_as_uleb128, BinaryData};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
 use move_compiler_v2::Experiment;
@@ -72,7 +73,13 @@ use move_core_types::{
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
-use move_unit_test::{package_test::UnitTestResult, UnitTestingConfig};
+use move_unit_test::{
+    backend::Backends,
+    package_test::{run_move_unit_tests_with_backend, UnitTestResult},
+    test_reporter::UnitTestFactoryWithCostTable,
+    v1_backend::V1BackendFactory,
+    UnitTestingConfig,
+};
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -559,8 +566,26 @@ pub struct TestPackage {
     #[clap(long = "fail-fast")]
     pub fail_fast: bool,
 
+    /// The VM to run tests on
+    #[clap(long = "move-vm", value_enum, default_value_t = MoveVm::V1, hide = true)]
+    pub move_vm: MoveVm,
+
+    /// Pass the run even if some tests are inconclusive: the VM cannot run them yet, or `both`
+    /// cannot compare them
+    #[clap(long = "allow-inconclusive", hide = true)]
+    pub allow_inconclusive: bool,
+
     #[clap(skip)]
     pub env: Arc<MoveEnv>,
+}
+
+/// The VM `aptos move test` runs tests on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum MoveVm {
+    V1,
+    Mono,
+    /// Both, failing a test whose outcomes on the two differ.
+    Both,
 }
 
 pub(crate) fn fix_bytecode_version(
@@ -614,8 +639,44 @@ impl CliCommand<&'static str> for TestPackage {
             ..Default::default()
         };
 
+        if self.move_vm == MoveVm::Mono {
+            // Coverage traces V1, and only V1 renders storage dumps.
+            if self.compute_coverage {
+                return Err(CliError::CommandArgumentError(
+                    "--coverage is not supported with --move-vm mono".to_string(),
+                ));
+            }
+            if self.dump_state {
+                return Err(CliError::CommandArgumentError(
+                    "--dump is not supported with --move-vm mono".to_string(),
+                ));
+            }
+        }
+
+        // TODO(Gas): we may want to switch to non-zero costs in the future
+        let natives = crate::aptos_debug_natives::aptos_debug_natives(
+            NativeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
+        );
+        let v1 = V1BackendFactory::new(
+            Some(natives),
+            true,
+            UnitTestFactoryWithCostTable::new(None, None),
+        );
+        // TODO(metering): bound MonoMove tests like V1's, so that a test that
+        // never terminates times out instead of hanging.
+        let mono = MonoMoveBackendFactory::new(u64::MAX);
+        let backends = match self.move_vm {
+            MoveVm::V1 => Backends::Single(&v1),
+            MoveVm::Mono => Backends::Single(&mono),
+            MoveVm::Both => Backends::Differential {
+                reference: &v1,
+                candidate: &mono,
+            },
+        };
+
         let path = self.move_options.get_package_path()?;
-        let result = move_unit_test::package_test::run_move_unit_tests(
+        let result = run_move_unit_tests_with_backend(
             path.as_path(),
             config.clone(),
             UnitTestingConfig {
@@ -634,19 +695,13 @@ impl CliCommand<&'static str> for TestPackage {
                     })
                     .collect(),
                 fail_fast: self.fail_fast,
+                allow_inconclusive: self.allow_inconclusive,
                 ..UnitTestingConfig::default()
             },
-            // TODO(Gas): we may want to switch to non-zero costs in the future
-            crate::aptos_debug_natives::aptos_debug_natives(
-                NativeGasParameters::zeros(),
-                MiscGasParameters::zeros(),
-            ),
+            backends,
             aptos_test_feature_flags_genesis(),
-            None,
-            None,
             self.compute_coverage,
             &mut std::io::stdout(),
-            true,
         )
         .map_err(|err| CliError::UnexpectedError(format!("Failed to run tests: {:#}", err)))?;
 

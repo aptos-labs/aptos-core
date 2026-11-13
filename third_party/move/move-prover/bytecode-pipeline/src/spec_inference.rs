@@ -114,12 +114,13 @@ use move_model::{
     exp_simplifier::{flatten_conjunction_owned, is_complementary, ExpSimplifier},
     memory_labels::{all_labels_in_exp, MemoryLabelInfo},
     model::{
-        FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, SpecFunId,
-        StructEnv, StructId,
+        FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId,
+        QualifiedInstId, SpecFunId, StructEnv, StructId,
     },
     pragmas::{
         ABORTS_IF_IS_PARTIAL_PRAGMA, ABORTS_IF_IS_STRICT_PRAGMA, CONDITION_INFERRED_PROP,
         CONDITION_INFERRED_SATHARD, CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, OPAQUE_PRAGMA,
+        VERIFY_PRAGMA,
     },
     sourcifier::Sourcifier,
     spec_derivation,
@@ -138,6 +139,7 @@ use move_stackless_bytecode::{
         Operation, PropKind,
     },
     stackless_control_flow_graph::{BlockId, StacklessControlFlowGraph},
+    usage_analysis,
 };
 use num::{BigInt, Zero};
 use std::{
@@ -193,6 +195,9 @@ struct SpecInferenceRun {
 pub enum PartialAbortReason {
     MemoryHavoc,
     UnknownCallee(QualifiedId<FunId>),
+    /// An abort condition depended on the state of a call; see
+    /// `abort_condition_depends_on_call_state`.
+    CallState,
 }
 
 /// State at a program point during backward WP analysis, also used in bytecode dumps.
@@ -849,6 +854,36 @@ fn compute_memory_free_functions(env: &GlobalEnv, targets: &FunctionTargetsHolde
     env.set_extension(MemoryFreeFunctions(free));
 }
 
+/// Functions whose postcondition relates to their result only across an actual
+/// call at some instantiation of the function's type parameters; see
+/// [`usage_analysis::behavioral_transition_guarded_at_some_instance`]. The
+/// `result_of` carrier WP substitutes for such a call is anchored by the call's
+/// `ensures_of` fact, and an abort condition naming the carrier is dropped: at
+/// a single state the carrier is not the result of the call.
+pub struct TransitionGuardedFunctions(BTreeSet<QualifiedId<FunId>>);
+
+fn compute_transition_guarded_functions(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
+    let mut guarded = BTreeSet::new();
+    let summary_of = |callee| {
+        targets
+            .get_data(&callee, &FunctionVariant::Baseline)
+            .and_then(|data| {
+                data.annotations
+                    .get::<usage_analysis::UsageState>()
+                    .cloned()
+            })
+    };
+    for (fun, variant) in targets.get_funs_and_variants() {
+        if variant != FunctionVariant::Baseline {
+            continue;
+        }
+        if usage_analysis::behavioral_transition_guarded_at_some_instance(env, fun, &summary_of) {
+            guarded.insert(fun);
+        }
+    }
+    env.set_extension(TransitionGuardedFunctions(guarded));
+}
+
 /// Whether a function's own code and declared contract permit memory freedom.
 fn is_locally_memory_free(fun_env: &FunctionEnv<'_>, targets: &FunctionTargetsHolder) -> bool {
     // Frames and spec-variable updates can declare effects absent from
@@ -911,6 +946,7 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
 
     fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
         compute_memory_free_functions(env, targets);
+        compute_transition_guarded_functions(env, targets);
         let mut inferred = ContractInferenceTargets::default();
         for (fun, variant) in targets.get_funs_and_variants() {
             let fun_env = env.get_function(fun);
@@ -1373,9 +1409,9 @@ fn mark_transparent_result_dependencies_solver_hard(env: &GlobalEnv) {
 /// generated carrier is not related to that runtime result and cannot justify
 /// a caller postcondition such as `result == result_of<f>(args)`.
 ///
-/// When the transparent function's own specification determines its results,
-/// the carrier it constrains is the actual result, and the condition relies
-/// on nothing unrelated.
+/// When the backend binds a call through a function value to the carrier
+/// (`spec_derivation::closure_result_is_carrier`), the carrier is the actual
+/// result, and the condition relies on nothing unrelated.
 ///
 /// Such clauses are retained for inspection but marked `sathard`; an abort
 /// clause relying on one leaves the contract partial.
@@ -1391,7 +1427,15 @@ fn condition_depends_on_transparent_result(env: &GlobalEnv, exp: &Exp) -> bool {
             && !env
                 .get_function((*module_id).qualified(*fun_id))
                 .is_opaque()
-            && !spec_derivation::spec_determines_results(env, (*module_id).qualified(*fun_id))
+            && !(spec_derivation::closure_result_is_carrier(env, (*module_id).qualified(*fun_id))
+                // The backend binds only after a successful call; a caller's
+                // clause must also hold where `requires` fails and the result is fresh.
+                && !env
+                    .get_function((*module_id).qualified(*fun_id))
+                    .get_spec()
+                    .conditions
+                    .iter()
+                    .any(|cond| cond.kind == ConditionKind::Requires))
             && !spec_derivation::has_derived_behavior(
                 env,
                 (*module_id).qualified(*fun_id),
@@ -1545,6 +1589,7 @@ impl FunctionTargetProcessor for LambdaSpecInferenceProcessor {
 
     fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
         compute_memory_free_functions(env, targets);
+        compute_transition_guarded_functions(env, targets);
     }
 
     fn process(
@@ -1965,6 +2010,24 @@ fn run_spec_inference_analysis(
         // Collect modifies targets before normalization (labels still present).
         for ensures in &state.ensures {
             collect_modifies_targets(ensures, &mut state.direct_modifies);
+        }
+
+        // An abort condition which depends on the state of a call cannot be
+        // stated at the entry state; see `abort_condition_depends_on_call_state`.
+        {
+            let mut defined = BTreeSet::new();
+            for cond in state.ensures.iter().chain(state.aborts.iter()) {
+                defined.extend(cond.as_ref().all_defined_labels());
+            }
+            let num_aborts = state.aborts.len();
+            state
+                .aborts
+                .retain(|cond| !analyzer.abort_condition_depends_on_call_state(cond, &defined));
+            if state.aborts.len() != num_aborts {
+                state
+                    .partial_abort_reasons
+                    .insert(PartialAbortReason::CallState);
+            }
         }
 
         // Final label normalization: classify all labels and convert.
@@ -2407,6 +2470,10 @@ fn update_spec<'env>(
                     PartialAbortReason::MemoryHavoc => {
                         "an abort condition did not survive a memory-havocking loop".to_owned()
                     },
+                    PartialAbortReason::CallState => "an abort condition depended on memory \
+                        written by a call, or on the result of a call which may write memory \
+                        its contract observes; neither is stated at the entry state"
+                        .to_owned(),
                     PartialAbortReason::UnknownCallee(callee_id) => {
                         let callee = env.get_function(*callee_id);
                         let callee_name = callee.get_full_name_with_address();
@@ -4863,11 +4930,19 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                                     PartialAbortReason::UnknownCallee(module_id.qualified(*fun_id)),
                                 );
                             }
-                        } else if dests.len() == 1
-                            && let Some(result_exp) = self
-                                .try_as_functional_result_exp(*module_id, *fun_id, type_inst, srcs)
+                        } else if !dests.is_empty()
+                            // Substituting the results drops the callee's memory state:
+                            // a later read of memory it wrote, and its abort condition,
+                            // would be stated at the caller's pre-state. A callee that
+                            // may use memory keeps its behavioral call.
+                            && !self.callee_may_use_memory(module_id.qualified(*fun_id))
+                            && let Some(result_exps) = self
+                                .try_as_functional_result_exps(*module_id, *fun_id, type_inst, srcs)
                         {
-                            *state = self.substitute_exp_state(state, dests[0], &result_exp);
+                            debug_assert_eq!(result_exps.len(), dests.len());
+                            let subs: Vec<(TempIndex, Exp)> =
+                                dests.iter().copied().zip(result_exps).collect();
+                            *state = self.substitute_multiple_temps_in_state(state, &subs);
                             let args: Vec<Exp> =
                                 srcs.iter().map(|src| self.mk_temporary(*src)).collect();
                             let (fun_exp, _) = self.mk_closure(
@@ -6488,7 +6563,10 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         // For void callees: `ensures_of<f>(args)` is the only postcondition.
         // For non-void with discarded result: anchor with `ensures_of<f>(args,
         // result_of<f>(args)...)` so downstream predicates can reference
-        // the intermediate state.
+        // the intermediate state. A transition-guarded callee is anchored
+        // even when its result is used: only the `ensures_of` fact ties the
+        // carrier to the call, for the caller's own verification and for
+        // whoever assumes the caller's contract.
         if num_declared_results == 0 {
             let ensures_of = self.mk_ensures_of_with_state(
                 fun_exp.clone(),
@@ -6497,7 +6575,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                 behavior_post,
             );
             state.add_ensures(ensures_of);
-        } else if !any_dest_referenced {
+        } else if !any_dest_referenced || self.callee_is_transition_guarded(&fun_exp) {
             let mut ensures_args = args.clone();
             for i in 0..num_declared_results {
                 ensures_args.push(self.mk_result_of_at_with_state(
@@ -7105,22 +7183,134 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             .collect()
     }
 
-    /// Instantiate a caller-visible functional postcondition `result == E`
-    /// as a direct value expression for a single-result callee. This keeps the
-    /// inferred value tied to the actual call; a generic `result_of` carrier
-    /// is insufficient for transparent callees because their executions are
-    /// not summarized by the carrier's Skolem axiom.
-    fn try_as_functional_result_exp(
+    /// Whether a call to `callee` may use global memory: every function may that is not
+    /// classified memory-free ([`MemoryFreeFunctions`]).
+    fn callee_may_use_memory(&self, callee: QualifiedId<FunId>) -> bool {
+        self.global_env()
+            .get_extension::<MemoryFreeFunctions>()
+            .is_none_or(|free| !free.0.contains(&callee))
+    }
+
+    /// Whether `fun_exp` names a function whose `result_of` carrier is tied to
+    /// the call's result only across the call ([`TransitionGuardedFunctions`]).
+    /// A function value of unknown target is not: its postcondition is
+    /// functional in its result.
+    fn callee_is_transition_guarded(&self, fun_exp: &Exp) -> bool {
+        let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref() else {
+            return false;
+        };
+        self.global_env()
+            .get_extension::<TransitionGuardedFunctions>()
+            .is_some_and(|guarded| guarded.0.contains(&module_id.qualified(*fun_id)))
+    }
+
+    /// Whether a call to the analyzed function may write `resource`, by its
+    /// usage summary; a function value it invokes without a bound may. A
+    /// native, or an unverified opaque, callee has no usage summary: what a
+    /// call to it writes is its declared frame.
+    fn may_write_resource(&self, module_id: ModuleId, struct_id: StructId) -> bool {
+        let env = self.global_env();
+        let usage = usage_analysis::get_memory_usage(&self.target);
+        let names =
+            |mem: &QualifiedInstId<StructId>| mem.module_id == module_id && mem.id == struct_id;
+        usage.unbounded_invoke
+            || usage.invoke_frame_wildcard
+            || usage.modified.all.iter().any(names)
+            || usage.invoke_frame.all.iter().any(names)
+            || self.target.get_bytecode().iter().any(|bc| {
+                let Bytecode::Call(_, _, Operation::Function(mid, fid, inst), _, _) = bc else {
+                    return false;
+                };
+                let callee_id = mid.qualified(*fid);
+                let callee = env.get_function(callee_id);
+                (callee.is_native()
+                    || (callee.is_opaque() && callee.is_pragma_false(VERIFY_PRAGMA)))
+                    && match usage_analysis::call_effects(env, callee_id, inst, &|_| None) {
+                        None => true,
+                        Some(effects) => effects.writes.iter().any(names),
+                    }
+            })
+    }
+
+    /// Whether an abort condition depends on the state of a call, which an
+    /// `aborts_if`, evaluated at the entry state, cannot express: it reads a
+    /// resource the function may write at the exit state (a state no
+    /// operation defines; a defined intermediate state is evaluated through
+    /// its definition), or it names the `result_of` carrier of a
+    /// transition-guarded callee without the call's post-state, where the
+    /// carrier is not the result of the call unless the callee's contract
+    /// determines its results from the pre-state alone. Such a clause is
+    /// dropped and the contract advertised as partial.
+    fn abort_condition_depends_on_call_state(
+        &self,
+        cond: &Exp,
+        defined: &BTreeSet<MemoryLabel>,
+    ) -> bool {
+        let env = self.global_env();
+        let mut found = false;
+        cond.visit_pre_order(&mut |e| {
+            if let ExpData::Call(id, op, args) = e {
+                match op {
+                    AstOp::Global(Some(label)) | AstOp::Exists(Some(label))
+                        if *label != self.at_entry_label && !defined.contains(label) =>
+                    {
+                        if let Some(Type::Struct(module_id, struct_id, _)) =
+                            env.get_node_instantiation(*id).first()
+                        {
+                            found |= self.may_write_resource(*module_id, *struct_id);
+                        }
+                    },
+                    AstOp::Behavior(
+                        kind @ (BehaviorKind::ResultOf | BehaviorKind::WriteOf(_)),
+                        range,
+                    ) if range.post.is_none() => {
+                        found |= args.first().is_some_and(|fun_exp| {
+                            self.callee_is_transition_guarded(fun_exp)
+                                && !(*kind == BehaviorKind::ResultOf
+                                    && self.callee_results_determined_at_pre_state(fun_exp))
+                        });
+                    },
+                    _ => {},
+                }
+            }
+            !found
+        });
+        found
+    }
+
+    /// Whether the callee's contract determines every result as a value over
+    /// its arguments alone, which the carrier then has at any state.
+    fn callee_results_determined_at_pre_state(&self, fun_exp: &Exp) -> bool {
+        let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref() else {
+            return false;
+        };
+        let env = self.global_env();
+        let callee_id = module_id.qualified(*fun_id);
+        let result_count = env.get_function(callee_id).get_return_count();
+        let values = spec_derivation::functional_result_spec_values(env, callee_id);
+        (0..result_count).all(|idx| values.contains_key(&idx))
+    }
+
+    /// Instantiate caller-visible functional postconditions `result_i == E_i`
+    /// as direct value expressions, one per result; `None` unless every
+    /// result is determined. This keeps the inferred values tied to the
+    /// actual call; a generic `result_of` carrier is insufficient for
+    /// transparent callees because their executions are not summarized by
+    /// the carrier's Skolem axiom, and for opaque ones it leaves a caller
+    /// condition stated at carrier projections, which the solver can only
+    /// relate back to the call's results through the carrier axiom.
+    fn try_as_functional_result_exps(
         &self,
         module_id: ModuleId,
         fun_id: FunId,
         type_inst: &[Type],
         srcs: &[TempIndex],
-    ) -> Option<Exp> {
+    ) -> Option<Vec<Exp>> {
         let env = self.global_env();
         let callee_qid = module_id.qualified(fun_id);
         let callee = env.get_function(callee_qid);
-        if callee.get_return_count() != 1
+        let result_count = callee.get_return_count();
+        if result_count == 0
             || callee
                 .get_parameters()
                 .iter()
@@ -7128,23 +7318,32 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         {
             return None;
         }
-        let value = spec_derivation::functional_result_spec_values(env, callee_qid).remove(&0)?;
+        let mut values = spec_derivation::functional_result_spec_values(env, callee_qid);
+        let values = (0..result_count)
+            .map(|idx| values.remove(&idx))
+            .collect::<Option<Vec<_>>>()?;
         let mut replacer = |_id: NodeId, target: RewriteTarget| match target {
             RewriteTarget::Temporary(index) => srcs.get(index).map(|src| self.mk_temporary(*src)),
             RewriteTarget::LocalVar(_) => None,
         };
-        let value = ExpRewriter::new(env, &mut replacer)
-            .set_type_args(type_inst)
-            .rewrite_exp(value);
-        for called in value.called_spec_funs(env) {
-            env.add_used_spec_fun_transitive(called.to_qualified_id());
-        }
-        // The spliced value is related to the call's actual result only by
-        // Move equality, as material inlined from a behavioral predicate is,
-        // so its spec functions need the same congruence axioms over
-        // `$IsEqual`.
-        env.mark_move_equality_congruence_spec_funs_in(&value);
-        Some(value)
+        let values = values
+            .into_iter()
+            .map(|value| {
+                let value = ExpRewriter::new(env, &mut replacer)
+                    .set_type_args(type_inst)
+                    .rewrite_exp(value);
+                for called in value.called_spec_funs(env) {
+                    env.add_used_spec_fun_transitive(called.to_qualified_id());
+                }
+                // The spliced value is related to the call's actual result
+                // only by Move equality, as material inlined from a
+                // behavioral predicate is, so its spec functions need the
+                // same congruence axioms over `$IsEqual`.
+                env.mark_move_equality_congruence_spec_funs_in(&value);
+                value
+            })
+            .collect();
+        Some(values)
     }
 
     /// The pure-spec-call test shared with the source-level derivation; see

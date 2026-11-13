@@ -57,7 +57,9 @@ impl RestoreHandler {
 
     pub fn reset_state_store(&self) -> Result<()> {
         self.state_store.reload();
-        self.aptosdb.reset_position_store_to_ledger()
+        self.aptosdb.reset_position_store_to_ledger()?;
+        self.aptosdb.reset_order_store_to_ledger()?;
+        self.aptosdb.reset_collateral_store_to_ledger()
     }
 
     /// Whether this DB keeps native-position state, i.e. whether a restore

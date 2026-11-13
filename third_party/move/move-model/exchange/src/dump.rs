@@ -1679,6 +1679,7 @@ impl<'a> Ctx<'a> {
                     BehaviorKind::UnchangedOf => xast::BehaviorKind::UnchangedOf,
                     BehaviorKind::FoldsOf => xast::BehaviorKind::FoldsOf,
                     BehaviorKind::WriteOf(index) => xast::BehaviorKind::WriteOf(*index),
+                    BehaviorKind::TransitionOf => xast::BehaviorKind::TransitionOf,
                 },
                 range: self.memory_range(range),
             },

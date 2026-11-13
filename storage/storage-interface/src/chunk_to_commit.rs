@@ -33,6 +33,13 @@ pub struct ChunkToCommit<'a> {
     /// be persisted/merklized at commit without recomputation. `None` when
     /// native position is disabled.
     pub position_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
+    /// Order summary computed at execution time, as `position_state_summary`
+    /// is. `None` unless the trading-native state roots are computed.
+    pub order_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
+    /// Collateral summary computed at execution time, as
+    /// `position_state_summary` is. `None` unless the trading-native state
+    /// roots are computed.
+    pub collateral_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
     /// Position writes since the base, computed in the execution phase
     /// — earlier than `position_state_summary`, which is a checkpoint-stage
     /// product. Commit publishes this as the bundle's tip so the
@@ -70,27 +77,15 @@ impl ChunkToCommit<'_> {
     }
 
     pub fn result_ledger_state_with_summary(&self) -> LedgerStateWithSummary {
-        let latest = StateWithSummary::new(
-            self.state.latest().clone(),
-            self.state_summary.latest().clone(),
-        );
-        let last_checkpoint = StateWithSummary::new(
+        LedgerStateWithSummary::new_at_checkpoint(StateWithSummary::new(
             self.state.last_checkpoint().clone(),
             self.state_summary.last_checkpoint().clone(),
-        );
-        LedgerStateWithSummary::from_latest_and_last_checkpoint(latest, last_checkpoint)
+        ))
     }
 
     pub fn estimated_total_state_updates(&self) -> usize {
-        let for_last_checkpoint = self
-            .state_update_refs
+        self.state_update_refs
             .for_last_checkpoint_batched()
-            .map_or(0, |x| x.len());
-        let for_latest = self
-            .state_update_refs
-            .for_latest_batched()
-            .map_or(0, |x| x.len());
-
-        for_latest + for_last_checkpoint
+            .map_or(0, |x| x.len())
     }
 }

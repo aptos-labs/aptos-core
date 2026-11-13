@@ -27,11 +27,19 @@ def updateRequested : IO Bool := do
       return true
   return false
 
+/-- The fixtures `VEREX_E2E_FILTER` names, a comma-separated list of file
+stems, where it is set: a development convenience, never the default
+coverage. -/
+def selectedFixtures : IO (Option (List String)) :=
+  return (← IO.getEnv "VEREX_E2E_FILTER").map (·.splitOn ",")
+
 /-- Discover baseline inputs in stable filename order. A new source file is
 therefore included without editing a Lean driver or case table. -/
 def sourceFiles (directory : System.FilePath) (suffix : String) : IO (Array System.FilePath) := do
   let entries ← directory.readDir
-  pure <| entries.filter (·.fileName.endsWith suffix)
+  let selected ← selectedFixtures
+  pure <| entries.filter (fun entry => entry.fileName.endsWith suffix &&
+      selected.all (·.contains (entry.path.fileStem.getD "")))
     |>.qsort (·.fileName < ·.fileName)
     |>.map (·.path)
 
@@ -77,12 +85,14 @@ def withStagedDirectory (source destination : System.FilePath)
 so a newly dropped file or subdirectory is included without registration. -/
 partial def sourceFilesRecursive (directory : System.FilePath) (suffix : String) :
     IO (Array System.FilePath) := do
+  let selected ← selectedFixtures
   let mut found : Array System.FilePath := #[]
   for entry in ← directory.readDir do
     if entry.fileName.startsWith "." then continue
     if ← entry.path.isDir then
       found := found ++ (← sourceFilesRecursive entry.path suffix)
-    else if entry.fileName.endsWith suffix then
+    else if entry.fileName.endsWith suffix &&
+        selected.all (·.contains (entry.path.fileStem.getD "")) then
       found := found.push entry.path
   pure <| found.qsort (toString · < toString ·)
 

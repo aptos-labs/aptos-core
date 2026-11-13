@@ -1,0 +1,40 @@
+VerexE2ETests/SourceVerify/library_utf8_errors.spec.lean:5:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `roundtrip` failed; provide a proof in the module:
+  verify roundtrip by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_errors.spec.lean:8:3: error: the specification clause `ensures result is Some ==> (result.0).length == 0` is not established
+VerexE2ETests/SourceVerify/library_utf8_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `success_bytes` failed; provide a proof in the module:
+  verify success_bytes by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_errors.spec.lean:11:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `success_length` failed; provide a proof in the module:
+  verify success_length by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_errors.spec.lean:14:3: error: the specification clause `ensures result is Err` is not established
+VerexE2ETests/SourceVerify/library_utf8_errors.spec.lean:13:6: error: verex verification failed: the automatic verification of `decode` failed; provide a proof in the module:
+  verify decode by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_errors.spec.lean:17:3: error: the specification clause `ensures result` is not established
+VerexE2ETests/SourceVerify/library_utf8_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `all_valid` failed; provide a proof in the module:
+  verify all_valid by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

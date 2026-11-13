@@ -2,6 +2,8 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexSL.Contract.Clauses
+import VerexIR.Proofs.Denote.GivenOwn
+import VerexIR.Proofs.ReceiverScoped
 
 /-!
 # Generated contracts from VIR specifications
@@ -49,6 +51,7 @@ private structure Slot where
   kind : SlotKind := .plain
   physical : IrTy
   nty : VerexIR.Proofs.Denote.NTy
+  clauseDomain : Domain
 
 private def slotOf (context : Context) (name : Name) (typeId : TypeId)
     (allowReference : Bool := false) : MetaM Slot := do
@@ -58,14 +61,31 @@ private def slotOf (context : Context) (name : Name) (typeId : TypeId)
     | .reference reference => do
         unless allowReference do
           throwError "a result of reference type is not supported in generated contracts"
-        let some referent := context.unit.tables.types[reference.referent.index]?
-          | throwError "reference referent type {reference.referent.index} is out of range"
+        -- A shared reference holds what it refers to, through any reference there.
+        let rec seenThrough : Nat → TypeId → TypeId
+          | 0, id => id
+          | fuel + 1, id => match context.unit.tables.types[id.index]? with
+            | some (.reference inner) => seenThrough fuel inner.referent
+            | _ => id
+        let referentId := if reference.kind == .shared then
+            seenThrough context.unit.tables.types.size reference.referent
+          else reference.referent
+        let some referent := context.unit.tables.types[referentId.index]?
+          | throwError "reference referent type {referentId.index} is out of range"
         let kind := match reference.kind with
           | .shared => SlotKind.sharedRef
           | .mutable => SlotKind.mutableRef
-        pure (kind, referent, reference.referent)
+        pure (kind, referent, referentId)
     | declared => pure (SlotKind.plain, declared, typeId)
-  return { name, kind, physical, nty := ← context.nativeType physicalId }
+  let some clauseType := context.unit.tables.types[(specTypeId context.unit typeId).index]?
+    | throwError "a clause slot has an unknown referent type"
+  -- Preserve nested loan carriers here. `nativeType` intentionally sees through
+  -- all references for clause expressions, which is too early for this slot.
+  let some nty := context.ntyOf? physicalId
+    | throwError "a clause slot has no native carrier"
+  let nty := match nty with | .slice element => .vector element | other => other
+  return { name, kind, physical, nty
+           clauseDomain := domainOf clauseType }
 
 private def disjunction (parts : Array Lean.Expr) : MetaM Lean.Expr := do
   match parts.toList with
@@ -147,9 +167,9 @@ partial def loopSpecifications (ns : ValidatedNamespace)
 
 /-- A condition's clause marked with the condition's range, so that a
 failure inside it is reported at the condition. -/
-def markCondition (unit : ValidatedUnit) (condition : VerexIR.Condition)
+def markCondition (ns : ValidatedNamespace) (condition : VerexIR.Condition)
     (clause : Lean.Expr) : Lean.Expr :=
-  markObligation (conditionRange unit condition) clause
+  markObligation (conditionRange ns condition) clause
 
 /-- Locals lexically available at a loop header. Body-local slots exist in
 the runtime row but are not initialized on the first visit. -/
@@ -231,7 +251,7 @@ private partial def invariantValueReads (ns : ValidatedNamespace) (root : ExprId
       | .operation (.specification (.global _)) instantiations arguments _ =>
           let read := match instantiations.toList, arguments[0]? with
             | [.typeArg resource], some key =>
-                #[{ typeIndex := resource.typeId.index, key, atEntry := inOld }]
+                #[{ typeIndex := (ns.typeId resource.typeId).index, key, atEntry := inOld }]
             | _, _ => #[]
           read ++ arguments.flatMap fun child => invariantValueReads ns child inOld
       | kind =>
@@ -246,6 +266,33 @@ private def pragmaEnabled (contract : VerexIR.FunctionContract) (name : String) 
     match pragma with
     | .assign pragmaName (.constant (.bool true)) _ => pragmaName == name
     | _ => false
+
+/-- Whether `aborts_if_is_strict` is in effect for a function, by its contract
+or its module. -/
+private def abortsStrictly (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Bool :=
+  pragmaEnabled declaration.contract "aborts_if_is_strict" || declaration.pragmas.any fun
+    | .assign name (.constant (.bool true)) _ => name == "aborts_if_is_strict"
+    | _ => false
+
+/-- The key of the obligation a function's failing paths owe where no clause
+permits them, shared by the profiles (`doc/plan/proof-language.md`, "Obligation
+addressing"): Rust's implicit clause, or a strict Move function's `False`. -/
+def noFailureKey? (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Option String :=
+  let states (kind : VerexIR.ConditionKind) := declaration.contract.conditions.any fun condition =>
+    condition.kind == kind && !isImplicitNoPanic condition
+  if states .abortsIf then none
+  else if declaration.contract.conditions.any isImplicitNoPanic then some "no panic"
+  else if !states .abortsWith && abortsStrictly declaration && declaration.body != .absent then
+    some "no abort"
+  else none
+
+/-- Where that obligation is located: the function's `spec` item, or the
+function where it has none. -/
+def noFailureRange (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : ObligationRange :=
+  locRange ns (declaration.contract.loc.getD declaration.loc)
 
 /-- The expressions a function's verification reads: the conditions of its
 contract and its body. -/
@@ -277,6 +324,8 @@ private def reachFold {α : Type} (unit : ValidatedUnit) (roots : List (VerexIR.
         let some ownerNs := unit.namespaces[owner.index]? | continue
         let some expression := ownerNs.expressions[id.index]? | continue
         if let .operation operation instantiations _ _ := expression.kind then
+          let operation := ownerNs.relocate operation
+          let instantiations := ownerNs.relocate instantiations
           folded := visit folded operation instantiations
           match operation with
           | .specification (.functionCall reference _) =>
@@ -304,7 +353,7 @@ where
     | 0 => false
     | fuel + 1 => match unit.tables.types[typeId.index]? with
       | some (.typeParameter _) | none => false
-      | some (.vector element _) | some (.typeDomain element) => go element fuel
+      | some (.vector element _) | some (.slice element) | some (.typeDomain element) => go element fuel
       | some (.reference reference) => go reference.referent fuel
       | some (.tuple elements) => elements.all (go · fuel)
       | some (.function arguments result _) => arguments.all (go · fuel) && go result fuel
@@ -356,6 +405,8 @@ def frameUses (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
             | some (.typeParameter index) => arguments[index]?.join
             | _ => if closedType unit typeId then some typeId else none
         if let .operation operation instantiations _ _ := expression.kind then
+          let operation := ownerNs.relocate operation
+          let instantiations := ownerNs.relocate instantiations
           let inner := instantiations.map fun
             | .typeArg typeUse => inFrame typeUse.typeId
             | _ => none
@@ -364,9 +415,12 @@ def frameUses (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
               .specification (.remove _) | .specification (.update _) =>
               if let some (some resource) := inner[0]? then
                 unless memory.contains resource do memory := memory.push resource
-                if operation matches .global (.borrow .mutable) | .global .take |
-                    .global .publish | .specification (.publish _) |
-                    .specification (.remove _) | .specification (.update _) then
+                let writes := match operation with
+                  | .global kind => kind.writesMemory
+                  | .specification (.publish _) | .specification (.remove _) |
+                      .specification (.update _) => true
+                  | _ => false
+                if writes then
                   unless written.contains resource do written := written.push resource
           | .specification (.functionCall reference _) =>
               if let some typeArguments := inner.mapM (fun argument => argument) then
@@ -393,7 +447,7 @@ def frameUses (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
                         let some { kind := .operation _ targetInstantiations _ _, .. } :=
                             calleeNs.expressions[target.index]? | continue
                         let some (VerexIR.GenericArgument.typeArg resource) :=
-                            targetInstantiations[0]? | continue
+                            (calleeNs.relocate targetInstantiations)[0]? | continue
                         let resource? := match unit.tables.types[resource.typeId.index]? with
                           | some (.typeParameter index) => inner[index]?.join
                           | _ => if closedType unit resource.typeId then some resource.typeId
@@ -422,7 +476,8 @@ private def axiomInstances (unit : ValidatedUnit) (ns : ValidatedNamespace)
         let some expression := ns.expressions[id.index]? | continue
         if let .operation (.specification (.functionCall reference _)) instantiations _ _ :=
             expression.kind then
-          if let some arguments := instantiations.mapM (fun
+          let reference := ns.qualifiedRef reference
+          if let some arguments := (ns.relocate instantiations).mapM (fun
               | .typeArg typeUse => some typeUse.typeId
               | _ => none) then
             own := own.push (reference, arguments)
@@ -481,6 +536,7 @@ private partial def unifyInstance (unit : ValidatedUnit) (pattern : ScopedType) 
           | (.typeArg left, .typeArg right) =>
               unifyInstance unit (within left.typeId) right.typeId binding fuel
           | _ => some binding
+    | some (.slice element), some (.slice element')
     | some (.vector element _), some (.vector element' _) =>
         unifyInstance unit (within element) element' binding fuel
     | _, _ => if patternId == actual && scope.isNone then some binding else none
@@ -511,6 +567,8 @@ private def invariantInstances (unit : ValidatedUnit) (ns : ValidatedNamespace)
           else (unit.namespaces[owner.index]?).getD ownNamespace
         let some expression := ownerNs.expressions[id.index]? | continue
         if let .operation operation instantiations _ _ := expression.kind then
+          let operation := ownerNs.relocate operation
+          let instantiations := ownerNs.relocate instantiations
           if operation matches .global _ | .specification (.global _) |
               .specification (.publish _) | .specification (.remove _) |
               .specification (.update _) then
@@ -584,8 +642,8 @@ private def reachFrom (unit : ValidatedUnit) (roots : List (VerexIR.NamespaceId 
   let ((reached, resources), complete) := reachFold unit roots (false, #[])
     fun (reached, resources) operation instantiations =>
       let counts := match operation with
-        | .global (.borrow .mutable) | .global .take | .global .publish => true
-        | .global _ | .specification (.global _) | .specification (.publish _) |
+        | .global kind => kind.writesMemory || !writes
+        | .specification (.global _) | .specification (.publish _) |
             .specification (.remove _) | .specification (.update _) => !writes
         | _ => false
       if !counts then (reached, resources) else
@@ -613,7 +671,7 @@ private def qualifiedName? (unit : ValidatedUnit) (reference : VerexIR.Qualified
     Option String := do
   let path ← unit.tables.namespaces[reference.namespaceId.index]?
   let qualified ← unit.tables.names[reference.name.index]?
-  some ("::".intercalate (path.segments.toList ++ [qualified.name]))
+  some ("::".intercalate (path.segments.toList ++ [SpecTypes.scopedSpelling qualified]))
 
 /-- The functions of `names` a function applies, in code or in a
 specification, at any depth (`reachFold`); past the walk's bound, all of
@@ -632,6 +690,11 @@ private def reachedFunctions (unit : ValidatedUnit) (namespaceId : VerexIR.Names
             | none => reached
         | _ => reached
   if complete then names.filter reached.contains else names
+
+/-- Whether an invariant reads a spec variable's memory. -/
+private def readsGhostMemory (context : Context) (read : InvariantValueRead) : Bool :=
+  ((context.unit.tables.types[read.typeIndex]?).bind (nominalDeclaration? context.unit)).any
+    fun (_, _, declaration) => declaration.isGhostMemory
 
 /-- The implicit existence premise for one totalized invariant read. -/
 private def invariantReadGuard (context : Context) (read : InvariantValueRead) :
@@ -657,7 +720,9 @@ private def guardedInvariantBody (context : Context) (root body : ExprId)
   let reads := (invariantValueReads context.ns root).foldl
     (fun unique read => if unique.contains read then unique else unique.push read) #[]
   for read in reads do
-    guards := guards.push (← invariantReadGuard context read)
+    -- A spec variable is always present.
+    unless readsGhostMemory context read do
+      guards := guards.push (← invariantReadGuard context read)
   if guards.isEmpty then return proposition
   mkArrow (← conjunction guards) proposition
 
@@ -721,7 +786,7 @@ private def namespaceInvariantTerms (context : Context)
     unless declaration.condition.auxiliary.isEmpty do
       throwError "namespace invariants cannot carry auxiliary expressions"
     let localTypes ← declaration.locals.mapM fun localDecl => do
-      let some ty := context.unit.tables.types[localDecl.type.typeId.index]?
+      let some ty := invariantNs.typeOf localDecl.type.typeId
         | throwError "namespace invariant local type {localDecl.type.typeId.index} is out of range"
       pure ty
     let emptyLocals := Array.replicate declaration.locals.size none
@@ -739,7 +804,7 @@ private def namespaceInvariantTerms (context : Context)
         else axiomArguments.map fun
           | .type typeId => context.ntyOf? typeId
           | .ghost index => some (.param index) }
-    let range := conditionRange context.unit declaration.condition
+    let range := conditionRange invariantNs declaration.condition
     -- The declarations the invariant reads, against those a write modifies.
     let handleOf (typeIndex : Nat) : Option VerexIR.StructHandle := do
       let ty ← context.unit.tables.types[typeIndex]?
@@ -772,10 +837,10 @@ private def namespaceInvariantTerms (context : Context)
               | throwError "namespace invariant quantifier pattern is out of range"
             let .variable localId := pattern.kind
               | throwError "namespace invariants require a variable binder"
-            let some patternType := context.unit.tables.types[pattern.typeId.index]?
+            let some patternType := invariantNs.typeOf pattern.typeId
               | throwError "namespace invariant binder type is out of range"
             let proposition ← withLocalDeclD (Name.mkSimple s!"invariant_{localId.index}")
-                (← invariantContext.binderType pattern.typeId) fun value => do
+                (← invariantContext.binderType (invariantNs.typeId pattern.typeId)) fun value => do
               let active := { invariantContext with
                 locals := invariantContext.locals.set! localId.index (some value)
                 oldLocals := invariantContext.oldLocals.set! localId.index (some value) }
@@ -832,14 +897,18 @@ private def invariantModifiedResources (ns : ValidatedNamespace)
       | throwError "a modifies clause must name one resource type"
     let some key := arguments[0]?
       | throwError "a modifies clause expects one key"
-    resources := resources.push { typeIndex := resource.typeId.index, key }
+    resources := resources.push { typeIndex := (ns.typeId resource.typeId).index, key }
   pure (some resources)
 
-private def groupConditions (unit : ValidatedUnit)
+private def groupConditions (ns : ValidatedNamespace)
     (conditions : Array VerexIR.Condition) : MetaM ClauseGroups := do
   let mut groups : ClauseGroups := {}
+  -- The implicit `False` adds nothing beside a clause permitting a panic.
+  let statesAborts := conditions.any fun condition =>
+    condition.kind == .abortsIf && !isImplicitNoPanic condition
   for condition in conditions do
-    let range := conditionRange unit condition
+    if statesAborts && isImplicitNoPanic condition then continue
+    let range := conditionRange ns condition
     match condition.kind with
     | .requires => groups := { groups with
         requires := groups.requires.push (condition.expression, range) }
@@ -922,11 +991,11 @@ private def Scoped.ofNominal (arguments : Array Scoped) (uses : Array VerexIR.Ge
 
 /-- The rows of fields a nominal declaration holds: its fields, or each
 variant's payload with the variant's name. -/
-private def fieldRows (unit : ValidatedUnit) (declaration : VerexIR.StructDecl) :
+private def fieldRows (ns : ValidatedNamespace) (declaration : VerexIR.StructDecl) :
     Array (Option String × Array VerexIR.FieldDecl) :=
   if declaration.variants.isEmpty then #[(none, declaration.fields)]
   else declaration.variants.map fun variant =>
-    (some (((unit.tables.names[variant.name.index]?).map (·.name)).getD ""), variant.fields)
+    (some (((ns.nameOf variant.name).map (·.name)).getD ""), variant.fields)
 
 /-- A scoped type argument in the native row used by a closure's frame. -/
 private partial def Scoped.toNative? (unit : ValidatedUnit) (owner : VerexIR.NamespaceId)
@@ -939,9 +1008,10 @@ private partial def Scoped.toNative? (unit : ValidatedUnit) (owner : VerexIR.Nam
 
 /-- The type of the values an intrinsic map holds, as a use under the owner's
 arguments: its second type argument. -/
-private def mapValueType? (unit : ValidatedUnit) (declaration : VerexIR.StructDecl)
-    (arguments : Array Scoped) : Option (IrTy × Array Scoped) := do
-  guard (mapModel? unit (.nominal declaration.name #[])).isSome
+private def mapValueType? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : VerexIR.StructDecl) (arguments : Array Scoped) :
+    Option (IrTy × Array Scoped) := do
+  guard (mapModel? unit (.nominal (ns.nameId declaration.name) #[])).isSome
   let valueArgument ← arguments[1]?
   let .mk id scope := valueArgument
   Scoped.resolve unit scope id
@@ -954,7 +1024,10 @@ private partial def carriesInvariant (unit : ValidatedUnit) (ty : IrTy)
     (arguments : Array Scoped) (depth : Nat) : Bool :=
   if depth > 16 then false else
   match ty with
-  | .vector element _ => match Scoped.resolve unit arguments element with
+  | .reference reference => match Scoped.resolve unit arguments reference.referent with
+      | some (referent, scope) => carriesInvariant unit referent scope (depth + 1)
+      | none => false
+  | .vector element _ | .slice element => match Scoped.resolve unit arguments element with
       | some (elementType, scope) => carriesInvariant unit elementType scope (depth + 1)
       | none => false
   | .tuple elements => elements.any fun element =>
@@ -967,8 +1040,8 @@ private partial def carriesInvariant (unit : ValidatedUnit) (ty : IrTy)
           VerexIR.Proofs.Denote.declarationHasClosureFields owner declaration ||
             declaration.contract.conditions.any (·.kind == .structInvariant) ||
             (mapModel? unit ty).isSome ||
-            (fieldRows unit declaration).any fun (_, fields) => fields.any fun field =>
-              match Scoped.resolve unit scope field.type.typeId with
+            (fieldRows owner declaration).any fun (_, fields) => fields.any fun field =>
+              match Scoped.resolve unit scope (owner.typeId field.type.typeId) with
               | some (fieldType, fieldScope) => carriesInvariant unit fieldType fieldScope (depth + 1)
               | none => false
       | none => false
@@ -988,15 +1061,16 @@ private partial def carriesMatchingInvariant (unit : ValidatedUnit) (needed : Sp
     | some (elementType, scope) => carriesMatchingInvariant unit needed elementType scope (depth + 1)
     | none => false
   match ty with
-  | .vector elementId _ => element elementId
+  | .reference reference => element reference.referent
+  | .vector elementId _ | .slice elementId => element elementId
   | .tuple elements => elements.any element
   | .nominal _ uses => match nominalDeclaration? unit ty with
-      | some (handle, _, declaration) =>
+      | some (handle, owner, declaration) =>
           let reads := invariantReads unit handle.namespaceId declaration
           let scope := Scoped.ofNominal arguments uses
           needed reads ||
-            (fieldRows unit declaration).any fun (_, fields) => fields.any fun field =>
-              match Scoped.resolve unit scope field.type.typeId with
+            (fieldRows owner declaration).any fun (_, fields) => fields.any fun field =>
+              match Scoped.resolve unit scope (owner.typeId field.type.typeId) with
               | some (fieldType, fieldScope) =>
                   carriesMatchingInvariant unit needed fieldType fieldScope (depth + 1)
               | none => false
@@ -1009,7 +1083,7 @@ reads the executable unit. -/
 def signatureInvariantsReadUnit (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
   let carries (typeId : VerexIR.TypeId) : Bool :=
-    match ns.tables.types[typeId.index]? with
+    match ns.typeOf typeId with
     | some (.reference reference) =>
         (ns.tables.types[reference.referent.index]?).any
           (carriesMatchingInvariant unit (fun reads => reads.unit || reads.requires) · #[] 0)
@@ -1043,7 +1117,7 @@ private def declarationLocalValues (unit : ValidatedUnit) (owner : VerexIR.Struc
       locals := locals.set! declaration.fields.size (some value)
     -- A ghost field's local, its slot.
     for ghost in declaration.ghosts do
-      let some ghostName := ns.tables.names[ghost.name.index]? | continue
+      let some ghostName := ns.nameOf ghost.name | continue
       let some position := declaration.locals.findIdx? (·.name == ghostName.name) | continue
       let some slot := VerexIR.SemanticOperations.handleGhostIndex? unit owner none
           ghostName.name
@@ -1060,10 +1134,10 @@ private def declarationLocalValues (unit : ValidatedUnit) (owner : VerexIR.Struc
     -- A ghost field's local, its slot: each variant's slot follows its own
     -- fields.
     for ghost in declaration.ghosts do
-      let some ghostName := ns.tables.names[ghost.name.index]? | continue
+      let some ghostName := ns.nameOf ghost.name | continue
       let some position := declaration.locals.findIdx? (·.name == ghostName.name) | continue
       let some choices := declaration.variants.toList.mapM fun (variant : VerexIR.VariantDecl) => do
-          let named : VerexIR.QualifiedName ← ns.tables.names[variant.name.index]?
+          let named : VerexIR.QualifiedName ← ns.nameOf variant.name
           let index ← VerexIR.SemanticOperations.handleGhostIndex? unit owner
             (some named.name) ghostName.name
           some (named.name, index)
@@ -1091,7 +1165,7 @@ private def declaredInvariantTerms (context : Context) (ty : IrTy) (scope : Arra
   -- instance the value has, in a field, an element, or a map's entry: their
   -- values are native values of the arguments' native types.
   let localTypes ← declaration.locals.mapM fun localDecl => do
-    let some localType := context.unit.tables.types[localDecl.type.typeId.index]?
+    let some localType := ns.typeOf localDecl.type.typeId
       | throwError "data invariant local type {localDecl.type.typeId.index} is out of range"
     pure localType
   let typeArgumentTypes := scope.map (Scoped.toNative? context.unit namespaceId)
@@ -1116,7 +1190,7 @@ private def declaredInvariantTerms (context : Context) (ty : IrTy) (scope : Arra
             { invariantContext with state := some memory, oldState := some memory }
             condition.expression) (usedOnly := true)
       else translate invariantContext condition.expression
-    let range := conditionRange context.unit condition
+    let range := conditionRange ns condition
     pure (proposition, range)
 
 
@@ -1130,7 +1204,7 @@ private def modifiedSlotTerm (context : Context) (id : ExprId) :
   match expression.kind with
   | .operation (.specification (.global _)) instantiations arguments _ =>
       let resource ← match instantiations.toList with
-        | [.typeArg resource] => pure resource.typeId
+        | [.typeArg resource] => pure (context.ns.typeId resource.typeId)
         | _ => throwError "a modifies clause needs one resource type"
       let some key := arguments[0]?
         | throwError "a modifies clause expects one key"
@@ -1150,7 +1224,7 @@ private def modifiedSlotTerm (context : Context) (id : ExprId) :
 the slots `slots` name: every listed resource type reads the same at every
 key other than its listed ones, and, unless the frame is loose, every other
 resource type reads the same everywhere. -/
-private def slotFrame (initial final : Lean.Expr) (slots : Array (Lean.Expr × Lean.Expr))
+def slotFrame (initial final : Lean.Expr) (slots : Array (Lean.Expr × Lean.Expr))
     (loose : Bool) : MetaM Lean.Expr := do
   let mut resources : Array Lean.Expr := #[]
   for (resource, _) in slots do
@@ -1181,9 +1255,8 @@ private partial def rowElementTypes (row : Lean.Expr) : Array Lean.Expr :=
   else #[]
 
 /-- The components of a native row value, as projections. -/
-private def rowProjections (skolems row : Lean.Expr) (types : Array Lean.Expr) :
+private def rowComponentsAt (carriers row : Lean.Expr) (types : Array Lean.Expr) :
     MetaM (Array Lean.Expr) := do
-    let carriers ← frameCarriers skolems
     let mut rest := row
     let mut values := #[]
     for index in [:types.size] do
@@ -1195,6 +1268,10 @@ private def rowProjections (skolems row : Lean.Expr) (types : Array Lean.Expr) :
       values := values.push (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) carrier tailType rest)
       rest := mkApp3 (mkConst ``Prod.snd [Level.zero, Level.zero]) carrier tailType rest
     return values
+
+private def rowProjections (skolems row : Lean.Expr) (types : Array Lean.Expr) :
+    MetaM (Array Lean.Expr) := do
+  rowComponentsAt (← frameCarriers skolems) row types
 
 /-- The result shape of a function type's result row: an invocation returns
 no value or one. -/
@@ -1238,7 +1315,7 @@ private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
   let some ns := context.unit.namespaces[owner.index]?
     | throwError "a field frame's namespace is out of range"
   let localTypes ← declaration.locals.mapM fun localDecl => do
-    let some ty := context.unit.tables.types[localDecl.type.typeId.index]?
+    let some ty := ns.typeOf localDecl.type.typeId
       | throwError "a field frame's local has no type"
     pure ty
   let mut locals := Array.replicate declaration.locals.size none
@@ -1285,23 +1362,87 @@ private def variantFieldType? (τ : VerexIR.Proofs.Denote.NTy) (variant : String
   let row ← VerexIR.Proofs.Denote.NRows.variant? names rows variant
   row.toList[index]?
 
+/-- The current value and the prophecy of a native reference to `referent`.
+The current is plain, open while the loan lives; the prophecy is certified
+in a certified value and plain in a plain one, such as the current of a
+reference holding this one (`NTy.carrier`, `NTy.plain`). -/
+private def heldReferenceParts (carriers referent value : Lean.Expr) :
+    MetaM (Lean.Expr × Lean.Expr) := do
+  let holder := (← instantiateMVars (← inferType value)).consumeMData
+  let plain := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plain) carriers referent
+  let prophecy := if holder.isAppOf ``VerexIR.Proofs.Denote.NTy.plain ||
+      holder.isAppOf ``VerexIR.Proofs.Denote.NTy.plainOf then plain
+    else mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) carriers referent
+  return (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) plain prophecy value,
+    mkApp3 (mkConst ``Prod.snd [Level.zero, Level.zero]) plain prophecy value)
+
 /-- The data invariants of a native value of a type, at any depth, as the
 Move Prover assumes them: the type's declared invariants; for an intrinsic
 map, its discipline's validity and the invariants of its values; the
 invariants of each field, under the test of its variant; and those of each
 element of a vector. `τ` is the value's native type, the type `ty` denotes
-under `arguments`. -/
-private partial def deepInvariantTerms (context : Context) (ty : IrTy) (arguments : Array Scoped)
-    (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) (depth : Nat) :
+under `arguments`.  A declaration in `carried` states nothing of its own
+level: its data invariant is part of the carrier of its type, so a value of
+it has it by typing and no boundary restates it, which is the test the
+markers at a construction and at a mutation end make of the same record
+(`markedInvariant`, `doc/plan/data-and-global-invariants.md`).  The walk
+goes on into what it holds, where a declaration whose invariant is not
+carried states its own. -/
+private partial def deepInvariantTerms (context : Context)
+    (carried : Array VerexIR.StructHandle) (ty : IrTy) (arguments : Array Scoped)
+    (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) (depth : Nat)
+    (fallback : ObligationRange := {}) (includePlainDeep : Bool := false) :
     MetaM (Array (Lean.Expr × ObligationRange)) := do
-  unless carriesInvariant context.unit ty arguments depth do return #[]
+  unless carriesInvariant context.unit ty arguments depth ||
+      (includePlainDeep && !τ.certificateFree) do return #[]
   let carriers ← context.carriers
+  -- The deep invariant of a value the walk cannot take apart: a parameter
+  -- of the enclosing function, or a representation the arms do not know.
+  -- Stated whole and of a plain value only — a certified value carries it
+  -- by its type, so the one value this statement serves is the current of
+  -- a `&mut`, plain while lent (`NTy.deepHolds`; the normal form unfolds
+  -- it element by element).
+  let whole (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) (range : ObligationRange) :
+      MetaM (Array (Lean.Expr × ObligationRange)) := do
+    unless includePlainDeep do return #[]
+    if τ.certificateFree then return #[]
+    let quoted ← quoteNTy τ
+    unless ← withNewMCtxDepth (isDefEq (← inferType value) (plainType carriers quoted)) do
+      return #[]
+    return #[(mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.deepHolds) carriers quoted value, range)]
+  if ty matches .typeParameter _ then return ← whole τ value fallback
   match ty, τ with
+  | .reference reference, _ =>
+      let some (referent, scope) := Scoped.resolve context.unit arguments reference.referent
+        | throwError "an invariant-bearing reference has an unresolved referent"
+      -- A holder's current referent is observed at each end of its outer loan.
+      -- Shared references erase native loan wrappers, leaving this value directly.
+      match τ with
+      | .ref inner =>
+          let (current, _) ← heldReferenceParts carriers (← quoteNTy inner) value
+          -- No carrier certifies it: the type of a held reference carries its
+          -- prophecy's invariants only (`NTy.deepHolds`), and no slot names it
+          -- for `Term.assumeCurrent`. Its declarations state theirs here.
+          deepInvariantTerms context #[] referent scope inner current (depth + 1)
+            fallback includePlainDeep
+      | .sliceRef element =>
+          deepInvariantTerms context carried referent scope (.vector element)
+            (← sliceReferenceContents value) (depth + 1) fallback includePlainDeep
+      | _ =>
+          deepInvariantTerms context carried referent scope τ value (depth + 1)
+            fallback includePlainDeep
+  | .slice element, .slice elementType
+  | .slice element, .vector elementType
   | .vector element _, .vector elementType =>
-      let some (elementIr, scope) := Scoped.resolve context.unit arguments element | return #[]
-      let carrier := carrierType carriers (← quoteNTy elementType)
+      let some (elementIr, scope) := Scoped.resolve context.unit arguments element
+        | return ← whole τ value fallback
+      let element ← quoteNTy elementType
+      let plain ← withNewMCtxDepth
+        (isDefEq (← inferType value) (plainType carriers (← quoteNTy τ)))
+      let carrier := if plain then plainType carriers element else carrierType carriers element
       withLocalDeclD `element carrier fun elementValue => do
-        let terms ← deepInvariantTerms context elementIr scope elementType elementValue (depth + 1)
+        let terms ← deepInvariantTerms context carried elementIr scope elementType elementValue
+          (depth + 1) fallback includePlainDeep
         let some (_, range) := terms[0]? | return #[]
         let member ← mkAppM ``Membership.mem
           #[← mkAppM ``VerexIR.SpecVector.values #[value], elementValue]
@@ -1312,33 +1453,48 @@ private partial def deepInvariantTerms (context : Context) (ty : IrTy) (argument
       let components ← nativeComponents carriers (← quoteNTy τ) value
       let mut terms := #[]
       for (element, index) in elements.zipIdx do
-        let some (elementIr, scope) := Scoped.resolve context.unit arguments element | continue
         let (some componentType, some (_, component)) := (row.toList[index]?, components[index]?)
           | throwError "internal: a tuple's component is out of its native row"
-        terms := terms ++
-          (← deepInvariantTerms context elementIr scope componentType component (depth + 1))
+        terms := terms ++ (← match Scoped.resolve context.unit arguments element with
+          | some (elementIr, scope) =>
+              deepInvariantTerms context carried elementIr scope componentType component
+                (depth + 1) fallback includePlainDeep
+          | none => whole componentType component fallback)
       return terms
   | .nominal _ uses, _ =>
       let some (owner, ns, declaration) := nominalDeclaration? context.unit ty | return #[]
       if !declaration.variants.isEmpty && !declaration.contract.parameterFrames.isEmpty then
         throwError "modifies_of on enum fields is not carried yet"
       let scope := Scoped.ofNominal arguments uses
-      let mut terms ← declaredInvariantTerms context ty scope τ value
+      -- A carried declaration states nothing of its own level — its declared
+      -- clauses, an intrinsic map owner's validity, the frame a
+      -- function-valued field keeps — which is what its `Carriers.own`
+      -- states; the walk goes on into what it holds, where a declaration
+      -- whose invariant is not carried states its own.
+      let states := !carried.contains owner
+      let mut terms ← if states then declaredInvariantTerms context ty scope τ value
+        else pure #[]
       if let some model := mapModel? context.unit ty then
         let some intrinsic := ns.intrinsics.find? (·.owner == declaration.name) | return terms
-        let range := locRange context.unit intrinsic.loc
+        let range := locRange ns intrinsic.loc
         -- An owner's entries are valid under its discipline, and each value
         -- held satisfies its invariants.
         let owned ← nativeOwner carriers τ value
         let table := owned.typed
-        terms := terms.push (← mkAppOptM ``VerexIR.SpecMap.Valid
-          #[table.keys.carrier, table.values.carrier, ← table.discipline model, table.map], range)
-        if let some (valueIr, valueScope) := mapValueType? context.unit declaration scope then
+        if states then
+          terms := terms.push (← owned.valid model, range)
+          -- A lent owner's table contains plain keys and values. Its map
+          -- discipline does not certify either, so a loop must also preserve
+          -- the entries' deep invariants across its havoc.
+          if let some tableType := owned.fields.toList.getLast? then
+            terms := terms ++ (← whole tableType owned.table range)
+        if let some (valueIr, valueScope) := mapValueType? context.unit ns declaration scope then
           let some (.table _ valueType) := owned.fields.toList.getLast?
             | throwError "internal: a map owner's last field is not its table"
           let stored ← withLocalDeclD `key table.keys.carrier fun key => do
             let held := TypedTable.nativeOf table.values (← table.valueAt key)
-            let inner ← deepInvariantTerms context valueIr valueScope valueType held (depth + 1)
+            let inner ← deepInvariantTerms context carried valueIr valueScope valueType held
+              (depth + 1) range includePlainDeep
             let some (_, range) := inner[0]? | return none
             let present ← mkEq (← table.hasKey key) (mkConst ``Bool.true)
             let body ← mkArrow present (← conjunction (inner.map (·.1)))
@@ -1351,17 +1507,19 @@ private partial def deepInvariantTerms (context : Context) (ty : IrTy) (argument
       let fieldRow := match τ with
         | .struct _ _ fields => fields.toList
         | _ => []
-      for (variant, fields) in fieldRows context.unit declaration do
+      for (variant, fields) in fieldRows ns declaration do
         for (field, index) in fields.zipIdx do
-          let some (fieldIr, fieldScope) := Scoped.resolve context.unit scope field.type.typeId
-            | continue
+          let resolved := Scoped.resolve context.unit scope (ns.typeId field.type.typeId)
           let fieldTerms (fieldType : VerexIR.Proofs.Denote.NTy) (selected : Lean.Expr) :
               MetaM (Array (Lean.Expr × ObligationRange)) := do
-            let mut inner ← deepInvariantTerms context fieldIr fieldScope fieldType selected
-              (depth + 1)
-            if VerexIR.Proofs.Denote.fieldKeepsMemory ns field then
+            let mut inner ← match resolved with
+              | some (fieldIr, fieldScope) =>
+                  deepInvariantTerms context carried fieldIr fieldScope fieldType selected
+                    (depth + 1) (locRange ns field.loc) includePlainDeep
+              | none => whole fieldType selected (locRange ns field.loc)
+            if states && VerexIR.Proofs.Denote.fieldKeepsMemory ns field then
               inner := inner.push (← fieldFrameTerm context owner.namespaceId declaration index
-                scope τ value fieldType selected, locRange context.unit field.loc)
+                scope τ value fieldType selected, locRange ns field.loc)
             return inner
           match variant with
           | none =>
@@ -1389,24 +1547,90 @@ private partial def deepInvariantTerms (context : Context) (ty : IrTy) (argument
                     pure (← mkForallFVars #[payload] (← mkArrow held term), range)
                 terms := terms ++ held
       return terms
-  | _, _ => return #[]
+  | _, _ => whole τ value fallback
 
-/-- The data invariants of a native value of a physical type, at any depth. -/
+/-- The data invariants a declaration states of its own values, one level
+deep: its declared clauses, the validity of an intrinsic map owner's table,
+and the frame a function-valued field keeps.  The fields', the elements' and
+the entries' invariants are not restated here: `NTy.deepHolds` conjoins them
+at every depth, so a declaration's `Carriers.own` states one level and
+nothing is owed twice (`doc/designs/data-invariants.md`, "Data
+invariants"). -/
+private def ownInvariantTerms (context : Context) (ty : IrTy)
+    (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) :
+    MetaM (Array (Lean.Expr × ObligationRange)) := do
+  let .nominal _ uses := ty | return #[]
+  let some (owner, ns, declaration) := nominalDeclaration? context.unit ty | return #[]
+  if !declaration.variants.isEmpty && !declaration.contract.parameterFrames.isEmpty then
+    throwError "modifies_of on enum fields is not carried yet"
+  let carriers ← context.carriers
+  let scope := Scoped.ofNominal #[] uses
+  let mut terms ← declaredInvariantTerms context ty scope τ value
+  -- An owner's entries are valid under its discipline.  The values it holds
+  -- have their own invariants by their type, not by the owner's.
+  if let some model := mapModel? context.unit ty then
+    let some intrinsic := ns.intrinsics.find? (·.owner == declaration.name) | return terms
+    let owned ← nativeOwner carriers τ value
+    return terms.push (← owned.valid model, locRange ns intrinsic.loc)
+  -- The frame a function-valued field keeps (`modifies_of`), which is the
+  -- declaration's own statement of the field and not the field's invariant.
+  let quoted ← quoteNTy τ
+  let components ← if declaration.variants.isEmpty then nativeComponents carriers quoted value
+    else pure #[]
+  let fieldRow := match τ with
+    | .struct _ _ fields => fields.toList
+    | _ => []
+  for (variant, fields) in fieldRows ns declaration do
+    for (field, index) in fields.zipIdx do
+      unless VerexIR.Proofs.Denote.fieldKeepsMemory ns field do continue
+      let frameOf (fieldType : VerexIR.Proofs.Denote.NTy) (selected : Lean.Expr) :
+          MetaM (Lean.Expr × ObligationRange) := do
+        return (← fieldFrameTerm context owner.namespaceId declaration index scope τ value
+          fieldType selected, locRange ns field.loc)
+      match variant with
+      | none =>
+          let (some fieldType, some (_, component)) := (fieldRow[index]?, components[index]?)
+            | throwError "internal: a struct's field is out of its native row"
+          terms := terms.push (← frameOf fieldType component)
+      | some name =>
+          let some fieldType := variantFieldType? τ name index
+            | throwError "internal: a variant's field is out of its native row"
+          let some (_, read) ← typedVariantField? τ #[(name, index)] carriers quoted value
+            | throwError "a function-valued field of a variant keeps a frame, which generated \
+                contracts do not carry"
+          let test ← nativeVariantTest carriers quoted value owner #[name]
+          let (term, range) ← frameOf fieldType read
+          terms := terms.push (← mkArrow test term, range)
+  return terms
+
+/-- The data invariants of a native value of a physical type, at any depth,
+those of the declarations in `carried` excepted (`deepInvariantTerms`). -/
 private def dataInvariantTerms (context : Context) (ty : IrTy) (τ : VerexIR.Proofs.Denote.NTy)
-    (value : Lean.Expr) : MetaM (Array (Lean.Expr × ObligationRange)) :=
-  deepInvariantTerms context ty #[] τ value 0
+    (value : Lean.Expr) (carried : Array VerexIR.StructHandle := #[])
+    (includePlainDeep : Bool := false) :
+    MetaM (Array (Lean.Expr × ObligationRange)) :=
+  deepInvariantTerms context carried ty #[] τ value 0 (includePlainDeep := includePlainDeep)
 
-/-- Data invariants carried by selected native values of a parameter/result
-row. Data invariants constrain a reference's referent. -/
+/-- Data invariants a boundary states of selected native values of a parameter/result
+row. Data invariants constrain a reference's referent. Those of the `carried`
+declarations are left out, declaration by declaration at every depth: a carried
+invariant is part of the carrier of its type — assumed of a `&mut` parameter's
+current at entry (`Term.assumeCurrent`), owed of a `&mut` argument's at the
+hand-over (`Term.handedOver`) and of a parameter's where its loan ends at the
+exit — so a boundary states nothing of it, while one reading the executable unit,
+a precondition or memory is not carried and keeps the present treatment
+(`doc/plan/data-and-global-invariants.md`, "The stored-invariant layer still
+exists for the declarations the carriers do not state"). -/
 private def slotDataInvariantTerms (context : Context) (slots : Array Slot)
     (bound : Array SlotBinders)
-    (nativeOf : SlotBinders → Option Lean.Expr) :
+    (nativeOf : SlotBinders → Option Lean.Expr)
+    (carried : Array VerexIR.StructHandle) :
     MetaM (Array (Lean.Expr × ObligationRange)) := do
   let mut terms := #[]
   for (slot, binders) in slots.zip bound do
     unless hasDataInvariant context.unit slot.physical do continue
     let some value := nativeOf binders | continue
-    terms := terms ++ (← dataInvariantTerms context slot.physical slot.nty value)
+    terms := terms ++ (← dataInvariantTerms context slot.physical slot.nty value carried)
   pure terms
 
 /-- The name a clause gives the opaque specification function `name` of the
@@ -1416,14 +1640,15 @@ private def declaredOpaqueSpec? (unit : ValidatedUnit) (path : List String) (nam
   let index ← unit.tables.namespaces.toList.findIdx? (·.segments.toList == path)
   let ns ← unit.namespaces[index]?
   guard <| ns.specFunctions.any fun function =>
-    function.body.isNone && (unit.tables.names[function.name.index]?.map (·.name)) == some name
+    function.body.isNone && ((ns.nameOf function.name).map (·.name)) == some name
   some ("::".intercalate (path ++ [name]))
 
 /-- Whether a physical type is a byte vector, `Vector<u8>`. -/
 private def isByteVector (unit : ValidatedUnit) (ty : IrTy) : Bool :=
-  if let .vector element _ := ty then
-    unit.tables.types[element.index]? == some (.integer (.bits 8) false)
-  else false
+  match ty with
+  | .vector element _ | .slice element =>
+      unit.tables.types[element.index]? == some (.integer (.bits 8) false)
+  | _ => false
 
 /-- Whether the unit declares the native at a qualified name. -/
 private def declaresNative (unit : ValidatedUnit) (qualified : String) : Bool := Id.run do
@@ -1434,7 +1659,7 @@ private def declaresNative (unit : ValidatedUnit) (qualified : String) : Bool :=
     | return false
   let some ns := unit.namespaces[index]? | return false
   return ns.functions.any fun function =>
-    function.body == .absent && (unit.tables.names[function.name.index]?.map (·.name)) == some name
+    function.body == .absent && ((ns.nameOf function.name).map (·.name)) == some name
 
 /-- The value of an uninterpreted function at type arguments and clause
 values, as a clause applying it denotes it (`opaqueSpec`): of a native
@@ -1453,8 +1678,10 @@ private def opaqueApplication (context : Context) (name : String) (typeArguments
         | throwError "internal: an uninterpreted value of a native type without the type"
       let carriers ← context.carriers
       let τ ← quoteNTy nty
-      let carrier := carrierType carriers τ
-      let inhabited := mkApp2 (mkConst ``Inhabited.mk [1]) carrier (← typedInhabitant carriers τ)
+      let carrier := plainWorkerType carriers τ
+      let inhabitant := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainInhabitant)
+        carriers τ (← inhabitableProof τ)
+      let inhabited := mkApp2 (mkConst ``Inhabited.mk [1]) carrier inhabitant
       opaqueValue name typeArguments carrier inhabited bundle context.ns.profile
 
 /-- The native type of a byte vector. -/
@@ -1512,9 +1739,9 @@ private def serializeFacts (context : Context)
   -- Each parameter's value, with its type (a reference's referent).
   let mut values : Array (TypeId × IrTy × Lean.Expr × Lean.Expr) := #[]
   for ((slot, binders), parameter) in (slots.zip bound).zip declaration.signature.parameters do
-    let typeId := match context.unit.tables.types[parameter.typeUse.typeId.index]? with
+    let typeId := match context.ns.typeOf parameter.typeUse.typeId with
       | some (.reference reference) => reference.referent
-      | _ => parameter.typeUse.typeId
+      | _ => context.ns.typeId parameter.typeUse.typeId
     let some nty := context.ntyOf? typeId | continue
     let typeArgument := mkApp (mkConst ``VerexSL.Contract.SpecTypeArgument.native)
       (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.substWith) types (← quoteNTy nty))
@@ -1596,6 +1823,7 @@ private def bodyCallees (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceI
             | .call (.function reference) | .call (.closure reference _) => some reference
             | _ => none
           if let some reference := reference? then
+            let reference := ns.qualifiedRef reference
             if let some functionId := unit.resolution.function? reference.name then
               let callee := (reference.namespaceId.index, functionId.index)
               unless callees.contains callee do callees := callees.push callee
@@ -1718,10 +1946,14 @@ def callWriteInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceI
     (ghostMemory := some uses.written)
   conjunction (terms.map fun (clause, range) => markObligation range clause)
 
-/-- Whether a function owes invariants of memory: it writes, at any depth,
-memory a namespace invariant of the unit reads, or a resource that carries a
-data invariant. Such a function is verified for them even without a
-specification of its own. -/
+/-- Whether a function owes invariants of memory: it writes, at any depth, memory
+a namespace invariant of the unit reads, or a resource holding a data invariant
+that is not part of the carrier of its type — one stating a behavioral predicate
+or reading memory, which is owed of what a write stores (`storedInvariantTerm`).
+Such a function is verified for them even without a specification of its own; a
+carried invariant is owed at the certifying cut instead, and `handlesDataInvariants`
+selects the function that owes one (`doc/plan/data-and-global-invariants.md`, "The
+stored-invariant layer still exists for the declarations the carriers do not state"). -/
 def owesMemoryInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
   match reachFrom unit
@@ -1733,9 +1965,13 @@ def owesMemoryInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.Namespace
         ns.invariants.any fun invariant =>
           invariantApplies (some written) unit delegated ⟨index⟩ invariant
       invariantRead || written.any fun handle =>
-        (unit.namespaces[handle.namespaceId.index]?.bind (·.structs[handle.structId]?)).any
-          fun resource => resource.abilities.contains .key &&
-            hasDataInvariant unit (.nominal resource.name #[])
+        match unit.namespaces[handle.namespaceId.index]? with
+        | some ns => (ns.structs[handle.structId]?).any fun resource =>
+            resource.abilities.contains .key &&
+              carriesMatchingInvariant unit
+                (fun reads => reads.unit || reads.requires || reads.state)
+                (.nominal (ns.nameId resource.name) #[]) #[] 0
+        | none => false
 
 /-- A resource declaration by its module path and name, which identifies it
 across units. -/
@@ -1744,7 +1980,7 @@ def qualifiedResource? (unit : ValidatedUnit) (handle : VerexIR.StructHandle) :
   let path ← unit.tables.namespaces[handle.namespaceId.index]?
   let ns ← unit.namespaces[handle.namespaceId.index]?
   let declaration ← ns.structs[handle.structId]?
-  let name ← unit.tables.names[declaration.name.index]?
+  let name ← ns.nameOf declaration.name
   pure (path.segments, name.name)
 
 /-- The resources, by qualified name, the functions of a namespace reach in
@@ -1808,8 +2044,19 @@ arguments `θ` of an instance and a native value of it at the frame `θ`
 induces over the runtime frame of the unit memory is typed at. An
 invariant reading memory holds in every memory, so none reads memory. Each
 takes that unit first, then the executable unit where one states a
-behavioral predicate (`storedInvariantAt`). -/
-def storedInvariantTerm (unit : ValidatedUnit) :
+behavioral predicate (`storedInvariantAt`).  A declaration in `carried`
+states nothing here, at any depth of the walk: its data invariant is part of
+the carrier of its type, so a stored value of it has it by typing
+(`StorageEncodes`) and the resolution of a loan on it certifies what a write
+puts there (`Lender.resolve`); a write would otherwise owe it a second time.
+A stored declaration whose own invariant is carried but which holds a
+declaration whose invariant is not — a behavioural one, or one the carriers
+do not support — still states that one, so the walk decides and no test of
+the stored declaration alone does.  This is the test the markers and the
+boundaries make of the same record (`markedInvariant`,
+`doc/plan/data-and-global-invariants.md`). -/
+def storedInvariantTerm (unit : ValidatedUnit)
+    (carried : Array VerexIR.StructHandle := #[]) :
     MetaM StoredInvariants := do
   let readsUnit := storedInvariantReadsUnit unit
   let mut carriers : Array VerexIR.StructHandle := #[]
@@ -1822,7 +2069,7 @@ def storedInvariantTerm (unit : ValidatedUnit) :
       let declaration := ns.structs[structIndex]
       let owner : VerexIR.StructHandle := ⟨⟨namespaceIndex⟩, structIndex⟩
       unless declaration.abilities.contains .key do continue
-      let ty : IrTy := .nominal declaration.name #[]
+      let ty : IrTy := .nominal (ns.nameId declaration.name) #[]
       unless hasDataInvariant unit ty do continue
       let some σ := VerexIR.Proofs.Denote.structNTy unit owner
         | throwError "internal: a stored declaration has no native type"
@@ -1831,10 +2078,11 @@ def storedInvariantTerm (unit : ValidatedUnit) :
       -- frame its values are at.
       let generic := !(σ.nominalArguments? matches some .nil)
       let case? : Option Lean.Expr ⊕ String ←
-          withUnitVariable .default fun memoryUnit functions =>
+          withUnitInhabitants .default fun memoryUnit functions inhabitants =>
           withLocalDeclD `executable (unitReaderType unit memoryUnit functions) fun executable => do
         let leading :=
-          if readsUnit then #[memoryUnit, functions, executable] else #[memoryUnit, functions]
+          if readsUnit then #[memoryUnit, functions, inhabitants, executable]
+          else #[memoryUnit, functions, inhabitants]
         let atFrame (binder frame : Lean.Expr) : MetaM (Option Lean.Expr ⊕ String) := do
           let carrier := carrierType (← frameCarriers frame) (← quoteNTy σ)
           withLocalDeclD `value carrier fun value => do
@@ -1842,13 +2090,14 @@ def storedInvariantTerm (unit : ValidatedUnit) :
               unit, namespaceId := ⟨namespaceIndex⟩, ns, locals := #[], results := #[]
               types := some (← frameTypes frame)
               executable := if readsUnit then some executable else none }
-            let terms ← try dataInvariantTerms context ty σ value catch error =>
+            let terms ← try dataInvariantTerms context ty σ value carried catch error =>
               return Sum.inr (← error.toMessageData.toString)
             if terms.isEmpty then return Sum.inl none
             let held ← conjunction (terms.map fun (term, range) => markObligation range term)
             return Sum.inl (some (← mkLambdaFVars (leading ++ #[binder, value]) held))
         withLocalDeclD `θ (mkConst ``VerexIR.Proofs.Denote.TypeArgs) fun θ =>
-          let runtime := mkApp2 (mkConst ``VerexIR.Proofs.Denote.Skolems.runtime) memoryUnit functions
+          let runtime := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.runtime) memoryUnit
+            functions inhabitants
           atFrame θ (if generic then
               mkApp4 (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate) memoryUnit functions θ
                 runtime
@@ -1862,6 +2111,197 @@ def storedInvariantTerm (unit : ValidatedUnit) :
           cases := cases.push case
   return { carriers, types, cases, unsupported }
 
+/-- The data invariants a unit's declarations state, as its `Carriers.own`
+(`doc/designs/data-invariants.md`, "Data invariants"): per declaration that
+states one and that neither reads the executable unit nor reads memory, its
+clauses over a row of type arguments and a value of the declaration at the
+frame they induce.  A declaration whose invariants read the executable unit — a
+behavioural clause, or a function-valued field — or read memory is behavioural
+and keeps the present stored-invariant treatment (`doc/plan/data-and-global-invariants.md`,
+"Behavioural clauses inside a data invariant"): `own` cannot mention the executable
+unit, and a memory-reading clause quantifies over a `Memory unit`, a function
+into the certified carriers `own` is a field of. -/
+structure DataOwn where
+  /-- The `own` predicate, where any declaration contributes one. -/
+  predicate : Option Lean.Expr := none
+  /-- The declarations `own` states an invariant of, their native types, and
+  their clauses. -/
+  carriers : Array VerexIR.StructHandle := #[]
+  types : Array VerexIR.Proofs.Denote.NTy := #[]
+  cases : Array Lean.Expr := #[]
+  /-- Those whose invariants read the executable unit or memory, which keep
+  the present stored-invariant treatment. -/
+  behavioural : Array VerexIR.StructHandle := #[]
+  /-- Those whose invariants are not carried, each with the reason. -/
+  unsupported : Array (VerexIR.StructHandle × String) := #[]
+
+/-- The clauses of each declaration whose data invariant `Carriers.own`
+carries, over a row of type arguments and a value of the declaration at the
+frame the arguments induce over the unit's function values.  Each takes that
+unit, its function values and its inhabitants first; no case takes the
+executable unit, which `own` cannot mention. -/
+def dataOwnTerms (unit : ValidatedUnit) : MetaM DataOwn := do
+  let mut carriers : Array VerexIR.StructHandle := #[]
+  let mut types : Array VerexIR.Proofs.Denote.NTy := #[]
+  let mut cases : Array Lean.Expr := #[]
+  let mut behavioural : Array VerexIR.StructHandle := #[]
+  let mut unsupported : Array (VerexIR.StructHandle × String) := #[]
+  for h : namespaceIndex in [:unit.namespaces.size] do
+    let ns := unit.namespaces[namespaceIndex]
+    for h : structIndex in [:ns.structs.size] do
+      let declaration := ns.structs[structIndex]
+      let owner : VerexIR.StructHandle := ⟨⟨namespaceIndex⟩, structIndex⟩
+      let ty : IrTy := .nominal (ns.nameId declaration.name) #[]
+      unless hasDataInvariant unit ty do continue
+      let reads := invariantReads unit ⟨namespaceIndex⟩ declaration
+      if reads.unit || reads.requires || reads.state then
+        behavioural := behavioural.push owner
+        if reads.state then
+          unsupported := unsupported.push (owner,
+            "its data invariant reads memory, which a value's type cannot state")
+        continue
+      let some σ := VerexIR.Proofs.Denote.structNTy unit owner
+        | throwError "internal: a declaration with a data invariant has no native type"
+      let case? : Option Lean.Expr ⊕ String ←
+          withUnitInhabitants .default fun unitExpr functions inhabitants => do
+        let leading := #[unitExpr, functions, inhabitants]
+        let runtime := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.runtime) unitExpr
+          functions inhabitants
+        withLocalDeclD `θ (mkConst ``VerexIR.Proofs.Denote.TypeArgs) fun θ => do
+          -- Every declaration states its invariant at the frame a row of
+          -- type arguments induces, generic or not: `OwnAtArguments` reads
+          -- the clauses there.
+          let frame := mkApp4 (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate) unitExpr
+            functions θ runtime
+          let carrier := plainType (← frameCarriers frame) (← quoteNTy σ)
+          withLocalDeclD `value carrier fun value => do
+            let context : Context := {
+              unit, namespaceId := ⟨namespaceIndex⟩, ns, locals := #[], results := #[]
+              types := some (← frameTypes frame) }
+            let terms ← try ownInvariantTerms context ty σ value catch error =>
+              return Sum.inr (← error.toMessageData.toString)
+            if terms.isEmpty then return Sum.inl none
+            let held ← conjunction (terms.map fun (term, range) => markObligation range term)
+            return Sum.inl (some (← mkLambdaFVars (leading ++ #[θ, value]) held))
+      match case? with
+      | .inr reason => unsupported := unsupported.push (owner, reason)
+      | .inl none => pure ()
+      | .inl (some case) =>
+          carriers := carriers.push owner
+          types := types.push σ
+          cases := cases.push case
+  return { carriers, types, cases, behavioural, unsupported }
+
+/-- Declaration-owned clauses in given parameter sorts. The same clause
+translator reads a plain value in an own-independent scaffold; the resulting
+predicate is installed in the actual verification family by `withDeclarations`.
+Neither the caller's parameter invariants nor its nominal predicates are
+assumed while defining these clauses. -/
+def givenDataOwnTerms (unit : ValidatedUnit) : MetaM DataOwn := do
+  let mut carriers : Array VerexIR.StructHandle := #[]
+  let mut types : Array VerexIR.Proofs.Denote.NTy := #[]
+  let mut cases : Array Lean.Expr := #[]
+  let mut behavioural : Array VerexIR.StructHandle := #[]
+  let mut unsupported : Array (VerexIR.StructHandle × String) := #[]
+  for h : namespaceIndex in [:unit.namespaces.size] do
+    let ns := unit.namespaces[namespaceIndex]
+    for h : structIndex in [:ns.structs.size] do
+      let declaration := ns.structs[structIndex]
+      let owner : VerexIR.StructHandle := ⟨⟨namespaceIndex⟩, structIndex⟩
+      let ty : IrTy := .nominal (ns.nameId declaration.name) #[]
+      unless hasDataInvariant unit ty do continue
+      let reads := invariantReads unit ⟨namespaceIndex⟩ declaration
+      if reads.unit || reads.requires || reads.state then
+        behavioural := behavioural.push owner
+        unsupported := unsupported.push (owner,
+          "its given data invariant requires behavioral or storage interpretation")
+        continue
+      let some σ := VerexIR.Proofs.Denote.structNTy unit owner
+        | throwError "internal: a declaration with a data invariant has no native type"
+      let case? : Option Lean.Expr ⊕ String ←
+          withUnitVariable .default fun unitExpr functions => do
+        withLocalDeclD `given (mkConst ``VerexIR.Proofs.Denote.GivenFrame) fun given => do
+        withLocalDeclD `θ (mkConst ``VerexIR.Proofs.Denote.TypeArgs) fun θ => do
+          let scaffold := mkApp (mkConst ``VerexIR.Proofs.Denote.GivenFrame.clauseScaffold) given
+          let inhabitants := mkApp
+            (mkConst ``VerexIR.Proofs.Denote.GivenFrame.clauseScaffoldNonempty) given
+          let induced := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Carriers.instantiate)
+            θ scaffold inhabitants
+          let inducedInhabitants := mkApp3
+            (mkConst ``VerexIR.Proofs.Denote.CarriersNonempty.instantiate) θ scaffold inhabitants
+          let arguments ← mkAppM ``Subtype.val #[θ]
+          let schema ← quoteNTy σ
+          let actual := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.subst) arguments schema
+          let original := mkApp (mkConst ``VerexIR.Proofs.Denote.GivenFrame.toCarriers) given
+          let types ← withLocalDeclD `index (mkConst ``Nat) fun index => do
+            mkLambdaFVars #[index] (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.subst)
+              arguments (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.param) index))
+          withLocalDeclD `value (plainType original actual) fun value => do
+            let valueAtSchema := mkApp5 (mkConst ``VerexIR.Proofs.Denote.NTy.plainToSkolem)
+              scaffold inhabitants θ schema value
+            let held? : Lean.Expr ⊕ String ← withLocalDecl `nonempty .instImplicit
+                (mkApp (mkConst ``VerexIR.Proofs.Denote.CarriersNonempty) induced) fun nonempty => do
+              let interpretation : TranslationFrame := {
+                unit := unitExpr, functions, carriers := induced, state := mkConst ``Unit, types }
+              let context : Context := {
+                unit, namespaceId := ⟨namespaceIndex⟩, ns, locals := #[], results := #[]
+                types := some types, interpretation := some interpretation }
+              let terms ← try ownInvariantTerms context ty σ valueAtSchema catch error =>
+                return Sum.inr (← error.toMessageData.toString)
+              let held ← conjunction (terms.map fun (term, range) => markObligation range term)
+              return Sum.inl (mkApp (← mkLambdaFVars #[nonempty] held) inducedInhabitants)
+            match held? with
+            | .inr error => return Sum.inr error
+            | .inl held =>
+                let clause := mkApp3 (mkConst ``VerexIR.Proofs.Denote.GivenOwnClause.mk)
+                  given actual (← mkLambdaFVars #[value] held)
+                return Sum.inl (some (← mkLambdaFVars #[unitExpr, functions, given, θ] clause))
+      match case? with
+      | .inr reason => unsupported := unsupported.push (owner, reason)
+      | .inl none => pure ()
+      | .inl (some case) =>
+          unless ← isTypeCorrect case do
+            throwError "internal: generated given data invariant is not well typed"
+          carriers := carriers.push owner
+          types := types.push σ
+          cases := cases.push case
+  return { carriers, types, cases, behavioural, unsupported }
+
+/-- Select generated given clauses by ADT identity and its type arguments.
+Rows outside the inhabitable substitution interface conservatively reject
+packing: they are unsupported, never an absent declaration with `own=True`. -/
+def givenOwnDeclarationsAt (own : DataOwn) (unitExpr functions given : Lean.Expr) :
+    MetaM Lean.Expr := do
+  unless own.unsupported.isEmpty do
+    throwError "given data invariants are unsupported: {repr own.unsupported}"
+  withLocalDeclD `source (mkConst ``VerexIR.StructHandle) fun source =>
+  withLocalDeclD `arguments (mkConst ``VerexIR.Proofs.Denote.NRow) fun arguments => do
+    let clauseType := mkApp (mkConst ``VerexIR.Proofs.Denote.GivenOwnClause) given
+    let mut selected ← mkAppOptM ``Option.none #[clauseType]
+    for ((owner, σ), case) in ((own.carriers.zip own.types).zip own.cases).reverse do
+      let inhabitable ← mkEq
+        (mkApp (mkConst ``VerexIR.Proofs.Denote.NRow.inhabitable) arguments) (toExpr true)
+      let inside ← withLocalDeclD `inhabitable inhabitable fun proof => do
+        let predicate ← withLocalDeclD `row (mkConst ``VerexIR.Proofs.Denote.NRow) fun row => do
+          mkLambdaFVars #[row] (← mkEq
+            (mkApp (mkConst ``VerexIR.Proofs.Denote.NRow.inhabitable) row) (toExpr true))
+        let θ ← mkAppOptM ``Subtype.mk
+          #[mkConst ``VerexIR.Proofs.Denote.NRow, predicate, arguments, proof]
+        let clause := mkApp4 case unitExpr functions given θ
+        mkLambdaFVars #[proof] (← mkAppM ``Option.some #[clause])
+      let outside ← withLocalDeclD `unsupported (mkNot inhabitable) fun proof => do
+        let actual := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.subst)
+          arguments (← quoteNTy σ)
+        let carriers := mkApp (mkConst ``VerexIR.Proofs.Denote.GivenFrame.toCarriers) given
+        let rejected ← withLocalDeclD `value (plainType carriers actual) fun value =>
+          mkLambdaFVars #[value] (mkConst ``False)
+        let clause := mkApp3 (mkConst ``VerexIR.Proofs.Denote.GivenOwnClause.mk)
+          given actual rejected
+        mkLambdaFVars #[proof] (← mkAppM ``Option.some #[clause])
+      let clause ← mkAppM ``dite #[inhabitable, inside, outside]
+      selected ← mkAppM ``ite #[← mkEq source (toExpr owner), clause, selected]
+    mkLambdaFVars #[source, arguments] selected
+
 /-- The stored invariants' predicate at a memory: over the unit the memory
 is typed at, then the executable unit where they read it. -/
 def storedInvariantAt (unit : ValidatedUnit) (predicate : Lean.Expr) (executable : Option Lean.Expr)
@@ -1869,7 +2309,8 @@ def storedInvariantAt (unit : ValidatedUnit) (predicate : Lean.Expr) (executable
   let type ← whnfR (← inferType memory)
   unless type.isAppOfArity ``VerexIR.Proofs.Denote.Memory 2 do
     throwError "internal: the stored invariants are applied to {memory}, not a memory"
-  let atUnit := mkApp2 predicate (type.getArg! 0) (type.getArg! 1)
+  let atUnit := mkApp3 predicate (type.getArg! 0) (type.getArg! 1)
+    (← carriersNonemptyOf (type.getArg! 0) (type.getArg! 1))
   unless storedInvariantReadsUnit unit do return atUnit
   let some executable := executable
     | throwError "the stored invariants read the executable unit, which this contract does \
@@ -1896,43 +2337,47 @@ def translateLoopInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.Namesp
     (entryLocals : Array (Option Lean.Expr) := #[]) (entryState : Option Lean.Expr := none)
     (state : Option Lean.Expr := none) (executable : Option Lean.Expr := none)
     (kind : VerexIR.ConditionKind := .loopInvariant)
-    (labeledAnchors : Array (Nat × Array (Option Lean.Expr) × Lean.Expr) := #[]) :
-    MetaM Lean.Expr := do
+    (labeledAnchors : Array (Nat × Array (Option Lean.Expr) × Lean.Expr) := #[])
+    (finalLocals oldFinalLocals : Array (Option Lean.Expr) := #[])
+    (interpretation : Option TranslationFrame := none) : MetaM Lean.Expr := do
   let context : Context := {
     unit, namespaceId, ns, locals, oldLocals, localTypes, localNames, results := #[],
-    types, state, oldState := some oldState,
-    anchorLocals := entryLocals, anchorState := entryState, labeledAnchors, executable }
+    finalLocals, oldFinalLocals, types, state, oldState := some oldState,
+    anchorLocals := entryLocals, anchorState := entryState, labeledAnchors, executable, interpretation }
   let mut clauses ← block.conditions.filterMapM fun condition => do
     if condition.kind != kind then return none
     -- A split directs the cases on a Boolean; one on an enum is no step.
     if condition.kind == .split then
       let isBoolean := (ns.expressions[condition.expression.index]?).any fun expression =>
-        unit.tables.types[expression.typeId.index]? == some .bool
+        ns.typeOf expression.typeId == some .bool
       unless isBoolean do return none
-      return some (markObligation (conditionRange unit condition)
+      return some (markObligation (conditionRange ns condition)
         (← mkAppM ``VerexIR.Proofs.CaseSplit #[← translate context condition.expression]))
-    some <$> markObligation (conditionRange unit condition) <$>
+    some <$> markObligation (conditionRange ns condition) <$>
       translate context condition.expression
   -- A slot of a type carrying a data invariant binds its native value.
   for (slot, τ) in dataInvariantSlots do
     let some (some value) := locals[slot]? | throwError "a data invariant slot has no binder"
     let some ty := localTypes[slot]? | throwError "a data invariant slot has no type"
-    for (invariant, range) in ← dataInvariantTerms context ty τ value do
+    for (invariant, range) in ← dataInvariantTerms context ty τ value (includePlainDeep := true) do
       clauses := clauses.push (markObligation range invariant)
   conjunction clauses
 
 /-- The data invariants of a native value of a physical type and its
 native type, at any depth, as one conjunction of clauses marked with their
-source ranges: what a construction owes of the value it makes. -/
+source ranges: what a construction owes of the value it makes.  A
+declaration in `carried` states nothing of its own level: the value's
+carrier holds its invariant already (`deepInvariantTerms`). -/
 def valueDataInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (ns : ValidatedNamespace) (types : Option Lean.Expr)
     (ty : IrTy) (τ : VerexIR.Proofs.Denote.NTy)
-    (value state : Lean.Expr) (executable : Option Lean.Expr) : MetaM Lean.Expr := do
+    (value state : Lean.Expr) (executable : Option Lean.Expr)
+    (carried : Array VerexIR.StructHandle := #[]) : MetaM Lean.Expr := do
   let context : Context := {
     unit, namespaceId, ns, locals := #[], oldLocals := #[], localTypes := #[],
     localNames := #[], results := #[], types, state := some state,
     oldState := some state, executable }
-  conjunction ((← dataInvariantTerms context ty τ value).map fun (clause, range) =>
+  conjunction ((← dataInvariantTerms context ty τ value carried).map fun (clause, range) =>
     markObligation range clause)
 
 /-- The native value of type `τ` a specification expression denotes over a
@@ -1948,28 +2393,66 @@ def translateUpdateValue (unit : ValidatedUnit) (namespaceId : VerexIR.Namespace
     localNames, results := #[], types, state := some state, executable }
   nativeOfClause (← context.carriers) τ (← translate context expression)
 
+/-- The locals a ghost field's initializer reads, over the certified field
+row of the pack: each declared field's local at its component, and each
+initialized ghost slot's local at its contents.  An initializer runs before
+the value is made, so `this` has no value here
+(`doc/designs/data-invariants.md`). -/
+private def declarationRowLocalValues (unit : ValidatedUnit) (owner : VerexIR.StructHandle)
+    (ns : ValidatedNamespace) (declaration : VerexIR.StructDecl) (localTypes : Array IrTy)
+    (carriers : Lean.Expr) (variant : Option String) (fields : VerexIR.Proofs.Denote.NRow)
+    (row : Lean.Expr) : MetaM (Array (Option Lean.Expr) × Array Lean.Expr) := do
+  let mut locals := Array.replicate declaration.locals.size none
+  let types ← fields.toList.toArray.mapM quoteNTy
+  let components ← rowComponentsAt carriers row types
+  if declaration.variants.isEmpty then
+    unless declaration.fields.size <= declaration.locals.size do
+      throwError "a struct initializer has fewer declaration locals than fields"
+    for (_, index) in declaration.fields.zipIdx do
+      let some localType := localTypes[index]?
+        | throwError "a ghost initializer's field local is out of range"
+      let some component := components[index]?
+        | throwError "a ghost initializer's field is out of the pack's row"
+      locals := locals.set! index (some (← (domainOf localType).binderOfNative component))
+  for ghost in declaration.ghosts do
+    let some ghostName := ns.nameOf ghost.name | continue
+    let some position := declaration.locals.findIdx? (·.name == ghostName.name) | continue
+    let some slot := VerexIR.SemanticOperations.handleGhostIndex? unit owner variant ghostName.name
+      | throwError "ghost field `{ghostName.name}` does not resolve in an initializer"
+    let some localType := localTypes[position]?
+      | throwError "a ghost initializer's ghost local is out of range"
+    let some contents := components[slot]?
+      | throwError "ghost field `{ghostName.name}` is out of the pack's row"
+    locals := locals.set! position (some (← (domainOf localType).binderOfNative contents))
+  return (locals, components)
+
 /-- The native value of type `σ` a ghost field's initializer gives a value
-packed at a nominal type, over the packed native value of type `τ` and the
-state (`doc/designs/ghost-fields.md`). -/
+packed at a nominal type, over the pack's certified field row and the state
+(`doc/designs/ghost-fields.md`).  The initializers run before the row is
+forgotten and certified, so the row is what they read
+(`Meanings.ghostInit`). -/
 def translateGhostInitializer (unit : ValidatedUnit) (types : Option Lean.Expr)
-    (ty : IrTy) (_variant : Option String)
-    (initializer : ExprId) (τ σ : VerexIR.Proofs.Denote.NTy) (value state : Lean.Expr)
+    (ty : IrTy) (variant : Option String)
+    (initializer : ExprId) (fields : VerexIR.Proofs.Denote.NRow)
+    (σ : VerexIR.Proofs.Denote.NTy) (row state : Lean.Expr)
     (executable : Option Lean.Expr) : MetaM Lean.Expr := do
   let some (owner, ns, declaration) := nominalDeclaration? unit ty
     | throwError "a ghost initializer's type is not a declared nominal"
   let .nominal _ uses := ty | throwError "a ghost initializer's type is not a declared nominal"
   let scope := Scoped.ofNominal #[] uses
   let localTypes ← declaration.locals.mapM fun localDecl => do
-    let some localType := unit.tables.types[localDecl.type.typeId.index]?
+    let some localType := ns.typeOf localDecl.type.typeId
       | throwError "a ghost initializer's local type is out of range"
     pure localType
   let typeArgumentTypes := scope.map (Scoped.toNative? unit owner.namespaceId)
   let context : Context := {
     unit, namespaceId := owner.namespaceId, ns, locals := #[], localTypes, results := #[],
     types, state := some state, executable, typeArgumentTypes }
-  let locals ← declarationLocalValues unit owner ns declaration localTypes (← context.carriers) τ
-    value
-  let context := { context with locals, oldLocals := locals.map fun _ => none }
+  let (locals, components) ← declarationRowLocalValues unit owner ns declaration localTypes
+    (← context.carriers) variant fields row
+  let empty := locals.map fun _ => none
+  let packed := (owner, variant, components)
+  let context := { context with locals, oldLocals := empty, packedRow := some packed }
   nativeOfClause (← context.carriers) σ (← translate context initializer)
 
 /-- Whether a quoted native row holds only scalars and type parameters, and
@@ -1994,8 +2477,8 @@ where
 
 /-- The quoted native signature a contract is stated over. -/
 structure NativeSignature where
-  /-- The skolem family the carriers are taken at. -/
-  skolems : Lean.Expr
+  /-- The carrier and state interpretation of the contract. -/
+  frame : TranslationFrame
   /-- The parameter row. -/
   params : Lean.Expr
   /-- Each parameter's native type, in order. -/
@@ -2009,30 +2492,106 @@ structure NativeSignature where
 
 /-- Whether a quoted native type is a mutable reference. -/
 private def isReferenceType (ty : Lean.Expr) : Bool :=
-  ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.ref 1
+  ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.ref 1 ||
+    ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1
 
 /-- The current value and the prophecy of a native reference to `referent`. -/
-private def referenceParts (skolems referent value : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
-  let carrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) (← frameCarriers skolems) referent
-  return (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) carrier carrier value,
-    mkApp3 (mkConst ``Prod.snd [Level.zero, Level.zero]) carrier carrier value)
+private def referencePartsAt (carriers referent value : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) :=
+  heldReferenceParts carriers referent value
+
+/-- The current value and the prophecy of a native reference of type `type`: a
+mutable slice's two readings (`sliceReferenceContents`), or a reference's. -/
+private def referenceParts (carriers type value : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
+  if type.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1 then
+    return (← sliceReferenceContents value, ← sliceReferenceContents value true)
+  referencePartsAt carriers type.appArg! value
+
+/-- The equation a returned mutable reference's value view rests on: its
+prophecy is its current value, as the reference's death leaves it
+(`ResultShape.Settled`).  The current is plain and the prophecy certified,
+so the prophecy is read with its certificates forgotten
+(`doc/designs/data-invariants.md`). -/
+private def settledReference (carriers referent current prophecy : Lean.Expr)
+    (slice : Bool := false) : MetaM Lean.Expr := do
+  -- A slice reference keeps both readings certified (`NTy.carrier`,
+  -- `.sliceRef`), so its settled equation compares them directly; a
+  -- reference's current is plain, so its prophecy is read forgotten.
+  if slice then mkEq current prophecy
+  else mkEq current (← plainValueOf carriers referent prophecy)
+
+/-- The type a reference's prophecy is read at: its referent, and the vector
+of a mutable slice's elements, which its contents are read as
+(`sliceReferenceContents`). -/
+private def settledReferent (type : Lean.Expr) : Lean.Expr :=
+  if type.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1 then
+    mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.vector) type.appArg!
+  else type.appArg!
+
+/-- A native value holding references as a clause reads it at entry, or with
+`prophecies` at exit (`NTy.viewed`). -/
+private def viewedNative (carriers : Lean.Expr) (prophecies : Bool) (ty value : Lean.Expr) :
+    MetaM Lean.Expr := do
+  return mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.viewed) carriers
+    (toExpr prophecies) ty value
+
+/-- A certified value holding references as a clause reads it, at the plain
+layer: a certified aggregate keeps the references it holds as they are
+(`NTy.viewed`), since settling one inside the certificate would owe a new
+one, so its row is forgotten first and viewed there (`NTy.plainViewed`). -/
+private def plainViewedNative (carriers : Lean.Expr) (prophecies : Bool) (ty value : Lean.Expr) :
+    Lean.Expr :=
+  mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.plainViewed) carriers (toExpr prophecies) ty
+    (mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.forget) carriers ty value)
+
+/-- Clause locals see through a chain of references. Keep the native carrier
+separately for invariants; projecting a nested holder does not settle its loan. -/
+private def clauseReferent (carriers : Lean.Expr) :
+    VerexIR.Proofs.Denote.NTy → Lean.Expr → MetaM Lean.Expr
+  | .sliceRef _, value => sliceReferenceContents value
+  | .ref referent, value => do
+      let (current, _) ← referencePartsAt carriers (← quoteNTy referent) value
+      clauseReferent carriers referent current
+  | _, value => pure value
 
 /-- The clause binders of the parameters, read off the native arguments.  A
 mutable reference's entry is its current value and its exit its prophecy. -/
-private def parameterBinders (skolems : Lean.Expr) (slots : Array Slot) (types : Array Lean.Expr)
+private def parameterBinders (carriers : Lean.Expr) (slots : Array Slot) (types : Array Lean.Expr)
     (arguments : Lean.Expr) : MetaM (Array SlotBinders) := do
-  let values ← rowProjections skolems arguments types
+  let values ← rowComponentsAt carriers arguments types
   unless slots.size == types.size do
     throwError "internal: a parameter row differs from its declaration"
   (slots.zip (types.zip values)).mapM fun (slot, ty, value) => do
     let domain := domainOf slot.physical
     match slot.kind with
     | .mutableRef =>
-        let (current, prophecy) ← referenceParts skolems ty.appArg! value
-        return { entry := ← domain.binderOfNative current, entryNative := current
-                 exit := some (← domain.binderOfNative prophecy), exitNative := some prophecy }
-    | .plain | .sharedRef =>
-        return { entry := ← domain.binderOfNative value, entryNative := value }
+        let (current, prophecy) ← referenceParts carriers ty value
+        -- A referent holding references is read at each end of this loan: what
+        -- it holds keeps its own loans.
+        let (current, prophecy) ← if slot.nty.refFree then pure (current, prophecy) else
+          -- The current is plain and the prophecy certified, each viewed at its layer.
+          pure (mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.plainViewed) carriers
+              (toExpr false) (← quoteNTy slot.nty) current,
+            ← viewedNative carriers false (← quoteNTy slot.nty) prophecy)
+        return {
+          entry := ← slot.clauseDomain.binderOfNative (← clauseReferent carriers slot.nty current)
+          entryNative := current
+          exit := some (← slot.clauseDomain.binderOfNative (← clauseReferent carriers slot.nty prophecy))
+          exitNative := some prophecy }
+    | .plain =>
+        if slot.nty.refFree then
+          return { entry := ← domain.binderOfNative value, entryNative := value }
+        -- A value holding references is read through them, compositionally.
+        let entry := plainViewedNative carriers false ty value
+        let exit := plainViewedNative carriers true ty value
+        return { entry := ← domain.binderOfNative entry, entryNative := entry
+                 exit := some (← domain.binderOfNative exit), exitNative := some exit }
+    | .sharedRef =>
+        if slot.nty.refFree then
+          return { entry := ← domain.binderOfNative value, entryNative := value }
+        -- A shared view holds no loan: a clause reads what it holds as current.
+        let entry := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainUnerase)
+          carriers (← quoteNTy slot.nty) (← plainValueOf carriers (← quoteNTy slot.nty.erase) value)
+        return { entry := ← domain.binderOfNative entry, entryNative := entry }
 
 /-- Whether the expression tree at `root` reads a returned reference's final
 value. -/
@@ -2057,20 +2616,20 @@ function of the unit, its function values, the arguments and the state. -/
 def buildDeclaredRequires (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
-    (frameOf : Lean.Expr → Lean.Expr → MetaM Lean.Expr) :
+    (frameOf : Lean.Expr → Lean.Expr → Lean.Expr → MetaM Lean.Expr) :
     MetaM Lean.Expr := do
-  let groups ← groupConditions unit declaration.contract.conditions
+  let groups ← groupConditions ns declaration.contract.conditions
   let localTypes ← declaration.locals.mapM fun localDecl => do
-    let some ty := unit.tables.types[(specTypeId unit localDecl.type.typeId).index]?
+    let some ty := unit.tables.types[(specTypeId unit (ns.typeId localDecl.type.typeId)).index]?
       | throwError "function local has an unknown type"
     pure ty
   let parameterTypes ← declaration.signature.parameters.mapM fun parameter => do
-    let some nty := VerexIR.Proofs.Denote.ntyOf unit namespaceId parameter.typeUse.typeId
+    let some nty := VerexIR.Proofs.Denote.ntyOf unit namespaceId (ns.typeId parameter.typeUse.typeId)
       | throwError "a parameter has no native type"
     pure nty
   let row ← quoteRow (VerexIR.Proofs.Denote.NRow.ofList parameterTypes.toList)
-  withUnitVariable .default fun unitExpr functions => do
-    let frame ← frameOf unitExpr functions
+  withUnitInhabitants .default fun unitExpr functions inhabitants => do
+    let frame ← frameOf unitExpr functions inhabitants
     let carriers ← frameCarriers frame
     let argumentsType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers row
     withLocalDeclD `args argumentsType fun args =>
@@ -2081,13 +2640,12 @@ def buildDeclaredRequires (unit : ValidatedUnit) (namespaceId : VerexIR.Namespac
       for (parameter, nty, nativeValue, index) in
           ((declaration.signature.parameters.zip parameterTypes).zip natives).zipIdx.map
             fun (((parameter, nty), nativeValue), index) => (parameter, nty, nativeValue, index) do
-        let some ty := unit.tables.types[(specTypeId unit parameter.typeUse.typeId).index]?
+        let some ty := unit.tables.types[(specTypeId unit (ns.typeId parameter.typeUse.typeId)).index]?
           | throwError "a parameter has an unknown type"
-        let current ← match nty with
-          | .ref referent => do
-              let carrier := carrierType carriers (← quoteNTy referent)
-              pure (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) carrier carrier nativeValue)
-          | _ => pure nativeValue
+        -- The current of a mutable reference, which a precondition reads of
+        -- it, is plain (`referenceParts`); a chain of references is read
+        -- through to what it holds (`clauseReferent`).
+        let current ← clauseReferent carriers nty nativeValue
         locals := locals.set! index (some (← (domainOf ty).binderOfNative current))
       let context : Context :=
         { unit, namespaceId, ns, locals, localTypes
@@ -2097,7 +2655,7 @@ def buildDeclaredRequires (unit : ValidatedUnit) (namespaceId : VerexIR.Namespac
           state := some state, oldState := some state }
       let context ← bindLets context groups.lets false
       let clauses ← groups.requires.mapM (translate context ·.1)
-      mkLambdaFVars #[unitExpr, functions, args, state] (← conjunction clauses)
+      mkLambdaFVars #[unitExpr, functions, inhabitants, args, state] (← conjunction clauses)
 
 /-- Whether a function's body is verified: it has one, and neither its
 specification nor its module sets `pragma verify = false`. -/
@@ -2136,7 +2694,7 @@ private def invariantNeeds (unit : ValidatedUnit)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (needed : SpecReads → Bool) : Bool := Id.run do
   let carries (id : VerexIR.TypeId) : Bool :=
-    match ns.tables.types[id.index]? with
+    match ns.typeOf id with
     | some (.reference reference) =>
         (ns.tables.types[reference.referent.index]?).any
           (carriesMatchingInvariant unit needed · #[] 0)
@@ -2186,7 +2744,7 @@ def assumesTyping (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
       return true
     if (bodyReads unit namespaceId declaration).determinism then return true
     if declaration.signature.parameters.any (fun parameter =>
-        ns.tables.types[parameter.typeUse.typeId.index]? matches some (.function ..)) then
+        ns.typeOf parameter.typeUse.typeId matches some (.function ..)) then
       return true
     for callee in directCallees unit namespaceId ns declaration do
       let some calleeNs := unit.namespaces[callee.namespaceId.index]? | continue
@@ -2230,16 +2788,6 @@ def conditionReadsBehavior (unit : ValidatedUnit) (namespaceId : VerexIR.Namespa
 def conditionReadsRequires (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (root : ExprId) : Bool :=
   (readsFrom unit [(namespaceId, root)]).requires
-
-/-- Whether a function's contract states a behavioral predicate or assumes
-typing: then it takes the executable unit. -/
-def contractReadsUnit (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
-    (ns : ValidatedNamespace)
-    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
-  declaration.contract.conditions.any (conditionReadsBehavior unit namespaceId ·.expression) ||
-    assumesTyping unit namespaceId ns declaration ||
-    signatureInvariantsReadUnit unit ns declaration ||
-    (storedInvariantReadsUnit unit && reachesMemory unit namespaceId declaration)
 
 /-- Whether a function's precondition, its `requires` and the pre-state
 `let`s they read, states a behavioral predicate. -/
@@ -2289,17 +2837,30 @@ private def resultBinders (unit : ValidatedUnit) (slots : Array Slot)
   | [slot], some ty =>
       let domain := domainOf slot.physical
       if slot.kind == .mutableRef then
-        let (current, prophecy) ← referenceParts signature.skolems ty.appArg! result
-        let final ← domain.binderOfNative prophecy
-        return (#[{ entry := ← domain.binderOfNative current, entryNative := current
+        let (current, prophecy) ← referenceParts signature.frame.carriers ty result
+        let final ← slot.clauseDomain.binderOfNative
+          (← clauseReferent signature.frame.carriers slot.nty prophecy)
+        return (#[{ entry := ← slot.clauseDomain.binderOfNative
+                      (← clauseReferent signature.frame.carriers slot.nty current), entryNative := current
                     exit := some final, exitNative := some prophecy }],
-          #[← mkEq prophecy current], #[some final], #[])
+          #[← settledReference signature.frame.carriers (settledReferent ty) current prophecy
+            (slice := ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1)],
+          #[some final], #[])
       let .tuple elements := slot.physical
-        | return (#[{ entry := ← domain.binderOfNative result, entryNative := result }], #[],
-            #[none], #[])
+        | if slot.nty.refFree then
+            return (#[{ entry := ← domain.binderOfNative result, entryNative := result }], #[],
+              #[none], #[])
+          -- A value holding references: read at its current values, each
+          -- reference's prophecy being its current value.
+          let current := plainViewedNative signature.frame.carriers false ty result
+          let prophecy := plainViewedNative signature.frame.carriers true ty result
+          -- The prophecy view is the result with each reference it holds at
+          -- its final value: what `final` of a projection of the result reads.
+          return (#[{ entry := ← domain.binderOfNative current, entryNative := current }],
+            #[← mkEq prophecy current], #[some (← domain.binderOfNative prophecy)], #[])
       -- A Move tuple: each component's binder, a returned reference's its
       -- current value, and its final value its prophecy.
-      let values ← rowProjections signature.skolems result signature.resultComponentTypes
+      let values ← rowComponentsAt signature.frame.carriers result signature.resultComponentTypes
       unless values.size == elements.size do
         throwError "internal: a tuple result's components differ from its declaration"
       let mut components := #[]
@@ -2309,9 +2870,11 @@ private def resultBinders (unit : ValidatedUnit) (slots : Array Slot)
           (signature.resultComponentTypes.zip values).zip elements do
         let componentDomain ← signatureDomain unit element "a result component"
         if isReferenceType componentType then
-          let (current, prophecy) ← referenceParts signature.skolems componentType.appArg! value
+          let (current, prophecy) ← referenceParts signature.frame.carriers componentType value
           components := components.push (← componentDomain.binderOfNative current)
-          premises := premises.push (← mkEq prophecy current)
+          premises := premises.push
+            (← settledReference signature.frame.carriers (settledReferent componentType) current prophecy
+              (slice := componentType.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1))
           finals := finals.push (some (← componentDomain.binderOfNative prophecy))
         else
           components := components.push (← componentDomain.binderOfNative value)
@@ -2326,8 +2889,8 @@ def recursiveSpecFunctions (unit : ValidatedUnit) : Array VerexIR.QualifiedRef :
   let mut found := #[]
   for ns in unit.namespaces, namespaceIndex in [0:unit.namespaces.size] do
     for declaration in ns.specFunctions do
-      let some qualified := unit.tables.names[declaration.name.index]? | continue
-      let reference : VerexIR.QualifiedRef := ⟨⟨namespaceIndex⟩, declaration.name⟩
+      let some qualified := ns.nameOf declaration.name | continue
+      let reference : VerexIR.QualifiedRef := ⟨⟨namespaceIndex⟩, ns.nameId declaration.name⟩
       unless qualified.namespaceId == reference.namespaceId && declaration.body.isSome do continue
       unless declaration.contract.conditions.any (·.kind == .decreases) do continue
       unless specRecursive unit reference do continue
@@ -2369,12 +2932,12 @@ def ensureLemmaDefinitions (unit : ValidatedUnit)
 type, or the native type of one its definitions take at a family. -/
 def lemmaParameterTypes (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) :
     MetaM (Array (Lean.Expr ⊕ VerexIR.Proofs.Denote.NTy)) := do
-  let some (_, declaration) := lemmaOf? unit reference
+  let some (lemmaNs, declaration) := lemmaOf? unit reference
     | throwError "a lemma does not resolve"
   let natives := lemmaNativeParameters unit reference
   declaration.signature.parameters.mapIdxM fun index parameter => do
     if let some (_, nty) := natives.find? (·.1 == index) then return .inr nty
-    let domain ← signatureDomain unit parameter.typeUse.typeId "a lemma parameter"
+    let domain ← signatureDomain unit (lemmaNs.typeId parameter.typeUse.typeId) "a lemma parameter"
     let some type := domain.scalarType? | throwError "a lemma parameter has no native type"
     return .inl type
 
@@ -2421,7 +2984,7 @@ private def nativeName (context : Context)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : MetaM String := do
   let some path := context.unit.tables.namespaces[context.namespaceId.index]?
     | throwError "a native's namespace has no path"
-  let some qualified := context.unit.tables.names[declaration.name.index]?
+  let some qualified := context.ns.nameOf declaration.name
     | throwError "a native has no name"
   return "::".intercalate (path.segments.toList ++ [qualified.name])
 
@@ -2431,7 +2994,7 @@ vector result has the length the model states. None for a native without
 exactly one result. -/
 private def uninterpretedResult (context : Context)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
-    (resultLength : Option Nat) (function : Option String)
+    (resultLength : Option Nat) (function : Option String) (reflection : Option TypeReflection)
     (parameterSlots : Array Slot) (parameterBound : Array SlotBinders)
     (resultSlots : Array Slot) (resultBound : Array SlotBinders) : MetaM (Array Lean.Expr) := do
   let [resultSlot] := resultSlots.toList | return #[]
@@ -2442,9 +3005,21 @@ private def uninterpretedResult (context : Context)
   let domain := domainOf resultSlot.physical
   let value ← modelApplication context declaration name parameterSlots
     (parameterBound.map (·.current)) domain (some resultSlot.nty)
+  let value ← match reflection, context.types with
+    | some reflection, some types =>
+        reflectedValue reflection (← context.carriers) resultSlot.nty
+          (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.substWith) types
+            (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.param) (toExpr (0 : Nat)))) value
+    | _, _ => pure value
   -- The uninterpreted value on the left: a second call at the same arguments
   -- rewrites to the first's result, and a clause naming the native closes.
-  let mut clauses := #[← mkEq value resultBinders.entry]
+  -- A native result is stated at the layer the two values are held at: a
+  -- model builds no certificate, so a plain value — a reflected one — is
+  -- equated plainly (`equateNative`).
+  let mut clauses := #[← if domain == .native then
+      equateNative (← context.carriers) (← quoteNTy resultSlot.nty) value
+        resultBinders.entryNative
+    else mkEq value resultBinders.entry]
   if let some length := resultLength then
     if resultSlot.nty matches .vector _ then
       clauses := clauses.push (← mkEq (← nativeLength resultBinders.entryNative)
@@ -2462,18 +3037,169 @@ private def orderResult (context : Context)
   let [resultSlot] := resultSlots.toList | throwError "a structural order has one result"
   let [resultBinders] := resultBound.toList | throwError "a structural order has one result"
   let order ← structuralOrderTerm context leftSlot.nty left.currentNative right.currentNative
-  mkEq resultBinders.entryNative (← orderingTerm context resultSlot.physical order)
+  -- The ordering value is plain, as a specification builds one: the result
+  -- is stated of its plain value (`equateNative`).
+  equateNative (← context.carriers) (← quoteNTy resultSlot.nty) resultBinders.entryNative
+    (← orderingTerm context resultSlot.physical order)
+
+/-- A function's own name, after the scopes of its namespace it is in. -/
+private def functionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
+  let qualified? : Option VerexIR.QualifiedName := do
+    let ns ← unit.namespaces[handle.namespaceId.index]?
+    let declaration ← ns.functions[handle.functionId.index]?
+    ns.nameOf declaration.name
+  (qualified?.map fun name => "::".intercalate (name.scope.push name.name).toList).getD ""
+
+/-- A function's path-qualified name, in every namespace. -/
+def qualifiedFunctionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
+  let path := (unit.tables.namespaces[handle.namespaceId.index]?.map (·.segments)).getD #[]
+  "::".intercalate (path.push (functionName unit handle)).toList
+
+/-- A function's name relative to a unit: its name in the unit's module,
+namespace 0, by its scopes there, and its path-qualified name in another
+namespace. -/
+def functionKey (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
+  if handle.namespaceId.index == 0 then functionName unit handle
+  else qualifiedFunctionName unit handle
+
+/-- Locate one function of a registered unit by its key, or its path-qualified
+name in the unit's module. -/
+def findFunction? (unit : ValidatedUnit) (key : String) :
+    Option (Nat × ValidatedNamespace × Nat ×
+      VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) := do
+  -- A scope's segment may hold `::`, a function's name does not.
+  let name := (key.splitOn "::").getLast?.getD key
+  for h : namespaceIndex in [0:unit.namespaces.size] do
+    let ns := unit.namespaces[namespaceIndex]
+    for h : index in [0:ns.functions.size] do
+      let declaration := ns.functions[index]
+      if let some qualified := ns.nameOf declaration.name then
+        if qualified.name == name then
+          let handle : VerexIR.FunctionHandle := { namespaceId := ⟨namespaceIndex⟩, functionId := ⟨index⟩ }
+          if functionKey unit handle == key || qualifiedFunctionName unit handle == key then
+            return (namespaceIndex, ns, index, declaration)
+  none
+
+/-- A byte vector literal of a text, as a clause's `b"…"` denotes one. -/
+private def byteVectorLiteral (carriers : Lean.Expr) (text : String) : MetaM Lean.Expr := do
+  let element : VerexIR.Proofs.Denote.NTy := .int 8 false
+  let values ← text.toList.mapM fun byte =>
+    nativeOfClause carriers element (toExpr (Int.ofNat byte.toNat))
+  let array ← mkArrayLit (carrierType carriers (← quoteNTy element)) values
+  let bounded ← VerexIR.Proofs.Denote.decidedLemma (← mkAppM ``LT.lt
+    #[← mkAppM ``Array.size #[array], mkNatLit (2 ^ 64)])
+  return mkApp3 (mkConst ``VerexIR.SpecVector.mk) (carrierType carriers (← quoteNTy element))
+    array bounded
+
+/-- The abort of the aggregator model: the prelude's test of the element's
+`type_name`, the value a clause applying that native denotes. -/
+private def aggregatorAborts (context : Context)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : MetaM Lean.Expr := do
+  let some (namespaceIndex, owner, _, typeName) := findFunction? context.unit moveTypeNameNative
+    | throwError "the aggregator model reads `{moveTypeNameNative}`, which is not in the unit"
+  let some result := typeName.signature.results[0]?
+    | throwError "`{moveTypeNameNative}` has no result"
+  let some types := context.types
+    | throwError "the aggregator model is applied outside a family"
+  let callee : Context := { context with namespaceId := ⟨namespaceIndex⟩, ns := owner }
+  let string ← callee.nativeType (owner.typeId result.typeId)
+  let carriers ← context.carriers
+  let name ← modelApplication context declaration moveTypeNameNative #[] #[] .native (some string)
+  let name ← reflectedValue .name carriers string
+    (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.substWith) types
+      (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.param) (toExpr (0 : Nat)))) name
+  let some (_, bytes) := (← nativeComponents carriers (← quoteNTy string) name)[0]?
+    | throwError "`{moveTypeNameNative}` has no bytes"
+  -- The reflected name's bytes are held at the layer the reflected value
+  -- is, the literal at the layer a clause builds; the test is of the plain
+  -- values (`equateNative`).
+  let named (text : String) : MetaM Lean.Expr := do
+    return mkNot (← equateNative carriers (← quoteNTy bytesType) bytes
+      (← byteVectorLiteral carriers text))
+  mkAppM ``And #[← named "u64", ← named "u128"]
+
+/-- The result clause of the aggregator model, at an element the prelude
+computes on (`aptos-natives.bpl`). -/
+private def aggregatorEnsures (frame : Lean.Expr) (operation : AggregatorOperation)
+    (parameterSlots : Array Slot) (parameterBound : Array SlotBinders)
+    (resultSlots : Array Slot) (resultBound : Array SlotBinders) : MetaM Lean.Expr := do
+  let carriers ← frameCarriers frame
+  let leading ← frameLeading frame
+  let fields (slot : Slot) (value : Lean.Expr) :
+      MetaM (VerexIR.Proofs.Denote.NTy × Lean.Expr × Lean.Expr) := do
+    let .struct _ _ (.cons element (.cons _ .nil)) := slot.nty
+      | throwError "an aggregator has a value and a maximum"
+    let #[(_, current), (_, maximum)] := ← nativeComponents carriers (← quoteNTy slot.nty) value
+      | throwError "an aggregator has a value and a maximum"
+    return (element, current, maximum)
+  -- The model reads every value at the plain layer
+  -- (`Skolems.aggregatorValuePlain`): an element is an integer, whose plain
+  -- and certified values are the same, and the readings reach it both ways
+  -- — the plain projections of the aggregator's value
+  -- (`nativeComponents`) and the certified result and argument binders,
+  -- which are read plainly here (`plainValueOf`,
+  -- `doc/designs/data-invariants.md`).
+  let intOf (element : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) : MetaM Lean.Expr := do
+    let elementType ← quoteNTy element
+    return mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.aggregatorValuePlain)
+      (leading ++ #[frame, elementType, ← plainValueOf carriers elementType value])
+  let guarded (element : VerexIR.Proofs.Denote.NTy) (body : Lean.Expr) : MetaM Lean.Expr := do
+    let test := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.isAggregatorElement)
+      (leading ++ #[frame, ← quoteNTy element])
+    mkArrow (← mkEq test (mkConst ``Bool.true)) body
+  let isTrue (value : Lean.Expr) := clauseOfNative .bool value
+  match operation, (parameterSlots.zip parameterBound).toList, (resultSlots.zip resultBound).toList with
+  | .create, [(_, maximum)], [(result, built)] =>
+      let (element, current, limit) ← fields result built.entryNative
+      guarded element (← conjunction #[
+        ← mkEq (← intOf element current) (mkIntLit 0),
+        ← mkEq (← intOf element limit) (← intOf element maximum.entryNative)])
+  | .createUnbounded, [], [(result, built)] =>
+      let (element, current, limit) ← fields result built.entryNative
+      let largest := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.aggregatorMax)
+        (leading ++ #[frame, ← quoteNTy element])
+      guarded element (← conjunction #[
+        ← mkEq (← intOf element current) (mkIntLit 0),
+        ← mkEq (← intOf element limit) largest])
+  | .tryAdd, [(self, aggregator), (_, amount)], [(_, outcome)]
+  | .trySub, [(self, aggregator), (_, amount)], [(_, outcome)] =>
+      let (element, current, limit) ← fields self aggregator.entryNative
+      let (_, newCurrent, newLimit) ← fields self aggregator.currentNative
+      let current ← intOf element current
+      let limit ← intOf element limit
+      let newCurrent ← intOf element newCurrent
+      let newLimit ← intOf element newLimit
+      let amount ← intOf element amount.entryNative
+      let (refused, updated) ← match operation with
+        | .tryAdd => do
+            let sum ← mkAppM ``HAdd.hAdd #[amount, current]
+            pure (← mkAppM ``LT.lt #[limit, sum], sum)
+        | _ => do
+            pure (← mkAppM ``LT.lt #[current, amount], ← mkAppM ``HSub.hSub #[current, amount])
+      let succeeded ← isTrue outcome.entryNative
+      let kept ← mkEq newLimit limit
+      guarded element (← conjunction #[
+        ← mkArrow refused (← conjunction #[mkNot succeeded, ← mkEq newCurrent current, kept]),
+        ← mkArrow (mkNot refused) (← conjunction #[succeeded, ← mkEq newCurrent updated, kept])])
+  | .isAtLeast, [(self, aggregator), (_, minimum)], [(_, outcome)] =>
+      let (element, current, _) ← fields self aggregator.entryNative
+      guarded element (← mkAppM ``Iff #[← isTrue outcome.entryNative,
+        ← mkAppM ``LE.le #[← intOf element minimum.entryNative, ← intOf element current]])
+  | .read, [(self, aggregator)], [(_, value)] =>
+      let (element, current, _) ← fields self aggregator.entryNative
+      guarded element (← mkEq (← intOf element value.entryNative) (← intOf element current))
+  | _, _, _ => throwError "an aggregator native has an unexpected signature"
 
 /-- The executable role a function plays for an intrinsic map of its
 namespace with a carried model, by the name its binding declares. -/
 def mapRoleName? (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Option String := do
-  let target : VerexIR.QualifiedRef := { namespaceId, name := declaration.name }
+  let target : VerexIR.QualifiedRef := { namespaceId, name := ns.nameId declaration.name }
   let intrinsic ← ns.intrinsics.find? fun intrinsic =>
-    intrinsic.model == "map" && intrinsic.executableBindings.any (·.target == target)
-  let binding ← intrinsic.executableBindings.find? (·.target == target)
-  guard (mapModel? unit (.nominal intrinsic.owner #[])).isSome
+    intrinsic.model == "map" && intrinsic.executableBindings.any (ns.qualifiedRef ·.target == target)
+  let binding ← intrinsic.executableBindings.find? (ns.qualifiedRef ·.target == target)
+  guard (mapModel? unit (.nominal (ns.nameId intrinsic.owner) #[])).isSome
   pure binding.role
 
 /-- The executable role a function plays for an intrinsic map of its
@@ -2499,8 +3225,9 @@ def representationRead? (unit : ValidatedUnit) (ns : ValidatedNamespace)
   let .structured root := declaration.body | return none
   -- A table's declared fields are the leading fields of its abstract value.
   let owner? (reference : VerexIR.QualifiedRef) : Option VerexIR.QualifiedRef := do
+    let reference := ns.qualifiedRef reference
     let ownerNs ← unit.namespaces[reference.namespaceId.index]?
-    let structId ← ownerNs.structs.findIdx? (·.name == reference.name)
+    let structId ← ownerNs.structs.findIdx? (ownerNs.nameId ·.name == reference.name)
     let layout ← VerexIR.Validation.ownerLayout? unit reference.namespaceId structId
     guard (!(layout.shape matches .table _))
     some reference
@@ -2510,7 +3237,8 @@ def representationRead? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     | fuel + 1, some (.field base reference _) | fuel + 1, some (.ghostField base reference _) =>
         owner? reference <|> placeOwner? base fuel
     | fuel + 1, some (.deref base) | fuel + 1, some (.index base _)
-    | fuel + 1, some (.subslice base ..) | fuel + 1, some (.downcast base _) =>
+    | fuel + 1, some (.subslice base ..) | fuel + 1, some (.unsize base)
+    | fuel + 1, some (.downcast base _) =>
         placeOwner? base fuel
   let mut pending := #[root]
   let mut visited : Array Nat := #[]
@@ -2525,7 +3253,7 @@ def representationRead? (unit : ValidatedUnit) (ns : ValidatedNamespace)
         | .data (.select reference _) | .data (.selectGhost reference _)
         | .data (.selectVariants reference _) | .data (.testVariants reference _)
         | .data (.discriminant reference) | .data (.updateField reference _) => owner? reference
-        | .move place | .copy place | .borrow _ place | .read place | .write place
+        | .move place | .copy place | .borrow _ place | .read place | .readDiscriminant place | .write place
         | .drop place => placeOwner? place ns.places.size
         | _ => none
       if let some owner := read then return some owner
@@ -2536,41 +3264,65 @@ def representationRead? (unit : ValidatedUnit) (ns : ValidatedNamespace)
 private def mapRoleModel (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : MetaM MapModel := do
-  let target : VerexIR.QualifiedRef := { namespaceId, name := declaration.name }
+  let target : VerexIR.QualifiedRef := { namespaceId, name := ns.nameId declaration.name }
   let some intrinsic := ns.intrinsics.find? fun intrinsic =>
-      intrinsic.model == "map" && intrinsic.executableBindings.any (·.target == target)
+      intrinsic.model == "map" && intrinsic.executableBindings.any (ns.qualifiedRef ·.target == target)
     | throwError "a map role function has no intrinsic declaration"
-  let some model := mapModel? unit (.nominal intrinsic.owner #[])
+  let some model := mapModel? unit (.nominal (ns.nameId intrinsic.owner) #[])
     | throwError "a map role function's owner has no carried representation"
   return model
 
+/-- Whether a function is the `new` role of a table owner with a handle. -/
+private def tableAllocator (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
+  mapRoleOf? unit namespaceId ns declaration == some .new_ &&
+    (Id.run do
+      let target : VerexIR.QualifiedRef := { namespaceId, name := ns.nameId declaration.name }
+      let some intrinsic := ns.intrinsics.find? fun intrinsic =>
+          intrinsic.model == "map" && intrinsic.executableBindings.any (ns.qualifiedRef ·.target == target)
+        | return false
+      return (mapModel? unit (.nominal (ns.nameId intrinsic.owner) #[])).any (·.handle))
+
+/-- Whether evaluating the expressions may call a table's `new` at any depth. -/
+def rootsAllocateTables (unit : ValidatedUnit) (roots : List (VerexIR.NamespaceId × ExprId)) :
+    Bool :=
+  let (found, complete) := reachFold unit roots false fun found operation _ =>
+    found || match operation with
+      | .call (.function reference) =>
+          (do
+            let calleeNs ← unit.namespaces[reference.namespaceId.index]?
+            let functionId ← unit.resolution.function? reference.name
+            let callee ← calleeNs.functions[functionId.index]?
+            pure (tableAllocator unit reference.namespaceId calleeNs callee)).getD false
+      | _ => false
+  found || !complete
+
 /-- Whether a function allocates a table: it is the `new` role of a table
 owner with a handle, or calls one at any depth. The allocation history is
-then in its frame (`doc/designs/intrinsic-maps.md`, "Owned Table values"). -/
+then in its frame (`doc/designs/intrinsic-maps.md`, "Ownership of table contents"). -/
 def allocatesTables (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
-  let allocator (namespaceId : VerexIR.NamespaceId) (ns : ValidatedNamespace)
-      (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
-    mapRoleOf? unit namespaceId ns declaration == some .new_ &&
-      (Id.run do
-        let target : VerexIR.QualifiedRef := { namespaceId, name := declaration.name }
-        let some intrinsic := ns.intrinsics.find? fun intrinsic =>
-            intrinsic.model == "map" && intrinsic.executableBindings.any (·.target == target)
-          | return false
-        return (mapModel? unit (.nominal intrinsic.owner #[])).any (·.handle))
-  allocator namespaceId ns declaration ||
-    let (found, complete) := reachFold unit
-      ((functionRoots declaration).toList.map (namespaceId, ·)) false fun found operation _ =>
-        found || match operation with
-          | .call (.function reference) =>
-              (do
-                let calleeNs ← unit.namespaces[reference.namespaceId.index]?
-                let functionId ← unit.resolution.function? reference.name
-                let callee ← calleeNs.functions[functionId.index]?
-                pure (allocator reference.namespaceId calleeNs callee)).getD false
-          | _ => false
-    found || !complete
+  tableAllocator unit namespaceId ns declaration ||
+    rootsAllocateTables unit ((functionRoots declaration).toList.map (namespaceId, ·))
+
+/-- Whether a function keeps the stored invariants: it reaches memory, or
+allocates, which writes the allocation history no invariant reads. -/
+def keepsStoredInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
+  reachesMemory unit namespaceId declaration || allocatesTables unit namespaceId ns declaration
+
+/-- Whether a function's contract states a behavioral predicate or assumes
+typing: then it takes the executable unit. -/
+def contractReadsUnit (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
+  declaration.contract.conditions.any (conditionReadsBehavior unit namespaceId ·.expression) ||
+    assumesTyping unit namespaceId ns declaration ||
+    signatureInvariantsReadUnit unit ns declaration ||
+    (storedInvariantReadsUnit unit && keepsStoredInvariants unit namespaceId ns declaration)
 
 /-- The native value of an optional result at its native type: present with
 a native value, or empty, as its declared layout holds it, a vector wrapper
@@ -2586,7 +3338,10 @@ private def optionalValue (context : Context) (slot : Slot) (value : Option Lean
   match layout, slot.nty with
   | .vector, .struct _ _ (.cons vectorType@(.vector element) _) =>
       let elements ← value.toArray.mapM (clauseOfNative element)
-      nativeConstructed slot.nty none carriers #[← nativeVectorLiteral carriers vectorType elements]
+      -- The wrapper's vector sits inside the built value, whose row is
+      -- plain (`nativeConstructed`), so its elements are plain too.
+      nativeConstructed slot.nty none carriers
+        #[← nativeVectorLiteral carriers vectorType elements (plain := true)]
   | .variants empty present, .enum _ _ names rows _ =>
       match value with
       | none => nativeConstructed slot.nty (some empty) carriers #[]
@@ -2623,12 +3378,21 @@ private def owner (operands : RoleOperands) (index : Nat) : MetaM NativeOwner :=
   let (slot, binders) ← operands.parameter index
   nativeOwner operands.carriers slot.nty binders.entryNative
 
-/-- The owner a mutated parameter holds at exit. -/
+/-- The owner a mutated parameter holds at exit, at the layer its entry
+value is read at.  A mutable reference's exit value is its prophecy,
+certified, while its entry value is the current, plain while the loan lives:
+a role's effect equates the two, and the equation of a certified value with
+a plain one is the equation of their plain values, which the certified value
+forgets to — nothing is lost, since forgetting is injective
+(`NTy.forget_injective`, `doc/designs/data-invariants.md`).  The
+data invariants of the value the loan leaves behind are owed where the
+mutation ends, not stated here. -/
 private def exitOwner (operands : RoleOperands) (index : Nat) : MetaM NativeOwner := do
   let (slot, binders) ← operands.parameter index
   let some exit := binders.exitNative
     | throwError m!"the intrinsic map role `{operands.role.name}` does not mutate parameter {index}"
-  nativeOwner operands.carriers slot.nty exit
+  let ownerType ← quoteNTy slot.nty
+  nativeOwner operands.carriers slot.nty (← plainValueOf operands.carriers ownerType exit)
 
 /-- A parameter's entry value as a view's typed value. -/
 private def typed (operands : RoleOperands) (view : VerexIR.Proofs.Denote.NativeMaps.TypedView)
@@ -2728,6 +3492,26 @@ private def allocationRecorded (context : Context) (handle : Lean.Expr) : MetaM 
 private def emptyEntries (owner : NativeOwner) : MetaM Lean.Expr := do
   emptyTableOf (← inferType owner.table)
 
+/-- A mutable map borrow writes the returned prophecy back into the raw
+entries. Reading those entries through a type parameter's total decoder
+would forget distinctions between uncertified plain values. -/
+private def rawMapWriteback (entry exit : NativeOwner) (model : MapModel)
+    (key value : Lean.Expr) : MetaM Lean.Expr := do
+  let_expr VerexIR.SpecEntries pair := ← whnfD (← inferType entry.table)
+    | throwError "a map's raw table is not an entry carrier"
+  let_expr Prod keyType valueType := pair
+    | throwError "a map's raw entries are not key-value pairs"
+  let entries ← mkAppM ``VerexIR.SpecEntries.entries #[entry.table]
+  let discipline ← match ← model.rank? with
+    | none => mkAppOptM ``VerexIR.SpecMap.Discipline.sequence #[keyType]
+    | some rank =>
+        mkAppM ``VerexIR.SpecMap.Discipline.ordered #[← entry.typed.keys.plainKeyOrder rank]
+  let equal := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plainDecEq)
+    entry.typed.keys.carriers entry.typed.keys.type
+  let updated ← mkAppOptM ``VerexIR.SpecMap.update
+    #[keyType, valueType, equal, discipline, entries, key, value]
+  mkEq (← mkAppM ``VerexIR.SpecEntries.entries #[exit.table]) updated
+
 /-- The result and effect clauses of an intrinsic map role, over the entry
 binders, the exit binders of a mutated map, and the result binders. A value
 the role builds replaces its result; an observation of the map is on the
@@ -2747,8 +3531,13 @@ private def mapRoleEnsures (context : Context) (operands : RoleOperands)
   let observed (view : VerexIR.Proofs.Denote.NativeMaps.TypedView) (value : Lean.Expr) :
       MetaM Lean.Expr := do
     mkEq value (← TypedTable.typedOfNative view (← result).2.entryNative)
+  -- A value the role builds against the result's own: the equation holds at
+  -- the layer the two are held at, the built value being a plain row or
+  -- variant value and the result a certified value of its type
+  -- (`equateNative`).
   let built (value : Lean.Expr) : MetaM Lean.Expr := do
-    mkEq (← result).2.entryNative value
+    let (slot, binders) ← result
+    equateNative carriers (← quoteNTy slot.nty) binders.entryNative value
   -- The final value of a returned mutable reference as a view's typed value.
   let final (view : VerexIR.Proofs.Denote.NativeMaps.TypedView) : MetaM Lean.Expr := do
     let some final := (← result).2.exitNative
@@ -2760,18 +3549,27 @@ private def mapRoleEnsures (context : Context) (operands : RoleOperands)
     let (slot, binders) ← result
     let present ← optionalValue context slot (some (TypedTable.nativeOf view value))
     let empty ← optionalValue context slot none
-    mkEq (← mkAppOptM ``ite #[none, condition, none, present, empty]) binders.entryNative
+    equateNative carriers (← quoteNTy slot.nty)
+      (← mkAppOptM ``ite #[none, condition, none, present, empty]) binders.entryNative
   -- A pair result of a typed key and value.
   let pair (table : TypedTable) (key value : Lean.Expr) : MetaM Lean.Expr := do
     let (slot, _) ← result
     let .tuple row := slot.nty
       | throwError m!"the result of `{role.name}` is not a pair"
-    built (← nativeValueRow carriers row
+    built (← plainNativeRow carriers row
       [TypedTable.nativeOf table.keys key, TypedTable.nativeOf table.values value])
   -- A vector result holding typed values of a view, in order.
   let listed (view : VerexIR.Proofs.Denote.NativeMaps.TypedView) (values vector : Lean.Expr) :
       MetaM Lean.Expr := do
     let unread ← mkAppM ``List.map #[view.unread, values]
+    -- The vector crosses into the view's layer: a plain view holds the
+    -- entries of a table a reference's current holds, and its elements are
+    -- plain, so the vector of them is at the plain layer of its own type
+    -- (`plainValueOf`).
+    let vector ← if view.plain then
+        plainValueOf view.carriers (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.vector) view.type)
+          vector
+      else pure vector
     mkEq unread (← mkAppM ``Array.toList #[← mkAppM ``VerexIR.SpecVector.values #[vector]])
   -- What a value write keeps: the slots of the map at entry.
   let sameGhosts (exit entry : NativeOwner) : MetaM Lean.Expr := do
@@ -2789,12 +3587,13 @@ private def mapRoleEnsures (context : Context) (operands : RoleOperands)
   -- handle the allocation records; its slots are fresh.
   if role == .new_ || role == .newWithConfig then
     let (slot, binders) ← result
-    let built ← nativeOwner carriers slot.nty binders.entryNative
+    let built ← nativeOwner carriers slot.nty
+      (← plainValueOf carriers (← quoteNTy slot.nty) binders.entryNative)
     let mut facts := #[← mkEq built.table (← emptyEntries built)]
     if let some (_, length) := built.length then
       facts := facts.push (← mkEq (← mkAppM ``VerexIR.SpecInt.val #[length]) (mkIntLit 0))
     -- A placeholder `dummy_field` is `false`, as an empty struct's
-    -- (`doc/designs/intrinsic-maps.md`, "Table layout").
+    -- (`doc/designs/intrinsic-maps.md`, "Layouts").
     if let some placeholder := built.handle then
       if (← whnfR (← inferType placeholder)).isConstOf ``Bool then
         facts := facts.push (← mkEq placeholder (mkConst ``Bool.false))
@@ -2878,8 +3677,13 @@ private def mapRoleEnsures (context : Context) (operands : RoleOperands)
         ← mkEq exit.typed.map (← table.remove discipline key)] ++ (← leadingKept exit entry)
   | .borrowMut =>
       let (exit, key) := (← exit, ← key)
+      let (_, keyBinding) ← operands.parameter 1
+      let some finalValue := (← result).2.exitNative
+        | throwError "a mutable map borrow has no result prophecy"
+      let rawKey ← plainValueOf carriers table.keys.type keyBinding.entryNative
+      let rawValue ← plainValueOf carriers table.values.type finalValue
       return #[← observed table.values (← table.valueAt key),
-        ← mkEq exit.typed.map (← table.update discipline key (← final table.values)),
+        ← rawMapWriteback entry exit model rawKey rawValue,
         ← sameGhosts exit entry] ++ (← leadingKept exit entry)
   | .borrowMutWithDefault =>
       let (exit, key) := (← exit, ← key)
@@ -2930,7 +3734,12 @@ private def mapRoleEnsures (context : Context) (operands : RoleOperands)
       let present ← withLocalDeclD `neighbour table.keys.carrier fun neighbour => do
         mkLambdaFVars #[neighbour]
           (← optionalValue context slot (some (TypedTable.nativeOf table.keys neighbour)))
-      return #[← mkEq (← mkAppOptM ``Option.elim #[none, none, neighbour, empty, present])
+      -- The optional value the clause builds is a plain variant value
+      -- (`nativeConstructed`) and the result is a certified value of its
+      -- type: the two are equated at the layer they are held at
+      -- (`equateNative`).
+      return #[← equateNative carriers (← quoteNTy slot.nty)
+        (← mkAppOptM ``Option.elim #[none, none, neighbour, empty, present])
         binders.entryNative]
   | .keys => return #[← listed table.keys (← table.keyList) (← result).2.entryNative]
   | .values => return #[← listed table.values (← table.valueList) (← result).2.entryNative]
@@ -2993,8 +3802,21 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (nativeModel : Option NativeModel := none)
     (executable : Option Lean.Expr := none)
     (requiresMeaning : Option Lean.Expr := none)
-    (stored : StoredInvariants := {}) :
+    (stored : StoredInvariants := {})
+    -- The unit's carried data invariants (`dataOwnTerms`): a declaration
+    -- among them states nothing at this boundary, its invariant being part
+    -- of the carrier of its type.
+    (own : DataOwn := {})
+    (directContract : Option (VerexIR.FunctionHandle → Lean.Expr → Option Lean.Expr →
+      MetaM DirectContract) := none)
+    (typeArgumentTypes : Array (Option VerexIR.Proofs.Denote.NTy) := #[])
+    -- Read the declarations at these arguments rather than substituting their
+    -- native readings (`Context.readAtArguments`).
+    (atArguments : Option VerexIR.Proofs.Denote.NRow := none) :
     MetaM Lean.Expr := do
+  let typeArgumentTypes :=
+    atArguments.map (fun row => row.toList.toArray.map some) |>.getD typeArgumentTypes
+  let readAtArguments := atArguments.isSome
   let uses := frameUses unit namespaceId declaration
   -- The data invariants of stored resources hold of the memory a function
   -- reaches, at entry and at exit, as the Move Prover assumes them at entry
@@ -3011,10 +3833,11 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   -- A function reaching a resource that carries one assumes them at entry;
   -- every other function that reaches memory keeps them, wherever they hold.
   let assumesStored := reach.any fun resources => resources.any stored.carriers.contains
-  let storedInvariant := if reach.isSome then stored.predicate else none
-  let memoryInvariants (state : Lean.Expr) : MetaM Lean.Expr := do
+  let storedInvariant := if keepsStoredInvariants unit namespaceId ns declaration
+    then stored.predicate else none
+  let storedDataInvariants (state : Lean.Expr) : MetaM Lean.Expr := do
     let some invariant := storedInvariant | throwError "internal: no stored invariants"
-    mkAppM ``VerexIR.Proofs.Denote.MemoryInvariants
+    mkAppM ``VerexIR.Proofs.Denote.DataInvariants
       #[← storedInvariantAt unit invariant executable state, state]
   -- An intrinsic map role is read by the map model, not by its source
   -- specification (`doc/designs/intrinsic-maps.md`, "Roles"), but for the
@@ -3024,7 +3847,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     let some role := VerexIR.MapOperation.ofName? name
       | throwError m!"the intrinsic map role `{name}` is not carried"
     return (role, ← mapRoleModel unit namespaceId ns declaration)
-  let declared ← groupConditions unit declaration.contract.conditions
+  let declared ← groupConditions ns declaration.contract.conditions
   let groups := if mapRole.isSome then { requires := declared.requires, lets := declared.lets }
     else declared
   let invariantResources ← invariantModifiedResources ns declaration.contract
@@ -3040,23 +3863,22 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   -- value of the model's uninterpreted function at its arguments, so two
   -- calls at equal arguments agree and a clause naming the function speaks
   -- about the same value.
-  let isStrict := pragmaEnabled declaration.contract "aborts_if_is_strict" ||
-    inEffect "aborts_if_is_strict" || nativeModel.isSome || mapRole.isSome
+  let isStrict := abortsStrictly declaration || nativeModel.isSome || mapRole.isSome
   let parameterSlots ← declaration.signature.parameters.mapIdxM fun index parameter =>
     slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
              locals := #[], results := #[], types := types,
-             typeInstantiation := typeInstantiation }
+             typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments }
       (Name.mkSimple (if parameter.name.isEmpty then s!"argument{index}" else parameter.name))
-      parameter.typeUse.typeId (allowReference := true)
+      (ns.typeId parameter.typeUse.typeId) (allowReference := true)
   let resultSlots ← declaration.signature.results.mapIdxM fun index result =>
     slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
              locals := #[], results := #[], types := types,
-             typeInstantiation := typeInstantiation }
+             typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments }
       (Name.mkSimple (if declaration.signature.results.size == 1 then "result"
         else s!"result{index}"))
-      result.typeId (allowReference := true)
+      (ns.typeId result.typeId) (allowReference := true)
   let functionLocalTypes ← declaration.locals.mapM fun localDecl => do
-    let some ty := unit.tables.types[localDecl.type.typeId.index]?
+    let some ty := ns.typeOf localDecl.type.typeId
       | throwError "function local has an unknown type"
     match ty with
     | .reference reference =>
@@ -3066,35 +3888,34 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     | _ => pure ty
   let padLocals (values : Array (Option Lean.Expr)) : Array (Option Lean.Expr) :=
     values ++ Array.replicate (declaration.locals.size - values.size) none
-  let argumentsType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) ((← frameCarriers signature.skolems))
+  let argumentsType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) (signature.frame.carriers)
     signature.params
-  let resultType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.ResultShape.carrier) ((← frameCarriers signature.skolems))
+  let resultType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.ResultShape.carrier) (signature.frame.carriers)
     signature.shape
-  let runtimeState := mkAppN (mkConst ``VerexIR.Proofs.Denote.Memory)
-    (← frameLeading signature.skolems)
+  let runtimeState := signature.frame.state
   let failure := mkConst ``VerexIR.Proofs.Failure
   /- In a one-state clause a parameter denotes its entry value; in
   `ensures` it denotes the current value — the prophecy of a mutable
   reference — and `spec.old` reaches the entry. -/
   let labelDefinitions := stateDefinitions ns declaration.contract
   let contextOf (state : Lean.Expr) (bound : Array SlotBinders) : Context :=
-    { unit, namespaceId, ns
-      types := types, typeInstantiation := typeInstantiation
+    { unit, namespaceId, ns, interpretation := some signature.frame
+      types := types, typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments
       locals := padLocals (bound.map fun binders => some binders.entry)
       localTypes := functionLocalTypes
       localNames := declaration.locals.map (·.name)
       oldLocals := padLocals (bound.map fun binders => some binders.entry)
       results := #[]
-      state := some state, oldState := some state, executable, requiresMeaning
+      state := some state, oldState := some state, executable, requiresMeaning, directContract
       labelDefinitions
       labelEntry := some { memory := state, locals := padLocals (bound.map (some ∘ SlotBinders.entry)) }
       labelExit := some { memory := state, locals := padLocals (bound.map (some ∘ SlotBinders.entry)) } }
   let requiresTerm ← withLocalDeclD `arguments argumentsType fun arguments =>
     withLocalDeclD `state runtimeState fun state => do
-      let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
+      let bound ← parameterBinders signature.frame.carriers parameterSlots signature.argumentTypes arguments
       let context ← bindLets (contextOf state bound) groups.lets false
       let dataInvariants ← slotDataInvariantTerms context parameterSlots bound
-        (some ·.entryNative)
+        (some ·.entryNative) own.carriers
       -- Each clause marked, so that a caller's leaf owing it is keyed by it.
       let clauses ← groups.requires.mapM fun (clause, range) =>
         return markObligation range (← translate context clause)
@@ -3105,7 +3926,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
         (invariantApplies reach unit delegated) uses.applied uses.memory
         (some (typeArity declaration)) (some uses.written)
       let storedAssumed ← if assumesStored && storedInvariant.isSome then
-          pure #[← memoryInvariants state] else pure #[]
+          pure #[← storedDataInvariants state] else pure #[]
       let signers ← signerFacts context parameterSlots bound (some ·.entry)
       -- What a body applying hashes and serialization assumes: a role's
       -- meaning is the map model, which assumes none of it.
@@ -3119,12 +3940,12 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     withLocalDeclD `state runtimeState fun state =>
       withLocalDeclD `result resultType fun result =>
         withLocalDeclD `final runtimeState fun final => do
-          let parameterBound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
+          let parameterBound ← parameterBinders signature.frame.carriers parameterSlots signature.argumentTypes arguments
           let (resultBound, prophecies, finals, components) ←
             resultBinders unit resultSlots signature result
           let context : Context :=
-            { unit, namespaceId, ns
-              types := types, typeInstantiation := typeInstantiation
+            { unit, namespaceId, ns, interpretation := some signature.frame
+              types := types, typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments
               locals := padLocals (parameterBound.map fun binders => some binders.current)
               localTypes := functionLocalTypes
               localNames := declaration.locals.map (·.name)
@@ -3133,7 +3954,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
               resultFinals := finals
               resultComponents := components
               resultTypes := resultSlots.map (·.physical)
-              state := some final, oldState := some state, executable, requiresMeaning
+              state := some final, oldState := some state, executable, requiresMeaning, directContract
               labelDefinitions
               labelEntry := some {
                 memory := state, locals := padLocals (parameterBound.map (some ∘ SlotBinders.entry)) }
@@ -3142,28 +3963,31 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
           let context ← bindLets context groups.lets true
           let mut clauses ← groups.ensures.mapM fun (clause, range) =>
             return markObligation range (← translate context clause)
-          if let some (.uninterpreted resultLength function _) := nativeModel then
+          if let some (.uninterpreted resultLength function _ reflection) := nativeModel then
             clauses := clauses ++ (← uninterpretedResult context declaration resultLength
-              function parameterSlots parameterBound resultSlots resultBound)
+              function reflection parameterSlots parameterBound resultSlots resultBound)
           if let some .structuralOrder := nativeModel then
             clauses := clauses.push (← orderResult context parameterSlots parameterBound
               resultSlots resultBound)
+          if let some (.aggregator operation) := nativeModel then
+            clauses := clauses.push (← aggregatorEnsures (← signature.frame.concrete) operation
+              parameterSlots parameterBound resultSlots resultBound)
           if let some (role, model) := mapRole then
             let operands : RoleOperands := { role, slots := parameterSlots, bound := parameterBound
-                                             model, carriers := ← frameCarriers signature.skolems }
+                                             model, carriers := signature.frame.carriers }
             clauses := clauses ++ (← mapRoleEnsures { context with oldState := some state }
               operands resultSlots resultBound)
           let resultInvariants ← slotDataInvariantTerms context resultSlots resultBound
-            (some ·.entryNative)
+            (some ·.entryNative) own.carriers
           let resultSigners ← signerFacts context resultSlots resultBound (some ·.entry)
           let exitInvariants ← slotDataInvariantTerms context parameterSlots parameterBound
-            (·.exitNative)
+            (·.exitNative) own.carriers
           let dataInvariantObligations :=
             (resultInvariants ++ exitInvariants).map fun (clause, range) =>
               markObligation range clause
           let storedInvariants ← if storedInvariant.isNone then pure #[]
-            else if assumesStored then pure #[← memoryInvariants final]
-            else pure #[← mkArrow (← memoryInvariants state) (← memoryInvariants final)]
+            else if assumesStored then pure #[← storedDataInvariants final]
+            else pure #[← mkArrow (← storedDataInvariants state) (← storedDataInvariants final)]
           let invariants ← namespaceInvariantTerms context invariantResources .exit
             (invariantApplies reach unit delegated) (memory := uses.memory)
             (ghostBase := some (typeArity declaration)) (ghostMemory := some uses.written)
@@ -3190,14 +4014,16 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   let modelAborts (context : Context) (bound : Array SlotBinders) : MetaM (Option Lean.Expr) := do
     if let some (role, model) := mapRole then
       return ← mapRoleAborts context
-        { role, slots := parameterSlots, bound, model, carriers := ← frameCarriers signature.skolems }
-    let some (.uninterpreted _ _ (some predicate)) := nativeModel | return none
+        { role, slots := parameterSlots, bound, model, carriers := signature.frame.carriers }
+    if let some (.aggregator _) := nativeModel then
+      return some (← aggregatorAborts context declaration)
+    let some (.uninterpreted _ _ (some predicate) _) := nativeModel | return none
     let holds ← modelApplication context declaration predicate parameterSlots
       (bound.map (·.entry)) .boolean none
     return some (mkNot (← Domain.boolean.ofBinder holds))
   let abortConditionTerm ← withLocalDeclD `arguments argumentsType fun arguments =>
     withLocalDeclD `state runtimeState fun state => do
-      let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
+      let bound ← parameterBinders signature.frame.carriers parameterSlots signature.argumentTypes arguments
       let context ← bindLets (contextOf state bound) groups.lets false
       let clauses ← groups.abortsIf.mapM (translate context ·.condition)
       let body ← if declaredAborts then disjunction clauses
@@ -3207,13 +4033,18 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     withLocalDeclD `state runtimeState fun state =>
       withLocalDeclD `failure failure fun failureBinder => do
         if !declaredAborts && !hasCodes then
-          let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes
+          let bound ← parameterBinders signature.frame.carriers parameterSlots signature.argumentTypes
             arguments
           let permitted := (← modelAborts (contextOf state bound) bound).getD
-            (if isStrict then mkConst ``False else mkConst ``True)
+            -- Strictness supplies an implicit `aborts_if false`. In partial
+            -- mode it is sufficient only, just like an explicit clause;
+            -- it imposes no coverage requirement on an actual abort.
+            (if !isStrict || isPartial then mkConst ``True
+             else if declaration.body == .absent then mkConst ``False
+             else markObligation (noFailureRange ns declaration) (mkConst ``False))
           mkLambdaFVars #[arguments, state, failureBinder] permitted
         else
-          let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
+          let bound ← parameterBinders signature.frame.carriers parameterSlots signature.argumentTypes arguments
           let context ← bindLets (contextOf state bound) groups.lets false
           let mut matched : Array Lean.Expr := #[]
           let mut conditions : Array Lean.Expr := #[]
@@ -3253,7 +4084,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   -- Allocating a table records its handle in the allocation history, a
   -- slot no Move specification names: the frame of a function allocating
   -- one, itself or through a callee, leaves it open
-  -- (`doc/designs/intrinsic-maps.md`, "Owned Table values").
+  -- (`doc/designs/intrinsic-maps.md`, "Ownership of table contents").
   let allocates := allocatesTables unit namespaceId ns declaration
   let allocationSlot : Array (Lean.Expr × Lean.Expr) := if allocates then
       #[(mkConst ``VerexIR.Proofs.Denote.TableMemory.allocationResource,
@@ -3270,7 +4101,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
               if allocates then slotFrame initial final allocationSlot false
               else mkEq final initial
             else do
-              let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
+              let bound ← parameterBinders signature.frame.carriers parameterSlots signature.argumentTypes arguments
               -- A key may name a pre-state `let`.
               let context ← bindLets (contextOf initial bound) groups.lets false
               let slots ← declaration.contract.modifies.mapM (modifiedSlotTerm context)
@@ -3287,8 +4118,8 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
       let some executable := executable
         | throwError "internal: a contract assuming typing does not take the unit"
       let unitExpr ← executableUnit executable
-      let values ← rowProjections signature.skolems arguments signature.argumentTypes
-      let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
+      let values ← rowComponentsAt signature.frame.carriers arguments signature.argumentTypes
+      let bound ← parameterBinders signature.frame.carriers parameterSlots signature.argumentTypes arguments
       let mut conjuncts := #[]
       for (type, value, index) in signature.argumentTypes.zipWith (·, ·) values |>.zipIdx |>.map
           (fun ((type, value), index) => (type, value, index)) do
@@ -3306,35 +4137,57 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
           -- The value is typed by its carrier; an invocation's rows that
           -- mention the frame's type parameters are decided where the frame
           -- resolves them to scalars.
-          for invoked in #[row, type.getArg! 2] do
+          let methodEvidence := declaration.profile == .rust &&
+            declaration.attributes.any (fun
+              | .assign "method_evidence" (.constant (.integer parameter)) _ =>
+                  parameter == Int.ofNat index
+              | _ => false)
+          for invoked in (if methodEvidence then #[] else #[row, type.getArg! 2]) do
             if mentionsInvocableParameter invoked then
               conjuncts := conjuncts.push
                 (mkAppN (mkConst ``VerexIR.Proofs.ScalarAt)
-                  ((← frameLeading signature.skolems) ++ #[signature.skolems, invoked]))
+                  (signature.frame.leading ++ #[(← signature.frame.concrete), invoked]))
           -- Over a model, the frame is of the model's invocations.
-          let invoke? ← modelInvoke? executable signature.skolems
+          let invoke? ← modelInvoke? executable (← signature.frame.concrete)
+          -- A compiler-generated static method dictionary carries a checked
+          -- non-panicking, memory-preserving contract. Unlike the ordinary
+          -- function-value frame, this obligation applies to mutable receivers.
+          if methodEvidence then
+            conjuncts := conjuncts.push (← mkAppM'
+              (mkAppN (mkConst ``VerexIR.Proofs.MethodContract)
+                (signature.frame.leading ++ #[executable, (← signature.frame.concrete)]))
+              #[row, sharing, shape, value])
+          if declaration.profile == .rust && declaration.attributes.any (fun
+              | .assign "scoped_method_evidence" (.constant (.integer parameter)) _ =>
+                  parameter == Int.ofNat index
+              | _ => false) then
+            conjuncts := conjuncts.push (← mkAppM'
+              (mkAppN (mkConst ``VerexIR.Proofs.ReceiverScopedMethod)
+                (signature.frame.leading ++ #[(← signature.frame.concrete)]))
+              #[row, sharing, shape, value])
           match declaration.contract.parameterFrames.find? (·.parameter.index == index) with
           | none =>
-              conjuncts := conjuncts.push (← match invoke? with
-                | some invoke =>
-                    mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf)
-                      ((← frameLeading signature.skolems) ++ #[signature.skolems, invoke]))
-                      #[row, sharing, shape, value]
-                | none =>
-                    mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
-                      ((← frameLeading signature.skolems) ++ #[executable, signature.skolems]))
-                      #[row, sharing, shape, value])
+              unless methodEvidence do
+                conjuncts := conjuncts.push (← match invoke? with
+                  | some invoke =>
+                      mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf)
+                        (signature.frame.leading ++ #[(← signature.frame.concrete), invoke]))
+                        #[row, sharing, shape, value]
+                  | none =>
+                      mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
+                        (signature.frame.leading ++ #[executable, (← signature.frame.concrete)]))
+                        #[row, sharing, shape, value])
           | some frame =>
               -- The closed frame but for the targets, the formals bound to
               -- an invocation's arguments; `modifies_of<f> *` frames nothing.
               unless frame.modifiesAll do
                 let invocationType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList)
-                  ((← frameCarriers signature.skolems)) row
+                  (signature.frame.carriers) row
                 let frameTerm ← withLocalDeclD `invocation invocationType fun invocation =>
                   withLocalDeclD `pre runtimeState fun pre =>
                     withLocalDeclD `post runtimeState fun post => do
                       let componentTypes := rowElementTypes row
-                      let components ← rowProjections signature.skolems invocation componentTypes
+                      let components ← rowComponentsAt signature.frame.carriers invocation componentTypes
                       let mut context := contextOf pre bound
                       for (formal, component) in frame.formals.zip components do
                         let some physical := functionLocalTypes[formal.index]?
@@ -3348,11 +4201,11 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
                 conjuncts := conjuncts.push (← match invoke? with
                   | some invoke =>
                       mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.FramedAtOf)
-                        ((← frameLeading signature.skolems) ++ #[signature.skolems, invoke]))
+                        (signature.frame.leading ++ #[(← signature.frame.concrete), invoke]))
                         #[row, sharing, shape, frameTerm, value]
                   | none =>
                       mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.FramedAt)
-                        ((← frameLeading signature.skolems) ++ #[executable, signature.skolems]))
+                        (signature.frame.leading ++ #[executable, (← signature.frame.concrete)]))
                         #[row, sharing, shape, frameTerm, value])
       mkLambdaFVars #[arguments, initial] (← conjunction conjuncts)
   let contract ← mkAppOptM ``VerexIR.Proofs.Contract.mk
@@ -3360,7 +4213,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
       some requiresTerm, some assumesTerm, some ensuresTerm, some abortsTerm,
       some abortConditionTerm, some abortConditionTerm, some frameTerm]
   -- Verification is native (`doc/designs/native-verification.md`).
-  let name := ((ns.tables.names[declaration.name.index]?).map (·.name)).getD "a function"
+  let name := ((ns.nameOf declaration.name).map (·.name)).getD "a function"
   discard <| VerexIR.Proofs.Denote.reportRuntimeValues m!"the contract of `{name}`" contract
   return contract
 
@@ -3377,25 +4230,6 @@ private partial def pathSegments (stx : Syntax) : Array String :=
 private def pathName (segments : Array String) : Name :=
   segments.foldl (fun name segment => Name.str name segment) .anonymous
 
-/-- A function's own name, without its namespace path. -/
-private def functionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
-  let qualified? : Option VerexIR.QualifiedName := do
-    let ns ← unit.namespaces[handle.namespaceId.index]?
-    let declaration ← ns.functions[handle.functionId.index]?
-    unit.tables.names[declaration.name.index]?
-  (qualified?.map (·.name)).getD ""
-
-/-- A function's path-qualified name, in every namespace. -/
-def qualifiedFunctionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
-  let path := (unit.tables.namespaces[handle.namespaceId.index]?.map (·.segments)).getD #[]
-  "::".intercalate (path.push (functionName unit handle)).toList
-
-/-- A function's name relative to a unit: its own name in the unit's module,
-namespace 0, and its path-qualified name in another namespace. -/
-def functionKey (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
-  if handle.namespaceId.index == 0 then functionName unit handle
-  else qualifiedFunctionName unit handle
-
 /-- The prelude model a native is read by, beside what its specification
 states: the Move Prover's prelude defines a native whatever its
 specification adds. -/
@@ -3405,26 +4239,6 @@ def nativeModelOf? (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle)
     Option NativeModel :=
   if declaration.body == .absent then nativeModel? ns.profile (qualifiedFunctionName unit handle)
   else none
-
-/-- Locate one function of a registered unit by its key: its name in the
-unit's module, or its path-qualified name in another namespace. -/
-def findFunction? (unit : ValidatedUnit) (key : String) :
-    Option (Nat × ValidatedNamespace × Nat ×
-      VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) := do
-  let parts := (key.splitOn "::").toArray
-  let path := parts.pop
-  let name := parts.back?.getD key
-  for h : namespaceIndex in [0:unit.namespaces.size] do
-    let ns := unit.namespaces[namespaceIndex]
-    let owned := if path.isEmpty then namespaceIndex == 0 else
-      unit.tables.namespaces[ns.identity.index]?.map (·.segments) == some path
-    unless owned do continue
-    for h : index in [0:ns.functions.size] do
-      let declaration := ns.functions[index]
-      if let some qualified := unit.tables.names[declaration.name.index]? then
-        if qualified.name == name then
-          return (namespaceIndex, ns, index, declaration)
-  none
 
 /-- Which clauses of a contract hold where: a `[concrete]` clause is proved
 of the function's body, an `[abstract]` one is what its callers see of it,
@@ -3456,6 +4270,16 @@ def ContractView.of (view : ContractView)
   { declaration with contract := { declaration.contract with
       conditions := declaration.contract.conditions.filter (!markedAs excluded ·) } }
 
+/-- Whether a function's aborts are exact, as the Move Prover's
+`spec_aborts_are_exact` reads them: its callers see an `aborts_if`, and it is not
+`aborts_if_is_partial`. Of a view of the declaration. -/
+def abortsAreExact (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
+  let isPartial := pragmaEnabled declaration.contract "aborts_if_is_partial" ||
+    declaration.pragmas.any fun
+      | .assign name (.constant (.bool true)) _ => name == "aborts_if_is_partial"
+      | _ => false
+  !isPartial && declaration.contract.conditions.any (·.kind == .abortsIf)
+
 /-- The precondition of a function where it starts, as its caller owes it
 at the call: its `requires` clauses in the view its callers see,
 over its parameters' values (`locals`, the other locals unbound) and the
@@ -3470,7 +4294,7 @@ def startPrecondition (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (state : Lean.Expr) (executable : Option Lean.Expr) :
     MetaM Lean.Expr := do
   let conditions := (ContractView.interface.of declaration).contract.conditions
-  let groups ← groupConditions unit conditions
+  let groups ← groupConditions ns conditions
   let context : Context := {
     unit, namespaceId, ns, locals, oldLocals := locals, localTypes,
     localNames := declaration.locals.map (·.name), results := #[], types,
@@ -3478,7 +4302,7 @@ def startPrecondition (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   let context ← bindLets context groups.lets false
   conjunction (← (conditions.filter fun condition => condition.kind == .requires &&
       !conditionReadsRequires unit namespaceId condition.expression).mapM fun condition => do
-    pure (markCondition unit condition (← translate context condition.expression)))
+    pure (markCondition ns condition (← translate context condition.expression)))
 
 /-- Name of the generated contract definition. -/
 def contractName (namespaceSegments : Array String) (function : String) : Name :=
@@ -3511,31 +4335,91 @@ def unitName (namespaceSegments : Array String) : Name :=
 def functionCarriersName (namespaceSegments : Array String) : Name :=
   Name.str (pathName namespaceSegments) "functionCarriers"
 
+/-- Name of the unit's function values before its data invariants are
+stated of them: the same carriers with `Carriers.own` at its default, which
+the declarations' invariants are generated over so that they are closed
+before the instance proper exists (`doc/designs/data-invariants.md`,
+"Data invariants").  A definition, not an instance, so that resolution never
+picks the own-free family in a theorem. -/
+def functionCarriersBaseName (namespaceSegments : Array String) : Name :=
+  Name.str (pathName namespaceSegments) "functionCarriersBase"
+
+/-- Name of the proof that a unit's base function values state no data
+invariant, and of the inhabitants of its certified carriers that proof
+gives: what the declarations' invariants are generated over, before the
+instance proper exists (`functionCarriersBaseName`). -/
+def ownTrivialBaseName (namespaceSegments : Array String) : Name :=
+  Name.str (pathName namespaceSegments) "ownTrivialBase"
+def carriersNonemptyBaseName (namespaceSegments : Array String) : Name :=
+  Name.str (pathName namespaceSegments) "carriersNonemptyBase"
+
+/-- Name of a unit's `Carriers.own`: the data invariants its declarations
+state, selected by a declaration's handle
+(`doc/designs/data-invariants.md`). -/
+def dataOwnName (namespaceSegments : Array String) : Name :=
+  Name.str (pathName namespaceSegments) "dataOwn"
+
+/-- Name of the equation reading a unit's `Carriers.own` as that predicate:
+what an obligation at a pack or a loan's death reduces through, after
+`Carriers.own_runtime` has reached the field. -/
+def ownEqName (namespaceSegments : Array String) : Name :=
+  Name.str (pathName namespaceSegments) "ownEq"
+
+/-- A location as `file:line:column` when its source is readable, else its
+byte offset. -/
+private def locPosition (ns : ValidatedNamespace) (loc : VerexIR.LocId) : IO String := do
+  let range := locRange ns loc
+  let contents ← (some <$> IO.FS.readFile range.file) <|> pure none
+  match contents with
+  | some text =>
+      let position := (FileMap.ofString text).toPosition ⟨range.startByte⟩
+      pure s!"{range.file}:{position.line}:{position.column + 1}"
+  | none => pure s!"{range.file}:byte {range.startByte}"
+
 /-- Define the registered unit as a Lean literal, once per namespace. -/
 def ensureUnitDefinition (namespaceSegments : Array String)
     (unit : ValidatedUnit) : CommandElabM Name := do
   let name := unitName namespaceSegments
-  if (← getEnv).contains name then return name
-  -- A theorem holds of the unit as preparation admits it: a unit the static
-  -- checker refuses would make every theorem about it vacuous.
+  if (← getEnv).contains name then
+    let authoritative := (VerexSL.registeredUnit? (← getEnv) name.getPrefix).getD unit
+    liftTermElabM <| VerexIR.Proofs.Denote.registerNominalUnit name authoritative
+    return name
+  -- A theorem holds of the unit as preparation admits it. Preparation may not
+  -- refuse its loans; typing reads the certificates a rejection withholds.
+  -- A rejection is located in its namespace's tables; a loan-death
+  -- diagnostic has no location.
+  let loanErrors : Array (Option ValidatedNamespace × VerexIR.Validation.Diagnostic) :=
+    let rejections := unit.ownedBorrowDiagnostics.map
+      fun (entry : ValidatedNamespace × VerexIR.Validation.Diagnostic) => (some entry.1, entry.2)
+    let deaths := (VerexIR.Validation.loanDeathDiagnostics unit).map
+      fun (d : VerexIR.Validation.Diagnostic) => ((none : Option ValidatedNamespace), d)
+    (rejections ++ deaths).filter fun entry => entry.2.severity == .error
+  unless loanErrors.isEmpty do
+    let lines ← loanErrors.toList.mapM fun (ns?, d) => do
+      let located (loc : VerexIR.LocId) : IO String := match ns? with
+        | some ns => locPosition ns loc
+        | none => pure ""
+      let related ← d.related.toList.mapM fun r => do
+        pure s!"\n  {r.message}: {← located r.loc}"
+      let position ← match d.primary with
+        | some loc => located loc
+        | none => pure ""
+      pure s!"{d.code}: {d.message} at {position}{String.join related}"
+    throwError m!"the borrow analysis rejects the unit, so preparation refuses it:\n\
+      {"\n".intercalate lines}"
+  -- A unit the static checker refuses would make every theorem about it vacuous.
   let failures := VerexIR.Validation.StaticTyping.unitFailures unit
     (VerexIR.Validation.targetPointerWidth? unit)
   unless failures.isEmpty do
     throwError m!"the unit is not statically typed, so preparation refuses it:\n\
       {"\n".intercalate failures.toList}"
-  -- Nor may preparation refuse its loans.
-  let loanErrors := (unit.borrowDiagnostics ++ VerexIR.Validation.loanDeathDiagnostics unit).filter
-    (·.severity == .error)
-  unless loanErrors.isEmpty do
-    throwError m!"the borrow analysis rejects the unit, so preparation refuses it:\n\
-      {"\n".intercalate (loanErrors.toList.map fun d => s!"{d.code}: {d.message}")}"
   -- Nor may execution preparation refuse it under every registry.
   let refusals := VerexIR.Validation.executionRefusals unit
   unless refusals.isEmpty do
     throwError m!"execution preparation refuses the unit under every registry, so its \
       theorems would be vacuous:\n\
       {"\n".intercalate (refusals.toList.map fun d => s!"{d.code}: {d.message}")}"
-  let value ← VerexSL.Quote.quoteUnit unit
+  let value ← VerexSL.Quote.quoteUnit unit (registeredObject? (← getEnv))
   liftTermElabM do
     addDecl (.defnDecl {
       name, levelParams := []
@@ -3543,6 +4427,8 @@ def ensureUnitDefinition (namespaceSegments : Array String)
       value
       hints := .abbrev, safety := .safe })
     enableRealizationsForConst name
+  modifyEnv (recordDefinedUnit · name.getPrefix unit)
+  liftTermElabM <| VerexIR.Proofs.Denote.registerNominalUnit name unit
   return name
 
 /-- Prefix of a namespace's compilation artifacts: its compile views, key
@@ -3554,18 +4440,14 @@ def semanticsName (namespaceSegments : Array String) : Name :=
 def pointerWidthEqName (namespaceSegments : Array String) : Name :=
   Name.str (pathName namespaceSegments) "targetPointerWidth_eq"
 
-/-- Quote the registered unit once per namespace, with the typed twins of
-its declarations and the kernel's evaluation of its target
-pointer width. The semantics reads the validated unit itself, so there is
-no prepared unit to certify. -/
+/-- Quote the registered unit once per namespace, with the kernel's
+evaluation of its target pointer width. The semantics reads the validated
+unit itself, so there is no prepared unit to certify. -/
 def ensureUnitDefinitions (namespaceSegments : Array String)
     (unit : ValidatedUnit) : CommandElabM Name := do
   let unitDefinition ← ensureUnitDefinition namespaceSegments unit
   let widthEqName := pointerWidthEqName namespaceSegments
   if (← getEnv).contains widthEqName then return widthEqName
-  -- An inductive declaration waits for every pending kernel check: the twin
-  -- structures come first.
-  discard <| SpecTypes.ensureSpecTypes namespaceSegments unit
   let width := VerexIR.Validation.targetPointerWidth? unit
   liftTermElabM do
     addDecl (.thmDecl {

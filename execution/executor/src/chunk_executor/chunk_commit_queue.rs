@@ -54,6 +54,12 @@ pub struct ChunkCommitQueue {
     /// Native-position summary chained across chunks (the parent the next
     /// chunk rebases from). `None` when native position is disabled.
     latest_position_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
+    /// Native-collateral summary chained across chunks, as
+    /// `latest_position_state_summary` is.
+    latest_collateral_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
+    /// Native-order summary chained across chunks, as
+    /// `latest_position_state_summary` is.
+    latest_order_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
     /// `PositionOverlay` chained across chunks — the parent the next
     /// chunk extends from.
     ///
@@ -90,6 +96,8 @@ impl ChunkCommitQueue {
             state_summary,
             transaction_accumulator,
             position_state_summary,
+            order_state_summary,
+            collateral_state_summary,
             positions,
             orders,
             collateral,
@@ -127,6 +135,8 @@ impl ChunkCommitQueue {
             latest_state: state,
             latest_state_summary: state_summary,
             latest_position_state_summary: position_state_summary,
+            latest_order_state_summary: order_state_summary,
+            latest_collateral_state_summary: collateral_state_summary,
             latest_positions: positions.clone(),
             committed_positions: positions,
             latest_orders: orders.clone(),
@@ -184,6 +194,8 @@ impl ChunkCommitQueue {
     ) -> Result<(
         LedgerStateSummary,
         Option<LedgerWithSummary<NativeStateWithSummary>>,
+        Option<LedgerWithSummary<NativeStateWithSummary>>,
+        Option<LedgerWithSummary<NativeStateWithSummary>>,
         Arc<InMemoryTransactionAccumulator>,
         ChunkToUpdateLedger,
     )> {
@@ -197,6 +209,8 @@ impl ChunkCommitQueue {
         Ok((
             self.latest_state_summary.clone(),
             self.latest_position_state_summary.clone(),
+            self.latest_order_state_summary.clone(),
+            self.latest_collateral_state_summary.clone(),
             self.latest_txn_accumulator.clone(),
             chunk,
         ))
@@ -222,6 +236,16 @@ impl ChunkCommitQueue {
             .output
             .ensure_state_checkpoint_output()?
             .position_state_summary
+            .clone();
+        self.latest_order_state_summary = chunk
+            .output
+            .ensure_state_checkpoint_output()?
+            .order_state_summary
+            .clone();
+        self.latest_collateral_state_summary = chunk
+            .output
+            .ensure_state_checkpoint_output()?
+            .collateral_state_summary
             .clone();
         self.latest_txn_accumulator = chunk
             .output

@@ -1,4 +1,5 @@
 Move prover returns: exiting with verification errors
+tests/sources/functional/intrinsic_map_key_order.move:50:9: error: the specification clause `ensures n == spec_len(old(m)) + 1` is not established
 tests/sources/functional/intrinsic_map_key_order.move:51:9: error: the specification clause `ensures spec_key_at(m, n - 1).price >= k.price` is not established
 tests/sources/functional/intrinsic_map_key_order.move:52:9: error: the specification clause `ensures spec_len(old(m)) > 0
         ==> spec_key_at(m, n - 1).price
@@ -7,6 +8,7 @@ tests/sources/functional/intrinsic_map_key_order.move:48:5: error: verex verific
   verify add_bounds_largest by lean =>
     verex_obligations
     verex_on
+    | ensures_1 => verex_prepare; sorry
     | ensures_2 => verex_prepare; sorry
     | ensures_3 => verex_prepare; sorry
     | _ => verex_decide

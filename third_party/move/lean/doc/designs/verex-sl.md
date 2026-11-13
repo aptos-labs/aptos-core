@@ -152,6 +152,58 @@ identifiers instead of forcing guillemets. Numeric tuple fields keep their
 `.0`, `0 : T`, and `{ 0 := value }` spellings. Semantic round trip is
 alpha-equivalence for binders, not textual binder-name equality.
 
+### Scopes
+
+A Rust crate is one namespace, and a Rust module is a naming scope inside it,
+as a Lean `namespace` is; so is what an associated function belongs to. A name
+carries its scope, a path relative to the namespace (`QualifiedName.scope`), and
+the namespace declares its scopes with their locations and kinds
+(`Namespace.scopes`). Move names have none; a scope in a Move namespace is an
+error. A scope is an item of `verex namespace`, reopenable, and its keyword
+states its kind:
+
+```lean
+verex namespace shapes where
+  struct Counter where
+    value : u32
+
+  impl Counter where                  -- the type of an inherent impl
+    fun add (self : Counter, amount : u32) -> u32 := self.value + amount
+
+  mod area where                      -- a module; only a module nests scopes
+    fun square (side : u32) -> u32 := side * side
+
+  trait Step where                    -- a trait's methods
+    native fun step (value : u32) -> u32
+
+  trait impl «<shapes::Counter as std::ops::Drop>» where   -- a trait impl's
+    fun drop (_1 : &mut Counter) -> Unit := ()
+```
+
+The name of a scope is one opaque segment, as the exporter writes it, quoted
+where it is no identifier; the path of a trait impl is its rustc spelling. The
+keyword carries the kind, so reopening a scope with another keyword is an error
+(`VEREX-SCOPE-KIND`). `use`, `friend`, namespace pragmas and `spec module` belong
+to the namespace and are rejected in a scope.
+
+Inside a scope a declaration is named bare. A path resolves from the innermost
+scope outward: each enclosing scope with the path appended, then the namespace's
+`use` paths, then the namespace root, then a namespace of the unit by its own
+path, longest first, the rest of the path a scope in it. It looks for a declaration of the
+kind the use wants, so a struct and a scope may share a name, as `Counter` does.
+The rendering prints the shortest path that resolves back to its target, and the
+namespace's full path where an inner scope hides every shorter one. A
+`spec` item names a function of its own scope; a reopened block may state it.
+Proof files name targets by path from the namespace root (`verify area::square`,
+`verify Counter::add`), and a proof step's expression resolves as one in its
+function does.
+
+A dependency crate is a namespace of the unit with `pragma verify = false`,
+rendered before the crate that uses it. A function of it is `native fun`, the
+Rust property `function.dependency`, declared by its signature. A type whose shape
+the crate does not observe is `opaque struct`, the Rust property `struct.opaque`,
+which is neither constructed nor destructured.
+
 ## Grammar overview
 
 `[...]` is optional, `...` repetition, and capitalized words such as `Expr`
@@ -186,6 +238,10 @@ NamespaceItem ::=
   | SpecVarDecl
   | NamespaceCondition
   | IntrinsicDecl
+  | ScopeItem
+
+ScopeItem ::=
+  ("mod" | "impl" | "trait" | "trait" "impl") Ident "where" NamespaceItem*
 
 GenericBinder ::=
   "{" Ident ":" ("type" | "const" | "lifetime" | "evidence")
@@ -237,6 +293,7 @@ Place ::=
   | Place "[" Nat ".." Nat "]"
   | Place "[" Nat "..^" Nat "]"
   | "downcast" Place "as" Path "::" Ident
+  | "unsize" Place
 
 Expr ::=
   Const | Path | Ident | Operation
@@ -313,7 +370,10 @@ Verex exposes the four VIR binder sorts: `{T}`, `{N : const}`,
 binders, not implicit Lean arguments. An unannotated binder is a type
 binder; `: type` is written only for a phantom parameter
 (`{T : phantom type}`). Type binders may carry the core abilities
-(`{T has Copy, Drop, Store}`); other constraints use a `where` block:
+(`{T has Copy, Drop, Store}`). A lifetime binder may declare region bounds,
+for example `{a : lifetime outlives b, static}`; these lower to core
+`lifetimeOutlives` predicates and survive canonical printing and reimport.
+The general trait-constraint design uses a `where` block:
 
 ```lean
 where
@@ -359,6 +419,7 @@ interned node.
 | Unbounded integers | `Nat`, `Int` |
 | Tuple | `(T₁, ..., Tₙ)` |
 | Dynamic, fixed vector | `Vector<T>`, `Vector<T, const N>` |
+| Unsized slice | `Slice<T>` (accessed through references at runtime) |
 | Logical range, event store | `Range`, `EventStore` |
 | Type, resource, state domain | `TypeDomain<T>`, `ResourceDomain<R<...>>`, `StateDomain` |
 | Nominal type | `path::Name::<...>` |
@@ -380,7 +441,12 @@ language equals the enclosing namespace profile; the explicit cross-profile
 annotation `&[rust] 'a mut T` is reserved for the adapter design.
 Lifetimes are `'static`, named parameter lifetimes, `_` for inference, and
 generated local lifetimes; canonical printing may give a local lifetime a
-stable generated name when `_` would lose constraints.
+stable generated name when `_` would lose constraints. Every `_` of a namespace
+is its one inference lifetime: Move references carry no lifetimes, and a Rust
+body's regions are erased at export, into the one lifetime the rendered unit
+then has too, so that the borrow analysis reads the same lifetimes in both.
+A signature's named lifetimes stay, each one lifetime wherever it is mentioned. The
+borrow analysis relates them, and an elided lifetime in a signature relates to all.
 
 Dynamic and fixed vectors share one VIR constructor; the optional length is
 a closed nonnegative const. Tuples may be empty or unary. A function has one
@@ -511,13 +577,16 @@ output may suffix the name to keep identities visible.
 ## Places and ownership operations
 
 ```text
-p ::= x | *p | p.field | p[e] | p[start..stop] | p[start..^stop]
-    | downcast p as Type::Variant
+p ::= x | *p | p.field | p[e]
+    | core.subslice[start, stop](p) | core.subsliceFromEnd[start, stop](p)
+    | downcast p as Type::Variant | unsize p
 ```
 
-`p[start..^stop]` means `start .. length(p) - stop`. A downcast refines an
+`core.subsliceFromEnd[start, stop](p)` means `start .. length(p) - stop`. A downcast refines an
 enum place to one variant before selecting its fields; tuple fields use
-constant indexes. Ownership operations are explicit so partial moves and
+constant indexes. `unsize p` is the whole of a fixed array as an unsized slice,
+which only a borrow reads: `&(unsize p)` is the coercion of `&[T; N]` to `&[T]`,
+and `&mut (unsize p)` preserves the backing array's extent through its mutable slice type. Ownership operations are explicit so partial moves and
 non-consuming reads survive a fresh elaboration:
 
 ```lean
@@ -528,7 +597,8 @@ read(place)    -- non-consuming place read (Rust CopyForDeref)
 &place         -- shared reference
 &mut place     -- mutable reference
 place := value -- write through a place
-drop(place)    -- destroy a Drop value
+drop(place)    -- destroy a Drop value; in Rust, `@[destructor]` on a struct or
+               -- enum states its drop runs a destructor, which has no denotation
 ```
 
 The profile and the ability and borrow checker decide which are legal;
@@ -601,7 +671,8 @@ uses labels (`loop@outer`, `break@outer`), and unknown labels are rejected.
 Loops are expressions and may produce a value through `break`. A body that
 can fall through must match its declared result type; a loop body, an `if`
 without `else`, and a fall-through pattern assignment have type `Unit`.
-Abrupt control is polymorphic through `Never`.
+Abrupt control is polymorphic through `Never`. An `else` left of the offside
+column of the enclosing block belongs to an `if` outside that block.
 
 `for iterator in lower..upper do` is the half-open range loop. Each bound is
 evaluated once, in order. Lowering expands it to typed locals, a `loop`, a
@@ -633,6 +704,8 @@ new Type { field := value }
 new Type::Variant { field := value }
 function[FnType](target, captures...)
 invoke(callable, arguments...)
+closure Name Binders (has Abilities)? (field : Type := value, ...)
+  fun call Binders (self : &Name<...>, parameters...) -> Result := body
 core.call_extension profile[...] targets[...] (arguments...)
 ```
 
@@ -654,8 +727,17 @@ A closure names an ordinary function and captures its parameter prefix; its
 result type is the residual function type. `invoke` takes the callable
 first. Direct calls and closure construction substitute type, const,
 lifetime, and evidence arguments and are checked against the full
-signature. Caller and target share a profile; a cross-profile call needs an
-explicit validated adapter.
+signature. A call spells only type arguments: each lifetime binder of its
+target takes the inference lifetime. Caller and target share a profile; a
+cross-profile call needs an explicit validated adapter.
+
+`closure` is a Rust closure, where the function around it first constructs it: it
+declares the struct `Name` of its captures, in the enclosing module, and the function in
+the struct's scope
+(`impl Name`), and constructs the struct with the values. Lowering makes both items of
+the module, so the function's body is a function of its own: its locals, sites and loop
+numbers are not those of the body around it, and `impl Name where spec call where`
+addresses its contract. The function is called as `Name::call(&g, 1u32)`.
 
 ## Primitive operations
 
@@ -718,6 +800,7 @@ core.data.select[Type, field](value)
 core.data.selectVariants[Type, Variant₁.field₁, ...](value)
 core.data.testVariants[Type, Variant₁, ...](value)
 core.data.discriminant[Type](value)
+core.readDiscriminant[ResultType](place)
 core.data.updateField(value, field, replacement)
 ```
 
@@ -728,6 +811,18 @@ field, so the core form is printed only for a selection of some of them
 (Move's `x.Variant.field`). Functional field updates are specification
 expressions preserving the variant and the other fields; updates on
 intrinsic maps and on fields absent from some variants are not supported.
+
+`core.readDiscriminant` reads the tag directly from initialized enum storage,
+without reading or moving its payload. It can therefore read an enum whose
+payload is partially moved. The value-based `core.data.discriminant` remains
+available when the whole value is initialized.
+
+Slice places use `unsize place` for a whole fixed-array view,
+`core.subslice[start, stop](place)` for an absolute subrange, and
+`core.subsliceFromEnd[start, endOffset](place)` for a range whose upper bound
+is measured from the sequence's end. These places are read through a borrow;
+for example, `(&(unsize values)).length`. Arbitrary mutable subrange borrows
+remain unsupported.
 
 ## Global storage
 
@@ -838,6 +933,18 @@ from a specification position resolves to the derived interpretation; no
 separate `spec fun` is needed. Where no translation exists, the use is an
 error and the author provides a `spec fun` or an opaque model.
 
+The interpretation has no reading of an effect, so calling an impure function
+in a specification is an error at the call, naming what makes it impure, in
+every profile. A function with a body is impure when, transitively, the body
+borrows `&mut`, mutates or drops through a `&mut`, writes global storage, or
+calls a function value. One without a body is impure when its signature holds a
+`&mut`. A function taking `&mut` only to read through it stays callable, and so
+does one rebinding its own locals, which the reading threads. This goes beyond
+Move's `pureness_checker`, which accepts a global write and a function value,
+since either would be read as nothing here. The state operations of a
+specification (`publish`, `remove`, `update`) are values over labelled states,
+not effects.
+
 Abort behavior is not part of a derived specification function: assertions,
 explicit aborts, and arithmetic failures impose no condition on its logical
 result, and an aborting path has an unspecified value. The derived body is
@@ -904,11 +1011,16 @@ spec f (x : T) where
 | Bindings | `let_pre`, `let_post` |
 | Local proof commands | `assert`, `assume`, `decreases`, `update` |
 | Function behavior | `requires`, `ensures`, `aborts_if`, `aborts_with`, `succeeds_if`, `emits`, `function_invariant`, `loop_invariant` |
+
+The failure clause `aborts_if` is one condition under either profile and
+each profile spells it: `aborts_if`, with an optional code, under Move, and
+`panics_if`, which takes none, under Rust, whose only exceptional outcome is
+a panic and which spells neither `aborts_if` nor `aborts_with`.
 | Data and namespace | `struct_invariant`, `global_invariant`, `global_invariant_update`, `schema_invariant`, `axiom` |
 
 A profile guide may adapt the surface vocabulary only when the adapted form
 lowers to the same condition. A Rust-profile program never panics: every
-Rust function has an implicit `aborts_if false`; `panic` stays
+Rust function has an implicit `panics_if false`; `panic` stays
 representable so the verifier proves it unreachable. A condition has one
 principal expression plus named auxiliary expressions (an abort code, an
 event payload); attributes on conditions preserve their properties.
@@ -953,6 +1065,55 @@ save_state_anchor!(n)` records the locals and state at its point, and
 `with_state_anchor!(n, e)` in a later assertion reads them as `old` inside
 `e`.
 
+A function's `spec` item can state a loop's conditions outside the body, for
+a body the item's file does not hold, as a Rust file's specification file does:
+
+```lean
+spec sum where
+  requires n <= 1000
+  loop 1 where
+    let bound := n
+    invariant i <= bound
+```
+
+`loop k` is the function's `k`-th loop in the rendered body's source order,
+from 1, as the proof language numbers it: a nested loop follows the loop
+around it, and a `for` is a loop that holds no invariants. Lowering places the
+conditions where an in-body loop specification goes, so a printed unit shows
+them in the loop, and its obligations are `invariant 2 of loop 1 entry` and
+`… step`, numbered among the function's invariants by their source order. A
+`loop k` the function does not have, or a second item for one loop, is an
+error at the item; a name the loop does not have in scope is an error at the
+clause. The item holds invariants and the `let` bindings they read; facts and
+proof steps at a loop are proof steps at its points (`at loop 1 entry`).
+
+A function without a body in the Rust profile can state its contract at shapes
+of its generics, each a `spec` item of its own:
+
+```lean
+native fun index {T} {I} {A} {Output}(_1 : &Vec<T, A>, _2 : I) -> &Output
+spec index at {T} {usize} {A} {T} where
+  requires _2 < vec_length(_1)
+  ensures result == vec_at(_1, _2)
+```
+
+`at` has one type per type binder of the function, in the order of its binders,
+and spells no lifetime binder, which is elided in the signature at the shape. A bare
+name that is one of the function's binders is a
+variable of the shape, here `T` and `A`, at any position, as `T` stands at
+`Output`; any other bare name must name a type (`VEREX-SHAPE-NAME`). The item is
+a generic contract over the variables, whose parameters and result are the function's
+at the shape, so `_2` is a `usize` and `result` a `&T`. A variable may repeat
+(`{T} {T}`). A call uses the shape its type arguments match, its own parameters
+rigid: `unwrap_or` at a caller's `{T}` matches `{T}` and not `{u32}`. Two shapes
+one instantiation could match are an error at the later item, and a contract
+without `at` overlaps every shape (`VIR-SHAPE-OVERLAP`). `{usize}` and the integer
+of its width are distinct shapes, which must state one contract. A call matching no shape
+has no contract and is rejected at its location, naming its type arguments and
+the shapes. A shape on a function with a body is rejected (`VIR-SHAPE-BODY`), as
+is a function value of a function with shapes. A shape holds pragmas and clauses,
+not `loop` items.
+
 Pragmas are the leading entries of a contract. Verex does not support Move
 schemas, so `include` is an ordinary identifier. Byte-vector pragma payloads
 use byte strings (`pragma bv = b"0"` is the byte 48).
@@ -977,13 +1138,13 @@ The canonical `spec.*` vocabulary maps one-to-one to `SpecOperation`:
 
 | Family | Operations |
 |---|---|
-| Calls and results | `functionCall`, `result` |
+| Calls and results | `functionCall`, `lemma`, `result` |
 | Domains | `typeValue`, `typeDomain`, `resourceDomain`, `stateDomain` |
-| State and frames | `global`, `canModify`, `old`, `final`, `saveStateAnchor`, `withStateAnchor`, `foldsCaptureAnchor`, `inlineCallSummary` |
-| Function behavior | `requiresOf`, `abortsOf`, `ensuresOf`, `resultOf`, `unchangedOf`, `foldsOf`, `writeOf(index)` |
-| Tracing | `traceUser`, `traceAutomatic`, `traceSubAutomatic` |
+| State and frames | `global`, `exists`, `canModify`, `old`, `final`, `saveStateAnchor`, `withStateAnchor`, `foldsCaptureAnchor`, `inlineCallSummary` |
+| Function behavior | `behavior(kind)`, `kind` a `BehaviorKind`: `requiresOf`, `abortsOf`, `ensuresOf`, `resultOf`, `unchangedOf`, `foldsOf`, `writeOf(index)` |
+| Tracing | `trace(kind)`, `kind` a `TraceKind`: `user`, `automatic`, `subAutomatic` |
 | Logical resources | `publish`, `remove`, `update` |
-| Vectors | `emptyVector`, `singletonVector`, `updateVector`, `concatVector`, `indexOfVector`, `containsVector`, `inRange`, `inVectorRange`, `vectorRange` |
+| Vectors | `emptyVector`, `singletonVector`, `updateVector`, `concatVector`, `indexOfVector`, `containsVector`, `lengthVector`, `indexVector`, `sliceVector`, `inRange`, `inVectorRange`, `vectorRange` |
 | Integers and bit vectors | `maxValue`, `bitVectorToInt`, `intToBitVector` |
 | Execution observations | `abortFlag`, `abortCode`, `wellFormed` |
 | Boxing | `boxValue`, `unboxValue` |
@@ -1000,7 +1161,11 @@ the mutable-reference argument selected by `index` and is an internal
 canonical form. `final(result)` names the final value of a returned mutable
 reference, the value its lender holds once the caller's writes through it
 end (`ensures cell.value == final(result)`); without `final`, a returned
-reference reads as its current value. The shared checker types all
+reference reads as its current value. It reads a reference the result
+*carries* as well as one the result is, by a projection of the result
+(`final(result.0)` of an `Option<&mut T>` the model of `slice::get_mut`
+writes back into the slice); in a loop invariant it reads a place holding
+a reference. The shared checker types all
 specification operations before a verification backend receives them.
 
 ## Intrinsics
@@ -1050,8 +1215,10 @@ evidence.
 Canonical output consumes only `ValidatedUnit`, checked registries, and
 source maps; prints headers, imports, binder sorts, and ambiguous operation
 kinds; prefers sugar only where re-elaboration selects the same
-constructor; names unnamed or colliding locals, lifetimes, and evidence
-stably; preserves every semantic node; prints structured bodies; emits a
+constructor; names unnamed or colliding locals, lifetimes (Rust's `'_` binder
+as `l<index>`), and evidence stably; declares a local `mut` where what follows
+its binding writes it or borrows it mutably; preserves every semantic node;
+prints structured bodies; emits a
 reverse source map from byte ranges to VIR IDs, provenance only in
 sidecars; and reports a located capability error rather than dropping a
 node. The required law is profile-aware alpha-equivalence:

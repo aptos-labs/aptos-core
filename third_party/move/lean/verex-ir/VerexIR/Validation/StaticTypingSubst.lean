@@ -120,6 +120,7 @@ theorem constTyped_subst {pointerWidth : Option Nat} :
           exact constsTyped_subst elements.toList types typed
       | _ => simp [constTyped] at typed
   | .profile _, type, typed => by simp [constTyped] at typed
+  | .opaque _, type, typed => by simp [constTyped] at typed
 
 theorem constsTypedEach_subst {pointerWidth : Option Nat} :
     ∀ (values : List ConstValue) (type : SemTy), constsTypedEach pointerWidth values type = true →
@@ -146,7 +147,7 @@ theorem all_eq_subst {types : List SemTy} {type : SemTy}
   rintro _ ⟨element, member, rfl⟩
   rw [all element member]
 
-theorem primitiveTyped_subst {pointerWidth : Option Nat} {operation : PrimitiveOperation}
+theorem primitiveTyped_subst (sizedArguments : SizedArguments arguments) {pointerWidth : Option Nat} {operation : PrimitiveOperation}
     {operands : List SemTy} {result : SemTy}
     (typed : primitiveTyped pointerWidth operation operands result = true) :
     primitiveTyped pointerWidth operation (operands.map (·.subst arguments))
@@ -224,6 +225,10 @@ theorem primitiveTyped_subst {pointerWidth : Option Nat} {operation : PrimitiveO
         simp only [Bool.and_eq_true, beq_iff_eq] at typed
         obtain ⟨integral_, rfl⟩ := typed
         simp [SemTy.subst, integral_subst integral_, integral_]
+    | [.slice element, index], typed =>
+        simp only [Bool.and_eq_true, beq_iff_eq] at typed
+        obtain ⟨integral_, rfl⟩ := typed
+        simp [SemTy.subst, integral_subst integral_, integral_]
   case compare =>
     simp only [Bool.and_eq_true] at typed
     rw [holds_subst typed.1.1]
@@ -246,7 +251,9 @@ theorem primitiveTyped_subst {pointerWidth : Option Nat} {operation : PrimitiveO
     match result, typed with
     | .tuple [value, .bool], typed => simp [SemTy.subst, SemTy.substList, fixedInteger_subst typed, typed]
   case copyValue | moveValue =>
-    simp only [beq_iff_eq] at typed ⊢; subst typed; rfl
+    simp only [Bool.and_eq_true, beq_iff_eq] at typed ⊢
+    obtain ⟨sized, rfl⟩ := typed
+    exact ⟨SemTy.sized_subst sizedArguments result sized, rfl⟩
 
 private theorem List.mapM_argSubst {α : Type} {f g : α → Option SemArg} :
     ∀ {xs : List α} {ys : List SemArg}, xs.mapM f = some ys →
@@ -431,10 +438,8 @@ theorem selected_subst {operand result : SemTy} {field field' : SemTy → Bool}
   · exact .inl (step _ direct)
   · right
     split at through
-    · rename_i kind _ resultKind referent
-      simp only [Bool.and_eq_true] at through
-      simp only [SemTy.subst, Bool.and_eq_true]
-      exact ⟨through.1, step _ through.2⟩
+    · simp only [SemTy.subst]
+      exact step _ through
     · cases through
 
 end Context
@@ -543,6 +548,18 @@ theorem placeType_subst {context : Context} :
                   simp [integral_subst integral_, integral_]
                 · cases found
               · cases found
+          | slice element =>
+              simp only [SemTy.subst] at found ⊢
+              split at found
+              · rename_i indexType indexType_eq
+                rw [exprType_subst indexType_eq]
+                split at found
+                · rename_i integral_
+                  simp only [Option.some.injEq, Prod.mk.injEq] at found
+                  obtain ⟨rfl, rfl⟩ := found
+                  simp [integral_subst integral_, integral_]
+                · cases found
+              · cases found
           | tuple elements =>
               simp only [SemTy.subst, SemTy.substList_eq_map] at found ⊢
               split at found
@@ -556,6 +573,20 @@ theorem placeType_subst {context : Context} :
               · cases found
           | _ => simp at found
       | subslice base start stop fromEnd =>
+          simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at found ⊢
+          obtain ⟨⟨baseType, baseVariant⟩, base_eq, found⟩ := found
+          refine ⟨_, placeType_subst fuel base_eq, ?_⟩
+          cases baseType with
+          | vector element length =>
+              simp only [SemTy.subst, Option.some.injEq, Prod.mk.injEq] at found ⊢
+              obtain ⟨rfl, rfl⟩ := found
+              exact ⟨rfl, rfl⟩
+          | slice element =>
+              simp only [SemTy.subst, Option.some.injEq, Prod.mk.injEq] at found ⊢
+              obtain ⟨rfl, rfl⟩ := found
+              exact ⟨rfl, rfl⟩
+          | _ => simp at found
+      | unsize base =>
           simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at found ⊢
           obtain ⟨⟨baseType, baseVariant⟩, base_eq, found⟩ := found
           refine ⟨_, placeType_subst fuel base_eq, ?_⟩
@@ -671,7 +702,14 @@ theorem extract_map {α β : Type} (f : α → β) :
 @[simp] theorem subst_edgeClosed (context : Context) :
     (context.subst arguments).edgeClosed = context.edgeClosed := rfl
 
-theorem checkCall_subst {context : Context} {result : SemTy} {kind : CallKind}
+private theorem sizedActuals_subst (sizedArguments : SizedArguments arguments) {actuals : Array SemArg}
+    (checked : actuals.all SemArg.sized = true) :
+    (actuals.map (·.subst arguments)).all SemArg.sized = true := by
+  simp only [Array.all_eq_true', Array.mem_map] at checked ⊢
+  rintro _ ⟨argument, member, rfl⟩
+  exact SemArg.sized_subst sizedArguments argument (checked argument member)
+
+theorem checkCall_subst (sizedArguments : SizedArguments arguments) {context : Context} {result : SemTy} {kind : CallKind}
     {instantiations : Array GenericArgument} {operands : Array ExprId}
     (checked : context.checkCall result kind instantiations operands = true) :
     (context.subst arguments).checkCall (result.subst arguments) kind instantiations operands =
@@ -686,8 +724,8 @@ theorem checkCall_subst {context : Context} {result : SemTy} {kind : CallKind}
       · rename_i targetNs declaration resolved target_eq resolved_eq
         rw [target_eq, resolveArguments_subst (arguments := arguments) resolved_eq]
         simp only [Bool.and_eq_true, beq_iff_eq, Array.size_map] at checked ⊢
-        obtain ⟨⟨⟨arity, kinds⟩, edge⟩, checked⟩ := checked
-        refine ⟨⟨⟨arity, kinds⟩, edge⟩, ?_⟩
+        obtain ⟨sized, ⟨⟨⟨arity, kinds⟩, edge⟩, checked⟩⟩ := checked
+        refine ⟨by simpa using sizedActuals_subst sizedArguments sized, ⟨⟨⟨arity, kinds⟩, edge⟩, ?_⟩⟩
         split at checked
         · rename_i parameters results signature_eq
           rw [signatureTypes?_subst (arguments := arguments) signature_eq]
@@ -743,8 +781,8 @@ theorem checkCall_subst {context : Context} {result : SemTy} {kind : CallKind}
         rw [target_eq, resolveArguments_subst (arguments := arguments) resolved_eq]
         simp only [SemTy.subst, SemTy.substList_eq_map]
         simp only [Bool.and_eq_true, beq_iff_eq, Array.size_map] at checked ⊢
-        obtain ⟨⟨⟨⟨arity, kinds⟩, edge⟩, bound⟩, checked⟩ := checked
-        refine ⟨⟨⟨⟨arity, kinds⟩, edge⟩, bound⟩, ?_⟩
+        obtain ⟨sized, ⟨⟨⟨⟨arity, kinds⟩, edge⟩, bound⟩, checked⟩⟩ := checked
+        refine ⟨by simpa using sizedActuals_subst sizedArguments sized, ⟨⟨⟨⟨arity, kinds⟩, edge⟩, bound⟩, ?_⟩⟩
         split at checked
         · rename_i parameters results signature_eq
           rw [signatureTypes?_subst (arguments := arguments) signature_eq]
@@ -858,15 +896,46 @@ theorem checkData_subst {context : Context} {result : SemTy} {operation : DataOp
         · cases checked
       · cases checked
 
-theorem checkOperation_subst {context : Context} {result : SemTy} {operation : Operation}
+theorem mutableReferent_subst (sizedArguments : SizedArguments arguments) {type : SemTy}
+    (checked : mutableReferent type = true) : mutableReferent (type.subst arguments) = true := by
+  simp only [mutableReferent, Bool.or_eq_true] at checked ⊢
+  rcases checked with sized | slice
+  · exact Or.inl (SemTy.sized_subst sizedArguments _ sized)
+  · cases type <;> simp_all [SemTy.subst]
+
+theorem sharedBorrowResult_subst {source result : SemTy}
+    (checked : sharedBorrowResult source result = true) :
+    sharedBorrowResult (source.subst arguments) (result.subst arguments) = true := by
+  simp only [sharedBorrowResult, Bool.or_eq_true, beq_iff_eq] at checked ⊢
+  rcases checked with rfl | viewed
+  · exact Or.inl rfl
+  · right
+    cases source <;> cases result <;> simp_all [SemTy.subst]
+    split at viewed <;> simp_all [SemTy.subst]
+
+theorem checkOperation_subst (sizedArguments : SizedArguments arguments) {context : Context} {result : SemTy} {operation : Operation}
     {instantiations : Array GenericArgument} {operands : Array ExprId}
     (checked : context.checkOperation result operation instantiations operands = true) :
     (context.subst arguments).checkOperation (result.subst arguments) operation instantiations
       operands = true := by
   cases operation with
-  | copy place | read place | move place =>
+  | copy place | move place =>
+      simp only [checkOperation, Bool.and_eq_true, beq_iff_eq] at checked ⊢
+      exact ⟨⟨SemTy.sized_subst sizedArguments result checked.1.1, checked.1.2⟩,
+        placeTypeOf_subst checked.2⟩
+  | read place =>
       simp only [checkOperation, Bool.and_eq_true, beq_iff_eq] at checked ⊢
       exact ⟨checked.1, placeTypeOf_subst checked.2⟩
+  | readDiscriminant place =>
+      simp only [checkOperation, Bool.and_eq_true] at checked ⊢
+      obtain ⟨⟨⟨empty, instantiations⟩, integer⟩, typed⟩ := checked
+      rw [integral_subst integer]
+      refine ⟨⟨⟨empty, instantiations⟩, integer⟩, ?_⟩
+      split at typed
+      · rename_i name parameters place_eq
+        rw [placeTypeOf_subst place_eq]
+        simpa only [SemTy.subst, subst_unit, subst_ns, subst_pointerWidth] using typed
+      · cases typed
   | borrow kind place =>
       simp only [checkOperation, Bool.and_eq_true] at checked ⊢
       refine ⟨checked.1, ?_⟩
@@ -874,9 +943,10 @@ theorem checkOperation_subst {context : Context} {result : SemTy} {operation : O
       split at checked
       · rename_i referenceKind referent kind_eq referent_eq
         rw [kind_eq, placeTypeOf_subst referent_eq]
-        simp only [beq_iff_eq] at checked ⊢
-        subst checked
-        rfl
+        simp only [Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq] at checked ⊢
+        obtain ⟨rfl, shared | mutable⟩ := checked
+        · exact ⟨rfl, Or.inl shared⟩
+        · exact ⟨rfl, Or.inr (mutableReferent_subst sizedArguments mutable)⟩
       · cases checked
   | write place =>
       simp only [checkOperation] at checked ⊢
@@ -884,7 +954,8 @@ theorem checkOperation_subst {context : Context} {result : SemTy} {operation : O
       · rename_i value type operands_eq type_eq
         rw [operands_eq, placeTypeOf_subst type_eq]
         simp only [Bool.and_eq_true] at checked ⊢
-        exact ⟨flows_subst checked.1, by simpa using packs_subst checked.2⟩
+        exact ⟨⟨SemTy.sized_subst sizedArguments _ checked.1.1, flows_subst checked.1.2⟩,
+          by simpa using packs_subst checked.2⟩
       · cases checked
   | drop place =>
       simp only [checkOperation, Bool.and_eq_true, Option.isSome_iff_exists] at checked ⊢
@@ -892,7 +963,7 @@ theorem checkOperation_subst {context : Context} {result : SemTy} {operation : O
       exact ⟨⟨empty, _, placeTypeOf_subst type_eq⟩, by simpa using packs_subst packed⟩
   | call kind =>
       simp only [checkOperation] at checked ⊢
-      exact checkCall_subst checked
+      exact checkCall_subst sizedArguments checked
   | global kind =>
       simp only [checkOperation] at checked ⊢
       split at checked
@@ -905,7 +976,9 @@ theorem checkOperation_subst {context : Context} {result : SemTy} {operation : O
         | some resourceType =>
             rw [resource_eq] at checked
             rw [typeOf_subst resource_eq]
-            simp only at checked ⊢
+            simp only [Bool.and_eq_true] at checked ⊢
+            refine ⟨SemTy.sized_subst sizedArguments _ checked.1, ?_⟩
+            have checked := checked.2
             rcases operands_eq : operands.toList with
               _ | ⟨first, _ | ⟨second, _ | ⟨third, rest⟩⟩⟩ <;>
               cases kind <;> simp only [operands_eq] at checked ⊢ <;>
@@ -925,7 +998,7 @@ theorem checkOperation_subst {context : Context} {result : SemTy} {operation : O
       split at checked
       · rename_i types types_eq
         rw [List.mapM_exprType_subst types_eq]
-        exact primitiveTyped_subst checked
+        exact primitiveTyped_subst sizedArguments checked
       · cases checked
   | reference kind =>
       simp only [checkOperation] at checked ⊢
@@ -951,15 +1024,14 @@ theorem checkOperation_subst {context : Context} {result : SemTy} {operation : O
         · rename_i referent reference_eq
           rw [exprType_subst reference_eq]
           simp only [SemTy.subst, Bool.and_eq_true] at checked ⊢
-          exact ⟨flows_subst checked.1, by simpa using packs_subst checked.2⟩
+          exact ⟨⟨SemTy.sized_subst sizedArguments _ checked.1.1, flows_subst checked.1.2⟩,
+          by simpa using packs_subst checked.2⟩
         · cases checked
       · rename_i value operands_eq
         split at checked
         · rename_i type value_eq
           rw [exprType_subst value_eq]
-          simp only [beq_iff_eq] at checked ⊢
-          subst checked
-          rfl
+          exact sharedBorrowResult_subst checked
         · cases checked
       · rfl
       · cases checked
@@ -979,7 +1051,7 @@ theorem resolveIn_closed {ns : ValidatedNamespace} {typeId : TypeId} {type : Sem
   rw [resolved, Option.some.injEq] at this
   exact this.symm
 
-theorem checkNode_subst {context : Context} {id : ExprId} (checked : context.checkNode id = true) :
+theorem checkNode_subst (sizedArguments : SizedArguments arguments) {context : Context} {id : ExprId} (checked : context.checkNode id = true) :
     (context.subst arguments).checkNode id = true := by
   unfold checkNode at checked ⊢
   simp only [subst_ns] at checked ⊢
@@ -1008,7 +1080,7 @@ theorem checkNode_subst {context : Context} {id : ExprId} (checked : context.che
   | localVar localId =>
       simp only [beq_iff_eq] at checked ⊢
       exact localType_subst checked
-  | operation operation instantiations operands surface => exact checkOperation_subst checked
+  | operation operation instantiations operands surface => exact checkOperation_subst sizedArguments checked
   | block statements result =>
       cases result with
       | some value => exact flows_subst checked
@@ -1085,7 +1157,8 @@ theorem checkNode_subst {context : Context} {id : ExprId} (checked : context.che
       split at checked
       · rename_i placeType placeType_eq
         rw [placeTypeOf_subst placeType_eq]
-        exact flows_subst checked
+        simp only [Bool.and_eq_true] at checked ⊢
+        exact ⟨SemTy.sized_subst sizedArguments _ checked.1, flows_subst checked.2⟩
       · cases checked
   | assignPattern pattern value =>
       simp only [Bool.and_eq_true, Bool.or_eq_true] at checked ⊢
@@ -1127,17 +1200,17 @@ theorem children_subst {context : Context} {id : ExprId} (checked : context.chec
   | quantifier kind binders triggers condition body => rfl
   | _ => simp [List.map_map, Function.comp_def]
 
-theorem checkTree_subst :
+theorem checkTree_subst (sizedArguments : SizedArguments arguments) :
     ∀ (fuel : Nat) {context : Context} {id : ExprId}, context.checkTree fuel id = true →
       (context.subst arguments).checkTree fuel id = true
   | 0, _, _, checked => by simp [checkTree] at checked
   | fuel + 1, context, id, checked => by
       simp only [checkTree, Bool.and_eq_true, List.all_eq_true] at checked ⊢
-      refine ⟨checkNode_subst checked.1, ?_⟩
+      refine ⟨checkNode_subst sizedArguments checked.1, ?_⟩
       rw [children_subst checked.1]
       simp only [List.mem_map, Prod.exists]
       rintro _ ⟨child, childId, member, rfl⟩
-      exact checkTree_subst fuel (checked.2 _ member)
+      exact checkTree_subst sizedArguments fuel (checked.2 _ member)
 end Context
 
 end Subst

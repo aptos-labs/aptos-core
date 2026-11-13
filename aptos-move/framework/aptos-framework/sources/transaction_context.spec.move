@@ -159,8 +159,11 @@ spec aptos_framework::transaction_context {
         axiom forall i: num, j: num where i < j: spec_counter_issued(i) < spec_counter_issued(j);
     }
 
-    /// The i-th value the counter issued.
-    spec fun spec_counter_issued(i: num): u128;
+    /// The i-th value the counter issued. Typed `num`, not `u128`: no strictly
+    /// increasing function over all integers fits in u128, so a `u128` result would
+    /// make the axiom above unsatisfiable. Drawn values are still u128, through the
+    /// result type of `monotonically_increasing_counter`.
+    spec fun spec_counter_issued(i: num): num;
 
     spec monotonically_increasing_counter(): u128 {
         pragma opaque;

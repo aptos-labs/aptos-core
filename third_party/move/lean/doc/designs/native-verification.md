@@ -28,10 +28,10 @@ mentions them. There is no option, no encoded fallback, and no construct
 that is "typed where decided": a construct is native or it is reported as
 unsupported.
 
-Two boundaries still hold runtime values: the captures of a closure value
-and the entries of the requires table. Their replacement is
-[`higher-order-functions.md`](higher-order-functions.md), "Function values
-as native data".
+A closure value's captures and the requires table are native too: the
+function carrier is data generated per link set
+([`higher-order-functions.md`](higher-order-functions.md), "Function values
+as native data").
 
 ## Why
 
@@ -63,19 +63,103 @@ denotation and the solver.
 | Integers in carrier positions | the certified `SpecInt.val`, a certified literal `SpecInt.mk`, else the cut `SpecInt.ofInt`; a clause integer stored in a fixed-width field is defined only in range (`bindCuts`) |
 | Structs, tuples | rows (`HList`), `Var.select`, `Var.update`; a ghost slot is a row component of type `.ghost σ` |
 | Enums | injections, `variantName`, `Which.project?`, native `match`; ordering enums by `orderingChoice`; a variant field read totally takes the field type's inhabitant under another variant, and a field of a type without one (a function type) is bound by a match arm or a `let` of a Boolean clause to what `Choices.select?` holds, universally |
+| Characters, arrays | `SpecChar` by its `val`; `SpecArray` by its `vector`, the vector's reads and the fact of its length |
 | Vectors | `SpecVector` only: literals, `append`/`push` total under the length bound, `extract`, `set`, element quantifiers over `values` |
 | Maps | the owner is a row and the intrinsic roles act on its `SpecEntries` component wherever it sits; a table's typed map is `SpecMap.ofEntries keys values x`, and a map written back into a table reads back as itself where its length fits and its entries read back; `new` is the empty owner |
 | Equality and order | carrier equality after ghost erasure (`NTy.equal`, identity types by `holdsContents`); `NTy.order`, defined by recursion on the type and used by `Term.order` and the `.compare` primitive, with one theorem `NTy.order_encode` relating it to the order of encodings for the agreement |
-| Memory | reads are `Option.getD` of the carrier at `NTy.storageKey κ k`; `exists` is `isSome`; `MemoryInvariants` over carriers |
+| Memory | reads are `Option.getD` of the carrier at `NTy.storageKey κ k`; `exists` is `isSome`; `Memory unit` is a function into certified carriers |
+| Data invariants | part of the carrier of the type: the plain layer `NTy.plain`, the certified `NTy.carrier` as its subtype by `NTy.deepHolds`, and one certifying step `certifyingAt` where a value is made, a mutation ends, a loan dies, a reference is handed over or returned ([`data-invariants.md`](data-invariants.md)) |
 | Specification functions | definitions and results over native bundles, per instantiation for generic ones (the `.at_…` scheme); opaque functions are `opaqueSpec` constants over native bundles; a definition's value outside its domain is `opaqueSpec "<f>.outside"` of its resolved type arguments |
 | Lemmas | native bundles, instantiated like specification functions; a parameter of native type is bound at the lemma's frame |
 | Behavioral predicates | `EnsuresOf`, `AbortsOf`, `ResultOf`, `StateOf`, `RequiresOf` over an invocation meaning (`closureMeaning executable` or a model unit's `invoke`) with native arguments and results; a `.ref` position is an `(entry, final)` pair |
-| Stored invariants | `StoredCase`: stated at the resource's own type arguments; a generic frame moves its view of the value there (`Skolems.reframe`), so the invariant holds at every frame by construction |
+| Stored invariants | `DataInvariants` and `StoredCase` over carriers, the second invariant layer, which states the invariants of the declarations a carrier cannot ([`data-invariants.md`](data-invariants.md), "The stored-invariant layer beside it") and whose removal is open ([`../plan/data-and-global-invariants.md`](../plan/data-and-global-invariants.md)): stated at the resource's own type arguments; a generic frame moves its view of the value there (`Skolems.reframe`), so the invariant holds at every frame by construction |
 | Type parameters | a value of a parameter type is native at every instantiation, its native type the argument's; an instance substitutes carriers, never domains |
 | Failures | `Failure := ThrowKind × Array Int`, related to the runtime failure by the injective `Failure.encode`; abort codes by `abortCodeMatches` |
 | Hash, serialization, signer facts | `opaqueValue` applications, as a clause's call builds them; `bcs::serialize` is a chosen function of which only non-emptiness is known |
+| Aggregators | `NativeModel.aggregator`: a frame reads an element through `Skolems.aggregatorValuePlain` and tests it by `Skolems.isAggregatorElement`, which are integers and decided at `u64`/`u128` at any frame (`aggregatorValuePlain_int`) and leave a type parameter unconstrained; the abort tests the value `type_name` denotes |
 | Mutable-reference lending in calls | unchanged: `NTy.lend`, `lendArguments`, `argumentsResolve` define what a run is, at the agreement boundary |
 | Obligation markers | unchanged; they carry no values |
+
+## Nominal declaration descriptors
+
+A quoted ADT use identifies its declaration and supplies its type arguments.
+The quotation layer defines one parameterized native descriptor per declaration
+of a defined unit. Nested ADTs refer to their descriptors instead of copying
+field trees. Descriptor identity includes the unit constant and the declaration
+handle: numeric handles are relocated by linking and do not identify a declaration
+across different units. Distinct declarations retain distinct descriptor names
+even when their fields coincide, and phantom type arguments remain explicit.
+Proof-only augmented units reuse the registered source unit's descriptor scope;
+they do not define a second unit or a second set of ADT descriptors.
+
+The validated declaration supplies the descriptor body. Quotation checks an
+incoming finite native layout against that declaration before naming it; it does
+not discard an inconsistent field row. Parameter substitution operates on the
+explicit arguments and preserves the descriptor head. Resolving parameters before
+quotation keeps resolution from depending on whether a definition has been opened.
+A missing unit scope is an error for ADT quotation; low-level synthetic tests
+request raw layouts explicitly. Legacy operations that inspect a field or variant
+use one shallow descriptor view and retain the original descriptor in emitted
+types. Descriptors are ordinary definitions. The kernel checks them against the
+structural backend, while routine reducible normalization retains their names.
+An observer opens one declaration at the operation boundary when constructing its
+existing projection or certificate proof. No global simplification rule unfolds
+the descriptors, and no additional family of equations equates separately
+generated layouts.
+
+Descriptors separate declaration identity from its current implementation. The
+initial backend still uses the finite structural `NTy` layout, its native products
+and variants, and its existing codec proofs. Recursive declarations require a
+backend with nominal carrier families or generated mutual inductives and proofs
+for their codecs and invariant boundaries. A cyclic definition cannot be represented
+by recursively expanding this finite backend, nor does naming that expansion make
+it recursive. Source-level nominal references already provide the finite graph
+needed for that later backend. Mutually recursive declarations must be bound as
+a group; their codecs and recursive invariant predicates must recurse over
+finite values, rather than expand the type graph. Carrier generation must
+distinguish recursive value structure from reference and function handles,
+and check positivity before generating inductives. The Move profile continues
+to reject recursive Move types.
+
+This representation change does not move invariant obligations onto generic
+parameters. Only the declared ADT boundary introduces its own invariant, and the
+existing construction, mutation-completion, and loan-completion checks remain.
+
+Certified struct-field access uses one named operation, `Var.selectCertified`.
+Its definition is uniform across type instantiations; choosing a different
+implementation for certificate-free fields would break that conversion. Table
+and vector observations open the operation only at the field boundary, then
+specialize the field's family through checked conversion. The owner's invariant
+and its proof remain behind their names. Existing table and vector laws apply
+to that canonical field operation.
+
+Field quotation also retains the owner's descriptor in `Term.fieldAt`. Its
+denotation evaluates the owner at that same type index before selecting the
+field. This keeps a global field read and an existence test on the same nominal
+resource key; opening a structurally indexed field constructor first would
+reconstruct the owner's full layout in the recursive read. Construction,
+destructuring, and variant operations likewise retain the owner descriptor in
+`Term.packAt`, `letFieldsAt`, `variantAt`, `isVariantAt`, and `payloadAt`. Their
+denotations use that owner index when reading or writing storage; observing an
+operation never reconstructs a second resource type from its field layout.
+
+A carrier family also stores its canonical plain reader together with a proof
+that it agrees with the existing total codec interpretation. Instantiation
+selects the concrete argument's reader directly. This preserves decoding for
+invalid plain values while avoiding a second reader assembled from codec
+composition. Recovering a plain table from its typed reading still requires
+the table's actual `deepHolds` evidence; the total decoder is not assumed
+injective outside that boundary. A certified argument and a plain argument use
+that same reader at construction; the existing forget/read law accounts for the
+certificate. Named-family inhabitants use one checked projection spelling without
+replacing an independent choice of inhabitants.
+
+Given declaration tables are ordinary named definitions as well. Routine
+normalization retains the table application in dependent binder types, rather than
+expanding the entire declaration registry. A producer that obtains an own-invariant
+proof opens only its selected declaration clause. Observed maps of projected table
+fields retain forward read equations; naming a map never reconstructs its owner
+from that reading.
 
 ## Enforcement
 
@@ -99,10 +183,29 @@ error.
 One normal form over carriers: the equations of `NTy.equal`, `NTy.unread`,
 `NTy.order`, `SpecInt.val_ofInt` under its bounds, `BitOp.eval_*`,
 `Var.update`, and a map's definition in the context rewritten into its
-reads (`verex_subst_maps`). Typed maps are named by `verex_prepare typed`
+reads (`verex_subst_maps`). An overflowing operation's flag is the range
+condition of its exact result, as a checked operation's failure is
+(`ModularOp.overflows_unsigned_succ`, `ModularOp.overflows_signed_succ`); a
+cast's value is its operand's remainder at the width (`wrapInt_unsigned`,
+`wrapInt_signed`); a code point's validity is its range
+(`isUnicodeScalar_eq_true`). Typed maps are named by `verex_prepare typed`
 (`verex_name_maps`); position facts are `typedMapPositionFacts`. Cuts
 meet a named local through the chain of names that defines it
 (`cutNamedValue`).
+
+An equation with a pair on either side, or at a tuple's type whatever its
+sides, is stated at its components, as `NTy.equal` compares rows
+(`pairInjectionRows`, `Prod.ext_iff`), where its type spells a row (a product,
+`HList`, a tuple's carrier; never by reducing the type), and a row of one value's reads is that
+value (`rowOfReads`, by structure eta, with a unit end only where the value's
+own rest is a unit). A pattern equated to an opaque read therefore fixes its
+locals to that read's projections, which substitution takes into every other
+fact. A local the other side does not mention stays whole, for its
+substitution, and so does a struct's value compared whole with no side
+constructed. A run's observation, an equation with a side `result_of` or
+`state_of`, stays whole: the run deciders read it as stated, and what they derive
+of a local decomposes. A rewrite through such an equation of a term holding the opaque
+value whole is given up: `f(e)` no longer meets `f((a, b))` where `e = (a, b)`.
 
 Variant splits: the walk splits only the variants its goal tests, and an
 obligation a hypothesis states closes before it is split. A constructor's
@@ -176,6 +279,54 @@ theorem, interface or self hypothesis states (`specializationCertificates`,
   automatic normal form needs. A step proof's leaf respells it by an
   equation proved case by case on the value (`whichProjectFamily`); the
   automatic normal form keeps the callee's spelling.
+
+## Contracts at a shape
+
+A bodiless Rust function may have contracts at shapes of its generics instead of
+one over all of them (`ShapeContract`, `FunctionDecl.shapes`). A shape holds its
+types `S` over its own variables, and the function's signature, its locals and
+its contract at them, so that `FunctionDecl.atShape` is a declaration of its own:
+validation and `buildContract` treat it as a generic function's, under the key
+`f.at_k`. Validation also checks that the signature is the function's at `S` and
+that no two shapes of a function unify, by first-order unification with an occurs
+check over the type table, lifetimes ignored, on VIR types as a call matches. `S` has
+one entry per binder of the function, `Unit` as a placeholder at a lifetime's, which
+no carrier reads, as `θ` holds it there.
+
+Two shapes apart only in a pointer-width integer (`{usize}`, `{u64}`) are distinct
+to a call but one meaning at one carrier to the verifier, as a hypothesis is over
+every `typeInstantiation`. So they must state one contract: where a body calls either,
+the two typed contracts, source marks off, are compared (`verifyShapeSiblings`), and a
+difference is an error, as the hypotheses together would hold of no run. Any other pair
+of shapes the verifier's types do not tell apart is rejected as an overlap. The solver
+may then read a call at either through either.
+
+A call's type arguments `θ` choose the shape by one-way matching
+(`matchingShape?`), which gives `σ` for its variables, with `θ = S.subst σ`
+(`TypeArgs.atShape`), the caller's parameters rigid. The match also holds of the
+VIR types (`shapeMatchesCall`), so `{usize}` does not take a call at `u64`. Only the shapes a body's
+calls match enter its theorems, each as a hypothesis (`shapeBinder`, rebuilt by
+`shapeHypothesisType` for the audit), a function's other shapes staying unused:
+
+```text
+native_f.at_k : ∀ {Θ} {σ} {ti},
+  Satisfies (specializedMeaning (S.atShape σ) (propheticMeaning at the frame (S.atShape σ) Θ, ti))
+    ((f.at_k.typedContract at the frame σ Θ, ti).ofSkolem σ)
+```
+
+Both sides are read at the caller's types. They agree because `σs.subst (S.subst σ)`
+and `(σs.subst S).subst σ` compute to the same row for a closed `S` and signature,
+checked when the hypothesis elaborates. The statement is what a call needs, so no
+theorem relates the run at `S`'s frame to the run at the call's. SC1–SC3 apply
+with `f.at_k.typedContract` for the generic contract and `σ` for `θ`
+(`specializationCertificates`). SC4 differs only in where the satisfaction comes
+from: `shapeCall?` finds the certificate whose generic contract the hypothesis
+states and whose `S.atShape σ` is the call's `θ`, `satisfies_of_equivalent` gives
+the satisfaction of the specialized contract, and the call goes on from
+`wp_specialized`.
+
+A function value of a function with shapes is rejected, as is a call of one in a
+unit verified through its model, whose callees stand as meanings.
 
 ## Not changed
 

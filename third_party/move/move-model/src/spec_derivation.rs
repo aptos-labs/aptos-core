@@ -33,8 +33,8 @@ use crate::{
     exp_simplifier::ExpSimplifier,
     memory_labels::{self, MemoryLabelInfo},
     model::{
-        FunId, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId, QualifiedInstId, SpecFunId,
-        StructId,
+        FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId, QualifiedInstId,
+        SpecFunId, StructId,
     },
     pragmas::{
         ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_ABSTRACT_PROP, CONDITION_CONCRETE_PROP,
@@ -462,9 +462,12 @@ fn exp_is_pure_single_state_impl(
                 Operation::SpecFunction(mid, fid, range) => {
                     let qid = mid.qualified(*fid);
                     let decl = env.get_spec_fun(qid);
+                    // `object::spec_exists_at` reads its type argument's
+                    // memory without declaring it.
                     if !range.is_default()
                         || !decl.used_memory.is_empty()
                         || !decl.generic_used_memory.is_empty()
+                        || well_known::is_object_spec_exists_at(env, qid)
                     {
                         pure = false;
                     } else if reject_behavior && visited_spec_funs.insert(qid) {
@@ -867,13 +870,78 @@ pub fn functional_result_spec_values(
 }
 
 /// Whether the function's specification determines each of its results as a
-/// value over its pre-state arguments and global memory. Then the behavioral
-/// `result_of` the specification constrains is the call's actual result, even
-/// for a transparent function whose body runs in its place.
+/// value over its pre-state arguments and global memory. The behavioral
+/// `result_of` the specification constrains is then the call's actual result
+/// only under [`closure_result_is_carrier`].
 pub fn spec_determines_results(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
     let result_count = env.get_function(id).get_result_type().flatten().len();
     let determined = result_spec_values(env, id, true);
     (0..result_count).all(|idx| determined.contains_key(&idx))
+}
+
+/// [`spec_determines_results`], with no result definition applying a
+/// behavioral predicate or a function value, directly or through a
+/// specification function. Such a definition (`result == result_of<f>(x)`) is
+/// an evaluator term, which need not range over the memory the call reads.
+pub fn spec_determines_results_concretely(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
+    let result_count = env.get_function(id).get_result_type().flatten().len();
+    let definitions = result_spec_definitions(env, id, true);
+    (0..result_count).all(|idx| definitions.iter().any(|(defined, _)| *defined == idx))
+        && definitions
+            .iter()
+            .all(|(_, exp)| exp_applies_no_behavior(env, exp, &mut BTreeSet::new()))
+}
+
+/// Whether a call of `id` through a function value returns the target's
+/// `result_of` carrier: no result definition determines a `&mut` parameter's
+/// post-state, so the target must have none, and every result must be
+/// [`spec_determines_results_concretely`].
+pub fn closure_result_is_carrier(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
+    !env.get_function(id)
+        .get_parameter_types()
+        .iter()
+        .any(Type::is_mutable_reference)
+        && spec_determines_results_concretely(env, id)
+}
+
+fn exp_applies_no_behavior(
+    env: &GlobalEnv,
+    exp: &Exp,
+    visited: &mut BTreeSet<QualifiedId<SpecFunId>>,
+) -> bool {
+    let mut ok = true;
+    exp.visit_pre_order(&mut |e| {
+        match e {
+            ExpData::Call(_, Operation::Behavior(..), _) | ExpData::Invoke(..) => ok = false,
+            ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) => {
+                let qid = mid.qualified(*fid);
+                if visited.insert(qid) {
+                    if let Some(body) = env.get_spec_fun(qid).body.clone() {
+                        ok = exp_applies_no_behavior(env, &body, visited);
+                    }
+                }
+            },
+            ExpData::Call(..)
+            | ExpData::Invalid(_)
+            | ExpData::Value(..)
+            | ExpData::LocalVar(..)
+            | ExpData::Temporary(..)
+            | ExpData::Lambda(..)
+            | ExpData::Quant(..)
+            | ExpData::Block(..)
+            | ExpData::IfElse(..)
+            | ExpData::Match(..)
+            | ExpData::Return(..)
+            | ExpData::Sequence(..)
+            | ExpData::Loop(..)
+            | ExpData::LoopCont(..)
+            | ExpData::Assign(..)
+            | ExpData::Mutate(..)
+            | ExpData::SpecBlock(..) => {},
+        }
+        ok
+    });
+    ok
 }
 
 /// The results the specification determines, by index: as pure single-state
@@ -883,6 +951,17 @@ fn result_spec_values(
     id: QualifiedId<FunId>,
     allow_memory: bool,
 ) -> BTreeMap<usize, Exp> {
+    result_spec_definitions(env, id, allow_memory)
+        .into_iter()
+        .collect()
+}
+
+/// Every result definition among the specification's `ensures` conjuncts.
+fn result_spec_definitions(
+    env: &GlobalEnv,
+    id: QualifiedId<FunId>,
+    allow_memory: bool,
+) -> Vec<(usize, Exp)> {
     use crate::ast::ConditionKind;
 
     let fun = env.get_function(id);
@@ -1152,6 +1231,252 @@ pub fn fun_aborts_memory(
         .collect();
     cache.aborts_memory.borrow_mut().insert(key, memory.clone());
     memory
+}
+
+/// Returns memory whose pre-state is needed by a function behavioral predicate
+/// at a concrete type instantiation. In addition to ordinary parameterized
+/// resources, this resolves resource memory selected by a bare function type
+/// parameter (for example the `T` in `object::spec_exists_at<T>`).
+pub fn behavioral_old_memory_instantiated(
+    fun_env: &FunctionEnv<'_>,
+    inst: &[Type],
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    let mut result = fun_env.get_spec_old_memory_instantiated(inst);
+    let spec = fun_env.get_spec();
+    for cond in &spec.conditions {
+        if matches!(cond.kind, ConditionKind::LetPre(..)) {
+            result.extend(
+                cond.exp
+                    .directly_used_memory(fun_env.env())
+                    .into_iter()
+                    .map(|memory| memory.instantiate(inst)),
+            );
+            for type_param in cond.exp.directly_generic_used_memory(fun_env.env()) {
+                if let Some(Type::Struct(module_id, struct_id, type_args)) =
+                    inst.get(type_param as usize).map(Type::skip_reference)
+                {
+                    result.insert(module_id.qualified_inst(*struct_id, type_args.clone()));
+                }
+            }
+        }
+    }
+    result
+}
+
+/// Whether every `ensures` clause of `fun_env`'s specification, with the spec
+/// `let`s it refers to, reads memory in the pre-state only. Such a clause
+/// holds for the result of a call at any pre-state the function does not
+/// abort in, independently of the post-state. The Boogie backend admits the
+/// same clauses to the unguarded pre-state axiom of the `result_of` carrier.
+pub fn fun_ensures_are_pre_state_only(fun_env: &FunctionEnv<'_>) -> bool {
+    let env = fun_env.env();
+    let spec = fun_env.get_spec();
+    let mut visiting = BTreeSet::new();
+    spec.filter_kind(ConditionKind::Ensures).all(|cond| {
+        let scoped = wrap_condition_with_referenced_lets(env, &spec, &cond.kind, true, &cond.exp);
+        exp_is_pre_state_only(env, &scoped, false, &mut visiting)
+    })
+}
+
+/// Wraps a condition expression with `(var sym := binding; body)` for each
+/// `LetPre`/`LetPost` binding of `spec` the condition references, directly
+/// or through another such binding; `LetPost` bindings are in scope of an
+/// `ensures` only. In a two-state context a `LetPre` binding is wrapped in
+/// `old()` so that it is evaluated at the pre-state.
+///
+/// Unreferenced bindings are left out: the pre-state-only classification
+/// judges the wrapped condition, and an unrelated `let post` reading memory
+/// would otherwise disqualify every clause.
+pub fn wrap_condition_with_referenced_lets(
+    env: &GlobalEnv,
+    spec: &Spec,
+    source_kind: &ConditionKind,
+    is_two_state: bool,
+    exp: &Exp,
+) -> Exp {
+    let include_post_lets = matches!(source_kind, ConditionKind::Ensures);
+    // Innermost binding first: a binding is live when a live scope names its
+    // symbol, and its own references then become live.
+    let mut live = exp.free_vars();
+    let mut wrapped = BTreeSet::new();
+    for (idx, cond) in spec.conditions.iter().enumerate().rev() {
+        let sym = match &cond.kind {
+            ConditionKind::LetPre(sym, _) => sym,
+            ConditionKind::LetPost(sym, _) if include_post_lets => sym,
+            _ => continue,
+        };
+        if live.remove(sym) {
+            live.extend(cond.exp.free_vars());
+            wrapped.insert(idx);
+        }
+    }
+    spec.conditions
+        .iter()
+        .enumerate()
+        .rev()
+        .filter(|(idx, _)| wrapped.contains(idx))
+        .fold(exp.clone(), |scope, (_, cond)| {
+            let sym = match &cond.kind {
+                ConditionKind::LetPre(sym, _) | ConditionKind::LetPost(sym, _) => sym,
+                _ => unreachable!("only let bindings are wrapped"),
+            };
+            let binding = if is_two_state && matches!(cond.kind, ConditionKind::LetPre(..)) {
+                let ty = env.get_node_type(cond.exp.node_id());
+                let loc = env.get_node_loc(cond.exp.node_id());
+                let node_id = env.new_node(loc, ty);
+                ExpData::Call(node_id, Operation::Old, vec![cond.exp.clone()]).into_exp()
+            } else {
+                cond.exp.clone()
+            };
+            ExpData::Block(
+                cond.exp.node_id(),
+                Pattern::Var(cond.exp.node_id(), *sym),
+                Some(binding),
+                scope,
+            )
+            .into_exp()
+        })
+}
+
+/// Whether `exp` reads global memory only under `old()` (or, with `in_old`,
+/// in a context already evaluated at the pre-state), through operations
+/// whose value is then determined by the pre-state alone.
+pub fn exp_is_pre_state_only(
+    env: &GlobalEnv,
+    exp: &Exp,
+    in_old: bool,
+    visiting: &mut BTreeSet<QualifiedId<SpecFunId>>,
+) -> bool {
+    use Operation as Op;
+    match exp.as_ref() {
+        ExpData::Value(..) | ExpData::LocalVar(..) | ExpData::Temporary(..) => true,
+        ExpData::Block(_, _, binding, body) => {
+            binding
+                .as_ref()
+                .is_none_or(|b| exp_is_pre_state_only(env, b, in_old, visiting))
+                && exp_is_pre_state_only(env, body, in_old, visiting)
+        },
+        ExpData::IfElse(_, cond, then, else_) => [cond, then, else_]
+            .into_iter()
+            .all(|e| exp_is_pre_state_only(env, e, in_old, visiting)),
+        // A braced block in a spec expression; its elements are expressions.
+        ExpData::Sequence(_, exps) => exps
+            .iter()
+            .all(|e| exp_is_pre_state_only(env, e, in_old, visiting)),
+        ExpData::Quant(_, kind, ranges, triggers, where_opt, body) => {
+            matches!(kind, QuantKind::Forall | QuantKind::Exists)
+                && ranges.iter().all(|(_, range)| {
+                    !matches!(env.get_node_type(range.node_id()), Type::StateDomain)
+                        && exp_is_pre_state_only(env, range, in_old, visiting)
+                })
+                && triggers
+                    .iter()
+                    .flatten()
+                    .all(|e| exp_is_pre_state_only(env, e, in_old, visiting))
+                && where_opt
+                    .as_ref()
+                    .is_none_or(|e| exp_is_pre_state_only(env, e, in_old, visiting))
+                && exp_is_pre_state_only(env, body, in_old, visiting)
+        },
+        ExpData::Call(_, Op::Old, args) => args
+            .iter()
+            .all(|e| exp_is_pre_state_only(env, e, true, visiting)),
+        ExpData::Call(_, op, args) => {
+            let op_ok = match op {
+                Op::Global(None) | Op::Exists(None) => in_old,
+                Op::SpecFunction(mid, fid, range) => {
+                    let qid = mid.qualified(*fid);
+                    let decl = env.get_spec_fun(qid);
+                    range.is_default()
+                        && !decl.uninterpreted
+                        && !decl.is_native
+                        && !decl.uses_old
+                        && decl.used_memory.is_empty()
+                        && decl.generic_used_memory.is_empty()
+                        && match &decl.body {
+                            None => false,
+                            // A recursive function is checked once; its
+                            // own call adds nothing.
+                            Some(_) if !visiting.insert(qid) => true,
+                            Some(body) => {
+                                let ok = exp_is_pre_state_only(env, body, false, visiting);
+                                visiting.remove(&qid);
+                                ok
+                            },
+                        }
+                },
+                Op::Pack(..)
+                | Op::Tuple
+                | Op::Select(..)
+                | Op::SelectVariants(..)
+                | Op::TestVariants(..)
+                | Op::UpdateField(..)
+                | Op::Result(_)
+                | Op::Index
+                | Op::Slice
+                | Op::Range
+                | Op::Implies
+                | Op::Iff
+                | Op::Identical
+                | Op::Add
+                | Op::Sub
+                | Op::Mul
+                | Op::Mod
+                | Op::Div
+                | Op::BitOr
+                | Op::BitAnd
+                | Op::Xor
+                | Op::Shl
+                | Op::Shr
+                | Op::And
+                | Op::Or
+                | Op::Eq
+                | Op::Neq
+                | Op::Lt
+                | Op::Gt
+                | Op::Le
+                | Op::Ge
+                | Op::Copy
+                | Op::Move
+                | Op::Not
+                | Op::Cast
+                | Op::Negate
+                | Op::Freeze(_)
+                | Op::Vector
+                | Op::Len
+                | Op::TypeValue
+                | Op::TypeDomain
+                | Op::EmptyVec
+                | Op::SingleVec
+                | Op::UpdateVec
+                | Op::ConcatVec
+                | Op::ReverseVec
+                | Op::IndexOfVec
+                | Op::ContainsVec
+                | Op::InRangeRange
+                | Op::InRangeVec
+                | Op::RangeVec
+                | Op::MaxU8
+                | Op::MaxU16
+                | Op::MaxU32
+                | Op::MaxU64
+                | Op::MaxU128
+                | Op::MaxU256
+                | Op::Bv2Int
+                | Op::Int2Bv
+                | Op::WellFormed
+                | Op::BoxValue
+                | Op::UnboxValue
+                | Op::NoOp => true,
+                _ => false,
+            };
+            op_ok
+                && args
+                    .iter()
+                    .all(|e| exp_is_pre_state_only(env, e, in_old, visiting))
+        },
+        _ => false,
+    }
 }
 
 /// The global memory a behavioral predicate over `fun` is evaluated in:

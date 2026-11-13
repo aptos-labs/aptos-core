@@ -20,6 +20,12 @@ pub struct LedgerSummary {
     pub transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
     /// Pre-committed native-position summary; `None` when position is disabled.
     pub position_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
+    /// Pre-committed native-order summary; `None` when the trading-native
+    /// state roots are not computed.
+    pub order_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
+    /// Pre-committed native-collateral summary; `None` when the trading-native
+    /// state roots are not computed.
+    pub collateral_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
     /// Pre-committed position overlay; `None` when position is disabled.
     pub positions: Option<PositionOverlay>,
     /// Pre-committed order overlay; `None` when trading-native storage is off.
@@ -42,6 +48,8 @@ impl LedgerSummary {
             state_summary,
             transaction_accumulator,
             position_state_summary: None,
+            order_state_summary: None,
+            collateral_state_summary: None,
             positions: None,
             orders: None,
             collateral: None,

@@ -1,0 +1,5 @@
+VerexE2ETests/SourceVerify/fnonce_adapters.rs:14:1: info: `shared_call` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_adapters.rs:14:1: info: `mutable_call` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_adapters.rs:14:1: info: `once` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fnonce_adapters.spec.lean:14:3: error: the specification clause `ensures ensures_of<__trait_FnOnce_call_once>(callback, result)` is not established
+VerexE2ETests/SourceVerify/fnonce_adapters.spec.lean:49:6: error: the opaque callee's specialized contract did not verify

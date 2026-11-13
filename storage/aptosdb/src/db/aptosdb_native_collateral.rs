@@ -15,6 +15,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_schemadb::{Cache, Env};
 use aptos_storage_interface::{
+    db_ensure as ensure,
     state_store::collateral::{decode_collateral_writes, CollateralBase, CollateralOverlay},
     AptosDbError, Result,
 };
@@ -44,18 +45,17 @@ impl AptosDB {
     /// Called from `open_internal` beside `init_native_order` when
     /// `rocksdb_configs.enable_trading_native` is set.
     ///
-    /// Collateral has no state root and no snapshot kind for state sync yet,
-    /// so fast sync and restore leave the collateral store as opened: a node
-    /// restored that way holds only the collateral written after its target.
+    /// `for_restore` opens without catching up to the ledger; the restore
+    /// brings the store up once it has saved its transactions
+    /// (`reset_collateral_store_to_ledger`).
     ///
-    /// For the same reason nothing catches a first enable on a ledger that
-    /// already carries collateral writes: catch-up replays only past a store
-    /// that has committed before, so the store opens empty. Enable the storage
-    /// before `NATIVE_COLLATERAL`.
-    ///
-    /// TODO[native_collateral](root): once the collateral root is computed,
-    /// refuse to open when the store disagrees with the committed root, as
-    /// `ensure_position_root_matches_ledger` does for positions.
+    /// Collateral has no snapshot kind for state sync yet, so fast sync and
+    /// restore leave the collateral store as opened, and catch-up replays
+    /// only past a store that has committed before. A node whose store
+    /// disagrees with the collateral root the ledger tip commits refuses to
+    /// open rather than diverge at its next block. Nothing catches a ledger
+    /// that carries collateral but no collateral root yet, so enable the
+    /// storage before `NATIVE_COLLATERAL`.
     pub(crate) fn init_native_collateral(
         &mut self,
         db_paths: &StorageDirPaths,
@@ -115,6 +115,7 @@ impl AptosDB {
             {
                 extend_tip(&bundle, target_version, &write_sets)?;
             }
+            ensure_collateral_root_matches_ledger(&bundle, &self.ledger_db)?;
         }
         self.collateral = Some(Arc::new(bundle));
         info!(
@@ -124,6 +125,74 @@ impl AptosDB {
         );
         Ok(())
     }
+}
+
+impl AptosDB {
+    /// Bring the collateral store up to the ledger after a restore saved
+    /// transactions past its snapshot without executing them.
+    pub(crate) fn reset_collateral_store_to_ledger(&self) -> Result<()> {
+        let Some(bundle) = self.collateral.as_ref() else {
+            return Ok(());
+        };
+        let v_overall = self.ledger_db.metadata_db().get_synced_version()?;
+        let snapshot_version = bundle
+            .store
+            .merkle_db
+            .latest_snapshot_version_at_or_before(v_overall.unwrap_or(Version::MAX))?;
+        if let Some((target_version, write_sets)) =
+            bundle.store.catch_up(&self.ledger_db, snapshot_version)?
+        {
+            extend_tip(bundle, target_version, &write_sets)?;
+        }
+        ensure_collateral_root_matches_ledger(bundle, &self.ledger_db)
+    }
+
+    /// Why a collateral-summary read cannot be served: storage is off, or the
+    /// DB was opened readonly, which keeps no collateral pipeline.
+    pub(crate) fn collateral_storage_unavailable(&self) -> AptosDbError {
+        let reason = if self.collateral.is_some() {
+            "the DB was opened readonly"
+        } else {
+            "storage.rocksdb_configs.enable_trading_native is off"
+        };
+        AptosDbError::Other(format!(
+            "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-collateral storage is not \
+             available: {reason}"
+        ))
+    }
+}
+
+/// Refuse to open when the ledger tip commits a collateral root the store
+/// disagrees with, as `ensure_position_root_matches_ledger` does for
+/// positions.
+fn ensure_collateral_root_matches_ledger(
+    bundle: &CollateralBundle,
+    ledger_db: &LedgerDb,
+) -> Result<()> {
+    let Some(store) = bundle.store.state_store.as_ref() else {
+        return Ok(());
+    };
+    let Some(v_overall) = ledger_db.metadata_db().get_synced_version()? else {
+        return Ok(());
+    };
+    let Some(committed_root) = ledger_db
+        .transaction_info_db()
+        .get_transaction_info(v_overall)?
+        .collateral_state_checkpoint_hash()
+    else {
+        return Ok(());
+    };
+    let latest = store.current_state().lock().last_checkpoint().clone();
+    let local_root = latest.root_hash();
+    ensure!(
+        local_root == committed_root,
+        "Native-collateral store (version {:?}, root {local_root:?}) disagrees with the \
+         collateral root {committed_root:?} committed at ledger version {v_overall}. Collateral \
+         storage was likely enabled on a node whose history already carries collateral, or the \
+         node was restored without it.",
+        latest.version(),
+    );
+    Ok(())
 }
 
 /// Readonly counterpart of the catch-up: replays the tail past the snapshot

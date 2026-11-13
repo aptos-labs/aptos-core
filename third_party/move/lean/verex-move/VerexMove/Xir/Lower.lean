@@ -340,7 +340,7 @@ private def withLoc (loc : LocId) (action : BodyM α) : BodyM α := do
   let saved := (← get)
   let context ← read
   let span := do
-    let location ← context.ns.tables.locations[loc.index]?
+    let location ← context.ns.location? loc
     let range ← location.primary
     pure { start := range.startByte, stop := range.endByte : Xir.Span }
   set { saved with loc := some loc, span := span.orElse fun _ => saved.span }
@@ -388,7 +388,8 @@ private partial def storesInto (target : LocalId) (id : PlaceId) : BodyM Bool :=
   match ← place id with
   | .localVar localId => pure (localId == target)
   | .deref _ => pure false
-  | .field base .. | .ghostField base .. | .index base _ | .subslice base .. | .downcast base _ =>
+  | .field base .. | .ghostField base .. | .index base _ | .subslice base .. | .unsize base
+  | .downcast base _ =>
       storesInto target base
 
 private partial def patternBinds (target : LocalId) (id : PatternId) : BodyM Bool := do
@@ -612,6 +613,7 @@ mutual
         | _ => failHere "an indexed place is not a vector"
     | .downcast base _ => placeType base
     | .subslice .. => failHere "a subslice has no Move bytecode form"
+    | .unsize _ => failHere "an unsize place has no Move bytecode form"
 
   /-- Borrow a place, returning the reference slot. -/
   partial def borrowPlace (id : PlaceId) (mutable : Bool) : BodyM Nat := do
@@ -656,6 +658,7 @@ mutual
         pure reference
     | .downcast .. => failHere "a whole variant cannot be borrowed in Move bytecode"
     | .subslice .. => failHere "a subslice has no Move bytecode form"
+    | .unsize _ => failHere "an unsize place has no Move bytecode form"
 
   /-- The value of a place: the slot itself, or a read through a borrow. -/
   partial def readPlace (id : PlaceId) : BodyM Nat := do
@@ -851,6 +854,7 @@ mutual
     | .call (.extension ..) => failHere "a profile call has no Move bytecode form"
     | .borrow kind target => pure #[← borrowPlace target (kind == .mutable)]
     | .read target | .copy target | .move target => pure #[← readPlace target]
+    | .readDiscriminant _ => failHere "a variant discriminant has no Move bytecode form"
     | .write target => do
         let value ← lowerExpr (← nth arguments 0 "the operation")
         assignPlace target value
@@ -1098,7 +1102,7 @@ private def lowerFunction (declaration : FunctionDecl FunctionBody) : M Xir.Func
   let typeParameters ← typeParameters loc declaration.signature.generics
   let returns ← declaration.signature.results.flatMapM fun result =>
     xirTypes loc result.typeId
-  let locations := (← tables).locations
+  let locations := (← read).ns.localTables.locations
   let span : Option Xir.Span := do
     let location ← locations[declaration.loc.index]?
     let range ← location.primary
@@ -1179,7 +1183,8 @@ private def withAcquires (structs : Nat) (functions : Array Xir.Function) : Arra
 
 /-- Lower one namespace of a validated unit to a deployable XIR module. -/
 def lowerModule (unit : ValidatedUnit) (namespaceId : NamespaceId) : Except Failure Xir.Module := do
-  let some ns := unit.namespaces[namespaceId.index]?
+  -- The namespace's body in the unit's numbering, which lowering reads.
+  let some ns := (unit.namespaces[namespaceId.index]?).map (·.inUnitIds)
     | throw { loc := none, message := s!"namespace {namespaceId.index} is out of range" }
   let run : M Xir.Module := do
     unless ns.profile == some .move do

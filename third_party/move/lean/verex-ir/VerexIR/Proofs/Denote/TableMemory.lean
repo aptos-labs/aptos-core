@@ -8,8 +8,8 @@ import VerexIR.Proofs.Maps.Table
 # Table allocation and identity
 
 A table is a value of its owner's type: its handle among the declared fields
-and its contents in a hidden last field (`doc/designs/intrinsic-maps.md`, "Owned
-Table values"). The handles allocated so far are a slot of the memory
+and its contents in a hidden last field (`doc/designs/intrinsic-maps.md`, "Tables
+in the runtime semantics"). The handles allocated so far are a slot of the memory
 (`allocationResource`), as the runtime keeps them (`RuntimeState.tableHandles`);
 the model operations keep a table's identity.
 -/
@@ -24,6 +24,16 @@ variable {unit : ValidatedUnit} [FunctionCarriers unit]
 empty scope are independent of a callee's type parameters, and the collection
 carrier imposes no Move vector length bound. -/
 def allocationResource : ResourceType := ⟨.address, .nil, .collection⟩
+
+/-- A stored value's resource is never the allocation history. -/
+@[vir_denote_norm] theorem value_ne_allocationResource (type : NTy) (arguments : NRow) :
+    ({ type, arguments } : ResourceType) ≠ allocationResource := by
+  simp only [allocationResource, ne_eq, ResourceType.mk.injEq, reduceCtorEq, and_false,
+    not_false_eq_true]
+
+@[vir_denote_norm] theorem allocationResource_ne_value (type : NTy) (arguments : NRow) :
+    allocationResource ≠ ({ type, arguments } : ResourceType) :=
+  (value_ne_allocationResource type arguments).symm
 
 def encodeAllocated (handles : Array String) : allocationResource.carrier unit := handles
 

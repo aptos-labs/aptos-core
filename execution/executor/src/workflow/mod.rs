@@ -7,7 +7,10 @@ use crate::types::partial_state_compute_result::PartialStateComputeResult;
 use anyhow::Result;
 use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_storage_interface::{
-    state_store::state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
+    state_store::state_summary::{
+        ProvableCollateralStateSummary, ProvableOrderStateSummary, ProvablePositionStateSummary,
+        ProvableStateSummary,
+    },
     DbReader, LedgerSummary,
 };
 use do_ledger_update::DoLedgerUpdate;
@@ -30,7 +33,15 @@ impl ApplyExecutionOutput {
     ) -> Result<PartialStateComputeResult> {
         let position_persisted = execution_output
             .compute_trading_native_state_roots
-            .then(|| ProvablePositionStateSummary::new_persisted(reader))
+            .then(|| ProvablePositionStateSummary::new_persisted_position(reader))
+            .transpose()?;
+        let order_persisted = execution_output
+            .compute_trading_native_state_roots
+            .then(|| ProvableOrderStateSummary::new_persisted_order(reader))
+            .transpose()?;
+        let collateral_persisted = execution_output
+            .compute_trading_native_state_roots
+            .then(|| ProvableCollateralStateSummary::new_persisted_collateral(reader))
             .transpose()?;
         let state_checkpoint_output = DoStateCheckpoint::run()
             .execution_output(&execution_output)
@@ -38,6 +49,10 @@ impl ApplyExecutionOutput {
             .persisted_state_summary(&ProvableStateSummary::new_persisted(reader)?)
             .maybe_parent_position_state_summary(base_view.position_state_summary.as_ref())
             .maybe_persisted_position_state_summary(position_persisted.as_ref())
+            .maybe_parent_order_state_summary(base_view.order_state_summary.as_ref())
+            .maybe_persisted_order_state_summary(order_persisted.as_ref())
+            .maybe_parent_collateral_state_summary(base_view.collateral_state_summary.as_ref())
+            .maybe_persisted_collateral_state_summary(collateral_persisted.as_ref())
             .build()?;
         let ledger_update_output = DoLedgerUpdate::run(
             &execution_output,

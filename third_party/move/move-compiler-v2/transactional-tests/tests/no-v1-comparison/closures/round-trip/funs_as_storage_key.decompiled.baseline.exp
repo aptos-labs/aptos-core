@@ -18,10 +18,10 @@ warning: Unused value of parameter `p1`. Consider removing the parameter, or pre
 task 3 lines 79-98:  publish [module 0x42::mod5 {]
 Error: compilation errors:
  error: type `|&u64, &mut u8|&u64 has copy + drop` is missing required ability `store`
-   ┌─ TEMPFILE3:90:89
+   ┌─ TEMPFILE3:90:87
    │
-90 │         0x1::vector::push_back<|&u64, &mut u8|(&u64) has copy + drop + store>(&mut _v1, _v0);
-   │                                                                                         ^^^
+90 │         0x1::vector::push_back<|&u64, &mut u8|&u64 has copy + drop + store>(&mut _v1, _v0);
+   │                                                                                       ^^^
 
 
 task 4 lines 101-149:  publish [module 0x42::mod6 {]

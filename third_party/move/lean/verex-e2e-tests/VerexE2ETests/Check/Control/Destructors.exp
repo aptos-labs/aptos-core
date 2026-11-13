@@ -1,0 +1,6 @@
+VerexE2ETests/Check/Control/Destructors.lean:26:4: error: no denotation for `consume`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/Check/Control/Destructors.lean:31:4: error: no denotation for `consume_field`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/Check/Control/Destructors.lean:36:4: error: no denotation for `consume_holder`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/Check/Control/Destructors.lean:60:4: error: no denotation for `forget_guard`: a call dropping a type parameter at a type with a destructor is not carried by the denotation
+VerexE2ETests/Check/Control/Destructors.lean:65:4: error: no denotation for `forget_holder_guard`: a call dropping a type parameter at a type with a destructor is not carried by the denotation
+VerexE2ETests/Check/Control/Destructors.lean:70:4: error: no denotation for `forget_guard_through`: a call dropping a type parameter at a type with a destructor is not carried by the denotation

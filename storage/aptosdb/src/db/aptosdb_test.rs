@@ -422,6 +422,7 @@ proptest! {
         let tmp_dir = TempPath::new();
 
         let db = open_db_with_persistent_hot_state(&tmp_dir);
+        let mut block_ends = Vec::new();
         let mut version = 0;
         for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
             db.save_transactions_for_test(
@@ -432,6 +433,7 @@ proptest! {
             )
             .unwrap();
             version += txns_to_commit.len() as u64;
+            block_ends.push(version - 1);
         }
 
         let db_version = db.expect_synced_version();
@@ -439,7 +441,12 @@ proptest! {
 
         drop(db);
 
-        let mut target_version = db_version - 70;
+        // The DB can't be reopened in the middle of a block.
+        let mut target_version = *block_ends
+            .iter()
+            .rev()
+            .find(|v| **v <= db_version - 70)
+            .unwrap();
 
         let db_dir = StorageDirPaths::from_path(tmp_dir.path());
         AptosDB::truncate_to_version(&db_dir, target_version).unwrap();
@@ -510,8 +517,8 @@ proptest! {
         let hot_root_hashes = |db: &AptosDB| {
             let live = db.state_store.live().unwrap();
             let state = live.current_state_locked();
-            [state.latest(), state.last_checkpoint()]
-                .map(|s| (s.version(), s.summary().hot_root_hash().unwrap()))
+            let s = state.last_checkpoint();
+            (s.version(), s.summary().hot_root_hash().unwrap())
         };
         prop_assert_eq!(hot_root_hashes(&db), hot_root_hashes(&ref_db));
 

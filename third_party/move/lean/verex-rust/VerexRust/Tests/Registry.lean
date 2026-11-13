@@ -16,7 +16,7 @@ open VerexIR.Validation
   features "extra" no_default_features true target ""
   => ".lake/build/registered-cargo.raw.json" as registeredCargo
 
-syntax (name := checkRegisteredRustCmd) "#check_registered_rust " ident : command
+syntax (name := checkRegisteredRustCmd) "#check_registered_rust " ident num : command
 
 @[command_elab checkRegisteredRustCmd]
 private def elabCheckRegisteredRust : CommandElab := fun stx => do
@@ -29,14 +29,14 @@ private def elabCheckRegisteredRust : CommandElab := fun stx => do
   unless !receipt.inputIdentity.isEmpty && !receipt.cacheKey.isEmpty &&
       !receipt.artifactHash.isEmpty do
     throwErrorAt name "registered Rust import has an empty input receipt"
-  unless unit.indexes.functionCounts == #[1] do
+  unless unit.indexes.functionCounts == #[stx[2].toNat] do
     throwErrorAt name "registered Rust import lost its declaration identity"
   unless (prepareExecution #[semantics] unit).isOk do
     throwErrorAt name "registered Rust import does not prepare for execution"
   unless (prepareVerification #[semantics] unit).isOk do
     throwErrorAt name "registered Rust import does not prepare for verification"
 
-#check_registered_rust registeredBasic
-#check_registered_rust registeredCargo
+#check_registered_rust registeredBasic 1
+#check_registered_rust registeredCargo 4
 
 end VerexIR.Rust.Tests.Registry

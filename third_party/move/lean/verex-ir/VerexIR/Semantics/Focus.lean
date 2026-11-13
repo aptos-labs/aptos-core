@@ -47,6 +47,7 @@ inductive Plain : RuntimeValue → Prop
       (plain : ∀ capture ∈ captures, Plain capture) :
       Plain (.closure function mask typeInstantiation captures)
   | ghost (contents : RuntimeValue) (plain : Plain contents) : Plain (.ghost contents)
+  | retired : Plain .retired
 
 /-- A nominal value over a literal field row is plain when its fields are:
 the form a generated erasure has. -/
@@ -62,7 +63,7 @@ def plain? : RuntimeValue → Bool
       plainList? elements.toList
   | .ghost contents => plain? contents
   | .borrow .. | .loanHole _ => false
-  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .retired | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ => true
 termination_by value => sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
@@ -145,7 +146,7 @@ private theorem collectPrunedList_borrowEntry?_eq_empty
 theorem Plain.collectPruned_borrowEntry?_eq_empty {value : RuntimeValue}
     (plain : Plain value) : collectPruned borrowEntry? value = #[] := by
   induction plain with
-  | unit | bool | character | integer | address | signer | string | bytes | ghost =>
+  | unit | bool | character | integer | address | signer | string | bytes | ghost | retired =>
       simp [collectPruned, borrowEntry?]
   | vector elements fields ih
   | tuple elements fields ih
@@ -175,7 +176,7 @@ private theorem maskReturnedBorrowList_eq_self (loans : Array Nat)
 theorem Plain.maskReturnedBorrows_eq_self {value : RuntimeValue}
     (plain : Plain value) (loans : Array Nat) : maskReturnedBorrows loans value = value := by
   induction plain with
-  | unit | bool | character | integer | address | signer | string | bytes =>
+  | unit | bool | character | integer | address | signer | string | bytes | retired =>
       simp [maskReturnedBorrows]
   | ghost contents _ ih => simp only [maskReturnedBorrows, ih]
   | vector elements fields ih
@@ -280,7 +281,7 @@ theorem findFirst_eq_none_of_plain {α : Type} {f : RuntimeValue → Option α}
     (matcher : LoanMatcher f) {value : RuntimeValue} (plain : Plain value) :
     findFirst f value = none := by
   induction plain with
-  | unit | bool | character | integer | address | signer | string | bytes =>
+  | unit | bool | character | integer | address | signer | string | bytes | retired =>
       rw [findFirst.eq_def, matcher.plain (by constructor)]
   | ghost contents plain =>
       rw [findFirst.eq_def, matcher.plain (Plain.ghost contents plain)]
@@ -319,7 +320,7 @@ theorem rewriteFirst_eq_none_of_plain {f : RuntimeValue → Option RuntimeValue}
     (matcher : LoanMatcher f) {value : RuntimeValue} (plain : Plain value) :
     rewriteFirst f value = none := by
   induction plain with
-  | unit | bool | character | integer | address | signer | string | bytes =>
+  | unit | bool | character | integer | address | signer | string | bytes | retired =>
       rw [rewriteFirst.eq_def, matcher.plain (by constructor)]
   | ghost contents plain =>
       rw [rewriteFirst.eq_def, matcher.plain (Plain.ghost contents plain)]

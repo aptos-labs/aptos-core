@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/proof_default_selector_errors.proof.lean:10:3: error: no path takes `when if 2 then`; the paths' decisions: [if 1 else, returns]; [if 1 then, returns]
+VerexE2ETests/SourceVerify/proof_default_selector_errors.proof.lean:9:8: error: verex verification failed: the proof of `pick` does not establish its specification

@@ -116,7 +116,7 @@ verify 0x42::table_stored_invariants::too_strong
 /--
 error: the specification clause `ensures permitted::<Bool>(result)` is not established
 ---
-error: verex verification failed: the automatic verification of `wrong_type` failed; provide a proof in the module:
+error: verex verification failed: the automatic verification of `wrong_type` exceeded its budget of 25000 maxHeartbeats; provide a proof in the module:
   verify wrong_type by lean =>
     verex_obligations
     verex_on
