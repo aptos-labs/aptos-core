@@ -8,6 +8,9 @@ inputs:
     description: "An optional additional key to pass to rust-cache"
     required: false
     default: ""
+  SKIP_CACHE:
+    description: "Let a caller restore the cache after its own tool verification"
+    default: "false"
   macos:
     description: "If the machine is using macOS"
     required: false
@@ -22,6 +25,9 @@ runs:
         sudo apt-get update
         sudo apt-get install build-essential ca-certificates curl git gnupg libpq-dev libssl-dev lsb-release lsof pkg-config software-properties-common wget --no-install-recommends --assume-yes
         sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh 23
+        for tool in clang clang++ lld ld.lld; do
+          sudo update-alternatives --remove-all "$tool" || true
+        done
         sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-23 100
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-23 100
         sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-23 100
@@ -33,6 +39,7 @@ runs:
     # rust-cache action will cache ~/.cargo and ./target
     # https://github.com/Swatinem/rust-cache#cache-details
     - name: Run cargo cache
+      if: ${{ inputs.SKIP_CACHE != 'true' }}
       uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
       with:
         key: ${{ inputs.ADDITIONAL_KEY }}

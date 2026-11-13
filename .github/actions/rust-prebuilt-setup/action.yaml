@@ -1,5 +1,5 @@
 name: Verify Prebuilt Rust Tools
-description: Verify the image contract and restore Cargo cache without installing tools.
+description: Reconcile checkout tools, reuse compatible images, and restore Cargo cache.
 inputs:
   cache-key:
     description: Cargo cache suffix
@@ -7,37 +7,65 @@ inputs:
   save-cache:
     description: Whether this job may update the Cargo build cache
     default: "true"
+  allow-system-setup:
+    description: Permit full setup on an isolated self-hosted job with installation privileges
+    default: "false"
+outputs:
+  cache-hit:
+    description: Whether an exact Cargo cache entry was restored
+    value: ${{ steps.cache.outputs.cache-hit }}
+  system-setup:
+    description: Whether checkout dependency installation was required
+    value: ${{ steps.setup.outputs.system-setup == 'true' }}
 runs:
   using: composite
   steps:
-    - name: Verify image contract
+    - name: Select tool setup
+      id: setup
       shell: bash
+      env:
+        RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        ALLOW_SYSTEM_SETUP: ${{ inputs.allow-system-setup }}
       run: |
         set -euo pipefail
         test "$HOME" = /home/runner
-        export PATH="$HOME/bin:$HOME/.cargo/bin:$HOME/.dotnet/tools:$PATH"
-        python3 - <<'PY'
-        import hashlib, json, pathlib
-        manifest = json.loads(pathlib.Path('/opt/aptos-rust-image.json').read_text())
-        for name, expected in manifest['files'].items():
-            actual = hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()
-            if actual != expected:
-                raise SystemExit(f'Image tools are stale for {name}; rebuild the image')
-        print(json.dumps(manifest, indent=2))
-        PY
+        export PATH="$HOME/bin:$HOME/.cargo/bin:$HOME/.dotnet/tools:$HOME/.local/bin:$PATH"
+        python3 "$GITHUB_ACTION_PATH/setup.py" prepare
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+      id: cache
+      with:
+        key: ${{ inputs.cache-key }}
+        save-if: ${{ inputs.save-cache == 'true' }}
+    - name: Install checkout dependencies when required
+      if: ${{ steps.setup.outputs.system-setup == 'true' }}
+      uses: ./.github/actions/rust-setup
+      with:
+        SKIP_CACHE: "true"
+    - name: Verify active tools
+      shell: bash
+      env:
+        SYSTEM_SETUP: ${{ steps.setup.outputs.system-setup == 'true' }}
+      run: |
+        set -euo pipefail
+        export PATH="$HOME/bin:$HOME/.cargo/bin:$HOME/.dotnet/tools:$HOME/.local/bin:$PATH"
+        export DOTNET_ROOT="$HOME/.dotnet"
+        if [ "${SYSTEM_SETUP:-false}" = true ] && ! command -v pre-commit >/dev/null; then
+          python3 -m venv "$HOME/.local/pre-commit-venv"
+          "$HOME/.local/pre-commit-venv/bin/pip" install pre-commit==4.3.0
+          mkdir -p "$HOME/.local/bin"
+          ln -sf "$HOME/.local/pre-commit-venv/bin/pre-commit" "$HOME/.local/bin/pre-commit"
+        fi
+        python3 "$GITHUB_ACTION_PATH/setup.py" verify
         rustc --version
         cargo nextest --version
         cargo sort --version
         clang --version
+        ld.lld --version
         protoc --version
         pre-commit --version
         "$HOME/bin/z3" --version
         "$HOME/bin/cvc5" --version
         test -x "$HOME/.dotnet/tools/boogie"
         docker info >/dev/null
-        printf '%s\n' "$HOME/bin" "$HOME/.cargo/bin" "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+        printf '%s\n' "$HOME/bin" "$HOME/.cargo/bin" "$HOME/.dotnet/tools" "$HOME/.local/bin" >> "$GITHUB_PATH"
         printf 'DOTNET_ROOT=%s\n' "$HOME/.dotnet" >> "$GITHUB_ENV"
-    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
-      with:
-        key: ${{ inputs.cache-key }}
-        save-if: ${{ inputs.save-cache == 'true' }}
