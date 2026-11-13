@@ -166,7 +166,7 @@ module 0xcafe::m2 {
 //# publish
 module 0xc0ffee::m3 {
     struct S has copy, drop {
-        f: ||(u8) has copy + drop,
+        f: ||u8 has copy + drop,
     }
     public fun main() {
         test(S{f: || lambda__1__main()});

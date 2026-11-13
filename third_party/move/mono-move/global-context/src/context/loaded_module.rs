@@ -12,14 +12,14 @@ use mono_move_core::{
     intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
     types::{view_type, InternedType, InternedTypeList, Type},
-    FieldTypes, Function, FunctionDefinitionIndex, FunctionPtr, Interner, PreparedModule,
+    Function, FunctionDefinitionIndex, FunctionPtr, Interner, NominalFields, PreparedModule,
 };
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{FunctionAttribute, StructDefinitionIndex, Visibility},
 };
 use move_core_types::identifier::IdentStr;
-use parking_lot::Mutex;
+use parking_lot::RwLock;
 use shared_dsa::{Entry, UnorderedMap, UnorderedSet};
 use specializer::{FunctionIR, ModuleIR};
 use std::sync::{Arc, OnceLock};
@@ -181,9 +181,11 @@ pub struct LoadedModule {
     ///    functions are stored in [`Self::functions`].
     /// 2. The type arguments are fully concrete — they're the actual
     ///    runtime types the function was monomorphized for.
+    /// Lookups run on every generic call and take the read lock, so workers
+    /// calling the same generic function do not block each other.
     // TODO(cleanup): revisit data structure used for actual monomorphized function storage.
     instantiated_functions:
-        Mutex<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
+        RwLock<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
     /// Maps the name of a group member defined in this module (a nominal type)
     /// to its group container type (also a nominal type). Built once when the
     /// module is loaded. If struct's or enum's name is not in the map, then it
@@ -243,7 +245,7 @@ impl LoadedModule {
             mandatory_dependencies,
             functions,
             function_indices,
-            instantiated_functions: Mutex::new(UnorderedMap::new()),
+            instantiated_functions: RwLock::new(UnorderedMap::new()),
             resource_group_members,
             randomness_annotated,
             public_pack_apis,
@@ -267,9 +269,9 @@ impl LoadedModule {
             .map(|def| {
                 let name =
                     module.interned_identifier_at(module.struct_handle_at(def.struct_handle).name);
-                let num_variants = match module.interned_field_types(name) {
-                    Some(FieldTypes::Enum(variants)) => variants.len(),
-                    Some(FieldTypes::Struct(_)) | None => 1,
+                let num_variants = match module.interned_fields(name) {
+                    Some(NominalFields::Enum(variants)) => variants.len(),
+                    Some(NominalFields::Struct(_)) | None => 1,
                 };
                 vec![false; num_variants]
             })
@@ -410,7 +412,7 @@ impl LoadedModule {
         ty_args: InternedTypeList,
     ) -> Option<(FunctionPtr, Arc<[LoadedModuleSlot]>)> {
         self.instantiated_functions
-            .lock()
+            .read()
             .get(&(name, ty_args))
             .map(|f| (f.function, f.mandatory_dependencies.clone()))
     }
@@ -426,7 +428,7 @@ impl LoadedModule {
         function: Function,
         function_ms: Arc<[LoadedModuleSlot]>,
     ) -> FunctionPtr {
-        match self.instantiated_functions.lock().entry((name, ty_args)) {
+        match self.instantiated_functions.write().entry((name, ty_args)) {
             Entry::Occupied(e) => e.get().function,
             Entry::Vacant(e) => e.insert(FunctionSlot::new(function, function_ms)).function,
         }
@@ -468,8 +470,9 @@ impl Drop for LoadedModule {
     //      is dropped. In this case just-leaked box was never published into
     //      any slot, so it has no aliases by construction.
     //
-    // TODO(correctness): `FunctionPtr`s in other modules' `CallDirect` ops are only sound
-    //   if callers are evicted with direct callees. (or their code is de-optimized).
+    // TODO(correctness): Callers with cross-module `CallByPtr` ops must be evicted
+    //   with their callees or have those ops replaced before the callees are freed.
+    //   `CallByPtrExempt` targets only functions in the caller's module.
     fn drop(&mut self) {
         self.functions.retain(|_, cell| {
             if let Some(slot) = cell.take() {
@@ -478,9 +481,11 @@ impl Drop for LoadedModule {
             }
             false
         });
-        self.instantiated_functions.lock().for_each_value(|slot| {
-            // SAFETY: see impl-level comment — no aliases at drop time.
-            unsafe { slot.function.free_unchecked() };
-        });
+        self.instantiated_functions
+            .get_mut()
+            .for_each_value(|slot| {
+                // SAFETY: see impl-level comment — no aliases at drop time.
+                unsafe { slot.function.free_unchecked() };
+            });
     }
 }

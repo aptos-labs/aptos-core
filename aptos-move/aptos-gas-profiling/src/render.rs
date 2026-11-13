@@ -5,7 +5,10 @@ use crate::log::{FrameName, WriteOpType};
 use aptos_types::{
     access_path::Path,
     state_store::{
-        state_key::{inner::TradingNativeKey, StateKey},
+        state_key::{
+            inner::{CollateralScope, TradingNativeKey},
+            StateKey,
+        },
         table::TableHandle,
     },
 };
@@ -137,6 +140,20 @@ impl Display for Render<'_, StateKey> {
                     market,
                     account,
                 } => write!(f, "bulk_order<{},{},{}>", exchange, market, account),
+                TradingNativeKey::Collateral {
+                    exchange,
+                    account,
+                    scope,
+                } => match scope {
+                    CollateralScope::Cross => {
+                        write!(f, "collateral<{},{},cross>", exchange, account)
+                    },
+                    CollateralScope::Isolated { market } => write!(
+                        f,
+                        "collateral<{},{},isolated,{}>",
+                        exchange, account, market
+                    ),
+                },
             },
         }
     }

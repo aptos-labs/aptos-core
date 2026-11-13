@@ -2272,6 +2272,20 @@ impl SpecTranslator<'_> {
                 let fun_exp = &args[0];
                 let pred_args = &args[1..];
 
+                if matches!(kind, BehaviorKind::TransitionOf)
+                    && !matches!(
+                        fun_exp.as_ref(),
+                        ExpData::Call(_, Operation::Closure(..), _)
+                    )
+                {
+                    // The backend builds the witness over a concrete closure only.
+                    self.env.error(
+                        &self.env.get_node_loc(node_id),
+                        "bug: transition witness over a function value",
+                    );
+                    return;
+                }
+
                 match fun_exp.as_ref() {
                     ExpData::Call(closure_id, Operation::Closure(mid, fid, mask), closure_args) => {
                         // Closure: use per-function behavioral spec function
@@ -2720,7 +2734,8 @@ impl SpecTranslator<'_> {
             | BehaviorKind::ResultOf
             | BehaviorKind::UnchangedOf
             | BehaviorKind::FoldsOf
-            | BehaviorKind::WriteOf(_) => post,
+            | BehaviorKind::WriteOf(_)
+            | BehaviorKind::TransitionOf => post,
         };
         let mut first = true;
         for memory in &union_used_memory {
@@ -3001,7 +3016,8 @@ impl SpecTranslator<'_> {
             | BehaviorKind::ResultOf
             | BehaviorKind::UnchangedOf
             | BehaviorKind::FoldsOf
-            | BehaviorKind::WriteOf(_) => post,
+            | BehaviorKind::WriteOf(_)
+            | BehaviorKind::TransitionOf => post,
         };
         let mut first = true;
         for memory in used_memory.iter() {
@@ -3098,6 +3114,7 @@ impl SpecTranslator<'_> {
             BehaviorKind::UnchangedOf => "unchanged_of",
             BehaviorKind::FoldsOf => "folds_of",
             BehaviorKind::WriteOf(_) => "write_of",
+            BehaviorKind::TransitionOf => "transition",
         };
         let struct_env = self.env.get_struct_qid(memory.to_qualified_id());
         let mem_display = struct_env.get_full_name_with_address().to_string();
@@ -3885,8 +3902,11 @@ impl SpecTranslator<'_> {
                     },
                     Operation::Behavior(_, range) if !range.is_default() => {
                         // Resolve the closure (first arg) to get the function's memory usage.
-                        if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
-                            args.first().map(|a| a.as_ref())
+                        let Some(fun_arg) = args.first() else {
+                            return true;
+                        };
+                        if let ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _) =
+                            fun_arg.as_ref()
                         {
                             let inst = env.get_node_instantiation(*closure_id);
                             let inst = Type::instantiate_slice(&inst, type_inst);
@@ -3901,6 +3921,17 @@ impl SpecTranslator<'_> {
                                 }
                             }
                             for mem in behavioral_old_memory_instantiated(&fun_env, &inst) {
+                                for label in range.labels() {
+                                    result.insert((label, mem.clone()));
+                                }
+                            }
+                        } else {
+                            // Any other target, temporaries included, goes through the
+                            // evaluator of its type, which reads this memory union.
+                            let fun_type =
+                                env.get_node_type(fun_arg.node_id()).instantiate(type_inst);
+                            let (used, old) = compute_evaluator_memory_union(env, &fun_type);
+                            for mem in used.iter().chain(old.iter()) {
                                 for label in range.labels() {
                                     result.insert((label, mem.clone()));
                                 }
@@ -4200,6 +4231,7 @@ impl SpecTranslator<'_> {
                             BehaviorKind::EnsuresOf
                             | BehaviorKind::ResultOf
                             | BehaviorKind::WriteOf(_)
+                            | BehaviorKind::TransitionOf
                             | BehaviorKind::RequiresOf
                             | BehaviorKind::AbortsOf
                             | BehaviorKind::UnchangedOf
@@ -4438,6 +4470,46 @@ impl SpecTranslator<'_> {
                 state_domain_labels.insert(var_name, affected);
             }
         }
+        let value_states: BTreeMap<Symbol, (MemoryLabel, Vec<Type>)> = ranges
+            .iter()
+            .filter(|(_, range)| {
+                matches!(
+                    self.get_node_type(range.node_id()).skip_reference(),
+                    Type::StateDomain
+                )
+            })
+            .filter_map(|(var, _)| {
+                let (_, var_name) = self.require_range_var(var);
+                self.find_value_state_for_label(&scan_targets, var_name)
+                    .map(|value_state| (var_name, value_state))
+            })
+            .collect();
+        // A state variable that binds nothing does not occur in the body, and the
+        // state domain is inhabited, so a quantifier over only such variables is its body.
+        if value_states.is_empty()
+            && state_domain_labels.values().all(BTreeSet::is_empty)
+            && ranges.iter().all(|(_, range)| {
+                matches!(
+                    self.get_node_type(range.node_id()).skip_reference(),
+                    Type::StateDomain
+                )
+            })
+        {
+            emit!(self.writer, "(");
+            if let Some(cond) = condition {
+                emit!(self.writer, "(");
+                self.translate_exp(cond);
+                emit!(self.writer, ") {} ", match kind {
+                    QuantKind::Forall => "==>",
+                    QuantKind::Exists => "&&",
+                    _ => unreachable!(),
+                });
+            }
+            emit!(self.writer, "(");
+            self.translate_exp(body);
+            emit!(self.writer, "))");
+            return;
+        }
         // Snapshot the full map (keys *and* values) so the outer entry for a
         // shared `MemoryLabel` is restored after an inner nested quantifier
         // overwrites it. Key-only restore would leave the inner's value live.
@@ -4500,6 +4572,8 @@ impl SpecTranslator<'_> {
                     // Memory and value-state binders are additive: a callee can
                     // read global memory *and* use `old(p)` on `&mut p`, so both
                     // kinds of binders must come into scope under the same label.
+                    // Memory binders range over every `$Memory`, with no well-formedness
+                    // constraint; only value-state binders get one below.
                     if let Some(affected) = state_domain_labels.get(&var_name) {
                         for (label, mem) in affected {
                             let name = boogie_resource_memory_name(self.env, mem, &Some(*label));
@@ -4512,9 +4586,7 @@ impl SpecTranslator<'_> {
                             comma = ", ";
                         }
                     }
-                    if let Some((label, val_tys)) =
-                        self.find_value_state_for_label(&scan_targets, var_name)
-                    {
+                    if let Some((label, val_tys)) = value_states.get(&var_name).cloned() {
                         let bv_flag = false;
                         let mut entries: Vec<(String, Type)> = Vec::with_capacity(val_tys.len());
                         for (i, val_ty) in val_tys.iter().enumerate() {

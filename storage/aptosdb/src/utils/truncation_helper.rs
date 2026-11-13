@@ -17,10 +17,10 @@ use crate::{
         hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         ledger_info::LedgerInfoSchema,
-        position_value::PositionValueSchema,
+        native_stale_value_index::NativeStaleValueIndexSchema,
+        native_value::NativeValueSchema,
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
-        stale_position_value_index::StalePositionValueIndexSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
         transaction::TransactionSchema,
@@ -112,7 +112,7 @@ fn truncate_native_kv_db_single_shard<T: NativeStoreSpec>(
     target_version: Version,
 ) -> Result<()> {
     let mut batch = SchemaBatch::new();
-    delete_value_and_index::<StalePositionValueIndexSchema, PositionValueSchema>(
+    delete_value_and_index::<NativeStaleValueIndexSchema, NativeValueSchema>(
         kv_db.shard(shard_id),
         target_version + 1,
         &mut batch,

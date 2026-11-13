@@ -20,7 +20,7 @@ fun call_identity_u64(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call identity<u64>, [r0] @1
+    0: [x0] := call_exempt identity<u64>, [r0] @1
     1: ret [x0] @2
 }
 
@@ -39,7 +39,7 @@ fun call_identity_u64() {
   entry_gas: 90
   code:
     0: Move8 [32] <- [0] @1
-    1: CallIndirect 0x1::test::identity<u64> @1
+    1: CallByNameExempt 0x1::test::identity<u64> @1
     2: Move8 [0] <- [32] @2
     3: Return @2
 }

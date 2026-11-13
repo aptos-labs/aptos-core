@@ -1253,7 +1253,7 @@ impl<'a> FunctionGenerator<'a> {
         // when variants in the borrow instruction are exact match with the variants in the API, we can directly call the API;
         // when variants in the borrow instruction are a subset of the variants in the API,
         // we need to generate code for calling the test variant API for each variant in the instruction;
-        // when variants in the borrow instruction are intersect with the variants in the API, we need to generate an error;
+        // partial overlap with an API's variants is ruled out by the type checker.
         let mut found = false;
         for ((cur_variants_opt, cur_offset, _), borrow_field_handle_index) in &vec {
             if offset == cur_offset {
@@ -1441,17 +1441,6 @@ impl<'a> FunctionGenerator<'a> {
                         }
                         self.abstract_pop_n(ctx, source.len());
                         self.abstract_push_result(ctx, dest);
-                        found = true;
-                        break;
-                    } else if !variants_set
-                        .intersection(&cur_variants_set)
-                        .collect::<Vec<_>>()
-                        .is_empty()
-                    {
-                        // handle the case e.x where x appears in multiple variants at the same offset but have different or may be instantiated with different types.
-                        struct_env.env().error(&fun_ctx.fun.get_bytecode_loc(ctx.attr_id), &format!("cannot perform borrow operation for field `{}` for struct `{}` since it has or may be instantiated with different types in variants",
-                        struct_env.get_field_by_offset_optional_variant(Some(cur_variants[0]), *offset).get_name().display(struct_env.env().symbol_pool()),
-                        struct_env.get_full_name_with_address()));
                         found = true;
                         break;
                     }

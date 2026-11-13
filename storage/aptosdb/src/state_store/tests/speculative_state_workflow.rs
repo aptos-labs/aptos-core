@@ -9,6 +9,7 @@ use aptos_infallible::Mutex;
 use aptos_scratchpad::test_utils::naive_smt::NaiveSmt;
 use aptos_storage_interface::{
     state_store::{
+        leaf_entry::leaf_entry_to_jmt_update,
         state::{LedgerState, State},
         state_summary::{LedgerStateSummary, ProvableStateSummary, StateSummary},
         state_update_refs::StateUpdateRefs,
@@ -25,7 +26,7 @@ use aptos_types::{
         state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
-        state_value::StateValue,
+        state_value::{StateValue, ARB_STATE_VALUE_MAX_SIZE},
         StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
@@ -52,13 +53,22 @@ use std::{
 
 const NUM_KEYS: usize = NUM_STATE_SHARDS * 6;
 const HOT_STATE_MAX_ITEMS_PER_SHARD: usize = NUM_KEYS / NUM_STATE_SHARDS / 2;
+// Small enough that the byte limit regularly kicks in before the item limit, and a single large
+// value can exceed it on its own. Vacant entries take only the key hash, so the item limit still
+// kicks in at times.
+const HOT_STATE_MAX_BYTES_PER_SHARD: usize = HashValue::LENGTH + ARB_STATE_VALUE_MAX_SIZE * 4 / 5;
 
-// TODO(HotState): these are not used much at the moment.
-const MAX_PROMOTIONS_PER_BLOCK: usize = NUM_KEYS;
-const REFRESH_INTERVAL_VERSIONS: Version = 50;
+// Small enough that a block leaves many keys read but not written, so they are eligible for
+// promotion.
+const MAX_WRITE_SET_SIZE: usize = NUM_KEYS / 8;
+// Small enough that blocks regularly hit the cap: 16 keys of 5 bytes each.
+const MAX_PROMOTION_BYTES_PER_BLOCK: usize = 80;
+// Short enough that promotions mix refreshes with skips of recently hot keys.
+const REFRESH_INTERVAL_VERSIONS: Version = 20;
 
 const TEST_CONFIG: HotStateConfig = HotStateConfig {
     max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
+    max_bytes_per_shard: HOT_STATE_MAX_BYTES_PER_SHARD,
     refresh_interval_versions: REFRESH_INTERVAL_VERSIONS,
     delete_on_restart: false,
 };
@@ -283,8 +293,12 @@ impl VersionState {
 
         if is_checkpoint {
             for shard in hot_state.iter_mut() {
-                while shard.len() > HOT_STATE_MAX_ITEMS_PER_SHARD {
-                    let (k, _) = shard.pop_lru().unwrap();
+                let mut value_bytes: usize = shard.iter().map(|(_, slot)| slot.size()).sum();
+                while shard.len() > HOT_STATE_MAX_ITEMS_PER_SHARD
+                    || shard.len() * HashValue::LENGTH + value_bytes > HOT_STATE_MAX_BYTES_PER_SHARD
+                {
+                    let (k, slot) = shard.pop_lru().unwrap();
+                    value_bytes -= slot.size();
                     hot_smt_updates.push((k.hash(), None));
                 }
             }
@@ -375,7 +389,6 @@ impl StateByVersion {
     }
 
     fn assert_state_slot(slot1: &StateSlot, slot2: &StateSlot) {
-        assert_eq!(slot1.state_key(), slot2.state_key());
         match (slot1.kind(), slot2.kind()) {
             (
                 StateSlotKind::HotVacant {
@@ -415,7 +428,6 @@ impl StateByVersion {
 
     fn assert_ledger_state(&self, ledger_state: &LedgerState) {
         self.assert_state(ledger_state.last_checkpoint());
-        self.assert_state(ledger_state.latest());
     }
 
     fn assert_state_summary(&self, state_summary: &StateSummary) {
@@ -435,7 +447,6 @@ impl StateByVersion {
 
     fn assert_ledger_state_summary(&self, ledger_state_summary: &LedgerStateSummary) {
         self.assert_state_summary(ledger_state_summary.last_checkpoint());
-        self.assert_state_summary(ledger_state_summary.latest());
     }
 
     fn assert_jmt_updates(&self, last_snapshot: &StateWithSummary, snapshot: &StateWithSummary) {
@@ -451,7 +462,8 @@ impl StateByVersion {
             .shards
             .iter()
             .flat_map(|shard| shard.iter())
-            .filter_map(|(_key_hash, slot)| slot.maybe_update_jmt(last_snapshot.next_version()))
+            .filter(|(_key_hash, slot)| slot.passes_jmt_filter(last_snapshot.next_version()))
+            .map(|(key_hash, slot)| leaf_entry_to_jmt_update(key_hash, &slot))
             .map(|(key_hash, value_opt)| (key_hash, value_opt.map(|(val_hash, _key)| val_hash)))
             .collect_vec();
 
@@ -555,19 +567,11 @@ fn assert_hot_state_ops(
     state_by_version: &StateByVersion,
     hot_state_updates: &HotStateUpdates,
     for_ckpt_base: Option<Version>,
-    for_latest_base: Option<Version>,
     for_ckpt_result: Option<Version>,
-    for_latest_result: Option<Version>,
 ) {
     if let Some(shards) = &hot_state_updates.for_last_checkpoint {
         let base = state_by_version.get_state(for_ckpt_base);
         let result = state_by_version.get_state(for_ckpt_result);
-        assert_hot_state_shard_ops(state_by_version, &base.hot_state, &result.hot_state, shards);
-    }
-    if let Some(shards) = &hot_state_updates.for_latest {
-        let base = state_by_version.get_state(for_latest_base);
-        let result = state_by_version.get_state(for_latest_result);
-        // for_latest is called with no checkpoint versions, so no evictions should occur.
         assert_hot_state_shard_ops(state_by_version, &base.hot_state, &result.hot_state, shards);
     }
 }
@@ -703,19 +707,11 @@ fn update_state(
 
         state_by_version.assert_ledger_state(&next_state);
 
-        let for_ckpt_base = parent_state.latest().version();
-        let for_latest_base = if hot_state_updates.for_last_checkpoint.is_some() {
-            next_state.last_checkpoint().version()
-        } else {
-            for_ckpt_base
-        };
         assert_hot_state_ops(
             &state_by_version,
             &hot_state_updates,
-            for_ckpt_base,
-            for_latest_base,
+            parent_state.last_checkpoint().version(),
             next_state.last_checkpoint().version(),
-            next_state.latest().version(),
         );
 
         parent_state = next_state.clone();
@@ -786,7 +782,6 @@ fn send_to_state_buffer(
 
     // Make sure the final checkpoint is committed.
     let final_state_with_summary: LedgerStateWithSummary = current_state.lock().clone();
-    assert!(final_state_with_summary.is_at_checkpoint());
     let final_version = final_state_with_summary.version().unwrap();
     if last_snapshot.version() != Some(final_version) {
         let snapshot = final_state_with_summary.last_checkpoint();
@@ -818,6 +813,7 @@ fn commit_state_buffer(
 
             for (key, slot) in naive_hot_state.iter() {
                 let slot2 = all_entries.get(key.crypto_hash_ref()).unwrap();
+                assert!(slot2.state_key().is_none());
                 StateByVersion::assert_state_slot(slot, slot2);
             }
         });
@@ -829,7 +825,7 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, Option<UserTxn>)>) -> (Vec<Txn>, 
     let mut state_by_version = StateByVersion::new_empty();
     for (block_txns, epilogue) in blocks {
         let mut op_accu =
-            BlockHotStateOpAccumulator::<StateKey>::new_with_config(MAX_PROMOTIONS_PER_BLOCK);
+            BlockHotStateOpAccumulator::<StateKey>::new_with_config(MAX_PROMOTION_BYTES_PER_BLOCK);
         let num_txns = block_txns.len();
         for (idx, txn) in block_txns.into_iter().enumerate() {
             // No promotions except for block epilogue. Also note that in case of reconfig, there's
@@ -856,7 +852,7 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, Option<UserTxn>)>) -> (Vec<Txn>, 
         }
         if let Some(epi_txn) = epilogue {
             let to_make_hot = op_accu
-                .get_keys_to_make_hot(|k| Ok(k.clone()))
+                .get_keys_to_make_hot(|k| Ok(k.clone()), StateKey::size)
                 .expect("Identity conversion to storage key cannot fail");
 
             state_by_version.append_version(
@@ -980,16 +976,17 @@ proptest! {
                 (
                     vec(
                         (
-                            arb_user_block(keys.clone(), NUM_KEYS, NUM_KEYS, NUM_KEYS),
+                            arb_user_block(keys.clone(), NUM_KEYS, MAX_WRITE_SET_SIZE, NUM_KEYS),
                             prop_oneof![
                                 1 => Just(None),
-                                9 => arb_user_txn(keys.clone(), NUM_KEYS, NUM_KEYS).prop_map(Some),
+                                9 => arb_user_txn(keys.clone(), NUM_KEYS, MAX_WRITE_SET_SIZE)
+                                    .prop_map(Some),
                             ],
                         ),
                         1..100
                     ),
-                    arb_user_block(keys.clone(), NUM_KEYS, NUM_KEYS, NUM_KEYS),
-                    arb_user_txn(keys, NUM_KEYS, NUM_KEYS),
+                    arb_user_block(keys.clone(), NUM_KEYS, MAX_WRITE_SET_SIZE, NUM_KEYS),
+                    arb_user_txn(keys, NUM_KEYS, MAX_WRITE_SET_SIZE),
                 )
             })
     ) {
@@ -997,13 +994,21 @@ proptest! {
 
         let (all_txns, state_by_version) = naive_run_blocks(blocks);
 
+        // Chunks of whole blocks, each extended from `NUM_KEYS / 2` txns to the next block end.
         let mut chunks = vec![];
         let mut next_version = 0;
-        for chunk in &all_txns.into_iter().chunks(NUM_KEYS / 2) {
-            let chunk: Vec<Txn> = chunk.collect();
-            let first_version = next_version;
-            next_version += chunk.len() as Version;
-            chunks.push(Chunk::from_txns(chunk, first_version));
+        let mut chunk = vec![];
+        for txn in all_txns {
+            let is_checkpoint = txn.is_checkpoint;
+            chunk.push(txn);
+            if is_checkpoint && chunk.len() >= NUM_KEYS / 2 {
+                let first_version = next_version;
+                next_version += chunk.len() as Version;
+                chunks.push(Chunk::from_txns(std::mem::take(&mut chunk), first_version));
+            }
+        }
+        if !chunk.is_empty() {
+            chunks.push(Chunk::from_txns(chunk, next_version));
         }
 
         replay_chunks_pipelined(chunks, Arc::new(state_by_version));

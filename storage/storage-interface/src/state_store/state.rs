@@ -5,6 +5,7 @@ use crate::{
     metrics::TIMER,
     state_store::{
         hot_state::HotStateLRU,
+        hot_state_config::{ConfigCursor, EffectiveHotStateConfig, ON_CHAIN_CONFIG_KEY},
         state_delta::StateDelta,
         state_update_refs::{BatchedStateUpdateRefs, PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::{
@@ -22,7 +23,7 @@ use anyhow::{bail, Result};
 use aptos_config::config::HotStateConfig;
 use aptos_crypto::HashValue;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
-use aptos_logger::warn;
+use aptos_logger::{info, warn};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
@@ -35,7 +36,7 @@ use arr_macro::arr;
 use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
-use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Clone, Debug, Default)]
 pub struct HotStateMetadata {
@@ -75,7 +76,7 @@ pub struct State {
     hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
-    hot_state_config: HotStateConfig,
+    hot_state_config: EffectiveHotStateConfig,
 }
 
 impl State {
@@ -84,7 +85,7 @@ impl State {
         shards: Arc<[MapLayer<HashValue, StateSlot>; NUM_STATE_SHARDS]>,
         hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         usage: StateStorageUsage,
-        hot_state_config: HotStateConfig,
+        hot_state_config: EffectiveHotStateConfig,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
@@ -98,7 +99,7 @@ impl State {
     pub fn new_at_version(
         version: Option<Version>,
         usage: StateStorageUsage,
-        hot_state_config: HotStateConfig,
+        hot_state_config: EffectiveHotStateConfig,
     ) -> Self {
         Self::new_at_version_with_hot_state_metadata(
             version,
@@ -111,7 +112,7 @@ impl State {
     pub fn new_at_version_with_hot_state_metadata(
         version: Option<Version>,
         usage: StateStorageUsage,
-        hot_state_config: HotStateConfig,
+        hot_state_config: EffectiveHotStateConfig,
         hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
     ) -> Self {
         Self::new_with_updates(
@@ -123,8 +124,13 @@ impl State {
         )
     }
 
+    /// Takes only the local config, since there can't be an on-chain config before genesis.
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
-        Self::new_at_version(None, StateStorageUsage::zero(), hot_state_config)
+        Self::new_at_version(
+            None,
+            StateStorageUsage::zero(),
+            EffectiveHotStateConfig::from_local(hot_state_config),
+        )
     }
 
     pub fn next_version(&self) -> Version {
@@ -137,10 +143,6 @@ impl State {
 
     pub fn usage(&self) -> StateStorageUsage {
         self.usage
-    }
-
-    pub fn hot_state_config(&self) -> HotStateConfig {
-        self.hot_state_config
     }
 
     pub fn shards(&self) -> &[MapLayer<HashValue, StateSlot>; NUM_STATE_SHARDS] {
@@ -220,6 +222,7 @@ impl State {
         assert!(self.next_version() >= state_cache.next_version());
 
         let overlay = self.make_delta(persisted);
+        let config_changes = self.hot_state_config_changes(batched_updates, per_version_updates);
         let (((shards, new_metadata), usage_delta_per_shard), hot_state_updates): (
             ((Vec<_>, Vec<_>), Vec<_>),
             Vec<_>,
@@ -231,10 +234,13 @@ impl State {
             per_version_updates.shards.as_slice(),
         )
             .into_par_iter()
+            .enumerate()
             .map(
-                |(cache, overlay, hot_metadata, batched_updates, per_version)| {
+                |(shard_id, (cache, overlay, hot_metadata, batched_updates, per_version))| {
+                    let mut cursor = ConfigCursor::new(self.hot_state_config, &config_changes);
                     let mut lru = HotStateLRU::new(
-                        NonZeroUsize::new(self.hot_state_config.max_items_per_shard).unwrap(),
+                        cursor.current().max_items(shard_id),
+                        cursor.current().max_bytes(shard_id),
                         Arc::clone(&persisted_hot_state),
                         overlay,
                         hot_metadata.latest,
@@ -255,12 +261,19 @@ impl State {
                                 cache,
                                 key,
                                 update,
-                                self.hot_state_config.refresh_interval_versions,
+                                cursor
+                                    .for_update(update.version)
+                                    .refresh_interval_versions(),
                             ) {
                                 shard_updates.insert(key_hash, op);
                             }
                         }
                         // Only evict at the checkpoints.
+                        let eviction_config = cursor.for_eviction(*ckpt_version);
+                        lru.set_limits(
+                            eviction_config.max_items(shard_id),
+                            eviction_config.max_bytes(shard_id),
+                        );
                         for (key_hash, slot) in lru.maybe_evict() {
                             assert!(slot.is_hot());
                             shard_updates
@@ -279,7 +292,9 @@ impl State {
                             cache,
                             key,
                             update,
-                            self.hot_state_config.refresh_interval_versions,
+                            cursor
+                                .for_update(update.version)
+                                .refresh_interval_versions(),
                         ) {
                             shard_updates.insert(key_hash, op);
                         }
@@ -309,17 +324,51 @@ impl State {
             .try_into()
             .expect("Known to be 16 shards.");
 
-        // TODO(HotState): extract and pass new hot state onchain config if needed.
+        let new_config = config_changes
+            .last()
+            .map_or(self.hot_state_config, |(_version, config)| *config);
         Ok((
             State::new_with_updates(
                 batched_updates.last_version(),
                 shards,
                 new_metadata,
                 usage,
-                self.hot_state_config,
+                new_config,
             ),
             hot_state_updates,
         ))
+    }
+
+    /// Changes to the on-chain hot state config in the updates, in version order.
+    fn hot_state_config_changes(
+        &self,
+        batched_updates: &BatchedStateUpdateRefs,
+        per_version_updates: &PerVersionStateUpdateRefs,
+    ) -> Vec<(Version, EffectiveHotStateConfig)> {
+        let key = &*ON_CHAIN_CONFIG_KEY;
+        let shard_id = key.get_shard_id();
+        // Avoid scanning the shard for the rare case.
+        if !batched_updates.shards[shard_id].contains_key(&key) {
+            return Vec::new();
+        }
+        per_version_updates.shards[shard_id]
+            .iter()
+            .filter(|(k, _update)| *k == key)
+            .filter_map(|(_k, update)| {
+                // Hotness ops don't change the value.
+                let value_opt = update.state_op.as_state_value_opt()?;
+                let config = self
+                    .hot_state_config
+                    .with_on_chain(value_opt.map(|value| value.bytes().as_ref()));
+                info!(
+                    version = update.version,
+                    exists_on_chain = value_opt.is_some(),
+                    effective_hot_state_config = ?config,
+                    "On-chain hot state config updated."
+                );
+                Some((update.version, config))
+            })
+            .collect()
     }
 
     /// Applies one update to the LRU. Returns `None` if the op is `MakeHot` and refresh is not
@@ -347,7 +396,11 @@ impl State {
         if let Some(mut slot) = lru.get_slot(&key_hash) {
             let mut refreshed = true;
             let slot_to_insert = if slot.is_hot() {
-                if slot.expect_hot_since_version() + refresh_interval <= update.version {
+                if slot
+                    .expect_hot_since_version()
+                    .saturating_add(refresh_interval)
+                    <= update.version
+                {
                     slot.refresh(update.version);
                 } else {
                     refreshed = false;
@@ -445,39 +498,25 @@ impl State {
     }
 }
 
-/// At a given version, the state and the last checkpoint state at or before the version.
+/// The state at the last checkpoint, which is where the ledger ends, as only whole blocks are
+/// committed.
 #[derive(Clone, Debug, Deref)]
 pub struct LedgerState {
-    last_checkpoint: State,
     #[deref]
-    latest: State,
+    last_checkpoint: State,
 }
 
 impl LedgerState {
-    pub fn new(latest: State, last_checkpoint: State) -> Self {
-        assert!(latest.is_descendant_of(&last_checkpoint));
-
-        Self {
-            latest,
-            last_checkpoint,
-        }
+    pub fn new(last_checkpoint: State) -> Self {
+        Self { last_checkpoint }
     }
 
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
-        let state = State::new_empty(hot_state_config);
-        Self::new(state.clone(), state)
-    }
-
-    pub fn latest(&self) -> &State {
-        &self.latest
+        Self::new(State::new_empty(hot_state_config))
     }
 
     pub fn last_checkpoint(&self) -> &State {
         &self.last_checkpoint
-    }
-
-    pub fn is_checkpoint(&self) -> bool {
-        self.latest.is_the_same(&self.last_checkpoint)
     }
 
     /// In the execution pipeline, at the time of state update, the reads during execution
@@ -493,14 +532,11 @@ impl LedgerState {
 
         let mut all_hot_state_updates = HotStateUpdates::new_empty();
         let last_checkpoint = if let Some(batched) = updates.for_last_checkpoint_batched() {
-            let per_version = updates
-                .for_last_checkpoint_per_version()
-                .expect("Both per-version and batched updates should exist.");
-            let (new_ckpt, hot_state_updates) = self.latest().update(
-                Arc::clone(&persisted_hot_view),
+            let (new_ckpt, hot_state_updates) = self.last_checkpoint.update(
+                persisted_hot_view,
                 persisted_snapshot,
                 batched,
-                per_version,
+                &updates.per_version,
                 updates.all_checkpoint_versions(),
                 reads,
             )?;
@@ -510,33 +546,7 @@ impl LedgerState {
             self.last_checkpoint.clone()
         };
 
-        let base_of_latest = if updates.for_last_checkpoint_batched().is_none() {
-            self.latest()
-        } else {
-            &last_checkpoint
-        };
-        let latest = if let Some(batched) = updates.for_latest_batched() {
-            let per_version = updates
-                .for_latest_per_version()
-                .expect("Both per-version and batched updates should exist.");
-            let (new_latest, hot_state_updates) = base_of_latest.update(
-                persisted_hot_view,
-                persisted_snapshot,
-                batched,
-                per_version,
-                &[],
-                reads,
-            )?;
-            all_hot_state_updates.for_latest = Some(hot_state_updates);
-            new_latest
-        } else {
-            base_of_latest.clone()
-        };
-
-        Ok((
-            LedgerState::new(latest, last_checkpoint),
-            all_hot_state_updates,
-        ))
+        Ok((LedgerState::new(last_checkpoint), all_hot_state_updates))
     }
 
     /// Old values of the updated keys are read from the DbReader at the version of the
@@ -553,7 +563,7 @@ impl LedgerState {
             reader,
             Arc::clone(&hot_state),
             persisted_snapshot.clone(),
-            self.latest().clone(),
+            self.last_checkpoint.clone(),
         );
         state_view.prime_cache(updates, PrimingPolicy::All)?;
 
@@ -568,8 +578,7 @@ impl LedgerState {
     }
 
     pub fn is_the_same(&self, other: &Self) -> bool {
-        self.latest.is_the_same(&other.latest)
-            && self.last_checkpoint.is_the_same(&other.last_checkpoint)
+        self.last_checkpoint.is_the_same(&other.last_checkpoint)
     }
 }
 
@@ -578,12 +587,15 @@ mod tests {
     use super::*;
     use crate::state_store::state_view::hot_state_view::EmptyHotState;
     use aptos_types::{
+        on_chain_config::{HotStateConfigV1, OnChainHotStateConfig},
         state_store::{state_slot::StateSlotKind, state_value::StateValue},
         write_set::{BaseStateOp, WriteOp},
     };
+    use std::{iter::once, num::NonZeroUsize};
 
     const TEST_CONFIG: HotStateConfig = HotStateConfig {
         max_items_per_shard: 100,
+        max_bytes_per_shard: 10_000,
         refresh_interval_versions: 100,
         delete_on_restart: false,
     };
@@ -629,6 +641,7 @@ mod tests {
     fn empty_lru<'a>(overlay: &'a LayeredMap<HashValue, StateSlot>) -> HotStateLRU<'a> {
         HotStateLRU::new(
             NonZeroUsize::new(100).unwrap(),
+            10_000,
             Arc::new(EmptyHotState),
             overlay,
             None,
@@ -664,7 +677,7 @@ mod tests {
             Arc::new(shards),
             Default::default(),
             StateStorageUsage::zero(),
-            TEST_CONFIG,
+            EffectiveHotStateConfig::from_local(TEST_CONFIG),
         )
     }
 
@@ -917,11 +930,31 @@ mod tests {
         assert_eq!(result.value.hot_since_version(), 1);
     }
 
+    #[test]
+    fn test_make_hot_max_interval_never_refreshes() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        seed_hot(&mut lru, &overlay, &cache, &k, 1);
+
+        let op = BaseStateOp::MakeHot;
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(100, &op), Version::MAX);
+        assert!(result.is_none());
+    }
+
     // ===== usage accounting =====
 
     #[test]
     fn test_update_usage_sums_deltas() {
-        let state = State::new_at_version(Some(0), StateStorageUsage::new(10, 1000), TEST_CONFIG);
+        let state = State::new_at_version(
+            Some(0),
+            StateStorageUsage::new(10, 1000),
+            EffectiveHotStateConfig::from_local(TEST_CONFIG),
+        );
         let mut deltas = vec![(0i64, 0i64); NUM_STATE_SHARDS];
         deltas[0] = (3, 100);
         deltas[5] = (-1, -40);
@@ -1022,7 +1055,11 @@ mod tests {
         assert_eq!(empty.next_version(), 0);
         assert_eq!(empty.version(), None);
 
-        let at5 = State::new_at_version(Some(5), StateStorageUsage::new(1, 2), TEST_CONFIG);
+        let at5 = State::new_at_version(
+            Some(5),
+            StateStorageUsage::new(1, 2),
+            EffectiveHotStateConfig::from_local(TEST_CONFIG),
+        );
         assert_eq!(at5.next_version(), 6);
         assert_eq!(at5.version(), Some(5));
         assert_eq!(at5.usage().items(), 1);
@@ -1061,7 +1098,7 @@ mod tests {
         let state = State::new_at_version_with_hot_state_metadata(
             Some(0),
             StateStorageUsage::zero(),
-            TEST_CONFIG,
+            EffectiveHotStateConfig::from_local(TEST_CONFIG),
             md,
         );
 
@@ -1075,21 +1112,170 @@ mod tests {
     }
 
     #[test]
-    fn test_ledger_state_empty_is_checkpoint() {
+    fn test_ledger_state_empty() {
         let ls = LedgerState::new_empty(TEST_CONFIG);
-        assert!(ls.is_checkpoint());
-        assert_eq!(ls.latest().next_version(), 0);
         assert_eq!(ls.last_checkpoint().next_version(), 0);
     }
 
-    #[test]
-    fn test_ledger_state_non_checkpoint() {
-        let s0 = State::new_empty(TEST_CONFIG);
-        let s1 = empty_descendant(&s0, &s0, 0);
-        let ls = LedgerState::new(s1.clone(), s0.clone());
+    // ===== on-chain config changes =====
 
-        assert!(!ls.is_checkpoint());
-        assert!(ls.latest().is_the_same(&s1));
-        assert!(ls.last_checkpoint().is_the_same(&s0));
+    fn on_chain_config_op(
+        max_items: u64,
+        max_bytes: u64,
+        refresh_interval_versions: Version,
+    ) -> BaseStateOp {
+        let config = OnChainHotStateConfig::V1(HotStateConfigV1 {
+            max_items_per_shard: vec![max_items; NUM_STATE_SHARDS],
+            max_bytes_per_shard: vec![max_bytes; NUM_STATE_SHARDS],
+            refresh_interval_versions,
+            max_promotion_bytes_per_block: 0,
+            defer_cold_writes_to_eviction: false,
+        });
+        let bytes = bcs::to_bytes(&bcs::to_bytes(&config).unwrap()).unwrap();
+        BaseStateOp::Creation(StateValue::new_legacy(bytes.into()))
+    }
+
+    fn creations(keys: &[StateKey]) -> Vec<(StateKey, BaseStateOp)> {
+        keys.iter()
+            .map(|k| (k.clone(), BaseStateOp::Creation(val(b"v"))))
+            .collect()
+    }
+
+    /// Applies one write set per version on top of `parent`.
+    fn apply_write_sets(
+        persisted: &State,
+        parent: &LedgerState,
+        write_sets: &[Vec<(StateKey, BaseStateOp)>],
+        checkpoint_indices: Vec<usize>,
+    ) -> (LedgerState, HotStateUpdates) {
+        let updates = StateUpdateRefs::index(
+            parent.next_version(),
+            write_sets.iter().map(|ws| ws.iter().map(|(k, op)| (k, op))),
+            write_sets.len(),
+            checkpoint_indices,
+        );
+        // Newly created keys were read as nonexistent.
+        let reads = ShardedStateCache::new_empty(persisted.version());
+        for (k, op) in write_sets.iter().flatten() {
+            if matches!(op, BaseStateOp::Creation(_)) {
+                reads.try_insert(k, &StateSlot::new(k.clone(), StateSlotKind::ColdVacant));
+            }
+        }
+        parent
+            .update_with_memorized_reads(Arc::new(EmptyHotState), persisted, &updates, &reads)
+            .unwrap()
+    }
+
+    #[test]
+    fn test_on_chain_config_change_evicts_at_its_checkpoint() {
+        let keys = (0..64).map(|i| key(&format!("k{i}"))).collect_vec();
+        let mut num_keys = [0; NUM_STATE_SHARDS];
+        for k in keys.iter().chain(once(&*ON_CHAIN_CONFIG_KEY)) {
+            num_keys[k.get_shard_id()] += 1;
+        }
+        let config_shard = ON_CHAIN_CONFIG_KEY.get_shard_id();
+
+        // Each of `keys` takes 33 bytes (key hash and a 1-byte value), so either cap keeps the
+        // newest item in each shard, except that the config alone exceeds the byte cap.
+        for (max_items, max_bytes, num_hot_in_config_shard) in [(1, u64::MAX, 1), (100, 33, 0)] {
+            let empty = LedgerState::new_empty(TEST_CONFIG);
+            // Like a reconfig txn, v1 shrinks the hot state and is a checkpoint.
+            let write_sets = [creations(&keys), vec![(
+                ON_CHAIN_CONFIG_KEY.clone(),
+                on_chain_config_op(max_items, max_bytes, 100),
+            )]];
+            let (state, updates) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 1]);
+
+            let updates = updates.for_last_checkpoint.unwrap();
+            for shard_id in 0..NUM_STATE_SHARDS {
+                let num_hot = if shard_id == config_shard {
+                    num_hot_in_config_shard
+                } else {
+                    num_keys[shard_id].min(1)
+                };
+                assert_eq!(state.num_hot_items(shard_id), num_hot);
+                let evictions = &updates[shard_id].evictions;
+                assert_eq!(evictions.len(), num_keys[shard_id] - num_hot);
+                // None at v0, before the change.
+                assert!(evictions.values().all(|op| op.eviction_version == 1));
+            }
+            let config = state.hot_state_config;
+            assert_eq!(config.max_items(0).get() as u64, max_items);
+            assert_eq!(config.max_bytes(0) as u64, max_bytes);
+        }
+    }
+
+    #[test]
+    fn test_on_chain_config_change_applies_to_later_updates() {
+        let empty = LedgerState::new_empty(TEST_CONFIG);
+        let k = key("a");
+        let (state, _) = apply_write_sets(
+            &empty,
+            &empty,
+            &[creations(std::slice::from_ref(&k))],
+            vec![0],
+        );
+        let refreshed = |updates: &HotStateUpdates| {
+            updates.for_last_checkpoint.as_ref().unwrap()[k.get_shard_id()]
+                .insertions
+                .contains_key(&khash(&k))
+        };
+
+        // `k` became hot at v0. With the local refresh interval (100), a promotion at v1 doesn't
+        // refresh it, while the new interval (1) would.
+        let write_sets = [vec![
+            (
+                ON_CHAIN_CONFIG_KEY.clone(),
+                on_chain_config_op(100, u64::MAX, 1),
+            ),
+            (k.clone(), BaseStateOp::MakeHot),
+        ]];
+        let (state, updates) = apply_write_sets(&empty, &state, &write_sets, vec![0]);
+        assert!(!refreshed(&updates));
+
+        let write_sets = [vec![(k.clone(), BaseStateOp::MakeHot)]];
+        let (_state, updates) = apply_write_sets(&empty, &state, &write_sets, vec![0]);
+        assert!(refreshed(&updates));
+    }
+
+    #[test]
+    fn test_on_chain_config_change_independent_of_batching() {
+        let empty = LedgerState::new_empty(TEST_CONFIG);
+        let keys = (0..48).map(|i| key(&format!("k{i}"))).collect_vec();
+        let write_sets = [
+            creations(&keys[..32]),
+            vec![
+                (
+                    ON_CHAIN_CONFIG_KEY.clone(),
+                    on_chain_config_op(2, u64::MAX, 1),
+                ),
+                (keys[0].clone(), BaseStateOp::MakeHot),
+            ],
+            vec![(keys[1].clone(), BaseStateOp::MakeHot)],
+            creations(&keys[32..]),
+        ];
+
+        // Blocks [v0], [v1, v2] and [v3]. All in one batch, like replaying write sets on restart.
+        let (one_batch, _) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 2, 3]);
+        let a = one_batch.last_checkpoint();
+        // Split right before the change, and right after it so it carries over to the next batch.
+        for (split_at, first_checkpoints, second_checkpoints) in
+            [(1, vec![0], vec![1, 2]), (3, vec![0, 2], vec![0])]
+        {
+            let (first, _) =
+                apply_write_sets(&empty, &empty, &write_sets[..split_at], first_checkpoints);
+            let (two_batches, _) =
+                apply_write_sets(&empty, &first, &write_sets[split_at..], second_checkpoints);
+
+            let b = two_batches.last_checkpoint();
+            assert_eq!(a.hot_state_config, b.hot_state_config);
+            for shard_id in 0..NUM_STATE_SHARDS {
+                assert_eq!(a.num_hot_items(shard_id), b.num_hot_items(shard_id));
+                assert_eq!(a.latest_hot_key(shard_id), b.latest_hot_key(shard_id));
+                assert_eq!(a.oldest_hot_key(shard_id), b.oldest_hot_key(shard_id));
+            }
+        }
+        // The shrink did happen.
+        assert!((0..NUM_STATE_SHARDS).all(|i| one_batch.last_checkpoint().num_hot_items(i) <= 2));
     }
 }

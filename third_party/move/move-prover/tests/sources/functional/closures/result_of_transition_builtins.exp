@@ -1,0 +1,79 @@
+Move prover returns: exiting with verification errors
+warning: opaque call to `result_of_transition_builtins::take` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+   ┌─ tests/sources/functional/closures/result_of_transition_builtins.move:20:5
+   │
+20 │ ╭     spec take {
+21 │ │         pragma opaque;
+22 │ │         aborts_if !exists<R>(a);
+23 │ │         ensures remove<R>(a);
+24 │ │         ensures result == old(global<R>(a).v);
+25 │ │     }
+   │ ╰─────^
+
+warning: opaque call to `result_of_transition_builtins::put` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+   ┌─ tests/sources/functional/closures/result_of_transition_builtins.move:42:5
+   │
+42 │ ╭     spec put {
+43 │ │         pragma opaque;
+44 │ │         aborts_if exists<R>(signer::address_of(s));
+45 │ │         ensures publish<R>(signer::address_of(s), R { v: 1 });
+46 │ │         ensures result == 1;
+47 │ │     }
+   │ ╰─────^
+
+warning: opaque call to `result_of_transition_builtins::set` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+   ┌─ tests/sources/functional/closures/result_of_transition_builtins.move:64:5
+   │
+64 │ ╭     spec set {
+65 │ │         pragma opaque;
+66 │ │         aborts_if !exists<R>(a);
+67 │ │         ensures update<R>(a, R { v: 5 });
+68 │ │         ensures result == 5;
+69 │ │     }
+   │ ╰─────^
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_builtins.move:35:9
+   │
+35 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:28: caller_take_false
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:33: caller_take_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:28: caller_take_false
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:29: caller_take_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:34: caller_take_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:35: caller_take_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_builtins.move:57:9
+   │
+57 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:50: caller_put_false
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:55: caller_put_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:50: caller_put_false
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:51: caller_put_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:56: caller_put_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:57: caller_put_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_builtins.move:80:9
+   │
+80 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:72: caller_set_false
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:77: caller_set_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:78: caller_set_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:72: caller_set_false
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:73: caller_set_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:79: caller_set_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_builtins.move:80: caller_set_false (spec)

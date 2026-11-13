@@ -77,6 +77,11 @@ def instantiatePlaceFieldTypeFuel? (ns : ValidatedNamespace)
           let index ← ns.tables.types.findIdx? fun candidate =>
             candidate == .vector element length
           some ⟨index⟩
+      | .slice element => do
+          let element ← instantiatePlaceFieldTypeFuel? ns instantiations fuel element
+          let index ← ns.tables.types.findIdx? fun candidate =>
+            candidate == .slice element
+          some ⟨index⟩
       | .typeDomain nested => do
           let nested ← instantiatePlaceFieldTypeFuel? ns instantiations fuel nested
           let index ← ns.tables.types.findIdx? (fun candidate => candidate == .typeDomain nested)

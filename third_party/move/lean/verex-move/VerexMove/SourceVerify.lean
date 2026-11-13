@@ -29,19 +29,23 @@ where a proof file's header finds it. -/
 def renderingOf (source : System.FilePath) : IO System.FilePath := do
   if ← source.isDir then return packageRendering source else fileRendering source
 
+/-- The libraries a namespace is compiled over: those verifying its importers
+loads. -/
+def compilationLibraries : Array Lean.Name := #[`VerexMove.Proofs]
+
 /-- Import what verifying a Move source elaborates: `VerexSL` and the header
 of its proof files. -/
 def importEnvironment : IO Lean.Environment :=
-  importLibraries #[`VerexMove.Proofs]
+  importLibraries compilationLibraries
 
 /-- The namespace of the unit that a module was encoded to. -/
 private def namespaceOf? (unit : VerexIR.Validation.ValidatedUnit) (module : Module) :
     Option VerexIR.NamespaceId :=
   unit.namespaces.findSome? fun ns => do
-    let segments ← ns.tables.namespaces[ns.identity.index]? |>.map (·.segments)
+    let segments ← ns.tables.namespaces[ns.unitIdentity.index]? |>.map (·.segments)
     guard (segments.size == 2 && segments[1]! == module.name &&
       (segments[0]! == module.address || module.addressAlias == some segments[0]!))
-    return ns.identity
+    return ns.unitIdentity
 
 /-- The source file declaring a module; its specifications, and callees
 read for inlining, may come from other files. -/
@@ -123,22 +127,19 @@ def misplacedLoopInvariants (package : Package) : IO (Array Report) := do
   return reports.qsort fun a b => a.file < b.file || a.file == b.file &&
     (a.line < b.line || a.line == b.line && a.column < b.column)
 
-/-- Verify a Move file, or the modules of a Move package directory, writing
-the VerexSL rendering to `output`. With `exported`, the source and its
-dependencies are read from that existing `move exchange --format ast` export
-instead of being exported here, as the Move CLI's `prove --lean` and the Move
-Prover's `--lean` hand them over; `filter`
-narrows the verified modules to those whose source file name contains it;
-`heartbeats` is the budget of a function without `pragma heartbeats`;
-`ignoreProofs` verifies every function automatically. With
-`modules`, a package directory is exported with only the named modules and
-what verifying them reads, and the named modules are verified. `dev` exports
-a package directory in dev mode. -/
-def verifySource (environment : Lean.Environment) (source output : System.FilePath)
-    (exported : Option System.FilePath := none) (filter : Option String := none)
-    (renderOnly : Bool := false) (heartbeats : Option Nat := none)
-    (modules : Array String := #[]) (dev : Bool := false) (ignoreProofs : Bool := false) :
-    IO (Array Report) := do
+/-- What verifying a source needs of its export: the unit, its target's
+namespace, the companions, and the reports on what the export omits. -/
+private structure PreparedSource where
+  unit : VerexIR.Validation.ValidatedUnit
+  target : Option VerexIR.NamespaceId
+  companions : Array Companion
+  omitted : Array Report
+
+/-- Export a source and encode it (`verifySource`): the reports where that ends
+the run. -/
+private def prepareSource (source : System.FilePath) (exported : Option System.FilePath)
+    (filter : Option String) (modules : Array String) (dev : Bool) :
+    IO (Except (Array Report) PreparedSource) := do
   let prepared ← VerexSL.Perf.withPhase .frontend do
     let package ← match exported with
       | some exported =>
@@ -154,18 +155,76 @@ def verifySource (environment : Lean.Environment) (source output : System.FilePa
     let package ← withProofFiles package
     -- A misplaced loop invariant rejects the run, as in the Move Prover.
     let misplaced ← misplacedLoopInvariants package
-    if !misplaced.isEmpty then return .error (Sum.inr misplaced)
+    if !misplaced.isEmpty then return .error misplaced
     match VerexMove.Frontend.VIR.Backend.fromXast package with
-    | .ok unit => pure (Except.ok (unit, ← companions package unit, ← omissions package))
-    | .error message => pure (Except.error (Sum.inl message))
-  match prepared with
-  | .error (Sum.inr reports) => return reports
-  | .error (Sum.inl message) =>
-      return #[{
-        file := source.toString, line := 1, column := 1
-        severity := .error, text := message }]
-  | .ok (unit, companions, omitted) =>
-      let reports ← run environment { unit, companions, output, renderOnly, heartbeats, ignoreProofs }
+    | .ok unit =>
+        let target := package.modules.filter (·.isTarget) |>.head?
+        pure (Except.ok { unit, target := target.bind (namespaceOf? unit)
+                          companions := ← companions package unit
+                          omitted := ← omissions package })
+    | .error message =>
+        pure (Except.error #[{
+          file := source.toString, line := 1, column := 1
+          severity := .error, text := message }])
+  return prepared
+
+/-- Verify a Move file, or the modules of a Move package directory, writing
+the VerexSL rendering to `output`. With `exported`, the source and its
+dependencies are read from that existing `move exchange --format ast` export
+instead of being exported here, as the Move CLI's `prove --lean` and the Move
+Prover's `--lean` hand them over; `filter`
+narrows the verified modules to those whose source file name contains it;
+`heartbeats` is the budget of a function without `pragma heartbeats`;
+`ignoreProofs` verifies every function automatically. With
+`modules`, a package directory is exported with only the named modules and
+what verifying them reads, and the named modules are verified. `dev` exports
+a package directory in dev mode. -/
+def verifySource (environment : Lean.Environment) (source output : System.FilePath)
+    (exported : Option System.FilePath := none) (filter : Option String := none)
+    (renderOnly : Bool := false) (heartbeats : Option Nat := none)
+    (modules : Array String := #[]) (dev : Bool := false) (ignoreProofs : Bool := false)
+    (jobs : Option Nat := none) :
+    IO (Array Report) := do
+  match ← prepareSource source exported filter modules dev with
+  | .error reports => return reports
+  | .ok { unit, companions, omitted, .. } =>
+      let reports ← run environment
+        { unit, companions, output, renderOnly, heartbeats, ignoreProofs, jobs }
       return (if renderOnly then #[] else omitted) ++ reports
+
+/-- Verify one module of a package directory over the namespaces compiled under
+`root`, which its rendering imports instead of elaborating them. -/
+def verifyOverNamespaces (source output root : System.FilePath) (module : String)
+    (renderOnly : Bool := false) (heartbeats : Option Nat := none) (dev : Bool := false)
+    (ignoreProofs : Bool := false) (jobs : Option Nat := none) :
+    IO (Array Report) := do
+  match ← prepareSource source none none #[module] dev with
+  | .error reports => return reports
+  | .ok { unit, target, companions, omitted } =>
+      let some target := target
+        | throw <| IO.userError s!"`{module}` has no namespace in the export of {source}"
+      let compiled : CompiledNamespaces := { root, target }
+      let request : Request :=
+        { unit, companions, output, renderOnly, heartbeats, ignoreProofs, jobs
+          compiled := some compiled }
+      -- Rendering says what it imports, which need not be compiled yet.
+      let environment ← VerexSL.Perf.withPhase .load <|
+        if renderOnly then importEnvironment
+        else importCompiled compilationLibraries request compiled
+      let reports ← run environment request
+      return (if renderOnly then #[] else omitted) ++ reports
+
+/-- Render every module of a package, each to a file of its own under `root`,
+as a dependency of what is verified over it. -/
+def renderPackageNamespaces (environment : Lean.Environment) (source root : System.FilePath)
+    (dev : Bool := false) :
+    IO (Except String (Array RenderedNamespace)) := do
+  let split ← VerexMove.Frontend.Cli.exportPackage source (includeDeps := true) dev
+  let package : Package :=
+    { modules := (split.modules ++ split.dependencies).map ({ · with isTarget := false }) }
+  match VerexMove.Frontend.VIR.Backend.fromXast package with
+  | .error message => return .error message
+  | .ok unit =>
+      return (← renderNamespaces environment unit #[] root).mapError (·.message)
 
 end VerexMove.SourceVerify

@@ -111,21 +111,6 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
         returned_edges
     }
 
-    /// Returns true if the given reference is borrowed via the given label.
-    pub fn is_borrowed_via(&self, id: RefID, label: &Lbl) -> bool {
-        self.has_ancestor_edge(id, |_, path, _| path.contains(label))
-    }
-
-    /// Returns true if the given reference is derived from the other one by
-    /// a sequence of borrow edges.
-    pub fn is_derived_from(&self, id: RefID, other_id: RefID) -> bool {
-        if id == other_id {
-            true
-        } else {
-            self.has_ancestor_edge(id, |parent, _, _| parent == other_id)
-        }
-    }
-
     /// Returns true if there is a transitive parent (ancestor) edge satisfying the predicate.
     pub fn has_ancestor_edge(
         &self,
@@ -133,14 +118,13 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
         pred: impl Fn(RefID, &[Lbl], RefID) -> bool,
     ) -> bool {
         let mut todo = vec![id];
-        let mut done = BTreeSet::new();
+        let mut done = BTreeSet::from([id]);
         while let Some(next) = todo.pop() {
-            done.insert(next);
             for (_loc, parent, path, _strong) in self.in_edges(next) {
                 if pred(parent, &path, next) {
                     return true;
                 }
-                if !done.insert(parent) {
+                if done.insert(parent) {
                     todo.push(parent)
                 }
             }

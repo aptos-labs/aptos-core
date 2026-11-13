@@ -1,0 +1,296 @@
+VerexE2ETests/Check/References/NestedHolders.lean:65:4: error: the specification clause `ensures result.x == 2` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:64:7: error: verex verification failed: the automatic verification of `ret_destruct_false` failed; provide a proof in the module:
+  verify ret_destruct_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:85:4: error: the specification clause `ensures result.x == 1` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:84:7: error: verex verification failed: the automatic verification of `ret_swap_false` failed; provide a proof in the module:
+  verify ret_swap_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:106:4: error: the specification clause `ensures result.x == 1` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:105:7: error: verex verification failed: the automatic verification of `ret_cond_swap_false` failed; provide a proof in the module:
+  verify ret_cond_swap_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:123:4: error: the specification clause `ensures result.y == b` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:122:7: error: verex verification failed: the automatic verification of `ret_write_first_false` failed; provide a proof in the module:
+  verify ret_write_first_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:141:4: error: the specification clause `ensures result.x == a` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:140:7: error: verex verification failed: the automatic verification of `ret_mixed_false` failed; provide a proof in the module:
+  verify ret_mixed_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:158:4: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:157:7: error: verex verification failed: the automatic verification of `hold_write_read_false` failed; provide a proof in the module:
+  verify hold_write_read_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:170:4: error: the specification clause `ensures x == old(x)` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:169:7: error: verex verification failed: the automatic verification of `hold_param_false` failed; provide a proof in the module:
+  verify hold_param_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:187:4: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:186:7: error: verex verification failed: the automatic verification of `hold_move_out_false` failed; provide a proof in the module:
+  verify hold_move_out_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:196:4: error: the specification clause `ensures false` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:195:7: error: verex verification failed: the automatic verification of `hold_move_out_vacuous` failed; provide a proof in the module:
+  verify hold_move_out_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:213:4: error: the specification clause `ensures result == 5` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:212:7: error: verex verification failed: the automatic verification of `hold_drop_false` failed; provide a proof in the module:
+  verify hold_drop_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:224:4: error: the specification clause `ensures h.r == old(h).r` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:223:7: error: verex verification failed: the automatic verification of `store_false` failed; provide a proof in the module:
+  verify store_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:236:4: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:235:7: error: verex verification failed: the automatic verification of `hold_callee_value_false` failed; provide a proof in the module:
+  verify hold_callee_value_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:247:4: error: the specification clause `ensures h.r == 8` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:246:7: error: verex verification failed: the automatic verification of `store_mut_false` failed; provide a proof in the module:
+  verify store_mut_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:261:4: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:260:7: error: verex verification failed: the automatic verification of `hold_callee_mut_false` failed; provide a proof in the module:
+  verify hold_callee_mut_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:277:4: error: the specification clause `ensures result == 7` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:276:7: error: verex verification failed: the automatic verification of `hold_callee_mut_after_false` failed; provide a proof in the module:
+  verify hold_callee_mut_after_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:295:4: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:294:7: error: verex verification failed: the automatic verification of `hold_return_false` failed; provide a proof in the module:
+  verify hold_return_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:313:4: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:312:7: error: verex verification failed: the automatic verification of `hold_take_false` failed; provide a proof in the module:
+  verify hold_take_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:330:4: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:329:7: error: verex verification failed: the automatic verification of `hold_take_moved_false` failed; provide a proof in the module:
+  verify hold_take_moved_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:347:4: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:346:7: error: verex verification failed: the automatic verification of `tup_take_caller_false` failed; provide a proof in the module:
+  verify tup_take_caller_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:367:4: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:366:7: error: verex verification failed: the automatic verification of `hold_field_ref_false` failed; provide a proof in the module:
+  verify hold_field_ref_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:387:4: error: the specification clause `ensures x == 3` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:386:7: error: verex verification failed: the automatic verification of `two_writes_false` failed; provide a proof in the module:
+  verify two_writes_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:403:4: error: the specification clause `ensures result.x == 2` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:402:7: error: verex verification failed: the automatic verification of `two_local_false` failed; provide a proof in the module:
+  verify two_local_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:421:4: error: the specification clause `ensures b == 2` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:420:7: error: verex verification failed: the automatic verification of `reassign_false` failed; provide a proof in the module:
+  verify reassign_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:445:4: error: the specification clause `ensures result == 2` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:444:7: error: verex verification failed: the automatic verification of `call_through_false` failed; provide a proof in the module:
+  verify call_through_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:457:4: error: the specification clause `ensures h.r == old(h).r` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:455:7: error: verex verification failed: the automatic verification of `add_one_false` failed; provide a proof in the module:
+  verify add_one_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:478:4: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:477:7: error: verex verification failed: the automatic verification of `early_false` failed; provide a proof in the module:
+  verify early_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:494:4: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:493:7: error: verex verification failed: the automatic verification of `field_value_false` failed; provide a proof in the module:
+  verify field_value_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:506:4: error: the specification clause `ensures result == old(x) + 1` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:505:7: error: verex verification failed: the automatic verification of `returned_param_false` failed; provide a proof in the module:
+  verify returned_param_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:520:4: error: the specification clause `ensures result == y` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:519:7: error: verex verification failed: the automatic verification of `returned_param_user_false` failed; provide a proof in the module:
+  verify returned_param_user_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:536:4: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:535:7: error: verex verification failed: the automatic verification of `whole_move_false` failed; provide a proof in the module:
+  verify whole_move_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:550:4: error: the specification clause `ensures result == 0` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:549:7: error: verex verification failed: the automatic verification of `loop_holder` failed; provide a proof in the module:
+  verify loop_holder by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:563:4: error: the specification clause `ensures false` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:562:7: error: verex verification failed: the automatic verification of `loop_holder_any` failed; provide a proof in the module:
+  verify loop_holder_any by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:585:4: error: the specification clause `ensures result == x0` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:584:7: error: verex verification failed: the automatic verification of `f_false` failed; provide a proof in the module:
+  verify f_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:593:4: error: the specification clause `ensures false` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:592:7: error: verex verification failed: the automatic verification of `f_vacuous` failed; provide a proof in the module:
+  verify f_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:614:4: error: the specification clause `ensures result == x0 + 1` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:613:7: error: verex verification failed: the automatic verification of `f_false` failed; provide a proof in the module:
+  verify f_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:622:4: error: the specification clause `ensures false` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:621:7: error: verex verification failed: the automatic verification of `f_vacuous` failed; provide a proof in the module:
+  verify f_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/NestedHolders.lean:648:4: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/Check/References/NestedHolders.lean:647:7: error: verex verification failed: the automatic verification of `f_false` failed; provide a proof in the module:
+  verify f_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

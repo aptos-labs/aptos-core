@@ -12,7 +12,7 @@ Evaluation of a checked body from a typed frame and state ends in a typed
 frame and state, under loans extending the starting ones, with a control of
 the type the checker assigns: a value of the node's type, a `break` value
 of its loop's type, returned values of the function's result types
-(`designs/static-typing.md`, Phase 4). Natives are assumed to preserve
+(`doc/historical/static-typing.md`, Phase 4). Natives are assumed to preserve
 typing (`NativesTyped`): the runtime provides them and `nativeCall` is
 opaque.
 -/
@@ -37,6 +37,7 @@ structure Running (unit : ValidatedUnit) (loans : LoanTypes) (context : Context)
     (frame : RuntimeFrame) : Prop where
   typed : TypedFrame unit loans context.ns context.locals context.env frame
   reads : FrameReads context frame
+  sizedArguments : SizedArguments context.env
 
 /-- A value an expression produced: of the expression's type, from an
 expression that does not divert. -/
@@ -143,6 +144,7 @@ def FunctionPreserves (unit : ValidatedUnit) (handle : FunctionHandle)
     (semantic : Array SemArg) (parameters results : List SemTy),
     unit.namespaces[handle.namespaceId.index]? = some ns →
     ns.functions[handle.functionId.index]? = some declaration →
+    SizedArguments semantic →
     FrameInstantiation ns (requiredAt unit handle) instantiation
       (frameEnv declaration.signature.generics semantic) →
     signatureTypes? ns declaration (frameEnv declaration.signature.generics semantic) =
@@ -183,7 +185,7 @@ theorem ControlTyped.weaken {unit : ValidatedUnit} {smaller larger : LoanTypes}
 theorem Running.weaken {unit : ValidatedUnit} {smaller larger : LoanTypes} {context : Context}
     {frame : RuntimeFrame} (extends_ : larger.Extends smaller)
     (running : Running unit smaller context frame) : Running unit larger context frame :=
-  ⟨running.typed.weaken extends_, running.reads⟩
+  ⟨running.typed.weaken extends_, running.reads, running.sizedArguments⟩
 
 /-- A frame with the same instantiation reads it as faithfully. -/
 theorem Running.of_typed {unit : ValidatedUnit} {loans loans' : LoanTypes} {context : Context}
@@ -191,7 +193,8 @@ theorem Running.of_typed {unit : ValidatedUnit} {loans loans' : LoanTypes} {cont
     (typed : TypedFrame unit loans' context.ns context.locals context.env frame')
     (instantiation_eq : frame'.typeInstantiation = frame.typeInstantiation) :
     Running unit loans' context frame' :=
-  ⟨typed, by unfold FrameReads; rw [instantiation_eq]; exact running.reads⟩
+  ⟨typed, by unfold FrameReads; rw [instantiation_eq]; exact running.reads,
+    running.sizedArguments⟩
 
 /-- A node a checked tree runs is checked, and so is each child it runs, one
 level deeper. -/
@@ -267,12 +270,40 @@ theorem settleLoans_instantiation (ended : Array LoanId) (frame : RuntimeFrame)
       exact same
     · exact same
 
-theorem settleAfter_instantiation (ended : Array LoanId) (control : Control)
+theorem retirePlace_instantiation (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (frame : RuntimeFrame) (state : RuntimeState) (place : LocalId × List LoanProjection) :
+    (retirePlace unit ns frame state place).1.typeInstantiation = frame.typeInstantiation := by
+  unfold retirePlace
+  split
+  · split
+    · rw [applyWriteBack_instantiation, clearBorrowValue_instantiation]
+    · rfl
+  · rfl
+
+theorem settleDeaths_instantiation (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (ended : Array LoanId) (places : Array (LocalId × List LoanProjection))
     (frame : RuntimeFrame) (state : RuntimeState) :
-    (settleAfter ended control frame state).1.typeInstantiation = frame.typeInstantiation := by
+    (settleDeaths unit namespaceId ended places frame state).1.typeInstantiation =
+      frame.typeInstantiation := by
+  have settled := settleLoans_instantiation ended frame state
+  unfold settleDeaths
+  dsimp only
+  split
+  · refine Array.foldl_preserves
+      (fun (pair : RuntimeFrame × RuntimeState) =>
+        pair.1.typeInstantiation = frame.typeInstantiation) _ _ _ settled fun _ _ _ same => ?_
+    rw [retirePlace_instantiation]
+    exact same
+  · exact settled
+
+theorem settleAfter_instantiation (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (ended : Array LoanId) (places : Array (LocalId × List LoanProjection)) (control : Control)
+    (frame : RuntimeFrame) (state : RuntimeState) :
+    (settleAfter unit namespaceId ended places control frame state).1.typeInstantiation =
+      frame.typeInstantiation := by
   unfold settleAfter
   split
-  · exact settleLoans_instantiation ended frame state
+  · exact settleDeaths_instantiation unit namespaceId ended places frame state
   · rfl
 
 theorem writeRuntimePlace?_instantiation {frame frame' : RuntimeFrame}
@@ -441,7 +472,7 @@ types and names, with each function and constant checked. -/
 theorem checkUnit_namespace {unit : ValidatedUnit} {pointerWidth : Option Nat}
     (checked : checkUnit unit pointerWidth = true) {index : Nat} {ns : ValidatedNamespace}
     (ns_eq : unit.namespaces[index]? = some ns) :
-    ns.identity.index = index ∧ ns.tables.types = unit.tables.types ∧
+    ns.unitIdentity.index = index ∧ ns.tables.types = unit.tables.types ∧
       ns.tables.names = unit.tables.names ∧ ns.structs.all (variantsDistinct ns) = true ∧
       ∃ table, requiredTypes unit = some table ∧
         (∀ functionIndex declaration, ns.functions[functionIndex]? = some declaration →
@@ -465,7 +496,7 @@ theorem checkUnit_namespace {unit : ValidatedUnit} {pointerWidth : Option Nat}
 theorem Placed.identity {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     {namespaceId : NamespaceId} {context : Context}
     (placed : Placed executable namespaceId context) :
-    unit.namespaces[context.ns.identity.index]? = some context.ns := by
+    unit.namespaces[context.ns.unitIdentity.index]? = some context.ns := by
   have := (checkUnit_namespace executable.typed placed.namespace_eq).1
   rw [this]
   exact placed.namespace_eq
@@ -685,7 +716,7 @@ theorem Placed.loops {unit : ValidatedUnit} {executable : ExecutableUnit unit}
 theorem Running.loops {unit : ValidatedUnit} {loans : LoanTypes} {context : Context}
     {frame : RuntimeFrame} {loops : List SemTy} :
     Running unit loans { context with loops } frame ↔ Running unit loans context frame :=
-  ⟨fun running => ⟨running.typed, running.reads⟩, fun running => ⟨running.typed, running.reads⟩⟩
+  ⟨fun running => ⟨running.typed, running.reads, running.sizedArguments⟩, fun running => ⟨running.typed, running.reads, running.sizedArguments⟩⟩
 
 /-- A loop runs its body inside the loop. -/
 theorem loop_child_checkTree {context : Context} {fuel : Nat} {id : ExprId}
@@ -798,7 +829,7 @@ theorem signatureTypes?_frameEnv {ns targetNs : ValidatedNamespace} {env : Array
     (arity : instantiations.size = declaration.signature.generics.size) :
     signatureTypes? targetNs declaration (frameEnv declaration.signature.generics arguments) =
       signatureTypes? targetNs declaration arguments := by
-  simp only [signatureTypes?, resolveIn,
+  simp only [signatureTypes?, resolveIn, resolveAt,
     SemTy.resolveFuel_congr (frameEnv_agree resolved agree arity)]
 
 theorem typeArguments_mem {instantiations : Array GenericArgument} {index : Nat}
@@ -822,9 +853,15 @@ theorem FrameReads.call {unit : ValidatedUnit} {executable : ExecutableUnit unit
     (agree : Context.kindsAgree generics instantiations = true)
     (arity : instantiations.size = generics.size) :
     FrameInstantiation targetNs (requiredAt unit handle)
-      (callTypeInstantiation unit handle frame.typeInstantiation instantiations)
+      (callTypeInstantiation unit handle frame.typeInstantiation
+        (context.ns.genericArguments instantiations))
       (frameEnv generics arguments) := by
+  rw [StaticTyping.resolveArguments_eq] at resolved
+  rw [← Context.kindsAgree_genericArguments context.ns] at agree
+  replace arity : (context.ns.genericArguments instantiations).size = generics.size := by
+    simpa using arity
   unfold Context.edgeClosed at edge
+  generalize context.ns.genericArguments instantiations = instantiations at resolved agree arity edge ⊢
   rw [index_eq, placed.unit_eq] at edge
   simp only [target_eq, Bool.and_eq_true, Array.all_eq_true'] at edge
   obtain ⟨consulted, closed⟩ := edge
@@ -1053,7 +1090,8 @@ theorem Running.call {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     (checked : context.checkCall type (.function reference) instantiations operands = true)
     (resolve_eq : resolveFunction? unit namespaceId reference = some handle)
     (callee : FunctionPreserves unit handle
-      (callTypeInstantiation unit handle frame.typeInstantiation instantiations)
+      (callTypeInstantiation unit handle frame.typeInstantiation
+        (context.ns.genericArguments instantiations))
       state values.toArray finalState outcome) :
     Preserved unit loans inert context (applyPendingFrom state.pending frame finalState).1
       (applyPendingFrom state.pending frame finalState).2 fun loans' =>
@@ -1067,7 +1105,7 @@ theorem Running.call {unit : ValidatedUnit} {executable : ExecutableUnit unit}
   | none => simp [resolved] at checked
   | some semantic =>
     simp only [resolved, Bool.and_eq_true, beq_iff_eq] at checked
-    obtain ⟨⟨⟨arity, agree⟩, edge⟩, signature⟩ := checked
+    obtain ⟨sizedArguments, ⟨⟨⟨arity, agree⟩, edge⟩, signature⟩⟩ := checked
     split at signature
     · rename_i parameters resultTypes signature_eq
       simp only [Bool.and_eq_true, beq_iff_eq] at signature
@@ -1077,7 +1115,7 @@ theorem Running.call {unit : ValidatedUnit} {executable : ExecutableUnit unit}
         agree arity'
       obtain ⟨loans', extends', stateTyped', results_typed⟩ :=
         callee loans inert targetNs declaration semantic parameters resultTypes targetNs_eq
-          declaration_eq faithful
+          declaration_eq (Array.all_eq_true'.mp sizedArguments) faithful
           (by rw [signatureTypes?_frameEnv resolved agree arity']; exact signature_eq)
           (by simpa using valuesTyped.flows (by simpa using size_eq) flows) stateTyped
       obtain ⟨running', stateTyped''⟩ := running.returned stateTyped extends' stateTyped'
@@ -1097,7 +1135,8 @@ theorem Running.closure {unit : ValidatedUnit} {executable : ExecutableUnit unit
     (checked : context.checkCall type (.closure reference mask) instantiations captures = true)
     (resolve_eq : resolveFunction? unit namespaceId reference = some handle) :
     HasType unit loans (.closure handle mask
-      (callTypeInstantiation unit handle frame.typeInstantiation instantiations)
+      (callTypeInstantiation unit handle frame.typeInstantiation
+        (context.ns.genericArguments instantiations))
       values.toArray) type := by
   obtain ⟨targetNs, declaration, target_eq, targetNs_eq, declaration_eq, index_eq⟩ :=
     functionTarget_of_resolve placed.namespace_eq resolve_eq
@@ -1109,7 +1148,7 @@ theorem Running.closure {unit : ValidatedUnit} {executable : ExecutableUnit unit
     cases type
     case function openTypes resultType =>
       simp only [resolved, Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at checked
-      obtain ⟨⟨⟨⟨arity, agree⟩, edge⟩, mask_bound⟩, signature⟩ := checked
+      obtain ⟨sizedArguments, ⟨⟨⟨⟨arity, agree⟩, edge⟩, mask_bound⟩, signature⟩⟩ := checked
       split at signature
       · rename_i parameters resultTypes signature_eq
         simp only [Bool.and_eq_true, beq_iff_eq] at signature
@@ -1119,6 +1158,7 @@ theorem Running.closure {unit : ValidatedUnit} {executable : ExecutableUnit unit
           semantic parameters resultTypes targetNs_eq declaration_eq
           (by rw [signatureTypes?_frameEnv resolved agree arity']; exact signature_eq)
           (FrameReads.call placed running.reads edge index_eq targetNs_eq resolved agree arity')
+          (Array.all_eq_true'.mp sizedArguments)
           mask_bound (by simpa using valuesTyped.flows (by simpa using size_eq) flows) open_eq
           packed
       · cases signature
@@ -1146,14 +1186,14 @@ theorem Running.invoke {unit : ValidatedUnit} {loans : LoanTypes} {context : Con
           HasType unit loans' (packResults results) resultType := by
   cases closureTyped with
   | closure _ _ _ _ _ _ targetNs declaration arguments allParameters results namespace_eq
-      declaration_eq signature_eq faithful mask_bound captures_typed parameters_eq packed =>
+      declaration_eq signature_eq faithful sized_arguments mask_bound captures_typed parameters_eq packed =>
     subst parameters_eq
     have composedTyped := HasTypes.compose
       (by rw [signatureTypes?_length signature_eq]; exact mask_bound) captures_typed valuesTyped
       compose_eq
     obtain ⟨loans', extends', stateTyped', results_typed⟩ :=
       callee loans inert targetNs declaration arguments allParameters results namespace_eq
-        declaration_eq faithful signature_eq (by simpa using composedTyped) stateTyped
+        declaration_eq sized_arguments faithful signature_eq (by simpa using composedTyped) stateTyped
     obtain ⟨running', stateTyped''⟩ := running.returned stateTyped extends' stateTyped'
     exact ⟨loans', extends', running', stateTyped'', fun results outcome_eq =>
       packResults_typed (results_typed results outcome_eq) packed⟩
@@ -1215,7 +1255,7 @@ theorem ValuesTyped.types {unit : ValidatedUnit} {loans : LoanTypes} {context : 
 /-- A frame reads a type it consults as the type the context resolves. -/
 theorem FrameReads.resolves {context : Context} {frame : RuntimeFrame} {typeId : TypeId}
     {type : SemTy} (reads : FrameReads context frame) (consults : context.consults typeId = true)
-    (typed : context.typeOf typeId = some type) :
+    (typed : resolveAt context.ns context.env typeId = some type) :
     Resolves context.ns.tables #[] (instantiatedTypeId frame.typeInstantiation typeId) type := by
   have resolved : Resolves context.ns.tables context.env typeId type := ⟨_, typed⟩
   unfold FrameReads at reads
@@ -1243,13 +1283,15 @@ theorem borrowRuntimePlace?_instantiation {unit : ValidatedUnit} {ns : Validated
     split at borrow
     · cases borrow
     obtain ⟨read, -, borrow⟩ := Option.bind_eq_some_iff.mp borrow
-    simp only [Option.some.injEq, Prod.mk.injEq] at borrow
-    rw [← borrow.1]
+    obtain ⟨rfl, -, -, -⟩ := RuntimeValue.view?_map_some borrow
+    rfl
   | mutable =>
     simp only [borrowRuntimePlace?, Option.bind_eq_bind, Option.bind_some] at borrow
     split at borrow
     · cases borrow
     obtain ⟨read, -, borrow⟩ := Option.bind_eq_some_iff.mp borrow
+    split at borrow
+    · cases borrow
     obtain ⟨lexical, -, borrow⟩ := Option.bind_eq_some_iff.mp borrow
     obtain ⟨⟨written, writtenState⟩, write, borrow⟩ := Option.bind_eq_some_iff.mp borrow
     have kept := writeRuntimePlace?_instantiation write
@@ -1321,7 +1363,7 @@ theorem Running.global {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     (valuesTyped : ValuesTyped unit loans context arguments.toList values)
     (checked : context.checkOperation type (.global kind) instantiations arguments = true)
     (evaluate_eq : evaluateGlobalOperation? unit context.ns resultType exprId kind
-      instantiations values.toArray frame state = some result) :
+      (context.ns.genericArguments instantiations) values.toArray frame state = some result) :
     GlobalResultTyped unit loans inert context.ns context.locals context.env frame state type
       result ∧ ∃ resource, instantiations = #[.typeArg resource] := by
   simp only [Context.checkOperation] at checked
@@ -1331,11 +1373,14 @@ theorem Running.global {unit : ValidatedUnit} {executable : ExecutableUnit unit}
       apply Array.toList_inj.mp
       simpa using instantiations_eq
     subst array_eq
+    rw [ValidatedNamespace.genericArguments_typeArg] at evaluate_eq
     refine ⟨?_, resource, rfl⟩
     simp only [Bool.and_eq_true] at checked
     obtain ⟨consults, checked⟩ := checked
     split at checked
     · rename_i resourceType resourceType_eq
+      simp only [Bool.and_eq_true] at checked
+      obtain ⟨resourceSized, checked⟩ := checked
       have resolves := running.reads.resolves consults resourceType_eq
       have ns_eq := placed.identity
       split at checked
@@ -1346,7 +1391,7 @@ theorem Running.global {unit : ValidatedUnit} {executable : ExecutableUnit unit}
         · rename_i referenceKind kind_eq
           simp only [beq_iff_eq] at checked
           subst checked
-          exact evaluateGlobal_borrow_typed ns_eq resolves kind_eq running.typed stateTyped
+          exact evaluateGlobal_borrow_typed ns_eq resolves resourceSized kind_eq running.typed stateTyped
             evaluate_eq
         · cases checked
       · simp only [beq_iff_eq] at checked
@@ -1415,7 +1460,7 @@ theorem constant_initializer {unit : ValidatedUnit} {executable : ExecutableUnit
     simp only [Bool.and_eq_true] at checked
     refine ⟨table, type, type_eq, checked.1, ih loans inert _ _ ⟨rfl, rfl, target_namespace_eq, table_eq⟩
       checked.2 ⟨⟨rfl, fun _ _ _ declaration_eq _ => by simp [constantContext] at declaration_eq⟩,
-        rfl, rfl⟩
+        ⟨rfl, rfl⟩, by simp [SizedArguments, constantContext]⟩
       stateTyped⟩
   · cases checked
 
@@ -1442,7 +1487,8 @@ theorem HasType.mutable_current {unit : ValidatedUnit} {loans : LoanTypes} {loan
     (typed : HasType unit loans (.borrow loan current) (.reference .mutable referent)) :
     HasType unit loans current referent := by
   cases typed with
-  | borrow _ _ _ _ current_typed => exact current_typed
+  | borrow _ _ _ _ current_typed view => exact current_typed.storageView view.storageView
+  | observed _ _ settled _ => simp [RuntimeValue.live] at settled
 
 theorem updateBorrowValue?_instantiation {frame frame' : RuntimeFrame}
     {state state' : RuntimeState} {loan : Nat} {replacement : RuntimeValue}
@@ -1550,7 +1596,7 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
     (type_eq : context.typeOf expression.typeId = some type)
     (valuesTyped : ValuesTyped unit loans context operands.toList values)
     (checked : context.checkOperation type operation instantiations operands = true)
-    (evaluate_eq : evaluatePlaceOperation? unit context.ns expression.typeId exprId operation
+    (evaluate_eq : evaluatePlaceOperation? unit context.ns (context.ns.typeId expression.typeId) exprId operation
       values.toArray frame state = some (finalFrame, finalState, value)) :
     Preserved unit loans inert context finalFrame finalState fun loans' =>
       HasType unit loans' value type := by
@@ -1566,6 +1612,24 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
       obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
       obtain ⟨variant, placeTyped⟩ := running.place placed checked.2 resolve_eq
       exact ⟨loans, .refl _, running, stateTyped, placeTyped.read read_eq⟩
+  | readDiscriminant place =>
+      simp only [evaluatePlaceOperation?, Option.bind_eq_bind] at evaluate_eq
+      split at evaluate_eq
+      · cases evaluate_eq
+      obtain ⟨resolved, -, evaluate_eq⟩ := Option.bind_eq_some_iff.mp evaluate_eq
+      obtain ⟨read, -, evaluate_eq⟩ := Option.bind_eq_some_iff.mp evaluate_eq
+      split at evaluate_eq
+      · obtain ⟨tag, -, evaluate_eq⟩ := Option.bind_eq_some_iff.mp evaluate_eq
+        obtain ⟨node, node_eq, evaluate_eq⟩ := Option.bind_eq_some_iff.mp evaluate_eq
+        obtain ⟨integerType, integer_eq, evaluate_eq⟩ := Option.bind_eq_some_iff.mp evaluate_eq
+        split at evaluate_eq
+        · rename_i integerValue integer_ok
+          simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
+          obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
+          exact ⟨loans, .refl _, running, stateTyped,
+            checkedInteger_result_typed ⟨_, type_eq⟩ node_eq integer_eq integer_ok⟩
+        · cases evaluate_eq
+      · cases evaluate_eq
   | move place =>
       simp only [Context.checkOperation, Bool.and_eq_true, beq_iff_eq] at checked
       simp only [evaluatePlaceOperation?, Option.bind_eq_bind] at evaluate_eq
@@ -1582,9 +1646,19 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
           obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
           exact ⟨loans, .refl _, running.of_typed (running.typed.clear _) rfl, stateTyped,
             value_typed⟩
-        · simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
-          obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
-          exact ⟨loans, .refl _, running, stateTyped, value_typed⟩
+        · cases read with
+          | borrow loan held =>
+              simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
+              obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
+              obtain ⟨cleared, clearedState⟩ :=
+                clearBorrowValue_typed (loan := loan) running.typed stateTyped
+              exact ⟨loans, .refl _,
+                running.of_typed cleared (clearBorrowValue_instantiation _ _ _), clearedState,
+                value_typed⟩
+          | _ =>
+              simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
+              obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
+              exact ⟨loans, .refl _, running, stateTyped, value_typed⟩
       · cases evaluate_eq
   | borrow kind place =>
       simp only [Context.checkOperation, Bool.and_eq_true] at checked
@@ -1598,8 +1672,8 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
         obtain ⟨resolved, resolve_eq, borrow_eq⟩ := Option.bind_eq_some_iff.mp evaluate_eq
         split at checked
         · rename_i referenceKind referent kind_eq placeType_eq
-          simp only [beq_iff_eq] at checked
-          subst checked
+          simp only [Bool.and_eq_true, beq_iff_eq] at checked
+          obtain ⟨rfl, borrowable⟩ := checked
           obtain ⟨variant, placeTyped⟩ := placed.place placeType_eq resolve_eq
           have kept := borrowRuntimePlace?_instantiation borrow_eq
           cases kind with
@@ -1612,9 +1686,26 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
           | mutable =>
               simp only [borrowedKind, Option.some.injEq] at kind_eq
               subst kind_eq
-              obtain ⟨frameTyped, stateTyped', typed, -⟩ :=
-                borrowRuntimePlace?_mutable_typed running.typed stateTyped placeTyped borrow_eq
-              exact ⟨_, stateTyped.mint.1, running.of_typed frameTyped kept, stateTyped', typed⟩
+              change Context.mutableReferent referent = true at borrowable
+              by_cases sized : referent.sized = true
+              · obtain ⟨frameTyped, stateTyped', typed, -⟩ :=
+                  borrowRuntimePlace?_mutable_typed running.typed stateTyped sized placeTyped borrow_eq
+                exact ⟨_, stateTyped.mint.1, running.of_typed frameTyped kept, stateTyped', typed⟩
+              · have slice : ∃ element, referent = .slice element := by
+                  cases referent <;> simp_all [Context.mutableReferent]
+                obtain ⟨element, rfl⟩ := slice
+                have resultResolves : Resolves context.ns.tables context.env
+                    (context.ns.typeId expression.typeId) (.reference .mutable (.slice element)) :=
+                  ⟨_, type_eq⟩
+                have referenceShape := (Resolves.node node_eq _).mp resultResolves
+                simp only [NodeResolves] at referenceShape
+                obtain ⟨resolvedReferent, referentResolves, referenceEq⟩ := referenceShape
+                have referentEq := (SemTy.reference.inj referenceEq).2
+                subst resolvedReferent
+                have sliceShape := referentResolves.slice_node running.sizedArguments
+                obtain ⟨extent, frameTyped, stateTyped', typed, -⟩ :=
+                  borrowRuntimePlace?_slice_typed running.typed stateTyped sliceShape placeTyped borrow_eq
+                exact ⟨_, stateTyped.mint.1, running.of_typed frameTyped kept, stateTyped', typed⟩
           | profile _ => simp [borrowedKind] at kind_eq
         · cases checked
       · cases evaluate_eq
@@ -1623,7 +1714,7 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
       split at checked
       · rename_i operand placeType operands_eq placeType_eq
         simp only [Bool.and_eq_true] at checked
-        obtain ⟨flows, packed⟩ := checked
+        obtain ⟨⟨sized, flows⟩, packed⟩ := checked
         obtain ⟨argument, rfl, argumentTyped⟩ := valuesTyped.single operands_eq
         rw [evaluatePlaceOperation?_write] at evaluate_eq
         obtain ⟨resolved, resolve_eq, evaluate_eq⟩ := Option.bind_eq_some_iff.mp evaluate_eq
@@ -1632,7 +1723,7 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
         simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
         obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
         obtain ⟨variant, placeTyped⟩ := running.place placed placeType_eq resolve_eq
-        obtain ⟨frameTyped, rfl⟩ := placeTyped.write running.typed (argumentTyped.flows flows)
+        obtain ⟨frameTyped, rfl⟩ := placeTyped.write running.typed sized (argumentTyped.flows flows)
           write_eq
         exact ⟨loans, .refl _, running.of_typed frameTyped (writeRuntimePlace?_instantiation write_eq),
           stateTyped, packResults_typed (values := #[]) .nil packed⟩
@@ -1739,10 +1830,9 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
                         simp only at evaluate_eq
                         split at evaluate_eq
                         · cases evaluate_eq
-                        · simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
-                          obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
+                        · obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some evaluate_eq
                           exact ⟨loans, .refl _, running, stateTyped,
-                            .shared _ _ typed.mutable_current⟩
+                            .shared _ _ (typed.mutable_current.observe holeless)⟩
                       all_goals simp at evaluate_eq
                     · cases evaluate_eq
               all_goals simp at checked
@@ -1767,10 +1857,10 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
                   cases kind
                   case mutable =>
                     simp only [Bool.and_eq_true] at checked
-                    obtain ⟨flows, packed⟩ := checked
+                    obtain ⟨⟨sized, flows⟩, packed⟩ := checked
                     rw [evaluatePlaceOperation?_mutate] at evaluate_eq
                     obtain ⟨frameTyped, stateTyped', typed⟩ := mutateBorrow?_typed running.typed
-                      stateTyped targetTyped (argumentTyped.flows flows) packed evaluate_eq
+                      stateTyped sized targetTyped (argumentTyped.flows flows) packed evaluate_eq
                     exact ⟨loans, .refl _, running.of_typed frameTyped
                       (mutateBorrow?_instantiation evaluate_eq), stateTyped', typed⟩
                   all_goals simp at checked
@@ -1801,19 +1891,16 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
                 obtain ⟨argument, rfl, -, argumentType, argumentType_eq, typed⟩ :=
                   valuesTyped.single operands_eq
                 rw [argumentType_eq] at checked
-                simp only [beq_iff_eq] at checked
-                subst checked
                 rw [evaluatePlaceOperation?_sharedBorrow] at evaluate_eq
-                simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
-                obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
-                exact ⟨loans, .refl _, running, stateTyped, .shared _ _ typed⟩
+                obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some evaluate_eq
+                exact ⟨loans, .refl _, running, stateTyped, typed.sharedBorrow checked holeless⟩
           case mutable =>
-            rw [show evaluatePlaceOperation? unit context.ns expression.typeId exprId
+            rw [show evaluatePlaceOperation? unit context.ns (context.ns.typeId expression.typeId) exprId
               (.reference (.borrow .mutable)) values.toArray frame state = none from rfl]
               at evaluate_eq
             cases evaluate_eq
           case profile value =>
-            rw [show evaluatePlaceOperation? unit context.ns expression.typeId exprId
+            rw [show evaluatePlaceOperation? unit context.ns (context.ns.typeId expression.typeId) exprId
               (.reference (.borrow (.profile value))) values.toArray frame state = none from rfl]
               at evaluate_eq
             cases evaluate_eq
@@ -1949,17 +2036,21 @@ theorem preservation {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     intro namespaceId frame state exprId startFrame startState nodeFrame nodeState control
       finalFrame finalState before_eq node_step after_eq ih
     intro loans inert context fuel placed checked running stateTyped
-    have settled := settleLoans_typed
-      (ended := (loanDeathsAt unit namespaceId exprId).before) running.typed stateTyped
-    have kept := settleLoans_instantiation (loanDeathsAt unit namespaceId exprId).before
+    have settled := settleDeaths_typed (namespaceId := namespaceId)
+      (ended := (loanDeathsAt unit namespaceId exprId).before)
+      (places := (deadPlacesAt unit namespaceId exprId).before) running.typed stateTyped
+    have kept := settleDeaths_instantiation unit namespaceId
+      (loanDeathsAt unit namespaceId exprId).before (deadPlacesAt unit namespaceId exprId).before
       frame state
     rw [before_eq] at settled kept
     obtain ⟨loans', extends', nodeRunning, nodeState', typed⟩ :=
       ih loans inert context fuel placed checked (running.of_typed settled.1 kept) settled.2
-    have after := settleAfter_typed
-      (ended := (loanDeathsAt unit namespaceId exprId).after) (control := control)
+    have after := settleAfter_typed (namespaceId := namespaceId)
+      (ended := (loanDeathsAt unit namespaceId exprId).after)
+      (places := (deadPlacesAt unit namespaceId exprId).after) (control := control)
       nodeRunning.typed nodeState'
-    have kept' := settleAfter_instantiation (loanDeathsAt unit namespaceId exprId).after
+    have kept' := settleAfter_instantiation unit namespaceId
+      (loanDeathsAt unit namespaceId exprId).after (deadPlacesAt unit namespaceId exprId).after
       control nodeFrame nodeState
     rw [after_eq] at after kept'
     exact ⟨loans', extends', nodeRunning.of_typed after.1 kept', after.2, typed⟩
@@ -2467,7 +2558,8 @@ theorem preservation {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     split at placeChecked
     · rename_i placeType placeType_eq
       obtain ⟨variant, placeTyped⟩ := running'.place placed placeType_eq resolve_eq
-      obtain ⟨written, rfl⟩ := placeTyped.write running'.typed (childTyped.flows placeChecked)
+      simp only [Bool.and_eq_true] at placeChecked
+      obtain ⟨written, rfl⟩ := placeTyped.write running'.typed placeChecked.1 (childTyped.flows placeChecked.2)
         write_eq
       refine ⟨loans', extends', running'.of_typed written (writeRuntimePlace?_instantiation write_eq),
         state', fun fuel => ?_, type, exprType_of expression_eq type_eq,
@@ -2997,14 +3089,14 @@ theorem preservation {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     | throw_ kind arguments => trivial
   case native =>
     intro handle typeInstantiation initialState arguments ns declaration finalState outcome
-      namespace_eq declaration_eq arity_eq provided_eq native_eq hole_free
+      namespace_eq declaration_eq arity_eq scoped_eq provided_eq native_eq hole_free
     exact natives handle typeInstantiation initialState arguments finalState outcome native_eq
   case body =>
     intro handle typeInstantiation initialState arguments ns declaration frame root finalFrame
-      evaluatedState finalState control outcome namespace_eq declaration_eq provided_eq frame_eq
+      evaluatedState finalState control outcome namespace_eq declaration_eq scoped_eq provided_eq frame_eq
       body_eq body_step outcome_eq hole_free finalize_eq ih
     intro loans inert ns' declaration' semantic parameters results namespace_eq' declaration_eq'
-      faithful signature_eq argumentsTyped stateTyped
+      sizedArguments faithful signature_eq argumentsTyped stateTyped
     rw [namespace_eq, Option.some.injEq] at namespace_eq'
     subst namespace_eq'
     rw [declaration_eq, Option.some.injEq] at declaration_eq'
@@ -3034,7 +3126,7 @@ theorem preservation {unit : ValidatedUnit} {executable : ExecutableUnit unit}
           (handle.namespaceId.index, handle.functionId.index) declaration staticResults).subst
           semantic) frame := by
       refine ⟨initialFrame?_typed rfl (fun index parameter parameter_eq => ?_) argumentsTyped
-        frame_eq, ?_⟩
+        frame_eq, ?_, ?_⟩
       · simp only [List.getElem?_map, Option.map_eq_some_iff] at parameter_eq
         obtain ⟨staticParameter, staticParameter_eq, rfl⟩ := parameter_eq
         have holds := List.all_eq_true.mp parametersChecked (staticParameter, index)
@@ -3048,8 +3140,18 @@ theorem preservation {unit : ValidatedUnit} {executable : ExecutableUnit unit}
           simp [requiredAt, table_eq]
         rw [initialFrame?_instantiation frame_eq, ← required_eq]
         exact faithful
+      · change SizedArguments ((staticEnv declaration.signature.generics).map (·.subst semantic))
+        intro argument member
+        obtain ⟨source, sourceMember, rfl⟩ := Array.mem_map.mp member
+        apply SemArg.sized_subst sizedArguments source
+        obtain ⟨index, bound, eq⟩ := Array.mem_iff_getElem.mp sourceMember
+        subst source
+        have bound' : index < declaration.signature.generics.size := by
+          simpa [staticEnv] using bound
+        simp only [staticEnv, Array.getElem_mapIdx]
+        cases declaration.signature.generics[index].kind <;> rfl
     obtain ⟨loans', extends', running', state', controlTyped⟩ :=
-      ih loans inert _ _ placed (Context.checkTree_subst (arguments := semantic) _ treeChecked) running stateTyped
+      ih loans inert _ _ placed (Context.checkTree_subst (arguments := semantic) sizedArguments _ treeChecked) running stateTyped
     have resultsLength := signatureTypes?_results_length static_eq
     subst finalize_eq
     cases control with
@@ -3173,6 +3275,7 @@ theorem preservation {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     simp only [type_eq, kind_eq] at nodeChecked
     obtain ⟨⟨loans'', extends'', frameTyped, stateTyped'', valueTyped⟩, resource, rfl⟩ :=
       running'.global placed state' valuesTyped nodeChecked evaluate_eq
+    rw [ValidatedNamespace.genericArguments_typeArg] at evaluate_eq
     exact ⟨loans'', extends''.trans extends', running'.of_typed frameTyped
       (evaluateGlobalOperation?_instantiation evaluate_eq), stateTyped'',
       valuesTyped.operation_quiet expression_eq kind_eq, type, exprType_of expression_eq type_eq,

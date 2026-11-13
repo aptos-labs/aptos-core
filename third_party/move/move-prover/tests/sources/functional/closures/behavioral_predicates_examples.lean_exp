@@ -1,33 +1,31 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/behavioral_predicates_examples.move:111:9: error: the precondition `requires !aborts_of<f>(x)` of `apply_no_abort` does not hold at this call
+tests/sources/functional/closures/behavioral_predicates_examples.move:111:9: error: the precondition `requires !aborts_of<f>(x)` of `apply_no_abort` does not hold at call 1
 tests/sources/functional/closures/behavioral_predicates_examples.move:155:5: error: verex verification failed: the automatic verification of `apply_no_abort_test_fail` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify apply_no_abort_test_fail by
+  verify apply_no_abort_test_fail by lean =>
     verex_obligations
     verex_on
-    | requires_of_apply_no_abort => verex_prepare; sorry
+    | requires_1_of_apply_no_abort_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/behavioral_predicates_examples.move:166:5: error: the precondition of `apply_no_abort_opaque` is not established
+tests/sources/functional/closures/behavioral_predicates_examples.move:123:9: error: the precondition `requires !aborts_of<f>(x)` of `apply_no_abort_opaque` does not hold at call 1
 tests/sources/functional/closures/behavioral_predicates_examples.move:166:5: error: verex verification failed: the automatic verification of `apply_no_abort_opaque_test_fail` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify apply_no_abort_opaque_test_fail by
+  verify apply_no_abort_opaque_test_fail by lean =>
     verex_obligations
     verex_on
-    | requires_of_apply_no_abort_opaque => verex_prepare; sorry
+    | requires_1_of_apply_no_abort_opaque_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_predicates_examples.move:226:9: error: the specification clause `ensures result == true` is not established
-tests/sources/functional/closures/behavioral_predicates_examples.move:187:17: error: the loop invariant `∀ (j in 0 .. i), !result_of<pred>(v[j])` is not preserved by an iteration
 tests/sources/functional/closures/behavioral_predicates_examples.move:225:5: error: verex verification failed: the automatic verification of `contains_test_found` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify contains_test_found by
+  verify contains_test_found by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
-    | contains_invariant_2_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_predicates_examples.move:234:9: error: the specification clause `ensures result == true` is not established
 tests/sources/functional/closures/behavioral_predicates_examples.move:233:5: error: verex verification failed: the automatic verification of `contains_opaque_test_found` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify contains_opaque_test_found by
+  verify contains_opaque_test_found by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -35,7 +33,7 @@ tests/sources/functional/closures/behavioral_predicates_examples.move:233:5: err
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_predicates_examples.move:187:17: error: the loop invariant `∀ (j in 0 .. i), !result_of<pred>(v[j])` is not preserved by an iteration
 tests/sources/functional/closures/behavioral_predicates_examples.move:241:5: error: verex verification failed: the automatic verification of `contains_test_not_found` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify contains_test_not_found by
+  verify contains_test_not_found by lean =>
     verex_obligations
     verex_on
     | contains_invariant_2_step => verex_prepare; sorry
@@ -43,61 +41,51 @@ tests/sources/functional/closures/behavioral_predicates_examples.move:241:5: err
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_predicates_examples.move:250:9: error: the specification clause `ensures result == false` is not established
 tests/sources/functional/closures/behavioral_predicates_examples.move:249:5: error: verex verification failed: the automatic verification of `contains_opaque_test_not_found` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify contains_opaque_test_not_found by
+  verify contains_opaque_test_not_found by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_predicates_examples.move:308:9: error: the specification clause `ensures result == 1` is not established
-tests/sources/functional/closures/behavioral_predicates_examples.move:269:13: error: the loop invariant `∀ (j in 0 .. i), !result_of<pred>(v[j])` is not preserved by an iteration
 tests/sources/functional/closures/behavioral_predicates_examples.move:307:5: error: verex verification failed: the automatic verification of `index_test_found` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify index_test_found by
-    verex_obligations
-    verex_on
-    | ensures_1 => verex_prepare; sorry
-    | index_invariant_2_step => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/behavioral_predicates_examples.move:317:9: error: the specification clause `ensures result == 1` is not established
-tests/sources/functional/closures/behavioral_predicates_examples.move:316:5: error: verex verification failed: the automatic verification of `index_opaque_test_found` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify index_opaque_test_found by
+  verify index_test_found by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/behavioral_predicates_examples.move:379:9: error: the specification clause `ensures result == 8` is not established
 tests/sources/functional/closures/behavioral_predicates_examples.move:336:13: error: the loop invariant `result == spec_reduce(reducer, vec, start, i)` is not preserved by an iteration
+tests/sources/functional/closures/behavioral_predicates_examples.move:379:9: error: the specification clause `ensures result == 8` is not established
 tests/sources/functional/closures/behavioral_predicates_examples.move:378:5: error: verex verification failed: the automatic verification of `reduce_test_ok` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify reduce_test_ok by
+  verify reduce_test_ok by lean =>
     verex_obligations
     verex_on
-    | ensures_1 => verex_prepare; sorry
     | reduce_invariant_2_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_predicates_examples.move:387:9: error: the specification clause `ensures result == 8` is not established
 tests/sources/functional/closures/behavioral_predicates_examples.move:386:5: error: verex verification failed: the automatic verification of `reduce_opaque_test_ok` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify reduce_opaque_test_ok by
+  verify reduce_opaque_test_ok by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/behavioral_predicates_examples.move:395:9: error: the specification clause `ensures result == 7` is not established
 tests/sources/functional/closures/behavioral_predicates_examples.move:336:13: error: the loop invariant `result == spec_reduce(reducer, vec, start, i)` is not preserved by an iteration
+tests/sources/functional/closures/behavioral_predicates_examples.move:395:9: error: the specification clause `ensures result == 7` is not established
 tests/sources/functional/closures/behavioral_predicates_examples.move:394:5: error: verex verification failed: the automatic verification of `reduce_test_fail` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify reduce_test_fail by
+  verify reduce_test_fail by lean =>
     verex_obligations
     verex_on
-    | ensures_1 => verex_prepare; sorry
     | reduce_invariant_2_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_predicates_examples.move:403:9: error: the specification clause `ensures result == 7` is not established
 tests/sources/functional/closures/behavioral_predicates_examples.move:402:5: error: verex verification failed: the automatic verification of `reduce_opaque_test_fail` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify reduce_opaque_test_fail by
+  verify reduce_opaque_test_fail by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

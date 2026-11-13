@@ -1,0 +1,15 @@
+//# publish
+// The field must be declared with the same type in all listed variants.
+module 0x42::non_uniform
+enum E has drop
+  V0
+    x: u64
+  V1
+    x: u8
+
+fun get(e: &E): u64
+    move_loc e
+    borrow_variant_field E, V0::x, V1::x
+    read_ref
+    ret
+

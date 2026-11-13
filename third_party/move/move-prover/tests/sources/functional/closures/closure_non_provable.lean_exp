@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/closure_non_provable.move:10:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/closure_non_provable.move:8:5: error: verex verification failed: the automatic verification of `exec` failed; provide a proof in `tests/sources/functional/closures/closure_non_provable.proof.lean`:
-  verify exec by
+  verify exec by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

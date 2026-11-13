@@ -42,8 +42,9 @@ structure BuildState where
   /-- Whether the encoder is inside specification content, where local
   occurrences arrive projected and may name executable locals. -/
   logical : Bool := false
-  /-- Hidden temporaries the encoder introduced, named `$t<n>` like the
-  VerexSL lowering's, so the two lowerings of one element access agree. -/
+  /-- Hidden temporaries the encoder introduced in the current declaration,
+  named `$t<n>` like the VerexSL lowering's, so the two lowerings of one element
+  access agree; a declaration's numbers do not depend on what else is exported. -/
   temporaryLocals : Nat := 0
   /-- The one lifetime the unit's references are inferred at: Move
   references carry no lifetimes, so a call's result borrows from every
@@ -54,6 +55,10 @@ structure BuildState where
   nonTarget : Bool := false
   /-- The package's functions that may write global memory. -/
   globalWriters : List QualifiedName := []
+  /-- The spec variable memory the package's functions may update. -/
+  ghostWrites : List (QualifiedName × List Frames.GhostMemory) := []
+  /-- The `update`s of the function being built, applied at each return. -/
+  exitUpdates : Array Xast.Condition := #[]
   /-- The state labels of the module being built, by the exchange's numbers:
   the names they are in VIR. -/
   stateLabels : Array (Nat × VerexIR.NameId) := #[]
@@ -81,7 +86,7 @@ structure BuildState where
   /-- The steps of the function's proof the Move Prover runs at each return. -/
   exitSteps : Array Proofs.Step := #[]
   /-- The package's and its dependencies' ghost fields, by struct: the
-  verification model's alone (`designs/ghost-fields.md`). -/
+  verification model's alone (`doc/designs/ghost-fields.md`). -/
   ghostFields : List (QualifiedName × List String) := []
 
 abbrev BuildM := StateT BuildState (Except String)
@@ -379,7 +384,7 @@ private def addParameter (parameter : Param) (loc : VerexIR.LocId) : BuildM Vere
 
 /-- A specification function's parameter, at its specification type. One
 declared with a fixed-width integer type keeps that type: the function is
-defined where its argument fits it (G15 in `designs/prover-test-problems.md`). -/
+defined where its argument fits it (G15 in `doc/status/prover-test-problems.md`). -/
 private def addSpecificationParameter (parameter : Param)
     (loc : VerexIR.LocId) : BuildM VerexIR.Parameter := do
   let ty := if (BitVectorConversion.fixedWidth? parameter.ty).isSome then parameter.ty
@@ -429,6 +434,7 @@ private def withMutablyBorrowedLocals (expressionsBefore : Nat)
     | fuel + 1, some (.field base ..) => rootLocal? base fuel
     | fuel + 1, some (.index base _) => rootLocal? base fuel
     | fuel + 1, some (.subslice base ..) => rootLocal? base fuel
+    | fuel + 1, some (.unsize base) => rootLocal? base fuel
     | fuel + 1, some (.downcast base _) => rootLocal? base fuel
     | _, _ => none
   -- A value borrow's operand reaches the local it borrows through field and
@@ -467,7 +473,7 @@ private def withMutablyBorrowedLocals (expressionsBefore : Nat)
     | none => parameter
 
 private def resetLocals : BuildM Unit := modify fun state => {
-  state with sourceLocals := #[], locals := #[] }
+  state with sourceLocals := #[], locals := #[], temporaryLocals := 0 }
 
 /-- Names a `std::vector` native, whose semantics VIR owns directly.
 
@@ -522,10 +528,10 @@ private def isSignerAddressOf (name : Xast.QualifiedName) : Bool :=
     (name.name == "address_of" || name.name == "$address_of")
 
 /-- The name a state label of the exchange is in VIR. -/
-private def virLabel (label : Nat) : BuildM Nat := do
+private def virLabel (label : Nat) : BuildM VerexIR.NameId := do
   let some (_, name) := (← get).stateLabels.find? (·.1 == label)
     | throw s!"state label {label} has no name"
-  return name.index
+  return name
 
 private def virRange (range : Xast.MemoryRange) : BuildM VerexIR.MemoryRange := do
   return { pre := ← range.pre.mapM virLabel, post := ← range.post.mapM virLabel }
@@ -549,7 +555,7 @@ private def virOperation : Xast.Operation → BuildM VerexIR.Operation
   | .deref => return .reference .dereference
   | .freeze explicit => return .reference (.freeze explicit)
   | .select name field => do
-      -- A ghost field is read from its slot (`designs/ghost-fields.md`).
+      -- A ghost field is read from its slot (`doc/designs/ghost-fields.md`).
       let ghost := (← get).ghostFields.any fun (owner, ghosts) =>
         owner == name && ghosts.contains field
       if ghost then return .data (.selectGhost (← addQualifiedRef name) field)
@@ -591,6 +597,15 @@ private def toPragma (pragma : Xast.Pragma) : VerexIR.Attribute :=
     | .name name => .name none name
     | .qualifiedName name => .qualifiedName name)
 
+/-- A block's pragmas as Verex reads them: `verex_verify = false`, which only
+Verex reads, resolves `verify` to false. -/
+private def toPragmas (pragmas : List Xast.Pragma) : Array VerexIR.Attribute :=
+  let off := pragmas.any fun pragma =>
+    pragma.name == "verex_verify" && pragma.value == .value (.bool false)
+  let kept := pragmas.toArray.filter fun pragma =>
+    pragma.name != "verex_verify" && !(off && pragma.name == "verify")
+  kept.map toPragma ++ (if off then #[.assign "verify" (.constant (.bool false))] else #[])
+
 /-- The `proof_file` pragma naming the proof file beside a module's source,
 which every function of the module inherits. -/
 private def proofFilePragma (module : Xast.Module) : Array VerexIR.Attribute :=
@@ -599,22 +614,9 @@ private def proofFilePragma (module : Xast.Module) : Array VerexIR.Attribute :=
 
 /-- A module's pragmas: its own, and the proof file named on it. -/
 private def modulePragmas (module : Xast.Module) : Array VerexIR.Attribute :=
-  module.pragmas.toArray.map toPragma ++ proofFilePragma module
+  toPragmas module.pragmas ++ proofFilePragma module
 
 /-- Instantiate a declaration type with a call or nominal's type arguments. -/
-private partial def instantiateTypeParameters (args : List Xast.Ty) : Xast.Ty → Xast.Ty
-  | .typeParam index => args[index]?.getD (.typeParam index)
-  | .tuple elements => .tuple (elements.map (instantiateTypeParameters args))
-  | .vector element => .vector (instantiateTypeParameters args element)
-  | .struct name parameters => .struct name (parameters.map (instantiateTypeParameters args))
-  | .function parameters result abilities =>
-      .function (instantiateTypeParameters args parameters) (instantiateTypeParameters args result) abilities
-  | .reference mutable referent => .reference mutable (instantiateTypeParameters args referent)
-  | .typeDomain ty => .typeDomain (instantiateTypeParameters args ty)
-  | .resourceDomain name parameters =>
-      .resourceDomain name (parameters.map (·.map (instantiateTypeParameters args)))
-  | ty => ty
-
 private def functionWrapper? (ty : Xast.Ty) :
     BuildM (Option (QualifiedName × List Xast.Ty × Xast.Ty)) := do
   let .struct name args := ty | return none
@@ -732,17 +734,10 @@ mutual
                 | .old => do
                     let instantiationLoc ← addGeneratedLocation loc
                     pure #[.typeArg { typeId, loc := instantiationLoc }]
-                -- Likewise an equality keeps the type a schema declared its
-                -- operands at (`num`) after inclusion substitutes values of
-                -- another type; VIR compares at the operands' type.
-                | .eq | .neq =>
-                    let inst := match inst, arguments with
-                      | [_], first :: rest =>
-                          if !(first.ty matches .reference ..) && rest.all (·.ty == first.ty) then
-                            [first.ty]
-                          else inst
-                      | _, _ => inst
-                    generatedTypeArguments loc inst
+                -- An equality keeps the type a schema declared its operands
+                -- at after inclusion substitutes values of other types; VIR
+                -- compares at the operands' own types.
+                | .eq | .neq => pure #[]
                 | _ => generatedTypeArguments loc inst
               let sourceArguments := arguments
               let arguments ← sourceArguments.toArray.mapM addExpr
@@ -1439,14 +1434,15 @@ mutual
           | .loopCont nest isContinue =>
               pure <| if isContinue then .continue_ nest else .break_ nest none
           | .«return» value =>
-              if (← get).exitSteps.isEmpty then pure <| .return_ #[← addExpr value]
+              if (← get).exitSteps.isEmpty && (← get).exitUpdates.isEmpty then
+                pure <| .return_ #[← addExpr value]
               else atExit loc typeId value true
           | .assign pattern value => pure <| .assignPattern (← addPattern false pattern) (← addExpr value)
           | .mutate target value =>
               pure <| .operation (.reference .mutate)
                 #[] #[← addMutationTarget target, ← addExpr value]
           -- An `update` writes model state only: a ghost field, or the ghost
-          -- resource backing a spec variable (`designs/ghost-fields.md`).
+          -- resource backing a spec variable (`doc/designs/ghost-fields.md`).
           | .specBlock spec => .spec <$> addSpecBlock spec loc
           | .quant kind ranges triggers condition body => do
               let kind := match kind with
@@ -1539,7 +1535,7 @@ mutual
     | _ => pure none
 
   /-- An `update`'s target: a read of the ghost field's place, through the
-  reference where the base is one (`designs/ghost-fields.md`); any other
+  reference where the base is one (`doc/designs/ghost-fields.md`); any other
   target as its expression. -/
   private partial def addUpdateTarget (target : Exp) : BuildM VerexIR.ExprId := do
     match target with
@@ -1626,8 +1622,16 @@ mutual
         if let some value := updateTarget then
           auxiliary := auxiliary.push ("updateTarget", ← addUpdateTarget value)
         let encoded ← addExpr expression
+        -- A specification reads a reference as its referent; an update's target
+        -- never is one.
+        let encoded ← match kind, expression with
+          | .update, .mk (.reference _ referent) valueLoc _ => do
+              let valueLoc ← addLocation valueLoc
+              addExprNode valueLoc (← addType valueLoc referent)
+                (.operation (.reference .dereference) #[] #[encoded])
+          | _, _ => pure encoded
         -- Updates cross the boundary between mathematical integers and
-        -- fixed-width fields in either direction (`designs/ghost-fields.md`).
+        -- fixed-width fields in either direction (`doc/designs/ghost-fields.md`).
         let encoded ← match kind, updateTarget, expression with
           | .update, some (.mk targetType _ _), .mk .num valueLoc _ =>
               match targetType with
@@ -1709,9 +1713,10 @@ mutual
   private partial def atExit (loc : VerexIR.LocId) (typeId : VerexIR.TypeId)
       (value : Exp) (returns : Bool) : BuildM VerexIR.ExprKind := do
     let steps := (← get).exitSteps
+    let updates := (← get).exitUpdates
     let valueId ← addExpr value
     -- The steps of a nested return are not those of this one.
-    modify fun state => { state with exitSteps := #[] }
+    modify fun state => { state with exitSteps := #[], exitUpdates := #[] }
     let kind ← inScope do
       let components : List (String × Ty) := match value.ty with
         | .tuple elements => elements.zipIdx.map fun (ty, index) => (s!"$result_{index}", ty)
@@ -1740,6 +1745,14 @@ mutual
       let specifications ← conditions.mapM fun condition =>
         addExprNode loc unitType
           (.spec { loc, conditions := #[condition], pragmas := #[VerexIR.SpecBlock.proofPragma] })
+      let storing ← updates.mapM fun update => do
+        let .mk kind updateLoc properties written abortCode additional handle condition target :=
+          update
+        let condition ← addCondition <| .mk kind updateLoc properties
+          (Proofs.substitute (fun _ => none) result written) abortCode additional handle condition
+          target
+        addExprNode loc unitType (.spec { loc, conditions := #[condition] })
+      let specifications := specifications ++ storing
       let returned := match value.ty with
         | .tuple _ => Exp.mk value.ty value.loc
             (.call .tuple [] (components.map fun (name, ty) => resultLocal name ty) none)
@@ -1752,7 +1765,7 @@ mutual
           let block ← addExprNode loc typeId (.block specifications (some tail))
           pure (VerexIR.ExprKind.letDecl patternId (some valueId) block)
       | none => pure (.block (#[valueId] ++ specifications) (some tail))
-    modify fun state => { state with exitSteps := steps }
+    modify fun state => { state with exitSteps := steps, exitUpdates := updates }
     return kind
 
   private partial def addSpecBlock (spec : Xast.Spec) (fallback : VerexIR.LocId) : BuildM VerexIR.SpecBlock :=
@@ -1760,7 +1773,7 @@ mutual
     | .mk sourceLoc pragmas conditions frame _ _ => logically do
         let sourceLoc ← sourceLoc.mapM addLocation
         let loc := sourceLoc.getD fallback
-        let pragmas := pragmas.toArray.map toPragma
+        let pragmas := toPragmas pragmas
         return {
           loc
           sourceLoc
@@ -1923,12 +1936,29 @@ private def addParameterFrames (params : List Param) (accessOf : List Xast.Acces
       modifiesAll := access.modifiesAll }
   return frames
 
+private def ghostMemoryPragma : VerexIR.Attribute :=
+  .assign "ghost_memory" (.constant (.bool true))
+
+/-- The fields the Move Prover's prelude gives a Move structure beyond those it
+declares, by qualified name, of its verification model: equality compares them,
+unlike a ghost field's. No Move code constructs such a structure: its natives do. -/
+private def moveModelFields : List (String × List String) := [
+  ("0x1::aggregator::Aggregator", ["val"])]
+
 /-- Encode one nominal declaration: its binders, abilities, fields, variants,
 and its own specification contract. The result is what both an owned namespace
 and a dependency interface record, the latter without contract or locals. -/
 private def buildStructDecl (module : Module) (structDecl : Xast.Struct) :
     BuildM VerexIR.StructDecl := do
   let structLoc ← addLocation structDecl.loc
+  -- The verification model's fields beyond the declared ones, at the width of the
+  -- model's integers.
+  let modelFields := ((moveModelFields.find? fun (owner, _) =>
+      owner == s!"{canonicalModuleAddress module.ref}::{module.name}::{structDecl.name}").map
+    (·.2)).getD []
+  let structDecl : Xast.Struct := { structDecl with
+    fields := structDecl.fields ++ modelFields.map fun name =>
+      ({ name, doc := "", ty := .u128 } : Xast.Field) }
   let hasWriteFrames := structDecl.spec.accessOf.any
     (fun access => access.modifiesAll || !access.modifies.isEmpty)
   if hasWriteFrames && structDecl.variants.isSome then
@@ -1980,9 +2010,8 @@ private def buildStructDecl (module : Module) (structDecl : Xast.Struct) :
   let structContract ← addContract structDecl.spec structLoc
   -- The model backs a spec variable `x` with the resource `Ghost$x`
   -- (`GHOST_MEMORY_PREFIX` of the move-model), which only verification holds.
-  let ghostMemory : VerexIR.Attribute := .assign "ghost_memory" (.constant (.bool true))
   let structContract := if structDecl.name.startsWith "Ghost$" then
-      { structContract with pragmas := structContract.pragmas.push ghostMemory }
+      { structContract with pragmas := structContract.pragmas.push ghostMemoryPragma }
     else structContract
   let parameterFrames ← addParameterFrames
     (structDecl.fields.map fun field => { name := field.name, ty := field.ty })
@@ -2037,8 +2066,10 @@ private def buildInterface (module : Module) :
     let declaration ← buildStructDecl module structDecl
     -- A dependency's values hold its ghost slots; its packs, which give them
     -- their initial values, stay with the package that declares it.
+    let contract : VerexIR.FunctionContract :=
+      if declaration.isGhostMemory then { pragmas := #[ghostMemoryPragma] } else {}
     structs := structs.push { declaration with
-      contract := {}, locals := #[], attributes := #[]
+      contract, locals := #[], attributes := #[]
       ghosts := declaration.ghosts.map ({ · with initializer := none }) }
   let inlineFunctions := module.functions.filterMap fun function =>
     if isExpandedInline function then some function.name else none
@@ -2190,10 +2221,11 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
       let body ← function.body.mapM fun body => do
         let bodyLoc ← addLocation body.loc
         let bodyType ← addType bodyLoc body.ty
-        modify fun state => { state with exitSteps }
-        let encoded ← if exitSteps.isEmpty then addExpr body
+        let exitUpdates := function.spec.conditions.toArray.filter (·.kind == .update)
+        modify fun state => { state with exitSteps, exitUpdates }
+        let encoded ← if exitSteps.isEmpty && exitUpdates.isEmpty then addExpr body
           else addExprNode bodyLoc bodyType (← atExit bodyLoc bodyType body false)
-        modify fun state => { state with exitSteps := #[] }
+        modify fun state => { state with exitSteps := #[], exitUpdates := #[] }
         if entrySteps.isEmpty then pure encoded else do
           -- Each step is a block of its own: what it gives holds for the next.
           let unitType ← addType bodyLoc (.tuple [])
@@ -2205,9 +2237,14 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
             addExprNode bodyLoc unitType (.spec block)
           addExprNode bodyLoc bodyType (.block specifications (some encoded))
       let parameters ← withMutablyBorrowedLocals expressionsBefore parameters
-      let functionContract := Frames.explicit (← addContract function.spec functionLoc)
-        ((← get).globalWriters.contains (ownName module function.name))
-        (pragmaTrue function.pragmas "opaque")
+      let contractSpec ← match Frames.contractUpdates function with
+        | .ok spec => pure spec
+        | .error message => throw message
+      let writes := (← get).globalWriters.contains (ownName module function.name)
+      let ghostMemory := ((← get).ghostWrites.lookup (ownName module function.name)).getD []
+      let (contractSpec, closed) := Frames.withGhostMemory contractSpec ghostMemory function.loc
+        writes (pragmaTrue function.pragmas "opaque")
+      let functionContract := Frames.explicit (← addContract contractSpec functionLoc) writes closed
       let functionContract := { functionContract with
         parameterFrames := ← addParameterFrames function.params function.spec.accessOf }
       let locals := (← get).locals
@@ -2232,14 +2269,12 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
         contract := functionContract
         -- A function's pragmas resolve its contract's, the explicit frame's
         -- included; a dependency's resolve `verify = false` from its namespace.
-        pragmas := if module.isTarget then
-            function.pragmas.toArray.map toPragma ++
-              (if VerexSL.hasLooseFrame functionContract then #[Frames.loosePragma] else #[]) ++
-              proofFilePragma module
-          else
-            let contractNames := functionContract.pragmas.map pragmaName
-            functionContract.pragmas ++ (nonTargetPragmas (modulePragmas module) true
-              |>.filter fun pragma => !contractNames.contains (pragmaName pragma))
+        pragmas :=
+          let contractNames := functionContract.pragmas.map pragmaName
+          let inherited := if module.isTarget then modulePragmas module
+            else nonTargetPragmas (modulePragmas module) true
+          functionContract.pragmas ++
+            inherited.filter fun pragma => !contractNames.contains (pragmaName pragma)
         profileData
         attributes }
     let mut specFunctions : Array VerexIR.SpecFunctionDecl := #[]
@@ -2336,28 +2371,11 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
           properties := invariant.properties.toArray.map toPragma
           expression }
         locals }
-    -- The ghost resource backing a spec variable exists throughout, at
-    -- address 0: the assumption the Move Prover's well-formedness
-    -- instrumentation makes, stated as an axiom of the namespace.
+    -- A spec variable is always present: its reads default, its stores do not
+    -- ask (`doc/designs/ghost-fields.md`).
     for specVar in module.specVars do
       if specVar.init.isSome then
         throw s!"spec variable `{specVar.name}` has an initializer, which is not supported"
-      unless specVar.typeParams.isEmpty do
-        throw s!"spec variable `{specVar.name}` is generic, which is not supported"
-      resetLocals
-      let variableLoc ← addLocation specVar.loc
-      let axiomLoc ← addGeneratedLocation variableLoc
-      let ghostType : Xast.Ty := .struct (ownName module s!"Ghost${specVar.name}") []
-      let boolType ← addType axiomLoc .bool
-      let addressType ← addType axiomLoc .address
-      let address ← addExprNode axiomLoc addressType (.value (.address "0x0"))
-      let ghostArgument := VerexIR.GenericArgument.typeArg (← generatedTypeUse axiomLoc ghostType)
-      let expression ← addExprNode axiomLoc boolType <|
-        .operation (.global .contains) #[ghostArgument] #[address]
-      invariants := invariants.push {
-        loc := axiomLoc
-        condition := { loc := axiomLoc, kind := .axiom_ #[], expression }
-        locals := (← get).locals }
     let mut profileMetadata := #[]
     if let some alias := module.addressAlias then
       profileMetadata := profileMetadata.push (VerexIR.Move.propertyValue "metadata.addressAlias" alias)
@@ -2417,9 +2435,11 @@ def package (package : Package) : Except String VerexIR.Import.RawUnit := do
         if field.name != "0" then none else do
           let .function .. := field.ty | none
           some ({ module := module.ref, name := structDecl.name }, field.ty)
+  let ghostWrites := Frames.ghostWrites package
   let initial : BuildState := {
     sourceNamespaces := ownedNamespaces
-    globalWriters := Frames.globalWriters package
+    globalWriters := Frames.globalWriters package ghostWrites
+    ghostWrites := ghostWrites.1
     copyableStructs
     functionWrappers
     functionResults := (package.modules ++ package.dependencies).flatMap fun module =>

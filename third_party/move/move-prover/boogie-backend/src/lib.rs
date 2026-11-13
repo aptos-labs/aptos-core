@@ -90,6 +90,11 @@ struct TypeInfo {
     name: String,
     suffix: String,
     has_native_equality: bool,
+    /// True iff a table key of this type may be encoded injectively through an
+    /// inverse function: raw equality is Move equality on every value. An
+    /// intrinsic map anywhere in the type rules this out even under native
+    /// equality, since its `Table` representation keeps values at removed keys.
+    key_inverse_encoding: bool,
     /// True iff the type transitively carries a ghost field. Templates
     /// comparing values of this type must use `$IsEqual'<suffix>'` instead of
     /// raw `==`: ghosts are constructor arguments, so raw equality would
@@ -433,9 +438,13 @@ pub fn add_prelude(
         table_instances.append(&mut bv_table_instances);
     }
     context.insert("vec_instances", &vec_instances);
+    // Table, tuple, key and native instances are emitted once per normalized
+    // instantiation (`Type::normalize_inst`), as `normalized_inst_id` keys other
+    // entities: function types differing only in abilities are one Boogie type.
     let tuple_instances = mono_info
         .tuple_inst
         .iter()
+        .unique_by(|elems| Type::normalize_inst(elems))
         .map(|elems| TupleInfo::new(env, options, elems))
         .collect_vec();
     context.insert("tuple_instances", &tuple_instances);
@@ -443,7 +452,7 @@ pub fn add_prelude(
         .table_inst
         .values()
         .flat_map(|ty_args| ty_args.iter().map(|(kty, _)| kty))
-        .unique()
+        .unique_by(|kty| Type::normalize_inst(std::slice::from_ref(*kty)))
         .map(|ty| TypeInfo::new(env, options, ty, false))
         .collect_vec();
     context.insert("table_key_instances", &table_key_instances);
@@ -453,11 +462,14 @@ pub fn add_prelude(
             .iter()
             .filter(|(id, _)| env.get_module(**id).get_full_name_str() == module)
             .flat_map(|(_, insts)| {
-                insts.iter().map(|inst| {
-                    inst.iter()
-                        .map(|i| TypeInfo::new(env, options, i, false))
-                        .collect::<Vec<_>>()
-                })
+                insts
+                    .iter()
+                    .unique_by(|inst| Type::normalize_inst(inst))
+                    .map(|inst| {
+                        inst.iter()
+                            .map(|i| TypeInfo::new(env, options, i, false))
+                            .collect::<Vec<_>>()
+                    })
             })
             .sorted()
             .collect_vec()
@@ -541,6 +553,16 @@ pub fn add_prelude(
     }
     cmp_instances.sort();
     cmp_instances.dedup();
+    // One comparison per normalized type and rendering (the bv twin keeps its own).
+    let cmp_instances = cmp_instances
+        .into_iter()
+        .unique_by(|(ty, info)| {
+            (
+                Type::normalize_inst(std::slice::from_ref(ty)),
+                info.suffix.clone(),
+            )
+        })
+        .collect_vec();
     // Mark each MapImpl's K as `cmp_available` when its suffix is in `cmp_instances`,
     // so ordering-role templates can skip K's without an emitted cmp function.
     let cmp_k_suffixes: BTreeSet<String> = cmp_instances
@@ -627,12 +649,33 @@ pub fn add_prelude(
     Ok(())
 }
 
+/// Whether an intrinsic map occurs anywhere in `ty`: the type itself, a field of
+/// any variant, a vector element or a tuple component.
+fn contains_intrinsic_map(env: &GlobalEnv, ty: &Type) -> bool {
+    match ty {
+        Type::Struct(mid, sid, inst) => {
+            let struct_env = env.get_struct(mid.qualified(*sid));
+            if struct_env.is_intrinsic_of(move_model::pragmas::INTRINSIC_TYPE_MAP) {
+                return true;
+            }
+            struct_env
+                .get_fields()
+                .any(|f| contains_intrinsic_map(env, &f.get_type().instantiate(inst)))
+        },
+        Type::Vector(elem) => contains_intrinsic_map(env, elem),
+        Type::Tuple(elems) => elems.iter().any(|e| contains_intrinsic_map(env, e)),
+        _ => false,
+    }
+}
+
 impl TypeInfo {
     fn new(env: &GlobalEnv, options: &BoogieOptions, ty: &Type, bv_flag: bool) -> Self {
         Self {
             name: boogie_type(env, ty, bv_flag),
             suffix: boogie_type_suffix(env, ty, bv_flag),
             has_native_equality: has_native_equality(env, options, ty),
+            key_inverse_encoding: has_native_equality(env, options, ty)
+                && !contains_intrinsic_map(env, ty),
             has_ghost: crate::bytecode_translator::type_has_ghost_transitively(env, ty),
             is_bv: bv_flag && ty.is_number(),
             is_type_param: matches!(ty, Type::TypeParameter(_)),
@@ -669,6 +712,7 @@ impl MapImpl {
     ) -> Self {
         let insts: Vec<(TypeInfo, TypeInfo)> = ty_args
             .iter()
+            .unique_by(|(kty, vty)| Type::normalize_inst(&[kty.clone(), vty.clone()]))
             .map(|(kty, vty)| {
                 (
                     TypeInfo::new(env, options, kty, false),

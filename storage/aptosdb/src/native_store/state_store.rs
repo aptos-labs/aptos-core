@@ -21,7 +21,6 @@ use std::sync::Arc;
 
 pub(crate) type NativeStateStore =
     PipelineStateStore<NativeLedgerStateWithSummary, NativeBufferedState>;
-pub(crate) type PositionStateStore = NativeStateStore;
 
 impl NativeStateStore {
     pub fn new_at_snapshot<T: NativeStoreSpec>(

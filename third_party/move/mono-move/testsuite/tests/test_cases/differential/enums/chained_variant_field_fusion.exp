@@ -92,9 +92,9 @@ fun run_read_e(r0, r1): u8 {
     r2: 0x99::chained_variant_field_fusion::E
   code:
   L0:
-    0: [r2] := call mk_e, [r0, r1] @2
+    0: [r2] := call_exempt mk_e, [r0, r1] @2
     1: x0 := imm_borrow_loc r2 @4
-    2: [x0] := call read_e, [x0] @5
+    2: [x0] := call_exempt read_e, [x0] @5
     3: ret [x0] @6
 }
 
@@ -114,7 +114,7 @@ fun run_read_f(r0): u8 {
     2: r1 := pack_variant 0x99::chained_variant_field_fusion::F@0, [r2] @5
   L2:
     3: x0 := imm_borrow_loc r1 @7
-    4: [x0] := call read_f, [x0] @8
+    4: [x0] := call_exempt read_f, [x0] @8
     5: ret [x0] @9
   L0:
     6: r2 := ld_u8 1 @10
@@ -132,9 +132,9 @@ fun run_read_u(r0, r1): u8 {
     r2: 0x99::chained_variant_field_fusion::U
   code:
   L0:
-    0: [r2] := call mk_u, [r0, r1] @2
+    0: [r2] := call_exempt mk_u, [r0, r1] @2
     1: x0 := imm_borrow_loc r2 @4
-    2: [x0] := call read_u, [x0] @5
+    2: [x0] := call_exempt read_u, [x0] @5
     3: ret [x0] @6
 }
 
@@ -146,11 +146,11 @@ fun run_write_e(r0, r1): u8 {
   code:
   L0:
     0: x1 := ld_u8 0 @1
-    1: [r2] := call mk_e, [r0, x1] @2
+    1: [r2] := call_exempt mk_e, [r0, x1] @2
     2: x0 := mut_borrow_loc r2 @4
-    3: [] := call write_e, [x0, r1] @6
+    3: [] := call_exempt write_e, [x0, r1] @6
     4: x0 := imm_borrow_loc r2 @7
-    5: [x0] := call read_e, [x0] @8
+    5: [x0] := call_exempt read_e, [x0] @8
     6: ret [x0] @9
 }
 
@@ -258,10 +258,10 @@ fun run_read_e() {
   code:
     0: Move(1) [56] <- [8] @2
     1: Move8 [48] <- [0] @2
-    2: CallIndirect 0x99::chained_variant_field_fusion::mk_e @2
+    2: CallByNameExempt 0x99::chained_variant_field_fusion::mk_e @2
     3: Move8 [16] <- [48] @2
     4: SlotBorrow [48] <- &[16] @4
-    5: CallIndirect 0x99::chained_variant_field_fusion::read_e @5
+    5: CallByNameExempt 0x99::chained_variant_field_fusion::read_e @5
     6: Move(1) [0] <- [48] @6
     7: Return @6
 }
@@ -275,7 +275,7 @@ fun run_read_f() {
     2: EnumNew [8] desc=5 tag #0 @5
     3: HeapMoveTo [8]+8 <- [16] (size=1) @5
     4: SlotBorrow [56] <- &[8] @7
-    5: CallIndirect 0x99::chained_variant_field_fusion::read_f @8
+    5: CallByNameExempt 0x99::chained_variant_field_fusion::read_f @8
     6: Move(1) [0] <- [56] @9
     7: Return @9
     8: StoreImm1 [16] <- #1 @10
@@ -298,10 +298,10 @@ fun run_read_u() {
   code:
     0: Move(1) [56] <- [8] @2
     1: Move8 [48] <- [0] @2
-    2: CallIndirect 0x99::chained_variant_field_fusion::mk_u @2
+    2: CallByNameExempt 0x99::chained_variant_field_fusion::mk_u @2
     3: Move8 [16] <- [48] @2
     4: SlotBorrow [48] <- &[16] @4
-    5: CallIndirect 0x99::chained_variant_field_fusion::read_u @5
+    5: CallByNameExempt 0x99::chained_variant_field_fusion::read_u @5
     6: Move(1) [0] <- [48] @6
     7: Return @6
 }
@@ -312,13 +312,13 @@ fun run_write_e() {
   code:
     0: StoreImm1 [56] <- #0 @1
     1: Move8 [48] <- [0] @2
-    2: CallIndirect 0x99::chained_variant_field_fusion::mk_e @2
+    2: CallByNameExempt 0x99::chained_variant_field_fusion::mk_e @2
     3: Move8 [16] <- [48] @2
     4: SlotBorrow [48] <- &[16] @4
     5: Move(1) [64] <- [8] @6
-    6: CallIndirect 0x99::chained_variant_field_fusion::write_e @6
+    6: CallByNameExempt 0x99::chained_variant_field_fusion::write_e @6
     7: SlotBorrow [48] <- &[16] @7
-    8: CallIndirect 0x99::chained_variant_field_fusion::read_e @8
+    8: CallByNameExempt 0x99::chained_variant_field_fusion::read_e @8
     9: Move(1) [0] <- [48] @9
     10: Return @9
 }

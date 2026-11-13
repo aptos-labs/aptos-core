@@ -402,10 +402,20 @@ $1.vector.index_of{{S}}(v: Vec ({{T}}), e: {{T}}) returns (res1: bool, res2: int
 {%- set S = "'" ~ instance.suffix ~ "'" -%}
 
 function $EncodeKey{{S}}(k: {{K}}): int;
+{%- if instance.key_inverse_encoding %}
+// Injective via an inverse: linear in the number of keys, where the pairwise
+// form below is quadratic. Sound only because `$IsEqual` is `==` here.
+function $DecodeKey{{S}}(i: int): {{K}};
+axiom (
+  forall k: {{K}} :: {$EncodeKey{{S}}(k)}
+    $DecodeKey{{S}}($EncodeKey{{S}}(k)) == k
+);
+{%- else %}
 axiom (
   forall k1, k2: {{K}} :: {$EncodeKey{{S}}(k1), $EncodeKey{{S}}(k2)}
     $IsEqual{{S}}(k1, k2) <==> $EncodeKey{{S}}(k1) == $EncodeKey{{S}}(k2)
 );
+{%- endif %}
 {% endmacro table_key_encoding %}
 
 

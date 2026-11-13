@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/borrow_global_distinct_types.move:29:9: error: the specification clause `ensures result == 0` is not established
 tests/sources/regression/borrow_global_distinct_types.move:27:5: error: verex verification failed: the automatic verification of `write_zero_and_return_other` failed; provide a proof in `tests/sources/regression/borrow_global_distinct_types.proof.lean`:
-  verify write_zero_and_return_other by
+  verify write_zero_and_return_other by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

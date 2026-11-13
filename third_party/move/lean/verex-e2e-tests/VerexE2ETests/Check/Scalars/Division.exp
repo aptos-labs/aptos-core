@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Scalars/Division.lean:52:4: error: the specification clause `ensures result < x` is not established
 VerexE2ETests/Check/Scalars/Division.lean:51:7: error: verex verification failed: the automatic verification of `divide_back_strictly` failed; provide a proof in the module:
-  verify divide_back_strictly by
+  verify divide_back_strictly by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

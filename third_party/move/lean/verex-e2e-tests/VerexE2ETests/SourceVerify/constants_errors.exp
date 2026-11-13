@@ -1,0 +1,24 @@
+VerexE2ETests/SourceVerify/constants_errors.spec.lean:7:3: error: the specification clause `ensures result == (value < 1023)` is not established
+VerexE2ETests/SourceVerify/constants_errors.spec.lean:6:6: error: verex verification failed: the automatic verification of `below_limit` failed; provide a proof in the module:
+  verify below_limit by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/constants_errors.spec.lean:10:3: error: the specification clause `ensures result == 18446744073709551614` is not established
+VerexE2ETests/SourceVerify/constants_errors.spec.lean:9:6: error: verex verification failed: the automatic verification of `maximum` failed; provide a proof in the module:
+  verify maximum by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/constants_errors.spec.lean:13:3: error: the specification clause `ensures result == 8` is not established
+VerexE2ETests/SourceVerify/constants_errors.spec.lean:12:6: error: verex verification failed: the automatic verification of `count` failed; provide a proof in the module:
+  verify count by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

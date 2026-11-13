@@ -7,7 +7,7 @@ import VerexE2ETests.CheckSupport
 is, in verification, its abstract map at the table's handle: its
 specification roles and the contracts of its roles are the map model, and
 the runtime runs its role bodies, which call the table's roles
-(`designs/intrinsic-maps.md`, "Abstract representation"). -/
+(`doc/designs/intrinsic-maps.md`, "Abstract representation"). -/
 
 verex module 0x42::wrapped_tables where
   @[intrinsic_map]
@@ -89,7 +89,10 @@ verex module 0x42::wrapped_tables where
     ensures result == get(old(t), k)
     ensures !has(t, k)
     ensures size(t) == size(old(t)) - 1
-  verify take
+  verify take by lean =>
+    verex_obligations
+    all_goals (first | verex_decide | (verex_prepare; try verex_decide))
+    all_goals simp_all [VerexIR.SpecMap.hasKey_remove]
 
   public fun count(t : &TableWithLength<u64, u64>, k : u64) -> u64 :=
     if wrapped_contains(t, k) then wrapped_length(t) else 0u64
@@ -128,7 +131,7 @@ verex module 0x42::wrapped_tables where
 error: the specification clause `ensures size(t) == size(old(t))` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_size` failed; provide a proof in the module:
-  verify wrong_size by
+  verify wrong_size by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/proof/split.move:59:9: error: the specification clause `ensures result >= 10` is not established
 tests/sources/functional/proof/split.move:58:5: error: verex verification failed: the automatic verification of `clamp_above` failed; provide a proof in `tests/sources/functional/proof/split.proof.lean`:
-  verify clamp_above by
+  verify clamp_above by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

@@ -11,7 +11,7 @@ use prometheus::{
     Opts,
 };
 use std::sync::Arc;
-use sysinfo::{NetworkExt, NetworksExt, RefreshKind, System, SystemExt};
+use sysinfo::Networks;
 
 const NETWORK_SUBSYSTEM: &str = "network";
 
@@ -26,7 +26,7 @@ const INTERFACE_NAME_LABEL: &str = "interface_name";
 
 /// A Collector for exposing network metrics
 pub(crate) struct NetworkMetricsCollector {
-    system: Arc<Mutex<System>>,
+    networks: Option<Arc<Mutex<Networks>>>,
 
     total_received: Desc,
     total_transmitted: Desc,
@@ -38,9 +38,9 @@ pub(crate) struct NetworkMetricsCollector {
 
 impl NetworkMetricsCollector {
     fn new() -> Self {
-        let system = Arc::new(Mutex::new(System::new_with_specifics(
-            RefreshKind::new().with_networks_list().with_networks(),
-        )));
+        let networks = Networks::new_with_refreshed_list()
+            .ok()
+            .map(|networks| Arc::new(Mutex::new(networks)));
 
         let total_received = Opts::new(TOTAL_RECEIVED, "Total number of received bytes")
             .namespace(NAMESPACE)
@@ -88,7 +88,7 @@ impl NetworkMetricsCollector {
         .unwrap();
 
         Self {
-            system,
+            networks,
             total_received,
             total_transmitted,
             total_packets_received,
@@ -120,14 +120,16 @@ impl Collector for NetworkMetricsCollector {
     fn collect(&self) -> Vec<MetricFamily> {
         let _measure = MeasureLatency::new("network".into());
 
-        let mut system = self.system.lock();
-        system.refresh_networks_list();
-        system.refresh_networks();
+        let Some(networks) = &self.networks else {
+            return Vec::new();
+        };
+        let mut networks = networks.lock();
+        networks.refresh(true);
 
-        system
-            .networks()
+        networks
             .iter()
             .flat_map(|(interface_name, network)| {
+                let interface_name = &interface_name.to_string_lossy().into_owned();
                 let total_received = ConstMetric::new_counter(
                     self.total_received.clone(),
                     network.total_received() as f64,

@@ -690,7 +690,7 @@ impl FatLoopBuilder<'_> {
                                 .into_iter()
                                 .find(|Parameter(sym, _, _)| *sym == access.fun_param)
                                 .map(|Parameter(_, ty, _)| ty);
-                            let matches = param_ty.as_ref().map(&type_may_match).unwrap_or(true);
+                            let matches = param_ty.as_ref().map(type_may_match).unwrap_or(true);
                             if !matches {
                                 continue;
                             }

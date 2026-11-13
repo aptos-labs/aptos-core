@@ -63,6 +63,7 @@ spec aptos_framework::reconfiguration_with_dkg {
         use aptos_framework::consensus_config;
         use aptos_framework::execution_config;
         use aptos_framework::gas_schedule;
+        use aptos_framework::hot_state_config;
         use aptos_framework::jwks;
         use aptos_framework::randomness_config;
         use aptos_framework::jwk_consensus_config;
@@ -75,6 +76,7 @@ spec aptos_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<version::Version>;
         include config_buffer::OnNewEpochRequirement<gas_schedule::GasScheduleV2>;
         include config_buffer::OnNewEpochRequirement<execution_config::ExecutionConfig>;
+        include config_buffer::OnNewEpochRequirement<hot_state_config::HotStateConfig>;
         include config_buffer::OnNewEpochRequirement<consensus_config::ConsensusConfig>;
         include config_buffer::OnNewEpochRequirement<jwks::SupportedOIDCProviders>;
         include config_buffer::OnNewEpochRequirement<randomness_config::RandomnessConfig>;

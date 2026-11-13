@@ -16,7 +16,7 @@ env:
 jobs:
   vm-and-doc-tests:
     if: ${{ inputs.provider == 'hosted' }}
-    runs-on: 64cpu-aptos-image-ubuntu22-x64
+    runs-on: 64cpu-aptos-image-ubuntu24-x64
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,7 +32,7 @@ jobs:
 
   unit-test-shards:
     if: ${{ inputs.provider == 'hosted' }}
-    runs-on: 64cpu-aptos-image-ubuntu22-x64
+    runs-on: 64cpu-aptos-image-ubuntu24-x64
     timeout-minutes: 180
     strategy:
       fail-fast: false

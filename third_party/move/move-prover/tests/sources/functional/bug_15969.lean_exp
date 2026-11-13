@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/bug_15969.move:23:9: error: the specification clause `ensures result != spec_empty(s)` is not established
 tests/sources/functional/bug_15969.move:22:5: error: verex verification failed: the automatic verification of `test_empty` failed; provide a proof in `tests/sources/functional/bug_15969.proof.lean`:
-  verify test_empty by
+  verify test_empty by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

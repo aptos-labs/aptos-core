@@ -16,6 +16,11 @@ canonical source always crosses VIR before layout.
 
 namespace VerexSL.Print.Layout
 
+/-- Empty sequence literals need their element type; fixed arrays also need
+their extent, since a nonempty literal otherwise infers a growable vector. -/
+def sequenceBindingNeedsType (fixedArray : Bool) (size : Nat) : Bool :=
+  fixedArray || size == 0
+
 open Lean
 open Std (Format)
 
@@ -104,7 +109,7 @@ private def byteLiteral (values : Array UInt8) : String :=
 private def identifier (value : String) : String :=
   let value := if value.startsWith "'" then (value.drop 1).toString else value
   if !value.isEmpty && value.all Char.isDigit then value
-  else (Lean.Name.mkSimple value).toStringWithToken (isToken := isReservedWord)
+  else escapedIdentifier value
 
 private def pragmaName (value : String) : String :=
   if value == "opaque" then value else identifier value
@@ -162,6 +167,7 @@ private partial def typeText : Ty → String
   | .tuple elements =>
       if elements.isEmpty then "Unit"
       else "(" ++ ", ".intercalate (elements.map (typeText ·.value)).toList ++ ")"
+  | .slice element => "Slice<" ++ closeAngles (typeText element.value)
   | .vector element none => "Vector<" ++ closeAngles (typeText element.value)
   | .vector element (some length) =>
       "Vector<" ++ closeAngles s!"{typeText element.value}, const {length}"
@@ -172,9 +178,8 @@ private partial def typeText : Ty → String
       let referent := typeText referent.value
       let lifetime := match lifetime with
         | .inference => ""
-        | lifetime => s!"[{lifetimeText lifetime}]"
-      let separator := if !lifetime.isEmpty then " "
-        else if !mutable && referent.startsWith "&" then " " else ""
+        | lifetime => s!"[{lifetimeText lifetime}] "
+      let separator := if lifetime.isEmpty && !mutable && referent.startsWith "&" then " " else ""
       "&" ++ lifetime ++ (if mutable then "mut " else "") ++ separator ++ referent
   | .named segments arguments =>
       let name := pathText segments
@@ -203,7 +208,8 @@ private def binderText (binder : GenericBinder) : String :=
     | .const => " : const" ++ match binder.type with
         | some type => " " ++ typeText type.value
         | none => ""
-    | .lifetime => " : lifetime"
+    | .lifetime => " : lifetime" ++ if binder.outlives.isEmpty then "" else
+        " outlives " ++ ", ".intercalate (binder.outlives.map lifetimeText).toList
     | .evidence => " : evidence"
   "{" ++ identifier binder.name ++ annotation ++ abilitiesText binder.abilities ++ "}"
 
@@ -340,6 +346,9 @@ private def specificationText : SpecificationOperation → String
   | .singletonVector => "singletonVector"
   | .updateVector => "updateVector"
   | .concatVector => "concatVector"
+  | .stringConcat => "stringConcat"
+  | .stringBytes => "stringBytes"
+  | .charEncode => "charEncode"
   | .indexOfVector => "indexOfVector"
   | .containsVector => "containsVector"
   | .lengthVector => "lengthVector"
@@ -354,13 +363,24 @@ private def specificationText : SpecificationOperation → String
 private partial def placeDoc : Place → Doc
   | .local name _ => text (identifier name)
   | .deref base _ => text "*" ++ placeAtomDoc base
-  | .field base name _ => placeAtomDoc base ++ text s!".{identifier name}"
+  | .field base name _ =>
+      -- `x.0.1` would lex a float literal, and `_7.0` one identifier.
+      let basePrinter := if (identifier name).all Char.isDigit
+          then numericFieldBaseDoc else placeAtomDoc
+      basePrinter base ++ text s!".{identifier name}"
   | .downcast base enum variant _ =>
       text "downcast " ++ placeDoc base ++
         text s!" as {"::".intercalate (enum.map identifier).toList}::{identifier variant}"
 where
   placeAtomDoc (place : Place) : Doc := match place with
     | .local .. => placeDoc place
+    | _ => text "(" ++ placeDoc place ++ text ")"
+  /-- The base of a numeric field: `placeAtomDoc`, with a local ending in a
+  digit parenthesized as well. -/
+  numericFieldBaseDoc (place : Place) : Doc := match place with
+    | .local name _ =>
+        let doc := placeDoc place
+        if (identifier name).back?.any Char.isDigit then text "(" ++ doc ++ text ")" else doc
     | _ => text "(" ++ placeDoc place ++ text ")"
 
 private partial def patternDoc : BindingPattern → Doc
@@ -448,6 +468,12 @@ private def operatorInfoForExpr? : Expr → Option OperatorInfo
       if arguments.size == arity then some info else none
   | _ => none
 
+/-- Whether an expression's text ends in the type of a cast. -/
+private partial def endsInCast : Expr → Bool
+  | .typedPrimitive .profileCast .. => true
+  | .primitive _ arguments _ => (arguments.back?).any endsInCast
+  | _ => false
+
 private def expressionPrecedence (expression : Expr) : Nat :=
   if let some info := operatorInfoForExpr? expression then info.precedence
   else match expression with
@@ -462,6 +488,8 @@ private def expressionPrecedence (expression : Expr) : Nat :=
         .forRange .. | .loop .. | .break_ .. | .continue_ .. | .assign .. |
         .assignExpression .. | .assignPattern .. |
         .return_ .. | .labeled .. => 0
+    | .downcast .. => 0
+    | .unsize .. => 14
     | .field .. | .storageIndex .. | .index .. | .methodCall .. => 14
     | .typedPrimitive .profileCast .. => 12
     | .placeOperation .. | .borrowPlace .. | .borrowValue .. | .rawBorrowValue .. |
@@ -476,6 +504,117 @@ private def isLoopSpecification
     conditions.all fun condition => match condition.1 with
       | .let_ _ | .loopInvariant => true
       | _ => false
+
+private def parameterDoc (parameter : Parameter) : Doc :=
+  text <| (if parameter.mutable then "mut " else "") ++ identifier parameter.name ++
+    " : " ++ typeText parameter.type.value
+
+/-- A function body has an implicit result position.  The semantic printer
+can nevertheless receive a single explicit `return` after CFG
+structurization.  Spell that value directly at the function boundary so the
+first rendering is already the same canonical source that a re-import would
+produce. Returns in statement position remain explicit. -/
+private partial def normalizeFunctionBody (unitResult : Bool) : Expr → Expr
+  | .block #[.expression (.return_ value _)] none _ =>
+      normalizeFunctionBody unitResult value
+  | .block #[] (some (.return_ value _)) _ =>
+      normalizeFunctionBody unitResult value
+  | .block #[] (some value) span =>
+      if unitResult && !isKnownUnitExpression value then
+        .block #[.expression value] none span
+      else normalizeFunctionBody unitResult value
+  | body@(.block #[.expression value] none _) =>
+      -- Preserve a one-entry effect block around calls: the original VIR may
+      -- not carry a result annotation while re-elaboration does, and using
+      -- that incidental difference would break the canonical fixed point.
+      -- Structured control flow is unambiguously Unit-valued and can still
+      -- shed the administrative wrapper.
+      if isUnitEffect value ||
+          value matches .loop .. | .forRange .. | .ifElse .. | .match_ .. then
+        normalizeFunctionBody unitResult value
+      else body
+  | body@(.block #[.expression value,
+      .expression (.return_ (.unit _) _)] none _) =>
+      if isKnownUnitExpression value then normalizeFunctionBody unitResult value else body
+  | body@(.block #[.expression value,
+      .expression (.return_ (.unit _) _)] (some (.unit _)) _) =>
+      if isKnownUnitExpression value then normalizeFunctionBody unitResult value else body
+  | body@(.block #[.expression value]
+      (some (.return_ (.unit _) _)) _) =>
+      if isKnownUnitExpression value then normalizeFunctionBody unitResult value else body
+  | body@(.block #[.expression value] (some (.unit _)) _) =>
+      if isKnownUnitExpression value then normalizeFunctionBody unitResult value else body
+  | body => body
+
+/-- A function body and each final control-flow arm are already result
+positions. CFG structurization may nevertheless wrap those values in
+`return`; remove only those redundant wrappers while retaining early returns
+among block statements. -/
+private partial def normalizeResultPosition : Expr → Expr
+  | .return_ value _ => normalizeResultPosition value
+  | .block statements result span =>
+      .block statements (result.map normalizeResultPosition) span
+  | .ifElse condition thenBranch elseBranch span =>
+      .ifElse condition (normalizeResultPosition thenBranch)
+        (elseBranch.map normalizeResultPosition) span
+  | .match_ scrutinee arms span =>
+      .match_ scrutinee (arms.map fun (pattern, guard, body) =>
+        (pattern, guard, normalizeResultPosition body)) span
+  | body => body
+
+/-- Interpret the tail of a Unit-returning function in effect position. The
+semantic printer and the offside parser cannot carry an expected type between
+them, so a final ordinary expression may temporarily appear as a block result.
+Move it back into the sequence, recursively through final control-flow arms;
+an explicit non-Unit `return` remains untouched and therefore type-checked. -/
+private partial def normalizeUnitTail : Expr → Expr
+  | .return_ value span =>
+      if isKnownUnitExpression value then normalizeUnitTail value
+      else .return_ value span
+  | .block statements result span =>
+      match result with
+      | some unit@(.unit _) =>
+          if endsWithValue statements then .block statements (some unit) span
+          else .block statements none span
+      | some result@(.return_ ..) =>
+          let normalized := normalizeUnitTail result
+          if normalized matches .unit _ then .block statements none span
+          else if isKnownUnitExpression normalized then
+            .block (statements.push (.expression normalized)) none span
+          else .block statements (some result) span
+      | some result =>
+          .block (statements.push (.expression (normalizeUnitTail result))) none span
+      | none =>
+          match statements.back? with
+          | some (.expression value) =>
+              let value := normalizeUnitTail value
+              if value matches .unit _ then .block statements.pop none span
+              else .block (statements.pop.push (.expression value)) none span
+          | _ => .block statements none span
+  | .ifElse condition thenBranch elseBranch span =>
+      .ifElse condition (normalizeUnitTail thenBranch)
+        (elseBranch.map normalizeUnitTail) span
+  | .match_ scrutinee arms span =>
+      .match_ scrutinee (arms.map fun (pattern, guard, body) =>
+        (pattern, guard, normalizeUnitTail body)) span
+  | body => body
+
+/-- A declaration's source attributes print on their own line above it. -/
+private partial def sourceAttributeText : SourceAttribute → String
+  | .call name arguments _ =>
+      identifier name ++ (if arguments.isEmpty then "" else
+        " (" ++ ", ".intercalate (arguments.map sourceAttributeText).toList ++ ")")
+  | .assign name value _ =>
+      identifier name ++ " = " ++ match value with
+        | .number value => toString value
+        | .string value => toString (repr value)
+        | .name value => identifier value
+        | .qualifiedName value => value
+
+private def attributesDoc (attributes : Array SourceAttribute) : Doc :=
+  if attributes.isEmpty then .nil else
+    let entries := attributes.map sourceAttributeText
+    text ("@[" ++ ", ".intercalate entries.toList ++ "]") ++ hard
 
 mutual
   private partial def expressionDoc : Expr → Except String Doc
@@ -542,7 +681,10 @@ mutual
                 | .left => (info.precedence, info.precedence + 1)
                 | .right => (info.precedence + 1, info.precedence)
                 | .none => (info.precedence + 1, info.precedence + 1)
+              -- `x as u8 < y` would read `u8 <` as the start of type arguments.
+              let leftEndsInCast := info.symbol == "<" && endsInCast left
               let left ← expressionDocAt leftPrecedence left
+              let left := if leftEndsInCast then text "(" ++ left ++ text ")" else left
               let right ← expressionDocAt rightPrecedence right
               pure <| Format.group <| left ++
                 Format.nest 2 (soft ++ text s!"{info.symbol} " ++ right)
@@ -580,6 +722,17 @@ mutual
           else text ", " ++ commaSep captures
         pure <| text s!"function[{typeText result.value}]({pathText name}{typeSuffix}" ++
           suffix ++ text ")"
+    | .closureItem name generics abilities captures attributes function functionGenerics parameters result
+        body _ => do
+      let captures ← captures.mapM fun (field, type, value) => do
+        pure <| text s!"{identifier field} : {typeText type.value} := " ++ (← expressionDoc value)
+      let head := text s!"closure {identifier name}" ++ bindersDoc generics ++
+        text (abilitiesText abilities)
+      let signature := hangingDelimited
+        (text s!"fun {identifier function}{bindersText functionGenerics}") "(" ")"
+        (parameters.map parameterDoc) (text s!" -> {typeText result.value}")
+      pure <| hangingDelimited head " (" ")" captures ++ Format.nest 2 (hard ++
+        (attributesDoc attributes ++ (← functionBodyDoc signature result.value body)))
     | .invoke callable arguments _ =>
         call (text "invoke") <$> (#[callable] ++ arguments).mapM expressionDoc
     | .genericCall name types arguments _ => do
@@ -631,7 +784,11 @@ mutual
     | .select _ field value _ => do
         pure <| (← expressionDocAt 14 value) ++ text s!".{identifier field}"
     | .field value field _ => do
-        pure <| (← expressionDocAt 14 value) ++ text s!".{identifier field}"
+        -- `x.0.1` would lex a float literal: a chained field is parenthesized.
+        let baseDoc ← if (identifier field).all Char.isDigit
+            then expressionDocAt 15 value
+            else expressionDocAt 14 value
+        pure <| baseDoc ++ text s!".{identifier field}"
     | .storageIndex head index _ => do
         pure <| text (storageHeadText head.value) ++ text "[" ++
           (← expressionDoc index) ++ text "]"
@@ -659,18 +816,30 @@ mutual
     | .discriminant owner result value _ =>
         call (text s!"discriminant[{typeText owner.value}, {typeText result.value}]")
           <$> #[value].mapM expressionDoc
+    | .subslice place start stop fromEnd _ =>
+        let name := if fromEnd then "core.subsliceFromEnd" else "core.subslice"
+        call (text s!"{name}[{start}, {stop}]") <$> #[place].mapM expressionDoc
+    | .readDiscriminant result place _ =>
+        call (text s!"core.readDiscriminant[{typeText result.value}]")
+          <$> #[place].mapM expressionDoc
     | .placeOperation operation place _ =>
         let name := match operation with
           | .move => "move"
           | .copy => "copy"
           | .read => "core.read"
         call (text name) <$> #[place].mapM expressionDoc
+    | .downcast place _ => pure (placeDoc place)
+    | .unsize place _ => do
+        pure <| text "(unsize " ++ (← expressionDocAt 13 place) ++ text ")"
     | .borrowPlace mutable place _ =>
         pure <| text (if mutable then "&mut " else "&") ++ placeDoc place
     | .dropPlace place _ =>
         pure <| text "drop(" ++ placeDoc place ++ text ")"
     | .borrowValue mutable value _ => do
-        pure <| text (if mutable then "&mut " else "&") ++
+        -- Two `&` in a row would read as the token `&&`.
+        let separator := if !mutable && (value matches .borrowPlace .. | .borrowValue ..)
+          then " " else ""
+        pure <| text (if mutable then "&mut " else "&") ++ text separator ++
           (← expressionDocAt 13 value)
     | .rawBorrowValue mutable value _ => do
         pure <| call (text "core.borrowPlace")
@@ -794,7 +963,7 @@ mutual
           let [element] := types.toList
             | throw "spec.emptyVector expects one element type"
           unless arguments.isEmpty do throw "spec.emptyVector expects no operands"
-          return text s!"vec::<{typeText element.value}>()"
+          return text s!"vec::<{closeAngles (typeText element.value)}()"
         let builtin? := match operation with
           | .singletonVector => some "vec"
           | .updateVector => some "update"
@@ -835,7 +1004,13 @@ mutual
         expressionDoc (.primitive .logicalOr #[condition, elseBranch] span)
     | .ifElse condition thenBranch (some (.unit _)) span =>
         expressionDoc (.ifElse condition thenBranch none span)
-    | .ifElse condition thenBranch elseBranch _ => do
+    | .ifElse condition thenBranch elseBranch span => do
+        -- CFG imports can wrap an empty branch in a block. Normalize it before
+        -- choosing the one-sided spelling, so a second print cannot invert it.
+        if emptyUnit thenBranch && !(thenBranch matches .unit _) then
+          return ← expressionDoc (.ifElse condition (.unit span) elseBranch span)
+        if elseBranch.any (fun branch => emptyUnit branch && !(branch matches .unit _)) then
+          return ← expressionDoc (.ifElse condition thenBranch (some (.unit span)) span)
         -- A block-valued condition renders across lines; parentheses are what
         -- keep the following `then` attached to this `if`.
         let conditionDoc ← if rendersAsDo condition then
@@ -963,6 +1138,31 @@ mutual
     | .throw_ kind arguments _ =>
         call (text (throwText kind)) <$> arguments.mapM expressionDoc
 
+  /-- A function's signature and its body. -/
+  private partial def functionBodyDoc (signature : Doc) (result : Ty) (body : Expr) :
+      Except String Doc := do
+    let unitResult := result == .unit
+    let body := normalizeResultPosition body
+    let body := if unitResult then normalizeUnitTail body else body
+    let body := normalizeFunctionBody unitResult body
+    let body := if unitResult && !isKnownUnitExpression body &&
+        !isBlockExpression body && !isAbruptExpression body then
+      .block #[.expression body] none body.span
+    else body
+    let bodyDoc ← expressionDoc body
+    if body matches .match_ .. | .ifElse .. then
+      pure <| signature ++ text " :=" ++ Format.nest 2 (hard ++ bodyDoc)
+    else if isBlockExpression body then pure <| signature ++ text " := " ++ bodyDoc
+    else
+      let signatureWidth := (flattenedWidth? signature).getD 79
+      let bodyWidth := (flattenedWidth? bodyDoc).getD 79
+      if signatureWidth + 4 + bodyWidth <= 78 then
+        pure <| Format.group (signature ++ text " := " ++ bodyDoc)
+      else if signatureWidth > 78 && 13 + bodyWidth <= 78 then
+        pure <| signature ++ text " := " ++ bodyDoc
+      else
+        pure <| signature ++ text " :=" ++ Format.nest 2 (hard ++ bodyDoc)
+
   private partial def expressionDocAt (minimumPrecedence : Nat)
       (expression : Expr) : Except String Doc := do
     let document ← expressionDoc expression
@@ -1012,6 +1212,13 @@ mutual
         | .update => "update "
       pure <| text memberPrefix ++ (← expressionDoc expression)
 
+  private partial def emptyUnit : Expr → Bool
+    | .unit _ => true
+    | .block #[] none _ => true
+    | .block #[] (some result) _ => emptyUnit result
+    | .block #[.expression value] none _ => emptyUnit value
+    | _ => false
+
   private partial def negate : Expr → Expr
     | .primitive .logicalNot #[argument] _ => argument
     | .typedPrimitive .logicalNot _ #[argument] _ => argument
@@ -1029,9 +1236,17 @@ mutual
         pure <| text "let " ++ (if mutable then text "mut " else .nil) ++ patternDoc pattern ++
           annotation
     | .letDecl mutable pattern type (some value) _ => do
-        -- An abort produces no value from which to reconstruct the binder's
-        -- type. Keep its annotation, including for the derived spec reading.
-        let annotation := if value matches .throw_ .. then
+        -- An abort or empty vector cannot determine its type; a nonempty
+        -- array literal infers a dynamic vector unless its fixed length is
+        -- supplied by this annotation. In particular, an unsize base must
+        -- retain its fixed-array shape through formatting.
+        let fixedArray := type.any fun type => type.value matches .vector _ (some _)
+        let needsType := match value with
+          | .throw_ .. => true
+          | .primitive .vector arguments _ => sequenceBindingNeedsType fixedArray arguments.size
+          | .bytes values _ => sequenceBindingNeedsType fixedArray values.size
+          | _ => false
+        let annotation := if needsType then
             type.map (fun type => text (" : " ++ typeText type.value)) |>.getD .nil
           else .nil
         let value ← expressionDoc value
@@ -1042,13 +1257,12 @@ mutual
   private partial def statementDocs (statements : Array Statement) : Except String (Array Doc) := do
     let rec go (remaining : List Statement) (rendered : Array Doc) := do
       match remaining with
-      | .expression specExpr@(.specBlock conditions _ false) ::
-          .expression loopExpr@(.loop ..) :: rest
       | .expression loopExpr@(.loop ..) ::
           .expression specExpr@(.specBlock conditions _ false) :: rest =>
           if isLoopSpecification conditions then
-            -- Only a `while` takes a `where` region; any other loop is
-            -- followed by its specification, which lowering attaches.
+            -- A specification after a loop is the loop's. Only a `while`
+            -- takes a `where` region; any other loop is followed by its
+            -- specification, which lowering attaches to the loop.
             let attachment ← match loopExpr with
               | .loop (.ifElse _ _ (some (.break_ none _ none)) _) _ none =>
                   pure (block (text "where") (← specificationMemberDocs conditions))
@@ -1090,10 +1304,6 @@ mutual
     pure (entries ++ trailing)
 end
 
-private def parameterDoc (parameter : Parameter) : Doc :=
-  text <| (if parameter.mutable then "mut " else "") ++ identifier parameter.name ++
-    " : " ++ typeText parameter.type.value
-
 private def modifiersText (modifiers : FunctionModifiers) : String :=
   let values := match modifiers.visibility with
     | .private_ => #[]
@@ -1122,6 +1332,7 @@ private def clauseDoc : ContractClause → Except String Doc
       let base ← condition "aborts_with" expression properties
       let codes ← additional.mapM expressionDoc
       pure <| base ++ (if codes.isEmpty then .nil else text ", " ++ commaSep codes)
+  | .panicsIf expression properties _ => condition "panics_if" expression properties
   | .invariant expression properties _ => condition "invariant" expression properties
   | .modifies expression _ loose => do
       pure <| text "modifies " ++ (← expressionDoc expression) ++
@@ -1170,114 +1381,15 @@ private def contractDoc? (name : String) (clauses : Array ContractClause)
   let entries := entries ++ (← clauses.mapM clauseDoc)
   pure <| some <| block (text s!"spec {identifier name} where") entries
 
+/-- A contract at a shape: the item names its types. -/
+private def shapeDoc (name : String) (shape : ShapeContractDecl) : Except String Doc := do
+  let entries ← shape.pragmas.mapM pragmaDoc
+  let entries := entries ++ (← shape.contract.mapM clauseDoc)
+  let types := " ".intercalate (shape.arguments.map fun type => s!"\{{typeText type.value}}").toList
+  pure <| block (text s!"spec {identifier name} at {types} where") entries
+
 private def fieldDoc (field : FieldDecl) : Doc :=
   text s!"{identifier field.name} : {typeText field.type.value}"
-
-/-- A function body has an implicit result position.  The semantic printer
-can nevertheless receive a single explicit `return` after CFG
-structurization.  Spell that value directly at the function boundary so the
-first rendering is already the same canonical source that a re-import would
-produce. Returns in statement position remain explicit. -/
-private partial def normalizeFunctionBody (unitResult : Bool) : Expr → Expr
-  | .block #[.expression (.return_ value _)] none _ =>
-      normalizeFunctionBody unitResult value
-  | .block #[] (some (.return_ value _)) _ =>
-      normalizeFunctionBody unitResult value
-  | .block #[] (some value) span =>
-      if unitResult && !isKnownUnitExpression value then
-        .block #[.expression value] none span
-      else normalizeFunctionBody unitResult value
-  | body@(.block #[.expression value] none _) =>
-      -- Preserve a one-entry effect block around calls: the original VIR may
-      -- not carry a result annotation while re-elaboration does, and using
-      -- that incidental difference would break the canonical fixed point.
-      -- Structured control flow is unambiguously Unit-valued and can still
-      -- shed the administrative wrapper.
-      if isUnitEffect value ||
-          value matches .loop .. | .forRange .. | .ifElse .. | .match_ .. then
-        normalizeFunctionBody unitResult value
-      else body
-  | body@(.block #[.expression value,
-      .expression (.return_ (.unit _) _)] none _) =>
-      if isKnownUnitExpression value then normalizeFunctionBody unitResult value else body
-  | body@(.block #[.expression value,
-      .expression (.return_ (.unit _) _)] (some (.unit _)) _) =>
-      if isKnownUnitExpression value then normalizeFunctionBody unitResult value else body
-  | body@(.block #[.expression value]
-      (some (.return_ (.unit _) _)) _) =>
-      if isKnownUnitExpression value then normalizeFunctionBody unitResult value else body
-  | body@(.block #[.expression value] (some (.unit _)) _) =>
-      if isKnownUnitExpression value then normalizeFunctionBody unitResult value else body
-  | body => body
-
-/-- A function body and each final control-flow arm are already result
-positions. CFG structurization may nevertheless wrap those values in
-`return`; remove only those redundant wrappers while retaining early returns
-among block statements. -/
-private partial def normalizeResultPosition : Expr → Expr
-  | .return_ value _ => normalizeResultPosition value
-  | .block statements result span =>
-      .block statements (result.map normalizeResultPosition) span
-  | .ifElse condition thenBranch elseBranch span =>
-      .ifElse condition (normalizeResultPosition thenBranch)
-        (elseBranch.map normalizeResultPosition) span
-  | .match_ scrutinee arms span =>
-      .match_ scrutinee (arms.map fun (pattern, guard, body) =>
-        (pattern, guard, normalizeResultPosition body)) span
-  | body => body
-
-/-- Interpret the tail of a Unit-returning function in effect position. The
-semantic printer and the offside parser cannot carry an expected type between
-them, so a final ordinary expression may temporarily appear as a block result.
-Move it back into the sequence, recursively through final control-flow arms;
-an explicit non-Unit `return` remains untouched and therefore type-checked. -/
-private partial def normalizeUnitTail : Expr → Expr
-  | .return_ value span =>
-      if isKnownUnitExpression value then normalizeUnitTail value
-      else .return_ value span
-  | .block statements result span =>
-      match result with
-      | some unit@(.unit _) =>
-          if endsWithValue statements then .block statements (some unit) span
-          else .block statements none span
-      | some result@(.return_ ..) =>
-          let normalized := normalizeUnitTail result
-          if normalized matches .unit _ then .block statements none span
-          else if isKnownUnitExpression normalized then
-            .block (statements.push (.expression normalized)) none span
-          else .block statements (some result) span
-      | some result =>
-          .block (statements.push (.expression (normalizeUnitTail result))) none span
-      | none =>
-          match statements.back? with
-          | some (.expression value) =>
-              let value := normalizeUnitTail value
-              if value matches .unit _ then .block statements.pop none span
-              else .block (statements.pop.push (.expression value)) none span
-          | _ => .block statements none span
-  | .ifElse condition thenBranch elseBranch span =>
-      .ifElse condition (normalizeUnitTail thenBranch)
-        (elseBranch.map normalizeUnitTail) span
-  | .match_ scrutinee arms span =>
-      .match_ scrutinee (arms.map fun (pattern, guard, body) =>
-        (pattern, guard, normalizeUnitTail body)) span
-  | body => body
-
-/-- A declaration's source attributes print on their own line above it. -/
-private partial def sourceAttributeText : SourceAttribute → String
-  | .call name arguments _ =>
-      identifier name ++ (if arguments.isEmpty then "" else
-        " (" ++ ", ".intercalate (arguments.map sourceAttributeText).toList ++ ")")
-  | .assign name value _ =>
-      identifier name ++ " = " ++ match value with
-        | .number value => toString value
-        | .string value => toString (repr value)
-        | .name value => identifier value
-
-private def attributesDoc (attributes : Array SourceAttribute) : Doc :=
-  if attributes.isEmpty then .nil else
-    let entries := attributes.map sourceAttributeText
-    text ("@[" ++ ", ".intercalate entries.toList ++ "]") ++ hard
 
 private def itemDocs : Item → Except String (Array Doc)
   | .constant declaration => do
@@ -1285,10 +1397,11 @@ private def itemDocs : Item → Except String (Array Doc)
         {typeText declaration.type.value} :=" ++
         Format.nest 2 (soft ++ (← expressionDoc declaration.value))]
   | .struct declaration => do
-      let head := text s!"struct {identifier declaration.name}" ++
+      let keyword := if declaration.isOpaque then "opaque struct" else "struct"
+      let head := text s!"{keyword} {identifier declaration.name}" ++
         bindersDoc declaration.generics ++ text (abilitiesText declaration.abilities) ++ text " where"
       let declarationDoc := attributesDoc declaration.attributes ++
-        block head (declaration.fields.map fieldDoc)
+        (if declaration.isOpaque then head else block head (declaration.fields.map fieldDoc))
       pure <| match ← contractDoc? declaration.name declaration.contract declaration.pragmas with
         | none => #[declarationDoc]
         | some contract => #[declarationDoc, contract]
@@ -1305,6 +1418,8 @@ private def itemDocs : Item → Except String (Array Doc)
         | none => #[declarationDoc]
         | some contract => #[declarationDoc, contract]
   | .function declaration => do
+      if declaration.contractOnly then
+        return (← contractDoc? declaration.name declaration.contract declaration.pragmas).toArray
       let signatureHead := s!"{modifiersText declaration.modifiers}fun {identifier declaration.name}\
         {bindersText declaration.generics}"
       let signature := hangingDelimited (text signatureHead) "(" ")"
@@ -1312,48 +1427,29 @@ private def itemDocs : Item → Except String (Array Doc)
         (text s!" -> {typeText declaration.result.value}")
       let declarationDoc ← match declaration.body with
         | none => pure signature
-        | some body =>
-            let unitResult := declaration.result.value == .unit
-            let body := normalizeResultPosition body
-            let body := if declaration.result.value == .unit then
-                normalizeUnitTail body
-              else body
-            let body := normalizeFunctionBody unitResult body
-            let body := if unitResult && !isKnownUnitExpression body &&
-                !isBlockExpression body && !isAbruptExpression body then
-              .block #[.expression body] none body.span
-            else body
-            let bodyDoc ← expressionDoc body
-            if body matches .match_ .. | .ifElse .. then
-              pure <| signature ++ text " :=" ++ Format.nest 2 (hard ++ bodyDoc)
-            else if isBlockExpression body then pure <| signature ++ text " := " ++ bodyDoc
-            else
-              let signatureWidth := (flattenedWidth? signature).getD 79
-              let bodyWidth := (flattenedWidth? bodyDoc).getD 79
-              if signatureWidth + 4 + bodyWidth <= 78 then
-                pure <| Format.group (signature ++ text " := " ++ bodyDoc)
-              else if signatureWidth > 78 && 13 + bodyWidth <= 78 then
-                pure <| signature ++ text " := " ++ bodyDoc
-              else
-                pure <| signature ++ text " :=" ++ Format.nest 2 (hard ++ bodyDoc)
+        | some body => functionBodyDoc signature declaration.result.value body
       let declarationDoc := attributesDoc declaration.attributes ++ declarationDoc
+      let shapes ← declaration.shapes.mapM (shapeDoc declaration.name)
       pure <| match ← contractDoc? declaration.name declaration.contract declaration.pragmas with
-        | none => #[declarationDoc]
-        | some contract => #[declarationDoc, contract]
+        | none => #[declarationDoc] ++ shapes
+        | some contract => #[declarationDoc, contract] ++ shapes
   | .specFunction declaration => do
       let declarationPrefix := if declaration.isOpaque then "opaque spec fun" else "spec fun"
       let signatureHead := s!"{declarationPrefix} {identifier declaration.name}\
         {bindersText declaration.generics}"
       let signature := hangingDelimited (text signatureHead) "(" ")"
         (declaration.parameters.map parameterDoc)
-        (text s!" : {typeText declaration.result.value}")
+        (match declaration.result with
+          | some result => text s!" : {typeText result.value}"
+          | none => .nil)
       let signature ← match declaration.decreases with
         | some measure => pure (signature ++ text " decreases " ++ (← expressionDoc measure))
         | none => pure signature
       let declarationDoc ← match declaration.body with
         | none => pure signature
         | some body =>
-            let body := normalizeFunctionBody (declaration.result.value == .unit)
+            let body := normalizeFunctionBody
+              (declaration.result.any (·.value == .unit))
               (normalizeResultPosition body)
             let bodyDoc ← expressionDoc body
             if body matches .match_ .. | .ifElse .. then
@@ -1388,6 +1484,8 @@ private def itemDocs : Item → Except String (Array Doc)
             Format.nest 2 (← expressionDoc declaration.expression)
         clauseDoc (.invariant declaration.expression declaration.properties declaration.span)
       pure #[block (text "spec module where") entries]
+  -- `itemsDocs` lays a scope out, with the comments inside it.
+  | .scope .. => pure #[]
 
 private def itemSpan : Item → Span
   | .constant declaration => declaration.span
@@ -1397,6 +1495,7 @@ private def itemSpan : Item → Span
   | .specFunction declaration => declaration.span
   | .lemma declaration => declaration.span
   | .namespaceInvariants declarations => declarations[0]?.map (·.span) |>.getD {}
+  | .scope _ _ _ span => span
 
 private def normalizedDocumentationLines (documentation : String) : List String :=
   let rawLines := documentation.trimAscii.toString.splitOn "\n"
@@ -1438,13 +1537,49 @@ private def documentationDoc (documentation : String) : Doc :=
   | lines => vcat <| #[text "/-!"] ++
       lines.toArray.map (fun line => text line.trimAsciiEnd.toString) ++ #[text "-/"]
 
+private def scopeKeyword : ScopeKind → String
+  | .module => "mod"
+  | .inherent => "impl"
+  | .implementation => "trait impl"
+  | .trait => "trait"
+
+/-- The items of a namespace or scope, each after the comments before it, and
+the comments after the last one. A scope takes the comments inside it. -/
+private partial def itemsDocs (items : Array Item) (comments : Array Comment) :
+    Except String (Array Doc) := do
+  let mut remainingComments := comments
+  let mut documents := #[]
+  for item in items do
+    let (before, remaining) := remainingComments.partition fun comment =>
+      comment.span.startByte <= (itemSpan item).startByte
+    remainingComments := remaining
+    let itemDocuments ← match item with
+      | .scope name kind nested span =>
+          let (inside, after) := remainingComments.partition fun comment =>
+            comment.span.startByte < span.endByte
+          remainingComments := after
+          let head := text s!"{scopeKeyword kind} {identifier name} where"
+          let members ← itemsDocs nested inside
+          pure #[if members.isEmpty then head
+            else head ++ Format.nest 2 (hard ++ blankSep members)]
+      | item => itemDocs item
+    if before.isEmpty || itemDocuments.isEmpty then
+      documents := documents ++ itemDocuments
+    else
+      documents := documents.push (commentsDoc before ++ hard ++ itemDocuments[0]!) ++
+        itemDocuments.drop 1
+  if !remainingComments.isEmpty then
+    documents := documents.push (commentsDoc remainingComments)
+  return documents
+
 /-- Lay out a parsed VerexSL compilation unit as its prelude (header,
 import, and address aliases) and one rendering per namespace, in order;
 `joinParts` makes the file. `leadingComments` are top-level namespace
 comments discarded as trivia by Lean's parser; the source backend uses these
 for explicit unsupported-declaration notices. -/
 def formatParts (unit : CompilationUnit) (width : Nat := 80)
-    (leadingComments : Array String := #[]) (declaredAliases : Array (String × String) := #[]) :
+    (leadingComments : Array String := #[]) (declaredAliases : Array (String × String) := #[])
+    (imports : Array Lean.Name := #[]) :
     Except String (String × Array String) := do
   let namespaces ← unit.namespaces.mapM fun ns => do
     let uses := ns.uses.map fun path => text s!"use {pathText path}"
@@ -1453,20 +1588,7 @@ def formatParts (unit : CompilationUnit) (width : Nat := 80)
     let pragmas ← ns.pragmas.mapM pragmaDoc
     let comments := ns.comments.qsort fun left right =>
       left.span.startByte < right.span.startByte
-    let mut remainingComments := comments
-    let mut items := #[]
-    for item in ns.items do
-      let (before, remaining) := remainingComments.partition fun comment =>
-        comment.span.startByte <= (itemSpan item).startByte
-      let itemDocuments ← itemDocs item
-      if before.isEmpty || itemDocuments.isEmpty then
-        items := items ++ itemDocuments
-      else
-        items := items.push (commentsDoc before ++ hard ++ itemDocuments[0]!) ++
-          itemDocuments.drop 1
-      remainingComments := remaining
-    if !remainingComments.isEmpty then
-      items := items.push (commentsDoc remainingComments)
+    let items ← itemsDocs ns.items comments
     let leadingCommentDocs := if leadingComments.isEmpty then #[] else
       #[vcat (leadingComments.map fun comment => text s!"-- {comment}")]
     -- Imports form one declaration group. Keeping them adjacent makes a
@@ -1493,7 +1615,8 @@ def formatParts (unit : CompilationUnit) (width : Nat := 80)
       text s!"address_alias {identifier name} = {address}") ++ hard ++ hard
   let prelude := text "-- Copyright © Aptos Foundation" ++ hard ++
     text "-- SPDX-License-Identifier: Apache-2.0" ++ hard ++ hard ++
-    text "import VerexSL" ++ hard ++ hard ++ aliasDeclarations
+    vcat (#[text "import VerexSL"] ++ imports.map fun name => text s!"import {name}") ++ hard ++
+    hard ++ aliasDeclarations
   pure (renderDoc prelude width, namespaces.map (renderDoc · width))
 
 /-- The file of a prelude and its namespaces: the namespaces separated by a
@@ -1545,9 +1668,11 @@ def formatSource (environment : Environment) (source : String) (width : Nat := 8
 /-- Lay out several semantic sources, one namespace each, as one file with
 their namespaces in the given order. -/
 def formatSourceParts (environment : Environment) (sources : Array String) (width : Nat := 80)
-    (sourceName : String := "<generated>") (declaredAliases : Array (String × String) := #[]) :
+    (sourceName : String := "<generated>") (declaredAliases : Array (String × String) := #[])
+    (imports : Array Name := #[]) :
     Except String (String × Array String) := do
   let units ← sources.mapM (parseSource environment · sourceName)
   formatParts { sourceName, namespaces := units.flatMap (·.namespaces) } width #[] declaredAliases
+    imports
 
 end VerexSL.Print.Layout

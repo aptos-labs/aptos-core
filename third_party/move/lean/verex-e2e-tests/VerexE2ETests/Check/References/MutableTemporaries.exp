@@ -1,6 +1,14 @@
 VerexE2ETests/Check/References/MutableTemporaries.lean:54:4: error: the specification clause `ensures c.value == old(c).value` is not established
 VerexE2ETests/Check/References/MutableTemporaries.lean:53:7: error: verex verification failed: the automatic verification of `discarded_unchanged` failed; provide a proof in the module:
-  verify discarded_unchanged by
+  verify discarded_unchanged by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/References/MutableTemporaries.lean:87:4: error: the specification clause `ensures c.value == old(c).value + 1 && result == c` is not established
+VerexE2ETests/Check/References/MutableTemporaries.lean:85:7: error: verex verification failed: the automatic verification of `read_deref` failed; provide a proof in the module:
+  verify read_deref by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

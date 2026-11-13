@@ -12,7 +12,6 @@ use aptos_types::{
     write_set::{BaseStateOp, WriteSet},
 };
 use arr_macro::arr;
-use itertools::Itertools;
 use rayon::prelude::*;
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -124,11 +123,9 @@ impl BatchedStateUpdateRefs<'_> {
 pub struct StateUpdateRefs<'kv> {
     pub per_version: PerVersionStateUpdateRefs<'kv>,
     all_checkpoint_versions: Vec<Version>,
-    /// Updates from the beginning of the block/chunk to the last checkpoint (if it exists).
-    for_last_checkpoint: Option<(PerVersionStateUpdateRefs<'kv>, BatchedStateUpdateRefs<'kv>)>,
-    /// Updates from the version after last checkpoint to last version (`None` if the last version
-    /// is a checkpoint, e.g. in a regular block).
-    for_latest: Option<(PerVersionStateUpdateRefs<'kv>, BatchedStateUpdateRefs<'kv>)>,
+    /// Updates from the beginning of the block/chunk to the last checkpoint, which is the last
+    /// version. `None` if there are no versions.
+    for_last_checkpoint: Option<BatchedStateUpdateRefs<'kv>>,
 }
 
 impl<'kv> StateUpdateRefs<'kv> {
@@ -136,20 +133,8 @@ impl<'kv> StateUpdateRefs<'kv> {
         &self.all_checkpoint_versions
     }
 
-    pub(crate) fn for_last_checkpoint_per_version(&self) -> Option<&PerVersionStateUpdateRefs<'_>> {
-        self.for_last_checkpoint.as_ref().map(|x| &x.0)
-    }
-
     pub(crate) fn for_last_checkpoint_batched(&self) -> Option<&BatchedStateUpdateRefs<'_>> {
-        self.for_last_checkpoint.as_ref().map(|x| &x.1)
-    }
-
-    pub(crate) fn for_latest_per_version(&self) -> Option<&PerVersionStateUpdateRefs<'_>> {
-        self.for_latest.as_ref().map(|x| &x.0)
-    }
-
-    pub(crate) fn for_latest_batched(&self) -> Option<&BatchedStateUpdateRefs<'_>> {
-        self.for_latest.as_ref().map(|x| &x.1)
+        self.for_last_checkpoint.as_ref()
     }
 
     pub fn index_write_sets(
@@ -168,6 +153,7 @@ impl<'kv> StateUpdateRefs<'kv> {
         )
     }
 
+    /// The last version, if any, must be a checkpoint, as only whole blocks are committed.
     pub fn index<
         UpdateIter: IntoIterator<Item = (&'kv StateKey, &'kv BaseStateOp)>,
         VersionIter: IntoIterator<Item = UpdateIter>,
@@ -182,79 +168,32 @@ impl<'kv> StateUpdateRefs<'kv> {
                 per_version: PerVersionStateUpdateRefs::new_empty(first_version),
                 all_checkpoint_versions: vec![],
                 for_last_checkpoint: None,
-                for_latest: None,
             };
         }
 
-        let mut updates_by_version = updates_by_version.into_iter();
-        let mut num_versions_for_last_checkpoint = 0;
-        let last_checkpoint_index = all_checkpoint_indices.last().copied();
-
-        let for_last_checkpoint = last_checkpoint_index.map(|index| {
-            num_versions_for_last_checkpoint = index + 1;
-            let per_version = PerVersionStateUpdateRefs::index(
-                first_version,
-                updates_by_version
-                    .by_ref()
-                    .take(num_versions_for_last_checkpoint),
-                num_versions_for_last_checkpoint,
-            );
-            let batched = Self::batch_updates(&per_version);
-            (per_version, batched)
-        });
-
-        let for_latest = match last_checkpoint_index {
-            Some(index) if index + 1 == num_versions => None,
-            _ => {
-                assert!(num_versions_for_last_checkpoint < num_versions);
-                let per_version = PerVersionStateUpdateRefs::index(
-                    first_version + num_versions_for_last_checkpoint as Version,
-                    updates_by_version,
-                    num_versions - num_versions_for_last_checkpoint,
-                );
-                let batched = Self::batch_updates(&per_version);
-                Some((per_version, batched))
-            },
-        };
+        assert_eq!(
+            all_checkpoint_indices.last().copied(),
+            Some(num_versions - 1),
+            "The last version must be a checkpoint.",
+        );
+        let per_version =
+            PerVersionStateUpdateRefs::index(first_version, updates_by_version, num_versions);
+        let batched = Self::batch_updates(&per_version);
 
         Self {
-            per_version: Self::concat_per_version_updates(
-                for_last_checkpoint.as_ref().map(|x| &x.0),
-                for_latest.as_ref().map(|x| &x.0),
-            ),
+            per_version,
             all_checkpoint_versions: all_checkpoint_indices
                 .into_iter()
                 .map(|index| first_version + index as Version)
                 .collect(),
-            for_last_checkpoint,
-            for_latest,
-        }
-    }
-
-    fn concat_per_version_updates(
-        for_last_checkpoint: Option<&PerVersionStateUpdateRefs<'kv>>,
-        for_latest: Option<&PerVersionStateUpdateRefs<'kv>>,
-    ) -> PerVersionStateUpdateRefs<'kv> {
-        match for_last_checkpoint {
-            Some(for_last_checkpoint) => {
-                let mut all = for_last_checkpoint.clone();
-                if let Some(for_latest) = for_latest {
-                    all.num_versions += for_latest.num_versions;
-                    for (dest, src) in all.shards.iter_mut().zip_eq(for_latest.shards.iter()) {
-                        dest.extend_from_slice(src);
-                    }
-                }
-                all
-            },
-            None => for_latest.cloned().expect("At least one should be Some."),
+            for_last_checkpoint: Some(batched),
         }
     }
 
     pub fn last_inner_checkpoint_index(&self) -> Option<usize> {
-        self.for_last_checkpoint.as_ref().map(|updates| {
-            assert_eq!(updates.0.num_versions, updates.1.num_versions);
-            updates.0.num_versions - 1
-        })
+        self.for_last_checkpoint
+            .as_ref()
+            .map(|_| self.per_version.num_versions - 1)
     }
 
     fn batch_updates(
@@ -354,58 +293,37 @@ mod tests {
         verify_batching(for_last_checkpoint, "A", 1, "A1");
         verify_batching(for_last_checkpoint, "B", 1, "B1");
         verify_batching(for_last_checkpoint, "C", 2, "C2");
-
-        assert!(ret.for_latest_batched().is_none());
     }
 
     #[test]
-    fn test_chunk_with_checkpoint() {
-        // For example, the second half of a previous block and the first half of the current
-        // block.
+    fn test_chunk_with_multiple_blocks() {
         let v0 = write_set(&[("A", "A0")]);
         let v1 = write_set(&[("A", "A1"), ("B", "B1")]);
         let v2 = write_set(&[("A", "A2"), ("B", "B2")]);
         let v3 = write_set(&[("B", "B3"), ("C", "C3")]);
-        let all_checkpoint_indices = vec![1];
+        let all_checkpoint_indices = vec![1, 3];
         let ret = StateUpdateRefs::index_write_sets(
-            0,
+            10,
             vec![&v0, &v1, &v2, &v3],
             4,
             all_checkpoint_indices,
         );
 
+        assert_eq!(ret.all_checkpoint_versions(), &[11, 13]);
         let for_last_checkpoint = ret.for_last_checkpoint_batched().unwrap();
-        assert_eq!(for_last_checkpoint.first_version, 0);
-        assert_eq!(for_last_checkpoint.num_versions, 2);
-        verify_batching(for_last_checkpoint, "A", 1, "A1");
-        verify_batching(for_last_checkpoint, "B", 1, "B1");
-
-        let for_latest = ret.for_latest_batched().unwrap();
-        assert_eq!(for_latest.first_version, 2);
-        assert_eq!(for_latest.num_versions, 2);
-        verify_batching(for_latest, "A", 2, "A2");
-        verify_batching(for_latest, "B", 3, "B3");
-        verify_batching(for_latest, "C", 3, "C3");
+        assert_eq!(for_last_checkpoint.first_version, 10);
+        assert_eq!(for_last_checkpoint.num_versions, 4);
+        verify_batching(for_last_checkpoint, "A", 12, "A2");
+        verify_batching(for_last_checkpoint, "B", 13, "B3");
+        verify_batching(for_last_checkpoint, "C", 13, "C3");
     }
 
     #[test]
-    fn test_chunk_with_no_checkpoint() {
-        // A chunk that is the middle of a large block.
-        let v0 = write_set(&[("A", "A0"), ("B", "B0")]);
-        let v1 = write_set(&[("A", "A1")]);
-        let v2 = write_set(&[("C", "C2")]);
-        let all_checkpoint_indices = vec![];
-        let ret =
-            StateUpdateRefs::index_write_sets(10, vec![&v0, &v1, &v2], 3, all_checkpoint_indices);
-
-        assert!(ret.for_last_checkpoint_batched().is_none());
-
-        let for_latest = ret.for_latest_batched().unwrap();
-        assert_eq!(for_latest.first_version, 10);
-        assert_eq!(for_latest.num_versions, 3);
-        verify_batching(for_latest, "A", 11, "A1");
-        verify_batching(for_latest, "B", 10, "B0");
-        verify_batching(for_latest, "C", 12, "C2");
+    #[should_panic(expected = "The last version must be a checkpoint.")]
+    fn test_chunk_ending_mid_block() {
+        let v0 = write_set(&[("A", "A0")]);
+        let v1 = write_set(&[("B", "B1")]);
+        StateUpdateRefs::index_write_sets(0, vec![&v0, &v1], 2, vec![0]);
     }
 
     #[test]
@@ -441,9 +359,9 @@ mod tests {
         let pairs1: Vec<_> = keys1.iter().map(|k| (k.as_str(), "v1")).collect();
         let ws0 = write_set(&pairs0);
         let ws1 = write_set(&pairs1);
-        let ret = StateUpdateRefs::index_write_sets(0, vec![&ws0, &ws1], 2, vec![]);
+        let ret = StateUpdateRefs::index_write_sets(0, vec![&ws0, &ws1], 2, vec![1]);
 
-        for shard in &ret.for_latest_per_version().unwrap().shards {
+        for shard in &ret.per_version.shards {
             assert!(shard.is_sorted_by_key(|(k, u)| (u.version, *k.crypto_hash_ref())));
         }
     }

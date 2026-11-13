@@ -1,6 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/behavioral_spliced_congruence.move:70:5: error: verification failed with a residual obligation:
 executable✝ : VerexIR.Validation.ExecutableUnit unit
+verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
 nativesTyped : VerexIR.NativesTyped executable✝
 nativesShift : VerexIR.NativesShift executable✝
 runsAgree : VerexIR.Proofs.RunsAgree executable✝
@@ -9,108 +10,60 @@ verexTerminating : VerexIR.Proofs.Terminating executable✝
 verexAgree : VerexIR.Proofs.TypesAgree unit
 verexResources : VerexIR.Proofs.ResourcesTyped unit
 cb_settle :
-  (VerexIR.Proofs.Denote.NTy.function
-      (VerexIR.Proofs.Denote.NRow.cons
-        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-          VerexIR.Proofs.Denote.NRow.nil
-          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-            (VerexIR.Proofs.Denote.NRow.cons
-              (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                (VerexIR.Proofs.Denote.NRow.cons
-                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                    VerexIR.Proofs.Denote.NRow.nil
-                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                      VerexIR.Proofs.Denote.NRow.nil))
-                  VerexIR.Proofs.Denote.NRow.nil)
-                (VerexIR.Proofs.Denote.NRow.cons
-                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                        VerexIR.Proofs.Denote.NRow.nil)).vector
-                  VerexIR.Proofs.Denote.NRow.nil))
-              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                VerexIR.Proofs.Denote.NRow.nil))))
-        (VerexIR.Proofs.Denote.NRow.cons
-          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-            VerexIR.Proofs.Denote.NRow.nil
-            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-              (VerexIR.Proofs.Denote.NRow.cons
-                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                  (VerexIR.Proofs.Denote.NRow.cons
-                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                        VerexIR.Proofs.Denote.NRow.nil))
-                    VerexIR.Proofs.Denote.NRow.nil)
-                  (VerexIR.Proofs.Denote.NRow.cons
-                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                        VerexIR.Proofs.Denote.NRow.nil
-                        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                          VerexIR.Proofs.Denote.NRow.nil)).vector
-                    VerexIR.Proofs.Denote.NRow.nil))
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  VerexIR.Proofs.Denote.NRow.nil))))
+  VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain
+    (VerexIR.Proofs.Denote.NTy.function
+      (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+        (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
-      [false, false, false]
-      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)).carrier
-taker_account : VerexIR.Proofs.Denote.NTy.address.carrier
+      { parameters := [false, false, false], results := [false] }
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
+taker_account :
+  VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain VerexIR.Proofs.Denote.NTy.address
 taker_client_id_vec :
-  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 } VerexIR.Proofs.Denote.NRow.nil
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-          VerexIR.Proofs.Denote.NRow.nil)).vector.carrier
-taker_price : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
-maker_account : VerexIR.Proofs.Denote.NTy.address.carrier
+  VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain
+    0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector
+taker_price :
+  VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 64 false)
+maker_account :
+  VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain VerexIR.Proofs.Denote.NTy.address
 maker_client_id_vec :
-  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 } VerexIR.Proofs.Denote.NRow.nil
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-          VerexIR.Proofs.Denote.NRow.nil)).vector.carrier
-maker_price size : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+  VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain
+    0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector
+maker_price :
+  VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 64 false)
+size : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed : True
-permitted_1 :
+permitted :
   VerexIR.Proofs.KeepsMemoryAt executable✝
-    (VerexIR.Proofs.Denote.NRow.cons
-      (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } VerexIR.Proofs.Denote.NRow.nil
-        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-          (VerexIR.Proofs.Denote.NRow.cons
-            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-              (VerexIR.Proofs.Denote.NRow.cons
-                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                  VerexIR.Proofs.Denote.NRow.nil
-                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                    VerexIR.Proofs.Denote.NRow.nil))
-                VerexIR.Proofs.Denote.NRow.nil)
-              (VerexIR.Proofs.Denote.NRow.cons
-                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                    VerexIR.Proofs.Denote.NRow.nil
-                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                      VerexIR.Proofs.Denote.NRow.nil)).vector
-                VerexIR.Proofs.Denote.NRow.nil))
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
-      (VerexIR.Proofs.Denote.NRow.cons
-        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-          VerexIR.Proofs.Denote.NRow.nil
-          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-            (VerexIR.Proofs.Denote.NRow.cons
-              (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                (VerexIR.Proofs.Denote.NRow.cons
-                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                    VerexIR.Proofs.Denote.NRow.nil
-                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                      VerexIR.Proofs.Denote.NRow.nil))
-                  VerexIR.Proofs.Denote.NRow.nil)
-                (VerexIR.Proofs.Denote.NRow.cons
-                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                        VerexIR.Proofs.Denote.NRow.nil)).vector
-                  VerexIR.Proofs.Denote.NRow.nil))
-              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                VerexIR.Proofs.Denote.NRow.nil))))
+    (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+      (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
         (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
-    cb_settle.val
-permitted_2_1 : ↑taker_client_id_vec.values.size ≤ 1
-permitted_2_2 : ↑maker_client_id_vec.values.size ≤ 1
+    { parameters := [false, false, false], results := [false] }
+    (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
+left✝¹⁶ left✝¹⁴ left✝¹² : True
+left✝¹¹ :
+  (VerexIR.Proofs.Denote.NTy.function
+        (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+          (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+        { parameters := [false, false, false], results := [false] }
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          VerexIR.Proofs.Denote.NRow.nil)).deepHolds
+    cb_settle
+right✝⁵ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit
+left✝¹⁰ : VerexIR.Proofs.Denote.NTy.address.deepHolds taker_account
+left✝⁹ : VerexIR.Proofs.Denote.NTy.address.deepHolds maker_account
+left✝⁶ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds taker_price
+right✝⁴ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit
+left✝³ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds maker_price
+right✝³ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit
+left✝² : 0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector.deepHolds taker_client_id_vec
+right✝² : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit
+left✝¹ : 0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector.deepHolds maker_client_id_vec
+right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit
+verexInvariant✝ : ↑taker_client_id_vec.values.size ≤ 1
+verexInvariant : ↑maker_client_id_vec.values.size ≤ 1
 bounds✝ : taker_client_id_vec.values.size < 18446744073709551616
 bounds : maker_client_id_vec.values.size < 18446744073709551616
 taker_price_lower : 0 ≤ taker_price.val
@@ -119,364 +72,94 @@ maker_price_lower : 0 ≤ maker_price.val
 maker_price_upper : maker_price.val ≤ 18446744073709551615
 size_lower : 0 ≤ size.val
 size_upper : size.val ≤ 18446744073709551615
+left✝ :
+  0 ≤
+    (VerexIR.Proofs.ResultOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+        (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+          (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+        { parameters := [false, false, false], results := [false] }
+        (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
+        ((taker_account, (taker_client_id_vec, ()), taker_price, ()),
+          (maker_account, (maker_client_id_vec, ()), maker_price, ()), size, ())
+        initialState✝ { val := 0, fits := ⋯ }).val
+right✝ :
+  (VerexIR.Proofs.ResultOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+        (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+          (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+        { parameters := [false, false, false], results := [false] }
+        (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
+        ((taker_account, (taker_client_id_vec, ()), taker_price, ()),
+          (maker_account, (maker_client_id_vec, ()), maker_price, ()), size, ())
+        initialState✝ { val := 0, fits := ⋯ }).val ≤
+    18446744073709551615
 ⊢ VerexIR.Proofs.wp
-    (VerexIR.Proofs.Denote.closureMeaning executable✝ cb_settle.val
-      (VerexIR.Proofs.Denote.NRow.cons
-        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-          VerexIR.Proofs.Denote.NRow.nil
-          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-            (VerexIR.Proofs.Denote.NRow.cons
-              (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                (VerexIR.Proofs.Denote.NRow.cons
-                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                    VerexIR.Proofs.Denote.NRow.nil
-                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                      VerexIR.Proofs.Denote.NRow.nil))
-                  VerexIR.Proofs.Denote.NRow.nil)
-                (VerexIR.Proofs.Denote.NRow.cons
-                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                        VerexIR.Proofs.Denote.NRow.nil)).vector
-                  VerexIR.Proofs.Denote.NRow.nil))
-              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                VerexIR.Proofs.Denote.NRow.nil))))
-        (VerexIR.Proofs.Denote.NRow.cons
-          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-            VerexIR.Proofs.Denote.NRow.nil
-            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-              (VerexIR.Proofs.Denote.NRow.cons
-                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                  (VerexIR.Proofs.Denote.NRow.cons
-                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                        VerexIR.Proofs.Denote.NRow.nil))
-                    VerexIR.Proofs.Denote.NRow.nil)
-                  (VerexIR.Proofs.Denote.NRow.cons
-                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                        VerexIR.Proofs.Denote.NRow.nil
-                        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                          VerexIR.Proofs.Denote.NRow.nil)).vector
-                    VerexIR.Proofs.Denote.NRow.nil))
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  VerexIR.Proofs.Denote.NRow.nil))))
+    (VerexIR.Proofs.Denote.closureMeaning executable✝
+      (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+        (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
-      (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false))
-      ((taker_account, (taker_client_id_vec, PUnit.unit), taker_price, PUnit.unit),
-        (maker_account, (maker_client_id_vec, PUnit.unit), maker_price, PUnit.unit), size, ()))
+      { parameters := [false, false, false], results := [false] }
+      (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
+      (⟨(taker_account, (taker_client_id_vec, ()), taker_price, ()), ⋯⟩,
+        ⟨(maker_account, (maker_client_id_vec, ()), maker_price, ()), ⋯⟩, size, ()))
     (fun result final =>
-      (¬VerexIR.Proofs.AbortsOf executable✝
-              ((VerexIR.Proofs.Denote.NTy.function
-                    (VerexIR.Proofs.Denote.NRow.cons
-                      (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                        VerexIR.Proofs.Denote.NRow.nil
-                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-                          (VerexIR.Proofs.Denote.NRow.cons
-                            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                              (VerexIR.Proofs.Denote.NRow.cons
-                                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                  VerexIR.Proofs.Denote.NRow.nil
-                                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                    VerexIR.Proofs.Denote.NRow.nil))
-                                VerexIR.Proofs.Denote.NRow.nil)
-                              (VerexIR.Proofs.Denote.NRow.cons
-                                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                    VerexIR.Proofs.Denote.NRow.nil
-                                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                      VerexIR.Proofs.Denote.NRow.nil)).vector
-                                VerexIR.Proofs.Denote.NRow.nil))
-                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                              VerexIR.Proofs.Denote.NRow.nil))))
-                      (VerexIR.Proofs.Denote.NRow.cons
-                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                          VerexIR.Proofs.Denote.NRow.nil
-                          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-                            (VerexIR.Proofs.Denote.NRow.cons
-                              (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                                (VerexIR.Proofs.Denote.NRow.cons
-                                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                    VerexIR.Proofs.Denote.NRow.nil
-                                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                      VerexIR.Proofs.Denote.NRow.nil))
-                                  VerexIR.Proofs.Denote.NRow.nil)
-                                (VerexIR.Proofs.Denote.NRow.cons
-                                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                      VerexIR.Proofs.Denote.NRow.nil
-                                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                        VerexIR.Proofs.Denote.NRow.nil)).vector
-                                  VerexIR.Proofs.Denote.NRow.nil))
-                              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                                VerexIR.Proofs.Denote.NRow.nil))))
-                        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                          VerexIR.Proofs.Denote.NRow.nil)))
-                    [false, false, false]
-                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                      VerexIR.Proofs.Denote.NRow.nil)).encode
-                cb_settle)
-              [VerexIR.RuntimeValue.nominal { namespaceId := { index := 0 }, structId := 0 } none
-                  #[VerexIR.RuntimeValue.address taker_account,
-                    VerexIR.RuntimeValue.nominal { namespaceId := { index := 2 }, structId := 0 } none
-                      #[VerexIR.RuntimeValue.vector
-                          (Array.map
-                            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                  VerexIR.Proofs.Denote.NRow.nil
-                                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                    VerexIR.Proofs.Denote.NRow.nil)).codec.encode
-                            taker_client_id_vec.values)],
-                    VerexIR.RuntimeValue.integer taker_price.val],
-                VerexIR.RuntimeValue.nominal { namespaceId := { index := 0 }, structId := 0 } none
-                  #[VerexIR.RuntimeValue.address maker_account,
-                    VerexIR.RuntimeValue.nominal { namespaceId := { index := 2 }, structId := 0 } none
-                      #[VerexIR.RuntimeValue.vector
-                          (Array.map
-                            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                  VerexIR.Proofs.Denote.NRow.nil
-                                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                    VerexIR.Proofs.Denote.NRow.nil)).codec.encode
-                            maker_client_id_vec.values)],
-                    VerexIR.RuntimeValue.integer maker_price.val],
-                VerexIR.RuntimeValue.integer size.val]
-              initialState✝ →
-          result.val =
-            (VerexIR.SemanticOperations.packResults
-                (VerexIR.Proofs.ResultOf executable✝
-                  ((VerexIR.Proofs.Denote.NTy.function
-                        (VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                            VerexIR.Proofs.Denote.NRow.nil
-                            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-                              (VerexIR.Proofs.Denote.NRow.cons
-                                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                                  (VerexIR.Proofs.Denote.NRow.cons
-                                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                      VerexIR.Proofs.Denote.NRow.nil
-                                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                        VerexIR.Proofs.Denote.NRow.nil))
-                                    VerexIR.Proofs.Denote.NRow.nil)
-                                  (VerexIR.Proofs.Denote.NRow.cons
-                                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                        VerexIR.Proofs.Denote.NRow.nil
-                                        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                          VerexIR.Proofs.Denote.NRow.nil)).vector
-                                    VerexIR.Proofs.Denote.NRow.nil))
-                                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                                  VerexIR.Proofs.Denote.NRow.nil))))
-                          (VerexIR.Proofs.Denote.NRow.cons
-                            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                              VerexIR.Proofs.Denote.NRow.nil
-                              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-                                (VerexIR.Proofs.Denote.NRow.cons
-                                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                                    (VerexIR.Proofs.Denote.NRow.cons
-                                      (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                        VerexIR.Proofs.Denote.NRow.nil
-                                        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                          VerexIR.Proofs.Denote.NRow.nil))
-                                      VerexIR.Proofs.Denote.NRow.nil)
-                                    (VerexIR.Proofs.Denote.NRow.cons
-                                      (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                          VerexIR.Proofs.Denote.NRow.nil
-                                          (VerexIR.Proofs.Denote.NRow.cons
-                                            (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                            VerexIR.Proofs.Denote.NRow.nil)).vector
-                                      VerexIR.Proofs.Denote.NRow.nil))
-                                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                                    VerexIR.Proofs.Denote.NRow.nil))))
-                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                              VerexIR.Proofs.Denote.NRow.nil)))
-                        [false, false, false]
-                        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                          VerexIR.Proofs.Denote.NRow.nil)).encode
-                    cb_settle)
-                  [VerexIR.RuntimeValue.nominal { namespaceId := { index := 0 }, structId := 0 } none
-                      #[VerexIR.RuntimeValue.address taker_account,
-                        VerexIR.RuntimeValue.nominal { namespaceId := { index := 2 }, structId := 0 } none
-                          #[VerexIR.RuntimeValue.vector
-                              (Array.map
-                                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                      VerexIR.Proofs.Denote.NRow.nil
-                                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                        VerexIR.Proofs.Denote.NRow.nil)).codec.encode
-                                taker_client_id_vec.values)],
-                        VerexIR.RuntimeValue.integer taker_price.val],
-                    VerexIR.RuntimeValue.nominal { namespaceId := { index := 0 }, structId := 0 } none
-                      #[VerexIR.RuntimeValue.address maker_account,
-                        VerexIR.RuntimeValue.nominal { namespaceId := { index := 2 }, structId := 0 } none
-                          #[VerexIR.RuntimeValue.vector
-                              (Array.map
-                                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                      VerexIR.Proofs.Denote.NRow.nil
-                                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                        VerexIR.Proofs.Denote.NRow.nil)).codec.encode
-                                maker_client_id_vec.values)],
-                        VerexIR.RuntimeValue.integer maker_price.val],
-                    VerexIR.RuntimeValue.integer size.val]
-                  initialState✝)).asInt) ∧
-        ¬VerexIR.Proofs.AbortsOf executable✝
-            ((VerexIR.Proofs.Denote.NTy.function
-                  (VerexIR.Proofs.Denote.NRow.cons
-                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-                        (VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                            (VerexIR.Proofs.Denote.NRow.cons
-                              (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                VerexIR.Proofs.Denote.NRow.nil
-                                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                  VerexIR.Proofs.Denote.NRow.nil))
-                              VerexIR.Proofs.Denote.NRow.nil)
-                            (VerexIR.Proofs.Denote.NRow.cons
-                              (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                  VerexIR.Proofs.Denote.NRow.nil
-                                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                    VerexIR.Proofs.Denote.NRow.nil)).vector
-                              VerexIR.Proofs.Denote.NRow.nil))
-                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                            VerexIR.Proofs.Denote.NRow.nil))))
-                    (VerexIR.Proofs.Denote.NRow.cons
-                      (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                        VerexIR.Proofs.Denote.NRow.nil
-                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-                          (VerexIR.Proofs.Denote.NRow.cons
-                            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                              (VerexIR.Proofs.Denote.NRow.cons
-                                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                  VerexIR.Proofs.Denote.NRow.nil
-                                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                    VerexIR.Proofs.Denote.NRow.nil))
-                                VerexIR.Proofs.Denote.NRow.nil)
-                              (VerexIR.Proofs.Denote.NRow.cons
-                                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                    VerexIR.Proofs.Denote.NRow.nil
-                                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                      VerexIR.Proofs.Denote.NRow.nil)).vector
-                                VerexIR.Proofs.Denote.NRow.nil))
-                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                              VerexIR.Proofs.Denote.NRow.nil))))
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                        VerexIR.Proofs.Denote.NRow.nil)))
-                  [false, false, false]
-                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    VerexIR.Proofs.Denote.NRow.nil)).encode
-              cb_settle)
-            [VerexIR.RuntimeValue.nominal { namespaceId := { index := 0 }, structId := 0 } none
-                #[VerexIR.RuntimeValue.address taker_account,
-                  VerexIR.RuntimeValue.nominal { namespaceId := { index := 2 }, structId := 0 } none
-                    #[VerexIR.RuntimeValue.vector
-                        (Array.map
-                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                VerexIR.Proofs.Denote.NRow.nil
-                                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                  VerexIR.Proofs.Denote.NRow.nil)).codec.encode
-                          taker_client_id_vec.values)],
-                  VerexIR.RuntimeValue.integer taker_price.val],
-              VerexIR.RuntimeValue.nominal { namespaceId := { index := 0 }, structId := 0 } none
-                #[VerexIR.RuntimeValue.address maker_account,
-                  VerexIR.RuntimeValue.nominal { namespaceId := { index := 2 }, structId := 0 } none
-                    #[VerexIR.RuntimeValue.vector
-                        (Array.map
-                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                VerexIR.Proofs.Denote.NRow.nil
-                                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                  VerexIR.Proofs.Denote.NRow.nil)).codec.encode
-                          maker_client_id_vec.values)],
-                  VerexIR.RuntimeValue.integer maker_price.val],
-              VerexIR.RuntimeValue.integer size.val]
-            initialState✝)
-    (fun failure =>
-      VerexIR.Proofs.AbortsOf executable✝
-        ((VerexIR.Proofs.Denote.NTy.function
+      (¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
               (VerexIR.Proofs.Denote.NRow.cons
-                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                  VerexIR.Proofs.Denote.NRow.nil
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-                    (VerexIR.Proofs.Denote.NRow.cons
-                      (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                        (VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                            VerexIR.Proofs.Denote.NRow.nil
-                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                              VerexIR.Proofs.Denote.NRow.nil))
-                          VerexIR.Proofs.Denote.NRow.nil)
-                        (VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                              VerexIR.Proofs.Denote.NRow.nil
-                              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                VerexIR.Proofs.Denote.NRow.nil)).vector
-                          VerexIR.Proofs.Denote.NRow.nil))
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                        VerexIR.Proofs.Denote.NRow.nil))))
+                0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
                 (VerexIR.Proofs.Denote.NRow.cons
-                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                    VerexIR.Proofs.Denote.NRow.nil
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-                      (VerexIR.Proofs.Denote.NRow.cons
-                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                          (VerexIR.Proofs.Denote.NRow.cons
-                            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                              VerexIR.Proofs.Denote.NRow.nil
-                              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                VerexIR.Proofs.Denote.NRow.nil))
-                            VerexIR.Proofs.Denote.NRow.nil)
-                          (VerexIR.Proofs.Denote.NRow.cons
-                            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                VerexIR.Proofs.Denote.NRow.nil
-                                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                  VerexIR.Proofs.Denote.NRow.nil)).vector
-                            VerexIR.Proofs.Denote.NRow.nil))
-                        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                          VerexIR.Proofs.Denote.NRow.nil))))
+                  0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                     VerexIR.Proofs.Denote.NRow.nil)))
-              [false, false, false]
+              { parameters := [false, false, false], results := [false] }
+              (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
+              ((taker_account, (taker_client_id_vec, ()), taker_price, ()),
+                (maker_account, (maker_client_id_vec, ()), maker_price, ()), size, ())
+              initialState✝ →
+          result.val =
+            (VerexIR.Proofs.ResultOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+                (VerexIR.Proofs.Denote.NRow.cons
+                  0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+                  (VerexIR.Proofs.Denote.NRow.cons
+                    0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                      VerexIR.Proofs.Denote.NRow.nil)))
+                { parameters := [false, false, false], results := [false] }
+                (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
+                ((taker_account, (taker_client_id_vec, ()), taker_price, ()),
+                  (maker_account, (maker_client_id_vec, ()), maker_price, ()), size, ())
+                initialState✝ { val := 0, fits := ⋯ }).val) ∧
+        ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
+            (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+              (VerexIR.Proofs.Denote.NRow.cons
+                0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil)))
+            { parameters := [false, false, false], results := [false] }
+            (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
+            ((taker_account, (taker_client_id_vec, ()), taker_price, ()),
+              (maker_account, (maker_client_id_vec, ()), maker_price, ()), size, ())
+            initialState✝)
+    (fun error =>
+      VerexIR.Proofs.Denote.AbortsAt 10439
+        (VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
+          (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+            (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                VerexIR.Proofs.Denote.NRow.nil)).encode
-          cb_settle)
-        [VerexIR.RuntimeValue.nominal { namespaceId := { index := 0 }, structId := 0 } none
-            #[VerexIR.RuntimeValue.address taker_account,
-              VerexIR.RuntimeValue.nominal { namespaceId := { index := 2 }, structId := 0 } none
-                #[VerexIR.RuntimeValue.vector
-                    (Array.map
-                      (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                            VerexIR.Proofs.Denote.NRow.nil
-                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                              VerexIR.Proofs.Denote.NRow.nil)).codec.encode
-                      taker_client_id_vec.values)],
-              VerexIR.RuntimeValue.integer taker_price.val],
-          VerexIR.RuntimeValue.nominal { namespaceId := { index := 0 }, structId := 0 } none
-            #[VerexIR.RuntimeValue.address maker_account,
-              VerexIR.RuntimeValue.nominal { namespaceId := { index := 2 }, structId := 0 } none
-                #[VerexIR.RuntimeValue.vector
-                    (Array.map
-                      (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                            VerexIR.Proofs.Denote.NRow.nil
-                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                              VerexIR.Proofs.Denote.NRow.nil)).codec.encode
-                      maker_client_id_vec.values)],
-              VerexIR.RuntimeValue.integer maker_price.val],
-          VerexIR.RuntimeValue.integer size.val]
-        initialState✝)
+                VerexIR.Proofs.Denote.NRow.nil)))
+          { parameters := [false, false, false], results := [false] }
+          (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
+          ((taker_account, (taker_client_id_vec, ()), taker_price, ()),
+            (maker_account, (maker_client_id_vec, ()), maker_price, ()), size, ())
+          initialState✝))
     initialState✝
 tests/sources/functional/closures/behavioral_spliced_congruence.move:70:5: error: verex verification failed: the automatic verification of `run` failed; provide a proof in `tests/sources/functional/closures/behavioral_spliced_congruence.proof.lean`:
-  verify run by
+  verify run by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/behavioral_spliced_congruence.move:79:5: error: the precondition of `settle` is not established
-tests/sources/functional/closures/behavioral_spliced_congruence.move:79:5: error: the precondition of `settle` is not established
-tests/sources/functional/closures/behavioral_spliced_congruence.move:79:5: error: verex verification failed: the automatic verification of `run_concrete` failed; provide a proof in `tests/sources/functional/closures/behavioral_spliced_congruence.proof.lean`:
-  verify run_concrete by
-    verex_obligations
-    verex_on
-    | requires_of_settle => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/behavioral_spliced_congruence.move:93:5: error: the precondition of `settle` is not established
-tests/sources/functional/closures/behavioral_spliced_congruence.move:93:5: error: the precondition of `settle` is not established
 tests/sources/functional/closures/behavioral_spliced_congruence.move:95:9: error: the specification clause `ensures result
         == spec_settle(
           taker.account, taker.client_id, taker.price, maker.account,
@@ -484,19 +167,9 @@ tests/sources/functional/closures/behavioral_spliced_congruence.move:95:9: error
             + 1
         )` is not established
 tests/sources/functional/closures/behavioral_spliced_congruence.move:93:5: error: verex verification failed: the automatic verification of `run_concrete_wrong` failed; provide a proof in `tests/sources/functional/closures/behavioral_spliced_congruence.proof.lean`:
-  verify run_concrete_wrong by
+  verify run_concrete_wrong by lean =>
     verex_obligations
     verex_on
-    | requires_of_settle => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/behavioral_spliced_congruence.move:57:5: error: the precondition of `settle` is not established
-tests/sources/functional/closures/behavioral_spliced_congruence.move:57:5: error: the precondition of `settle` is not established
-tests/sources/functional/closures/behavioral_spliced_congruence.move:57:5: error: verex verification failed: the automatic verification of `callbacks` failed; provide a proof in `tests/sources/functional/closures/behavioral_spliced_congruence.proof.lean`:
-  verify callbacks by
-    verex_obligations
-    verex_on
-    | requires_of_settle => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

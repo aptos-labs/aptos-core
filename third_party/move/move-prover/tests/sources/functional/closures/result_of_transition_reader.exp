@@ -1,0 +1,168 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_reader.move:35:9
+   │
+35 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:30: caller_ctrl
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:34: caller_ctrl (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:30: caller_ctrl
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:31: caller_ctrl
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:35: caller_ctrl (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_reader.move:45:9
+   │
+45 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:38: caller_single
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:43: caller_single (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:38: caller_single
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:39: caller_single
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:44: caller_single (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:45: caller_single (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_reader.move:57:9
+   │
+57 │         ensures result == result_of<get>(a);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:48: caller_two
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:55: caller_two (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:56: caller_two (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:48: caller_two
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:49: caller_two
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:50: caller_two
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:48: caller_two
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:57: caller_two (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_reader.move:58:9
+   │
+58 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:48: caller_two
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:55: caller_two (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:56: caller_two (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:48: caller_two
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:49: caller_two
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:50: caller_two
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:48: caller_two
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:57: caller_two (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:58: caller_two (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_reader.move:83:9
+   │
+83 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:78: caller_ctrl
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:82: caller_ctrl (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:78: caller_ctrl
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:72: get (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:79: caller_ctrl
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:83: caller_ctrl (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_reader.move:93:9
+   │
+93 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:86: caller_single
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:91: caller_single (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:86: caller_single
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:72: get (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:87: caller_single
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:92: caller_single (spec)
+   =     at tests/sources/functional/closures/result_of_transition_reader.move:93: caller_single (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/result_of_transition_reader.move:106:9
+    │
+106 │         ensures false;
+    │         ^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:96: caller_two
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:103: caller_two (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:104: caller_two (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:96: caller_two
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:72: get (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:97: caller_two
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:98: caller_two
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:96: caller_two
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:105: caller_two (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:106: caller_two (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/result_of_transition_reader.move:130:9
+    │
+130 │         ensures false;
+    │         ^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:125: caller_ctrl
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:129: caller_ctrl (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:125: caller_ctrl
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:120: get (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:126: caller_ctrl
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:130: caller_ctrl (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/result_of_transition_reader.move:140:9
+    │
+140 │         ensures false;
+    │         ^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:133: caller_single
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:138: caller_single (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:133: caller_single
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:120: get (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:134: caller_single
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:139: caller_single (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:140: caller_single (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/result_of_transition_reader.move:153:9
+    │
+153 │         ensures false;
+    │         ^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:143: caller_two
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:150: caller_two (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:151: caller_two (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:143: caller_two
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:120: get (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:144: caller_two
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:145: caller_two
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:143: caller_two
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:152: caller_two (spec)
+    =     at tests/sources/functional/closures/result_of_transition_reader.move:153: caller_two (spec)

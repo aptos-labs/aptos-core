@@ -1,0 +1,115 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/regression/joined_mut_ref_lenders.move:17:9
+   │
+17 │         invariant x > 1;
+   │         ^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:65: locals_broken
+   =         cond = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:66: locals_broken
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:17
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:66: locals_broken
+   =         p = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:67: locals_broken
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:17
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:67: locals_broken
+   =         q = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:68: locals_broken
+   =         s = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:69: locals_broken
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:17
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/joined_mut_ref_lenders.move:32:9
+   │
+32 │         ensures result == 0; // error: the field returned was never written
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:22: globals_other
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:31: globals_other (spec)
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:22: globals_other
+   =         choose_a = <redacted>
+   =         addr = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:23: globals_other
+   =         a = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:24: globals_other
+   =         b = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:25: globals_other
+   =         selected = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:26: globals_other
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:27: globals_other
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:22: globals_other
+   =         result = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:32: globals_other (spec)
+
+error: data invariant does not hold
+   ┌─ tests/sources/regression/joined_mut_ref_lenders.move:82:9
+   │
+82 │         invariant v == 0;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:88: mixed_global_broken
+   =         b = <redacted>
+   =         addr = <redacted>
+   =         o = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:89: mixed_global_broken
+   =         r = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:90: mixed_global_broken
+   =         r = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:82
+
+error: data invariant does not hold
+   ┌─ tests/sources/regression/joined_mut_ref_lenders.move:82:9
+   │
+82 │         invariant v == 0;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:88: mixed_global_broken
+   =         b = <redacted>
+   =         addr = <redacted>
+   =         o = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:89: mixed_global_broken
+   =         r = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:90: mixed_global_broken
+   =         r = <redacted>
+   =         o = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:88: mixed_global_broken
+   =         o = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:82
+
+error: data invariant does not hold
+   ┌─ tests/sources/regression/joined_mut_ref_lenders.move:82:9
+   │
+82 │         invariant v == 0;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:94: mixed_global_broken_swapped
+   =         b = <redacted>
+   =         addr = <redacted>
+   =         o = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:95: mixed_global_broken_swapped
+   =         r = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:96: mixed_global_broken_swapped
+   =         r = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:82
+
+error: data invariant does not hold
+   ┌─ tests/sources/regression/joined_mut_ref_lenders.move:82:9
+   │
+82 │         invariant v == 0;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:94: mixed_global_broken_swapped
+   =         b = <redacted>
+   =         addr = <redacted>
+   =         o = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:95: mixed_global_broken_swapped
+   =         r = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:96: mixed_global_broken_swapped
+   =         r = <redacted>
+   =         o = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:94: mixed_global_broken_swapped
+   =         o = <redacted>
+   =     at tests/sources/regression/joined_mut_ref_lenders.move:82
+

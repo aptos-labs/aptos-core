@@ -3,7 +3,10 @@
 
 //! Tests for the hot state snapshot APIs used by fast sync to serve and restore hot state.
 
-use crate::{db::test_helper::arb_blocks_to_commit_with_params, pruner::PrunerManager, AptosDB};
+use crate::{
+    db::test_helper::arb_blocks_to_commit_with_params, pruner::PrunerManager,
+    state_store::StateStore, AptosDB,
+};
 use aptos_config::config::{
     HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
@@ -35,7 +38,7 @@ use aptos_types::{
 };
 use proptest::prelude::*;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -71,6 +74,22 @@ fn block_epilogue_txn(writes: Vec<(StateKey, Option<StateValue>)>) -> Transactio
         false,                               /* is_reconfig */
         TransactionAuxiliaryData::default(), /* transaction_auxiliary_data */
     )
+}
+
+/// Builds an empty block epilogue whose `TransactionInfo` commits `hot_root`, to serve as a fast
+/// sync target.
+fn fast_sync_target_txn(hot_root: Option<HashValue>) -> TransactionToCommit {
+    let mut txn = block_epilogue_txn(vec![]);
+    txn.transaction_info = TransactionInfo::builder_v1()
+        .transaction_hash(HashValue::random())
+        .state_change_hash(HashValue::random())
+        .event_root_hash(HashValue::random())
+        .state_checkpoint_hash(HashValue::random())
+        .maybe_hot_state_checkpoint_hash(hot_root)
+        .gas_used(0)
+        .status(ExecutionStatus::Success)
+        .build();
+    txn
 }
 
 /// Commits each element of `blocks` as a one-transaction (block-epilogue) block and returns the
@@ -535,10 +554,25 @@ fn test_hot_state_restore() {
         vec![(key("d"), Some(val(b"d2"))), (key("b"), None)],
         vec![(key("e"), Some(val(b"e3")))],
     ]);
+    // Fast sync restores a hot state snapshot only for a target that commits its root. The empty
+    // target block leaves the hot state unchanged.
+    let root_hash = src
+        .state_store
+        .hot_state_merkle_db
+        .get_root_hash(version)
+        .unwrap();
+    let version = version + 1;
+    src.save_transactions_for_test(
+        &[fast_sync_target_txn(Some(root_hash))],
+        version,
+        None,
+        true,
+    )
+    .unwrap();
     let expected = collect_paged(&src, version, usize::MAX);
     assert!(!expected.is_empty());
     let chunks = collect_chunks_with_proof(&src, version, 2);
-    let root_hash = chunks[0].root_hash;
+    assert_eq!(chunks[0].root_hash, root_hash);
 
     let tmp_dst = TempPath::new();
     let dst = open_persistent_hot_state_db(&tmp_dst);
@@ -554,6 +588,10 @@ fn test_hot_state_restore() {
     }
     receiver.finish_box().unwrap();
     finalize_fast_sync(&src, &dst, version);
+    assert_eq!(
+        dst.get_state_storage_usage(Some(version)).unwrap(),
+        src.get_state_storage_usage(Some(version)).unwrap()
+    );
 
     let pruners = &dst.state_store.state_pruner;
     assert_eq!(
@@ -688,7 +726,50 @@ fn test_hot_state_restore() {
 }
 
 #[test]
+fn test_hot_state_usage_delta() {
+    let cold: HashMap<_, _> = [
+        (key("stale"), val(b"old")),
+        (key("deleted"), val(b"gone")),
+        (key("read"), val(b"read")),
+    ]
+    .into_iter()
+    .collect();
+    let hot = [
+        (key("stale"), Some(val(b"newer"))),
+        (key("deleted"), None),
+        (key("created"), Some(val(b"c"))),
+        (key("read"), Some(val(b"read"))),
+        (key("absent"), None),
+    ]
+    .into_iter()
+    .map(|(k, v)| Ok((k, HotStateValue::new(v, 0))));
+
+    let delta = StateStore::hot_state_usage_delta(hot, |k| Ok(cold.get(k).cloned())).unwrap();
+
+    let size = |k: &str, v: &[u8]| (key(k).size() + val(v).size()) as i64;
+    assert_eq!(
+        delta,
+        (
+            0, // "deleted" is gone and "created" is new.
+            size("stale", b"newer") - size("stale", b"old") - size("deleted", b"gone")
+                + size("created", b"c"),
+        )
+    );
+}
+
+#[test]
 fn test_hot_state_restore_empty() {
+    fast_sync_empty_hot_state(Some(*SPARSE_MERKLE_PLACEHOLDER_HASH));
+}
+
+/// Fast sync targets commit no hot root until `HOT_STATE_ROOT_IN_TXN_INFO` is enabled.
+#[test]
+fn test_hot_state_restore_without_hot_root() {
+    fast_sync_empty_hot_state(None);
+}
+
+/// Fast syncs to a target with an empty hot state, whose `TransactionInfo` commits `hot_root`.
+fn fast_sync_empty_hot_state(hot_root: Option<HashValue>) {
     let tmp_src = TempPath::new();
     let src = AptosDB::new_for_test(&tmp_src);
     commit_blocks(&src, vec![vec![
@@ -700,17 +781,7 @@ fn test_hot_state_restore_empty() {
     drop(src);
     let src = AptosDB::new_for_test(&tmp_src);
     let version = 1;
-    let mut txn = block_epilogue_txn(vec![]);
-    txn.transaction_info = TransactionInfo::builder_v1()
-        .transaction_hash(HashValue::random())
-        .state_change_hash(HashValue::random())
-        .event_root_hash(HashValue::random())
-        .state_checkpoint_hash(HashValue::random())
-        .hot_state_checkpoint_hash(*SPARSE_MERKLE_PLACEHOLDER_HASH)
-        .gas_used(0)
-        .status(ExecutionStatus::Success)
-        .build();
-    src.save_transactions_for_test(&[txn], version, None, true)
+    src.save_transactions_for_test(&[fast_sync_target_txn(hot_root)], version, None, true)
         .unwrap();
     assert_eq!(
         src.state_store
@@ -720,11 +791,15 @@ fn test_hot_state_restore_empty() {
         *SPARSE_MERKLE_PLACEHOLDER_HASH
     );
 
-    // Fast sync never creates a hot state receiver for an empty snapshot.
+    // Fast sync streams no hot state values here, so it never creates a hot state receiver.
     let tmp_dst = TempPath::new();
     let dst = open_persistent_hot_state_db(&tmp_dst);
     restore_cold_state(&src, &dst, version);
     finalize_fast_sync(&src, &dst, version);
+    assert_eq!(
+        dst.get_state_storage_usage(Some(version)).unwrap(),
+        src.get_state_storage_usage(Some(version)).unwrap()
+    );
     assert_eq!(
         dst.state_store
             .hot_state_merkle_db

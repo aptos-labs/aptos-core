@@ -1,0 +1,115 @@
+Move prover returns: exiting with verification errors
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+    ┌─ tests/sources/functional/closures/result_of_transition.move:149:17
+    │
+149 │     fun no_call(a: address): u64 {
+    │                 ^
+
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+    ┌─ tests/sources/functional/closures/result_of_transition.move:181:23
+    │
+181 │     fun check_no_call(a: address): u64 {
+    │                       ^
+
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+    ┌─ tests/sources/functional/closures/result_of_transition.move:191:22
+    │
+191 │     fun bump_no_call(a: address): u64 {
+    │                      ^
+
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+    ┌─ tests/sources/functional/closures/result_of_transition.move:202:29
+    │
+202 │     fun bump_no_call_memory(a: address): u64 {
+    │                             ^
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition.move:42:9
+   │
+42 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition.move:33: caller_false
+   =     at tests/sources/functional/closures/result_of_transition.move:39: caller_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition.move:40: caller_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition.move:33: caller_false
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition.move:34: caller_false
+   =     at tests/sources/functional/closures/result_of_transition.move:35: caller_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition.move:41: caller_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition.move:42: caller_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition.move:68:9
+   │
+68 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition.move:60: caller1_false
+   =     at tests/sources/functional/closures/result_of_transition.move:65: caller1_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition.move:66: caller1_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition.move:60: caller1_false
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition.move:61: caller1_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition.move:67: caller1_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition.move:68: caller1_false (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/result_of_transition.move:100:9
+    │
+100 │         ensures false;
+    │         ^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/result_of_transition.move:91: caller2_false
+    =     at tests/sources/functional/closures/result_of_transition.move:97: caller2_false (spec)
+    =     at tests/sources/functional/closures/result_of_transition.move:98: caller2_false (spec)
+    =     at tests/sources/functional/closures/result_of_transition.move:91: caller2_false
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition.move:92: caller2_false
+    =     at tests/sources/functional/closures/result_of_transition.move:93: caller2_false
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition.move:99: caller2_false (spec)
+    =     at tests/sources/functional/closures/result_of_transition.move:100: caller2_false (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/result_of_transition.move:112:9
+    │
+112 │         ensures false;
+    │         ^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/result_of_transition.move:104: caller_plain
+    =     at tests/sources/functional/closures/result_of_transition.move:110: caller_plain (spec)
+    =     at tests/sources/functional/closures/result_of_transition.move:111: caller_plain (spec)
+    =     at tests/sources/functional/closures/result_of_transition.move:104: caller_plain
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition.move:105: caller_plain
+    =     at tests/sources/functional/closures/result_of_transition.move:106: caller_plain
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition.move:112: caller_plain (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/result_of_transition.move:153:9
+    │
+153 │         ensures ensures_of<bump>(a, 1, 2);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/result_of_transition.move:149: no_call
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition.move:150: no_call
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition.move:153: no_call (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/result_of_transition.move:206:9
+    │
+206 │ ╭         ensures exists<R>(a) && global<R>(a).v < 100
+207 │ │             ==> ({ let (p, q) = result_of<bump>(a); global<R>(a).v == old(global<R>(a).v) + 1 });
+    │ ╰─────────────────────────────────────────────────────────────────────────────────────────────────^
+    │
+    =     at tests/sources/functional/closures/result_of_transition.move:202: bump_no_call_memory
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition.move:203: bump_no_call_memory
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/result_of_transition.move:206: bump_no_call_memory (spec)

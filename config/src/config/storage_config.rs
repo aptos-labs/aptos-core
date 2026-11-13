@@ -201,9 +201,11 @@ pub struct RocksdbConfigs {
     pub index_db_config: RocksdbConfig,
     #[serde(default = "default_to_true")]
     pub enable_storage_sharding: bool,
-    /// Attach native-position storage on open: the position KV and JMT DBs
-    /// and the resident index. The on-chain `TRADING_NATIVE` and
-    /// `NATIVE_POSITION` features gate the writes themselves.
+    /// Attach trading-native storage on open: the position, order and
+    /// collateral KV and JMT DBs, and the resident position and order
+    /// indexes. The on-chain `TRADING_NATIVE`, `NATIVE_POSITION`,
+    /// `NATIVE_ORDERBOOK` and `NATIVE_COLLATERAL` features gate the writes
+    /// themselves.
     #[serde(default)]
     pub enable_trading_native: bool,
     pub high_priority_background_threads: i32,
@@ -253,6 +255,10 @@ impl Default for RocksdbConfigs {
 pub struct HotStateConfig {
     /// Max number of items in each shard.
     pub max_items_per_shard: usize,
+    /// Max sum of key and value sizes in each shard, counting each key as its 32-byte hash, which is
+    /// all the hot state keeps. Values vary a lot in size, so capping the item count alone doesn't
+    /// bound memory usage.
+    pub max_bytes_per_shard: usize,
     /// Every now and then refresh `hot_since_version` for hot items to prevent them from being
     /// evicted.
     pub refresh_interval_versions: u64,
@@ -264,6 +270,7 @@ impl Default for HotStateConfig {
     fn default() -> Self {
         Self {
             max_items_per_shard: 250_000,
+            max_bytes_per_shard: 512 << 20,
             refresh_interval_versions: 100_000,
             delete_on_restart: true,
         }
@@ -543,6 +550,10 @@ pub struct StorageDirPaths {
     hot_state_merkle_db_paths: ShardedDbPaths,
     position_db_paths: ShardedDbPaths,
     position_merkle_db_paths: ShardedDbPaths,
+    order_db_paths: ShardedDbPaths,
+    order_merkle_db_paths: ShardedDbPaths,
+    collateral_db_paths: ShardedDbPaths,
+    collateral_merkle_db_paths: ShardedDbPaths,
 }
 
 impl StorageDirPaths {
@@ -630,6 +641,54 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
+    pub fn order_db_metadata_root_path(&self) -> &PathBuf {
+        self.order_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn order_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
+        self.order_db_paths
+            .shard_path(shard_id)
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn order_merkle_db_metadata_root_path(&self) -> &PathBuf {
+        self.order_merkle_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn order_merkle_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
+        self.order_merkle_db_paths
+            .shard_path(shard_id)
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn collateral_db_metadata_root_path(&self) -> &PathBuf {
+        self.collateral_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn collateral_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
+        self.collateral_db_paths
+            .shard_path(shard_id)
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn collateral_merkle_db_metadata_root_path(&self) -> &PathBuf {
+        self.collateral_merkle_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn collateral_merkle_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
+        self.collateral_merkle_db_paths
+            .shard_path(shard_id)
+            .unwrap_or(&self.default_path)
+    }
+
     pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
         Self {
             default_path: path.as_ref().to_path_buf(),
@@ -640,6 +699,10 @@ impl StorageDirPaths {
             hot_state_merkle_db_paths: Default::default(),
             position_db_paths: Default::default(),
             position_merkle_db_paths: Default::default(),
+            order_db_paths: Default::default(),
+            order_merkle_db_paths: Default::default(),
+            collateral_db_paths: Default::default(),
+            collateral_merkle_db_paths: Default::default(),
         }
     }
 
@@ -660,6 +723,10 @@ impl StorageDirPaths {
             hot_state_merkle_db_paths,
             position_db_paths: Default::default(),
             position_merkle_db_paths: Default::default(),
+            order_db_paths: Default::default(),
+            order_merkle_db_paths: Default::default(),
+            collateral_db_paths: Default::default(),
+            collateral_merkle_db_paths: Default::default(),
         }
     }
 }

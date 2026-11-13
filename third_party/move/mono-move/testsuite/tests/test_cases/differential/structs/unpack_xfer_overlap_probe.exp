@@ -32,9 +32,9 @@ fun trigger(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call pair_provider, [] @1
+    0: [x0] := call_exempt pair_provider, [] @1
     1: [x1, x2] := unpack 0x66::unpack_xfer_overlap_probe::Pair, x0 @2
-    2: [x0] := call consume, [r0, x1, x2] @3
+    2: [x0] := call_exempt consume, [r0, x1, x2] @3
     3: ret [x0] @4
 }
 === micro-ops ===
@@ -66,11 +66,11 @@ fun trigger() {
   frame_data_size: 8
   entry_gas: 202
   code:
-    0: CallIndirect 0x66::unpack_xfer_overlap_probe::pair_provider @1
+    0: CallByNameExempt 0x66::unpack_xfer_overlap_probe::pair_provider @1
     1: Move8 [48] <- [40] @2
     2: Move8 [40] <- [32] @2
     3: Move8 [32] <- [0] @3
-    4: CallIndirect 0x66::unpack_xfer_overlap_probe::consume @3
+    4: CallByNameExempt 0x66::unpack_xfer_overlap_probe::consume @3
     5: Move8 [0] <- [32] @4
     6: Return @4
 }

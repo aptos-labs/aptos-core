@@ -4,9 +4,10 @@
 use crate::{
     code_cache_global::GlobalModuleCache,
     counters::{
-        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES, GLOBAL_MODULE_CACHE_NUM_MODULES,
-        GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_MODULE_IDS, NUM_INTERNED_TYPES,
-        NUM_INTERNED_TYPE_VECS, STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
+        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES, GLOBAL_LAYOUT_CACHE_SIZE_IN_BYTES,
+        GLOBAL_MODULE_CACHE_NUM_MODULES, GLOBAL_MODULE_CACHE_SIZE_IN_BYTES,
+        NUM_INTERNED_MODULE_IDS, NUM_INTERNED_TYPES, NUM_INTERNED_TYPE_VECS,
+        STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
 };
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
@@ -170,12 +171,13 @@ where
             self.module_cache.flush_all_caches();
         }
 
-        // If there are too many layouts: flush only them.
-        let num_layout_entries = self.module_cache.num_cached_layouts();
-        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES.set(num_layout_entries as i64);
-        if num_layout_entries > config.max_layout_cache_size {
-            self.module_cache.flush_layout_cache();
-        }
+        // Layout cache size is bounded on every insertion (it is flushed if the new layout does
+        // not fit), here we only set the bound and record metrics.
+        self.module_cache
+            .set_max_layout_cache_size_in_bytes(config.max_layout_cache_size_in_bytes);
+        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES.set(self.module_cache.num_cached_layouts() as i64);
+        GLOBAL_LAYOUT_CACHE_SIZE_IN_BYTES
+            .set(self.module_cache.layout_cache_size_estimate_in_bytes() as i64);
 
         Ok(())
     }
@@ -610,7 +612,7 @@ mod test {
             max_struct_name_index_map_num_entries: 2,
             max_interned_tys: 100,
             max_interned_ty_vecs: 100,
-            max_layout_cache_size: 10,
+            max_layout_cache_size_in_bytes: 1024,
             max_interned_module_ids: 100,
         };
 
@@ -782,16 +784,16 @@ mod test {
         // Add 3 types and 3 type vectors.
         runtime_environment
             .ty_pool()
-            .intern_ty_args(&[Type::Vector(triomphe::Arc::new(Type::Signer)), Type::U8]);
+            .intern_ty_args(&[Type::vector(Type::Signer), Type::U8])
+            .unwrap();
         runtime_environment
             .ty_pool()
-            .intern_ty_args(&[Type::U8, Type::Vector(triomphe::Arc::new(Type::Address))]);
-        runtime_environment.ty_pool().intern_ty_args(&[
-            Type::Signer,
-            Type::Vector(triomphe::Arc::new(Type::Vector(triomphe::Arc::new(
-                Type::Address,
-            )))),
-        ]);
+            .intern_ty_args(&[Type::U8, Type::vector(Type::Address)])
+            .unwrap();
+        runtime_environment
+            .ty_pool()
+            .intern_ty_args(&[Type::Signer, Type::vector(Type::vector(Type::Address))])
+            .unwrap();
 
         assert_eq!(runtime_environment.module_id_pool().len(), 3);
         assert_eq!(runtime_environment.struct_name_index_map_size().unwrap(), 3);

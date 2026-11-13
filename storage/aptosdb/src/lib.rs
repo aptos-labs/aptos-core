@@ -31,11 +31,11 @@ mod db_options;
 mod event_store;
 mod ledger_db;
 mod lru_node_cache;
+pub mod native_metrics;
 pub mod native_state_committer;
 pub mod native_state_reader;
 pub mod native_state_store;
 pub(crate) mod native_store;
-pub mod position_metrics;
 mod pruner;
 mod sharded_db_layout;
 mod sharded_jmt_merkle_db;
@@ -44,7 +44,6 @@ mod sharded_kv_db;
 #[cfg(test)]
 mod native_storage_tests;
 
-pub use native_state_committer::NativeStateCommitter;
 pub use native_state_reader::{InMemoryNativeStateReader, NativeStateReader};
 pub use native_state_store::{AccountKey, PositionBase, PositionKey, PositionOverlay};
 mod state_kv_db;

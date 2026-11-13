@@ -6,4 +6,4 @@ error: cannot select field `x` since it has different types in variants of enum 
 18 │         let x_0 = &mut x.x;
    │                        ^
    │
-   = field `x` has type `u8` in variant `V2` and type `u64` in variant `V1`
+   = in `enum Wrapper2`, field `x` has type `u8` in variant `V2` and type `u64` in variant `V1`
