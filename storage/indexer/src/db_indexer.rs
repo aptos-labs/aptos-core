@@ -691,6 +691,7 @@ impl DBIndexer {
         key_prefix: &StateKeyPrefix,
         cursor: Option<&StateKey>,
         ledger_version: Version,
+        at_checkpoint: bool,
     ) -> Result<impl Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_ + use<'_>> {
         self.indexer_db
             .ensure_cover_ledger_version(ledger_version)?;
@@ -700,6 +701,7 @@ impl DBIndexer {
             key_prefix.clone(),
             cursor.cloned(),
             ledger_version,
+            at_checkpoint,
         )
     }
 

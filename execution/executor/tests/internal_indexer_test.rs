@@ -181,6 +181,7 @@ fn test_db_indexer_data() {
             &StateKeyPrefix::from(core_account.address()),
             None,
             total_version,
+            /* at_checkpoint = */ false,
         )
         .unwrap();
     let core_kv_res: Vec<_> = core_kv_iter.collect();
@@ -190,6 +191,7 @@ fn test_db_indexer_data() {
             &StateKeyPrefix::from(AccountAddress::from_hex_literal("0x1").unwrap()),
             None,
             total_version,
+            /* at_checkpoint = */ false,
         )
         .unwrap();
     let address_one_kv_res = address_one_kv_iter.collect::<Result<Vec<_>, _>>().unwrap();

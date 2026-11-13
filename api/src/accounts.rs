@@ -453,6 +453,7 @@ impl Account {
                 self.address.into(),
                 self.start.as_ref(),
                 self.ledger_version,
+                &self.latest_ledger_info,
                 // Just use the max as the default
                 determine_limit(
                     self.limit,
@@ -523,6 +524,7 @@ impl Account {
                 self.address.into(),
                 self.start.as_ref(),
                 self.ledger_version,
+                &self.latest_ledger_info,
                 // Just use the max as the default
                 determine_limit(
                     self.limit,
