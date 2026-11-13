@@ -103,7 +103,7 @@ fn view_request(
         .get_latest_ledger_info_and_verify_lookup_version(ledger_version.map(|inner| inner.0))?;
 
     let state_view = context
-        .state_view_at_version(requested_version)
+        .state_view_at_version(requested_version, &ledger_info)
         .map_err(|err| {
             BasicErrorWith404::bad_request_with_code(
                 err,

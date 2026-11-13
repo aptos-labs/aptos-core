@@ -142,12 +142,18 @@ impl IndexerReader for IndexerReaders {
         key_prefix: &StateKeyPrefix,
         cursor: Option<&StateKey>,
         ledger_version: Version,
+        at_checkpoint: bool,
     ) -> anyhow::Result<Box<dyn Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_>> {
         if let Some(db_indexer_reader) = &self.db_indexer_reader {
             if db_indexer_reader.indexer_db.statekeys_enabled() {
                 return Ok(Box::new(
                     db_indexer_reader
-                        .get_prefixed_state_value_iterator(key_prefix, cursor, ledger_version)
+                        .get_prefixed_state_value_iterator(
+                            key_prefix,
+                            cursor,
+                            ledger_version,
+                            at_checkpoint,
+                        )
                         .map_err(|err| {
                             anyhow!(format!(
                                 "failed to get prefixed state value iterator {}",

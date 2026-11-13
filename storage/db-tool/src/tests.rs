@@ -488,6 +488,7 @@ mod dbtool_tests {
             StateKeyPrefix::new(AccessPath, b"".to_vec()),
             None,
             snapshot_version,
+            /* at_checkpoint = */ false,
         )
         .unwrap();
 
