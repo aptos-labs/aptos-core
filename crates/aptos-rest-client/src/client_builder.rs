@@ -96,13 +96,14 @@ impl ClientBuilder {
         let version_path_base = get_version_path_with_base(self.base_url.clone());
 
         Client {
-            inner: self
-                .reqwest_builder
-                .default_headers(self.headers)
-                .timeout(self.timeout)
-                .cookie_store(true)
-                .build()
-                .unwrap(),
+            http: crate::http_client::HttpClient::new(
+                self.reqwest_builder
+                    .default_headers(self.headers)
+                    .timeout(self.timeout)
+                    .cookie_store(true)
+                    .build()
+                    .unwrap(),
+            ),
             base_url: self.base_url,
             version_path_base,
         }

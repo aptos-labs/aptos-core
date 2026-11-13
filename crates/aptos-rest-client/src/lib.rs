@@ -11,11 +11,12 @@ pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
 pub mod client_builder;
+mod http_client;
 pub mod state;
 pub mod types;
 
 pub use crate::client_builder::{AptosBaseUrl, ClientBuilder};
-use crate::{aptos::AptosVersion, error::RestError};
+use crate::{aptos::AptosVersion, error::RestError, http_client::HttpClient};
 use anyhow::{anyhow, Result};
 pub use aptos_api_types::{
     self, IndexResponseBcs, MoveModuleBytecode, PendingTransaction, Transaction,
@@ -43,6 +44,7 @@ use move_core_types::{
     ident_str,
     language_storage::{ModuleId, StructTag, TypeTag},
 };
+pub use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
     Client as ReqwestClient, StatusCode,
@@ -79,7 +81,7 @@ pub struct OriginatingAddress {
 
 #[derive(Clone, Debug)]
 pub struct Client {
-    inner: ReqwestClient,
+    http: HttpClient,
     base_url: Url,
     version_path_base: String,
 }
@@ -133,6 +135,20 @@ impl Client {
 
     pub fn new(base_url: Url) -> Self {
         Self::builder(AptosBaseUrl::Custom(base_url)).build()
+    }
+
+    /// Returns a shallow clone of this client that attaches `headers` to every request
+    /// sent through the returned [`Client`].
+    ///
+    /// The underlying connection pool and cookie jar are shared without mutating `self` or
+    /// setting default headers on the shared client, so per-request headers cannot leak across
+    /// requests.
+    pub fn with_headers(&self, headers: HeaderMap) -> Self {
+        Self {
+            http: self.http.with_headers(headers),
+            base_url: self.base_url.clone(),
+            version_path_base: self.version_path_base.clone(),
+        }
     }
 
     pub fn path_prefix_string(&self) -> String {
@@ -330,7 +346,7 @@ impl Client {
             address.to_hex(),
             asset_type
         ))?;
-        let response = self.inner.get(url).send().await?;
+        let response = self.http.send(self.http.get(url)).await?;
         self.json(response).await
     }
 
@@ -428,11 +444,8 @@ impl Client {
         }
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, JSON)
-            .body(request)
-            .send()
+            .http
+            .send(self.http.post(url).header(CONTENT_TYPE, JSON).body(request))
             .await?;
 
         self.json(response).await
@@ -450,12 +463,14 @@ impl Client {
         }
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_VIEW_FUNCTION)
-            .header(ACCEPT, BCS)
-            .body(txn_payload)
-            .send()
+            .http
+            .send(
+                self.http
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_VIEW_FUNCTION)
+                    .header(ACCEPT, BCS)
+                    .body(txn_payload),
+            )
             .await?;
 
         let response = self.check_and_parse_bcs_response(response).await?;
@@ -474,12 +489,14 @@ impl Client {
         }
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_VIEW_FUNCTION)
-            .header(ACCEPT, JSON)
-            .body(txn_payload)
-            .send()
+            .http
+            .send(
+                self.http
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_VIEW_FUNCTION)
+                    .header(ACCEPT, JSON)
+                    .body(txn_payload),
+            )
             .await?;
 
         self.json(response).await
@@ -493,11 +510,13 @@ impl Client {
         let url = self.build_path("transactions/simulate")?;
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
-            .body(txn_payload)
-            .send()
+            .http
+            .send(
+                self.http
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
+                    .body(txn_payload),
+            )
             .await?;
 
         self.json(response).await
@@ -517,11 +536,13 @@ impl Client {
         ))?;
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
-            .body(txn_payload)
-            .send()
+            .http
+            .send(
+                self.http
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
+                    .body(txn_payload),
+            )
             .await?;
 
         self.json(response).await
@@ -535,12 +556,14 @@ impl Client {
         let url = self.build_path("transactions/simulate")?;
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
-            .header(ACCEPT, BCS)
-            .body(txn_payload)
-            .send()
+            .http
+            .send(
+                self.http
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
+                    .header(ACCEPT, BCS)
+                    .body(txn_payload),
+            )
             .await?;
 
         let response = self.check_and_parse_bcs_response(response).await?;
@@ -560,12 +583,14 @@ impl Client {
         ))?;
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
-            .header(ACCEPT, BCS)
-            .body(txn_payload)
-            .send()
+            .http
+            .send(
+                self.http
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
+                    .header(ACCEPT, BCS)
+                    .body(txn_payload),
+            )
             .await?;
 
         let response = self.check_and_parse_bcs_response(response).await?;
@@ -580,11 +605,13 @@ impl Client {
         let url = self.build_path("transactions")?;
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
-            .body(txn_payload)
-            .send()
+            .http
+            .send(
+                self.http
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
+                    .body(txn_payload),
+            )
             .await?;
 
         self.json::<PendingTransaction>(response).await
@@ -598,11 +625,13 @@ impl Client {
         let url = self.build_path("transactions")?;
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
-            .body(txn_payload)
-            .send()
+            .http
+            .send(
+                self.http
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
+                    .body(txn_payload),
+            )
             .await?;
 
         self.check_response(response).await?;
@@ -614,12 +643,14 @@ impl Client {
         let url = self.build_path("transactions")?;
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
-            .header(ACCEPT, BCS)
-            .body(txn_payload)
-            .send()
+            .http
+            .send(
+                self.http
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
+                    .header(ACCEPT, BCS)
+                    .body(txn_payload),
+            )
             .await?;
 
         let response = self.check_and_parse_bcs_response(response).await?;
@@ -634,11 +665,13 @@ impl Client {
         let url = self.build_path("transactions/batch")?;
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
-            .body(txn_payload)
-            .send()
+            .http
+            .send(
+                self.http
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
+                    .body(txn_payload),
+            )
             .await?;
         self.json(response).await
     }
@@ -651,12 +684,14 @@ impl Client {
         let url = self.build_path("transactions/batch")?;
 
         let response = self
-            .inner
-            .post(url)
-            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
-            .header(ACCEPT, BCS)
-            .body(txn_payload)
-            .send()
+            .http
+            .send(
+                self.http
+                    .post(url)
+                    .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
+                    .header(ACCEPT, BCS)
+                    .body(txn_payload),
+            )
             .await?;
 
         let response = self.check_and_parse_bcs_response(response).await?;
@@ -988,7 +1023,7 @@ impl Client {
     ) -> AptosResult<Response<Vec<Transaction>>> {
         let url = self.build_path("transactions")?;
 
-        let mut request = self.inner.get(url);
+        let mut request = self.http.get(url);
         if let Some(start) = start {
             request = request.query(&[("start", start)])
         }
@@ -997,7 +1032,7 @@ impl Client {
             request = request.query(&[("limit", limit)])
         }
 
-        let response = request.send().await?;
+        let response = self.http.send(request).await?;
 
         self.json(response).await
     }
@@ -1020,7 +1055,10 @@ impl Client {
         let mut url = self.build_path("transactions/auxiliary_info")?;
         url.set_query(Some(&format!("start_version={}&limit={}", start, limit)));
 
-        let response = self.inner.get(url).header(ACCEPT, BCS).send().await?;
+        let response = self
+            .http
+            .send(self.http.get(url).header(ACCEPT, BCS))
+            .await?;
         let response = self.check_and_parse_bcs_response(response).await?;
         Ok(response
             .and_then(|inner| bcs::from_bytes(&inner))?
@@ -1049,7 +1087,10 @@ impl Client {
         hash: HashValue,
     ) -> AptosResult<reqwest::Response> {
         let url = self.build_path(&format!("transactions/by_hash/{}", hash.to_hex_literal()))?;
-        let response = self.inner.get(url).header(ACCEPT, BCS).send().await?;
+        let response = self
+            .http
+            .send(self.http.get(url).header(ACCEPT, BCS))
+            .await?;
         Ok(response)
     }
 
@@ -1058,7 +1099,7 @@ impl Client {
         hash: HashValue,
     ) -> AptosResult<reqwest::Response> {
         let url = self.build_path(&format!("transactions/by_hash/{}", hash.to_hex_literal()))?;
-        Ok(self.inner.get(url).send().await?)
+        Ok(self.http.send(self.http.get(url)).await?)
     }
 
     pub async fn get_transaction_by_version(
@@ -1083,7 +1124,7 @@ impl Client {
         version: u64,
     ) -> AptosResult<reqwest::Response> {
         let url = self.build_path(&format!("transactions/by_version/{}", version))?;
-        Ok(self.inner.get(url).send().await?)
+        Ok(self.http.send(self.http.get(url)).await?)
     }
 
     pub async fn get_account_ordered_transactions(
@@ -1094,7 +1135,7 @@ impl Client {
     ) -> AptosResult<Response<Vec<Transaction>>> {
         let url = self.build_path(&format!("accounts/{}/transactions", address.to_hex()))?;
 
-        let mut request = self.inner.get(url);
+        let mut request = self.http.get(url);
         if let Some(start) = start {
             request = request.query(&[("start", start)])
         }
@@ -1103,7 +1144,7 @@ impl Client {
             request = request.query(&[("limit", limit)])
         }
 
-        let response = request.send().await?;
+        let response = self.http.send(request).await?;
 
         self.json(response).await
     }
@@ -1202,9 +1243,8 @@ impl Client {
         ))?;
 
         let response = self
-            .inner
-            .get(url)
-            .send()
+            .http
+            .send(self.http.get(url))
             .await
             .map_err(anyhow::Error::from)?;
         self.json(response).await
@@ -1286,7 +1326,7 @@ impl Client {
             version
         ))?;
 
-        let response = self.inner.get(url).send().await?;
+        let response = self.http.send(self.http.get(url)).await?;
         self.json(response).await
     }
 
@@ -1369,7 +1409,7 @@ impl Client {
             struct_tag,
             field_name
         ))?;
-        let mut request = self.inner.get(url);
+        let mut request = self.http.get(url);
         if let Some(start) = start {
             request = request.query(&[("start", start)])
         }
@@ -1378,7 +1418,7 @@ impl Client {
             request = request.query(&[("limit", limit)])
         }
 
-        let response = request.send().await?;
+        let response = self.http.send(request).await?;
         self.json(response).await
     }
 
@@ -1475,7 +1515,7 @@ impl Client {
             "key": json!(key),
         });
 
-        let response = self.inner.post(url).json(&data).send().await?;
+        let response = self.http.send(self.http.post(url).json(&data)).await?;
         self.json(response).await
     }
 
@@ -1497,7 +1537,7 @@ impl Client {
             "key": json!(key),
         });
 
-        let response = self.inner.post(url).json(&data).send().await?;
+        let response = self.http.send(self.http.post(url).json(&data)).await?;
         self.json(response).await
     }
 
@@ -1578,7 +1618,7 @@ impl Client {
 
     pub async fn get_account(&self, address: AccountAddress) -> AptosResult<Response<Account>> {
         let url = self.build_path(&format!("accounts/{}", address.to_hex()))?;
-        let response = self.inner.get(url).send().await?;
+        let response = self.http.send(self.http.get(url)).await?;
         self.json(response).await
     }
 
@@ -1603,7 +1643,7 @@ impl Client {
             address.to_hex()
         ))?;
 
-        let mut request = self.inner.get(url).header(ACCEPT, BCS);
+        let mut request = self.http.get(url).header(ACCEPT, BCS);
         if let Some(start_version) = start_version {
             request = request.query(&[("start_version", start_version)])
         }
@@ -1616,14 +1656,14 @@ impl Client {
             request = request.query(&[("limit", limit)])
         }
 
-        let response = request.send().await?;
+        let response = self.http.send(request).await?;
         let response = self.check_and_parse_bcs_response(response).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
     pub async fn estimate_gas_price(&self) -> AptosResult<Response<GasEstimation>> {
         let url = self.build_path("estimate_gas_price")?;
-        let response = self.inner.get(url).send().await?;
+        let response = self.http.send(self.http.get(url)).await?;
         self.json(response).await
     }
 
@@ -1634,7 +1674,7 @@ impl Client {
             .append_pair("name", &name)
             .append_pair("actions", &actions)
             .finish();
-        let response = self.inner.get(url.clone()).send().await?;
+        let response = self.http.send(self.http.get(url.clone())).await?;
 
         if !response.status().is_success() {
             Err(parse_error(response).await)
@@ -1671,10 +1711,8 @@ impl Client {
     pub async fn health_check(&self, seconds: u64) -> AptosResult<()> {
         let url = self.build_path("-/healthy")?;
         let response = self
-            .inner
-            .get(url)
-            .query(&[("duration_secs", seconds)])
-            .send()
+            .http
+            .send(self.http.get(url).query(&[("duration_secs", seconds)]))
             .await?;
 
         if !response.status().is_success() {
@@ -1685,11 +1723,14 @@ impl Client {
     }
 
     async fn get<T: DeserializeOwned>(&self, url: Url) -> AptosResult<Response<T>> {
-        self.json(self.inner.get(url).send().await?).await
+        self.json(self.http.send(self.http.get(url)).await?).await
     }
 
     async fn get_bcs(&self, url: Url) -> AptosResult<Response<bytes::Bytes>> {
-        let response = self.inner.get(url).header(ACCEPT, BCS).send().await?;
+        let response = self
+            .http
+            .send(self.http.get(url).header(ACCEPT, BCS))
+            .await?;
         self.check_and_parse_bcs_response(response).await
     }
 
@@ -1727,11 +1768,8 @@ impl Client {
         data: serde_json::Value,
     ) -> AptosResult<T> {
         let response = self
-            .inner
-            .post(url)
-            .header(ACCEPT, JSON)
-            .json(&data)
-            .send()
+            .http
+            .send(self.http.post(url).header(ACCEPT, JSON).json(&data))
             .await?;
         if !response.status().is_success() {
             Err(parse_error(response).await)
@@ -1746,11 +1784,8 @@ impl Client {
         data: serde_json::Value,
     ) -> AptosResult<Response<bytes::Bytes>> {
         let response = self
-            .inner
-            .post(url)
-            .header(ACCEPT, BCS)
-            .json(&data)
-            .send()
+            .http
+            .send(self.http.post(url).header(ACCEPT, BCS).json(&data))
             .await?;
         self.check_and_parse_bcs_response(response).await
     }
@@ -1761,7 +1796,7 @@ impl Client {
         start: Option<u64>,
         limit: Option<u16>,
     ) -> AptosResult<Response<bytes::Bytes>> {
-        let mut request = self.inner.get(url).header(ACCEPT, BCS);
+        let mut request = self.http.get(url).header(ACCEPT, BCS);
         if let Some(start) = start {
             request = request.query(&[("start", start)])
         }
@@ -1770,7 +1805,7 @@ impl Client {
             request = request.query(&[("limit", limit)])
         }
 
-        let response = request.send().await?;
+        let response = self.http.send(request).await?;
         self.check_and_parse_bcs_response(response).await
     }
 
@@ -1875,7 +1910,7 @@ impl Client {
                 ledger_version,
                 &cursor,
             )?;
-            let raw_response = self.inner.get(url).send().await?;
+            let raw_response = self.http.send(self.http.get(url)).await?;
             let response: Response<Vec<T>> = self.json(raw_response).await?;
             cursor.clone_from(&response.state().cursor);
             if cursor.is_none() {
@@ -1960,7 +1995,7 @@ pub fn retriable(status_code: StatusCode, _aptos_error: Option<AptosError>) -> b
 impl From<(ReqwestClient, Url)> for Client {
     fn from((inner, base_url): (ReqwestClient, Url)) -> Self {
         Client {
-            inner,
+            http: HttpClient::new(inner),
             base_url,
             version_path_base: DEFAULT_VERSION_PATH_BASE.to_string(),
         }
@@ -2013,4 +2048,205 @@ enum WaitForTransactionResult<T> {
     FailedExecution(String),
     Pending(State),
     Success(Response<T>),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_api_types::X_APTOS_CLIENT;
+    use aptos_infallible::Mutex;
+    use std::sync::Arc;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+    };
+
+    type RecordedRequests = Arc<Mutex<Vec<(String, BTreeMap<String, Vec<String>>)>>>;
+
+    async fn spawn_mock_server() -> (Url, RecordedRequests) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let recorded: RecordedRequests = Arc::new(Mutex::new(Vec::new()));
+        let recorded_clone = recorded.clone();
+
+        let version_bcs = bcs::to_bytes(&AptosVersion { major: 1.into() }).unwrap();
+
+        tokio::spawn(async move {
+            loop {
+                let Ok((mut stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let recorded_conn = recorded_clone.clone();
+                let body = version_bcs.clone();
+                tokio::spawn(async move {
+                    // Handle multiple requests over the same keep-alive connection.
+                    loop {
+                        let mut buf = Vec::new();
+                        let mut chunk = [0u8; 4096];
+                        let header_end = loop {
+                            let n = match stream.read(&mut chunk).await {
+                                Ok(0) | Err(_) => return,
+                                Ok(n) => n,
+                            };
+                            buf.extend_from_slice(&chunk[..n]);
+                            if let Some(pos) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                                break pos;
+                            }
+                        };
+
+                        let header_str = String::from_utf8_lossy(&buf[..header_end]).to_string();
+                        let mut lines = header_str.split("\r\n");
+                        let request_line = lines.next().unwrap_or_default().to_string();
+                        let mut headers_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
+                        let mut content_length: usize = 0;
+                        for line in lines {
+                            if let Some((k, v)) = line.split_once(':') {
+                                let key = k.trim().to_ascii_lowercase();
+                                let val = v.trim().to_string();
+                                if key == "content-length" {
+                                    content_length = val.parse().unwrap_or(0);
+                                }
+                                headers_map.entry(key).or_default().push(val);
+                            }
+                        }
+
+                        let already_read_body = buf.len() - (header_end + 4);
+                        if already_read_body < content_length {
+                            let mut rem = vec![0u8; content_length - already_read_body];
+                            if stream.read_exact(&mut rem).await.is_err() {
+                                return;
+                            }
+                        }
+
+                        recorded_conn
+                            .lock()
+                            .push((request_line.clone(), headers_map));
+
+                        let response_body = if request_line.contains("/-/healthy") {
+                            b"ok".to_vec()
+                        } else {
+                            body.clone()
+                        };
+                        let response = format!(
+                            "HTTP/1.1 200 OK\r\n\
+                             content-type: application/x-bcs\r\n\
+                             content-length: {}\r\n\
+                             connection: keep-alive\r\n\
+                             x-aptos-chain-id: 4\r\n\
+                             x-aptos-ledger-version: 10\r\n\
+                             x-aptos-ledger-oldest-version: 0\r\n\
+                             x-aptos-ledger-timestampusec: 1700000000000000\r\n\
+                             x-aptos-epoch: 1\r\n\
+                             x-aptos-block-height: 5\r\n\
+                             x-aptos-oldest-block-height: 0\r\n\r\n",
+                            response_body.len()
+                        );
+                        if stream.write_all(response.as_bytes()).await.is_err() {
+                            return;
+                        }
+                        if stream.write_all(&response_body).await.is_err() {
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+
+        (Url::parse(&format!("http://{}", addr)).unwrap(), recorded)
+    }
+
+    #[tokio::test]
+    async fn test_with_headers_per_request_isolation_on_shared_pool() {
+        let (url, recorded) = spawn_mock_server().await;
+        let base_client = Client::new(url);
+
+        // 1. Request with per-request headers
+        let mut headers_a = HeaderMap::new();
+        headers_a.insert("x-client-id", HeaderValue::from_static("caller-a"));
+        headers_a.insert("x-request-id", HeaderValue::from_static("req-1"));
+        base_client
+            .with_headers(headers_a)
+            .health_check(60)
+            .await
+            .unwrap();
+
+        // 2. Subsequent request on base_client (reusing keep-alive connection) must NOT leak headers_a
+        base_client.health_check(60).await.unwrap();
+
+        // 3. Request with a different header set
+        let mut headers_b = HeaderMap::new();
+        headers_b.insert("x-client-id", HeaderValue::from_static("caller-b"));
+        base_client
+            .with_headers(headers_b)
+            .health_check(60)
+            .await
+            .unwrap();
+
+        let requests = recorded.lock();
+        assert_eq!(requests.len(), 3);
+
+        assert_eq!(
+            requests[0].1.get("x-client-id"),
+            Some(&vec!["caller-a".to_string()])
+        );
+        assert_eq!(
+            requests[0].1.get("x-request-id"),
+            Some(&vec!["req-1".to_string()])
+        );
+
+        assert!(!requests[1].1.contains_key("x-client-id"));
+        assert!(!requests[1].1.contains_key("x-request-id"));
+
+        assert_eq!(
+            requests[2].1.get("x-client-id"),
+            Some(&vec!["caller-b".to_string()])
+        );
+        assert!(!requests[2].1.contains_key("x-request-id"));
+    }
+
+    #[tokio::test]
+    async fn test_with_headers_preserves_explicit_protocol_headers_and_multi_values() {
+        let (url, recorded) = spawn_mock_server().await;
+        let base_client = Client::new(url);
+
+        let mut custom_headers = HeaderMap::new();
+        // Explicit method headers like `Accept: application/x-bcs` must NOT be overwritten
+        custom_headers.insert(ACCEPT, HeaderValue::from_static("text/plain"));
+        // Default client headers like `x-aptos-client` CAN be overridden per-request
+        custom_headers.insert(X_APTOS_CLIENT, HeaderValue::from_static("aptos-custom/1.0"));
+        // Multi-value headers are preserved
+        custom_headers.append("x-forwarded-for", HeaderValue::from_static("10.0.0.1"));
+        custom_headers.append("x-forwarded-for", HeaderValue::from_static("10.0.0.2"));
+
+        base_client
+            .with_headers(custom_headers)
+            .get_account_resource_bcs::<AptosVersion>(CORE_CODE_ADDRESS, "0x1::version::Version")
+            .await
+            .unwrap();
+        base_client
+            .get_account_resource_bcs::<AptosVersion>(CORE_CODE_ADDRESS, "0x1::version::Version")
+            .await
+            .unwrap();
+
+        let requests = recorded.lock();
+        assert_eq!(requests.len(), 2);
+
+        // First call: Accept stays application/x-bcs, x-aptos-client overridden, multi-value preserved
+        assert_eq!(requests[0].1.get("accept"), Some(&vec![BCS.to_string()]));
+        assert_eq!(
+            requests[0].1.get(X_APTOS_CLIENT),
+            Some(&vec!["aptos-custom/1.0".to_string()])
+        );
+        assert_eq!(
+            requests[0].1.get("x-forwarded-for"),
+            Some(&vec!["10.0.0.1".to_string(), "10.0.0.2".to_string()])
+        );
+
+        // Second call on base_client: default x-aptos-client restored, no x-forwarded-for
+        assert_eq!(
+            requests[1].1.get(X_APTOS_CLIENT),
+            Some(&vec![X_APTOS_SDK_HEADER_VALUE.to_string()])
+        );
+        assert!(!requests[1].1.contains_key("x-forwarded-for"));
+    }
 }
