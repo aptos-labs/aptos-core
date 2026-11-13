@@ -1050,6 +1050,36 @@ mod reopen {
         position_root: Option<HashValue>,
         order_root: Option<HashValue>,
     ) -> TransactionToCommit {
+        trading_block(writes, orders, &[], position_root, order_root, None)
+    }
+
+    /// As [`block_with_orders`], writing each `(collateral key, value)`
+    /// instead of orders; `None` deletes.
+    fn block_with_collateral(
+        writes: &[(StateKey, u64)],
+        collateral: &[(StateKey, Option<&[u8]>)],
+        collateral_root: Option<HashValue>,
+    ) -> TransactionToCommit {
+        trading_block(writes, &[], collateral, None, None, collateral_root)
+    }
+
+    /// A one-transaction block writing positions, orders and collateral;
+    /// a `None` value deletes.
+    fn trading_block(
+        writes: &[(StateKey, u64)],
+        orders: &[(StateKey, Option<&[u8]>)],
+        collateral: &[(StateKey, Option<&[u8]>)],
+        position_root: Option<HashValue>,
+        order_root: Option<HashValue>,
+        collateral_root: Option<HashValue>,
+    ) -> TransactionToCommit {
+        fn write_op(value: &Option<&[u8]>) -> WriteOp {
+            match value {
+                Some(bytes) => WriteOp::legacy_modification(bytes.to_vec().into()),
+                None => WriteOp::legacy_deletion(),
+            }
+        }
+
         let txn_info = TransactionInfo::builder_v1()
             .transaction_hash(HashValue::random())
             .state_change_hash(HashValue::random())
@@ -1059,6 +1089,7 @@ mod reopen {
             .status(ExecutionStatus::Success)
             .maybe_position_state_checkpoint_hash(position_root)
             .maybe_order_state_checkpoint_hash(order_root)
+            .maybe_collateral_state_checkpoint_hash(collateral_root)
             .build();
         let positions: BTreeMap<_, _> = writes
             .iter()
@@ -1074,62 +1105,24 @@ mod reopen {
                 orders
                     .iter()
                     .map(|(key, value)| {
-                        let op = match value {
-                            Some(bytes) => WriteOp::legacy_modification(bytes.to_vec().into()),
-                            None => WriteOp::legacy_deletion(),
-                        };
-                        (key.clone(), NativeOrderOp::from_write_op(op))
+                        (key.clone(), NativeOrderOp::from_write_op(write_op(value)))
                     })
                     .collect(),
             );
         }
-        TransactionToCommit::new(
-            Transaction::block_epilogue_v0(HashValue::zero(), BlockEndInfo::new_empty()),
-            txn_info,
-            write_set,
-            vec![],
-            false,
-            TransactionAuxiliaryData::default(),
-        )
-    }
-
-    /// As [`block_with_orders`], writing each `(collateral key, value)`
-    /// instead of orders; `None` deletes.
-    fn block_with_collateral(
-        writes: &[(StateKey, u64)],
-        collateral: &[(StateKey, Option<&[u8]>)],
-        collateral_root: Option<HashValue>,
-    ) -> TransactionToCommit {
-        let txn_info = TransactionInfo::builder_v1()
-            .transaction_hash(HashValue::random())
-            .state_change_hash(HashValue::random())
-            .event_root_hash(HashValue::random())
-            .state_checkpoint_hash(HashValue::random())
-            .gas_used(0)
-            .status(ExecutionStatus::Success)
-            .maybe_collateral_state_checkpoint_hash(collateral_root)
-            .build();
-        let positions: BTreeMap<_, _> = writes
-            .iter()
-            .map(|(key, tag)| {
-                let op = WriteOp::legacy_modification(position_bytes(*tag).into());
-                (key.clone(), NativePositionOp::from_write_op(op))
-            })
-            .collect();
-        let mut write_set = WriteSet::default().into_v1();
-        write_set.add_native_positions(positions);
-        write_set.add_native_collateral(
-            collateral
-                .iter()
-                .map(|(key, value)| {
-                    let op = match value {
-                        Some(bytes) => WriteOp::legacy_modification(bytes.to_vec().into()),
-                        None => WriteOp::legacy_deletion(),
-                    };
-                    (key.clone(), NativeCollateralOp::from_write_op(op))
-                })
-                .collect(),
-        );
+        if !collateral.is_empty() {
+            write_set.add_native_collateral(
+                collateral
+                    .iter()
+                    .map(|(key, value)| {
+                        (
+                            key.clone(),
+                            NativeCollateralOp::from_write_op(write_op(value)),
+                        )
+                    })
+                    .collect(),
+            );
+        }
         TransactionToCommit::new(
             Transaction::block_epilogue_v0(HashValue::zero(), BlockEndInfo::new_empty()),
             txn_info,
@@ -2599,6 +2592,148 @@ mod reopen {
 
     /// Fast sync to a target whose order root is the empty-tree placeholder,
     /// then commit orders on top.
+    /// Reads `(position size, order price, collateral reserved)` for
+    /// account 1 through one combined view.
+    fn read_trading_native(db: &AptosDB) -> (Option<u64>, Option<u64>, Option<u64>) {
+        use aptos_storage_interface::state_store::{
+            collateral::CollateralKey,
+            orders::{NativeOrder, OrderKey},
+        };
+        use aptos_types::state_store::{
+            native_collateral::NativeCollateral, native_order::NativeSingleOrder,
+            state_key::inner::CollateralScope,
+        };
+
+        let order_key = OrderKey::Single {
+            exchange: exchange(1),
+            market: super::market(7),
+            order_id: 1,
+        };
+        let collateral_key = CollateralKey {
+            exchange: exchange(1),
+            account: super::account(1),
+            scope: CollateralScope::Cross,
+        };
+        db.trading_native_reader()
+            .expect("native stores attached")
+            .with_view(|view| {
+                let size = view
+                    .positions
+                    .expect("position store attached")
+                    .get_account_positions(exchange(1), super::account(1))
+                    .first()
+                    .map(|(_, position)| position.size());
+                let price = match view.orders.expect("order store attached").get(&order_key) {
+                    Some(NativeOrder::Single(NativeSingleOrder::V1(order))) => Some(order.price),
+                    Some(other) => panic!("unexpected order {:?}", other),
+                    None => None,
+                };
+                let reserved = view
+                    .collateral
+                    .expect("collateral store attached")
+                    .get(&collateral_key)
+                    .map(|NativeCollateral::V1 { reserved, .. }| reserved);
+                (size, price, reserved)
+            })
+    }
+
+    #[test]
+    fn combined_view_reads_every_store_at_the_latest_chunk() {
+        let dir = TempPath::new();
+        let db = open(&dir, true);
+        assert_eq!(read_trading_native(&db), (None, None, None));
+
+        db.save_transactions_for_test(
+            &[trading_block(
+                &[(position_key(1), 10)],
+                &[(order_key(1), Some(&order_value(b'a')))],
+                &[(collateral_key(1), Some(&collateral_value(b'a')))],
+                None,
+                None,
+                None,
+            )],
+            0,
+            None,
+            true,
+        )
+        .expect("commit");
+        assert_eq!(
+            read_trading_native(&db),
+            (Some(10), Some(u64::from(b'a')), Some(u64::from(b'a')))
+        );
+
+        // A chunk touching only orders leaves the other tips as they were.
+        commit_orders(&db, 1, &[], &[(order_key(1), Some(&order_value(b'b')))]);
+        assert_eq!(
+            read_trading_native(&db),
+            (Some(10), Some(u64::from(b'b')), Some(u64::from(b'a')))
+        );
+    }
+
+    /// Tips are published together: while a reader holds the order tip, a
+    /// commit writing every store cannot publish its positions either.
+    #[test]
+    fn a_commit_publishes_no_tip_while_another_is_held() {
+        use std::{
+            sync::{mpsc, Arc},
+            time::Duration,
+        };
+
+        let dir = TempPath::new();
+        let db = Arc::new(open(&dir, true));
+        commit_collateral(&db, 0, &[(position_key(1), 10)], &[]);
+
+        let order_tip = db.order().expect("order store attached").orders.lock();
+        let committer = {
+            let db = Arc::clone(&db);
+            std::thread::spawn(move || {
+                db.save_transactions_for_test(
+                    &[trading_block(
+                        &[(position_key(1), 20)],
+                        &[(order_key(1), Some(&order_value(b'a')))],
+                        &[(collateral_key(1), Some(&collateral_value(b'a')))],
+                        None,
+                        None,
+                        None,
+                    )],
+                    1,
+                    None,
+                    true,
+                )
+                .expect("commit")
+            })
+        };
+        // Long enough for the commit to reach the held order tip. The
+        // position tip is then either locked by a publish waiting on the
+        // order tip, or not yet replaced.
+        std::thread::sleep(Duration::from_millis(200));
+        let (sender, receiver) = mpsc::channel();
+        {
+            let db = Arc::clone(&db);
+            std::thread::spawn(move || {
+                let version = db
+                    .position()
+                    .expect("position store attached")
+                    .positions
+                    .lock()
+                    .version();
+                let _ = sender.send(version);
+            });
+        }
+        match receiver.recv_timeout(Duration::from_millis(200)) {
+            Ok(version) => assert_eq!(version, Some(0), "position tip published alone"),
+            Err(mpsc::RecvTimeoutError::Timeout) => {},
+            Err(error) => panic!("{:?}", error),
+        }
+        drop(order_tip);
+
+        committer.join().expect("committer");
+        assert_eq!(
+            read_trading_native(&db),
+            (Some(20), Some(u64::from(b'a')), Some(u64::from(b'a')))
+        );
+    }
+
     #[test]
     fn fast_sync_to_an_empty_order_tree_then_commit() {
         let dir = TempPath::new();
