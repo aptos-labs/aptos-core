@@ -139,387 +139,405 @@ error: post-condition does not hold
     =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:181: native_wrapper_twice (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:237:37
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:230:37
     │
-237 │     spec pure_native_across_write { ensures result_1 == result_2; } // error: the result is not determined
+230 │     spec pure_native_across_write { ensures result_1 == result_2; } // error: the result is not determined
     │                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:230: pure_native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:223: pure_native_across_write
     =         x = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:231: pure_native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:224: pure_native_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:232: pure_native_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:233: pure_native_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:234: pure_native_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:230: pure_native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:225: pure_native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:226: pure_native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:227: pure_native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:223: pure_native_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:237: pure_native_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:230: pure_native_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:247:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:240:9
     │
-247 │         ensures result_1 == result_2; // error: each call may differ
+240 │         ensures result_1 == result_2; // error: each call may differ
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:239: native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:232: native_across_write
     =         x = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:240: native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:233: native_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:241: native_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:242: native_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:243: native_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:239: native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:234: native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:235: native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:236: native_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:232: native_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:247: native_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:240: native_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:271:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:264:9
     │
-271 │         ensures result_1 == result_2; // error: the second call reads the changed R
+264 │         ensures result_1 == result_2; // error: the second call reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:262: native_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:270: native_memory_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:263: native_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:255: native_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:263: native_memory_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:256: native_memory_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:264: native_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:265: native_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:266: native_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:262: native_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:257: native_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:258: native_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:259: native_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:255: native_memory_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:271: native_memory_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:264: native_memory_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:281:32
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:274:32
     │
-281 │     spec signer_across_write { ensures result_1 == result_2; } // error: the result is not determined
+274 │     spec signer_across_write { ensures result_1 == result_2; } // error: the result is not determined
     │                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:274: signer_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:267: signer_across_write
     =         s = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:275: signer_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:268: signer_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:276: signer_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:277: signer_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:278: signer_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:274: signer_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:269: signer_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:270: signer_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:271: signer_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:267: signer_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:281: signer_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:274: signer_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:339:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:332:9
     │
-339 │         ensures result_1 == result_2; // error: the callback reads the changed R
+332 │         ensures result_1 == result_2; // error: the callback reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:330: reads_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:338: reads_frame_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:331: reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:323: reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:331: reads_frame_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:324: reads_frame_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:332: reads_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:333: reads_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:334: reads_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:330: reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:325: reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:326: reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:327: reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:323: reads_frame_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:339: reads_frame_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:332: reads_frame_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:351:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:344:9
     │
-351 │         ensures result_1 == result_2; // error: the callback reads the changed R
+344 │         ensures result_1 == result_2; // error: the callback reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:342: reads_frame_unsat_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:350: reads_frame_unsat_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:343: reads_frame_unsat_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:335: reads_frame_unsat_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:343: reads_frame_unsat_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:336: reads_frame_unsat_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:344: reads_frame_unsat_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:345: reads_frame_unsat_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:346: reads_frame_unsat_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:342: reads_frame_unsat_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:337: reads_frame_unsat_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:338: reads_frame_unsat_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:339: reads_frame_unsat_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:335: reads_frame_unsat_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:351: reads_frame_unsat_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:344: reads_frame_unsat_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:363:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:356:9
     │
-363 │         ensures result_1 == result_2; // error: the callback reads the changed R
+356 │         ensures result_1 == result_2; // error: the callback reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:354: transparent_reads_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:362: transparent_reads_frame_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:355: transparent_reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:347: transparent_reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:355: transparent_reads_frame_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:348: transparent_reads_frame_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:356: transparent_reads_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:357: transparent_reads_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:358: transparent_reads_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:354: transparent_reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:349: transparent_reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:350: transparent_reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:351: transparent_reads_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:347: transparent_reads_frame_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:363: transparent_reads_frame_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:356: transparent_reads_frame_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:375:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:368:9
     │
-375 │         ensures result_1 == result_2; // error: the callback reads the changed R
+368 │         ensures result_1 == result_2; // error: the callback reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:366: modifies_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:374: modifies_frame_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:367: modifies_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:359: modifies_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:367: modifies_frame_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:360: modifies_frame_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:374: modifies_frame_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:368: modifies_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:369: modifies_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:370: modifies_frame_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:366: modifies_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:367: modifies_frame_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:361: modifies_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:362: modifies_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:363: modifies_frame_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:359: modifies_frame_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:375: modifies_frame_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:368: modifies_frame_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:383:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:376:9
     │
-383 │         ensures result_1 == result_2; // error: the carrier names no memory
+376 │         ensures result_1 == result_2; // error: the carrier names no memory
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:379: reads_frame_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:372: reads_frame_twice
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:380: reads_frame_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:373: reads_frame_twice
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:383: reads_frame_twice (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:376: reads_frame_twice (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:391:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:384:9
     │
-391 │         ensures result_1 == result_2; // error: what the callback reads is not known
+384 │         ensures result_1 == result_2; // error: what the callback reads is not known
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:387: reads_any_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:380: reads_any_twice
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:388: reads_any_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:381: reads_any_twice
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:391: reads_any_twice (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:384: reads_any_twice (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:403:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:396:9
     │
-403 │         ensures result_1 == result_2; // error: the result is not determined
+396 │         ensures result_1 == result_2; // error: the result is not determined
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:395: reads_frame_named_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:396: reads_frame_named_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:388: reads_frame_named_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:389: reads_frame_named_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:397: reads_frame_named_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:398: reads_frame_named_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:399: reads_frame_named_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:395: reads_frame_named_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:390: reads_frame_named_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:391: reads_frame_named_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:392: reads_frame_named_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:388: reads_frame_named_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:403: reads_frame_named_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:396: reads_frame_named_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:437:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:430:9
     │
-437 │         ensures result_1 == result_2; // error: the second call reads the changed R
+430 │         ensures result_1 == result_2; // error: the second call reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:428: intrinsic_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:436: intrinsic_memory_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:429: intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:421: intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:429: intrinsic_memory_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:422: intrinsic_memory_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:430: intrinsic_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:431: intrinsic_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:432: intrinsic_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:428: intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:423: intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:424: intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:425: intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:421: intrinsic_memory_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:437: intrinsic_memory_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:430: intrinsic_memory_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:449:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:442:9
     │
-449 │         ensures result_1 == result_2; // error: the second call reads the changed R
+442 │         ensures result_1 == result_2; // error: the second call reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:440: move_intrinsic_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:448: move_intrinsic_memory_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:441: move_intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:433: move_intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:441: move_intrinsic_memory_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:434: move_intrinsic_memory_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:442: move_intrinsic_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:443: move_intrinsic_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:444: move_intrinsic_memory_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:440: move_intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:435: move_intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:436: move_intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:437: move_intrinsic_memory_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:433: move_intrinsic_memory_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:449: move_intrinsic_memory_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:442: move_intrinsic_memory_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:469:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:462:9
     │
-469 │         ensures result_1 == result_2; // error: the second call reads the changed R
+462 │         ensures result_1 == result_2; // error: the second call reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:460: bodied_intrinsic_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:468: bodied_intrinsic_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:461: bodied_intrinsic_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:453: bodied_intrinsic_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:461: bodied_intrinsic_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:454: bodied_intrinsic_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:462: bodied_intrinsic_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:463: bodied_intrinsic_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:464: bodied_intrinsic_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:460: bodied_intrinsic_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:455: bodied_intrinsic_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:456: bodied_intrinsic_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:457: bodied_intrinsic_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:453: bodied_intrinsic_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:469: bodied_intrinsic_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:462: bodied_intrinsic_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:487:31
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:480:31
     │
-487 │     spec table_across_write { ensures result_1 == result_2; } // error: the result is not determined
+480 │     spec table_across_write { ensures result_1 == result_2; } // error: the result is not determined
     │                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:478: table_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:471: table_across_write
     =         t = <redacted>
     =         k = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:481: table_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:474: table_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:482: table_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:483: table_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:484: table_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:480: table_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:475: table_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:476: table_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:477: table_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:473: table_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:487: table_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:480: table_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:513:25
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:506:25
     │
-513 │     spec vector_twice { ensures result_1 == result_2; } // error: the result is not determined
+506 │     spec vector_twice { ensures result_1 == result_2; } // error: the result is not determined
     │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:509: vector_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:502: vector_twice
     =         x = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:510: vector_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:503: vector_twice
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:511: vector_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:504: vector_twice
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:513: vector_twice (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:506: vector_twice (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:519:22
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:512:22
     │
-519 │     spec bcs_twice { ensures result_1 == result_2; } // error: the result is not determined
+512 │     spec bcs_twice { ensures result_1 == result_2; } // error: the result is not determined
     │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:515: bcs_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:508: bcs_twice
     =         x = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:516: bcs_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:509: bcs_twice
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:517: bcs_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:510: bcs_twice
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:519: bcs_twice (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:512: bcs_twice (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:525:25
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:518:25
     │
-525 │     spec string_twice { ensures result_1 == result_2; } // error: the result is not determined
+518 │     spec string_twice { ensures result_1 == result_2; } // error: the result is not determined
     │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:521: string_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:514: string_twice
     =         x = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:522: string_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:515: string_twice
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:523: string_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:516: string_twice
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:525: string_twice (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:518: string_twice (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:531:23
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:524:23
     │
-531 │     spec hash_twice { ensures result_1 == result_2; } // error: the result is not determined
+524 │     spec hash_twice { ensures result_1 == result_2; } // error: the result is not determined
     │                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:527: hash_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:520: hash_twice
     =         x = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:528: hash_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:521: hash_twice
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:529: hash_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:522: hash_twice
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:531: hash_twice (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:524: hash_twice (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:548:29
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:541:29
     │
-548 │     spec mut_native_twice { ensures result_1 == result_2; } // error: each call may differ
+541 │     spec mut_native_twice { ensures result_1 == result_2; } // error: each call may differ
     │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:544: mut_native_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:537: mut_native_twice
     =         x = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:545: mut_native_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:538: mut_native_twice
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:546: mut_native_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:539: mut_native_twice
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:548: mut_native_twice (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:541: mut_native_twice (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:557:26
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:550:26
     │
-557 │     spec context_twice { ensures result_1 == result_2; } // error: each call may differ
+550 │     spec context_twice { ensures result_1 == result_2; } // error: each call may differ
     │                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:554: context_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:547: context_twice
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:555: context_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:548: context_twice
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:557: context_twice (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:550: context_twice (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:568:31
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:561:31
     │
-568 │     spec local_digest_twice { ensures result_1 == result_2; } // error: each call may differ
+561 │     spec local_digest_twice { ensures result_1 == result_2; } // error: each call may differ
     │                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:564: local_digest_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:557: local_digest_twice
     =         x = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:565: local_digest_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:558: local_digest_twice
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:566: local_digest_twice
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:559: local_digest_twice
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:568: local_digest_twice (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:561: local_digest_twice (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:638:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:626:9
     │
-638 │         ensures result_1 == result_2; // error: the second call reads the changed R
+626 │         ensures result_1 == result_2; // error: the second call reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:628: requires_failed_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:636: requires_failed_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:637: requires_failed_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:629: requires_failed_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:616: requires_failed_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:624: requires_failed_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:625: requires_failed_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:617: requires_failed_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:630: requires_failed_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:631: requires_failed_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:632: requires_failed_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:628: requires_failed_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:618: requires_failed_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:619: requires_failed_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:620: requires_failed_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:616: requires_failed_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:638: requires_failed_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:626: requires_failed_across_write (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:648:9
+    │
+648 │         ensures result_1 == result_2; // error: the second call reads the changed R
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:639: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:647: rec_wrap_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:640: rec_wrap_across_write
+    =         h = <redacted>
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:641: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:642: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:643: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:639: rec_wrap_across_write
+    =         result_1 = <redacted>
+    =         result_2 = <redacted>
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:648: rec_wrap_across_write (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:660:9
@@ -527,35 +545,35 @@ error: post-condition does not hold
 660 │         ensures result_1 == result_2; // error: the second call reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:651: rec_wrap_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:659: rec_wrap_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:652: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:651: rec_read_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:659: rec_read_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:652: rec_read_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:653: rec_wrap_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:654: rec_wrap_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:655: rec_wrap_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:651: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:653: rec_read_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:654: rec_read_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:655: rec_read_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:651: rec_read_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:660: rec_wrap_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:660: rec_read_across_write (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:672:9
+    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:694:9
     │
-672 │         ensures result_1 == result_2; // error: the second call reads the changed R
+694 │         ensures result_1 == result_2; // error: the second call reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:663: rec_read_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:671: rec_read_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:664: rec_read_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:685: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:693: rec_wrap_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:686: rec_wrap_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:665: rec_read_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:666: rec_read_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:667: rec_read_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:663: rec_read_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:687: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:688: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:689: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:685: rec_wrap_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:672: rec_read_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:694: rec_wrap_across_write (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:706:9
@@ -563,32 +581,14 @@ error: post-condition does not hold
 706 │         ensures result_1 == result_2; // error: the second call reads the changed R
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:697: rec_wrap_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:705: rec_wrap_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:698: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:697: rec_read_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:705: rec_read_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:698: rec_read_across_write
     =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:699: rec_wrap_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:700: rec_wrap_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:701: rec_wrap_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:697: rec_wrap_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:699: rec_read_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:700: rec_read_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:701: rec_read_across_write
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:697: rec_read_across_write
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:706: rec_wrap_across_write (spec)
-
-error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/apply_carrier_unread_memory.move:718:9
-    │
-718 │         ensures result_1 == result_2; // error: the second call reads the changed R
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:709: rec_read_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:717: rec_read_across_write (spec)
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:710: rec_read_across_write
-    =         h = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:711: rec_read_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:712: rec_read_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:713: rec_read_across_write
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:709: rec_read_across_write
-    =         result_1 = <redacted>
-    =         result_2 = <redacted>
-    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:718: rec_read_across_write (spec)
+    =     at tests/sources/functional/closures/apply_carrier_unread_memory.move:706: rec_read_across_write (spec)
