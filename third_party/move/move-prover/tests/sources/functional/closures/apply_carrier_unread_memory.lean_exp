@@ -52,31 +52,21 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:114:5: error:
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
-prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
 args✝ : VerexIR.Proofs.Denote.HList params
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed : True
 permitted :
   (initialState✝
-          {
-            type :=
-              VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
-                VerexIR.Proofs.Denote.NRow.nil
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  VerexIR.Proofs.Denote.NRow.nil),
+          { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
             arguments := VerexIR.Proofs.Denote.NRow.nil }
           (VerexIR.StorageKey.address "0x42")).isSome =
       true ∧
     ((initialState✝
-                {
-                  type :=
-                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                        VerexIR.Proofs.Denote.NRow.nil),
-                  arguments := VerexIR.Proofs.Denote.NRow.nil }
-                (VerexIR.StorageKey.address "0x42")).getD
-            ({ val := 0, fits := ⋯ }, ())).fst.val =
+                  { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
+                    arguments := VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address "0x42")).getD
+              (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
       0
 ⊢ VerexIR.NativesTyped executable✝
 tests/sources/functional/closures/apply_carrier_unread_memory.move:114:5: error: verex verification failed: the automatic verification of `callback_across_write_unsat` failed; provide a proof in the module:
@@ -125,6 +115,14 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:213:5: error:
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/apply_carrier_unread_memory.move:220:36: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:220:5: error: verex verification failed: the automatic verification of `determined_native_twice` failed; provide a proof in the module:
+  verify determined_native_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/apply_carrier_unread_memory.move:269:37: error: the specification clause `ensures result == spec.result[1]` is not established
 tests/sources/functional/closures/apply_carrier_unread_memory.move:269:5: error: verex verification failed: the automatic verification of `pure_native_across_write` failed; provide a proof in the module:
   verify pure_native_across_write by lean =>
@@ -162,31 +160,21 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:369:5: error:
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
-prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
 args✝ : VerexIR.Proofs.Denote.HList params
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed : True
 permitted :
   (initialState✝
-          {
-            type :=
-              VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
-                VerexIR.Proofs.Denote.NRow.nil
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  VerexIR.Proofs.Denote.NRow.nil),
+          { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
             arguments := VerexIR.Proofs.Denote.NRow.nil }
           (VerexIR.StorageKey.address "0x42")).isSome =
       true ∧
     ((initialState✝
-                {
-                  type :=
-                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                        VerexIR.Proofs.Denote.NRow.nil),
-                  arguments := VerexIR.Proofs.Denote.NRow.nil }
-                (VerexIR.StorageKey.address "0x42")).getD
-            ({ val := 0, fits := ⋯ }, ())).fst.val =
+                  { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
+                    arguments := VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address "0x42")).getD
+              (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
       0
 ⊢ VerexIR.NativesTyped executable✝
 tests/sources/functional/closures/apply_carrier_unread_memory.move:369:5: error: verex verification failed: the automatic verification of `reads_frame_across_write` failed; provide a proof in the module:
@@ -200,31 +188,21 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:381:5: error:
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
-prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
 args✝ : VerexIR.Proofs.Denote.HList params
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed : True
 permitted :
   (initialState✝
-          {
-            type :=
-              VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
-                VerexIR.Proofs.Denote.NRow.nil
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  VerexIR.Proofs.Denote.NRow.nil),
+          { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
             arguments := VerexIR.Proofs.Denote.NRow.nil }
           (VerexIR.StorageKey.address "0x42")).isSome =
       true ∧
     ((initialState✝
-                {
-                  type :=
-                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                        VerexIR.Proofs.Denote.NRow.nil),
-                  arguments := VerexIR.Proofs.Denote.NRow.nil }
-                (VerexIR.StorageKey.address "0x42")).getD
-            ({ val := 0, fits := ⋯ }, ())).fst.val =
+                  { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
+                    arguments := VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address "0x42")).getD
+              (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
       0
 ⊢ VerexIR.NativesTyped executable✝
 tests/sources/functional/closures/apply_carrier_unread_memory.move:381:5: error: verex verification failed: the automatic verification of `reads_frame_unsat_across_write` failed; provide a proof in the module:
@@ -238,31 +216,21 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:393:5: error:
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
-prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
 args✝ : VerexIR.Proofs.Denote.HList params
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed : True
 permitted :
   (initialState✝
-          {
-            type :=
-              VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
-                VerexIR.Proofs.Denote.NRow.nil
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  VerexIR.Proofs.Denote.NRow.nil),
+          { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
             arguments := VerexIR.Proofs.Denote.NRow.nil }
           (VerexIR.StorageKey.address "0x42")).isSome =
       true ∧
     ((initialState✝
-                {
-                  type :=
-                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                        VerexIR.Proofs.Denote.NRow.nil),
-                  arguments := VerexIR.Proofs.Denote.NRow.nil }
-                (VerexIR.StorageKey.address "0x42")).getD
-            ({ val := 0, fits := ⋯ }, ())).fst.val =
+                  { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
+                    arguments := VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address "0x42")).getD
+              (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
       0
 ⊢ VerexIR.NativesTyped executable✝
 tests/sources/functional/closures/apply_carrier_unread_memory.move:393:5: error: verex verification failed: the automatic verification of `transparent_reads_frame_across_write` failed; provide a proof in the module:
@@ -276,31 +244,21 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:405:5: error:
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
-prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
 args✝ : VerexIR.Proofs.Denote.HList params
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed : True
 permitted :
   (initialState✝
-          {
-            type :=
-              VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
-                VerexIR.Proofs.Denote.NRow.nil
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  VerexIR.Proofs.Denote.NRow.nil),
+          { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
             arguments := VerexIR.Proofs.Denote.NRow.nil }
           (VerexIR.StorageKey.address "0x42")).isSome =
       true ∧
     ((initialState✝
-                {
-                  type :=
-                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                        VerexIR.Proofs.Denote.NRow.nil),
-                  arguments := VerexIR.Proofs.Denote.NRow.nil }
-                (VerexIR.StorageKey.address "0x42")).getD
-            ({ val := 0, fits := ⋯ }, ())).fst.val =
+                  { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
+                    arguments := VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address "0x42")).getD
+              (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
       0
 ⊢ VerexIR.NativesTyped executable✝
 tests/sources/functional/closures/apply_carrier_unread_memory.move:405:5: error: verex verification failed: the automatic verification of `modifies_frame_across_write` failed; provide a proof in the module:
@@ -314,7 +272,7 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:414:5: error:
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
-prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
 args✝ : VerexIR.Proofs.Denote.HList params
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
@@ -330,7 +288,7 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:422:5: error:
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
-prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
 args✝ : VerexIR.Proofs.Denote.HList params
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
@@ -439,6 +397,7 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:600:5: error:
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/apply_carrier_unread_memory.move:606:5: error: verification failed with a residual obligation:
 executable✝ : VerexIR.Validation.ExecutableUnit unit
+verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
 nativesTyped : VerexIR.NativesTyped executable✝
 nativesShift : VerexIR.NativesShift executable✝
 runsAgree : VerexIR.Proofs.RunsAgree executable✝
@@ -460,14 +419,15 @@ assumed :
     { parameters := [false], results := [false] }
     (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f
 permitted : True
-bounds : b.values.size < 18446744073709551616
+bounds✝ : b.values.size < 18446744073709551616
+bounds : #[].size < 2 ^ 64
 ⊢ VerexIR.Proofs.wp
     (VerexIR.Proofs.Denote.closureMeaning executable✝
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector VerexIR.Proofs.Denote.NRow.nil)
       { parameters := [false], results := [false] }
       (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ()))
     (fun result final =>
-      (¬VerexIR.Proofs.AbortsOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+      (¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
                 VerexIR.Proofs.Denote.NRow.nil)
               { parameters := [false], results := [false] }
@@ -479,17 +439,17 @@ bounds : b.values.size < 18446744073709551616
                 VerexIR.Proofs.Denote.NRow.nil)
               { parameters := [false], results := [false] }
               (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
-              initialState✝ default) ∧
+              initialState✝ { values := #[], bounded := ⋯ }) ∧
         final = initialState✝ ∧
-          ¬VerexIR.Proofs.AbortsOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+          ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
                 VerexIR.Proofs.Denote.NRow.nil)
               { parameters := [false], results := [false] }
               (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
               initialState✝)
     (fun error =>
-      VerexIR.Proofs.Denote.AbortsAt 1788885
-        (VerexIR.Proofs.AbortsOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+      VerexIR.Proofs.Denote.AbortsAt 980699
+        (VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
             VerexIR.Proofs.Denote.NRow.nil)
           { parameters := [false], results := [false] }
