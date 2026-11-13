@@ -26,6 +26,97 @@ run_cmd do
     unless printed == again do
       throwError "positional frame is not a formatting fixed point"
 
+-- Tag reads remain place operations through the source roundtrip. Their
+-- spelling must not turn into a whole-value read of an enum payload.
+run_cmd do
+  let env ← getEnv
+  let source := "verex namespace tag_read_roundtrip using rust where\n" ++
+    "  enum Choice has Drop where\n" ++
+    "    | left (value : u64) = -7\n" ++
+    "    | right = 19\n" ++
+    "  fun tag(value : Choice) -> i64 := core.readDiscriminant[i64](value)\n" ++
+    "  native fun make() -> Choice\n" ++
+    "  fun computed() -> i64 := do\n" ++
+    "    let mut _1 : Choice\n" ++
+    "    _1 := make()\n" ++
+    "    core.readDiscriminant[i64](_1)\n"
+  let printed ← match VerexSL.Print.formatSource env source with
+    | .ok printed => pure printed
+    | .error error => throwError "tag read did not format: {error}"
+  unless printed.contains "core.readDiscriminant[i64](value)" do
+    throwError "tag read lost its distinct place operation: {printed}"
+  let .ok again := VerexSL.Print.formatSource env printed
+    | throwError "tag read did not re-import"
+  unless printed == again do
+    throwError "tag read is not a formatting fixed point"
+
+-- Reading the tag after moving a payload preserves the declared value of
+-- the active variant; the payload itself remains unavailable to later reads.
+verex namespace partial_move_tag using rust where
+  enum Choice has Drop where
+    | left (payload : string) = -7
+    | right = 19
+  fun take_tag(value : Choice) -> i64 := do
+    let payload := move((downcast value as Choice::left).payload)
+    core.readDiscriminant[i64](value)
+  spec take_tag where
+    requires value is left
+    ensures result == -7
+
+run_cmd do
+  unless (← getEnv).contains `partial_move_tag.take_tag.verified do
+    throwError "tag read after moving the payload did not verify"
+
+-- Empty array temporaries retain their element type and fixed length when
+-- declarations and assignments are combined, then formatted a second time.
+run_cmd do
+  let env ← getEnv
+  let source := "verex namespace empty_array_roundtrip using rust where\n" ++
+    "  fun empty_length() -> usize := do\n" ++
+    "    let mut _1 : Vector<u8, const 0>\n" ++
+    "    _1 := #[]\n" ++
+    "    let view := &(unsize _1)\n" ++
+    "    view.length\n" ++
+    "  fun nonempty_length() -> usize := do\n" ++
+    "    let mut _1 : Vector<u8, const 2>\n" ++
+    "    _1 := #[0u8, 255u8]\n" ++
+    "    let view := &(unsize _1)\n" ++
+    "    view.length\n"
+  let printed ← match VerexSL.Print.formatSource env source with
+    | .ok printed => pure printed
+    | .error error => throwError "empty array did not format: {error}"
+  unless printed.contains "Vector<u8, const 0>" && printed.contains "Vector<u8, const 2>" do
+    throwError "array literal lost its element type or fixed length: {printed}"
+  let .ok again := VerexSL.Print.formatSource env printed
+    | throwError "empty array did not re-import: {printed}"
+  unless printed == again do
+    throwError "empty array is not a formatting fixed point"
+
+-- Slices retain their unsized identity and projections through source formatting.
+run_cmd do
+  let env ← getEnv
+  let source := "verex namespace slice_places_roundtrip using rust where\n" ++
+    "  fun length(value : &Slice<u8>) -> usize := value.length\n" ++
+    "  spec length where\n" ++
+    "    requires value == #[1u8, 2u8]\n" ++
+    "    ensures result == 2\n" ++
+    "  fun tail(value : &Slice<u8>) -> usize := do\n" ++
+    "    let view := &core.subsliceFromEnd[1, 0](*value)\n" ++
+    "    view.length\n" ++
+    "  fun prefix(value : &Slice<u8>) -> usize := do\n" ++
+    "    let view := &core.subslice[0, 1](*value)\n" ++
+    "    view.length\n"
+  let printed ← match VerexSL.Print.formatSource env source with
+    | .ok printed => pure printed
+    | .error error => throwError "slice places did not format: {error}"
+  unless printed.contains "Slice<u8>" && printed.contains "core.subsliceFromEnd[1, 0]" &&
+      printed.contains "core.subslice[0, 1]" do
+    throwError "slice type or place bounds were erased: {printed}"
+  let .ok again := VerexSL.Print.formatSource env printed
+    | throwError "slice places did not re-import: {printed}"
+  unless printed == again do
+    throwError "slice places are not a formatting fixed point"
+
 -- Calls keep mathematical scalar results in derived specifications; their
 -- containing vectors keep physical elements. Only that boundary is injected.
 verex module 0x42::scalar_call_elements where
@@ -1129,9 +1220,9 @@ elab "#guard_verex_frontend" : command => do
   match VerexSL.Print.render env rustImplicitCopy with
   | .error error => throwError "the Rust implicit-copy fixture did not render: {error}"
   | .ok printed =>
-      unless printed.contains "tuple_first(pair : (u32, Bool)) -> u32 := pair[0u32]" &&
+      unless printed.contains "tuple_first(pair : (u32, Bool)) -> u32 := pair.0" &&
           printed.contains "vector_first(values : &Vector<u32>) -> u32 := values[0usize]" &&
-          !printed.contains "core.read(pair[0u32])" &&
+          !printed.contains "core.read(pair.0)" &&
           !printed.contains "*values[0usize]" do
         throwError "Rust scalar reads lost their implicit-copy spelling:\n{printed}"
       match VerexSL.Print.formatSource env printed with
@@ -1227,8 +1318,7 @@ elab "#guard_verex_frontend" : command => do
       | place => place
     pure <| VerexIR.Validation.Internal.mkValidatedUnit unit.tables unit.profiles
       (unit.namespaces.set! 0 { ns with places }) unit.dependencies unit.evidence unit.indexes
-      unit.structurizationWitnesses unit.resolution unit.initializationCertificates
-      unit.borrowCertificates unit.borrowRejections
+      unit.resolution
   match VerexSL.Print.render env (← shareCheckedIndex `«0x42».conditional_index_check) with
   | .error error => throwError "the conditional index-check fixture did not render: {error}"
   | .ok printed =>
@@ -1406,3 +1496,39 @@ run_cmd do
     | throwError "formatted post-only label did not parse"
   unless printed == again do
     throwError "post-only label formatting is not stable"
+
+-- Lifetime constraints survive the surface round trip, including forward
+-- references to another binder and the static region.
+run_cmd do
+  let env ← getEnv
+  let source := "verex namespace lifetime_bounds where\n" ++
+    "  fun shorten {a : lifetime outlives b, static} {b : lifetime}" ++
+    "(x : &[a] u32) -> &[b] u32 := x\n"
+  let printed ← match VerexSL.Print.formatSource env source with
+    | .ok printed => pure printed
+    | .error error => throwError "lifetime bounds did not format: {error}"
+  unless printed.contains "outlives b, static" do
+    throwError "lifetime bounds disappeared: {printed}"
+  let .ok again := VerexSL.Print.formatSource env printed
+    | throwError "lifetime bounds did not re-import"
+  unless printed == again do
+    throwError "lifetime bounds are not a formatting fixed point"
+  for bound in ["missing", "_"] do
+    let invalid := "verex namespace invalid_bound where\n" ++
+      "  fun f {a : lifetime outlives " ++ bound ++ "}() -> u32 := 0\n"
+    if (VerexSL.Print.formatSource env invalid).isOk then
+      throwError "invalid lifetime bound `{bound}` was accepted"
+
+-- A `spec` item collects its clauses by syntax kind, so a clause the
+-- elaborator does not list would be dropped without a diagnostic. Every kind
+-- of the `verexClause` category is a clause or a pragma.
+run_cmd do
+  let env ← getEnv
+  let some category := (Lean.Parser.parserExtension.getState env).categories.find? `verexClause
+    | throwError "the `verexClause` syntax category is not registered"
+  let known := VerexSL.clauseSyntaxKinds ++ VerexSL.pragmaSyntaxKinds
+  let unregistered := category.kinds.foldl
+    (fun found kind _ => if known.contains kind then found else found.push kind) (#[] : Array Name)
+  unless unregistered.isEmpty do
+    throwError "clause syntax the elaborator would drop silently: {unregistered}; \
+      add each to `clauseSyntaxKinds` or `pragmaSyntaxKinds` and to `clauseOf`"

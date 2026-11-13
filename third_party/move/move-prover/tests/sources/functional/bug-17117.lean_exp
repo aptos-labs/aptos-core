@@ -1,4 +1,27 @@
 Move prover returns: exiting with verification errors
+tests/sources/functional/bug-17117.move:6:9: error: the data invariant `invariant x > 20` does not hold where a mutation ends
+tests/sources/functional/bug-17117.move:6:9: error: the specification clause `invariant x > 20` is not established
+tests/sources/functional/bug-17117.move:65:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (1000000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/bug-17117.move:65:5: error: verex verification failed: the automatic verification of `get_s_error` exceeded its budget of 1000000 maxHeartbeats after deciding 14 leaves (stage interrupted); provide a proof in `tests/sources/functional/bug-17117.proof.lean`:
+  verify get_s_error by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/bug-17117.move:6:9: error: the specification clause `invariant x > 20` is not established
+tests/sources/functional/bug-17117.move:6:9: error: the data invariant `invariant x > 20` does not hold where a mutation ends
+tests/sources/functional/bug-17117.move:72:5: error: verex verification failed: the automatic verification of `get_s_no_error` failed; provide a proof in `tests/sources/functional/bug-17117.proof.lean`:
+  verify get_s_no_error by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/bug-17117.move:82:13: error: the assertion `r.x == y` does not hold
 tests/sources/functional/bug-17117.move:79:5: error: verex verification failed: the automatic verification of `test_input_param_as_mut_ref` failed; provide a proof in `tests/sources/functional/bug-17117.proof.lean`:
   verify test_input_param_as_mut_ref by lean =>

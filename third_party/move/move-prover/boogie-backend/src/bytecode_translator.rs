@@ -6508,10 +6508,15 @@ impl StructTranslator<'_> {
         }
 
         // Emit compare function and procedure
+        // The struct is translated once per normalized instantiation; a comparison
+        // registered under another ability variant of it is the same Boogie entity.
         let cmp_struct_types = self.parent.env.cmp_types.borrow();
+        let normalized_type_inst = Type::normalize_inst(self.type_inst);
         for cmp_struct_type in cmp_struct_types.iter() {
             if let Some((cur_struct, inst)) = cmp_struct_type.get_struct(env) {
-                if cur_struct.get_id() == struct_env.get_id() && inst == self.type_inst {
+                if cur_struct.get_id() == struct_env.get_id()
+                    && Type::normalize_inst(inst) == normalized_type_inst
+                {
                     if !struct_env.has_variants() {
                         let suffix =
                             boogie_type_suffix_for_struct(struct_env, self.type_inst, false);

@@ -4,7 +4,7 @@
 module 0xc0ffee::m {
     use 0x1::signer;
     struct Wrapper has copy, drop, store, key {
-        _0: |&signer|(u64) has copy + drop + store,
+        _0: |&signer|u64 has copy + drop + store,
     }
     public fun init(p0: &signer) {
         let _v0 = Wrapper{_0: |x| foo(x)};

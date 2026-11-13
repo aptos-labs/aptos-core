@@ -145,6 +145,22 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives
 }
 
+/// Returns test-only natives (signer creation, key generation, event queries)
+/// followed by production natives, matching V1's `testing` registration.
+#[cfg(feature = "testing")]
+pub fn make_all_test_only_and_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
+    let mut natives = make_all_unit_test_natives::<F>();
+    natives.extend(make_all_ed25519_test_natives::<F>());
+    natives.extend(make_all_multi_ed25519_test_natives::<F>());
+    natives.extend(make_all_bls12381_test_natives::<F>());
+    natives.extend(make_all_ristretto255_scalar_test_natives::<F>());
+    natives.extend(make_all_bulletproofs_test_natives::<F>());
+    natives.extend(make_all_crypto_algebra_test_natives::<F>());
+    natives.extend(make_all_event_test_natives::<F>());
+    natives.extend(make_all_production_natives::<F>());
+    natives
+}
+
 /// Parses a fully-qualified function name (e.g. "0x1::natives::u64_add")
 /// into its component parts. Panics on malformed input.
 //

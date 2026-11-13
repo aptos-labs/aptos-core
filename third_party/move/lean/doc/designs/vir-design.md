@@ -142,9 +142,13 @@ provenance fidelity is tested separately.
 ## Representation stages
 
 ```text
-RawUnit --normalize/structurize--> StructuredUnit --resolve--> ResolvedUnit
-        --infer/check types--> TypedUnit --validate/index----> ValidatedUnit
+RawUnit --normalize/structurize--> structured --resolve--> resolved
+        --infer/check types--> typed --validate/index----> ValidatedUnit
 ```
+
+The intermediate stages are passes inside one checked call (`validate`,
+`Validation/Check.lean`), not materialized types: `RawUnit` and
+`ValidatedUnit` are the only unit types.
 
 `RawUnit` is the only frontend output: declarations, name and type spellings,
 structured bodies or profile-tagged CFG bodies with neutral control,
@@ -158,14 +162,13 @@ expression, pattern, local, parameter, result, and type argument. Validation
 adds derived indexes and certifies all backend-independent rules;
 `ValidatedUnit` is the only input to backends and most analyses.
 
-Only `RawUnit` and `ValidatedUnit` are public construction boundaries; the
-constructors of the other forms are private. Frontend resolution and type
+Only `RawUnit` and `ValidatedUnit` are public construction boundaries. Frontend resolution and type
 information is a hint the shared checker verifies; a disagreement is a
 diagnostic. Structurization and validation run in one checked call, with
 upstream typed IDs recorded in import evidence while the checker
 independently checks table safety, arena acyclicity, profile vocabulary,
 declaration shape, and CFG structure. Materializing the intermediate stages
-as values changes exposure, not the boundary.
+as values would change exposure, not the boundary.
 
 Staging keeps MIR graph analysis inside VIR: the Rustc Public producer
 exports MIR-shaped raw nodes and owns neither the structurizer, loop
@@ -174,9 +177,12 @@ statements and call/drop/assert/cleanup terminators; the structurizer
 classifies storage lifetime markers, place mentions, and user-type
 ascriptions as inert administration and erases them after validation, and
 under `panic=abort` lowers ordinary bounds, overflow, division, and remainder
-assertions to explicit panic branches. Destructive and provenance-sensitive
-statements, cleanup edges, and exceptional terminators are rejection
-boundaries.
+assertions to explicit panic branches. Before that, a region of blocks all of
+whose paths reach a call that does not return collapses to `abort`
+(`Import/PanicRegions.lean`). `unreachable` is not a panic path: it says a path
+cannot happen, and leaves the graph only together with such a call. Destructive and
+provenance-sensitive statements, cleanup edges, and exceptional terminators outside
+a region are rejection boundaries.
 
 ## Compilation units and dependencies
 
@@ -184,10 +190,15 @@ The checked object is a compilation unit, not an isolated module: calls,
 friends, abilities, specifications, and intrinsic bindings refer across
 module boundaries. A unit holds a version, one interned `Tables` snapshot,
 profile configurations, owned namespaces, dependency interfaces, and import
-evidence. A namespace is a language-neutral hierarchical declaration
-container of which a Move module, Rust crate or module, and generated Verex
-namespace are profile-specific views; the core does not bake Move
-address/module identity into every declaration.
+evidence. A namespace is a language-neutral declaration container of which
+a Move module, a Rust crate, and a generated Verex namespace are
+profile-specific views; the core does not bake Move address/module identity
+into every declaration. A namespace declares its scopes, naming scopes
+inside it: the modules of a Rust crate, which refer to each other in cycles
+while crates form a DAG, so a crate stays one namespace, and the types,
+traits, and trait impls its associated functions belong to (`Vec::push` is
+`push` in scope `vec::Vec` of `alloc`). Only a module contains scopes. A name
+carries the scope it is declared in, a path relative to its namespace.
 
 The `Tables` snapshot contains the identities referenced by owned namespaces
 and dependency interfaces, once per unit. Owned namespaces occupy the leading
@@ -277,8 +288,8 @@ interned type has no source range, so occurrences use a located `TypeUse`
 in signatures, fields, locals, casts, and generic arguments. A namespace is
 a finite, deterministic record of its declarations by kind (constants,
 structs, associated items, traits, implementations, functions, specification
-functions and variables, invariants, intrinsics, comments), its arenas, its
-imports, profile metadata, attributes, and pragmas. Trait and implementation
+functions and variables, invariants, intrinsics, comments), its scopes, its
+arenas, its imports, profile metadata, attributes, and pragmas. Trait and implementation
 declarations are ordinary core declaration tables referenced through checked
 IDs, not profile payloads. Declaration arrays retain source order.
 
@@ -286,7 +297,7 @@ IDs, not profile payloads. Declaration arrays retain source order.
 
 The core type language is the known Move/Rust union: unit, never, Boolean,
 character, fixed-width integers, tuples, vectors with an optional fixed
-length (Move `vector<T>` and Rust `Vec<T>` against Rust arrays), nominal
+length (Move `vector<T>` and Rust `Vec<T>` against Rust arrays), unsized slices, nominal
 types with generic arguments, function types with abilities, type
 parameters, references, and a profile extension. Function-value abilities,
 generic predicates (abilities, trait implementation, associated type and
@@ -294,6 +305,18 @@ constant equalities, lifetime outlives, const equality), structure
 abilities, trait identities, implementations, and associated-item bindings
 are structural data; profiles define language-specific admission rules
 rather than replacing them with tags.
+
+Rust `[T]` has a distinct unsized `Slice<T>` type. Indexing exposes its element
+type; whole-value replacement, moves, and vector resizing require sized storage
+and do not apply to a slice. Generic actuals obey the supported `Sized` boundary;
+a reference to a slice is sized, while the slice itself is not.
+
+A mutable slice loan retains the fixed extent of its backing storage. Its logical
+carrier contains one extent and two arrays indexed by it, for the current and
+final contents. Thus every possible final value already has the borrowed length.
+Redirecting a reference variable may select another extent; reborrowing its
+referent preserves the existing extent. The integration gates and the remaining
+mutable-subrange work are tracked in [the Rust verification plan](../plan/rust-verification.md).
 
 Pure tuple/vector operations, indexing, Boolean operations, comparisons, and
 integer arithmetic are core nodes. Fixed-width arithmetic is modular; the
@@ -309,9 +332,27 @@ freeze form a typed reference-operation family. A direct local read is
 non-consuming; validation infers the access of a value type without `Copy`:
 a selection or index of it with `Copy` copies its place, the operand of an
 observer (discriminant, variant test, length, index check) reads it, and
-otherwise the local is moved; a reference local keeps its read. Field and
-variant operations carry strong qualified references; enum variants may
-record an observable integer discriminant distinct from array position.
+otherwise the local is moved. A reference without `Copy` is moved too, except
+as the operand an observer or a reference operation takes at rest; a reference
+with `Copy` keeps its read. Field and variant operations carry strong qualified
+references; enum variants may record an observable integer discriminant
+distinct from array position.
+
+`readDiscriminant(place)` observes only an enum's tag. Unlike a value-level
+discriminant applied to a whole-value read, it requires initialized enum
+storage but does not require payload fields moved out earlier to be initialized.
+It consumes no payload and yields the declared integer discriminant. Validation
+checks the enum place, empty operand/type-argument lists, and result bounds;
+execution also rejects a tag outside the result's integer bounds. Whole-value
+and payload reads retain their ordinary initialization requirements. The source
+form is `core.readDiscriminant[resultType](place)`.
+
+Initialization also records a saved tag's provenance for direct owned enum
+locals. An exact integer match arm can then discard partial-move facts of
+other declared variants. It retains root and selected-payload facts. Whole
+writes or moves, including a terminal downcast move, invalidate saved tags;
+borrowing disables this refinement because later indirect writes are not
+tracked. Defaults, unknown tags, and indirect enum storage remain conservative.
 
 The specification language is core: contract clauses and the
 `forall`/`exists`/choice quantifiers are typed nodes; mathematical integers,
@@ -333,7 +374,7 @@ literals core constants. An elided Move lifetime produces a fresh core
 the same table. Lifetime constraints, inference, and profile-specific borrow
 checking are separate checked passes.
 
-Places are first-class (local, dereference, field, index, subslice,
+Places are first-class (local, dereference, field, index, subslice, unsize,
 downcast) because both lowerings need them and Rust moves and borrows cannot
 be value-only expressions. Operations distinguish move, copy, borrow kinds,
 read, write, assert, and drop. `GlobalKind` makes keyed storage first-class
@@ -469,7 +510,7 @@ consistency.
 
 ## Checked construction and analyses
 
-`check` returns diagnostics and, on success, a `ValidatedUnit` whose
+`validate` returns diagnostics and, on success, a `ValidatedUnit` whose
 namespaces carry derived indexes (qualified names, declaration ownership,
 call targets, scopes, loop identities, intrinsic roles, dependency links),
 validated intrinsic graphs, and semantic features; the raw unit is not
@@ -659,58 +700,18 @@ status so a source change cannot retain an old theorem.
 
 Semantic equivalence is not equal text or equal provenance.
 
-## Deferred-work register
+## Boundary classification and adapters
 
-A deferral is recorded here, and in a frontend design when applicable, with
-its reactivation point, and removed only when the work lands, is rejected,
-or is superseded by a recorded decision.
-
-| Deferred item | Reactivate by |
-|---|---|
-| Strict RawUnit JSON v1: the deterministic encoding frozen and published as the external compatibility contract | Before RawUnit JSON is emitted outside the repository |
-| Full dependency interfaces and authoritative cross-namespace resolution (today one `Tables` snapshot with a declared interface for every external import) | Before dependency signatures or bodies participate in typing, interpretation, or verification |
-| Checked trait-selection evidence table, associated normalization, dictionary semantics | Before trait calls are interpreted or trait contracts transfer proofs (Rust M2) |
-| Structurization and semantics of the remaining raw MIR administration and exceptional control: destructive and provenance nodes, cleanup edges, pointer-alignment assertions, reachable unreachable/resume terminators, all rejected today | Rust M4; the unsafe profile for pointer-alignment assertions |
-| Drop flags, cleanup scopes, panic behavior, and unwinding beyond fixed `panic=abort` | Rust M4; full unwinding separately approved |
-| Authoritative resolution, whole-unit semantic type checking, lifetime constraints, and the rest of VIR borrow checking: general non-lexical loan death, dependency and unknown aggregate alias propagation, nominal variance, use-site region constraints | VIR Phase 2; Rust M3 |
-| Freshness and alignment: binding retained import-evidence statements to source, configuration, and semantic hashes; the Rust import receipt in the validated-unit proof boundary | Rust M1.5; M7 before a theorem about an external Rust artifact |
-| Raw pointers, allocation and provenance, unsafe cells and unions, explicit UB semantics | Rust M5 ([`unsafe-pointers.md`](../plan/unsafe-pointers.md)) |
-| Prophetic-reference residue: a loan-typing environment for walker-level preservation, non-lexical loan death, two-phase borrows, interior mutability ([`prophetic-references.md`](prophetic-references.md)) | The evaluator induction; Rust M3; a two-phase/interior-mutability design before `Cell`-style constructs |
-| Source printers and round trips: normalization of validation-only bodies, Move/Verex-native alpha-equivalence, Move/Verex source maps, cross-language location fidelity, corpus-wide round trips | VIR Phase 6; Rust M2/M7 |
-| Materialized `StructuredUnit`, `ResolvedUnit`, `TypedUnit` stages and the full staged API | With authoritative resolution and typing |
-
-## Phases
-
-The phases name the work and its gates; status is in
-[`roadmap.md`](../plan/roadmap.md).
-
-0. Freeze the boundary: every type, operation, effect, outcome, and state
-   component classified as core, Move, Rust, or unsupported. Gate: nothing
-   unclassified.
-1. Neutral core, profiles, IDs, and wire format. Gate: schema, malformed
-   table, normalization, and JSON tests pass without a frontend.
-2. Shared checking and the Move profile; `validate` the only route to
-   `ValidatedUnit`. Gate: raw fixtures exercise core-union, Move-only,
-   synthetic-profile, and invalid cross-profile operations; nothing
-   constructs validated values directly.
-3. The XAST compatibility frontend, the first backend, and the intrinsic
-   role schema. Gate: intrinsic error fixtures use shared codes; no printer
-   or report pass accepts XAST.
-4. Move and Verex frontends building raw VIR directly, authored locations
-   captured before expansion. Gate: the Verex tests and the Move corpus dump
-   validated VIR; an inventory test detects side-table-only semantics.
-5. The `verex-rust` boundary against the frozen profile interface. Gate: the
-   safe sequential Rust subset reaches validated VIR without a
-   frontend-specific analysis path.
-6. Source round trips, compared as semantic VIR. Gate: corpora pass semantic
-   and location fidelity tests.
-7. Lower backends: validated VIR to XIR, verification over validated VIR.
-   Gate: no semantic analysis reads frontend syntax after raw construction;
-   no backend accepts unchecked VIR.
-
-Every compatibility adapter has a named removal phase and gate. A missing
-VIR feature is explicitly unsupported; a frontend side table is not a
-substitute.
+Every type, operation, effect, outcome, and state component is classified as
+core, Move, Rust, or unsupported, mechanized by `Validation/Capability.lean`:
+nothing reaches validated VIR unclassified. A missing VIR feature is
+explicitly unsupported; a frontend side table is not a substitute. A
+compatibility adapter (the XAST frontend among them) is temporary and must
+state its removal criteria, and validated VIR is the only input of a
+backend. Open work on the
+representation is in [`roadmap.md`](../plan/roadmap.md), "4. Shared
+checking", "7. Rust frontend" and "8. Surface and backends"; the external
+freeze of RawUnit JSON v1 is under "Not scheduled".
 
 ## Tests
 
@@ -755,7 +756,7 @@ semantic debt in frontend paths).
 1. `verex-ir` / `VerexIR` is the neutral package and namespace.
 2. VIR has a v1 in-memory schema; XAST is a compatibility frontend; the
    deterministic derived JSON encoding is the external wire contract once
-   frozen (deferred-work register).
+   frozen ([`roadmap.md`](../plan/roadmap.md), "Not scheduled").
 3. Comments are a core table whose producers may leave it empty.
 4. The checked implementation is in Lean.
 5. Semantic profiles are explicit; the first profile is Move, and

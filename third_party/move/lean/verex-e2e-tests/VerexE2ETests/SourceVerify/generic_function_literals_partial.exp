@@ -1,0 +1,13 @@
+VerexE2ETests/SourceVerify/generic_function_literals_partial.move:66:9: error: the specification clause `ensures global<Pending>(@0x1).n == 0` is not established
+VerexE2ETests/SourceVerify/generic_function_literals_partial.move:62:5: error: verex verification failed: the automatic verification of `over_partial_wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_function_literals_partial.proof.lean`:
+  verify over_partial_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_function_literals_partial.move:8:1: error: `aborts_of` of a function whose aborts are not exact is not carried in generated contracts of a unit verified through its model: it reads the function's contract, exact with an `aborts_if` its callers see and without `aborts_if_is_partial`
+VerexE2ETests/SourceVerify/generic_function_literals_partial.move:8:1: error: `aborts_of` of a function whose aborts are not exact is not carried in generated contracts of a unit verified through its model: it reads the function's contract, exact with an `aborts_if` its callers see and without `aborts_if_is_partial`
+VerexE2ETests/SourceVerify/generic_function_literals_partial.move:8:1: error: `aborts_of` of a function whose aborts are not exact is not carried in generated contracts of a unit verified through its model: it reads the function's contract, exact with an `aborts_if` its callers see and without `aborts_if_is_partial`
+VerexE2ETests/SourceVerify/generic_function_literals_partial.move:8:1: error: `aborts_of` of a function without a contract is not carried in generated contracts of a unit verified through its model
+VerexE2ETests/SourceVerify/generic_function_literals_partial.move:8:1: error: `ensures_of` of a function without a contract is not carried in generated contracts of a unit verified through its model

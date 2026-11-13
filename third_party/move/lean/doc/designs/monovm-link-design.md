@@ -140,14 +140,15 @@ member next to the mono-move crates and depends only on the production
 crates, never on `mono-move-testsuite`. Its execution core is the call
 machinery of the MonoMove transaction executor: `production_natives`, lazy
 loader construction, an idle `InterpreterContext` over a plain `GasMeter`
-budget, `call_function` with BCS argument placement (`place_args`, covering
-signers and `&signer`), type arguments through `intern_type_tag`. Compiling
+budget, and a call built by `InterpreterContext::build_call` with signers
+and BCS arguments placed on it (`place_and_run` in `src/engine.rs`); entries
+take no type arguments (the empty type list). Compiling
 sources is a thin adapter-owned step over `move-compiler-v2`.
 
 Inputs are marshalled by the executor's BCS placement; results are read
 from the root frame by a supported serializer by return type, the BCS
 inverse of placement. Gas is a termination bound and diagnostic, never a
-compared quantity; `with_heap_size` bounds the heap.
+compared quantity; `InterpreterOptions::heap_size` bounds the heap.
 
 ```text
 mono-move/lean-link/

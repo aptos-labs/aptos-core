@@ -4,12 +4,6 @@
 import VerexSL
 
 verex namespace signed_division where
-  fun signed_div_rem(dividend : i8, divisor : i8) -> (i8, i8) :=
-    if divisor == 0i8 then panic()
-    else
-      if (divisor == -1i8) & (dividend == -128i8) then panic()
-      else
-        if divisor == 0i8 then panic()
-        else
-          if (divisor == -1i8) & (dividend == -128i8) then panic()
-          else (dividend / divisor, dividend % divisor)
+  fun signed_div_rem(dividend : i8, divisor : i8) -> (i8, i8) := do
+    let _3 := core.prim.checkedDividePanic(dividend, divisor)
+    (_3, core.prim.checkedModuloPanic(dividend, divisor))

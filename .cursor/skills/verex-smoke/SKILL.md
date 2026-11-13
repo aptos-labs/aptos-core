@@ -17,6 +17,7 @@ third_party/move/lean/scripts/smoke.sh            # ≈ 65 s warm; after a resta
 third_party/move/lean/scripts/smoke.sh --no-mvp   # without the Move Prover tests
 third_party/move/lean/scripts/smoke.sh --no-exe   # Lean fixtures only: no executable, no cargo
 third_party/move/lean/scripts/smoke.sh --jobs N   # Lean processes at once (or SMOKE_JOBS)
+third_party/move/lean/scripts/smoke.sh --rust     # the Rust gate with a Move canary: under a minute warm
 third_party/move/lean/scripts/smoke.sh --list     # the fixtures
 ```
 
@@ -96,6 +97,6 @@ the edited module only. The solver, `Contract` and `Verify` are split into
 parts so that most edits rebuild one part and its importers: an edit of the
 solver's walker costs about 30 s to libraries and 15 s more to the
 executable, against 90 s and 70 s before the split. Measurements and the
-parts: `third_party/move/lean/designs/performance.md`, "Modules split for
-edits", and `third_party/move/lean/CLAUDE.md`. After a restack, the first
+parts: `third_party/move/lean/doc/designs/performance.md`, "Modules split for
+edits". After a restack, the first
 smoke also rebuilds the Move CLI with cargo (8 min on 2026-10-22).

@@ -128,7 +128,7 @@ Tests: `functional/loop_unroll.move`, `functional/verify_vector.move`
 With `--check-inconsistency`, the Move Prover reports a function whose
 verification holds only because something it assumes is inconsistent.
 Verex states a function's in-body assumptions as a hypothesis of its
-theorem ([`denotation.md`](../designs/denotation.md), "Assumption ledger") and
+theorem ([`denotation.md`](../designs/denotation.md), "Specification functions, lemmas, modules") and
 does not check that the hypothesis can hold.
 
 Example (`functional/inconsistency.move`, `assume_false`): `spec { assume
@@ -324,110 +324,18 @@ VIR-SEMANTIC-TYPE: in fun create_and_insert_fail2: equality primitive operand ty
 
 Tests: `functional/verify_custom_table.move`.
 
-### C12. Call or closure target does not resolve — opaque-inline gap fixed
+### C12. Call or closure target does not resolve
 
-The adapter previously discarded every retained inline declaration even when
-an opaque call or behavioral predicate still referred to it. It now keeps opaque
-inline declarations and their comments in both owning modules and interfaces.
-Non-opaque declarations already expanded by compiler-v2 remain omitted.
-
-The three positive-gap fixtures now reach verification. `behavioral_predicate_inline_fun`
-verifies completely. `opaque_inline_body_fail` rejects the bad `inc` body and its
-dependent caller, while the explicitly trusted variant verifies. `opaque_inline_loop_sum::sum` and
-`test_sum_twice` verify automatically using facts about products of consecutive
-integers; the deliberately wrong `test_sum_wrong` postcondition fails.
-
-The remaining 1 test (also rejected by the Prover, marked †) has 4 messages:
+1 test (also rejected by the Prover, marked †), 4 messages:
 `specification call target … does not resolve to a declared function or specification function`.
 It refers to `f2` and `f4` in `functional/restrictions.move`†.
 
-### C16. Implicit freezing of returned references — frontend gap fixed
+### C18. Borrow result is not a reference type
 
-Compiler-v2 can type a call's result as `(&u64, &mut u64)` while its callee
-returns `(&mut u64, &mut u64)`. The frontend now preserves the instantiated
-callee result, evaluates it once, destructures it, and explicitly freezes the
-components whose context expects shared references. Computed freeze operands
-are held in a temporary for the denotation. Other type mismatches remain errors.
-
-`SourceVerify/returned_reference_freeze.move` verifies mixed/shared tuple
-results, a single returned reference, and mutation through the retained mutable
-reference at 25k; its false postcondition still fails. The follow-on lexical
-scope bug in `bp_forwarding` is fixed too: body quantifier domains are
-predeclared in their lexical scope, so a nested lambda's local cannot shadow an
-outer vector in a later assertion. `SourceVerify/quantifier_shadowing.move`
-verifies both positive cases and rejects the false assertion.
-
-Both affected registry files now reach verification. In `bp_forwarding`,
-`check_keys_bounded` and `check_all_positive` prove; `set_values` and
-`all_values_bounded` still exceed 25k. In `folds_of_wrapper_mut`, `mirror_keys`
-and `set_both` still exceed 25k. Their intentional negative cases remain failures.
-
-### C18. Borrow result is not a reference type — resource projection fixed
-
-`functional/state_labels/spec_fun_cross_resource.move` now reaches verification.
-Compiler-v2 retained `borrow_global` in a derived specification function after
-projecting its result to a resource value. The frontend now treats that logical,
-value-typed node as a global read; actual reference-typed borrows are unchanged.
-`SourceVerify/projected_global_reads.move` proves four positive targets at 25k,
-including a caller using an opaque contract's invocation-defined label without
-a callee program point. Its incorrect increment-by-two claim still fails.
-Closure-frame widening now normalizes `Weave.compose` when comparing a verified
-callee's frame with the wrapper's frame, as the precondition proof already did.
-That removes two residual frame obligations in the larger callers. The focused
-`closure_frame_widening` fixture proves six positives at 25k, including captures,
-and rejects a callback writing an unauthorized captured address; both cost gates
-pass. The subsequent field-update and prepared-fact changes below close the
-remaining cross-resource obligations.
-
-The scoped registry update and ordinary baseline check now pass with no
-diagnostics: all six targets prove at 25k. Field-update normalization and codec
-round trips close the two higher-order callers. The final direct-call target
-now tries its already available call facts before repeating behavioral contract
-derivation; preparation drops from 28.437M to 20.974M raw heartbeats. Failed
-speculative attempts restore the original goal and use the existing higher-order
-fallback. The 25k acceptance budget is unchanged. A short companion completes
-the proof. `SourceVerify/behavior_manual_facts` proves three positives and rejects
-the wrong final counter value at both 25k and the suite default. A
-literal-closure guard bounds failed speculation to two attempts per target.
-
-`functional/closures/bp_mut_ref_selector.move` remains rejected. Its projected
+`functional/closures/bp_mut_ref_selector.move` is rejected. Its projected
 field borrow also needs the behavioral predicate's implicit pre/post argument
-expansion, followed by V20's mutable-reference invocation support. Simply
-removing the borrow does not implement those semantics.
-
-### C20. Function-value typing — frontend gap fixed
-
-`functional/closures/amm_example.move` previously stopped with three
-`closure construction result is not a function type` diagnostics and one
-`invoked operand is not a function type`. Compiler-v2 implicitly packs a
-function into a positional single-function-field wrapper and unwraps it for
-invocation. The frontend now emits ordinary constructor and field-selection
-operations, instantiating the field type with the wrapper's type arguments.
-This preserves the wrapper's data-invariant and field-frame checks.
-
-Both printer stages quote numeric field-frame targets (`modifies_of<«0»>`).
-`SourceVerify/function_wrappers.move` proves all eight valid targets at 25k and
-rejects its invalid implicit pack. The frontend formatting test checks addressed
-and wildcard positional frames through two formatting passes.
-
-Pure short-circuit guards whose branches leave identical environments share
-their continuation. The `constant_product` companion supplies the arithmetic
-argument directly. A bounded arithmetic-only omega attempt precedes the
-full-context bound solver when memory-dependent hypotheses are present;
-`ArithmeticContext.lean` covers the fast path and fallback. An unrestricted
-variant grew proof terms on the core cost gate and was rejected.
-
-The focused probes also exposed open-generic closure-frame and state-labelled
-`result_of`/wildcard-frame proof gaps. The checked regression covers concrete
-generic instantiation and `ensures_of` invariants; it does not claim those broader
-proof gaps are solved. This scoped follow-up is after the full 437-file counts
-above (one pre-verification rejection now reaches verification).
-
-### C21. Field selection not on every variant — no longer occurs
-
-The selection was of a ghost field (`input.proof`), which the unit model
-carries (`ghost-fields.md`). The test now reaches
-verification and shows V27.
+expansion, followed by V20's mutable-reference invocation support; removing
+the borrow alone does not implement those semantics.
 
 ### C23. Spec variable with an initializer
 
@@ -540,11 +448,10 @@ Tests: `functional/closures/behavioral_soundness.move`, `functional/closures/clo
 
 ### V6. Construct not carried by the denotation
 
-5 tests, 7 messages.
+4 tests, 6 messages.
 
 Messages:
 
-- 1 × `` no denotation for `…`: a literal of this type is not carried by the denotation ``
 - 2 × `` no denotation for `…`: a closure whose rows are not its target's is not carried by the denotation ``
 - 4 × `` no denotation for `…`: a type argument without values is not carried by the denotation ``
 
@@ -557,27 +464,13 @@ values of a function type are the unit's typed closures, and the induced
 frame of a generic call defaults each parameter to an inhabitant of its
 argument (`Carriers.default_instantiate`).
 
-Example (`functional/type_reflection.move:71`):
+Tests: `functional/closures/closure_refs.move`, `functional/fun_field_nested_ability_variants.move`, `functional/fun_type_unused_ctor.move`, `regression/fun_type_arity_injectivity.move`.
 
-```text
-no denotation for `test_type_info_symbolic`: a literal of this type is not carried by the denotation
-```
+### V7. Intrinsic map representation not carried
 
-Tests: `functional/closures/closure_refs.move`, `functional/fun_field_nested_ability_variants.move`, `functional/fun_type_unused_ctor.move`, `functional/type_reflection.move`, `regression/fun_type_arity_injectivity.move`.
-
-### V7. Intrinsic map representation not carried — placeholder layouts carried
-
-The abstract map owners the Prover's tests declare (`struct Map<K, V> {}`,
-whose one field is the Boolean placeholder `dummy_field` the compilers give
-an empty struct) are placeholder layouts of the table view: their entries
-are the owner's hidden contents field, their identity is their entries, and
-every role, the bulk roles included, is available to them
-([`intrinsic-maps.md`](../designs/intrinsic-maps.md), "Views", "Lemmas of the bulk
-roles"). `intrinsic_map_rank`, `intrinsic_map_rank_bulk` and
-`intrinsic_map_insertion_order` fail exactly the functions the Prover fails
-(`rank_wrong`, `build_wrong`, `same_entries_not_equal` and `canary`).
-
-Still failing, 2 tests, 22 messages:
+The abstract map owners the Prover's tests declare (`struct Map<K, V> {}`)
+are placeholder layouts of the table view and are carried
+([`intrinsic-maps.md`](../designs/intrinsic-maps.md), "Abstract representation"). What is not, 2 tests, 22 messages:
 
 - `ghost_field_intrinsic_map_ops.move`: `map_spec_iter_preserved` is not
   carried (3 messages; iterator validity is stage 3 of the design), so
@@ -604,12 +497,15 @@ Tests: `functional/closures/inline/folds_of_map_intrinsic.move`, `functional/gho
 
 ### V10. Other elaboration errors in the rendering
 
-5 tests, 5 messages.
+3 tests, 3 messages.
 
 Messages:
 
-- 2 × `` VEREX-CALL-NAME: unknown function `…` ``
 - 3 × `VEREX-SPEC-ARITY: behavior predicate expects N value argument(s), got N`
+
+A fold over several captures (`folds_of_multi`, `folds_of_idx`) now elaborates
+and verifies, but for the clauses that need its tuple-valued recursion unfolded,
+which the automation does not do: `weighted_pair`, `pair_enumerate`.
 
 The constant-vector indexing error in `functional/consts.move` is fixed:
 its three valid functions verify, and its five invalid functions fail their
@@ -882,6 +778,28 @@ Tests: `regression/fun_value_equality.move`, `regression/fun_value_equality_ext.
 function value does not depend on its captures' ghost slots, which the
 runtime ignores, so a lemma transferring `KeepsMemoryAt` along
 `eraseGhosts`-equality is the fix.
+
+### V29. A read at a computed position beside a write at a named one
+
+1 test. A clause reads a vector at the position its source expression
+computes (`features[feature / 8]`) while the body wrote at the local a
+`let` named (`byte_index`), the two related by the leaf's `named_eq`
+hypothesis alone. The automatic stages decide the leaf without unnaming its
+positions, so the read-after-write rules (`Array.getElem?_setIfInBounds_*`)
+do not fire and the clause is left open:
+
+```text
+functional/bitwise_features.move:81:9: error: the specification clause `ensures include == spec_contains(features, feature)` is not established
+```
+
+Tests: `functional/bitwise_features.move` (`set`). `verex_unname` on the
+prepared leaf aligns the positions and the lookup then reduces, which
+`verex_unname_positions` is meant to do in `verex_prepared_leaf`; it reports
+`no named position` here. Aligning them is not sufficient on its own: the
+residue is the bitvector fact `m &&& (v ||| m) > 0` for the symbolic mask
+`m = 1 <<< (feature % 8) % 256`, which no closer decides. Both the stage
+that unnames a decided leaf's positions and the bitvector reasoning over a
+symbolic shift are open.
 
 ## Outside the unit tests
 

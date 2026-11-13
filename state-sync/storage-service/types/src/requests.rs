@@ -56,7 +56,7 @@ pub enum DataRequest {
 
     // Appended at the end to preserve BCS variant indices (wire compatibility).
     // V2 state requests carry the `StateKind`, so one variant serves any snapshot kind.
-    // Only native-position uses these today; main state stays on the V1 variants
+    // Only the native stores use these today; main state stays on the V1 variants
     // above for backward compatibility with already-deployed peers.
     // TODO(grao): once V2 is supported fleet-wide, migrate main state to these
     // (behind a config flag, like `enable_transaction_data_v2`) and deprecate the

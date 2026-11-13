@@ -53,7 +53,7 @@ theorem resolveFuel_untyped (tables : Tables) {env : Array SemArg}
               simp only [Option.map_eq_map, Option.map_eq_some_iff] at resolved ⊢
               obtain ⟨types, row, rfl⟩ := resolved
               exact ⟨types, mapM_some_of_forall row fun id _ type found => ih id type found, rfl⟩
-          | vector element bound =>
+          | vector element bound | slice element =>
               simp only [Option.map_eq_map, Option.map_eq_some_iff] at resolved ⊢
               obtain ⟨inner, innerFound, rfl⟩ := resolved
               exact ⟨inner, ih _ _ innerFound, rfl⟩
@@ -102,7 +102,7 @@ def frameSemArguments (unit : ValidatedUnit) (function : FunctionHandle)
     (generics : Array GenericBinder) : Array SemArg :=
   (frameArguments unit function typeInstantiation generics).map fun argument =>
     match argument with
-    | .typeArg value => match StaticTyping.resolveIn targetNs #[] value.typeId with
+    | .typeArg value => match StaticTyping.resolveAt targetNs #[] value.typeId with
       | some type => .type type
       | none => .erased
     | _ => .erased
@@ -171,6 +171,44 @@ theorem frameInstantiation_of_faithful {unit : ValidatedUnit} {function : Functi
       rw [← element]
       exact interned index bounded
 
+/-- Faithful closure instantiations satisfy the generic Sized contract. -/
+theorem frameSemArguments_sized {unit : ValidatedUnit} {function : FunctionHandle}
+    {typeInstantiation : Array (TypeId × TypeId)} {targetNs : ValidatedNamespace}
+    {declaration : FunctionDecl FunctionBody}
+    (namespace_eq : unit.namespaces[function.namespaceId.index]? = some targetNs)
+    (declaration_eq : targetNs.functions[function.functionId.index]? = some declaration)
+    (faithful : closureFaithful unit function typeInstantiation = true) :
+    SizedArguments (frameSemArguments unit function typeInstantiation targetNs
+      declaration.signature.generics) := by
+  simp only [closureFaithful, namespace_eq, declaration_eq] at faithful
+  split at faithful
+  · rename_i noTypes
+    intro argument member
+    obtain ⟨index, bound, rfl⟩ := Array.mem_iff_getElem.mp member
+    have bound' : index < declaration.signature.generics.size := by
+      simpa [frameSemArguments, frameArguments] using bound
+    have notType := Array.all_eq_true.mp noTypes index bound'
+    cases kind : declaration.signature.generics[index].kind <;>
+      simp [frameSemArguments, frameArguments, Array.getElem_map, Array.getElem_mapIdx,
+        kind, SemArg.sized] at notType ⊢
+    exact Bool.noConfusion notType
+  · simp only [Bool.and_eq_true] at faithful
+    have allSized := faithful.1.2
+    intro argument member
+    obtain ⟨raw, rawMember, rfl⟩ := Array.mem_map.mp member
+    have checked := Array.all_eq_true.mp allSized
+    obtain ⟨index, bound, entry⟩ := Array.mem_iff_getElem.mp rawMember
+    have atIndex := checked index bound
+    rw [entry] at atIndex
+    cases raw with
+    | typeArg value =>
+        cases resolved : StaticTyping.resolveAt targetNs #[] value.typeId with
+        | none => simp [resolved] at atIndex
+        | some type =>
+            simp only [resolved, Bool.and_eq_true] at atIndex
+            simpa only [resolved, SemArg.sized] using atIndex.1.1
+    | const | lifetime | evidence => rfl
+
 /-- What `closureSignature?` reads: a function's parameter and result types,
 its types mentioning only its own type parameters
 with nodes. -/
@@ -181,10 +219,11 @@ theorem closureSignature?_eq_some {unit : ValidatedUnit} {function : FunctionHan
       unit.namespaces[function.namespaceId.index]? = some targetNs ∧
       targetNs.functions[function.functionId.index]? = some declaration ∧
       declaration.signature.parameters.toList.mapM
-        (fun parameter => ntyOf unit function.namespaceId parameter.typeUse.typeId) =
+        (fun parameter => ntyOf unit function.namespaceId (targetNs.typeId parameter.typeUse.typeId)) =
           some parameters ∧
       declaration.signature.results.toList.mapM
-        (fun result => ntyOf unit function.namespaceId result.typeId) = some results ∧
+        (fun result => ntyOf unit function.namespaceId (targetNs.typeId result.typeId)) =
+          some results ∧
       (parameters ++ results).all (fun τ => τ.paramsAll fun index =>
         (declaration.signature.generics[index]?.any fun binder => binder.kind matches .typeArg) &&
           (paramNodeIn? unit function.namespaceId index).isSome) = true := by
@@ -195,7 +234,7 @@ theorem closureSignature?_eq_some {unit : ValidatedUnit} {function : FunctionHan
   split at bounded
   · next mentions =>
       simp only [Option.some.injEq, Prod.mk.injEq] at final
-      obtain ⟨rfl, rfl⟩ := final
+      obtain ⟨_, _, rfl, rfl⟩ := final
       exact ⟨targetNs, declaration, namespace_eq, declaration_eq, readParameters,
         readResults_eq, mentions⟩
   · cases bounded
@@ -205,10 +244,14 @@ mutual
 theorem NTy.paramFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
     (closed : ∀ index, allowed index = true → (types index).paramFree = true) :
     (τ : NTy) → τ.paramsAll allowed = true → (τ.substWith types).paramFree = true
-  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ => rfl
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ | .char, _ => rfl
   | .param index, mentioned => by
       simp only [NTy.paramsAll] at mentioned
-      exact closed index mentioned
+      exact (NTy.paramFree_unmark _).trans (closed index mentioned)
+  | .observed referent, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.substWith, NTy.paramFree,
+        NTy.paramFree_substWith closed referent mentioned]
   | .tuple elements, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.substWith, NTy.paramFree, NRow.paramFree_substWith closed elements mentioned]
@@ -222,14 +265,17 @@ theorem NTy.paramFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
       simp only [NTy.substWith, NTy.paramFree,
         NRow.paramFree_substWith closed arguments mentioned.1,
         NRows.paramFree_substWith closed rows mentioned.2, Bool.and_self]
-  | .vector element, mentioned => by
+  | .vector element, mentioned | .slice element, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed element mentioned]
+  | .array element _, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed element mentioned]
   | .table key value, mentioned => by
       simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
       simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed key mentioned.1,
         NTy.paramFree_substWith closed value mentioned.2, Bool.and_self]
-  | .ref referent, mentioned => by
+  | .ref referent, mentioned | .sliceRef referent, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed referent mentioned]
   | .ghost slot, mentioned => by
@@ -240,6 +286,9 @@ theorem NTy.paramFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
       simp only [NTy.substWith, NTy.paramFree, Bool.and_eq_true,
         NRow.paramFree_substWith closed parameters mentioned.1,
         NRow.paramFree_substWith closed results mentioned.2, and_self]
+  | .nominal _ arguments _, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.substWith, NTy.paramFree, NRow.paramFree_substWith closed arguments mentioned]
 
 theorem NRow.paramFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
     (closed : ∀ index, allowed index = true → (types index).paramFree = true) :
@@ -270,12 +319,21 @@ theorem NTy.refFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
     (τ : NTy) → τ.paramsAll allowed = true → τ.refFree = true →
       (τ.substWith types).refFree = true
   | .unit, _, _ | .bool, _, _ | .int _ _, _, _ | .num, _, _ | .address, _, _ | .signer, _, _
-  | .string, _, _ | .bytes, _, _ => rfl
+  | .string, _, _ | .bytes, _, _ | .char, _, _ => rfl
   | .function _ _ _, _, _ => rfl
+  | .nominal _ arguments _, mentioned, free => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.refFree] at free
+      simp only [NTy.substWith, NTy.refFree, NRow.refFree_substWith plain arguments mentioned free]
   | .param index, mentioned, _ => by
       simp only [NTy.paramsAll] at mentioned
-      exact plain index mentioned
-  | .ref _, _, free => by simp [NTy.refFree] at free
+      exact (NTy.refFree_unmark _).trans (plain index mentioned)
+  | .observed referent, mentioned, free => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.refFree] at free
+      simp only [NTy.substWith, NTy.refFree,
+        NTy.refFree_substWith plain referent mentioned free]
+  | .ref _, _, free | .sliceRef _, _, free => by simp [NTy.refFree] at free
   | .tuple elements, mentioned, free => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.refFree] at free
@@ -290,7 +348,11 @@ theorem NTy.refFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
       simp only [NTy.refFree] at free
       simp only [NTy.substWith, NTy.refFree,
         NRows.refFree_substWith plain rows mentioned.2 free]
-  | .vector element, mentioned, free => by
+  | .vector element, mentioned, free | .slice element, mentioned, free => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.refFree] at free
+      simp only [NTy.substWith, NTy.refFree, NTy.refFree_substWith plain element mentioned free]
+  | .array element _, mentioned, free => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.refFree] at free
       simp only [NTy.substWith, NTy.refFree, NTy.refFree_substWith plain element mentioned free]
@@ -329,12 +391,19 @@ theorem NRows.refFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
         NRows.refFree_substWith plain rest mentioned.2 free.2, and_self]
 end
 
+theorem resolveAt_subst {ns : ValidatedNamespace} {env : Array SemArg} {typeId : TypeId}
+    {type : SemTy} (arguments : Array SemArg)
+    (resolved : StaticTyping.resolveAt ns env typeId = some type) :
+    StaticTyping.resolveAt ns (env.map (·.subst arguments)) typeId =
+      some (type.subst arguments) :=
+  SemTy.resolveFuel_subst ns.tables env arguments _ typeId type resolved
+
 theorem resolveIn_subst {ns : ValidatedNamespace} {env : Array SemArg} {typeId : TypeId}
     {type : SemTy} (arguments : Array SemArg)
     (resolved : StaticTyping.resolveIn ns env typeId = some type) :
     StaticTyping.resolveIn ns (env.map (·.subst arguments)) typeId =
       some (type.subst arguments) :=
-  SemTy.resolveFuel_subst ns.tables env arguments _ typeId type resolved
+  resolveAt_subst arguments resolved
 
 private theorem mapM_resolveIn_subst {ns : ValidatedNamespace} {env : Array SemArg}
     (arguments : Array SemArg) {α : Type} (typeOf : α → TypeId) :
@@ -462,7 +531,7 @@ theorem faithful_argument {unit : ValidatedUnit} {function : FunctionHandle}
       ntyOf unit function.namespaceId
           (instantiatedTypeId typeInstantiation
             ((paramNodeIn? unit function.namespaceId index).get!)) = some τ ∧
-      StaticTyping.resolveIn targetNs #[]
+      StaticTyping.resolveAt targetNs #[]
           (instantiatedTypeId typeInstantiation
             ((paramNodeIn? unit function.namespaceId index).get!)) = some type ∧
       type.referenceFree = true ∧ τ.paramFree = true ∧ τ.refFree = true := by
@@ -493,7 +562,7 @@ theorem faithful_argument {unit : ValidatedUnit} {function : FunctionHandle}
     split at atIndex
     · next type resolved =>
         simp only [Bool.and_eq_true, Option.any_eq_true] at atIndex
-        obtain ⟨free, τ, native, closedType, plainType⟩ := atIndex
+        obtain ⟨⟨_, free⟩, τ, native, closedType, plainType⟩ := atIndex
         refine ⟨type, τ, ?_, ?_, by simpa [found] using native, by simpa [found] using resolved,
           free, closedType, plainType⟩
         · simp only [frameSemArguments, Array.getElem?_map, argument, Option.map_some, resolved]
@@ -579,6 +648,7 @@ theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans :
       StaticTyping.signatureTypes? targetNs declaration
         (frameEnv declaration.signature.generics arguments) =
           some (allParameters, targetResults) ∧
+      SizedArguments arguments ∧
       FrameInstantiation targetNs (requiredAt unit function) typeInstantiation
         (frameEnv declaration.signature.generics arguments) ∧
       mask < 2 ^ declaration.signature.parameters.size ∧
@@ -622,8 +692,8 @@ theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans :
           rw [extract_map, ← NRow.ofList_substWith] at suppliedTyped
           have sharing : closureShared unit function mask =
               { parameters := ClosureMask.extract mask false
-                  (parameterSharing unit function declaration)
-                results := resultSharing unit function declaration } := by
+                  (parameterSharing unit function targetNs declaration)
+                results := resultSharing unit function targetNs declaration } := by
             simp [closureShared, namespace_eq, declaration_eq, parameterSharing, resultSharing]
           rw [sharingEq] at sharing
           subst sharing
@@ -661,6 +731,7 @@ theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans :
             genericParameters.map (·.subst semArguments), genericResults.map (·.subst semArguments),
             namespace_eq, declaration_eq,
             by simpa only [frameEnv] using signatureTypes?_subst semArguments genericSignature,
+            frameSemArguments_sized namespace_eq declaration_eq faithful,
             frameInstantiation_of_faithful namespace_eq declaration_eq faithful, ?_, capturesTyped,
             suppliedTyped, resultsAt⟩
           rw [← Array.length_toList, ← mapM_length readParameters]
@@ -682,7 +753,8 @@ theorem VariantsTypedAs.find {unit : ValidatedUnit} {source : StructHandle}
       rows.paramFree = true → rows.refFree = true →
       ∃ ns declared fieldTypes ghostTypes,
         SemanticOperations.handleFields? unit source (some name) = some (ns, declared) ∧
-        ResolvesAll ns.tables arguments.toArray (declared.toList.map (·.type.typeId)) fieldTypes ∧
+        ResolvesAll ns.tables arguments.toArray (declared.toList.map (ns.typeId ·.type.typeId))
+          fieldTypes ∧
         ResolvesAll ns.tables arguments.toArray (ghostTypeIds unit source) ghostTypes ∧
         row.TypedAs unit (fieldTypes ++ ghostTypes.map .ghost) ∧ row.paramFree = true ∧
         row.refFree = true
@@ -770,7 +842,7 @@ theorem Skolems.admits_carrier {unit : ValidatedUnit} [FunctionCarriers unit] [�
   have admitted : NTy.admits unit (Θ.resolve (.function parameters shared results))
       (@NTy.encode (Carriers.runtime unit) _ (Θ.toRuntime _ function)) = true :=
     NTy.admits_encode unit _ _
-  rw [Θ.encode_toRuntime, NTy.encode_function, Θ.resolve_eq] at admitted
+  rw [Θ.encode_toRuntime, NTy.encode_function, Θ.resolve_eq_type] at admitted
   simpa only [NTy.substWith, NRow.resolved_eq_substWith, Skolems.type] using admitted
 
 /-- A scalar row reads only as its scalar types. -/
@@ -810,7 +882,7 @@ private theorem closureTyped_ofCarrier {unit : ValidatedUnit} [FunctionCarriers 
   obtain ⟨function, mask, typeInstantiation, captures, plain⟩ := closure
   simp only [ClosureValue.encode] at admitted
   obtain ⟨targetNs, declaration, arguments, allParameters, targetResults, namespace_eq,
-      declaration_eq, signature_eq, faithful, bound, capturesTyped, parametersTyped,
+      declaration_eq, signature_eq, sizedArguments, faithful, bound, capturesTyped, parametersTyped,
       resultsTyped⟩ := closureReading agree (loans := fun _ => none) admitted
     fun row _ capturesAdmitted rowTyped rowClosed rowPlain =>
       NRow.represented_of_admits representable agree captures.toList row capturesAdmitted rowTyped
@@ -820,7 +892,7 @@ private theorem closureTyped_ofCarrier {unit : ValidatedUnit} [FunctionCarriers 
   subst results_eq
   refine ⟨parameterTypes, targetResults, ClosureMask.extract mask false allParameters, observed,
     ⟨targetNs, declaration, arguments, allParameters, namespace_eq, declaration_eq, signature_eq,
-      faithful, bound, capturesTyped, rfl⟩,
+      sizedArguments, faithful, bound, capturesTyped, rfl⟩,
     RowTyped.ofResolved parametersScalar, fun shape row => ?_⟩
   subst row
   exact RowDecodes.ofObserved (RowDecodes.ofResolved shape resultsFree resultsScalar)
@@ -842,12 +914,16 @@ theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} [FunctionCarriers uni
     {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
     (returns : ∀ result final,
       EnsuresOf (closureMeaning executable) σs shared shape function args result initial final →
-      ¬AbortsOf (closureMeaning executable) σs shared shape function args initial →
-      (∀ default, ResultOf (closureMeaning executable) σs shared shape function args initial
-        default = result) →
-      StateOf (closureMeaning executable) σs shared shape function args initial = final →
+      ¬AbortsOfEntries (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial →
+      (∀ default, ResultOf (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial default = result) →
+      StateOf (closureMeaning executable) σs shared shape function (HList.settle σs args) initial =
+        final →
       ensures result final)
     (fails : ∀ error, AbortsOf (closureMeaning executable) σs shared shape function args initial →
+      AbortsOfEntries (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial →
       aborts error) :
     wp (closureMeaning executable σs shared shape function args) ensures aborts initial := by
   obtain ⟨_, resultTypes, targetTypes, -, typed, -, decodes⟩ :=
@@ -869,18 +945,20 @@ theorem returns_of_terminating {unit : ValidatedUnit} [FunctionCarriers unit]
     (agree : TypesAgree unit) (representable : OwnersRepresentable unit)
     (parametersScalar : ScalarAt unit σs) (resultsScalar : ScalarAt unit shape.row)
     {initial : Memory unit} (globals : MemoryTyped unit initial)
-    (unaborted : ¬AbortsOf (closureMeaning executable) σs shared shape function args initial) :
+    (unaborted : ¬AbortsOfEntries (closureMeaning executable) σs shared shape function
+      (HList.settle σs args) initial) :
     ∃ result final,
       EnsuresOf (closureMeaning executable) σs shared shape function args result initial final ∧
-      (∀ default, ResultOf (closureMeaning executable) σs shared shape function args initial
-        default = result) ∧
-      StateOf (closureMeaning executable) σs shared shape function args initial = final := by
+      (∀ default, ResultOf (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial default = result) ∧
+      StateOf (closureMeaning executable) σs shared shape function (HList.settle σs args) initial =
+        final := by
   obtain ⟨parameterTypes, resultTypes, targetTypes, observed, typed, rowTyped, decodes⟩ :=
     closureTyped_ofCarrier agree representable function shapeFree parametersScalar resultsScalar
   rcases terminating ‹_› _ σs shape args targetTypes resultTypes initial free shapeFree
       typed (HasTypes.ofObserved (observed ▸ rowTyped args)) (decodes shape rfl) globals with
     ⟨error, aborted⟩ | ⟨result, final, run⟩
-  · exact absurd ⟨error, aborted⟩ unaborted
+  · exact absurd (abortsOfEntries_of_abortsOf ⟨error, aborted⟩) unaborted
   · have flat := NRow.lentFlat_of_refFree σs free
     have shapeFlat := NRow.lentFlat_of_refFree shape.row shapeFree
     have settled := ResultShape.settled_of_refFree shape shapeFree result

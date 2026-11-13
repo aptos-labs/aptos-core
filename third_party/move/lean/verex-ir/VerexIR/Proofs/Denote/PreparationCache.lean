@@ -59,7 +59,7 @@ private structure Entry where
   declarations : Array Declaration
   instances : Array Lean.Expr
   options : Options
-  /-- Only owners charged for this request may inherit its result. -/
+  /-- The owners charged for this request; empty in the unowned scope. -/
   owners : Array Nat
 
 structure Cache where
@@ -70,10 +70,11 @@ inductive Lookup where
   | missing
   | found (proof? : Option Lean.Expr)
 
-/-- Reuse stays within the group charged for the original work. Unowned
-generation and authored work have a separate scope from automatic owners. -/
+/-- Reuse stays within the scope that paid for the original work: automatic
+owners share their results across sibling clauses, as the default walk's
+leaves do; unowned generation and authored work have a separate scope. -/
 def paidBy (paying consuming : Array Nat) : Bool :=
-  paying.isEmpty == consuming.isEmpty && consuming.all paying.contains
+  paying.isEmpty == consuming.isEmpty
 
 /-- Proof dependencies include the proof term, not just its statement.
 Changed definitions, replaced hypotheses and new local instances invalidate

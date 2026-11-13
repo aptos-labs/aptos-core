@@ -1,8 +1,4 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/folds_of_projection_anchors.move:31:5: error: the loop invariant `∀ (j in 0 .. remaining),
-        v1[j] == with_state_anchor!(0, old(v1))[j]` is not preserved by an iteration
-tests/sources/functional/closures/inline/folds_of_projection_anchors.move:31:5: error: the loop invariant `∀ (j in 0 .. remaining),
-        v2[j] == with_state_anchor!(0, old(v2))[j]` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of_projection_anchors.move:31:5: error: the loop invariant `a
         == «spec_fold_idx$lambda$0»(
           with_state_anchor!(4, old(a)), n - remaining,
@@ -33,8 +29,6 @@ tests/sources/functional/closures/inline/folds_of_projection_anchors.move:40:5: 
   verify both by lean =>
     verex_obligations
     verex_on
-    | invariant_4_step => verex_prepare; sorry
-    | invariant_5_step => verex_prepare; sorry
     | invariant_6_step => verex_prepare; sorry
     | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
@@ -63,10 +57,6 @@ tests/sources/functional/closures/inline/folds_of_projection_anchors.move:51:5: 
     | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/inline/folds_of_projection_anchors.move:56:5: error: the loop invariant `∀ (j in 0 .. remaining),
-        v1[j] == with_state_anchor!(12, old(v1))[j]` is not preserved by an iteration
-tests/sources/functional/closures/inline/folds_of_projection_anchors.move:56:5: error: the loop invariant `∀ (j in 0 .. remaining),
-        v2[j] == with_state_anchor!(12, old(v2))[j]` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of_projection_anchors.move:56:5: error: the loop invariant `a
         == «spec_fold_idx$lambda$0»(
           with_state_anchor!(15, old(a)), n - remaining,
@@ -100,8 +90,6 @@ tests/sources/functional/closures/inline/folds_of_projection_anchors.move:65:5: 
   verify wrong by lean =>
     verex_obligations
     verex_on
-    | invariant_4_step => verex_prepare; sorry
-    | invariant_5_step => verex_prepare; sorry
     | invariant_6_step => verex_prepare; sorry
     | aborts_if_1 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry

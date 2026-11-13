@@ -3,7 +3,7 @@
   "evidence": [
     {
       "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
-      "producer": "verex-rust-export via rustc Public",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
       "trusted": true
     }
   ],
@@ -21,44 +21,9 @@
               "arguments": [],
               "instantiations": [],
               "operation": {
-                "read": {
+                "readDiscriminant": {
                   "place": {
                     "index": 0
-                  }
-                }
-              },
-              "surface": null
-            }
-          },
-          "loc": {
-            "index": 9
-          },
-          "typeId": {
-            "index": 4
-          }
-        },
-        {
-          "kind": {
-            "operation": {
-              "arguments": [
-                {
-                  "index": 0
-                }
-              ],
-              "instantiations": [],
-              "operation": {
-                "data": {
-                  "kind": {
-                    "discriminant": {
-                      "type": {
-                        "name": {
-                          "index": 1
-                        },
-                        "namespaceId": {
-                          "index": 0
-                        }
-                      }
-                    }
                   }
                 }
               },
@@ -79,7 +44,7 @@
                 "index": 1
               },
               "value": {
-                "index": 1
+                "index": 0
               }
             }
           },
@@ -141,7 +106,7 @@
                 "index": 4
               },
               "value": {
-                "index": 4
+                "index": 3
               }
             }
           },
@@ -182,7 +147,7 @@
                 "index": 8
               },
               "value": {
-                "index": 6
+                "index": 5
               }
             }
           },
@@ -222,7 +187,7 @@
                 "index": 11
               },
               "value": {
-                "index": 8
+                "index": 7
               }
             }
           },
@@ -278,10 +243,10 @@
             "operation": {
               "arguments": [
                 {
-                  "index": 10
+                  "index": 9
                 },
                 {
-                  "index": 11
+                  "index": 10
                 }
               ],
               "instantiations": [],
@@ -307,7 +272,7 @@
                 "index": 13
               },
               "value": {
-                "index": 12
+                "index": 11
               }
             }
           },
@@ -369,7 +334,7 @@
                 "index": 18
               },
               "value": {
-                "index": 15
+                "index": 14
               }
             }
           },
@@ -409,7 +374,7 @@
                 "index": 20
               },
               "value": {
-                "index": 17
+                "index": 16
               }
             }
           },
@@ -461,7 +426,7 @@
                       {
                         "execute": {
                           "expression": {
-                            "index": 2
+                            "index": 1
                           }
                         }
                       }
@@ -494,7 +459,7 @@
                           "index": 5
                         },
                         "scrutinee": {
-                          "index": 3
+                          "index": 2
                         }
                       }
                     }
@@ -507,7 +472,7 @@
                       {
                         "execute": {
                           "expression": {
-                            "index": 5
+                            "index": 4
                           }
                         }
                       }
@@ -528,21 +493,21 @@
                       {
                         "execute": {
                           "expression": {
-                            "index": 7
+                            "index": 6
                           }
                         }
                       },
                       {
                         "execute": {
                           "expression": {
-                            "index": 9
+                            "index": 8
                           }
                         }
                       },
                       {
                         "execute": {
                           "expression": {
-                            "index": 13
+                            "index": 12
                           }
                         }
                       }
@@ -550,7 +515,7 @@
                     "terminator": {
                       "branch": {
                         "condition": {
-                          "index": 14
+                          "index": 13
                         },
                         "elseTarget": {
                           "index": 1
@@ -569,14 +534,14 @@
                       {
                         "execute": {
                           "expression": {
-                            "index": 16
+                            "index": 15
                           }
                         }
                       },
                       {
                         "execute": {
                           "expression": {
-                            "index": 18
+                            "index": 17
                           }
                         }
                       }
@@ -598,7 +563,7 @@
                       "return_": {
                         "values": [
                           {
-                            "index": 19
+                            "index": 18
                           }
                         ]
                       }
@@ -1029,6 +994,7 @@
       "pragmas": [],
       "profile": "rust",
       "profileMetadata": [],
+      "scopes": [],
       "specFunctions": [],
       "specVars": [],
       "structs": [
@@ -1121,7 +1087,7 @@
         ]
       ],
       "profile": "rust",
-      "version": 2
+      "version": 5
     }
   ],
   "tables": {
@@ -1466,6 +1432,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 6
+    "minor": 9
   }
 }

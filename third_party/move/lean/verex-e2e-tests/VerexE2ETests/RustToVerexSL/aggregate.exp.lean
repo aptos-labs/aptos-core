@@ -6,6 +6,6 @@ import VerexSL
 verex namespace aggregate where
   fun array(left : u32, right : u32) -> Vector<u32, const 2> := #[left, right]
 
-  fun first(pair : (u32, Bool)) -> u32 := pair[0u32]
+  fun first(pair : (u32, Bool)) -> u32 := pair.0
 
   fun tuple(value : u32, flag : Bool) -> (u32, Bool) := (value, flag)

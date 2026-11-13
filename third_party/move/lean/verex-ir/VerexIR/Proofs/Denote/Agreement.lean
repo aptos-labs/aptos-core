@@ -34,14 +34,26 @@ export, is an outcome of the denotation, at every frame and type
 instantiation.  Where the frame and the instantiation disagree on a type
 the callee reads the prophetic meaning has no outcome; at a coherent frame
 the compiler's types agree with the runtime's, so a coherent caller's calls
-and closures have coherent frames.  To be proved by induction on the fuel of
-`compileExpr`, one case per term constructor. -/
+and closures have coherent frames.  A function compiled at a substitution
+agrees at the same frames, over its substituted rows (`propheticMeaningAt`);
+without one the statement is `compileFunction`'s and `propheticMeaning`'s.
+To be proved by induction on the fuel of `compileExpr`, one case per term
+constructor.
+
+The refinement relates the outcomes of a start only where the denotation
+is defined there, and its certifying steps are undefined where a data
+invariant fails: a run that packs a value breaking its invariant, or that
+ends a mutable loan over one, keeps its big-step outcomes while the
+denotation is undefined at its start, so nothing is asserted of that start,
+and `Satisfies` excludes it, so the invariant is owed in the function that
+breaks it (`doc/designs/data-invariants.md`). -/
 axiom compileFunction_agrees {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit)
-    [Skolems unit] (handle : FunctionHandle)
-    (f : Function unit) (compiled : compileFunction unit handle = .ok f)
+    [Skolems unit] (handle : FunctionHandle) (substitution : Option TypeArgs)
+    (f : Function unit) (compiled : compileFunctionAt unit handle substitution = .ok f)
     (typeInstantiation : Array (TypeId × TypeId)) (args : HList f.params) :
-    Spec.Refines (propheticMeaning executable typeInstantiation handle f.params f.result args)
+    Spec.Refines
+      (propheticMeaningAt executable substitution typeInstantiation handle f.params f.result args)
       (f.denote executable typeInstantiation args)
 
 /-- The prophetic meanings of the compiled members of a cycle of calls, at
@@ -76,8 +88,9 @@ omit [Skolems unit] in
 theorem wp_of_refines {σ ε α : Type} {a b : Spec σ ε α} (refines : Spec.Refines a b)
     {ensures : α → σ → Prop} {aborts : ε → Prop} {initial : σ}
     (established : wp b ensures aborts initial) : wp a ensures aborts initial :=
-  ⟨fun result final step => established.1 result final (refines.ok _ _ _ step),
-    fun error step => established.2.1 error (refines.aborts _ _ step),
+  ⟨fun result final step =>
+      (refines.ok _ _ _ step).elim (established.1 result final) (absurd · established.2.2),
+    fun error step => (refines.aborts _ _ step).elim (established.2.1 error) (absurd · established.2.2),
     fun undefined => established.2.2 (refines.undefined _ undefined)⟩
 
 /-- A call to a compiled callee reasons over the callee's denotation: an
@@ -93,7 +106,25 @@ theorem wp_propheticMeaning_of_compiled {unit : ValidatedUnit} [FunctionCarriers
     (established : wp (f.denote executable typeInstantiation values) ensures aborts initial) :
     wp (propheticMeaning executable typeInstantiation handle f.params f.result values) ensures aborts
       initial :=
-  wp_of_refines (compileFunction_agrees executable handle f compiled typeInstantiation values) established
+  wp_of_refines (compileFunction_agrees executable handle none f compiled typeInstantiation values)
+    established
+
+/-- A call at type arguments holding a mutable reference: inlined, the callee's body at
+them replacing the call by the agreement theorem. -/
+theorem wp_propheticMeaningAt_of_compiled {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit)
+    [Skolems unit]
+    (substitution : Option TypeArgs) (typeInstantiation : Array (TypeId × TypeId))
+    (handle : FunctionHandle)
+    (f : Function unit) (compiled : compileFunctionAt unit handle substitution = .ok f)
+    (values : HList f.params)
+    (ensures : f.result.carrier → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit)
+    (established : wp (f.denote executable typeInstantiation values) ensures aborts initial) :
+    wp (propheticMeaningAt executable substitution typeInstantiation handle f.params f.result values)
+      ensures aborts initial :=
+  wp_of_refines (compileFunction_agrees executable handle substitution f compiled typeInstantiation
+    values) established
 
 /-- A contract established over the denotation holds of the prophetic
 meaning, which is what a caller's call denotes. -/
@@ -105,7 +136,22 @@ theorem satisfies_propheticMeaning {unit : ValidatedUnit} [FunctionCarriers unit
     (contract : Contract (Memory unit) Failure (HList f.params) f.result.carrier)
     (verified : Satisfies (f.denote executable typeInstantiation) contract) :
     Satisfies (propheticMeaning executable typeInstantiation handle f.params f.result) contract :=
-  satisfies_of_refines (compileFunction_agrees executable handle f compiled typeInstantiation) verified
+  satisfies_of_refines (compileFunction_agrees executable handle none f compiled typeInstantiation)
+    verified
+
+/-- A contract proved independently over a specialized body holds at that
+same frame; callers may use its contract without inlining the body. -/
+theorem satisfies_propheticMeaningAt {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit]
+    (substitution : Option TypeArgs) (typeInstantiation : Array (TypeId × TypeId))
+    (handle : FunctionHandle) (f : Function unit)
+    (compiled : compileFunctionAt unit handle substitution = .ok f)
+    (contract : Contract (Memory unit) Failure (HList f.params) f.result.carrier)
+    (verified : Satisfies (f.denote executable typeInstantiation) contract) :
+    Satisfies (propheticMeaningAt executable substitution typeInstantiation handle
+      f.params f.result) contract :=
+  satisfies_of_refines
+    (compileFunction_agrees executable handle substitution f compiled typeInstantiation) verified
 
 /-- Contracts established over the bodies of a cycle's members at every
 slot, each assuming every slot's contract of the calls to the members, hold
@@ -216,8 +262,8 @@ def GlobalsPreserved {unit : ValidatedUnit} [FunctionCarriers unit]
 the denotation encoded (`Failure.encode`), an abort code or the failed
 operation's operands. An assumption the public theorem states as a
 hypothesis, beside `GlobalsPreserved`; nothing establishes it yet, as
-validation does not constrain a throw's operands (`denotation.md`,
-"Assumption ledger"). -/
+validation does not constrain a throw's operands
+(`doc/status/assumptions.md`, "`FailuresIntegral`"). -/
 def FailuresIntegral {unit : ValidatedUnit} (executable : ExecutableUnit unit) : Prop :=
   ∀ handle typeInstantiation start arguments failure,
     (functionSpecAt executable handle typeInstantiation arguments).aborts start failure →
@@ -230,11 +276,10 @@ section Public
 /-- The runtime form of a contract over native arguments and typed memory.
 A runtime call lends the argument references under admissible loans from a
 state whose stores encode a memory, and the contract holds for every
-prophecy of theirs and every memory the stores encode.  A successful
-execution satisfies it at the value view: each returned reference's
-prophecy is its current value, and each argument reference's prophecy is
-its export with the returned references' holes filled by their current
-values. -/
+prophecy of theirs and every memory the stores encode. A successful
+execution supplies one loan correspondence spanning arguments, results, and
+exports. The correspondence follows replacement references by their actual
+runtime identity and resolves the final memory consistently. -/
 def _root_.VerexIR.Proofs.Contract.prophetic (unit : ValidatedUnit) [FunctionCarriers unit]
     [Skolems unit] (σs : NRow)
     (shape : ResultShape) (contract : Contract (Memory unit) Failure (HList σs) shape.carrier) :
@@ -248,12 +293,12 @@ def _root_.VerexIR.Proofs.Contract.prophetic (unit : ValidatedUnit) [FunctionCar
     ∀ memory, StorageEncodes unit memory initial →
       ∀ loans args, lendArguments σs args loans = some arguments → contract.assumes args memory
   ensures := fun arguments initial results final =>
-    ∃ memory memory' loans args result returnedLoans,
-      StorageEncodes unit memory initial ∧ StorageEncodesReturned unit memory' final results ∧
+    ∃ memory memory' loans args result correspondence,
+      StorageEncodes unit memory initial ∧
+      StorageEncodesReturned unit memory' final (correspondence.returnedRow results) ∧
       lendArguments σs args loans = some arguments ∧
-      shape.lend false result returnedLoans = some results ∧
-      shape.lend true result returnedLoans = some results ∧
-      argumentsResolve σs args loans results (exportsAfter initial.pending final.pending) ∧
+      BoundaryCorrespondence σs args shape result arguments results loans
+        (exportsAfter initial.pending final.pending) correspondence ∧
       contract.ensures args memory result memory'
   aborts := fun arguments initial error =>
     ∃ memory loans args failure, StorageEncodes unit memory initial ∧
@@ -266,19 +311,20 @@ def _root_.VerexIR.Proofs.Contract.prophetic (unit : ValidatedUnit) [FunctionCar
     ∀ memory, StorageEncodes unit memory initial →
       ∀ loans args, lendArguments σs args loans = some arguments → contract.mustAbort args memory
   frame := fun arguments initial results final =>
-    ∃ memory memory' loans args result returnedLoans, StorageEncodes unit memory initial ∧
-      StorageEncodesReturned unit memory' final results ∧
+    ∃ memory memory' loans args result correspondence, StorageEncodes unit memory initial ∧
+      StorageEncodesReturned unit memory' final (correspondence.returnedRow results) ∧
       lendArguments σs args loans = some arguments ∧
-      shape.lend false result returnedLoans = some results ∧
-      shape.lend true result returnedLoans = some results ∧
+      BoundaryCorrespondence σs args shape result arguments results loans
+        (exportsAfter initial.pending final.pending) correspondence ∧
       contract.frame args memory result memory'
 
 /-- A contract satisfied by the prophetic run at a runtime type instantiation
 holds of the big-step meaning there in its runtime form, for a unit whose
 runs keep global memory typed.  Every runtime execution from an admissible
-start is a prophetic outcome at the value view from a memory its stores
-encode, whose existence the contract's definedness guarantees. -/
+start is a prophetic outcome with a shared loan correspondence and final
+memory, whose existence the contract's definedness guarantees. -/
 theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
+    [@CarriersNonempty (Carriers.runtime unit)]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId)) (σs : NRow)
@@ -299,29 +345,34 @@ theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
   · intro results final execution
     obtain ⟨memory', encoded', agree⟩ :=
       preserved handle typeInstantiation initial arguments results final memory encoded execution
-    have view : ∃ result returnedLoans, ∃ resolved : HList σs,
-        shape.lend false result returnedLoans = some results ∧
-        shape.lend true result returnedLoans = some results ∧
+    have view : ∃ result, ∃ resolved : HList σs, ∃ correspondence,
         lendArguments σs resolved loans = some arguments ∧
-        argumentsResolve σs resolved loans results (exportsAfter initial.pending final.pending) := by
+        BoundaryCorrespondence σs resolved shape result arguments results loans
+          (exportsAfter initial.pending final.pending) correspondence ∧
+        correspondence.ReturnsStorage results final := by
       refine Classical.byContradiction fun none => established.2.2 ?_
       exact ⟨initial, loans, arguments, results, final, encoded, admissible, lent, execution,
         none⟩
-    obtain ⟨result, returnedLoans, resolved, lentCurrent, lentProphecy, lentResolved, resolves⟩ :=
-      view
+    obtain ⟨result, resolved, correspondence, lentResolved, boundary, storage⟩ := view
+    have encodedCorrespondence :
+        StorageEncodesReturned unit memory' final (correspondence.returnedRow results) := by
+      change StorageEncodes unit memory' (final.resolveReturned (correspondence.returnedRow results))
+      rw [storage]
+      exact encoded'
     have outcome :
         (propheticRun executable typeInstantiation handle σs shape resolved).ok memory result
           memory' :=
-      ⟨initial, loans, arguments, results, final, returnedLoans, results, encoded, admissible,
-        lentResolved, execution, lentCurrent, lentProphecy, resolves, encoded', agree⟩
+      ⟨initial, loans, arguments, results, final, correspondence, encoded, admissible,
+        lentResolved, execution, boundary, encodedCorrespondence, agree⟩
     obtain ⟨ensured, framed, notMust⟩ :=
       (verified resolved memory (assumed memory encoded loans resolved lentResolved)
         (required memory encoded loans resolved lentResolved)).1 result _ outcome
-    refine ⟨fun notMay => ?_, ⟨memory, memory', loans, resolved, result, returnedLoans, encoded, encoded', lentResolved,
-        lentCurrent, lentProphecy, framed⟩, fun must => notMust (must memory encoded loans resolved lentResolved)⟩
-    exact ⟨memory, memory', loans, resolved, result, returnedLoans, encoded, encoded', lentResolved,
-      lentCurrent, lentProphecy, resolves,
-      ensured fun may => notMay ⟨memory, loans, resolved, encoded, lentResolved, may⟩⟩
+    refine ⟨fun notMay => ?_,
+      ⟨memory, memory', loans, resolved, result, correspondence, encoded, encodedCorrespondence,
+        lentResolved, boundary, framed⟩,
+      fun must => notMust (must memory encoded loans resolved lentResolved)⟩
+    exact ⟨memory, memory', loans, resolved, result, correspondence, encoded, encodedCorrespondence, lentResolved,
+      boundary, ensured fun may => notMay ⟨memory, loans, resolved, encoded, lentResolved, may⟩⟩
   · intro error failed
     obtain ⟨failure, rfl⟩ := integral handle typeInstantiation initial arguments error failed
     exact ⟨memory, loans, args, failure, encoded, lent, rfl,
@@ -330,7 +381,7 @@ theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
 /-- A contract satisfied by the prophetic meaning at the runtime frame and
 the empty instantiation holds of the big-step meaning in its runtime form,
 for a unit whose runs keep global memory typed. -/
-theorem satisfies_prophetic {unit : ValidatedUnit} [FunctionCarriers unit]
+theorem satisfies_prophetic {unit : ValidatedUnit} [FunctionCarriers unit] [@CarriersNonempty (Carriers.runtime unit)]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (σs : NRow) (shape : ResultShape)
@@ -351,7 +402,7 @@ theorem satisfies_prophetic {unit : ValidatedUnit} [FunctionCarriers unit]
 frame type arguments induce over the runtime family, holds, read at the
 arguments' types, of its big-step meaning at every runtime type
 instantiation coherent with that frame. -/
-theorem satisfies_generic_at {unit : ValidatedUnit} [FunctionCarriers unit]
+theorem satisfies_generic_at {unit : ValidatedUnit} [FunctionCarriers unit] [@CarriersNonempty (Carriers.runtime unit)]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (θ : TypeArgs)

@@ -70,7 +70,11 @@ returned values are bound to locals that `result` denotes.
 **VerexSL.** An item `spec lemma L<T>(params) where` with `requires`,
 `ensures`, and `decreases` clauses, then `proof` and the steps, one per
 line: `assert e`, `assume e`, `apply φ`, `split e`. In a body, `spec apply
-φ` and `spec split e` join `spec assert` and `spec assume`.
+φ` and `spec split e` join `spec assert` and `spec assume`. The same lemma
+can be stated in a proof file instead, as a `lemma` item of the proof
+language ([`proof-language.md`](proof-language.md), "Lemma items"): the same
+declaration and the same verification, with the full step grammar available
+to its proof.
 
 ## Verification
 

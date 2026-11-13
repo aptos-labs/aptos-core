@@ -1,0 +1,69 @@
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:21:3: error: the specification clause `ensures result == c` is not established
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:19:6: error: verex verification failed: the automatic verification of `specified_false` failed; provide a proof in the module:
+  verify specified_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:25:5: error: the precondition `requires a <= 100 && self.c <= 100` of `caller_false::{closure#0}::call` does not hold at call 1
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:29:6: error: verex verification failed: the automatic verification of `caller_false` failed; provide a proof in the module:
+  verify caller_false by lean =>
+    verex_obligations
+    verex_on
+    | requires_1_of_call_at_call_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:35:5: error: the specification clause `ensures result == a` is not established
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:33:8: error: verex verification failed: the automatic verification of `body_false::{closure#0}::call` failed; provide a proof in the module:
+  verify «body_false::{closure#0}»::call by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:39:3: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:37:6: error: verex verification failed: the automatic verification of `body_false` failed; provide a proof in the module:
+  verify body_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:43:3: error: `no panic when aborts at op 1` is not established: the operation `a + c` at VerexE2ETests/SourceVerify/closure_specs_errors.rs:28:24 may panic
+  from: (VerexIR.Proofs.Denote.NTy.int 32 false).deepHolds self_c; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit; ¬(0 ≤ a.val + self_c.val ∧ a.val + self_c.val ≤ 4294967295)
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:43:8: error: verex verification failed: the automatic verification of `panicking::{closure#0}::call` failed; provide a proof in the module:
+  verify «panicking::{closure#0}»::call by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:60:5: error: the specification clause `ensures result == 2 * m` is not established
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:62:17: error: the loop invariant `i <= m && s == i` is not preserved by an iteration
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:58:8: error: verex verification failed: the automatic verification of `looped_false::{closure#0}::call` failed; provide a proof in the module:
+  verify «looped_false::{closure#0}»::call by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | invariant_1_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:62:17: error: the loop invariant `i <= m && s == i` is not preserved by an iteration
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:66:3: error: the specification clause `ensures result == 2 * n` is not established
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:64:6: error: verex verification failed: the automatic verification of `looped_false` failed; provide a proof in the module:
+  verify looped_false by lean =>
+    verex_obligations
+    verex_on
+    | call_invariant_1_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:97:3: error: the specification clause `ensures result == n0` is not established
+VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:95:6: error: verex verification failed: the automatic verification of `mut_specified_false` failed; provide a proof in the module:
+  verify mut_specified_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

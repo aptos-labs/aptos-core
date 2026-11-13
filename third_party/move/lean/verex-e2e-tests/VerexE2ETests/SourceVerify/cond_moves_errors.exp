@@ -1,0 +1,168 @@
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:12:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:11:6: error: verex verification failed: the automatic verification of `cond_move_local_false` failed; provide a proof in the module:
+  verify cond_move_local_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:15:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:14:6: error: verex verification failed: the automatic verification of `cond_move_local_vacuous` failed; provide a proof in the module:
+  verify cond_move_local_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:22:3: error: the specification clause `ensures h.r == v` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:21:6: error: verex verification failed: the automatic verification of `cond_move_param_by_value_false` failed; provide a proof in the module:
+  verify cond_move_param_by_value_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:25:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:24:6: error: verex verification failed: the automatic verification of `cond_move_param_by_value_vacuous` failed; provide a proof in the module:
+  verify cond_move_param_by_value_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:32:3: error: the specification clause `ensures h.r == v` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:31:6: error: verex verification failed: the automatic verification of `cond_move_lent_false` failed; provide a proof in the module:
+  verify cond_move_lent_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:35:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:34:6: error: verex verification failed: the automatic verification of `cond_move_lent_vacuous` failed; provide a proof in the module:
+  verify cond_move_lent_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:42:3: error: the specification clause `ensures a == v` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:41:6: error: verex verification failed: the automatic verification of `cond_return_false` failed; provide a proof in the module:
+  verify cond_return_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:45:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:44:6: error: verex verification failed: the automatic verification of `cond_return_vacuous` failed; provide a proof in the module:
+  verify cond_return_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:52:3: error: the specification clause `ensures spec.result[1] == v` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:51:6: error: verex verification failed: the automatic verification of `cond_store_false` failed; provide a proof in the module:
+  verify cond_store_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:55:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:54:6: error: verex verification failed: the automatic verification of `cond_store_vacuous` failed; provide a proof in the module:
+  verify cond_store_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:62:3: error: the specification clause `ensures a == v` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:61:6: error: verex verification failed: the automatic verification of `cond_two_components_false` failed; provide a proof in the module:
+  verify cond_two_components_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:65:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:64:6: error: verex verification failed: the automatic verification of `cond_two_components_vacuous` failed; provide a proof in the module:
+  verify cond_two_components_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:72:3: error: the specification clause `ensures a == v` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:71:6: error: verex verification failed: the automatic verification of `cond_nested_false` failed; provide a proof in the module:
+  verify cond_nested_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:75:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:74:6: error: verex verification failed: the automatic verification of `cond_nested_vacuous` failed; provide a proof in the module:
+  verify cond_nested_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:82:3: error: the specification clause `ensures a == v` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:81:6: error: verex verification failed: the automatic verification of `cond_callee_false` failed; provide a proof in the module:
+  verify cond_callee_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:85:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:84:6: error: verex verification failed: the automatic verification of `cond_callee_vacuous` failed; provide a proof in the module:
+  verify cond_callee_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:98:3: error: the specification clause `ensures n >= 2 ==> a == 0` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:97:6: error: verex verification failed: the automatic verification of `cond_loop_false` failed; provide a proof in the module:
+  verify cond_loop_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:106:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:105:6: error: verex verification failed: the automatic verification of `cond_loop_vacuous` failed; provide a proof in the module:
+  verify cond_loop_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:117:3: error: the specification clause `ensures !c ==> b == v` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:116:6: error: verex verification failed: the automatic verification of `cond_store_entry_false` failed; provide a proof in the module:
+  verify cond_store_entry_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:124:3: error: the specification clause `ensures !c ==> b == v` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:123:6: error: verex verification failed: the automatic verification of `whole_repoint_false` failed; provide a proof in the module:
+  verify whole_repoint_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:127:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/cond_moves_errors.spec.lean:126:6: error: verex verification failed: the automatic verification of `whole_repoint_vacuous` failed; provide a proof in the module:
+  verify whole_repoint_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

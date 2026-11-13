@@ -8,7 +8,7 @@ namespace VerexIR.Rust.Tests.RegistryConsumer
 open Lean Elab Command
 
 syntax (name := checkImportedRustRegistrationCmd)
-  "#check_imported_rust_registration " ident : command
+  "#check_imported_rust_registration " ident num : command
 
 @[command_elab checkImportedRustRegistrationCmd]
 private def elabCheckImportedRustRegistration : CommandElab := fun stx => do
@@ -19,10 +19,10 @@ private def elabCheckImportedRustRegistration : CommandElab := fun stx => do
     | throwError "registered Rust receipt did not survive the Lean module import boundary"
   unless !receipt.cacheKey.isEmpty && !receipt.artifactHash.isEmpty do
     throwError "imported Rust registration lost its canonical-input cache key"
-  unless unit.indexes.functionCounts == #[1] do
+  unless unit.indexes.functionCounts == #[stx[2].toNat] do
     throwError "imported Rust registration lost its validated declaration identity"
 
-#check_imported_rust_registration registeredBasic
-#check_imported_rust_registration registeredCargo
+#check_imported_rust_registration registeredBasic 1
+#check_imported_rust_registration registeredCargo 4
 
 end VerexIR.Rust.Tests.RegistryConsumer

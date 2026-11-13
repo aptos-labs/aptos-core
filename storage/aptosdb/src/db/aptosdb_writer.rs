@@ -70,7 +70,7 @@ impl DbWriter for AptosDB {
 
             chunk
                 .state_summary
-                .latest()
+                .last_checkpoint()
                 .global_state_summary
                 .log_generation("db_save");
 
@@ -202,6 +202,17 @@ impl DbWriter for AptosDB {
                     expected_root_hash,
                 )
             },
+            StateKind::Order => {
+                let order = self.order.as_ref().ok_or_else(|| {
+                    AptosDbError::Other("native-order store is not enabled".into())
+                })?;
+                crate::native_store::state_sync::get_native_snapshot_receiver(
+                    &order.store.kv_db,
+                    &order.store.merkle_db,
+                    version,
+                    expected_root_hash,
+                )
+            },
         })
     }
 
@@ -262,6 +273,18 @@ impl DbWriter for AptosDB {
                      native-position snapshot cannot be restored or verified. Enable \
                      COMPUTE_TRADING_NATIVE_STATE_ROOTS on the source chain, or run without \
                      native-position storage.",
+                    version,
+                );
+            }
+            let order_root =
+                output_with_proof.proof.transaction_infos[0].order_state_checkpoint_hash();
+            if self.order.is_some() {
+                ensure!(
+                    order_root.is_some(),
+                    "Fast sync target at version {} commits no order state root, so the \
+                     native-order snapshot cannot be restored or verified. Enable \
+                     COMPUTE_TRADING_NATIVE_STATE_ROOTS on the source chain, or run without \
+                     native-order storage.",
                     version,
                 );
             }
@@ -412,6 +435,9 @@ impl DbWriter for AptosDB {
             if let Some(expected_root_hash) = position_root {
                 self.reset_position_after_fast_sync(version, expected_root_hash)?;
             }
+            if let Some(expected_root_hash) = order_root {
+                self.reset_order_after_fast_sync(version, expected_root_hash)?;
+            }
 
             Ok(())
         })
@@ -436,6 +462,12 @@ impl AptosDB {
             "The first version passed in ({}), and the next version expected by db ({}) are inconsistent.",
             chunk.first_version,
             next_version,
+        );
+        ensure!(
+            chunk.state.next_version() == chunk.next_version(),
+            "Chunk ends at version {}, while its state is at version {:?}.",
+            chunk.expect_last_version(),
+            chunk.state.version(),
         );
 
         Ok(())
@@ -587,9 +619,11 @@ impl AptosDB {
             },
         }
 
-        // Orders have no consensus-committed root yet, so the store always
-        // computes its own summary.
-        bundle.store.advance_pipeline(chunk, None, sync_commit)
+        // With the roots on, the summary comes from execution on the chunk;
+        // off, the store computes it so the tree still tracks forward.
+        bundle
+            .store
+            .advance_pipeline(chunk, chunk.order_state_summary, sync_commit)
     }
 
     fn commit_native_collateral(&self, chunk: &ChunkToCommit, sync_commit: bool) -> Result<()> {

@@ -1,0 +1,140 @@
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:10:3: error: the specification clause `ensures result == 2 * c + 4` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:8:6: error: verex verification failed: the automatic verification of `direct_false` failed; provide a proof in the module:
+  verify direct_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:18:3: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `no_upvars_false` failed; provide a proof in the module:
+  verify no_upvars_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:24:3: error: the specification clause `ensures result == 0` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:23:6: error: verex verification failed: the automatic verification of `once_false` failed; provide a proof in the module:
+  verify once_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:30:3: error: the specification clause `ensures result.length == 0` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:29:6: error: verex verification failed: the automatic verification of `consume_false` failed; provide a proof in the module:
+  verify consume_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:33:1: error: `no panic when aborts at call 1 of call` is not established: the call `g(1)` at VerexE2ETests/SourceVerify/closures_errors.rs:49:5 may panic
+  from: (VerexIR.Proofs.Denote.NTy.int 32 false).deepHolds (c, ()).fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil (c, ()).snd; ¬(0 ≤ 1 + c.val ∧ 1 + c.val ≤ 4294967295)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:33:6: error: verex verification failed: the automatic verification of `panics` failed; provide a proof in the module:
+  verify panics by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of call => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:46:3: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:44:6: error: verex verification failed: the automatic verification of `nested_false` failed; provide a proof in the module:
+  verify nested_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:62:3: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:60:6: error: verex verification failed: the automatic verification of `zero_sized_capture_false` failed; provide a proof in the module:
+  verify zero_sized_capture_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:70:3: error: the specification clause `ensures result == n0` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:68:6: error: verex verification failed: the automatic verification of `counter_false` failed; provide a proof in the module:
+  verify counter_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:76:3: error: the specification clause `ensures a == old(a)` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:75:6: error: verex verification failed: the automatic verification of `write_through_false` failed; provide a proof in the module:
+  verify write_through_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:84:3: error: the specification clause `ensures result == start + 1` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:82:6: error: verex verification failed: the automatic verification of `moved_counter_false` failed; provide a proof in the module:
+  verify moved_counter_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:92:3: error: the specification clause `ensures result == start + 1` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:90:6: error: verex verification failed: the automatic verification of `moved_copy_keeps_false` failed; provide a proof in the module:
+  verify moved_copy_keeps_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:98:3: error: the specification clause `ensures x == old(x)` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:97:6: error: verex verification failed: the automatic verification of `moved_mut_false` failed; provide a proof in the module:
+  verify moved_mut_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.rs:195:5: info: `generic` uses concrete verification: Given interpretation does not yet support calls to callees without a contract
+VerexE2ETests/SourceVerify/closures_errors.rs:202:1: error: no denotation for `holds_guard`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:110:3: error: the specification clause `ensures result == x + 1` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:109:6: error: verex verification failed: the automatic verification of `shared_view_false` failed; provide a proof in the module:
+  verify shared_view_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:118:3: error: the specification clause `ensures result == c` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:116:6: error: verex verification failed: the automatic verification of `holds_closure_false` failed; provide a proof in the module:
+  verify holds_closure_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:126:3: error: the specification clause `ensures result == n0` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:124:6: error: verex verification failed: the automatic verification of `holds_mut_closure_false` failed; provide a proof in the module:
+  verify holds_mut_closure_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:134:3: error: the specification clause `ensures result == n0` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:132:6: error: verex verification failed: the automatic verification of `borrows_mut_closure_false` failed; provide a proof in the module:
+  verify borrows_mut_closure_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:142:3: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/SourceVerify/closures_errors.spec.lean:140:6: error: verex verification failed: the automatic verification of `use_make_false` failed; provide a proof in the module:
+  verify use_make_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/closures_errors.rs:307:1: error: no denotation for `holds_guards`: a drop at a type with a destructor is not carried by the denotation
