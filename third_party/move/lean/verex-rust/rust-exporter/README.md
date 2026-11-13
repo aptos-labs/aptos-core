@@ -1,7 +1,7 @@
 # `verex-rust-export`
 
 This is the project-owned Rustc Public driver for Verex. Its M0 spike uses
-Rustc Public's `run!` callback, inventories the public queries needed by the
+Rustc Public's `run_with_tcx!` callback, inventories the public queries needed by the
 mapper, and returns `ControlFlow::Break`, which stops rustc after analysis and
 before code generation/linking. The inventory is a diagnostic, not another
 exchange format; the only detached artifact will be `RawUnit` JSON.
@@ -45,6 +45,79 @@ Rust literals, retained with UTF-8 locations in `Namespace.comments`, and
 round-trip through both canonical source backends as non-semantic provenance.
 Artifact mode forces `-Cpanic=abort` after the supplied rustc arguments so its
 declared initial Rust profile cannot disagree with the body rustc analyzed.
+
+A crate is one namespace and its modules are scopes of it:
+`tests/raw-unit/modules.rs` names each function and type in the module path
+it is declared in, and the namespace declares those modules at their
+declarations. An associated function is named in the scope of its type
+(inherent impl), trait, or trait impl (`<Token as std::ops::Drop>` in
+`drop.rs`). Rustc Public does not say which definitions are modules, so a
+module is an enclosing definition that is neither a body nor the impl or trait
+of an associated item.
+
+`tests/raw-unit/dependency_types.rs` reaches `Option`, `Result`, and `Vec`:
+each dependency crate is a namespace after the crate's, stating
+`verify = false`, with the types the crate reaches. A type whose shape a body
+observes (constructs, matches, or projects) carries it; any other is opaque,
+marked `struct.opaque`. Dependency declarations have generated locations
+naming their definitions, since the unit does not record the toolchain's
+sources. `tests/raw-unit/dependency_calls.rs` calls dependency functions:
+each call is resolved as codegen resolves it (a trait method on a concrete
+type reaches its impl's method), and each called dependency function is
+declared by its generic signature without its body.
+`tests/raw-unit/dependency_projection.rs` calls a function whose signature names
+an associated type. Rustc Public has no normalizing signature query, but the
+types in MIR are normalized, so each distinct associated type is a generic
+parameter after the function's generics, named after the associated item, and a
+call instantiates it by unifying the declared signature with the call's operand
+and destination types. A call this does not bind is an export error at the call.
+Parameter-dependent dispatch uses explicit dictionaries for local single-method
+`&mut self` traits returning unit and for declared `Fn`, `FnMut`, and `FnOnce` bounds. Other trait
+interfaces still require checked evidence (`tests/fixtures/generic_trait_call.rs`).
+
+Export evaluates each constant a body uses and reads the result through the
+type's layout, so no constant is matched by name. Integers, `bool`, `char` and
+`&str` are literals (`tests/raw-unit/const_scalar.rs`); tuples, arrays, structs and
+enum variants are constructions of their parts (`const_aggregate.rs`, padding is
+never read); a constant at `&T` is a shared borrow of its referent's value, the
+core operation of a computed value, since a shared reference is the value it
+observes (`const_reference.rs`). An immutable `static` reads the same way, through
+its initializer (`const_static.rs`). A zero-sized constant of an ADT is the
+constructor of its layout's single variant, recursively, and optimized MIR assigns
+no zero-sized place, so a body returning a zero-sized type returns that value
+(`const_zero_sized.rs`). The confined `driver/polyfill.rs` bridge evaluates
+promoted constants (`const_promoted.rs`, `polyfill.rs`). Constants whose values
+depend on generic parameters and statics with interior mutability remain refused;
+`static mut` stays rejected.
+
+The bridge maps external macro expansion spans to their outer source call sites,
+so `assert!`, `assert_eq!`, and `panic!` carry primary locations in the user's
+source. The dominator fallback remains for generated spans without a local call site.
+
+A failure in a body is not an export error: an rvalue, place, call or constant the
+unit cannot state (a generic constant or a trait call that needs
+evidence) is an opaque node where it stands, stating why, and the rest of the body
+maps. A diverging region holding one collapses; any other survivor refuses its
+function at import. A type only a body states, of a local or of a call's instantiation,
+refuses the function the same way, before anything reads the body
+(`tests/opaque-unit/local_types.rs`). A function whose signature cannot be mapped, by a
+type, a struct field it reaches, or a binder, is declared `function.opaque` with no
+generics or parameters: import reports it as refused and refuses every caller, whatever
+its contract (`tests/opaque-unit/signature_types.rs`). What the whole unit depends on
+stays an export error: names and scopes, `Copy` and destructor properties. The exporter pins `-Copt-level=0` beside
+`-Cpanic=abort`, so a source has one MIR whatever Cargo's profile says.
+
+`tests/opaque-unit` holds artifacts that validation rejects. A constant with no
+statement in the unit (a function pointer, a float) is `ConstValue.opaque` with its
+type's text, and a callee that is unsafe or whose signature has no mapping is
+declared with the Rust property `function.opaque`, with no generics or parameters
+and a `!` result. An import pass collapses the diverging regions that hold them,
+and the import prunes an opaque declaration nothing then calls. Validation rejects a
+node a function reaches and any opaque declaration left (`VIR-OPAQUE-SURVIVOR`).
+A constant states the shape only of an ADT whose variants and fields are all
+visible. Rustc Public exposes no field's visibility, so that is a local ADT, an enum,
+a struct without fields, or a struct a body observes, whose fields rustc admitted;
+a constant of any other dependency struct is opaque.
 
 `tests/fixtures/generic.rs` exercises the same callback with one generic trait
 body. The probe checks that it remains one unspecialized body and observes the
@@ -91,8 +164,9 @@ in-bounds result and the preserved panic. `tests/raw-unit/array_repeat.rs` maps 
 `Repeat` to the core compact `repeatVector` primitive, validates its fixed
 length and `Copy` requirement, and executes the baseline without expanding the
 RawUnit artifact in proportion to the array length.
-`tests/raw-unit/slice.rs` preserves Rust's unsized slice as a dynamic core
-vector behind a shared reference. Slice pointer metadata lowers to core
+`tests/raw-unit/slice.rs` preserves Rust's unsized `[T]` as the distinct core
+`Slice<T>` type behind a shared reference. Owned `Vec<T>` remains
+`Vector<T>`; fixed arrays retain their length in their type. Slice pointer metadata lowers to core
 reference dereference plus `length`, and dynamic indexing retains the usual
 explicit bounds assertion; target width is no longer inferred or a preparation
 blocker. Canonical Verex source prints receiver auto-deref as `values.length`
@@ -106,9 +180,21 @@ and compares returned references plus final string heap state across re-import.
 to neutral VIR `length`; its interpreter semantics count UTF-8 bytes, including
 non-ASCII text, and canonical Rust re-import reconstructs the same call.
 `tests/raw-unit/subslice.rs` preserves the from-end MIR subslice generated by a
-rest pattern as a first-class core place. Shared place semantics read and write
-the selected range, and the baseline reaches structured validated VIR without
-inventing pointer arithmetic.
+rest pattern as a first-class core place. Shared borrows read the selected
+range as a slice snapshot; arbitrary mutable subslices remain unsupported
+until their fixed-extent write-back is carried by the native semantics.
+`tests/raw-unit/unsize.rs` folds the coercion of `&[T; N]` to `&[T]` into a borrow
+of the core place `unsize p`, preserving the distinction between fixed storage
+and the exposed slice type. The mutable form in
+`tests/raw-unit/unsize_mutable.rs` is supported: its loan retains
+the storage extent, and its native current and final readings share that extent
+by construction. Callers do not supply a length-preservation clause. This does
+not permit moving or replacing an unsized slice as a whole, resizing through a
+slice reference, or borrowing a computed slice value mutably. Core and Rust
+source-verification regressions cover these distinctions; the differential gate
+requires every function in `unsize_mutable` and `slice_extent` to execute
+conclusively. The compiler-agreement assumption remains explicit in
+`doc/status/assumptions.md`.
 `tests/raw-unit/slice_from_end.rs` lowers a from-end constant slice index to the
 existing core expression `length(slice) - offset` and index place. The baseline
 therefore preserves the runtime-dependent projection without adding a
@@ -179,7 +265,11 @@ unwind action. Under the fixed `panic=abort` profile, Lean structurizes the
 exact unreachable-unwind form to an explicit core drop followed by the normal
 continuation; validation, preparation, and the VerexSL `drop(place)` baseline
 all check that destruction is not silently erased. Cleanup edges and effectful
-drop glue remain explicit M4 boundaries.
+drop glue remain explicit M4 boundaries. The Rust property `struct.destructor`
+states of an ADT that it or an ADT its fields reach has a `Drop` impl, read from
+the trait impls of each crate the unit reaches; a field's type parameter counts
+for an ADT with visible fields only where it is instantiated, and for an opaque
+one always (`tests/raw-unit/destructors.rs`).
 `tests/raw-unit/assert.rs` detaches an `expected=false` division-by-zero MIR
 assertion, its normal target, and unwind action. The Rust mirror also has typed
 forms for storage-live/dead, place-mention, and user-type-ascription statements.
@@ -199,6 +289,13 @@ profile, where provenance has no safe observable runtime effect; a future
 unsafe profile must preserve them.
 `tests/raw-unit/match_guard.rs` preserves the optimized enum switch plus guard
 branch and validates their checked CFG-to-tree correspondence.
+The `tests/raw-unit` corpus contains positive fixtures admitted by the default
+validation and roundtrip suites. `tests/fixtures` also contains focused positive
+probes alongside rejection/API probes: `partial_move_tag` exercises post-move tag
+reads outside the standard Rust renderer, `associated_aliases` checks dependency
+signature shapes, and `evidence_composition` checks dictionary assembly. Native
+nested slice redirection uses the shared `raw-unit/slice_extent` fixture.
+
 `tests/fixtures/corpus.rs` covers scalar arithmetic, an enum switch, a loop,
 direct calls, an ordinary borrow, explicit drop and cleanup edges, and a raw
 pointer operation. `tests/fixtures/unsupported.rs` checks that inline assembly
@@ -221,9 +318,16 @@ The design now explicitly selects the generic `optimized_mir` returned by the
 pinned Rustc Public API. Plain lifetime/type-generic declarations and local
 direct generic calls retain one parametric body; `generic_identity.rs` checks
 validation, execution, VerexSL, and canonical-Rust re-import. The remaining
-M0 API blockers are that `FnDef` exposes neither its predicates nor a const
-function binder's declared type. The mapper does not work around those gaps
-through `rustc_middle`.
+public API gaps are covered by `driver/polyfill.rs`: item predicates (including
+parent identities and higher-ranked binders), caller-aware instance selection,
+const-parameter types, promoted evaluation, and macro call sites. The bridge also
+preserves early-bound signature lifetimes and queries declared Copy bounds,
+including supertraits. Only this module uses compiler queries and conversion;
+`mapper.rs` and `probe.rs` use public types. Import evidence names the polyfill.
+The mapper exports Copy abilities, region outlives predicates, and the static
+method-evidence slice described below. General trait predicates still need M2's
+checked evidence.
+Retire each wrapper when the pinned public API supplies its replacement.
 
 The M0 probe deliberately does **not** serialize a substitute JSON format. The
 detached writer implements the versioned `RawUnit` JSON spelling owned by
@@ -283,3 +387,78 @@ toolchain, and semantic profile. Each uncached input gets a content-addressed
 Cargo target directory, avoiding both destructive `cargo clean` calls and a
 stale Cargo-fresh root that would skip extraction. `VEREX_RUST_CACHE` may
 override the managed cache root.
+
+## Static method evidence
+
+`tests/evidence-unit/` checks declared method dictionaries with strict
+differential execution. Each dictionary is an ordinary function parameter,
+marked by `method_evidence = <parameter index>`. Its name starts with
+`__trait_<Trait>_<method>`; numeric suffixes disambiguate repeated bounds and
+source locals. Callers select implementations using compiler identities, and
+generic forwarding passes the dictionary without specializing the helper body.
+
+Higher-order invocation and its behavioral predicates require mutable
+referents to contain no references (including references passed as tuple
+components). Nested mutable-reference arguments or results such as
+`&mut &mut [T]` remain outside this higher-order subset; the shared loan
+correspondence used by direct calls does not broaden that boundary.
+
+`FnMut` evidence retains a mutable closure receiver and spreads its argument
+tuple. Results may be generic or aggregate types admitted by the Rust profile.
+Closures inside bounded generic functions capture their inherited dictionaries
+as additional arguments. A non-mutating `Fn` closure gets a checked
+`__fnmut_adapter_*` function that reborrows its receiver as shared.
+Declared `Fn` bounds instead supply a dictionary taking `&F` and invoke the
+shared closure body directly. `evidence-unit/static_fn` covers generic forwarding,
+arguments, generic and tuple results, multiple bounds, and repeated unit calls.
+Generic forwarding from `Fn` to `FnMut` uses a checked adapter that captures
+that shared dictionary and reborrows its mutable receiver. The
+`shared_method_adapter` attribute identifies the captured dictionary parameter;
+Rust source verification generates and proves receiver-preservation and
+behavioral specifications for these borrowing adapters. `closure_method_adapter`
+identifies the concrete closure target, including consuming adapters described below. Users specify the source closure's
+`call` method; they do not write specifications naming generated adapters.
+Generated-contract diagnostics point into the rendered verification file. `evidence-unit/fn_forward` exercises this forwarding
+with arguments, multiple bounds, repeated calls, generic/tuple results, and unit
+results. Declared `FnOnce` bounds supply a dictionary taking `F` by value;
+`evidence-unit/static_fnonce` covers consuming closure bodies, generic forwarding,
+non-`Copy` captures, scalar/tuple results, and unit calls. Concrete `Fn` and
+`FnMut` closures use checked consuming adapters that borrow the receiver for
+the original call and explicitly drop it afterward. Their generated contracts
+retain the invocation, existentially including the final mutable receiver.
+`evidence-unit/fnonce_adapters` checks these conversions. Source verification
+also accepts the generic result `R = ()` in opaque `mutable_call` and `once`
+helpers: it independently checks the helper's contract at the Unit frame and
+keeps the opaque call boundary. The source proof fixture no longer needs
+unit-only helpers. This specialized proof path requires reference-free type
+arguments and acyclic bodies without direct function calls, loops, body
+specifications or assumptions, or model state; borrowed receiver parameters
+remain supported. Native contracts that do not transfer to the Unit reading
+cannot use this body-checking path. See the
+[generic callable Unit results](../../doc/designs/rust-verification.md#generic-callable-unit-results).
+
+Generic borrowed dictionaries can also supply consuming evidence when the
+validator checks that the receiver borrow cannot escape through results or
+mutable writes. `evidence-unit/fnonce_forward` covers these adapters and their
+forwarding paths; the runtime and proof contract enforce the same checked
+dictionary requirement. Generic Unit-result forwarding through direct-call
+chains remains outside the bounded specialization path described above.
+The `fixtures/evidence_composition` fixture covers these combinations through native
+execution, interpreter expectations, and source round-trip.
+`raw-unit/evidence_arguments` additionally exercises arguments, receiver adapters,
+multiple bounds, and struct results in the differential suite. The evaluator also
+checks generic closure construction and captured dictionary invocations, retaining runtime type frames and mutable arguments' prophecies.
+Unsupported captures or incoherent frames remain inconclusive; the strict
+evidence suite requires every input to be conclusive.
+
+Export, execution, and verification are separate gates. A dictionary's
+`MethodContract` requires a defined, non-panicking, memory-preserving invocation;
+its target's proof must establish that obligation. Opaque generic contract
+transfer still rejects types containing mutable loans. Tuple-returning callbacks
+are covered by `raw-unit/tuple_callbacks`, including
+generic results instantiated by tuples, one-element tuples, and nested tuples.
+Tuples containing borrowed references retain the aggregate-reference restrictions.
+
+`function.shapeOnly` marks dependency declarations whose contracts are supplied
+only at modeled shapes. It does not grant unchecked trait evidence or make an
+unmodeled implementation executable.

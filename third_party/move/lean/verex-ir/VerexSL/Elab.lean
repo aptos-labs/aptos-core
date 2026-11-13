@@ -66,7 +66,7 @@ private def isTypeSyntax (stx : Syntax) : Bool :=
     ``verexI8Type, ``verexI16Type, ``verexI32Type, ``verexI64Type,
     ``verexI128Type, ``verexI256Type, ``verexUSizeType, ``verexISizeType,
     ``verexNatType, ``verexIntType, ``verexRangeType, ``verexStateDomainType,
-    ``verexVectorType, ``verexFixedVectorType, ``verexFunctionType,
+    ``verexSliceType, ``verexVectorType, ``verexFixedVectorType, ``verexFunctionType,
     ``verexReferenceType, ``verexTupleType, ``verexAppliedType,
     ``verexStandardAppliedType,
     ``verexNamedType].contains stx.getKind
@@ -124,7 +124,7 @@ private def isExprSyntax (stx : Syntax) : Bool :=
     ``verexVariantTestSurfaceExpr,
     ``verexSelectVariantsExpr,
     ``verexTestVariantsExpr, ``verexUpdateFieldExpr, ``verexDiscriminantExpr,
-    ``verexDiscriminantSurfaceExpr,
+    ``verexDiscriminantSurfaceExpr, ``verexReadDiscriminantExpr,
     ``verexMatchExpr,
     ``verexQuantifierExpr, ``verexSpecificationAnchorMarkerExpr,
     ``verexSpecificationAnchorMarkerBuiltinExpr,
@@ -154,13 +154,13 @@ private def isExprSyntax (stx : Syntax) : Bool :=
     ``verexBorrowGlobalMutSurfaceExpr, ``verexMoveFromSurfaceExpr,
     ``verexMoveToSurfaceExpr,
     ``verexInvokeExpr, ``verexClosureExpr, ``verexInvokeSurfaceExpr,
-    ``verexFunctionValueExpr,
+    ``verexFunctionValueExpr, ``verexClosureItemExpr,
     ``verexBorrowPlaceSurfaceExpr, ``verexBorrowValueSurfaceExpr,
-    ``verexDereferenceSurfaceExpr,
+    ``verexSubsliceExpr, ``verexUnsizeExpr, ``verexDereferenceSurfaceExpr,
     ``verexPlaceBorrowExpr, ``verexRawPlaceBorrowExpr, ``verexRawPlaceAssignExpr,
     ``verexDropPlaceExpr, ``verexDropPlaceSurfaceExpr,
     ``verexMovePlaceSurfaceExpr, ``verexCopyPlaceSurfaceExpr,
-    ``verexReadPlaceSurfaceExpr,
+    ``verexReadPlaceSurfaceExpr, ``verexDowncastExpr,
     ``verexValueBorrowExpr, ``verexFreezeReferenceExpr,
     ``verexFreezeExplicitReferenceExpr, ``verexDereferenceExpr,
     ``verexMutateReferenceExpr, ``verexAssignmentExpr,
@@ -219,16 +219,29 @@ private def isModifierSyntax (stx : Syntax) : Bool :=
     ``verexOpaqueModifier, ``verexDeprecatedModifier,
     ``verexViewModifier].contains stx.getKind
 
-private def isClauseSyntax (stx : Syntax) : Bool :=
+/-- The syntax kinds of the `verexClause` category a contract clause has
+(`clauseOf`). Collecting the clauses of a `spec` item filters by this list,
+so a clause syntax missing from it would be dropped without a diagnostic;
+`VerexSL.Tests.Frontend` holds the category against it and
+`pragmaSyntaxKinds`. -/
+def clauseSyntaxKinds : List Name :=
   [``verexLetPreClause, ``verexLetPostClause,
     ``verexRequiresClause, ``verexEnsuresClause,
-    ``verexAbortsIfClause, ``verexAbortsWithClause, ``verexInvariantClause, ``verexGhostClause,
+    ``verexAbortsIfClause, ``verexAbortsWithClause, ``verexPanicsIfClause,
+    ``verexInvariantClause, ``verexGhostClause,
     ``verexModifiesClause, ``verexLooseModifiesClause, ``verexModifiesAllClause,
     ``verexModifiesOfClause, ``verexModifiesOfAllClause,
-    ``verexReadsClause, ``verexReadsAllClause].contains stx.getKind
+    ``verexReadsClause, ``verexReadsAllClause]
+
+/-- The kinds of that category a pragma has instead (`pragmaOf`). -/
+def pragmaSyntaxKinds : List Name :=
+  [``verexPragmaClause, ``verexQualifiedPragmaClause]
+
+private def isClauseSyntax (stx : Syntax) : Bool :=
+  clauseSyntaxKinds.contains stx.getKind
 
 private def isPragmaSyntax (stx : Syntax) : Bool :=
-  stx.isOfKind ``verexPragmaClause || stx.isOfKind ``verexQualifiedPragmaClause
+  pragmaSyntaxKinds.contains stx.getKind
 
 private def isAbilitySyntax (stx : Syntax) : Bool :=
   [``verexCopyAbility, ``verexDropAbility, ``verexStoreAbility,
@@ -250,7 +263,7 @@ private partial def declarationAbilities (stx : Syntax) : Array Syntax :=
 private def isItemSyntax (stx : Syntax) : Bool :=
   [``verexUseItem, ``verexFriendItem, ``verexNamespacePragmaItem, ``verexConstantItem, ``verexStructItem, ``verexEnumItem,
     ``verexFunctionItem, ``verexSpecFunctionItem, ``verexLemmaItem, ``verexContractItem,
-    ``verexContractWhereItem, ``verexNamespaceInvariantItem].contains stx.getKind
+    ``verexContractWhereItem, ``verexNamespaceInvariantItem, ``verexScopeItem].contains stx.getKind
 
 /-- The Verex items of a module, not descending into its Lean items. -/
 private partial def moduleItems (stx : Syntax) : Array Syntax :=
@@ -278,14 +291,27 @@ partial def openItems (stx : Syntax) : Array Syntax :=
     else if child.isOfKind ``verexTheoremItem then found
     else found ++ openItems child) #[]
 
-/-- The in-module `verify` items and function specifications, in source
-order: what the module verifies explicitly and automatically. -/
-partial def verificationItems (stx : Syntax) : Array Syntax :=
+/-- The name of a scope item. -/
+private def scopeItemName (stx : Syntax) : Array String :=
+  (stx.getArgs.find? (·.isIdent)).toArray.map (·.getId.toString (escape := false))
+
+/-- Items of a module that `select` takes, each with the scope it is in, in
+source order, not descending into its Lean items. -/
+partial def scopedItemsWhere (select : Syntax → Bool) (stx : Syntax)
+    (scope : Array String := #[]) : Array (Array String × Syntax) :=
   stx.getArgs.foldl (fun found child =>
-    if child.isOfKind ``verexVerifyItem || child.isOfKind ``verexContractItem ||
-        child.isOfKind ``verexContractWhereItem then found.push child
+    if select child then found.push (scope, child)
     else if child.isOfKind ``verexTheoremItem then found
-    else found ++ verificationItems child) #[]
+    else if child.isOfKind ``verexScopeItem then
+      found ++ scopedItemsWhere select child (scope ++ scopeItemName child)
+    else found ++ scopedItemsWhere select child scope) #[]
+
+/-- The in-module `verify` items and function specifications, in source
+order, each with its scope: what the module verifies explicitly and
+automatically. -/
+def verificationItems (stx : Syntax) : Array (Array String × Syntax) :=
+  scopedItemsWhere (fun child => child.isOfKind ``verexVerifyItem ||
+    child.isOfKind ``verexContractItem || child.isOfKind ``verexContractWhereItem) stx
 
 /-- Collect category nodes without crossing into a nested expression: a
 subexpression owns its own branches, arms, and binders. -/
@@ -528,7 +554,7 @@ private partial def placeOf (stx : Syntax) : Except String Place := do
     pure <| name.splitOn "." |>.map unquoteIdentifier |>.foldl
       (fun place field => .field place field span)
       (← placeOf base)
-  else if stx.isOfKind ``verexDowncastPlace then
+  else if stx.isOfKind ``verexDowncastPlace || stx.isOfKind ``verexDowncastExpr then
     let some base := (placeChildren stx)[0]? | throw "a downcast place has no base"
     let some path := (pathChildren stx)[0]? | throw "a downcast place names no variant"
     let segments := (pathSegments path).map unquoteIdentifier
@@ -542,6 +568,7 @@ private partial def placeOfExpression : Expr → Except String Place
   | .local name span => pure (.local name span)
   | .field value name span => do pure (.field (← placeOfExpression value) name span)
   | .dereference value span => do pure (.deref (← placeOfExpression value) span)
+  | .downcast place _ => pure place
   | expression => throw s!"expression `{repr expression}` is not an assignable place"
 
 private def profileOf (stx : Syntax) : Except String ProfileName :=
@@ -617,6 +644,10 @@ private partial def typeOf (stx : Syntax) : Except String (Located Ty) := do
     else if stx.isOfKind ``verexIntType then pure .int
     else if stx.isOfKind ``verexRangeType then pure .range
     else if stx.isOfKind ``verexStateDomainType then pure .stateDomain
+    else if stx.isOfKind ``verexSliceType then
+      let some element := (typeChildren stx)[0]?
+        | throw "`Slice` requires an element type"
+      pure (.slice (← typeOf element))
     else if stx.isOfKind ``verexVectorType then
       let some element := (typeChildren stx)[0]?
         | throw "`Vector` requires an element type"
@@ -804,6 +835,42 @@ private def primitiveOf (name : String) (failure : Option ThrowKind) : Except St
   | "moveValue", none => pure .moveValue
   | _, some _ => throw s!"primitive `{name}` does not accept an abort/panic annotation"
   | _, none => throw s!"unknown primitive `{name}` or missing checked-operation failure annotation"
+
+private def parameterOf (stx : Syntax) : Except String Parameter := do
+  let some name := stx.getArgs.find? (·.isIdent)
+    | throw "a parameter must have a name"
+  let some type := (typeChildren stx)[0]?
+    | throw s!"parameter `{name.getId}` must have a type"
+  return {
+    name := name.getId.getString!
+    type := ← typeOf type
+    mutable := containsAtomOutsideTypes "mut" stx
+    span := spanOf stx }
+
+private def binderOf (stx : Syntax) : Except String GenericBinder := do
+  let some name := (identifiers stx)[0]? | throw "a generic binder must have a name"
+  let kind ←
+    if stx.isOfKind ``verexTypeBinder || stx.isOfKind ``verexInferredTypeBinder then
+      pure BinderKind.type
+    else if stx.isOfKind ``verexConstBinder || stx.isOfKind ``verexTypedConstBinder then
+      pure .const
+    else if stx.isOfKind ``verexLifetimeBinder then pure .lifetime
+    else if stx.isOfKind ``verexEvidenceBinder then pure .evidence
+    else throw s!"unknown generic binder `{stx.getKind}`"
+  let abilities ← (childrenWhere isAbilitySyntax stx).mapM abilityOf
+  if kind != .type && !abilities.isEmpty then
+    throw s!"only type binder `{name}` may carry abilities"
+  let type ← if stx.isOfKind ``verexTypedConstBinder then
+      let some type := (typeChildren stx)[0]?
+        | throw s!"const binder `{name}` requires its declared type"
+      some <$> typeOf type
+    else pure none
+  let phantom := containsAtom "phantom" stx
+  if phantom && kind != .type then
+    throw s!"only type binder `{name}` may be phantom"
+  let outlives ← (childrenWhere (fun child => child.isOfKind ``verexNamedLifetime ||
+      child.isOfKind ``verexInferenceLifetime) stx).mapM lifetimeOf
+  return { name, kind, type, abilities, phantom, outlives, span := spanOf stx }
 
 mutual
 private partial def blockExpressionOfEntries (entries : Array Syntax) (span : Span) :
@@ -1191,6 +1258,9 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
       else if containsAtomOutsideExpressions "spec.singletonVector" stx then .singletonVector
       else if containsAtomOutsideExpressions "spec.updateVector" stx then .updateVector
       else if containsAtomOutsideExpressions "spec.concatVector" stx then .concatVector
+      else if containsAtomOutsideExpressions "spec.stringConcat" stx then .stringConcat
+      else if containsAtomOutsideExpressions "spec.stringBytes" stx then .stringBytes
+      else if containsAtomOutsideExpressions "spec.charEncode" stx then .charEncode
       else if containsAtomOutsideExpressions "spec.indexOfVector" stx then .indexOfVector
       else if containsAtomOutsideExpressions "spec.containsVector" stx then .containsVector
       else if containsAtomOutsideExpressions "spec.lengthVector" stx then .lengthVector
@@ -1374,6 +1444,12 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
       | throw "a discriminant expression must have one operand"
     pure (.discriminant (← typeOf types[0]!) (← typeOf types[1]!)
       (← expressionOf value) span)
+  else if stx.isOfKind ``verexReadDiscriminantExpr then
+    let some result := (typeChildren stx)[0]?
+      | throw "a tag read requires its result type"
+    let some place := (exprChildren stx)[0]?
+      | throw "a tag read requires its place"
+    pure (.readDiscriminant (← typeOf result) (← expressionOf place) span)
   else if stx.isOfKind ``verexBlockExpr then
     blockExpressionOfEntries (blockEntries stx) span
   else if stx.isOfKind ``verexGenericCallExpr ||
@@ -1472,6 +1548,23 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
         | some capture => some <$> expressionOf capture
         | none => throw "a closure capture must be an expression"
     pure (.closure (← pathOf path) types (← typeOf result) captures span)
+  else if stx.isOfKind ``verexClosureItemExpr then
+    -- Its parts by position: the body's own binders and types are its own.
+    let captures ← (childrenOfKind ``verexCaptureSyntax stx[5]).mapM fun capture => do
+      let some field := (fieldIdentifierChildren capture)[0]?
+        | throw "a closure capture must name its field"
+      let some value := (exprChildren capture).back?
+        | throw "a closure capture must have a value"
+      pure (← fieldIdentifierOf field, ← typeOf capture[2], ← expressionOf value)
+    let some body := (exprChildren stx).back?
+      | throw "a closure must have a body"
+    pure (.closureItem stx[1].getId.getString!
+      (← (childrenWhere isGenericBinderSyntax stx[2]).mapM binderOf)
+      (← (childrenWhere isAbilitySyntax stx[3]).mapM abilityOf)
+      captures (← (childrenWhere isAttributeSyntax stx[7]).mapM attributeOf) stx[9].getId.getString!
+      (← (childrenWhere isGenericBinderSyntax stx[10]).mapM binderOf)
+      (← (childrenOfKind ``verexParameterSyntax stx[12]).mapM parameterOf)
+      (← typeOf stx[15]) (← expressionOf body) span)
   else if stx.isOfKind ``verexRawPlaceBorrowExpr then
     let some place := (exprChildren stx)[0]?
       | throw "core.borrowPlace must contain a place expression"
@@ -1486,6 +1579,17 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
     let some place := (placeChildren stx)[0]?
       | throw "a drop must contain a place"
     pure (.dropPlace (← placeOf place) span)
+  else if stx.isOfKind ``verexDowncastExpr then
+    pure (.downcast (← placeOf stx) span)
+  else if stx.isOfKind ``verexSubsliceExpr then
+    let some place := (exprChildren stx)[0]? | throw "a subslice place has no base"
+    let bounds := stx.getArgs.filterMap fun child => if isExprSyntax child then none else firstNat? child
+    let #[start, stop] := bounds | throw "a subslice place requires two constant bounds"
+    pure (.subslice (← expressionOf place) start stop
+      (containsAtomOutsideExpressions "core.subsliceFromEnd" stx) span)
+  else if stx.isOfKind ``verexUnsizeExpr then
+    let some place := (exprChildren stx)[0]? | throw "an unsize place has no base"
+    pure (.unsize (← expressionOf place) span)
   else if stx.isOfKind ``verexMovePlaceSurfaceExpr ||
       stx.isOfKind ``verexCopyPlaceSurfaceExpr ||
       stx.isOfKind ``verexReadPlaceSurfaceExpr then
@@ -1687,17 +1791,6 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
   else throw s!"unsupported Verex expression stx `{stx.getKind}`"
 end
 
-private def parameterOf (stx : Syntax) : Except String Parameter := do
-  let some name := stx.getArgs.find? (·.isIdent)
-    | throw "a parameter must have a name"
-  let some type := (typeChildren stx)[0]?
-    | throw s!"parameter `{name.getId}` must have a type"
-  return {
-    name := name.getId.getString!
-    type := ← typeOf type
-    mutable := containsAtomOutsideTypes "mut" stx
-    span := spanOf stx }
-
 private def modifiersOf (syntaxes : Array Syntax) : Except String FunctionModifiers := do
   let mut result : FunctionModifiers := {}
   let mut visibilitySeen := false
@@ -1792,31 +1885,9 @@ private def clauseOf (stx : Syntax) : Except String ContractClause := do
     pure (.abortsIf expression (← expressions[1]?.mapM expressionOf) properties span)
   else if stx.isOfKind ``verexAbortsWithClause then
     pure (.abortsWith expression (← (expressions.extract 1 expressions.size).mapM expressionOf) properties span)
+  else if stx.isOfKind ``verexPanicsIfClause then pure (.panicsIf expression properties span)
   else if stx.isOfKind ``verexInvariantClause then pure (.invariant expression properties span)
   else throw s!"unknown contract clause `{stx.getKind}`"
-
-private def binderOf (stx : Syntax) : Except String GenericBinder := do
-  let some name := (identifiers stx)[0]? | throw "a generic binder must have a name"
-  let kind ←
-    if stx.isOfKind ``verexTypeBinder || stx.isOfKind ``verexInferredTypeBinder then
-      pure BinderKind.type
-    else if stx.isOfKind ``verexConstBinder || stx.isOfKind ``verexTypedConstBinder then
-      pure .const
-    else if stx.isOfKind ``verexLifetimeBinder then pure .lifetime
-    else if stx.isOfKind ``verexEvidenceBinder then pure .evidence
-    else throw s!"unknown generic binder `{stx.getKind}`"
-  let abilities ← (childrenWhere isAbilitySyntax stx).mapM abilityOf
-  if kind != .type && !abilities.isEmpty then
-    throw s!"only type binder `{name}` may carry abilities"
-  let type ← if stx.isOfKind ``verexTypedConstBinder then
-      let some type := (typeChildren stx)[0]?
-        | throw s!"const binder `{name}` requires its declared type"
-      some <$> typeOf type
-    else pure none
-  let phantom := containsAtom "phantom" stx
-  if phantom && kind != .type then
-    throw s!"only type binder `{name}` may be phantom"
-  return { name, kind, type, abilities, phantom, span := spanOf stx }
 
 private def fieldOf (stx : Syntax) : Except String FieldDecl := do
   let some fieldSyntax := (fieldIdentifierChildren stx)[0]?
@@ -1835,7 +1906,7 @@ private def variantOf (stx : Syntax) : Except String VariantDecl := do
   let discriminant ← (childrenOfKind ``verexVariantDiscriminant stx)[0]?.mapM fun node => do
     let some value := firstNat? node
       | throw s!"variant `{name.getId}` has an invalid discriminant"
-    pure (Int.ofNat value)
+    pure (if containsAtom "-" node then -(Int.ofNat value) else Int.ofNat value)
   return {
     name := name.getId.getString!
     fields := ← (childrenOfKind ``verexFieldSyntax stx).mapM fieldOf
@@ -1847,11 +1918,24 @@ private inductive ParsedItem where
   | use (path : Array String)
   | friend (declaration : FriendDecl)
   | namespacePragma (value : Pragma)
-  | contract (name : String) (clauses : Array ContractClause)
-      (pragmas : Array Pragma) (span : Span)
+  | contract (name : String) (shape : Option (Array (Located Ty))) (clauses : Array ContractClause)
+      (pragmas : Array Pragma) (loops : Array LoopSpecification) (span : Span)
+  | scope (name : String) (kind : ScopeKind) (items : Array ParsedItem) (span : Span)
 
-private def itemOf (stx : Syntax) : Except String ParsedItem := do
-  if stx.isOfKind ``verexUseItem then
+private def scopeKindOf (stx : Syntax) : Except String ScopeKind :=
+  if stx.isOfKind ``verexModuleScope then pure .module
+  else if stx.isOfKind ``verexInherentScope then pure .inherent
+  else if stx.isOfKind ``verexTraitScope then pure .trait
+  else if stx.isOfKind ``verexImplementationScope then pure .implementation
+  else throw s!"unsupported Verex scope keyword `{stx.getKind}`"
+
+private partial def itemOf (stx : Syntax) : Except String ParsedItem := do
+  if stx.isOfKind ``verexScopeItem then
+    let some name := stx.getArgs.find? (·.isIdent)
+      | throw "a scope must have a name"
+    pure (.scope name.getId.getString! (← scopeKindOf stx[0])
+      (← (moduleItems stx).mapM itemOf) (spanOf stx))
+  else if stx.isOfKind ``verexUseItem then
     let some path := (pathChildren stx)[0]?
       | throw "a use declaration requires a path"
     pure (.use (← pathOf path))
@@ -1878,10 +1962,11 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
       | throw "a struct must have a name"
     pure (.item (.struct {
       name := name.getId.getString!
+      isOpaque := containsAtom "opaque" stx
       generics := ← (childrenWhere isGenericBinderSyntax stx).mapM binderOf
       fields := ← (childrenOfKind ``verexFieldSyntax stx).mapM fieldOf
       abilities := ← (declarationAbilities stx).mapM abilityOf
-      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
+      attributes := ← (childrenWhereOutsideExpressions isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``verexEnumItem then
     let some name := stx.getArgs.find? (·.isIdent)
@@ -1891,7 +1976,7 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
       generics := ← (childrenWhere isGenericBinderSyntax stx).mapM binderOf
       variants := ← (childrenOfKind ``verexVariantSyntax stx).mapM variantOf
       abilities := ← (declarationAbilities stx).mapM abilityOf
-      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
+      attributes := ← (childrenWhereOutsideExpressions isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``verexFunctionItem then
     let some name := stx.getArgs.find? (·.isIdent)
@@ -1902,11 +1987,11 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
     pure (.item (.function {
       name := name.getId.getString!
       modifiers := ← modifiersOf (childrenWhere isModifierSyntax stx)
-      generics := ← (childrenWhere isGenericBinderSyntax stx).mapM binderOf
+      generics := ← (childrenWhereOutsideExpressions isGenericBinderSyntax stx).mapM binderOf
       parameters := ← (childrenOfKind ``verexParameterSyntax stx).mapM parameterOf
       result := ← typeOf result
       body := ← expressions.back?.mapM expressionOf
-      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
+      attributes := ← (childrenWhereOutsideExpressions isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``verexSpecFunctionItem then
     let some name := stx.getArgs.find? (·.isIdent)
@@ -1928,7 +2013,7 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
       decreases := ← ((childrenOfKind ``verexSpecDecreasesSyntax stx)[0]?.bind
         (exprChildren · |>.back?)).mapM expressionOf
       body := ← expressions.back?.mapM expressionOf
-      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
+      attributes := ← (childrenWhereOutsideExpressions isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``verexLemmaItem then
     let some name := stx.getArgs.find? (·.isIdent)
@@ -1976,55 +2061,133 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
   else if stx.isOfKind ``verexContractItem || stx.isOfKind ``verexContractWhereItem then
     let some name := stx.getArgs.find? (·.isIdent)
       | throw "a function contract must name its function"
-    pure (.contract name.getId.getString!
+    let loops ← (childrenOfKind ``verexContractLoopSyntax stx).mapM fun member => do
+      let some number := firstNat? member[1] | throw "a `loop` item names its loop by a number"
+      pure ({ number, conditions := ← specStatementsOf member, span := spanOf member } :
+        LoopSpecification)
+    let shape ← match childrenOfKind ``verexContractShapeSyntax stx |>.back? with
+      | some member =>
+          some <$> (typeChildren member).mapM typeOf
+      | none => pure none
+    pure (.contract name.getId.getString! shape
       (← (childrenWhere isClauseSyntax stx).mapM clauseOf)
-      (← (childrenWhere isPragmaSyntax stx).mapM pragmaOf) (spanOf stx))
+      (← (childrenWhere isPragmaSyntax stx).mapM pragmaOf) loops (spanOf stx))
   else throw s!"unsupported Verex namespace item `{stx.getKind}`"
-
-private def attachContracts (parsed : Array ParsedItem) : Except String (Array Item) := do
-  let contracts := parsed.filterMap fun
-    | .contract name clauses pragmas span => some (name, clauses, pragmas, span)
-    | _ => none
-  for (name, _, _, _) in contracts do
-    if contracts.countP (·.1 == name) > 1 then
-      throw s!"function `{name}` has more than one `spec` block"
-    unless parsed.any fun
-        | .item (.function declaration) => declaration.name == name
-        | .item (.struct declaration) => declaration.name == name
-        | .item (.enum declaration) => declaration.name == name
-        | _ => false do
-      throw s!"specification names unknown function or nominal declaration `{name}`"
-  return parsed.filterMap fun
-    | .contract .. => none
-    | .use .. => none
-    | .friend .. => none
-    | .namespacePragma .. => none
-    | .item (.function declaration) =>
-        let contract := contracts.find? (·.1 == declaration.name)
-        let clauses := contract.map (·.2.1) |>.getD #[]
-        let pragmas := contract.map (·.2.2.1) |>.getD #[]
-        some (.function { declaration with
-          contract := clauses, contractSpan := contract.map (·.2.2.2), pragmas })
-    | .item (.struct declaration) =>
-        let contract := contracts.find? (·.1 == declaration.name)
-        let clauses := contract.map (·.2.1) |>.getD #[]
-        let pragmas := contract.map (·.2.2.1) |>.getD #[]
-        some (.struct { declaration with
-          contract := clauses, contractSpan := contract.map (·.2.2.2), pragmas })
-    | .item (.enum declaration) =>
-        let contract := contracts.find? (·.1 == declaration.name)
-        let clauses := contract.map (·.2.1) |>.getD #[]
-        let pragmas := contract.map (·.2.2.1) |>.getD #[]
-        some (.enum { declaration with
-          contract := clauses, contractSpan := contract.map (·.2.2.2), pragmas })
-    | .item item => some item
-
-private def pathName (segments : Array String) : Name :=
-  segments.foldl (fun name segment => Name.str name segment) .anonymous
 
 /-- Syntax spanning a byte range of the file, so a message lands on it. -/
 private def rangeSyntax (startByte endByte : Nat) : Syntax :=
   Syntax.atom (SourceInfo.synthetic ⟨startByte⟩ ⟨endByte⟩) ""
+
+private structure ParsedContract where
+  scope : Array String
+  name : String
+  shape : Option (Array (Located Ty))
+  clauses : Array ContractClause
+  pragmas : Array Pragma
+  loops : Array LoopSpecification
+  span : Span
+
+/-- Every parsed item with the scope it is in; a scope's blocks together. -/
+private partial def scopedParsedItems (parsed : Array ParsedItem) (scope : Array String := #[]) :
+    Array (Array String × ParsedItem) :=
+  parsed.flatMap fun
+    | .scope name _ items _ => scopedParsedItems items (scope.push name)
+    | item => #[(scope, item)]
+
+private partial def attachIn (contracts : Array ParsedContract) (scope : Array String)
+    (closures : Array (Array String × String)) (parsed : Array ParsedItem) : Array Item :=
+  parsed.filterMap fun
+    | .contract name none clauses pragmas loops span =>
+        -- A closure expression declares the function; `lower` joins the two.
+        if closures.contains (scope, name) then
+          some (.function { name, contract := clauses, contractSpan := span
+                            loopSpecifications := loops, pragmas, contractOnly := true, span })
+        else none
+    | .contract .. => none
+    | .use .. => none
+    | .friend .. => none
+    | .namespacePragma .. => none
+    | .scope name kind items span =>
+        some (.scope name kind (attachIn contracts (scope.push name) closures items) span)
+    | .item (.function declaration) =>
+        let named := contracts.filter fun candidate =>
+          candidate.scope == scope && candidate.name == declaration.name
+        let contract := named.find? (·.shape.isNone)
+        some (.function { declaration with
+          contract := contract.map (·.clauses) |>.getD #[]
+          contractSpan := contract.map (·.span)
+          loopSpecifications := contract.map (·.loops) |>.getD #[]
+          pragmas := contract.map (·.pragmas) |>.getD #[]
+          shapes := named.filterMap fun candidate => candidate.shape.map fun arguments =>
+            { arguments, contract := candidate.clauses, pragmas := candidate.pragmas
+              span := candidate.span } })
+    | .item (.struct declaration) =>
+        let contract := contracts.find? fun candidate =>
+          candidate.scope == scope && candidate.name == declaration.name
+        some (.struct { declaration with
+          contract := contract.map (·.clauses) |>.getD #[]
+          contractSpan := contract.map (·.span)
+          pragmas := contract.map (·.pragmas) |>.getD #[] })
+    | .item (.enum declaration) =>
+        let contract := contracts.find? fun candidate =>
+          candidate.scope == scope && candidate.name == declaration.name
+        some (.enum { declaration with
+          contract := contract.map (·.clauses) |>.getD #[]
+          contractSpan := contract.map (·.span)
+          pragmas := contract.map (·.pragmas) |>.getD #[] })
+    | .item item => some item
+
+private def attachContracts (parsed : Array ParsedItem) : Except (Option Span × String) (Array Item) := do
+  let placed := scopedParsedItems parsed
+  for (scope, item) in placed do
+    unless scope.isEmpty do
+      match item with
+      | .use .. => throw (none, "a `use` declaration belongs to the namespace, not to a scope")
+      | .friend declaration =>
+          throw (some declaration.span, "a `friend` declaration belongs to the namespace")
+      | .namespacePragma .. => throw (none, "a namespace `pragma` belongs to the namespace")
+      | .item (.namespaceInvariants _) =>
+          throw (none, "a module specification belongs to the namespace, not to a scope")
+      | _ => pure ()
+  let contracts := placed.filterMap fun
+    | (scope, .contract name shape clauses pragmas loops span) =>
+        some ({ scope, name, shape, clauses, pragmas, loops, span } : ParsedContract)
+    | _ => none
+  let closures := closureFunctions (attachIn #[] #[] #[] parsed)
+  for contract in contracts do
+    let name := contract.name
+    let inScope := placed.filterMap fun (scope, item) =>
+      if scope == contract.scope then some item else none
+    if contract.shape.isNone &&
+        (contracts.filter fun other => other.scope == contract.scope && other.shape.isNone).countP
+          (·.name == name) > 1 then
+      throw (some contract.span, s!"function `{name}` has more than one `spec` block")
+    if contract.shape.isSome then
+      if let some item := contract.loops[0]? then
+        throw (some item.span, s!"a contract at a shape is of a function without a body, which has \
+          no loop {item.number}")
+      if inScope.any (fun
+          | .item (.struct declaration) => declaration.name == name
+          | .item (.enum declaration) => declaration.name == name
+          | _ => false) then
+        throw (some contract.span, s!"`{name}` is no function, and has no contract at a shape")
+    if inScope.any (fun
+        | .item (.struct declaration) => declaration.name == name
+        | .item (.enum declaration) => declaration.name == name
+        | _ => false) then
+      if let some item := contract.loops[0]? then
+        throw (some item.span, s!"`{name}` is no function, and has no loop {item.number}")
+    unless (contract.shape.isNone && closures.contains (contract.scope, name)) || inScope.any fun
+        | .item (.function declaration) => declaration.name == name
+        | .item (.struct declaration) => declaration.name == name
+        | .item (.enum declaration) => declaration.name == name
+        | _ => false do
+      throw (some contract.span,
+        s!"specification names unknown function or nominal declaration `{name}`")
+  return attachIn contracts #[] closures parsed
+
+private def pathName (segments : Array String) : Name :=
+  segments.foldl (fun name segment => Name.str name segment) .anonymous
 
 /-- Log diagnostics, each as its byte range, severity, and message, at its
 range or at the command when it has none. A body and its specification
@@ -2121,7 +2284,10 @@ def compilationUnitOfSyntax (stx : Syntax) (sourceName : String)
     throw (stx, "a use declaration must contain at least two path segments")
   if uses.zipIdx.any fun (path, index) => uses.take index |>.contains path then
     throw (stx, "a use declaration may occur only once")
-  let parsed ← attachContracts parsedItems |>.mapError (stx, ·)
+  let parsed ← attachContracts parsedItems |>.mapError fun (span, message) =>
+    (match span with
+      | some span => rangeSyntax span.startByte span.endByte
+      | none => stx, message)
   pure {
     sourceName
     namespaces := #[{

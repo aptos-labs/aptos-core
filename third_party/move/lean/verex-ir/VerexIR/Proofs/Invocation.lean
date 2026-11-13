@@ -1,6 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexIR.Proofs.Denote.LoanCorrespondenceFlat
 import VerexIR.Proofs.Behavior
 import VerexIR.Proofs.Completeness
 import VerexIR.Semantics.LoanIndependence
@@ -44,18 +45,19 @@ theorem HasType.plain {unit : ValidatedUnit} {value : RuntimeValue} {type : SemT
   | .signer value => .signer value
   | .tuple values _ elements =>
       .tuple values fun value member => HasTypes.plain elements value (Array.mem_toList_iff.mpr member)
-  | .vector values _ _ _ elements =>
+  | .vector values _ _ _ elements | .slice values _ elements =>
       .vector values fun value member =>
         HasTypeEach.plain elements value (Array.mem_toList_iff.mpr member)
   | .nominal source variant fields _ _ _ _ _ _ _ _ _ _ typed =>
       .nominal source variant fields fun value member =>
         HasTypes.plain typed value (Array.mem_toList_iff.mpr member)
-  | .closure function mask instantiation captures _ _ _ _ _ _ _ _ _ _ _ _ typed _ _ =>
+  | .closure function mask instantiation captures _ _ _ _ _ _ _ _ _ _ _ _ _ typed _ _ =>
       .closure function mask instantiation captures fun value member =>
         HasTypes.plain typed value (Array.mem_toList_iff.mpr member)
-  | .borrow _ _ _ loan_eq _ => nomatch loan_eq
+  | .borrow _ _ _ loan_eq _ _ => nomatch loan_eq
   | .shared _ _ typed => HasType.plain typed
-  | .dead _ => .unit
+  | .observed _ _ _ typed => HasType.plain typed
+  | .dead _ => .retired
   | .hole _ _ _ loan_eq _ _ => nomatch loan_eq
   | .unitEmptyTuple => .unit
   | .emptyTupleUnit => .tuple #[] fun _ member => nomatch member
@@ -117,6 +119,7 @@ def ClosureTyped (unit : ValidatedUnit) (function : FunctionHandle) (mask : Nat)
     targetNs.functions[function.functionId.index]? = some declaration ∧
     StaticTyping.signatureTypes? targetNs declaration
       (frameEnv declaration.signature.generics arguments) = some (allParameters, results) ∧
+    SizedArguments arguments ∧
     FrameInstantiation targetNs (requiredAt unit function) typeInstantiation
       (frameEnv declaration.signature.generics arguments) ∧
     mask < 2 ^ declaration.signature.parameters.size ∧
@@ -190,6 +193,20 @@ theorem lendArguments_refFree {σs : NRow} (free : σs.refFree = true) {args : H
   | nil => simp only [Option.some.injEq] at lent; exact ⟨rfl, lent.symm⟩
   | cons _ _ => simp at lent
 
+theorem Denote.resultCodec_none_encode (result : ResultShape.none.carrier) :
+    (resultCodec .none).encode result = #[] := rfl
+
+theorem Denote.resultCodec_one_encode (τ : NTy) (result : τ.carrier) :
+    (resultCodec (.one τ)).encode result = #[τ.encode result] := rfl
+
+/-- A reference-free result lends as its encoding. -/
+theorem Denote.ResultShape.lend_encode : (shape : ResultShape) → shape.row.refFree = true →
+    (result : shape.carrier) → shape.lend false result [] = some ((resultCodec shape).encode result)
+  | .none, _, _ => rfl
+  | .one τ, free, result => by
+      simp only [NRow.refFree, Bool.and_true] at free
+      simp only [ResultShape.lend, NTy.lend_refFree τ free false result [], resultCodec_one_encode]
+
 /-- A run of a typed closure on typed arguments from typed global memory has
 no undefined outcome: every run of its target returns results that decode
 at the invocation's type. -/
@@ -218,18 +235,25 @@ theorem closureRun_defined {unit : ValidatedUnit} [FunctionCarriers unit]
   obtain ⟨start', arguments', exit', outcome, represents, -, outcome_eq, step⟩ := run
   obtain ⟨returned, rfl, values_eq⟩ := Outcome.normalize_eq_returned outcome_eq
   obtain ⟨targetNs, declaration, semantic, allParameters, ns_eq, declaration_eq, signature_eq,
-    faithful, -, -, rfl⟩ := typed
+    sizedArguments, faithful, -, -, rfl⟩ := typed
   obtain ⟨loans', inert, startTyped, argumentsTyped⟩ := represents.typed
   obtain ⟨loans'', -, -, returns⟩ := preservation natives step loans' inert targetNs declaration
-    semantic allParameters results ns_eq declaration_eq faithful signature_eq
+    semantic allParameters results ns_eq declaration_eq sizedArguments faithful signature_eq
     (argumentsTyped targetNs declaration semantic allParameters results ns_eq declaration_eq
       faithful signature_eq) startTyped
   obtain ⟨result, lend_result⟩ :=
     decodes loans'' returned (returns returned rfl) (EvalFunction_holeFree step)
   rw [values_eq] at lend_result
-  exact undecoded ⟨result, [], args, lend_result,
-    (ResultShape.lend_refFree shape shapeFree result).trans lend_result, lent,
-    argumentsResolve_refFree σs free args values _⟩
+  have encoded : (resultCodec shape).encode result = values :=
+    Option.some.inj ((ResultShape.lend_encode shape shapeFree result).symm.trans lend_result)
+  rw [← encoded] at undecoded
+  exact undecoded ⟨result, args, [], lent,
+    ⟨LoanCorrespondence.valid_nil,
+      by simpa using NRow.corresponds_refFree [] σs free args,
+      ResultShape.corresponds_refFree [] shape shapeFree result,
+      LoanCorrespondence.settles_nil _ _⟩,
+    LoanCorrespondence.returnsStorage_plain [] (ResultShape.encode_plain shape result) exit⟩
+
 
 /-- The weakest precondition of such a run: what its runs and aborts
 establish. -/
@@ -282,14 +306,14 @@ def readResults : List Bool → List RuntimeValue → List RuntimeValue
 /-- The positions of a parameter row that are mutable references. -/
 def Denote.NRow.mutable : NRow → List Bool
   | .nil => []
-  | .cons (.ref _) rest => true :: rest.mutable
+  | .cons (.ref _) rest | .cons (.sliceRef _) rest => true :: rest.mutable
   | .cons _ rest => false :: rest.mutable
 
 /-- A parameter row each element of which is a mutable reference or holds
 none, as a function's parameters are. -/
 def Denote.NRow.lentFlat : NRow → Bool
   | .nil => true
-  | .cons (.ref _) rest => rest.lentFlat
+  | .cons (.ref σ) rest | .cons (.sliceRef σ) rest => σ.refFree && rest.lentFlat
   | .cons τ rest => τ.refFree && rest.lentFlat
 
 /-- A row without references is flat. -/
@@ -314,6 +338,8 @@ any other argument's encoding. -/
 noncomputable def Denote.HList.entries : {row : NRow} → HList row → List RuntimeValue
   | .nil, _ => []
   | .cons (.ref σ) _, values => σ.plainEncode values.1.1 :: HList.entries values.2
+  | .cons (.sliceRef σ) _, values =>
+      (NTy.vector σ).encode values.1.currentVector :: HList.entries values.2
   | .cons τ _, values => τ.encode values.1 :: HList.entries values.2
 
 /-- The values a plain row of arguments passes, as a settled row is
@@ -321,6 +347,10 @@ noncomputable def Denote.HList.entries : {row : NRow} → HList row → List Run
 noncomputable def Denote.HListPlain.entries : {row : NRow} → HListPlain row → List RuntimeValue
   | .nil, _ => []
   | .cons (.ref σ) _, values => σ.plainEncode values.1.1 :: HListPlain.entries values.2
+  -- A slice reference passes its current reading alone, as `HList.entries`
+  -- has it.
+  | .cons (.sliceRef σ) _, values =>
+      (NTy.vector σ).plainEncode values.1.currentVector :: HListPlain.entries values.2
   | .cons τ _, values => τ.plainEncode values.1 :: HListPlain.entries values.2
 
 /-- The entry values of a row of arguments hold no loan. -/
@@ -347,6 +377,7 @@ theorem Denote.HList.entries_settle : (row : NRow) → (values : HList row) →
           | rfl
           | rw [show NTy.settle _ values.1 = NTy.forget _ values.1 from rfl,
               NTy.plainEncode_forget]
+          | exact congrArg (· :: _) (NTy.plainEncode_forget (.vector _) values.1.currentVector)
 
 /-- Settling is idempotent. -/
 theorem Denote.HList.settle_settle : (row : NRow) → (values : HList row) →
@@ -355,7 +386,9 @@ theorem Denote.HList.settle_settle : (row : NRow) → (values : HList row) →
   | .cons τ rest, values => by
       have later := Denote.HList.settle_settle rest values.2
       cases τ <;>
-        simp only [HList.settle, HListPlain.settle, NTy.settle, NTy.settlePlain, NTy.forget, later]
+        simp only [HList.settle, HListPlain.settle, NTy.settle, NTy.settlePlain, NTy.forget,
+          later] <;>
+        rfl
 
 /-- A result's values as a run returns them, read as `readResults` reads
 them: a returned mutable reference as its current value. -/
@@ -363,6 +396,7 @@ noncomputable def Denote.ResultShape.current : (shape : ResultShape) → shape.c
     Array RuntimeValue
   | .none, _ => #[]
   | .one (.ref σ), value => #[σ.plainEncode value.1]
+  | .one (.sliceRef σ), value => #[(NTy.vector σ).encode value.currentVector]
   | .one τ, value => #[τ.encode value]
 
 /-- A result read as values holds no loan. -/
@@ -388,6 +422,11 @@ theorem Denote.ResultShape.eq_of_current : (shape : ResultShape) → {result res
             Codec.encode_eq_encode] at listed settled settled'
           refine Prod.ext listed (NTy.encode_injective σ ?_)
           rw [← NTy.plainEncode_forget, ← NTy.plainEncode_forget, ← settled, ← settled', listed]
+      | sliceRef σ =>
+          have current : result.currentVector = result'.currentVector := by
+            simpa only [ResultShape.current, List.toList_toArray, List.cons.injEq,
+              and_true, NTy.encode, Codec.encode_eq_encode] using listed
+          exact SpecSliceRef.ext current (settled.symm.trans (current.trans settled'))
       | _ =>
           simp only [ResultShape.current, List.toList_toArray, List.cons.injEq, and_true,
             NTy.encode, Codec.encode_eq_encode] at listed
@@ -407,13 +446,22 @@ theorem Denote.NRow.lend_lentFlat : (row : NRow) → row.lentFlat = true → (va
   | .cons τ rest, flat, values, loans => by
       cases τ with
       | ref σ =>
-          simp only [NRow.lentFlat] at flat
+          simp only [NRow.lentFlat, Bool.and_eq_true] at flat
           cases loans with
           | nil => rfl
           | cons loan loans =>
-              simp only [NRow.lend, NTy.lend, Option.bind_some, NRow.mutable, HList.entries,
-                lendMutable, NRow.lend_lentFlat rest flat values.2 loans, ite_false,
-                Bool.false_eq_true]
+              simp only [NRow.lend, NTy.lend, Bool.false_eq_true, if_false,
+                NTy.plainLend_refFree σ flat.1, Option.map_some,
+                Option.bind_some, NRow.mutable, HList.entries,
+                lendMutable, NRow.lend_lentFlat rest flat.2 values.2 loans, ite_false]
+      | sliceRef σ =>
+          simp only [NRow.lentFlat, Bool.and_eq_true] at flat
+          cases loans with
+          | nil => rfl
+          | cons loan loans =>
+              simp only [NRow.lend, NTy.lend, Option.bind_some, NRow.mutable,
+                HList.entries, lendMutable, NRow.lend_lentFlat rest flat.2 values.2 loans,
+                Bool.false_eq_true, ite_false]
       | _ =>
           simp only [NRow.lentFlat, Bool.and_eq_true] at flat
           simp only [NRow.lend, NTy.lend_refFree _ flat.1, Option.bind_some, NRow.mutable,
@@ -442,8 +490,12 @@ theorem Denote.ResultShape.lend_settled : (shape : ResultShape) → shape.row.le
       cases τ with
       | ref σ =>
           simp only [ResultShape.Settled] at settled
+          simp only [ResultShape.row, NRow.lentFlat, Bool.and_true] at flat
           cases loans <;>
-            simp [ResultShape.lend, NTy.lend, settled, NTy.plainEncode_forget]
+            simp [ResultShape.lend, NTy.lend, settled, NTy.plainLend_refFree σ flat]
+      | sliceRef σ =>
+          change result.currentVector = result.finalVector at settled
+          cases loans <;> simp [ResultShape.lend, NTy.lend, settled]
       | _ =>
           simp only [NRow.lentFlat, Bool.and_true] at flat
           simp only [ResultShape.lend, NTy.lend_refFree _ flat]
@@ -460,22 +512,92 @@ theorem Denote.ResultShape.readResults_lend : (shape : ResultShape) → shape.ro
   | .one τ, flat, result, loans, results, lent => by
       cases τ with
       | ref σ =>
+          simp only [ResultShape.row, NRow.lentFlat, Bool.and_true] at flat
           match loans, lent with
           | [], lent => simp [ResultShape.lend, NTy.lend] at lent
           | loan :: rest, lent =>
-              cases rest <;> simp only [ResultShape.lend, NTy.lend, Option.some.injEq,
-                reduceCtorEq] at lent
+              cases rest <;> simp only [ResultShape.lend, NTy.lend, Bool.false_eq_true, if_false,
+                NTy.plainLend_refFree σ flat,
+                Option.map_some, Option.some.injEq, reduceCtorEq] at lent
               subst lent
               simp only [NRow.mutable, List.toList_toArray, readResults, ite_false,
                 RuntimeValue.observe,
                 RuntimeValue.observe_of_plain (NTy.plainEncode_plain σ result.1),
                 ResultShape.current, NTy.plainEncode]
+      | sliceRef σ =>
+          match loans, lent with
+          | [], lent => simp [ResultShape.lend, NTy.lend] at lent
+          | loan :: rest, lent =>
+              cases rest <;> simp only [ResultShape.lend, NTy.lend,
+                Option.some.injEq, reduceCtorEq] at lent
+              subst lent
+              simp only [NRow.mutable, List.toList_toArray, readResults, ite_false,
+                RuntimeValue.observe, RuntimeValue.observe_of_plain
+                  (NTy.encode_plain (.vector σ) result.currentVector), ResultShape.current]
+              exact congrArg List.singleton
+                (RuntimeValue.observe_of_plain (NTy.encode_plain (.vector σ) result.currentVector))
       | _ =>
           simp only [NRow.lentFlat, Bool.and_true] at flat
           simp only [ResultShape.lend, NTy.lend_refFree _ flat] at lent
           cases loans <;> simp only [Option.some.injEq, reduceCtorEq] at lent
           subst lent
           rfl
+
+/-- Flat boundary correspondence supplies the ordinary current-value lending
+witness used by the runtime determinism proof. -/
+theorem Denote.ResultShape.corresponds_lend_flat (correspondence : LoanCorrespondence) :
+    (shape : ResultShape) → shape.row.lentFlat = true → (result : shape.carrier) →
+    {results : Array RuntimeValue} → shape.corresponds correspondence result results →
+    ∃ loans, shape.lend false result loans = some results
+  | .none, _, _, _, related => by
+      change _ = #[] at related
+      subst related
+      exact ⟨[], rfl⟩
+  | .one τ, flat, result, results, related => by
+      obtain ⟨raw, rfl, related⟩ := related
+      cases τ with
+      | ref σ =>
+          simp only [ResultShape.row, NRow.lentFlat, Bool.and_true] at flat
+          obtain ⟨loan, current, final, rfl, _, currentRelated, _⟩ := related
+          have currentEq :=
+            (NTy.plainCorresponds_refFree_iff correspondence σ flat result.1 current).mp
+              currentRelated
+          subst current
+          exact ⟨[loan], by
+            simp [ResultShape.lend, NTy.lend, NTy.plainLend_refFree σ flat]⟩
+      | sliceRef σ =>
+          obtain ⟨loan, rfl, _⟩ := related
+          exact ⟨[loan], rfl⟩
+      | _ =>
+          simp only [ResultShape.row, NRow.lentFlat, Bool.and_true] at flat
+          have encoded := (NTy.corresponds_refFree_iff correspondence _ flat result raw).mp related
+          subst raw
+          exact ⟨[], by simp [ResultShape.lend, NTy.lend_refFree _ flat]⟩
+
+
+/-- A settled flat result resolves storage exactly as its runtime result row. -/
+theorem Denote.ResultShape.returnsStorage_flat (correspondence : LoanCorrespondence) :
+    (shape : ResultShape) → shape.row.lentFlat = true → (result : shape.carrier) →
+    shape.Settled result → {results : Array RuntimeValue} →
+    shape.corresponds correspondence result results → (exit : RuntimeState) →
+    correspondence.ReturnsStorage results exit
+  | .none, _, _, _, _, related, exit => by
+      change _ = #[] at related
+      subst related
+      exact correspondence.returnsStorage_plain (by simp) exit
+  | .one τ, flat, result, settled, _, related, exit => by
+      obtain ⟨raw, rfl, related⟩ := related
+      cases τ with
+      | ref σ =>
+          simp only [ResultShape.row, NRow.lentFlat, Bool.and_true] at flat
+          unfold LoanCorrespondence.ReturnsStorage
+          rw [correspondence.returnedRow_ref_settled flat result settled related]
+      | sliceRef σ =>
+          unfold LoanCorrespondence.ReturnsStorage
+          rw [correspondence.returnedRow_slice_settled result settled related]
+      | _ =>
+          simp only [ResultShape.row, NRow.lentFlat, Bool.and_true] at flat
+          exact correspondence.returnsStorage_refFree flat result related exit
 
 end Lending
 
@@ -852,11 +974,22 @@ private theorem closureRun_ok_agree {executable : ExecutableUnit unit}
     (ok : (closureRun executable closure σs shape args).ok state result post)
     (ok' : (closureRun executable closure σs shape args').ok state result' post') :
     result = result' ∧ post = post' := by
-  obtain ⟨start, loans, supplied, arguments, results, exit, returnedLoans, prophecyRow, encodes,
-    admissible, lends, composes, runs, lendResult, lendProphecy, -, encoded, agree⟩ := ok
-  obtain ⟨start', loans', supplied', arguments', results', exit', returnedLoans', prophecyRow',
-    encodes', admissible', lends', composes', runs', lendResult', lendProphecy', -, encoded',
-    agree'⟩ := ok'
+  obtain ⟨start, loans, supplied, arguments, results, exit, correspondence, encodes,
+    admissible, lends, composes, runs, boundary, encoded, agree⟩ := ok
+  obtain ⟨start', loans', supplied', arguments', results', exit', correspondence',
+    encodes', admissible', lends', composes', runs', boundary', encoded', agree'⟩ := ok'
+  obtain ⟨returnedLoans, lendResult⟩ :=
+    ResultShape.corresponds_lend_flat correspondence shape shapeFlat result boundary.result
+  obtain ⟨returnedLoans', lendResult'⟩ :=
+    ResultShape.corresponds_lend_flat correspondence' shape shapeFlat result' boundary'.result
+  have storage := ResultShape.returnsStorage_flat correspondence shape shapeFlat result
+    settled boundary.result exit
+  have storage' := ResultShape.returnsStorage_flat correspondence' shape shapeFlat result'
+    settled' boundary'.result exit'
+  change StorageEncodes unit post (exit.resolveReturned (correspondence.returnedRow results)) at encoded
+  change StorageEncodes unit post' (exit'.resolveReturned (correspondence'.returnedRow results')) at encoded'
+  rw [storage] at encoded
+  rw [storage'] at encoded'
   obtain ⟨lentRow, lendsRow, rfl⟩ := lendArguments_lentFlat flat lends
   obtain ⟨lentRow', lendsRow', rfl⟩ := lendArguments_lentFlat flat lends'
   rw [entries_of_settle same] at lendsRow'
@@ -874,20 +1007,16 @@ private theorem closureRun_ok_agree {executable : ExecutableUnit unit}
   rw [read, read'] at readAlike
   have sameResult := ResultShape.eq_of_current shape settled settled'
     (Array.toList_inj.mp readAlike).symm
-  rw [ResultShape.lend_settled shape shapeFlat result settled, lendResult] at lendProphecy
-  rw [ResultShape.lend_settled shape shapeFlat result' settled', lendResult'] at lendProphecy'
-  obtain rfl : prophecyRow = results := (Option.some.inj lendProphecy).symm
-  obtain rfl : prophecyRow' = results' := (Option.some.inj lendProphecy').symm
   refine ⟨sameResult, ?_⟩
-  suffices same : (exit'.resolveReturned prophecyRow').globals =
-        (exit.resolveReturned prophecyRow).globals ∧
-      (exit'.resolveReturned prophecyRow').tableHandles =
-        (exit.resolveReturned prophecyRow).tableHandles by
+  suffices same : (exit'.resolveReturned results').globals =
+        (exit.resolveReturned results).globals ∧
+      (exit'.resolveReturned results').tableHandles =
+        (exit.resolveReturned results).tableHandles by
     exact (memory_eq_of_encodes encoded' encoded same agree' agree).symm
   have resolved := RuntimeState.resolveReturned_rename injective (state' := { exit with
-    globals := exit.globals.rename ρ }) rfl prophecyRow
+    globals := exit.globals.rename ρ }) rfl results
   have resolved₂ := RuntimeState.resolveReturned_rename injective₂ (state' := { exit' with
-    globals := exit'.globals.rename ρ₂ }) rfl prophecyRow'
+    globals := exit'.globals.rename ρ₂ }) rfl results'
   rw [GlobalMap.rename_of_plain _ encoded.globals.plain] at resolved
   rw [GlobalMap.rename_of_plain _ encoded'.globals.plain] at resolved₂
   rw [← resolved, ← resolved₂]
@@ -904,7 +1033,7 @@ private theorem closureRun_not_aborts_of_ok {executable : ExecutableUnit unit}
     ¬∃ error, (closureRun executable closure σs shape args').aborts state error := by
   rintro ⟨error, start', loans', supplied', arguments', encodes', admissible', lends', composes',
     aborted⟩
-  obtain ⟨start, loans, supplied, arguments, results, exit, -, -, encodes, admissible, lends,
+  obtain ⟨start, loans, supplied, arguments, results, exit, -, encodes, admissible, lends,
     composes, runs, -⟩ := ok
   obtain ⟨lentRow, lendsRow, rfl⟩ := lendArguments_lentFlat flat lends
   obtain ⟨lentRow', lendsRow', rfl⟩ := lendArguments_lentFlat flat lends'
@@ -1084,8 +1213,9 @@ def Denote.NTy.scalarType? : NTy → Option SemTy
   | .signer => some .signer
   | .string => some .string
   | .bytes => some .bytes
-  | .unit | .tuple _ | .struct .. | .enum .. | .vector _ | .table _ _ | .ghost _ | .ref _
-  | .param _ | .function .. => none
+  | .char => some .character
+  | .unit | .tuple _ | .struct .. | .enum .. | .vector _ | .slice _ | .array _ _ | .table _ _ | .ghost _ | .ref _ | .sliceRef _
+  | .param _ | .function .. | .nominal .. | .observed _ => none
 
 theorem Denote.NTy.encode_hasType {unit : ValidatedUnit} [FunctionCarriers unit]
     [Skolems unit] {loans : LoanTypes} :
@@ -1111,10 +1241,13 @@ theorem Denote.NTy.encode_hasType {unit : ValidatedUnit} [FunctionCarriers unit]
       simp only [NTy.scalarType?, Option.some.injEq] at scalar; subst scalar; exact .string value
   | .bytes, _, scalar, value => by
       simp only [NTy.scalarType?, Option.some.injEq] at scalar; subst scalar; exact .bytes value
+  | .char, _, scalar, value => by
+      simp only [NTy.scalarType?, Option.some.injEq] at scalar; subst scalar
+      exact .character value.val value.valid
   | .unit, _, scalar, _ | .tuple _, _, scalar, _ | .struct .., _, scalar, _
-  | .enum .., _, scalar, _ | .vector _, _, scalar, _ | .table _ _, _, scalar, _
-  | .ghost _, _, scalar, _ | .ref _, _, scalar, _ | .param _, _, scalar, _
-  | .function .., _, scalar, _ => by
+  | .enum .., _, scalar, _ | .vector _, _, scalar, _ | .slice _, _, scalar, _ | .array _ _, _, scalar, _ | .table _ _, _, scalar, _
+  | .ghost _, _, scalar, _ | .ref _, _, scalar, _ | .sliceRef _, _, scalar, _ | .param _, _, scalar, _
+  | .function .., _, scalar, _ | .nominal .., _, scalar, _ | .observed _, _, scalar, _ => by
       simp [NTy.scalarType?] at scalar
 
 theorem Denote.NTy.decode_of_hasType {unit : ValidatedUnit} [FunctionCarriers unit]
@@ -1159,10 +1292,17 @@ theorem Denote.NTy.decode_of_hasType {unit : ValidatedUnit} [FunctionCarriers un
       cases typed with
       | bytes value => exact ⟨value, rfl⟩
       | hole => simp [RuntimeValue.holeFree?] at *
+  | .char, _, scalar, value, typed, _ => by
+      simp only [NTy.scalarType?, Option.some.injEq] at scalar; subst scalar
+      cases typed with
+      | character value valid => exact ⟨⟨value, valid⟩, rfl⟩
+      | hole => simp [RuntimeValue.holeFree?] at *
   | .unit, _, scalar, _, _, _ | .tuple _, _, scalar, _, _, _ | .struct .., _, scalar, _, _, _
-  | .enum .., _, scalar, _, _, _ | .vector _, _, scalar, _, _, _ | .table _ _, _, scalar, _, _, _
-  | .ghost _, _, scalar, _, _, _ | .ref _, _, scalar, _, _, _ | .param _, _, scalar, _, _, _
-  | .function .., _, scalar, _, _, _ =>
+  | .enum .., _, scalar, _, _, _ | .vector _, _, scalar, _, _, _ | .slice _, _, scalar, _, _, _ | .array _ _, _, scalar, _, _, _
+  | .table _ _, _, scalar, _, _, _
+  | .ghost _, _, scalar, _, _, _ | .ref _, _, scalar, _, _, _ | .sliceRef _, _, scalar, _, _, _ | .param _, _, scalar, _, _, _
+  | .function .., _, scalar, _, _, _ | .nominal .., _, scalar, _, _, _
+  | .observed _, _, scalar, _, _, _ =>
     by
       simp [NTy.scalarType?] at scalar
 
@@ -1172,11 +1312,12 @@ theorem Denote.NTy.normalize_encode_scalar {unit : ValidatedUnit} [FunctionCarri
     (τ : NTy) → {type : SemTy} → τ.scalarType? = some type → (value : τ.carrier) →
       SemanticOperations.normalize unit (τ.encode value) = τ.encode value
   | .bool, _, _, _ | .int _ _, _, _, _ | .num, _, _, _ | .address, _, _, _ | .signer, _, _, _
-  | .string, _, _, _ | .bytes, _, _, _ => by simp
+  | .string, _, _, _ | .bytes, _, _, _ | .char, _, _, _ => by simp
   | .unit, _, scalar, _ | .tuple _, _, scalar, _ | .struct .., _, scalar, _
-  | .enum .., _, scalar, _ | .vector _, _, scalar, _ | .table _ _, _, scalar, _
-  | .ghost _, _, scalar, _ | .ref _, _, scalar, _ | .param _, _, scalar, _
-  | .function .., _, scalar, _ => by simp [NTy.scalarType?] at scalar
+  | .enum .., _, scalar, _ | .vector _, _, scalar, _ | .slice _, _, scalar, _ | .array _ _, _, scalar, _ | .table _ _, _, scalar, _
+  | .ghost _, _, scalar, _ | .ref _, _, scalar, _ | .sliceRef _, _, scalar, _ | .param _, _, scalar, _
+  | .function .., _, scalar, _ | .nominal .., _, scalar, _
+  | .observed _, _, scalar, _ => by simp [NTy.scalarType?] at scalar
 
 /-- A value typed at a scalar type normalizes to itself: it is a scalar or a
 hole. -/
@@ -1237,6 +1378,7 @@ def observedType : SemTy → SemTy
   | .integer width signed => .integer width signed
   | .tuple elements => .tuple elements
   | .vector element length => .vector element length
+  | .slice element => .slice element
   | .nominal name arguments => .nominal name arguments
   | .function arguments result => .function arguments result
   | .profile value => .profile value
@@ -1399,20 +1541,6 @@ theorem RowDecodes.ofResolved {unit : ValidatedUnit} [FunctionCarriers unit] [Sk
               rw [← Skolems.encode_toRuntime, Skolems.toRuntime_ofRuntime]
               exact congrArg (fun raw => some #[raw]) encoded
 
-theorem Denote.resultCodec_none_encode (result : ResultShape.none.carrier) :
-    (resultCodec .none).encode result = #[] := rfl
-
-theorem Denote.resultCodec_one_encode (τ : NTy) (result : τ.carrier) :
-    (resultCodec (.one τ)).encode result = #[τ.encode result] := rfl
-
-/-- A reference-free result lends as its encoding. -/
-theorem Denote.ResultShape.lend_encode : (shape : ResultShape) → shape.row.refFree = true →
-    (result : shape.carrier) → shape.lend false result [] = some ((resultCodec shape).encode result)
-  | .none, _, _ => rfl
-  | .one τ, free, result => by
-      simp only [NRow.refFree, Bool.and_true] at free
-      simp only [ResultShape.lend, NTy.lend_refFree τ free false result [], resultCodec_one_encode]
-
 @[vir_denote_norm] theorem Denote.ResultShape.row_none : ResultShape.none.row = .nil := rfl
 @[vir_denote_norm] theorem Denote.ResultShape.row_one (τ : NTy) :
     (ResultShape.one τ).row = .cons τ .nil := rfl
@@ -1546,7 +1674,7 @@ theorem ClosureTyped.ofTypes {unit : ValidatedUnit} {function : FunctionHandle} 
   have empty : frameEnv declaration.signature.generics #[] = #[] := by
     rw [Array.isEmpty_iff] at generics
     simp [frameEnv, StaticTyping.staticEnv, generics]
-  refine ⟨targetNs, declaration, #[], allParameters, namespace_eq, declaration_eq, signature_eq,
+  refine ⟨targetNs, declaration, #[], allParameters, namespace_eq, declaration_eq, signature_eq, by simp [SizedArguments],
     .inl ⟨rfl, fun _ _ _ resolves => ?_⟩, bound, capturesTyped, rfl⟩
   rwa [empty] at resolves
 
@@ -1620,6 +1748,51 @@ theorem FramedAt.of_refFree_false {unit : ValidatedUnit} [FunctionCarriers unit]
     (references : parameters.refFree = false) :
     FramedAt executable parameters shared shape frame function :=
   fun free => by simp [references] at free
+
+/-- The first static method dictionary's checked contract: every invocation
+is defined, cannot panic, and preserves global memory. Mutable receiver state
+remains in the arguments' prophecies; it is not required to stay unchanged.
+Concrete dictionaries discharge this obligation using their target's theorem. -/
+def MethodContract {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit]
+    (parameters : NRow) (shared : Sharing) (shape : ResultShape)
+    (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
+  ∀ (args : HList parameters) (initial : Memory unit),
+    wp (closureMeaning executable parameters shared shape function args)
+      (fun _ final => final = initial) (fun _ => False) initial
+
+theorem MethodContract.of_instantiate {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Θ : Skolems unit]
+    (θ : TypeArgs) (free : θ.1.refFree = true) {parameters : NRow}
+    {shared : Sharing} {shape : ResultShape}
+    {function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+      (.function parameters shared shape.row)}
+    (checked : MethodContract executable (NRow.subst θ.1 parameters) shared (shape.subst θ.1)
+      (shape.functionOfSkolem θ parameters shared function)) :
+    @MethodContract unit _ executable (Skolems.instantiate θ Θ)
+      parameters shared shape function := by
+  intro args initial
+  rw [closureMeaning_instantiate executable θ free parameters shared shape function args]
+  simpa only [wp_bind, wp_pure] using checked (HList.ofSkolem θ parameters args) initial
+
+/-- Use a checked dictionary without assuming reference-free arguments. The
+success hypothesis retains the entire receiver transition in `EnsuresOf`. -/
+theorem MethodContract.invoke {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Skolems unit]
+    {parameters : NRow} {shared : Sharing} {shape : ResultShape}
+    {function : (NTy.function parameters shared shape.row).carrier}
+    (checked : MethodContract executable parameters shared shape function)
+    (args : HList parameters) {initial : Memory unit}
+    {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
+    (returns : ∀ result,
+      EnsuresOf (closureMeaning executable) parameters shared shape function args result initial initial →
+      ensures result initial) :
+    wp (closureMeaning executable parameters shared shape function args) ensures aborts initial := by
+  have safe := checked args initial
+  refine ⟨fun result final run => ?_, fun error run => False.elim (safe.2.1 error run), safe.2.2⟩
+  have same := safe.1 result final run
+  subst final
+  exact returns result run
 
 /-- A literal closure keeps a frame where every run of its target from
 typed memory, at any arguments, keeps it: the frame its body establishes,

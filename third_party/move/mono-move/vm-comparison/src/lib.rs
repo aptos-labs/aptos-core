@@ -17,6 +17,9 @@
 //!   a hook in the VM which was enabled long before reflection code was added.
 //!   To test both VMs, the modules needed to run via the newer reflection path
 //!   override that state, and the appropriate features are enabled.
+//! - MonoMove only implements the versioned transaction prologue and epilogue.
+//!   `transaction_validation` is overridden to have them, and the versioned
+//!   validation feature is enabled so V1 runs the same path.
 
 pub mod coin_supply;
 pub mod features;

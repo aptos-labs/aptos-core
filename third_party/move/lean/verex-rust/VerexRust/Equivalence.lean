@@ -104,6 +104,7 @@ mutual
     | .integer width signed => pure s!"integer:{repr width}:{signed}"
     | .tuple elements =>
         pure s!"tuple:{repr (← elements.mapM (typeProjection unit · (fuel - 1)))}"
+    | .slice element => pure s!"slice:{← typeProjection unit element (fuel - 1)}"
     | .vector element length =>
         pure s!"vector:{← typeProjection unit element (fuel - 1)}:{repr length}"
     | .range => pure "range"
@@ -177,7 +178,6 @@ private partial def typeIsCopy (unit : ValidatedUnit) (typeId : TypeId) (fuel : 
 
 private structure LocalProjectionState where
   mappings : Array (LocalId × Nat) := #[]
-  shiftCastSubstitutions : Array (LocalId × ExprId) := #[]
   valueSubstitutions : Array (LocalId × ExprId) := #[]
   localTypes : Array TypeId := #[]
   normalizePureAdministration : Bool := false
@@ -382,34 +382,6 @@ private def trailingPanicGuardSplit? (unit : ValidatedUnit) (ns : ValidatedNames
   some (statements.extract 0 (statements.size - count), suffix, condition,
     panicBranch, continuation, resultExpression.typeId)
 
-/-- rustc makes the `as u32` required by `wrapping_shl`/`wrapping_shr`
-explicit in MIR. The VIR shift primitive accepts an integer distance directly,
-so source rendering introduces this one administrative widening cast. -/
-private def forwardedShiftCast? (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (statements : Array ExprId) (result : Option ExprId) : Option (LocalId × ExprId × ExprId) := do
-  let [statementId] := statements.toList | none
-  let statement ← ns.expressions[statementId.index]?
-  let .assign temporaryPlace castId := statement.kind | none
-  let temporary ← directLocalPlace? ns temporaryPlace
-  let cast ← ns.expressions[castId.index]?
-  let .operation (.primitive .cast) _ castArguments _ := cast.kind | none
-  let [source] := castArguments.toList | none
-  let some (.integer (.bits 32) false) := unit.tables.types[cast.typeId.index]? | none
-  let sourceExpression ← ns.expressions[source.index]?
-  let some (.integer _ false) := unit.tables.types[sourceExpression.typeId.index]? | none
-  let resultId ← result
-  let resultExpression ← ns.expressions[resultId.index]?
-  let .block shiftStatements _ := resultExpression.kind | none
-  let shiftStatementId ← shiftStatements[0]?
-  let shiftStatement ← ns.expressions[shiftStatementId.index]?
-  let .assign _ shiftId := shiftStatement.kind | none
-  let shift ← ns.expressions[shiftId.index]?
-  let .operation (.primitive operation) _ shiftArguments _ := shift.kind | none
-  if operation != .shiftLeft && operation != .shiftRight then none else
-  let [_, distance] := shiftArguments.toList | none
-  let distanceLocal ← loadedLocal? ns distance
-  if distanceLocal == temporary then some (temporary, source, resultId) else none
-
 private partial def pureInlineableExpression? (unit : ValidatedUnit)
     (ns : ValidatedNamespace) (expressionId : ExprId) (fuel : Nat) : Bool :=
   match fuel, ns.expressions[expressionId.index]? with
@@ -419,8 +391,6 @@ private partial def pureInlineableExpression? (unit : ValidatedUnit)
       (operation matches .move _ || operation matches .copy _ || operation matches .read _ ||
         operation matches .primitive _) &&
         arguments.all (pureInlineableExpression? unit ns · fuel)
-  | _, some { kind := .block statements result, .. } =>
-      (forwardedShiftCast? unit ns statements result).isSome
   | _, _ => false
 
 /-- Recognize rustc's pure temporary chain ending in a result or returned
@@ -602,37 +572,24 @@ private def directFromEndLoad? (ns : ValidatedNamespace) (expressionId : ExprId)
   if !loadedDereferenceOf? ns loadValue borrowLocal then none
   some { root, target, offset }
 
-private def checkedFromEndLoad? (ns : ValidatedNamespace) (expressionId : ExprId) :
-    Option FromEndLoadAdmin := do
-  let expression ← ns.expressions[expressionId.index]?
-  let .block initialStatements initialResult := expression.kind | none
-  let (statements, some resultId) :=
-    flattenedAdminBlock ns initialStatements initialResult (ns.expressions.size + 1) | none
-  let result ← ns.expressions[resultId.index]?
-  let .ifElse condition success (some panic) := result.kind | none
-  let conditionLocal ← loadedLocal? ns condition
-  let assignments ← statements.mapM (assignedLocal? ns)
-  let conditionValue ← (assignments.find? (·.1 == conditionLocal)).map (·.2)
-  let conditionExpression ← ns.expressions[conditionValue.index]?
-  let .operation (.primitive .less) _ conditionArguments _ := conditionExpression.kind | none
-  let [loadedIndex, loadedBound] := conditionArguments.toList | none
-  let indexLocal ← loadedLocal? ns loadedIndex
-  let boundLocal ← loadedLocal? ns loadedBound
-  let boundValue ← (assignments.find? (·.1 == boundLocal)).map (·.2)
-  let root ← lengthOfDereferencedLocal? ns boundValue
+/-- The root and offset an index local holds as `length(*root) - offset`. -/
+private def fromEndIndex? (ns : ValidatedNamespace) (assignments : Array (LocalId × ExprId))
+    (indexLocal : LocalId) : Option (LocalId × Nat) := do
   let indexValue ← (assignments.find? (·.1 == indexLocal)).map (·.2)
   let index ← ns.expressions[indexValue.index]?
   let .operation (.primitive .subtract) _ indexArguments _ := index.kind | none
   let [loadedLength, offsetId] := indexArguments.toList | none
   let lengthLocal ← loadedLocal? ns loadedLength
   let lengthValue ← (assignments.find? (·.1 == lengthLocal)).map (·.2)
-  if lengthOfDereferencedLocal? ns lengthValue != some root then none
+  let root ← lengthOfDereferencedLocal? ns lengthValue
   let offsetExpression ← ns.expressions[offsetId.index]?
   let .value (.integer offset) _ := offsetExpression.kind | none
   if offset < 0 then none
-  let panicExpression ← ns.expressions[panic.index]?
-  let .throw_ .panic panicArguments := panicExpression.kind | none
-  if !panicArguments.isEmpty then none
+  some (root, offset.toNat)
+
+/-- The borrow, load and forwarding of the element at an index local. -/
+private def fromEndSuccess? (ns : ValidatedNamespace) (success : ExprId) (root indexLocal : LocalId)
+    (offset : Nat) : Option FromEndLoadAdmin := do
   let successExpression ← ns.expressions[success.index]?
   let .block successStatements none := successExpression.kind | none
   let [borrowStatement, loadStatement, forwardStatement] := successStatements.toList | none
@@ -648,7 +605,24 @@ private def checkedFromEndLoad? (ns : ValidatedNamespace) (expressionId : ExprId
   let forward ← ns.expressions[forwardStatement.index]?
   let .assign target forwardedValue := forward.kind | none
   if loadedLocal? ns forwardedValue != some valueLocal then none
-  some { root, target, offset := offset.toNat }
+  some { root, target, offset }
+
+private def checkedFromEndLoad? (ns : ValidatedNamespace) (expressionId : ExprId) :
+    Option FromEndLoadAdmin := do
+  let expression ← ns.expressions[expressionId.index]?
+  let .block initialStatements initialResult := expression.kind | none
+  let (statements, some resultId) :=
+    flattenedAdminBlock ns initialStatements initialResult (ns.expressions.size + 1) | none
+  let result ← ns.expressions[resultId.index]?
+  let .letDecl _ (some check) success := result.kind | none
+  let checkExpression ← ns.expressions[check.index]?
+  let .operation (.primitive (.checkVectorIndex .panic)) _ checkArguments _ :=
+    checkExpression.kind | none
+  let [_, checkedIndex] := checkArguments.toList | none
+  let indexLocal ← loadedLocal? ns checkedIndex
+  let assignments ← statements.mapM (assignedLocal? ns)
+  let (root, offset) ← fromEndIndex? ns assignments indexLocal
+  fromEndSuccess? ns success root indexLocal offset
 
 private def fromEndLoad? (ns : ValidatedNamespace) (expressionId : ExprId) :
     Option FromEndLoadAdmin :=
@@ -747,6 +721,20 @@ private def checkedIndexLoad? (unit : ValidatedUnit) (state : LocalProjectionSta
   let value ← assignedValue? ns statements indexLocal
   some { success, substitution := some (indexLocal, value) }
 
+/-- rustc holds a literal index in a temporary, and no check remains of an
+index below an array's literal length. -/
+private def literalIndexLoad? (ns : ValidatedNamespace) (expressionId : ExprId) :
+    Option CheckedIndexLoad := do
+  let expression ← ns.expressions[expressionId.index]?
+  let .block statements (some success) := expression.kind | none
+  let [statement] := statements.toList | none
+  let (indexLocal, value) ← assignedLocal? ns statement
+  let literal ← ns.expressions[value.index]?
+  let .value (.integer _) _ := literal.kind | none
+  let (_, index) ← directIndexedReturn? ns success
+  if loadedLocal? ns index != some indexLocal then none
+  some { success, substitution := some (indexLocal, value) }
+
 /-! The standard-Rust renderer spells an enum discriminant and a downcast-field
 read as borrowed source `match` expressions. rustc lowers those expressions to
 an exhaustive discriminant switch, temporary shared references, and (for a
@@ -762,7 +750,7 @@ private inductive EnumAdminPlace where
 private inductive EnumAdminValue where
   | place (place : EnumAdminPlace)
   | borrow (place : EnumAdminPlace)
-  | discriminant (type : QualifiedRef) (place : EnumAdminPlace)
+  | discriminant (type : Option QualifiedRef) (place : EnumAdminPlace)
   | integer (value : Int)
   | primitive (operation : PrimitiveOperation) (arguments : Array EnumAdminValue)
   | conditional (condition thenValue elseValue : EnumAdminValue)
@@ -792,7 +780,7 @@ private partial def enumAdminPlace? (ns : ValidatedNamespace) (environment : Enu
       some (.field (← enumAdminPlace? ns environment base (fuel - 1)) field)
   | .downcast base variant =>
       some (.downcast (← enumAdminPlace? ns environment base (fuel - 1)) variant)
-  | .index .. | .subslice .. | .ghostField .. => none
+  | .index .. | .subslice .. | .unsize _ | .ghostField .. => none
 
 private partial def enumAdminValue? (ns : ValidatedNamespace) (environment : EnumAdminEnv)
     (expressionId : ExprId) (fuel : Nat) : Option EnumAdminValue := do
@@ -808,10 +796,14 @@ private partial def enumAdminValue? (ns : ValidatedNamespace) (environment : Enu
           | none => some (.place (← enumAdminPlace? ns environment place (fuel - 1)))
       | .borrow .immutable place =>
           some (.borrow (← enumAdminPlace? ns environment place (fuel - 1)))
+      | .readDiscriminant place =>
+          if arguments.isEmpty then
+            some (.discriminant none (← enumAdminPlace? ns environment place (fuel - 1)))
+          else none
       | .data (.discriminant type) => do
           let [argument] := arguments.toList | none
           let .place place ← enumAdminValue? ns environment argument (fuel - 1) | none
-          some (.discriminant type place)
+          some (.discriminant (some type) place)
       | .primitive operation =>
           some (.primitive operation (← arguments.mapM fun argument =>
             enumAdminValue? ns environment argument (fuel - 1)))
@@ -983,6 +975,21 @@ private partial def enumAdminValueProjection (unit : ValidatedUnit) (value : Enu
   | .borrow _ | .discriminant .. =>
       liftProjection <| fail "enum source administration returns a non-value"
 
+/-- Recover the nominal owner of a tag-only read from its place. Unsupported
+projections keep the equivalence check conservative. -/
+private partial def enumAdminPlaceType? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (locals : Array TypeId) : EnumAdminPlace → Option TypeId
+  | .localVar localId => locals[localId.index]?
+  | .downcast base _ => enumAdminPlaceType? unit ns locals base
+  | .field base field => do
+      let type ← enumAdminPlaceType? unit ns locals base
+      let .nominal name _ ← unit.tables.types[type.index]? | none
+      let declaration ← ns.structs.find? (·.name == name)
+      let fields ← match base with
+        | .downcast _ variant => (declaration.variants.find? (·.name == variant)).map (·.fields)
+        | _ => some declaration.fields
+      (fields.find? (·.name == field)).map (·.type.typeId)
+
 private def enumSwitchProjection? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (expressionId : ExprId) (fuel : Nat) : ProjectionM (Option String) := do
   let some expression := ns.expressions[expressionId.index]? | return none
@@ -1050,7 +1057,13 @@ private def enumSwitchProjection? (unit : ValidatedUnit) (ns : ValidatedNamespac
   if projectedArms.isEmpty then return none
   let resultType ← liftProjection <|
     typeProjection unit expression.typeId unit.tables.types.size.succ
-  let enumType ← liftProjection <| qualifiedProjection unit enumType
+  let enumType ← match enumType with
+    | some reference => liftProjection <| qualifiedProjection unit reference
+    | none =>
+        let some type := enumAdminPlaceType? unit ns (← get).localTypes base | return none
+        let some (.nominal name _) := unit.tables.types[type.index]? | return none
+        let some qualified := unit.tables.names[name.index]? | return none
+        liftProjection <| qualifiedProjection unit { namespaceId := qualified.namespaceId, name }
   let base ← enumAdminPlaceProjection unit base
   pure <| some s!"{resultType}:enumSwitch:{enumType}:{base}:{repr projectedArms}"
 
@@ -1070,6 +1083,7 @@ mutual
         pure s!"index:{← placeProjection unit ns base (fuel - 1)}:{← expressionProjection unit ns index (fuel - 1)}"
     | .subslice base start stop fromEnd =>
         pure s!"subslice:{← placeProjection unit ns base (fuel - 1)}:{start}:{stop}:{fromEnd}"
+    | .unsize base => pure s!"unsize:{← placeProjection unit ns base (fuel - 1)}"
     | .downcast base variant =>
         pure s!"downcast:{← placeProjection unit ns base (fuel - 1)}:{← liftProjection <| nameProjection unit variant}"
     | .ghostField base _ field =>
@@ -1153,7 +1167,8 @@ mutual
       match ← fromEndLoadProjection? unit ns expressionId with
       | some normalized => return normalized
       | none => pure ()
-      if let some checked := checkedIndexLoad? unit (← get) ns expressionId then
+      if let some checked := (checkedIndexLoad? unit (← get) ns expressionId).orElse fun _ =>
+          literalIndexLoad? ns expressionId then
         let previous ← get
         let substitutions := match checked.substitution with
           | some substitution => #[substitution] ++ previous.valueSubstitutions
@@ -1261,33 +1276,11 @@ mutual
             | _, _ => pure ()
           let instantiations ← liftProjection <| instantiations.mapM
             (genericArgumentProjection unit · unit.tables.types.size.succ)
-          let shiftArguments (value distance : ExprId) : ProjectionM (Array String) := do
-            let value ← expressionProjection unit ns value (fuel - 1)
-            let state ← get
-            let distance ← match loadedLocal? ns distance with
-              | some localId => match state.shiftCastSubstitutions.find? (·.1 == localId) with
-                  | some substitution =>
-                      expressionProjection unit ns substitution.2 (fuel - 1)
-                  | none => expressionProjection unit ns distance (fuel - 1)
-              | none => expressionProjection unit ns distance (fuel - 1)
-            pure #[value, distance]
-          let arguments ← match operation, arguments.toList with
-            | .primitive .shiftLeft, [value, distance] => shiftArguments value distance
-            | .primitive .shiftRight, [value, distance] => shiftArguments value distance
-            | _, _ => children arguments
+          let arguments ← children arguments
           let operation ← operationProjection unit ns expression.typeId operation fuel
           pure s!"operation:{operation}:{repr instantiations}:{repr arguments}"
       | .block statements result =>
-          match forwardedShiftCast? unit ns statements result with
-          | some (temporary, source, forwardedResult) =>
-              let previous ← get
-              set { previous with
-                shiftCastSubstitutions := #[(temporary, source)] ++ previous.shiftCastSubstitutions }
-              let projected ← expressionProjection unit ns forwardedResult (fuel - 1)
-              let current ← get
-              set { previous with mappings := current.mappings, next := current.next }
-              pure projected
-          | none => match forwardedReturnValue? ns statements result with
+          match forwardedReturnValue? ns statements result with
           | some value =>
               let value ← expressionProjection unit ns value (fuel - 1)
               pure s!"return:{repr #[value]}"
@@ -1383,10 +1376,7 @@ mutual
           pure s!"assignPattern:{← patternProjection unit ns pattern (fuel - 1)}:{← expressionProjection unit ns value (fuel - 1)}"
       | .quantifier .. | .spec _ =>
           liftProjection <| fail "specification expressions are outside Rust source alpha-equivalence"
-    let erasesWrapper := expression.kind matches .letDecl _ none _ ||
-      match expression.kind with
-      | .block statements result => (forwardedShiftCast? unit ns statements result).isSome
-      | _ => false
+    let erasesWrapper := expression.kind matches .letDecl _ none _
     if erasesWrapper then pure kind
     else
       let type := if (← get).normalizePureAdministration && expression.kind matches .throw_ ..
@@ -1402,6 +1392,7 @@ mutual
         pure s!"{action}:{← placeProjection unit ns place fuel}"
     | .borrow kind place => pure s!"borrow:{repr kind}:{← placeProjection unit ns place fuel}"
     | .read place => pure s!"read:{← placeProjection unit ns place fuel}"
+    | .readDiscriminant place => pure s!"readDiscriminant:{← placeProjection unit ns place fuel}"
     | .write place => pure s!"write:{← placeProjection unit ns place fuel}"
     | .drop place => pure s!"drop:{← placeProjection unit ns place fuel}"
     | .call kind => match kind with

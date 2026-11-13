@@ -35,6 +35,12 @@ def givenUnsupported? (unit : ValidatedUnit) (handle : FunctionHandle)
     found || callee == handle) (fun kind _ found => found || kind == "invoke")
     (fun _ _ _ _ _ => true) false
   if unsupported then return "recursive or function-value call interpretation"
+  -- A call at a type argument holding a mutable reference denotes its own
+  -- operation (`InterpreterOps.atInstance`), and a scoped method dictionary
+  -- guards the body's meaning by its entry check; a given proof states neither.
+  if !(compiled.body.instances #[]).isEmpty then
+    return "reference type argument call interpretation"
+  if !compiled.scopedMethods.isEmpty then return "scoped method interpretation"
   -- A type-reflecting native's value is computed by the translator from the
   -- concrete frame; a given family carries no frame to compute it at. The
   -- aggregator model also reads this frame for its element type and fields.
@@ -66,6 +72,13 @@ def givenUnsupported? (unit : ValidatedUnit) (handle : FunctionHandle)
           (nativeModelOf? unit callee calleeNs calleeDeclaration).isNone)).getD false)
     (fun _ _ found => found) false
   if contractless then return "calls to callees without a contract"
+  -- A callee whose contracts are stated at shapes stands by the hypothesis of
+  -- the shape a call matches, which a given call's one premise does not select.
+  let atShapes := compiled.body.foldCalls (fun callee _ _ found => found ||
+      ((unit.namespaces[callee.namespaceId.index]?).bind
+        (·.functions[callee.functionId.index]?)).any (!·.shapes.isEmpty))
+    (fun _ _ found => found) false
+  if atShapes then return "shape contract interpretation"
   if Contract.contractReadsUnit unit handle.namespaceId ns declaration ||
       Contract.contractReadsRequires unit handle.namespaceId declaration then
     return "behavioral contract interpretation"
@@ -92,7 +105,7 @@ def givenDataOwnFor (unit : ValidatedUnit) (handle : FunctionHandle)
 before the walker starts. Translate only heartbeat exceptions into the target's
 budget report; keep clause and authored diagnostics that already occurred.
 The report retains Lean's heartbeat tag for structured consumers. -/
-private def givenVerificationAttempt (ns : VerexIR.Validation.ValidatedNamespace) (function : String)
+private def givenVerificationAttempt (ns : VerexIR.Validation.ValidatedNamespace) (function target : String)
     (authored : Bool) (budget : Nat) (act : TermElabM α) : TermElabM α := do
   let previous := targetStateExt.getState (← getEnv)
   let state ← TargetState.new
@@ -110,13 +123,13 @@ private def givenVerificationAttempt (ns : VerexIR.Validation.ValidatedNamespace
       let overBudget := failure.isMaxHeartbeat ||
         newMessages.any (fun message => message.data.hasTag (· == `runtime.maxHeartbeats))
       if !overBudget then
-        throwError (verificationFailureMessage ns function authored false budget
+        throwError (verificationFailureMessage ns function target authored false budget
           (← failedLeafNames) (← state.budgetStop.get))
       if authored then
         -- The authored tactic's location and detailed cause remain useful.
         -- Its summary deliberately says only that the proof did not close.
         if failure.isMaxHeartbeat then logException failure
-        throwError (verificationFailureMessage ns function true true budget
+        throwError (verificationFailureMessage ns function target true true budget
           (← failedLeafNames) (← state.budgetStop.get))
       -- A flush preserves insertion order but moves the unreported prefix
       -- into reported. Already reported diagnostics cannot be retracted; keep
@@ -128,7 +141,7 @@ private def givenVerificationAttempt (ns : VerexIR.Validation.ValidatedNamespace
           (fun message => !message.data.hasTag (· == `runtime.maxHeartbeats))
       Core.setMessageLog { messages with unreported := kept.foldl (·.push ·) {} }
       throwError (.tagged `runtime.maxHeartbeats
-        (verificationFailureMessage ns function authored true budget
+        (verificationFailureMessage ns function target authored true budget
           (← failedLeafNames) (← state.budgetStop.get)))
   finally
     modifyEnv (targetStateExt.setState · previous)
@@ -163,7 +176,11 @@ private def declareGivenFunctionCore (unit : ValidatedUnit) (handle : FunctionHa
   let budget := (heartbeatBudget? declaration).getD (verex.verifyHeartbeats.get (← getOptions))
   let leafBudget := (leafHeartbeatBudget? declaration).getD (verex.leafHeartbeats.get (← getOptions))
   let function := ((ns.nameOf declaration.name).map (·.name)).getD base.toString
-  liftTermElabM <| givenVerificationAttempt ns function isAuthored budget <|
+  let target := proofTarget function
+    (((ns.nameOf declaration.name).map SpecTypes.scopedSource).getD function)
+  let named := proofTarget function
+    (((ns.nameOf declaration.name).map SpecTypes.scopedSpelling).getD function)
+  liftTermElabM <| givenVerificationAttempt ns named target isAuthored budget <|
     withCurrHeartbeats <|
     withTheReader Core.Context (fun context => { context with maxHeartbeats := budget * 1000 }) <|
     withOptions (fun options =>

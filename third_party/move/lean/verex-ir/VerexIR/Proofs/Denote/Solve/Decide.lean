@@ -1790,6 +1790,47 @@ elab "verex_split_range" : tactic => focusGoal do
   let (cases, goal) ← (← goal.assert `range disjunction proof).intro1P
   replaceMainGoal (← splitValueCases goal cases certified)
 
+/-- The Boolean locals a fact tests in its propositional structure, as
+`b = true → q` or `¬(b = false ∧ p)`. Omega reads no Boolean, so it drops such a fact
+whole, whatever it says of integers. -/
+private partial def testedFlags (fact : Lean.Expr) : Array FVarId :=
+  let fact := fact.consumeMData
+  if fact.isAppOfArity ``And 2 || fact.isAppOfArity ``Or 2 then
+    testedFlags (fact.getArg! 0) ++ testedFlags (fact.getArg! 1)
+  else if fact.isAppOfArity ``Not 1 then testedFlags fact.appArg!
+  else if fact.isArrow then testedFlags fact.bindingDomain! ++ testedFlags fact.bindingBody!
+  else match fact.eq? with
+    | some (type, .fvar flag, value) =>
+        if type.isConstOf ``Bool && (value.isConstOf ``true || value.isConstOf ``false) then
+          #[flag]
+        else #[]
+    | _ => #[]
+
+/-- At most this many flags are split, each doubling a leaf's cases. -/
+private def flagLimit : Nat := 3
+
+/-- Split on a Boolean local that guards a conditional fact: the fact then says what it
+says of integers, or nothing. Fails with no such local or with more than a few, since
+the cases multiply. -/
+elab "verex_split_flag" : tactic => focusGoal do
+  let goal ← getMainGoal
+  let flags ← goal.withContext do
+    let mut flags : Array FVarId := #[]
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail then continue
+      let type ← instantiateMVars decl.type
+      if splitFree type || !(← isProp type) then continue
+      for flag in testedFlags type do
+        unless flags.contains flag do flags := flags.push flag
+    return flags
+  let some flag := flags[0]? | throwError "no fact tests a Boolean local"
+  if flags.size > flagLimit then throwError "the leaf tests too many Boolean locals"
+  replaceMainGoal ((← goal.cases flag).toList.map (·.mvarId))
+
+/-- Decide a leaf case by case over the Boolean locals its conditional facts test
+(`verex_split_flag`), each case normalized, a further flag split in turn. -/
+syntax "verex_decide_flags" : tactic
+
 /-- A transport between a value's spelling and a generic callee's view. -/
 private def isTransport (t : Lean.Expr) : Bool :=
   t.isConstOf ``NTy.toSkolem || t.isConstOf ``NTy.ofSkolem ||
@@ -2518,6 +2559,36 @@ elab "verex_entry_behavior" : tactic => focusGoal do
           replaceMainGoal []
           return
     saved.restore
+  -- A run stated at a row that certifies a value the clause names plain reads
+  -- at that value once its settled row is evaluated.
+  let functionOf (statement : Lean.Expr) (fromEnd : Nat) : Lean.Expr :=
+    statement.getAppArgs[statement.getAppNumArgs - fromEnd]!
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail then continue
+    let statement := StatedFacts.unmarked (← instantiateMVars decl.type)
+    unless statement.isAppOf behavior && statement.getAppNumArgs ≥ 6 &&
+        target.getAppNumArgs ≥ 6 && functionOf statement 5 == functionOf target 6 do continue
+    let saved ← saveState
+    try
+      let fact ← mkAppM reading #[decl.toExpr]
+      -- The reading proves the statement the goal marks.
+      let stated ← mkFreshExprSyntheticOpaqueMVar target
+      let asserted ← stated.mvarId!.assert `verexEntryReading (← inferType fact) fact
+      let (_, next) ← asserted.intro `verexEntryReading
+      setGoals [next]
+      let reading := mkIdent `verexEntryReading
+      evalTactic (← `(tactic| (
+        simp only [VerexIR.Proofs.Denote.HList.settle, VerexIR.Proofs.Denote.NTy.settle,
+          VerexIR.Proofs.Denote.HList.finals, vir_denote_norm] at $reading:ident
+        -- A clause names an integer cut to its width, where the run returns
+        -- the certified integer the cut reads back (`SpecInt.ofInt_val`): the
+        -- goal states the cut, the reading the run's own result.
+        try simp only [VerexIR.SpecInt.ofInt_val]
+        exact $reading)))
+      goal.assign (← instantiateMVars stated)
+      setGoals []
+      return
+    catch _ => saved.restore
   throwError "no hypothesis states the behavior of an arguments row"
 
 /-- A premise of an instance: a hypothesis, either way round, a behavior at
@@ -2552,11 +2623,68 @@ private def writtenPositions (e : Lean.Expr) : MetaM (Array Lean.Expr) :=
       mkAppOptM ``Nat.cast #[mkConst ``Int, none, ← mkAppM ``Array.size #[write.getArg! 1]]
     else pure ((write.getArg! 2).getArg! 0)
 
+theorem getElem?_eq_some_of_read {α : Type} (values : Array α) (position : Nat) (fallback expected : α)
+    (bound : position < values.size) (same : values[position]?.getD fallback = expected) :
+    values[position]? = some expected := by
+  subst same
+  simp only [Array.getElem?_eq_getElem bound, Option.getD_some]
+
+/-- The elements the hypotheses read at positions outside any binder, `v[k]` as a
+contract states it: each lookup with its fallback. -/
+private def statedReads (goal : MVarId) : MetaM (Array (Lean.Expr × Lean.Expr)) := goal.withContext do
+  let mut terms := #[]
+  for decl in ← getLCtx do
+    unless decl.isImplementationDetail do terms := terms.push (← instantiateMVars decl.type)
+  let cache := (← targetState).statedReads
+  if let some reads := (← cache.get)[terms]? then return reads
+  let reads := sitesWhere (fun term => !term.hasLooseBVars && term.isAppOfArity ``Option.getD 3 &&
+    (term.getArg! 1).isAppOfArity ``GetElem?.getElem? 7) terms
+  let reads := reads.map fun read => (read.getArg! 1, read.getArg! 2)
+  unless terms.any (·.hasMVar) do cache.modify (·.insert terms reads)
+  return reads
+
+/-- A lookup in bounds of an element the hypotheses read: `v[k]? = some y` from `k`
+in bounds and what they state of `v[k]` and `y`. -/
+elab "verex_lookup_read" : tactic => focusGoal do
+  let goal ← getMainGoal
+  let target ← goal.withContext (do instantiateMVars (← goal.getType))
+  unless target.isAppOfArity ``Eq 3 && (target.getArg! 2).isAppOfArity ``Option.some 2 &&
+      (target.getArg! 1).isAppOfArity ``GetElem?.getElem? 7 do
+    throwError "the goal is no lookup"
+  let lookup := target.getArg! 1
+  let expected := (target.getArg! 2).appArg!
+  for (stated, fallback) in ← statedReads goal do
+    let found ← goal.withContext do
+      unless ← isDefEq stated lookup do return false
+      let values := lookup.getArg! 5
+      let position := lookup.getArg! 6
+      let bound ← mkFreshExprMVar (← mkAppM ``LT.lt #[position, ← mkAppM ``Array.size #[values]])
+      let same ← mkFreshExprMVar
+        (← mkEq (← mkAppM ``Option.getD #[lookup, fallback]) expected)
+      let saved ← saveState
+      try
+        setGoals [bound.mvarId!]
+        evalTactic (← `(tactic| verex_bounds; omega))
+        setGoals [same.mvarId!]
+        evalTactic (← `(tactic| first
+          | assumption
+          | (apply VerexIR.SpecInt.ext; (try simp only [VerexIR.Proofs.Obligation_eq] at *); omega)))
+        goal.assign (← mkAppM ``getElem?_eq_some_of_read
+          #[values, position, fallback, expected, bound, same])
+        setGoals []
+        return true
+      catch _ =>
+        saved.restore
+        return false
+    if found then return
+  throwError "no hypothesis states the element read"
+
 /-- A premise of a witness at a position the context reads or writes: a
 premise of an instance, the lookup at the position read, or the goal
 rewritten by the context. -/
 macro "verex_witness_premise" : tactic => `(tactic| verex_focus (
   first
+  | verex_timed "wp-read" verex_lookup_read
   | verex_timed "wp-instance" verex_instance_premise
   | verex_timed "wp-simp" (simp (disch := omega) only [Int.toNat_natCast, Array.getElem?_push_size, VerexIR.Proofs.Denote.getElem?_push_of_lt,
       Array.getElem?_setIfInBounds_self_of_lt, Array.getElem?_setIfInBounds_ne]; done)
@@ -2918,6 +3046,63 @@ elab_rules : tactic
       let some proof ← decideInstance (body.beta #[witness]) premise reads | return false
       assignWitnessed goal #[(domain, body, witness)] proof
       return true
+    -- An array witness is most directly stated by a read in the context.
+    -- Try those positions before unrelated locals can exhaust the bounded
+    -- witness search. Other existential shapes retain the late fallback.
+    let statedWitness : TacticM Bool := do
+      unless domain.isConstOf ``Int do return false
+      let mut positions : Array Lean.Expr := #[]
+      for (lookup, _) in ← statedReads goal do
+        let position ← intPosition (lookup.getArg! 6)
+        unless positions.contains position do positions := positions.push position
+      for position in positions do
+        if ← attempt position (← `(tactic| verex_witness_premise)) then return true
+      return false
+    let readsArray := (body.find? (·.isAppOfArity ``GetElem?.getElem? 7)).isSome
+    if readsArray then
+      if ← statedWitness then return
+    -- A binder a clause reads as the result of a function value, where the
+    -- body states a behavior of that value at entry values: the results the
+    -- context's runs of the same value return, and an integer binder's
+    -- value of such a result. The clause names the result of one of the
+    -- runs the leaf holds, so these are the candidates the body itself
+    -- points at; they come before the bounds, each of whose candidates pays
+    -- the whole search of the instance (`verex_entry_behavior` reads a run
+    -- at the entry values of its row).
+    let behaviorWitness : TacticM Bool := do
+      let mut functions : Array Lean.Expr := #[]
+      for stated in conjuncts do
+        let stated := StatedFacts.unmarked stated
+        for (entries, _, _) in entryBehaviorReadings do
+          unless stated.isAppOf entries && stated.getAppNumArgs ≥ 6 do continue
+          let function := stated.getAppArgs[stated.getAppNumArgs - 6]!
+          if function.hasLooseBVars then continue
+          unless functions.contains function do functions := functions.push function
+      if functions.isEmpty then return false
+      let mut runs : Array (Lean.Expr × Lean.Expr) := #[]
+      for decl in ← getLCtx do
+        if decl.isImplementationDetail then continue
+        let statement := StatedFacts.unmarked (← instantiateMVars decl.type)
+        for (_, behavior, _) in entryBehaviorReadings do
+          unless statement.isAppOf behavior && statement.getAppNumArgs ≥ 5 do continue
+          let arguments := statement.getAppArgs
+          unless functions.contains arguments[arguments.size - 5]! do continue
+          let result := arguments[arguments.size - 3]!
+          unless runs.any (·.1 == result) do
+            runs := runs.push (result, arguments[arguments.size - 4]!)
+      -- A run whose arguments read another run's result happens after it, so
+      -- the result of a run reading none is the value a clause's binder
+      -- names first. The later results stay candidates, behind those.
+      let (later, earlier) := runs.partition fun (_, arguments) =>
+        runs.any fun (other, _) => (arguments.find? (· == other)).isSome
+      for (result, _) in earlier ++ later do
+        if ← attempt result (← `(tactic| verex_witness_premise)) then return true
+        unless domain.isConstOf ``Int do continue
+        let some value ← (try some <$> mkAppM ``VerexIR.SpecInt.val #[result]
+            catch _ => pure none) | continue
+        if ← attempt value (← `(tactic| verex_witness_premise)) then return true
+      return false
+    if ← behaviorWitness then return
     -- An integer the body bounds, such as a mutable parameter's value between
     -- two increments. A literal bound, such as a limit of the binder's type
     -- every bounded binder states, is tried after the context's values: a
@@ -2983,6 +3168,8 @@ elab_rules : tactic
       if ← attempt position (← `(tactic| verex_witness_premise)) then return
     for value in literalBounds do
       if ← attempt value (← `(tactic| verex_witness_premise)) then return
+    if !readsArray then
+      if ← statedWitness then return
     -- Prefer witnesses from the predicate and context before enumerating
     -- execution points. A label is an existential, including in caller-side
     -- contracts with no callee points; arithmetic can construct its value
@@ -3208,18 +3395,24 @@ elab "verex_modus_ponens" : tactic => focusGoal do
     (← getLCtx).foldlM (init := #[]) fun found decl => do
       if decl.isImplementationDetail then return found
       let type ← instantiateMVars decl.type
+      -- A callee's clause keeps the marker that names it; the implication
+      -- is its statement.
+      let (type, stated) := if type.isAppOfArity ``VerexIR.Proofs.Obligation 4 then
+          (type.appArg!, mkApp4 (mkConst ``Iff.mp) type type.appArg!
+            (mkAppN (mkConst ``VerexIR.Proofs.Obligation_iff) type.getAppArgs) decl.toExpr)
+        else (type, decl.toExpr)
       unless ← (pure type.isArrow <&&> isProp type) do return found
-      return found.push decl
+      return found.push (decl.fvarId, type, stated)
   -- Omega's decision of each premise, once: the candidates share premises,
   -- such as a position's bounds in the facts about every other position.
   let decided ← IO.mkRef (∅ : Std.HashMap Lean.Expr (Option Lean.Expr))
-  for decl in candidates do
+  for (hypothesis, implication, stated) in candidates do
     -- A candidate whose premises do not all hold leaves no trace; one whose
     -- premises hold keeps what proving them added.
     let saved ← saveState
     try
       let (premises, conclusion) ← goal.withContext do
-        forallTelescope (← instantiateMVars decl.type) fun binders conclusion => do
+        forallTelescope implication fun binders conclusion => do
           if conclusion.hasAnyFVar (binders.contains <| .fvar ·) then
             throwError "a premise is a dependency of the conclusion"
           let types ← binders.mapM fun binder => inferType binder
@@ -3253,8 +3446,8 @@ elab "verex_modus_ponens" : tactic => focusGoal do
         let proof ← instantiateMVars proof
         decided.modify (·.insert premise (some proof))
         proofs := proofs.push proof
-      used := used.push decl.fvarId
-      facts := facts.push (← goal.withContext (mkExpectedTypeHint (mkAppN decl.toExpr proofs)
+      used := used.push hypothesis
+      facts := facts.push (← goal.withContext (mkExpectedTypeHint (mkAppN stated proofs)
         conclusion))
     catch _ => saved.restore
   if facts.isEmpty then
@@ -4302,6 +4495,22 @@ elab "verex_normalizing_stated " label:str step:tactic : tactic => do
     catch _ => remaining := remaining.push goal
   setGoals remaining.toList
 
+/-- A leaf reading a vector its contracts grew or wrote: the clauses stated and
+the vector substituted, so that its reads are rewritten under the bound in the
+context. -/
+elab "verex_grown_vectors" : tactic => focusGoal do
+  let goal ← getMainGoal
+  let terms ← goal.withContext do
+    let declarations := (← getLCtx).decls.toArray.filterMap id
+    return (declarations.filter (!·.isImplementationDetail)).map (·.type) |>.push (← goal.getType)
+  let terms ← terms.mapM instantiateMVars
+  let grown := sitesWhere (fun term =>
+    term.isAppOf ``VerexIR.SpecVector.push || term.isAppOf ``VerexIR.SpecVector.append ||
+      term.isAppOf ``VerexIR.SpecVector.set) terms
+  if grown.isEmpty then throwError "the leaf grows no vector"
+  evalTactic (← `(tactic| simp only [VerexIR.Proofs.Obligation_eq] at *))
+  evalTactic (← `(tactic| all_goals verex_subst_vars))
+
 /-- The general leaf: one pipeline, each stage over the previous stage's
 goals, so that a rewriting pass is never repeated for a later alternative.
 Its stages report under `pipe-` labels (`verex_timed`), so a leaf's
@@ -4310,6 +4519,7 @@ macro "verex_pipeline" : tactic => `(tactic| verex_focus ( (
   verex_subst_vars
   try verex_split_search
   all_goals verex_reduce_projections
+  all_goals try verex_timed "pipe-grown" verex_grown_vectors
   all_goals verex_timed "pipe-simp" (verex_bounded
     (try simp (disch := omega) only [VerexIR.Proofs.Obligation_eq,
       Nat.reduceAdd, Int.reducePow, Int.reduceSub, Nat.reducePow, Nat.reduceSub,
@@ -4320,6 +4530,8 @@ macro "verex_pipeline" : tactic => `(tactic| verex_focus ( (
   | verex_timed "pipe-omega" verex_linear
   -- Positions that range over a few literal values, case by case.
   | verex_timed "pipe-ranges" verex_decide_ranges
+  -- Conditional facts guarded by a Boolean, in each of its cases.
+  | verex_timed "pipe-flags" verex_decide_flags
   | (verex_timed "pipe-round" verex_saturate_round
      all_goals (first
        | done
@@ -4594,6 +4806,10 @@ macro_rules
   (verex_timed "ctx-simp" verex_simp_by_context
    first
    | done
+   -- A behavior at entry values whose result or finals the context only now
+   -- spells as a run's: a value a clause cut to its width is the run's
+   -- result once the cut is read (`SpecInt.ofInt_val`).
+   | verex_timed "ctx-entries" verex_entry_behavior
    | (verex_timed "ctx-bounds" verex_bounds
       verex_timed "ctx-omega" omega))))
 
@@ -5653,12 +5869,23 @@ elab "verex_trace_state " label:str : tactic => do
   unless verex.solverDebug.get (← getOptions) do return
   for goal in ← getGoals do
     goal.withContext do
-      let line (e : Lean.Expr) (limit : Nat := 220) : MetaM String := do
+      let width := verex.solverDebugWidth.get (← getOptions)
+      let line (e : Lean.Expr) (limit : Nat := width) : MetaM String := do
         return ((toString (← ppExpr e)).replace "\n" " " |>.take limit).toString
       IO.println s!"    {label.getString} ⊢ {← line (← instantiateMVars (← goal.getType)) 3000}"
       for fvarId in ← goal.getNondepPropHyps do
         let decl ← fvarId.getDecl
         IO.println s!"      {decl.userName} : {← line (← instantiateMVars decl.type)}"
+
+macro_rules
+  | `(tactic| verex_decide_flags) => `(tactic| verex_focus ( (
+      verex_split_flag
+      all_goals verex_normalize_context
+      all_goals (first
+        | done
+        | verex_timed "flag omega" verex_linear
+        | verex_decide_flags
+        | verex_timed "flag decide" verex_decide_split))))
 
 -- A leaf holding values in a generic callee's view reads its ranges once the
 -- substitutions settled; each case is decided by the pipeline, which splits
@@ -6545,13 +6772,70 @@ private def clauseFailure (origin : Option Provenance) (snippet : String) : Mess
       m!"the update `{snippet}` writes a value out of the ghost field type's domain"
   | _ => m!"the specification clause `{snippet}` is not established"
 
+/-- A value's variant name without the tables it is read through, in the goals
+and messages a proof author reads. -/
+@[app_unexpander VerexIR.Proofs.Denote.variantName]
+private def unexpandVariantName : Lean.PrettyPrinter.Unexpander
+  | `($_ $_ $_ $value) => `(variant $value)
+  | _ => throw ()
+
+/-- The facts of a failing path, as a proof of it starts from: its hypotheses
+about values, without those about the program's semantics. -/
+private def pathFacts (goal : MVarId) : MetaM MessageData := do
+  let mut facts : Array String := #[]
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail || decl.isLet then continue
+    let type ← instantiateMVars decl.type
+    unless ← Lean.Meta.isProp type do continue
+    -- An obligation's location is not part of what it says.
+    let type := if type.isAppOfArity ``VerexIR.Proofs.Obligation 4 then type.getArg! 3 else type
+    if type.isConstOf ``True then continue
+    if type.getUsedConstants.any fun name =>
+        name == ``VerexIR.Proofs.wp || name == ``VerexIR.Validation.prepareExecution ||
+        name == ``VerexIR.Proofs.Satisfies || name == ``VerexIR.Proofs.Denote.FrameOf then continue
+    if let some (_, lhs, rhs) := type.eq? then
+      if ← Lean.Meta.withReducible (Lean.Meta.isDefEq lhs rhs) then continue
+    facts := facts.push ((← Lean.Meta.ppExpr type).pretty (width := 1000000))
+  if facts.isEmpty then return m!""
+  return m!"\n  from: {"; ".intercalate facts.toList}"
+
+/-- What a failed `no panic` or `no abort` says: the path's selector, and the
+operation the path fails at, at its source position. -/
+private def failingPathFailure (key : ObligationKey) (decisions : Array Decision) :
+    TacticM MessageData := do
+  let some site := abortSiteOf? decisions | return m!"`{key.text}` is not established"
+  let selector := s!"{key.text} when {(Decision.aborts site).text}"
+  let failing := if key.kind == "no panic" then "panic" else "abort"
+  let some (_, origin, expanded) := (← (← targetState).failureSites.get).find?
+      (·.1 == (Decision.aborts site).text)
+    | return m!"`{selector}` is not established"
+  let what := match site with
+    | .call .. => "call"
+    | .abort _ => failing
+    | .op _ => "operation"
+    | .invoke _ => "invocation"
+  let source? ← if origin.file == (← getFileName) then pure (some (← getFileMap).source) else
+    try some <$> IO.FS.readFile origin.file catch _ => pure none
+  let some source := source? | return m!"`{selector}` is not established"
+  let position := (FileMap.ofString source).toPosition ⟨origin.startByte⟩
+  let snippet := Substring.Raw.toString ⟨source, ⟨origin.startByte⟩, ⟨origin.endByte⟩⟩
+  if expanded then
+    -- A macro of another crate raised it: the range is what it is reached after.
+    let first := (snippet.splitOn "\n").headD snippet
+    return m!"`{selector}` is not established: a {what} raised by a macro, reached after \
+      `{first}` at {origin.file}:{position.line}:{position.column + 1}"
+  return m!"`{selector}` is not established: the {what} `{snippet}` at \
+    {origin.file}:{position.line}:{position.column + 1} may {failing}"
+
 /-- Report a verification condition that was not established, at every
 authored clause its `Obligation` markers — those in it and the `clauses` its
 closing stripped — locate not yet reported with the same message, or, with
-no marker, as `origin` or a residual obligation with its goal. Returns the
-reports so far. -/
+no marker, as `origin` or a residual obligation with its goal. The clause of a
+function's failing paths says where `decisions` have the path fail. Returns
+the reports so far. -/
 def reportObligation (goal : MVarId) (origin : Option Provenance)
-    (clauses : Array ObligationRange) (reported : Array (ObligationRange × String)) :
+    (clauses : Array ObligationRange) (decisions : Array Decision)
+    (reported : Array (ObligationRange × String)) :
     TacticM (Array (ObligationRange × String)) := do
   let fileMap ← getFileMap
   let fileName ← getFileName
@@ -6571,10 +6855,17 @@ def reportObligation (goal : MVarId) (origin : Option Provenance)
       let snippet := match source? with
         | some source => Substring.Raw.toString ⟨source, ⟨range.startByte⟩, ⟨range.endByte⟩⟩
         | none => s!"{range.file}:{range.startByte}"
-      let message := clauseFailure origin snippet
+      let named := ((← (← targetState).clauseRanges.get).find? (·.1 == range)).map (·.2)
+      let noFailure : Option ObligationKey := named.bind fun name =>
+        let key : ObligationKey := { kind := name }
+        if key.isNoFailure then some key else none
+      let message ← match noFailure with
+        | some key => failingPathFailure key decisions
+        | none => pure (clauseFailure origin snippet)
       let key := (range, ← message.toString)
       if reported.contains key then continue
       reported := reported.push key
+      let message ← if noFailure.isSome then pure (message ++ (← pathFacts goal)) else pure message
       match source? with
       | some _ =>
           if range.file == fileName then
@@ -6612,6 +6903,8 @@ macro_rules
        first
        -- A stated goal needs no family conversion or context normalization.
        | verex_timed "assumption" verex_assumption
+       -- Nor does a behavior at entry values that a run in the context reads.
+       | verex_timed "entry reading" verex_entry_behavior
        | verex_timed "stated facts" verex_stated
        -- An impossible path closes before preparing its context. Arithmetic
        -- conclusions wait for normalization, which first computes their guards.

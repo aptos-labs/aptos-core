@@ -67,7 +67,15 @@ def rustSchema : ProfileSchema where
   checkType := unsupportedExtension "Rust" "type"
   checkOperation := unsupportedExtension "Rust" "operation"
   checkSurface := unsupportedExtension "Rust" "surface"
-  checkProperty := unsupportedExtension "Rust" "property"
+  checkProperty := fun value =>
+    if value.tag == rustClosureTag || value.tag == rustRefusedTag ||
+        (value.tag == rustOpaqueTag || value.tag == rustDependencyTag || value.tag == rustShapeOnlyTag ||
+          value.tag == rustOpaqueFunctionTag || value.tag == destructorTag) &&
+          value.payload.isEmpty
+    then #[]
+    else unsupportedExtension "Rust" "property" value
+  opaqueNominal := fun properties => properties.any (·.tag == rustOpaqueTag)
+  bodiless := fun properties => some (properties.any (·.tag == rustDependencyTag))
 
 def profileRegistry : ProfileRegistry := #[moveSchema, rustSchema]
 
@@ -231,7 +239,7 @@ def nativeModel? (profile : Option Profile) (key : String) : Option NativeModel 
 or one without conditions that declares it intrinsic, deferring to the
 prelude. -/
 def readsNativeModel {β : Type} (declaration : VerexIR.FunctionDecl β) : Bool :=
-  declaration.contract.conditions.isEmpty &&
+  declaration.contract.conditions.all isImplicitNoPanic &&
     (declaration.contract.loc.isNone || declaration.pragmas.any fun
       | .assign "intrinsic" (.constant (.bool false)) _ => false
       | .assign "intrinsic" _ _ => true

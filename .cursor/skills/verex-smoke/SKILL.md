@@ -17,6 +17,7 @@ third_party/move/lean/scripts/smoke.sh            # ≈ 65 s warm; after a resta
 third_party/move/lean/scripts/smoke.sh --no-mvp   # without the Move Prover tests
 third_party/move/lean/scripts/smoke.sh --no-exe   # Lean fixtures only: no executable, no cargo
 third_party/move/lean/scripts/smoke.sh --jobs N   # Lean processes at once (or SMOKE_JOBS)
+third_party/move/lean/scripts/smoke.sh --rust     # the Rust gate with a Move canary: under a minute warm
 third_party/move/lean/scripts/smoke.sh --list     # the fixtures
 ```
 

@@ -1,0 +1,200 @@
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:7:1: error: `no panic when aborts at abort 1` is not established: the panic `assert!(c != 0)` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:9:5 may panic
+  from: c.val = 0
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `plain_assert` failed; provide a proof in the module:
+  verify plain_assert by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:10:6: error: verification failed with a residual obligation:
+case left.right
+c x : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+pathDecision✝ : ¬c.val = 0
+symmetric : ¬0 = c.val
+⊢ ¬c.val = 1
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:11:3: error: the specification clause `panics_if c == 1` is not established
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `message_assert` failed; provide a proof in the module:
+  verify message_assert by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | panics_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:14:1: error: `no panic when aborts at abort 1` is not established: the panic `assert!(c != 0, "c is zero")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:19:5 may panic
+  from: c.val = 0
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:14:6: error: verex verification failed: the automatic verification of `literal_message_assert` failed; provide a proof in the module:
+  verify literal_message_assert by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:17:1: error: `no panic when aborts at abort 1` is not established: the panic `panic!("zero")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:25:9 may panic
+  from: c.val = 0
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:17:6: error: verex verification failed: the automatic verification of `literal_panic` failed; provide a proof in the module:
+  verify literal_panic by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:22:3: error: the specification clause `ensures result == c + 1` is not established
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:20:6: error: verex verification failed: the automatic verification of `format_panic` failed; provide a proof in the module:
+  verify format_panic by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:24:1: error: `no panic when aborts at abort 1` is not established: the panic `unreachable!()` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:41:9 may panic
+  from: c.val ≤ 0
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:24:6: error: verex verification failed: the automatic verification of `unreachable_arm` failed; provide a proof in the module:
+  verify unreachable_arm by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:27:1: error: `no panic when aborts at abort 1` is not established: the panic `debug_assert!(c != 0)` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:46:5 may panic
+  from: c.val = 0
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:27:6: error: verex verification failed: the automatic verification of `debug_only` failed; provide a proof in the module:
+  verify debug_only by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:30:1: error: `no panic when aborts at call 1 of expect` is not established: the call `value.expect("a value")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:51:5 may panic
+  from: VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "None"
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:30:6: error: verex verification failed: the automatic verification of `expect_option` failed; provide a proof in the module:
+  verify expect_option by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of expect => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:33:1: error: `no panic when aborts at call 1 of unwrap` is not established: the call `value.unwrap()` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:55:5 may panic
+  from: VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "None"
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:33:6: error: verex verification failed: the automatic verification of `unwrap_option` failed; provide a proof in the module:
+  verify unwrap_option by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of unwrap => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:36:1: error: `no panic when aborts at call 1 of expect` is not established: the call `value.expect("a value")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:59:5 may panic
+  from: VerexIR.Proofs.Denote.variantPlainName ["Ok", "Err"] (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "Err"
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:36:6: error: verex verification failed: the automatic verification of `expect_result` failed; provide a proof in the module:
+  verify expect_result by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of expect => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:39:1: error: `no panic when aborts at call 1 of unwrap` is not established: the call `value.unwrap()` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:63:5 may panic
+  from: VerexIR.Proofs.Denote.variantPlainName ["Ok", "Err"] (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "Err"
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:39:6: error: verex verification failed: the automatic verification of `unwrap_result` failed; provide a proof in the module:
+  verify unwrap_result by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of unwrap => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:43:3: error: the specification clause `ensures result == 8` is not established
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:42:6: error: verex verification failed: the automatic verification of `static_read` failed; provide a proof in the module:
+  verify static_read by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:46:3: error: the specification clause `panics_if c >= 101` is not established
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:45:6: error: verex verification failed: the automatic verification of `const_limit` failed; provide a proof in the module:
+  verify const_limit by lean =>
+    verex_obligations
+    verex_on
+    | panics_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:49:1: error: `no panic when aborts at abort 1` is not established: the panic `assert!(c < u64::MAX)` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:76:5 may panic
+  from: 18446744073709551615 ≤ c.val
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:49:6: error: verex verification failed: the automatic verification of `maximum_guard` failed; provide a proof in the module:
+  verify maximum_guard by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:53:1: error: `no panic when aborts at abort 1` is not established: the panic `panic!("always")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:81:5 may panic
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:53:6: error: verex verification failed: the automatic verification of `always` failed; provide a proof in the module:
+  verify always by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:59:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:57:6: error: verex verification failed: the automatic verification of `past_the_panic` failed; provide a proof in the module:
+  verify past_the_panic by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:62:6: error: verification failed with a residual obligation:
+case left
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+c : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+snd✝ : VerexIR.Proofs.Denote.HList VerexIR.Proofs.Denote.NRow.nil
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+verexContinuation : VerexIR.Proofs.Denote.Flow
+    (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false))
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+    (VerexIR.Proofs.Denote.NTy.int 64 false).carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+      (fun result final => False)
+      (fun failure => VerexIR.Proofs.Obligation "panic_macros_errors.rs.lean" 5445 5459 True) state
+pathDecision✝ : ¬c.val = 0
+⊢ False
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:62:6: error: verex verification failed: the automatic verification of `not_always` failed; provide a proof in the module:
+  verify not_always by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:67:1: error: `no panic when aborts at abort 3` is not established: the panic `assert!(c != 0, "c is zero")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:101:5 may panic
+  from: a = true; 0 ≤ b.val / 2; b.val / 2 ≤ 18446744073709551615; entry.val = b.val / 2; c.val = 0
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:67:6: error: verex verification failed: the automatic verification of `join_assert` failed; provide a proof in the module:
+  verify join_assert by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 3 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:71:1: error: `no panic when aborts at abort 3` is not established: the panic `panic!("small")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:115:5 may panic
+  from: a = true; 0 ≤ b.val / 2; b.val / 2 ≤ 18446744073709551615; entry.val = b.val / 2; entry.val ≤ 100
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:71:6: error: verex verification failed: the automatic verification of `join_panic` failed; provide a proof in the module:
+  verify join_panic by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 3 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:75:1: error: `no panic when aborts at abort 1` is not established: the panic `panic!("unguarded")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:119:5 may panic
+VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:75:6: error: verex verification failed: the automatic verification of `unguarded` failed; provide a proof in the module:
+  verify unguarded by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

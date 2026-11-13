@@ -12,7 +12,14 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 /// Modules overridden to their newest version from HEAD. This is the minimal
 /// set of patches that preserves the historical behaviour as much as possible.
-const OVERRIDDEN: &[&str] = &["dispatchable_fungible_asset", "features", "function_info"];
+/// `transaction_validation` is included because MonoMove only implements the
+/// versioned prologue/epilogue, which older frameworks do not have.
+const OVERRIDDEN: &[&str] = &[
+    "dispatchable_fungible_asset",
+    "features",
+    "function_info",
+    "transaction_validation",
+];
 
 /// Overwrites [`OVERRIDDEN`] with this checkout's bytecode, together with any of
 /// their dependencies the captured chain did not have. Both VMs read the

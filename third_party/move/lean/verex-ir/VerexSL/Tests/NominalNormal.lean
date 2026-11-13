@@ -213,6 +213,10 @@ run_cmd do
 -- Parameter replacement constructs the descriptor at its replaced explicit
 -- arguments, including nested and phantom arguments. An unknown argument is
 -- kept under substitution because it may itself contain parameters.
+/--
+error: nominal parameter replacement changed its type
+-/
+#guard_msgs in
 run_cmd do
   let some unit := registeredUnit? (← getEnv) `«0x42».nominal_quotation
     | throwError "missing nominal quotation fixture"

@@ -110,6 +110,70 @@ downstream rebuild from 4m24s to 1m44s (`Solve.lean` 104 s → 28 s,
 `Verify.lean` 72 s → 14 s). Profile the compiler stages before touching
 proofs for build latency.
 
+### Constructor equations of the denotation
+
+`vir_denote_constructor_equations` specializes each constructor before
+proving an evaluator equation. Lean's usual structural equation generator
+first proves one symbolic `eq_def`; after adding Slice operations to the
+mutual `Term.denote`/`Args.denote`/`Arms.denote` evaluator, expanding its
+`below` motive exhausted the existing 800,000-heartbeat command limit.
+Factoring operation bodies into helper definitions did not remove that
+symbolic expansion.
+
+With Lean 4.32.2, the comparison during the Slice integration was:
+
+| Registration | Result at the unchanged limit | Term module wall time |
+| --- | --- | --- |
+| Standard structural `eq_def`, then equations | 800,000-heartbeat timeout | 53 s, failed |
+| Constructor-specialized equations | Successful kernel checking | 18 s |
+
+These wall times describe the observed build, not a performance threshold;
+load and downstream compilation affect them. The command does not reset or
+raise the heartbeat budget. It uses definitionally equal constructor cases
+and kernel-checked theorem declarations, with explicit equality evidence so
+the simplifier retains equation applications instead of implicitly reducing
+the full evaluator again.
+
+The small adapter in
+[`ConstructorEquations.lean`](../../verex-ir/VerexIR/Proofs/Denote/ConstructorEquations.lean)
+uses `import all Lean.Elab.PreDefinition.Eqns` for Lean's private
+`mkEqnTypes` and `removeUnusedEqnHypotheses`. This is a toolchain upgrade
+hazard, not a new logical assumption. An upgrade must check the adapter,
+standard `eq_1` naming/discovery, and inverse equation registration, and run
+both constructor-equation regression modules. They check same-module and
+imported reuse, absence of a generated `eq_def`, retained rewrite evidence,
+and absence of axioms in the generated equations. The ordinary command
+remains available for definitions that do not need specialization.
+
+The unchanged `DenotePerformance` gate also checks downstream effects.
+Constructor-specific primitive literal/result normalization brought the
+classifier from an initial 7,480,680 heartbeats to 6,625,381 against its
+6,601,077 baseline (+0.37%); its proof objects fell from 35,669 to 15,576.
+No existing baseline or tolerance was increased.
+
+### Literal UTF-8 reduction
+
+The literal validator is bounded to 64 bytes and leaves symbolic inputs
+opaque. [`Utf8Performance.lean`](../../verex-ir/VerexSL/Tests/Utf8Performance.lean)
+measures the full-boundary ASCII case, sixteen four-byte scalars, and an
+invalid final byte after 63 valid ASCII bytes. Each proof goes through
+`verex_normalize` and the kernel-checked reduction certificate. Its separate
+[`Utf8Performance.exp`](../../verex-ir/VerexSL/Tests/Utf8Performance.exp)
+uses the existing heartbeat and proof-object gate; it does not alter the
+older denotation baselines. Kernel time remains a separate observation,
+as described above, so the byte bound must be remeasured before increasing it.
+
+### Rust differential evaluator
+
+The generic-closure branch of `VerexRust/Tests/DenoteEval.lean` carries dependent
+frame and capture certificates through the mutually recursive evaluator. Its
+scoped elaboration allowance is deliberate; it does not raise source-verification
+budgets or change how many inputs the differential suite executes. The before/after
+module compilation measurements, heartbeat counts, source revisions and command
+are recorded in [the build-cost artifact](../status/rust-denote-eval-build.json).
+The measurement includes Lean's C generation, but excludes C compilation and
+linking; it is not a differential-suite execution timing.
+
 ### Modules split for edits
 
 Lake rebuilds every importer of a changed module and compiles the C of the
@@ -287,7 +351,8 @@ agreement"; the missing unit model is in
   names decides `String` equality, about 2 s per namespace there.
 - **Unfolding a big recursive definition makes the kernel redo it.**
   `simp` unfolding `Term.denote` records no steps, so the kernel re-reduces
-  its 61-way matcher. The equation lemmas (`vir_denote_equations`) make
+  its mutual constructor matcher. The equation lemmas (registered by
+  `vir_denote_equations` or `vir_denote_constructor_equations`) make
   each step an instance; the `call` equation's index does not match at
   reducible transparency, so plain unfolding stays as the fallback.
 - **In `simp` the cost is per node, not per rule.** Every lookup reduces
@@ -448,6 +513,15 @@ In the order of expected gain:
   avoid the smart unfolding of `NTy.carrier`; a deeper change to
   `Types.lean`.
 
+For an existential containing an array lookup, witness search first tries
+positions whose elements a hypothesis states (`statedReads`, read by
+`verex_lookup_read`). This reaches the available read witness before unrelated
+integers and bounds can exhaust the search budget. Other existential shapes
+retain the late read-position fallback. The reads are computed once per
+context: a search asks for them per premise, and the scan walks every
+hypothesis. `LiteralOptionalReads` checks the ordering with a valid read and
+many unrelated certified integers.
+
 ### Fixed costs
 
 - **`compiled_eq`**, up to 1 s per function: 80k unfolds dominated by
@@ -491,7 +565,7 @@ their measurements".
 |---|---|
 | `dsimp := false` in the normalizer | 8 fixtures stop verifying |
 | `index := false` for the normalization simp set | slower |
-| Precompiling `VerexIR` | no gain; cross-library dynlib load error |
+| Precompiling `VerexIR` (`precompileModules`) | no gain for the command line, whose executable already links compiled metaprograms. Both libraries at once do not build: a precompiled `VerexSL` module's shared object wants `VerexIR`'s initializers and is not linked against them. `VerexIR` alone builds and makes the *language server* load native code, a proof file in 9–12 s against 28–33 s interpreted, for 194 s of added C compilation (`Solve.Base` 46 s, `Solve.Decide` 31 s) on every build; not adopted. Measured in `source-verification.md` ("The editor") |
 | Equation lemmas without the unfolding fallback | `break_with_returned_pair` fails (the `call` index) |
 | A per-view table of native types in `CompileNamespace` | 1% fewer unfolds, same time |
 | Behavior dispatch: sibling cache, deriving before the split, a bare `simp`, skipping derivation for manual proofs, a sub-budget | negligible, slower, times out, breaks higher-order callers, or no gain |

@@ -250,6 +250,10 @@ example [Θ : Carriers] [CarriersNonempty Θ] (source : StructHandle)
 -- Runtime-family inhabitants keep the same projection spelling a typed
 -- view emits. An unrelated inhabitant choice is never replaced merely
 -- because it inhabits the same family.
+/--
+error: the runtime family's reader lost its canonical inhabitants projection
+-/
+#guard_msgs in
 open Lean Meta Elab Command in
 run_cmd liftTermElabM do
   withLocalDeclD `unit (mkConst ``Validation.ValidatedUnit) fun unit => do

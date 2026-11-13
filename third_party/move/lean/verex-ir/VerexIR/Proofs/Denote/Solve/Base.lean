@@ -434,6 +434,22 @@ def ObligationKey.selects (pattern key : ObligationKey) : Bool :=
       | some point, some other => point.selects other
       | _, _ => false)
 
+/-- Whether a key is that of a function's failing paths no clause permits,
+which a path's abort site tells apart. -/
+def ObligationKey.isNoFailure (key : ObligationKey) : Bool :=
+  key.kind == "no panic" || key.kind == "no abort"
+
+/-- The spellings of the failure clause permitting a profile's exceptional
+outcome: `aborts_if` for Move, `panics_if` for Rust
+(`doc/designs/rust-verification.md`, "Failure contract"). The clause is one
+condition kind of VIR, so a key keeps the spelling its target's profile
+gives it. -/
+def failureClauseKinds : List String := ["aborts_if", "panics_if"]
+
+/-- Whether a key is a failure clause's, under either profile's spelling. -/
+def ObligationKey.isFailureClause (key : ObligationKey) : Bool :=
+  failureClauseKinds.contains key.kind
+
 /-- A source decision on a leaf's path (`doc/designs/proof-language.md`,
 "Obligation addressing and provenance"): the `number`-th `if` taken, `match`
 taking a variant, loop exiting or continuing, or where the path aborts. -/
@@ -461,6 +477,12 @@ def Decision.text : Decision → String
   | .aborts (.invoke number) => s!"aborts at invoke {number}"
   | .invoke number target => s!"invoke {number} {target}"
   | .returns => "returns"
+
+/-- Where a path aborts, of its decisions. -/
+def abortSiteOf? (decisions : Array Decision) : Option AbortSite :=
+  decisions.findSome? fun
+    | .aborts site => some site
+    | .branch .. | .variant .. | .loop .. | .invoke .. | .returns => none
 
 /-- Whether a path's decision is one a selector states: the same, a call
 without its callee counted among all calls. -/
@@ -576,6 +598,9 @@ structure TargetState where
   /-- The key of each invariant clause, by its source range: `data
   invariant` for a struct's, `module invariant` for a global one. -/
   invariantKeys : IO.Ref (Array (ObligationRange × String))
+  /-- The source range of each site a failing path names, by the selector's
+  words (`aborts at op 1`). -/
+  failureSites : IO.Ref (Array (String × ObligationRange × Bool))
   /-- The last target's undecided leaves with their actual diagnostic
   locations, including foreign files and fallback locations. -/
   failedLeaves : IO.Ref (Array (Message × String))
@@ -621,6 +646,9 @@ structure TargetState where
   /-- The statements of bounds with their literals reduced, in this target:
   the same certificates are asserted at every leaf. Emptied for every target. -/
   reducedBounds : IO.Ref (Std.HashMap Lean.Expr Lean.Expr)
+  /-- The elements a context's hypotheses read, by the types of those hypotheses. A
+  witness search asks once per premise of the same context. -/
+  statedReads : IO.Ref (Std.HashMap (Array Lean.Expr) (Array (Lean.Expr × Lean.Expr)))
   /-- The hypothesis types in which no projection of a constructor
   application remained to reduce, in this target: the leaves restate the
   same context, and traversing a large contract fact for nothing is what the
@@ -832,6 +860,7 @@ def TargetState.new : IO TargetState := do
     clauseRanges := ← IO.mkRef #[]
     preconditionNumbers := ← IO.mkRef #[]
     invariantKeys := ← IO.mkRef #[]
+    failureSites := ← IO.mkRef #[]
     failedLeaves := ← IO.mkRef #[]
     exhaustedLeaves := ← IO.mkRef 0
     undecidedLeaves := ← IO.mkRef 0
@@ -846,6 +875,7 @@ def TargetState.new : IO TargetState := do
     familyProofs := ← IO.mkRef {}
     preparationOwners := ← IO.mkRef #[]
     reducedBounds := ← IO.mkRef {}
+    statedReads := ← IO.mkRef {}
     projectionFreeTypes := ← IO.mkRef {}
     undecidedPremises := ← IO.mkRef {}
     groundFailures := ← IO.mkRef {}
@@ -1632,6 +1662,13 @@ def Provenance.describe : Provenance → String
   | .pointAssert point index => s!"the assertion {index} {point.text}"
   | .returns => "that no abort condition holds where the function returns"
 
+/-- The width a hypothesis is truncated to in the solver's debug trace of an
+undecided leaf (`verex_trace_state`). -/
+register_option verex.solverDebugWidth : Nat := {
+  defValue := 220
+  descr := "the characters of a hypothesis the solver's debug trace prints"
+}
+
 /-- The heartbeats one complete automatic leaf attempt may spend, in
 thousands, including call observations, cheap deciders and preparation.
 Past them the leaf is reported for the proof file. Twenty million by default
@@ -2250,8 +2287,10 @@ def boundType (type : Lean.Expr) : MetaM Lean.Expr := do
   if type.isAppOf ``VerexIR.Proofs.Denote.ResultShape.carrier then whnfD type else whnfR type
 
 /-- The bound a value carries by its type `type` (in weak head normal form):
-a fixed-width integer's range, a vector's length bound. -/
+a fixed-width integer's range, a character's, a vector's length bound. -/
 def typedBound? (value type : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  if type.isConstOf ``VerexIR.SpecChar then
+    return some (← mkAppM ``VerexIR.SpecChar.bounds #[value])
   if type.isAppOfArity ``VerexIR.SpecVector 1 then
     return some (← mkAppM ``VerexIR.SpecVector.bounded #[value])
   -- A map's entries are as many as a Move vector holds.
@@ -3102,6 +3141,41 @@ def abstractRankTables (goal : MVarId) : MetaM MVarId := do
     catch _ => saved.restore
   return goal
 
+/-- Abstract the runtime frame (`Skolems.runtime`) to a variable, as the rank
+tables are (`abstractRankTables`). Every native type of a leaf names the
+frame's carriers, and a congruence closure unfolds the reducible frame down to
+its instance literal, along paths that leave two occurrences of one term
+apart: an opaque specification function applied to a value of a declared type
+in a callee's fact and in the goal. Nothing a leaf decides reads the frame's
+definition, and as a local of its class it is the instance the closure
+canonicalizes the carriers to. The locals whose types name it are generalized
+with it. -/
+def abstractRuntimeFrames (goal : MVarId) : MetaM MVarId := do
+  let frames ← goal.withContext do
+    let mut terms := #[← instantiateMVars (← goal.getType)]
+    for decl in ← getLCtx do
+      unless decl.isImplementationDetail do terms := terms.push (← instantiateMVars decl.type)
+    return sitesWhere (fun e => e.isAppOfArity ``Skolems.runtime 3 &&
+      !e.hasMVar && !e.hasLooseBVars) terms
+  let mut goal := goal
+  for frame in frames do
+    let hypotheses ← goal.withContext do
+      let mut hypotheses := #[]
+      for decl in ← getLCtx do
+        if decl.isImplementationDetail then continue
+        if frame.occurs (← instantiateMVars decl.type) then
+          hypotheses := hypotheses.push decl.fvarId
+      return hypotheses
+    -- A generalization that fails has reverted the hypotheses, assigning the
+    -- goal: the state is restored, so the goal stays the one to prove.
+    let saved ← saveState
+    try
+      let (_, _, next) ← goal.withContext <|
+        goal.generalizeHyp #[{ expr := frame, xName? := some `runtimeFrame }] hypotheses
+      goal := next
+    catch _ => saved.restore
+  return goal
+
 /-- An expression with the literal abbreviations a generated block names
 unfolded (rows, sharing marks, types, site keys, and weaves: reducible
 constants without parameters of those types) and the site keys' fields
@@ -3745,23 +3819,6 @@ private def assertProductBounds (goal : MVarId) : MetaM MVarId := goal.withConte
         goal := next
   return goal
 
-/-- Whether two terms differ at a position of integer or natural-number type:
-walking them in parallel through applications of one function, the first
-pair of subterms that disagree is arithmetic.  Linear facts can equate such
-subterms, which congruence then lifts to the applications holding them. -/
-private partial def differAtArithmetic (left right : Lean.Expr) : MetaM Bool := do
-  let left := left.consumeMData
-  let right := right.consumeMData
-  if left == right then return false
-  let type ← whnfR (← inferType left)
-  if type.isConstOf ``Int || type.isConstOf ``Nat then return true
-  let (leftFn, rightFn) := (left.getAppFn, right.getAppFn)
-  unless leftFn.isConst && leftFn == rightFn && left.getAppNumArgs == right.getAppNumArgs do
-    return false
-  for (l, r) in left.getAppArgs.zip right.getAppArgs do
-    if l != r then return ← differAtArithmetic l r
-  return false
-
 /-- The applications in a term whose function is a constant outside `skip`. -/
 private partial def applicationAtoms (skip : List Name) (found : Array Lean.Expr)
     (sub : Lean.Expr) : Array Lean.Expr :=
@@ -3774,29 +3831,6 @@ private partial def applicationAtoms (skip : List Name) (found : Array Lean.Expr
     | some name => if skip.contains name then found else found.push sub
     | none => found
   | _ => found
-
-/-- Whether a comparison holds two of its arithmetic atoms, integer- or
-natural-valued applications of one function that is not a constructor, whose
-arguments differ at an arithmetic position (`differAtArithmetic`): the linear
-decision reads them as unrelated atoms, while the linear facts may equate
-their arguments, so that only congruence relates them. -/
-private def atomsRelatedByCongruence (target : Lean.Expr) : MetaM Bool := do
-  let arithmetic : List Name := [``HAdd.hAdd, ``HSub.hSub, ``HMul.hMul, ``HDiv.hDiv,
-    ``HMod.hMod, ``Neg.neg, ``OfNat.ofNat, ``Int.ofNat, ``Nat.cast, ``NatCast.natCast,
-    ``IntCast.intCast, ``LE.le, ``LT.lt, ``Eq, ``Prod.mk, ``Prod.fst, ``Prod.snd]
-  -- The atoms the linear decision reads: integer- or natural-valued
-  -- applications of a function that is not a constructor.
-  let atoms ← (applicationAtoms arithmetic #[] target).filterM fun atom => do
-    if let some name := atom.getAppFn.constName? then
-      if (← getEnv).isConstructor name then return false
-    let type ← whnfR (← inferType atom)
-    return type.isConstOf ``Int || type.isConstOf ``Nat
-  for i in [0:atoms.size] do
-    for j in [i+1:atoms.size] do
-      let (a, b) := (atoms[i]!, atoms[j]!)
-      if a.getAppFn == b.getAppFn && a.getAppNumArgs == b.getAppNumArgs && a != b then
-        if ← differAtArithmetic a b then return true
-  return false
 
 /-- The instance arguments a term applies its functions at that instance
 resolution does not find, by their classes: a frame a leaf runs at, such as
@@ -3876,7 +3910,7 @@ elab "verex_grind" : tactic => focusGoal do
   let mut goal := goal
   for fvarId in victims.reverse do
     goal ← goal.tryClear fvarId
-  let abstracted ← abstractFunctionValues (← abstractRankTables goal)
+  let abstracted ← abstractRuntimeFrames (← abstractFunctionValues (← abstractRankTables goal))
   -- `grind` proves the goal handed to it, never an assigned one, which
   -- `getMainGoal` would skip.
   if ← abstracted.isAssigned then throwError "internal: the abstracted leaf is assigned"
@@ -3887,24 +3921,6 @@ elab "verex_grind" : tactic => focusGoal do
     try simp only [← VerexIR.SpecVector.eq_iff_values, ← VerexIR.SpecInt.eq_iff_val] at *))
   let some elements := (← getGoals).head? | return
   replaceMainGoal [← assertProductBounds (← identifyReads elements)]
-  -- Skip grind for arithmetic comparisons without products of two non-literal
-  -- terms or quotients by a non-literal divisor: verex_linear decides these
-  -- completely, and grind's congruence over atoms adds nothing, unless two
-  -- atoms apply one function at arguments the linear facts may equate
-  -- (`atomsRelatedByCongruence`).
-  let gatedGoal ← getMainGoal
-  let gatedTarget ← gatedGoal.withContext (instantiateMVars (← gatedGoal.getType))
-  let isArith :=
-    ((gatedTarget.isAppOfArity ``LE.le 4 || gatedTarget.isAppOfArity ``LT.lt 4) &&
-      (gatedTarget.getArg! 0).isConstOf ``Int) ||
-    (gatedTarget.isAppOfArity ``Eq 3 && (gatedTarget.getArg! 0).isConstOf ``Int)
-  let hasProduct := (gatedTarget.find? (·.isAppOfArity ``HMul.hMul 6)).isSome
-  let hasVarQuot := (gatedTarget.find? fun e =>
-    e.isAppOfArity ``HDiv.hDiv 6 && (e.getArg! 0).isConstOf ``Int &&
-    ((e.getArg! 5).int? <|> (e.getArg! 5).nat?.map Int.ofNat).isNone).isSome
-  if isArith && !hasProduct && !hasVarQuot then
-    unless ← gatedGoal.withContext (atomsRelatedByCongruence gatedTarget) do
-      throwError "verex_grind: arithmetic comparison with no products"
   replaceMainGoal [← installLeafInstances (← getMainGoal)]
   evalTactic (← `(tactic| verex_budgeted grind))
 
@@ -5781,6 +5797,30 @@ private def vectorEquation? (goal : MVarId) (eligible : FVarId → Bool)
         return some (decl.fvarId, x)
     return none
 
+/-- An array local whose vector's elements an equation fixes, as
+`vectorEquation?` finds a vector local: destructured, its vector is that
+local. -/
+private def arrayEquation? (goal : MVarId) (eligible : FVarId → Bool) :
+    MetaM (Option FVarId) :=
+  goal.withContext do
+    let fixed (side other : Lean.Expr) : Option FVarId :=
+      let values := if side.isAppOfArity ``Array.toList 2 then side.appArg! else side
+      let vector := if values.isAppOfArity ``VerexIR.SpecVector.values 2 then values.appArg!
+        else values
+      if vector.isAppOfArity ``VerexIR.SpecArray.vector 3 then
+        match vector.appArg! with
+        | .fvar x => if other.containsFVar x || !eligible x then none else some x
+        | _ => none
+      else none
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail then continue
+      let ty ← instantiateMVars decl.type
+      unless ty.isAppOfArity ``Eq 3 do continue
+      if let some x := fixed (ty.getArg! 1) (ty.getArg! 2) |>.orElse
+          fun _ => fixed (ty.getArg! 2) (ty.getArg! 1) then
+        return some x
+    return none
+
 /-- Destructure a vector local whose elements an equation fixes, and
 substitute the elements: arrays have no decision procedure, so what is
 known of them is known only where they are spelled alike. -/
@@ -6250,6 +6290,13 @@ def substVars (equationsOnly : Bool) : TacticM Unit := focusGoal do
           progress := true
         else if let some (equation, vector) ← vectorEquation? goal (!parameters.contains ·) then
           goal ← substituteVector goal equation vector
+          progress := true
+        else if let some array ← arrayEquation? goal (!parameters.contains ·) then
+          let #[case] ← goal.cases array | throwError "an array has one constructor"
+          -- The equation then reads the vector local the array holds.
+          setGoals [case.mvarId]
+          evalTactic (← `(tactic| verex_reduce_projections))
+          goal ← getMainGoal
           progress := true
         else if let some restated ← transportEquation? goal then
           goal := restated

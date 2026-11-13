@@ -948,11 +948,23 @@ private def spliceAll (replacements : Array (Name × Syntax)) (stx : Syntax) : S
 private def splice (expression : Syntax) : Syntax → Syntax :=
   spliceAll #[(placeholder, expression)]
 
+/-- The heads of the scope items around a declaration of a scope, outermost
+first. -/
+private def scopeHeads (ns : ValidatedNamespace) (scope : Array String) : Array String :=
+  (Array.range scope.size).filterMap fun depth => do
+    let path := scope.take (depth + 1)
+    let declared ← ns.scopes.find? (·.path == path)
+    let name ← path.back?
+    pure s!"{Print.scopeKeywordText declared.kind} {Print.sourceIdentifier name}"
+
 /-- The item a step's expression lowers in, named `«f__step_k»`: a
 specification function whose body is the expression, or, for a lemma
-formula, a lemma whose proof applies it; its parameters are the scope. -/
+formula, a lemma whose proof applies it; its parameters are the scope. It
+stands in the scope items `heads`, where the function is declared, so that a
+path in the expression resolves as one in the function does. -/
 private def stepItem (function : String) (index : Nat) (binders : String)
-    (scope : Array (String × String)) (step : StepExpression) : CommandElabM Syntax := do
+    (scope : Array (String × String)) (step : StepExpression) (heads : Array String := #[]) :
+    CommandElabM Syntax := do
   let binders := if binders.isEmpty then "" else " " ++ binders
   let stepBinders := step.binders.map fun (name, type) =>
     (name, (type.reprint.getD "Int").trimAscii.toString)
@@ -964,6 +976,8 @@ private def stepItem (function : String) (index : Nat) (binders : String)
     else
       let result := (step.type.map (" : " ++ ·)).getD ""
       s!"spec fun «{function}__step_{index}»{binders}({declared}){result} := {placeholder}"
+  let text := heads.foldr (init := text) fun head text =>
+    s!"{head} where\n" ++ "\n".intercalate ((text.splitOn "\n").map ("  " ++ ·))
   match Parser.runParserCategory (← getEnv) `verexItem text with
   | .ok item => return splice step.expression (atRangeOf step.expression item)
   | .error message => throwErrorAt step.expression m!"the step's scope does not parse: {message}"
@@ -1076,7 +1090,8 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
       let index := synthesized.size
       -- In the proof file's band: its positions are not the module's.
       synthesized := synthesized.push
-        (shifted proofBand (← stepItem function index binders scope step))
+        (shifted proofBand (← stepItem function index binders scope step
+          (scopeHeads ns (((ns.nameOf declaration.name).map (·.scope)).getD #[]))))
       pending := pending.push (step, s!"{function}__step_{index}", file)
       pendingItems := pendingItems.push index
   -- A lemma item is a `spec lemma` of the copy, its clauses at their places
@@ -5331,7 +5346,7 @@ private partial def runOnBlock (step : Syntax) (finish : Bool) (path : String) (
       let goal ← if key.kind == "ensures" || key.kind == "data invariant" then bindFinals goal
         else pure goal
       -- An abort condition reads the entry state.
-      let goal ← if key.kind == "aborts_if" || key.kind == "aborts_with" then
+      let goal ← if key.isFailureClause || key.kind == "aborts_with" || key.isNoFailure then
           match ← goal.withContext do
               return (← scopeEntries).find? (·.1 == "old_" ++ stateScopeName) with
           | some (_, entry) => bindStateEntry goal entry

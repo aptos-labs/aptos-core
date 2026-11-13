@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Lean
+import VerexIR.Proofs.Denote.ConstructorEquations
 
 /-!
 # Simp inventory of the denotation
@@ -64,6 +65,52 @@ elab "vir_denote_equations " ids:ident* : command => do
       | throwErrorAt id m!"`{name}` has no equations"
     let eqnIds := eqns.map fun eqn => mkIdent eqn
     elabCommand (← `(attribute [vir_denote ↓] $eqnIds*))
+
+open Lean Elab Command Meta in
+/-- Register constructor equations directly from a structural definition's
+source body. Each equation is checked by reflexivity after specialization;
+this avoids normalizing a symbolic mutual `below` motive for a global
+unfolding theorem. -/
+elab "vir_denote_constructor_equations " ids:ident* : command => do
+  for id in ids do
+    let name ← liftCoreM <| realizeGlobalConstNoOverloadWithInfo id
+    let equations ← liftTermElabM do
+      let some info := Structural.eqnInfoExt.find? (← getEnv) name
+        | throwErrorAt id "`{name}` is not a structural recursive definition"
+      let equations ← withNewMCtxDepth do
+        lambdaTelescope (cleanupAnnotations := true) info.value fun xs body => do
+          let lhs := mkAppN (mkConst name (info.levelParams.map mkLevelParam)) xs
+          let goal ← mkFreshExprSyntheticOpaqueMVar (← mkEq lhs body)
+          withReducible <| VerexIR.DenoteEquationTypes info.declNames goal.mvarId!
+      let mut names := #[]
+      for index in [:equations.size] do
+        let type := equations[index]!
+        let value ← forallTelescope type fun xs target => do
+          let some (_, lhs, rhs) := target.eq?
+            | throwError "constructor equation is not an equality"
+          unless ← isDefEq lhs rhs do
+            throwError "constructor equation is not definitionally equal: {target}"
+          -- Keep the equation application in simplifier proofs. A naked
+          -- reflexivity proof is treated as an implicit definitional rewrite,
+          -- making the kernel reduce the entire recursive evaluator again.
+          let reflexivity ← mkEqRefl lhs
+          let evidence ← mkAppM ``Eq.trans #[reflexivity, reflexivity]
+          mkLambdaFVars xs evidence
+        let (type, value) ← VerexIR.cleanDenoteEquation type value
+        let eqName := mkEqLikeNameFor (← getEnv) name s!"{eqnThmSuffixBasePrefix}{index + 1}"
+        addDecl (.thmDecl { name := eqName, levelParams := info.levelParams, type, value })
+        inferDefEqAttr eqName
+        names := names.push eqName
+      -- Standard names let Lean discover these equations after import too.
+      -- This lookup also registers their inverse association in eqnsExt.
+      let some registered ← getEqnsFor? name
+        | throwError "generated equations were not discovered for `{name}`"
+      unless registered == names do
+        throwError "generated equation inventory differs for `{name}`"
+      return names
+    let eqnIds := equations.map mkIdent
+    elabCommand (← `(attribute [vir_denote ↓] $eqnIds*))
+
 
 /-!
 ## The recursive specification functions the verifier has defined

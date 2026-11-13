@@ -839,10 +839,6 @@ error: VIR-MOVE-REFERENCE-TYPE-ARGUMENT: in fun f: unsupported construct: type a
 error: VIR-MOVE-REFERENCE-TYPE-ARGUMENT: in fun f: unsupported construct: type argument 0 of the constructor `Holder` holds a reference; Move type arguments cannot be references
 ---
 error: VIR-MOVE-REFERENCE-TYPE-ARGUMENT: in spec fun f: unsupported construct: type argument 0 of the type `Holder` holds a reference; Move type arguments cannot be references
----
-error: VIR-MOVE-REFERENCE-TYPE-ARGUMENT: in spec fun f: unsupported construct: type argument 0 of the type `Holder` holds a reference; Move type arguments cannot be references
----
-error: VIR-MOVE-REFERENCE-TYPE-ARGUMENT: in spec fun f: unsupported construct: type argument 0 of the constructor `Holder` holds a reference; Move type arguments cannot be references
 -/
 #guard_msgs in
 verex module 0x42::review4_generic_holder where
@@ -877,8 +873,6 @@ run_cmd do
 error: VIR-MOVE-REFERENCE-TYPE-ARGUMENT: in fun explicit: unsupported construct: type argument 0 of the call of `id` holds a reference; Move type arguments cannot be references
 ---
 error: VIR-MOVE-REFERENCE-TYPE-ARGUMENT: in fun inferred: unsupported construct: type argument 0 of the call of `id` holds a reference; Move type arguments cannot be references
----
-error: VIR-MOVE-REFERENCE-TYPE-ARGUMENT: in spec fun explicit: unsupported construct: type argument 0 of the call of `id` holds a reference; Move type arguments cannot be references
 -/
 #guard_msgs in
 verex module 0x42::review4_generic_call where

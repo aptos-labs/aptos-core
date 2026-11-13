@@ -246,10 +246,10 @@ example {registry : Validation.SemanticsRegistry}
     (transfer : «0x42».language_generics.identity.givenTransfer) :
     SatisfiesFunctionAt executable ⟨⟨0⟩, ⟨0⟩⟩
       (frameInstantiation «0x42».language_generics.unit ⟨⟨0⟩, ⟨0⟩⟩ #[]
-        #[⟨⟨8⟩, ⟨0⟩⟩])
+        #[.typeArg ⟨⟨8⟩, ⟨0⟩⟩])
       («0x42».language_generics.identity.contract executable ⟨.cons (.int 64 false) .nil, rfl⟩
         (frameInstantiation «0x42».language_generics.unit ⟨⟨0⟩, ⟨0⟩⟩ #[]
-          #[⟨⟨8⟩, ⟨0⟩⟩])) :=
+          #[.typeArg ⟨⟨8⟩, ⟨0⟩⟩])) :=
   «0x42».language_generics.identity.verified prepared preserved integral transfer
     ⟨.cons (.int 64 false) .nil, rfl⟩ rfl _ (FrameOf.frame rfl)
     (@Coherent.ofCheck _ _ (Skolems.instantiate ⟨.cons (.int 64 false) .nil, rfl⟩

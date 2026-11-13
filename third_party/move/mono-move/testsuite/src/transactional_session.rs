@@ -509,7 +509,7 @@ fn to_v1_bcs(ty: InternedType, bytes: Vec<u8>) -> Result<(TypeTag, Vec<u8>), Run
 /// first, independent of write order.
 // TODO(cleanup): commit through the executor's write-set materialization,
 // draining the `WriteSet` into `InMemoryStorage`, instead of this conversion.
-fn resource_changes(
+pub(crate) fn resource_changes(
     guard: &ExecutionGuard<'_>,
     effects: &SessionEffects,
 ) -> Result<ChangeSet, RunError> {
