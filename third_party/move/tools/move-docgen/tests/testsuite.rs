@@ -144,4 +144,6 @@ fn test_docgen(
     Ok(())
 }
 
-datatest_stable::harness!(test_runner, "tests/sources", r".*\.move$|.*_template\.md$",);
+datatest_stable::harness! {
+    { test = test_runner, root = "tests/sources", pattern = r".*\.move$|.*_template\.md$" },
+}

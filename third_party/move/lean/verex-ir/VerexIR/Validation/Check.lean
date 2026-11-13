@@ -132,6 +132,24 @@ private def checkAssociatedItemRef (unit : RawUnit) (trait : TraitRef)
   | some target => checkIndex "associated item" item.index target.associatedItems.size
   | none => #[]
 
+/-- Core generic binders currently range over sized values. References are sized,
+including references to an unsized slice; aggregate components must be sized. -/
+private def sizedType (tables : Tables) : Nat → TypeId → Bool
+  | 0, _ => false
+  | fuel + 1, id => match tables.types[id.index]? with
+    | some (.slice _) => false
+    | some (.tuple elements) => elements.all (sizedType tables fuel)
+    | some (.vector element _) => sizedType tables fuel element
+    | some (.nominal _ arguments) => arguments.all fun
+        | .typeArg value => sizedType tables fuel value.typeId
+        | _ => true
+    | some _ => true
+    | none => false
+
+private def checkSized (tables : Tables) (id : TypeId) : Array Diagnostic :=
+  if sizedType tables (tables.types.size + 1) id then #[] else
+    #[.error "VIR-TYPE-UNSIZED" "this by-value position requires a sized type; use a slice reference"]
+
 mutual
   private partial def checkConstValue (registry : ProfileRegistry) (unit : RawUnit)
       (tables : Tables) : ConstValue → Array Diagnostic
@@ -145,7 +163,7 @@ mutual
 
   private partial def checkGenericArgument (registry : ProfileRegistry) (unit : RawUnit)
       (tables : Tables) : GenericArgument → Array Diagnostic
-    | .typeArg value => checkTypeUse tables value
+    | .typeArg value => checkTypeUse tables value ++ checkSized tables value.typeId
     | .const value => checkConstValue registry unit tables value
     | .lifetime lifetime => checkLifetimeId tables lifetime
     | .evidence _ => #[]
@@ -175,8 +193,9 @@ mutual
 end
 
 private def checkType (registry : ProfileRegistry) (unit : RawUnit) (tables : Tables) : Ty → Array Diagnostic
-  | .tuple elements => elements.foldl (fun ds id => ds ++ checkTypeId tables id) #[]
-  | .vector element length => checkTypeId tables element ++ match length with
+  | .tuple elements => elements.foldl (fun ds id => ds ++ checkTypeId tables id ++ checkSized tables id) #[]
+  | .slice element => checkTypeId tables element ++ checkSized tables element
+  | .vector element length => checkTypeId tables element ++ checkSized tables element ++ match length with
       | some value => checkConstValue registry unit tables value
       | none => #[]
   | .typeDomain type => checkTypeId tables type
@@ -187,7 +206,8 @@ private def checkType (registry : ProfileRegistry) (unit : RawUnit) (tables : Ta
       checkName tables name ++ arguments.foldl (fun ds argument =>
         ds ++ checkGenericArgument registry unit tables argument) #[]
   | .function arguments result _ =>
-      arguments.foldl (fun ds id => ds ++ checkTypeId tables id) (checkTypeId tables result)
+      arguments.foldl (fun ds id => ds ++ checkTypeId tables id ++ checkSized tables id)
+        (checkTypeId tables result ++ checkSized tables result)
   | .reference reference => checkReferenceType registry unit tables reference
   | .profile value => checkProfileValue registry unit value ProfileSchema.checkType
   | _ => #[]
@@ -264,7 +284,7 @@ mutual
       | .typeParameter index => checkScopedBinder binders .typeArg index loc
       | .tuple elements => elements.foldl (fun ds element =>
           ds ++ checkScopedTypeFuel registry unit tables binders loc element fuel) #[]
-      | .vector element _ | .typeDomain element =>
+      | .vector element _ | .slice element | .typeDomain element =>
           checkScopedTypeFuel registry unit tables binders loc element fuel
       | .resourceDomain _ arguments => arguments.toArray.flatten.foldl
           (fun ds element => ds ++
@@ -364,7 +384,7 @@ private def checkTables (registry : ProfileRegistry) (unit : RawUnit) (tables : 
 private def placeChildren : Place → Array PlaceId
   | .localVar _ => #[]
   | .deref base | .field base .. | .ghostField base .. | .index base _ | .subslice base .. |
-      .downcast base _ => #[base]
+      .unsize base | .downcast base _ => #[base]
 
 private def genericArgumentTypeChildren : GenericArgument → Array TypeId
   | .typeArg value => #[value.typeId]
@@ -372,7 +392,7 @@ private def genericArgumentTypeChildren : GenericArgument → Array TypeId
 
 private def typeChildren : Ty → Array TypeId
   | .tuple elements => elements
-  | .vector element _ | .typeDomain element => #[element]
+  | .vector element _ | .slice element | .typeDomain element => #[element]
   | .resourceDomain _ arguments => arguments.getD #[]
   | .nominal _ arguments => arguments.filterMap fun
       | .typeArg value => some value.typeId
@@ -400,7 +420,7 @@ private def checkAcyclic (kind : String) (size : Nat) (children : Nat → Array 
 
 private def checkOperation {β : Type} (registry : ProfileRegistry) (unit : RawUnit) (ns : Namespace β)
     (loc : LocId) : Operation → Array Diagnostic
-  | .move place | .copy place | .read place | .write place | .drop place =>
+  | .move place | .copy place | .read place | .readDiscriminant place | .write place | .drop place =>
       checkPlaceId ns place (some loc)
   | .borrow kind place =>
       let base := checkPlaceId ns place (some loc)
@@ -489,6 +509,35 @@ private def closureStoreErrors (registry : ProfileRegistry) (unit : RawUnit) (ex
       | _, _ => #[]
   | _ => #[]
 
+/-- The profile and properties of the nominal a reference names, in the
+unit's namespaces or its dependencies' interfaces. -/
+private def nominalTraits? (unit : RawUnit) (reference : QualifiedRef) :
+    Option (Option Profile × Array ProfileValue) :=
+  let traits (profile : Option Profile) (structs : Array StructDecl) :=
+    (structs.find? (·.name == reference.name)).map fun struct => (profile, struct.properties)
+  (unit.namespaces.findSome? fun ns =>
+      if ns.identity == reference.namespaceId then traits ns.profile ns.structs else none).orElse
+    fun _ => unit.dependencies.findSome? fun dependency =>
+      if dependency.namespaceId == reference.namespaceId then
+        traits dependency.profile dependency.structs
+      else none
+
+/-- A nominal whose shape its unit does not see is neither constructed nor
+destructured. -/
+private def opaqueNominalErrors (registry : ProfileRegistry) (unit : RawUnit) (expr : Expr) :
+    Array Diagnostic :=
+  let target := match expr.kind with
+    | .operation (.call (.constructor callee _)) _ _ _
+    | .operation (.call (.destructor callee _)) _ _ _ => some callee
+    | _ => none
+  match target.bind (nominalTraits? unit) with
+  | some (some profile, properties) =>
+      if (profileSchema? registry profile).any (·.opaqueNominal properties) then
+        #[.error "VIR-NOMINAL-OPAQUE"
+          "an opaque nominal is neither constructed nor destructured" (some expr.loc)]
+      else #[]
+  | _ => #[]
+
 private def checkExprKind {β : Type} (registry : ProfileRegistry) (unit : RawUnit) (ns : Namespace β)
     (expr : Expr) : Array Diagnostic :=
   let childErrors := (expressionChildren expr.kind).foldl
@@ -502,7 +551,7 @@ private def checkExprKind {β : Type} (registry : ProfileRegistry) (unit : RawUn
               checkProfileValue registry unit value ProfileSchema.checkSurface
           | _ => #[]
         checkOperation registry unit ns expr.loc op ++ surfaceErrors ++
-          closureStoreErrors registry unit expr ++
+          closureStoreErrors registry unit expr ++ opaqueNominalErrors registry unit expr ++
           instantiations.foldl (fun ds argument =>
             ds ++ checkGenericArgument registry unit unit.tables argument) #[]
     | .letDecl pattern _ _ => checkPatternId ns pattern (some expr.loc)
@@ -550,10 +599,11 @@ private def checkSignature (registry : ProfileRegistry) (unit : RawUnit) (tables
         checkScopedPredicate registry unit tables scopedBinders (some binder.loc) predicate) ds) #[]
   let parameterErrors := signature.parameters.foldl
     (fun ds parameter => ds ++ checkTypeUse tables parameter.typeUse ++
-      checkScopedTypeUse registry unit tables scopedBinders parameter.typeUse) #[]
+      checkScopedTypeUse registry unit tables scopedBinders parameter.typeUse ++
+      checkSized tables parameter.typeUse.typeId) #[]
   let resultErrors := signature.results.foldl
     (fun ds result => ds ++ checkTypeUse tables result ++
-      checkScopedTypeUse registry unit tables scopedBinders result) #[]
+      checkScopedTypeUse registry unit tables scopedBinders result ++ checkSized tables result.typeId) #[]
   let predicateErrors := signature.predicates.foldl (fun ds predicate =>
     ds ++ checkGenericPredicate registry unit tables associatedItemCount predicate ++
       checkScopedPredicate registry unit tables scopedBinders none predicate) #[]
@@ -628,28 +678,31 @@ private def checkGenericBinders (registry : ProfileRegistry) (unit : RawUnit) (t
 
 private def checkField (tables : Tables) (field : FieldDecl) : Array Diagnostic :=
   checkLoc tables field.loc ++ checkName tables field.name (some field.loc) ++
-    checkTypeUse tables field.type
+    checkTypeUse tables field.type ++ checkSized tables field.type.typeId
 
-/-- Whether a type holds a reference, by its structure; a function value's
-type holds none of its parameters' or result's. -/
-private def typeHoldsReference (tables : Tables) : Nat → TypeId → Bool
-  | 0, _ => true
-  | fuel + 1, typeId => match tables.types[typeId.index]? with
-    | some (.reference _) => true
-    | some (.vector element _) | some (.typeDomain element) =>
-        typeHoldsReference tables fuel element
-    | some (.tuple elements) => elements.any (typeHoldsReference tables fuel)
-    | some (.resourceDomain _ arguments) =>
-        arguments.any (·.any (typeHoldsReference tables fuel))
-    | some (.nominal _ arguments) => arguments.any fun
-        | .typeArg use => typeHoldsReference tables fuel use.typeId
-        | .const _ | .lifetime _ | .evidence _ => false
-    | some .unit | some .never | some .bool | some .character | some .string | some .bytes
-    | some .address | some .signer | some (.integer ..) | some .range | some .eventStore
-    | some .stateDomain | some (.function ..) | some (.typeParameter _) | some (.profile _)
-    | none => false
+/-- A Move nominal declaration's fields hold no reference, at any depth: Move
+has no reference fields, and the borrow analysis treats a value of a Move
+nominal type as loan-free on that ground (`typeMayContainReference` in
+`Validation/Borrowing.lean`). A field of another nominal is covered by that
+nominal's own declaration. Other profiles may declare reference fields. -/
+private def moveReferenceFieldDiagnostics (tables : Tables) (profile : Option Profile)
+    (struct : StructDecl) : Array Diagnostic :=
+  if profile != some .move then #[] else
+  let nameOf (name : NameId) := match tables.names[name.index]? with
+    | some qualified => qualified.name
+    | none => s!"#{name.index}"
+  let check (owner : String) (ds : Array Diagnostic) (field : FieldDecl) :=
+    if typeHoldsReference tables (tables.types.size + 1) field.type.typeId then
+      ds.push <| .at "VIR-MOVE-REFERENCE-FIELD"
+        s!"unsupported construct: field `{nameOf field.name}` of {owner} holds a reference; \
+          Move nominal declarations have no reference fields" field.loc
+    else ds
+  let declaration := s!"Move declaration `{nameOf struct.name}`"
+  let ds := struct.fields.foldl (check declaration) #[]
+  struct.variants.foldl (fun ds variant =>
+    variant.fields.foldl (check s!"variant `{nameOf variant.name}` of {declaration}") ds) ds
 
-/-- A ghost field's declaration (`designs/ghost-fields.md`): its type holds
+/-- A ghost field's declaration (`doc/designs/ghost-fields.md`): its type holds
 no reference, so that its slot holds no loan; an initializer is an
 expression of an owned namespace. -/
 private def checkGhostField (registry : ProfileRegistry) (unit : RawUnit)
@@ -720,9 +773,254 @@ private def associatedItemKindsShareNamespace
 private def checkLocals (tables : Tables) (locals : Array LocalDecl) : Array Diagnostic :=
   locals.zipIdx.foldl (init := #[]) fun ds (localDecl, index) =>
     ds ++ checkLoc tables localDecl.loc ++ checkTypeUse tables localDecl.type ++
+      checkSized tables localDecl.type.typeId ++
       (if localDecl.id.index == index then #[] else
         #[.at "VIR-LOCAL-IDENTITY"
           s!"local id {localDecl.id.index} does not match table position {index}" localDecl.loc])
+
+/-! ### Shapes -/
+
+/-- A type's head without its type children, and those children. Lifetimes and
+evidence do not tell shapes apart: no instantiation is decided by them. -/
+private def typeHeadChildren : Ty → Ty × Array TypeId
+  | .tuple elements => (.tuple #[], elements)
+  | .vector element length => (.vector ⟨0⟩ length, #[element])
+  | .slice element => (.slice ⟨0⟩, #[element])
+  | .typeDomain type => (.typeDomain ⟨0⟩, #[type])
+  | .resourceDomain resource arguments => (.resourceDomain resource none, arguments.getD #[])
+  | .nominal name arguments =>
+      (.nominal name (arguments.filter fun | .const _ => true | _ => false),
+        arguments.filterMap fun | .typeArg value => some value.typeId | _ => none)
+  | .function arguments result abilities => (.function #[] ⟨0⟩ abilities, arguments.push result)
+  | .reference value =>
+      (.reference { value with referent := ⟨0⟩, lifetime := ⟨0⟩ }, #[value.referent])
+  | type => (type, #[])
+
+/-- A type of one of two shapes, whose parameters are that shape's variables. -/
+private abbrev ShapeTerm := Bool × TypeId
+
+/-- A term with the bindings of its variable followed to its end. -/
+private partial def resolveShapeTerm (types : Array Ty)
+    (bindings : Array ((Bool × Nat) × ShapeTerm)) (term : ShapeTerm) : ShapeTerm :=
+  match types[term.2.index]? with
+  | some (.typeParameter index) =>
+      match bindings.find? (·.1 == (term.1, index)) with
+      | some (_, bound) => resolveShapeTerm types bindings bound
+      | none => term
+  | _ => term
+
+/-- Whether a variable occurs in a term under the bindings. -/
+private partial def occursInShapeTerm (types : Array Ty)
+    (bindings : Array ((Bool × Nat) × ShapeTerm)) (bound : Bool × Nat) (term : ShapeTerm) :
+    Bool :=
+  let term := resolveShapeTerm types bindings term
+  match types[term.2.index]? with
+  | some (.typeParameter index) => (term.1, index) == bound
+  | some type => (typeHeadChildren type).2.any fun child =>
+      occursInShapeTerm types bindings bound (term.1, child)
+  | none => false
+
+/-- The bindings extended to unify the pairs of terms, if they unify. -/
+private partial def unifyShapeTerms (types : Array Ty) (read : Ty → Ty)
+    (bindings : Array ((Bool × Nat) × ShapeTerm)) :
+    List (ShapeTerm × ShapeTerm) → Option (Array ((Bool × Nat) × ShapeTerm))
+  | [] => some bindings
+  | (left, right) :: rest => do
+      let left := resolveShapeTerm types bindings left
+      let right := resolveShapeTerm types bindings right
+      if left == right then return ← unifyShapeTerms types read bindings rest
+      let leftType ← types[left.2.index]?
+      let rightType ← types[right.2.index]?
+      let bind (bound : Bool × Nat) (term : ShapeTerm) :=
+        if occursInShapeTerm types bindings bound term then none
+        else unifyShapeTerms types read (bindings.push (bound, term)) rest
+      match leftType, rightType with
+      | .typeParameter index, _ => bind (left.1, index) right
+      | _, .typeParameter index => bind (right.1, index) left
+      | _, _ =>
+          let (leftHead, leftChildren) := typeHeadChildren leftType
+          let (rightHead, rightChildren) := typeHeadChildren rightType
+          guard (read leftHead == read rightHead && leftChildren.size == rightChildren.size)
+          let children := (leftChildren.zip rightChildren).toList.map fun (leftChild, rightChild) =>
+            (((left.1, leftChild) : ShapeTerm), ((right.1, rightChild) : ShapeTerm))
+          unifyShapeTerms types read bindings (children ++ rest)
+
+/-- A type's head as the verifier reads it: a pointer-width integer is the
+integer of its width. -/
+private def readWidth (pointerWidth : Option Nat) : Ty → Ty
+  | .integer .pointer signed =>
+      match pointerWidth with
+      | some width => .integer (.bits width) signed
+      | none => .integer .pointer signed
+  | type => type
+
+/-- Whether some instantiation matches both shapes, the types' heads read by `read`. -/
+private def shapesOverlap (types : Array Ty) (read : Ty → Ty) (left right : ShapeContract) : Bool :=
+  (unifyShapeTerms types read #[] ((left.arguments.zip right.arguments).toList.map
+    fun (leftType, rightType) => ((false, leftType.typeId), (true, rightType.typeId)))).isSome
+
+/-- Whether two of a shape's types are one type as the verifier reads it. -/
+private partial def sameNativeType (types : Array Ty) (pointerWidth : Option Nat)
+    (left right : TypeId) : Bool :=
+  left == right || match types[left.index]?, types[right.index]? with
+    | some leftType, some rightType =>
+        let (leftHead, leftChildren) := typeHeadChildren leftType
+        let (rightHead, rightChildren) := typeHeadChildren rightType
+        readWidth pointerWidth leftHead == readWidth pointerWidth rightHead &&
+          leftChildren.size == rightChildren.size &&
+          (leftChildren.zip rightChildren).all fun (leftChild, rightChild) =>
+            sameNativeType types pointerWidth leftChild rightChild
+    | _, _ => false
+
+/-- Whether two shapes are one as the verifier reads them, apart at most in
+pointer-width integers: a native at their instantiations is one meaning at one
+carrier, and their contracts must agree (`verifyShapeSiblings`). -/
+def sameNativeShape (types : Array Ty) (pointerWidth : Option Nat) (left right : ShapeContract) :
+    Bool :=
+  left.arguments.size == right.arguments.size &&
+    (left.arguments.zip right.arguments).all fun (leftType, rightType) =>
+      sameNativeType types pointerWidth leftType.typeId rightType.typeId
+
+/-- Whether two types are the same but for lifetimes and evidence. -/
+private partial def sameShapeType (types : Array Ty) (left right : TypeId) : Bool :=
+  left == right || match types[left.index]?, types[right.index]? with
+    | some leftType, some rightType =>
+        let (leftHead, leftChildren) := typeHeadChildren leftType
+        let (rightHead, rightChildren) := typeHeadChildren rightType
+        leftHead == rightHead && leftChildren.size == rightChildren.size &&
+          (leftChildren.zip rightChildren).all fun (leftChild, rightChild) =>
+            sameShapeType types leftChild rightChild
+    | _, _ => false
+
+/-- What the variables of a shape's type take for the type to be `actual`, the
+caller's parameters rigid, extending `found`. -/
+private partial def bindCallType (types : Array Ty) (shape actual : TypeId)
+    (found : Array (Nat × TypeId)) : Option (Array (Nat × TypeId)) := do
+  let shapeType ← types[shape.index]?
+  if let .typeParameter index := shapeType then
+    match found.find? (·.1 == index) with
+    | some (_, bound) => guard (sameShapeType types bound actual); return found
+    | none => return found.push (index, actual)
+  let (shapeHead, shapeChildren) := typeHeadChildren shapeType
+  let (actualHead, actualChildren) := typeHeadChildren (← types[actual.index]?)
+  guard (shapeHead == actualHead && shapeChildren.size == actualChildren.size)
+  (shapeChildren.zip actualChildren).foldlM (init := found) fun found (shapeChild, actualChild) =>
+    bindCallType types shapeChild actualChild found
+
+/-- Whether a call's type arguments are a shape's types at some arguments of
+its variables, as VIR states them: `{usize}` does not match a call at `u64`,
+which the verifier's types do not tell apart. -/
+def shapeMatchesCall (types : Array Ty) (shape : Array TypeUse)
+    (call : Array GenericArgument) : Bool :=
+  let bound : Option (Array (Nat × TypeId)) := (shape.zip call).foldlM (init := #[])
+    fun found (pair : TypeUse × GenericArgument) => match pair.2 with
+      | .typeArg argument => bindCallType types pair.1.typeId argument.typeId found
+      | _ => some found
+  shape.size == call.size && bound.isSome
+
+/-- Whether `actual` is the type `declared` at the type arguments. -/
+private partial def instantiatesAs (types : Array Ty) (arguments : Array TypeUse)
+    (declared actual : TypeId) : Bool :=
+  match types[declared.index]?, types[actual.index]? with
+  | some (.typeParameter index), _ =>
+      match arguments[index]? with
+      | some argument => sameShapeType types argument.typeId actual
+      | none => false
+  | some declaredType, some actualType =>
+      let (declaredHead, declaredChildren) := typeHeadChildren declaredType
+      let (actualHead, actualChildren) := typeHeadChildren actualType
+      declaredHead == actualHead && declaredChildren.size == actualChildren.size &&
+        (declaredChildren.zip actualChildren).all fun (declaredChild, actualChild) =>
+          instantiatesAs types arguments declaredChild actualChild
+  | _, _ => false
+
+/-- The checks of a function's shapes as such; each one's contract is checked
+as a declaration of its own (`FunctionDecl.atShape`). A shape is of a bodiless
+Rust function, has one argument per binder, a placeholder at a lifetime's,
+binds what its arguments mention, states the function's signature at them, and overlaps no other
+contract of the function; the later of two is the one reported. -/
+private def checkShapes (registry : ProfileRegistry) (unit : RawUnit)
+    (function : FunctionDecl RawBody) : Array Diagnostic :=
+  let types := unit.tables.types
+  let pointerWidth := do
+    let config ← profileConfig? unit.profiles .rust
+    let option ← config.options.find? (·.1 == "target_pointer_width")
+    supportedTargetPointerWidth? option.2
+  let position (loc : LocId) : Nat :=
+    ((unit.tables.locations[loc.index]?).bind (·.primary)).map (·.startByte) |>.getD 0
+  let mentions (typeId : TypeId) (index : Nat) : Bool :=
+    occursInShapeTerm types #[] (false, index) (false, typeId)
+  function.shapes.zipIdx.foldl (init := #[]) fun ds (shape, shapeIndex) =>
+    let binders := binderKinds shape.signature.generics
+    let ds := ds ++ checkLoc unit.tables shape.loc ++ shape.arguments.foldl (fun ds argument =>
+      ds ++ checkTypeUse unit.tables argument ++
+        checkScopedTypeUse registry unit unit.tables binders argument) #[]
+    let ds := if function.profile == .rust then ds else ds.push <| .at "VIR-SHAPE-PROFILE"
+      "a contract at a shape is available in the Rust profile" shape.loc
+    let ds := if function.body matches .absent then ds else ds.push <| .at "VIR-SHAPE-BODY"
+      "a contract at a shape is of a function without a body: its callers assume it, and \
+        verifying a body at a shape is not supported" shape.loc
+    let parameters := function.signature.generics.filter (·.kind == .typeArg)
+    let arityFits := shape.arguments.size == function.signature.generics.size &&
+      (function.signature.generics.zip shape.arguments).all fun (binder, argument) =>
+        match binder.kind with
+        | .typeArg => true
+        | .lifetime => types[argument.typeId.index]? == some .unit
+        | .const | .evidence => false
+    let ds := if arityFits then ds else ds.push <| .at "VIR-SHAPE-ARITY"
+      s!"the shape has {shape.arguments.size} arguments, and the function \
+        {function.signature.generics.size} generics, each a type or a lifetime, with a \
+        placeholder at a lifetime" shape.loc
+    let ds := shape.signature.generics.zipIdx.foldl (init := ds) fun ds (binder, index) =>
+      let ds := if binder.kind == .typeArg && shape.arguments.any (mentions ·.typeId index) then ds
+        else ds.push <| .at "VIR-SHAPE-BINDER"
+          s!"the shape does not determine its variable `{binder.name}`" shape.loc
+      if parameters.any (·.name == binder.name) then ds
+      else ds.push <| .at "VIR-SHAPE-BINDER"
+        s!"the shape's variable `{binder.name}` is no generic binder of the function" shape.loc
+    let parametersAgree := function.signature.parameters.size == shape.signature.parameters.size &&
+      (function.signature.parameters.zip shape.signature.parameters).all fun (declared, actual) =>
+        instantiatesAs types shape.arguments declared.typeUse.typeId actual.typeUse.typeId
+    let resultsAgree := function.signature.results.size == shape.signature.results.size &&
+      (function.signature.results.zip shape.signature.results).all fun (declared, actual) =>
+        instantiatesAs types shape.arguments declared.typeId actual.typeId
+    let ds := if !arityFits || (parametersAgree && resultsAgree) then ds
+      else ds.push <| .at "VIR-SHAPE-SIGNATURE"
+        "the shape's signature is not the function's at the shape's types" shape.loc
+    -- A contract over all the generics and one at a shape overlap only where
+    -- the generic one has a reading: a type argument holding a mutable
+    -- reference is not `Plain`, so no generic contract transfers to it
+    -- (`doc/designs/denotation.md`, "Instances at a reference") and the shape
+    -- states the only contract a call there can read.
+    let structOf := fun name => do
+      let qualified ← unit.tables.names[name.index]?
+      let owner ← unit.namespaces[qualified.namespaceId.index]?
+      owner.structs.find? (·.name == name)
+    let atReference := shape.arguments.any fun argument =>
+      typeHoldsMutableReference unit.tables structOf (types.size + 1) argument.typeId
+    let ds := match function.contract.loc with
+      | some loc =>
+          if atReference then ds else
+          let later := if position shape.loc < position loc then loc else shape.loc
+          ds.push <| .at "VIR-SHAPE-OVERLAP"
+            "the function has a contract over all its generics, which overlaps its contract at \
+              a shape" later
+      | none => ds
+    (function.shapes.take shapeIndex).foldl (init := ds) fun ds earlier =>
+      if !arityFits || earlier.arguments.size != shape.arguments.size then ds
+      -- A call matches on VIR types.
+      else if shapesOverlap types id earlier shape then
+        ds.push <| .at "VIR-SHAPE-OVERLAP"
+          "the function's contracts overlap: an instantiation matches this shape and an earlier \
+            one" shape.loc
+      -- Calls at both reach one meaning at one carrier: only the same shape up to a
+      -- pointer-width integer can state that they agree.
+      else if shapesOverlap types (readWidth pointerWidth) earlier shape &&
+          !sameNativeShape types pointerWidth earlier shape then
+        ds.push <| .at "VIR-SHAPE-OVERLAP"
+          "the verifier's types do not tell an instantiation of this shape from one of an \
+            earlier shape that differs in more than a pointer-width integer" shape.loc
+      else ds
 
 private def checkParametersMatchLocals (parameters : Array Parameter)
     (locals : Array LocalDecl) : Array Diagnostic :=
@@ -903,6 +1201,35 @@ private def checkTraitInheritanceAcyclic (ns : RawNamespace) : Array Diagnostic 
   (Array.range ns.traits.size).foldl (fun ds root =>
     ds ++ visit root root [] (ns.traits.size + 1)) #[]
 
+/-- The scopes of a namespace: each declared once with a nonempty path, after
+its parent, which is a module; and every name the namespace owns in a scope it
+declares. -/
+private def checkScopes (tables : Tables) (owner : NamespaceId) (scopes : Array ScopeDecl)
+    (anchor : Option LocId) : Array Diagnostic :=
+  let scopeText (path : Array String) := String.intercalate "::" path.toList
+  let scopeErrors := scopes.zipIdx.foldl (init := #[]) fun ds (scope, index) =>
+    let earlier := scopes.take index
+    let ds := ds ++ checkLoc tables scope.loc
+    let ds := if scope.path.isEmpty then
+      ds.push <| .at "VIR-SCOPE-EMPTY" "a scope has an empty path" scope.loc
+    else ds
+    let ds := if earlier.any (·.path == scope.path) then
+      ds.push <| .at "VIR-SCOPE-DUPLICATE"
+        s!"scope `{scopeText scope.path}` is declared more than once" scope.loc
+    else ds
+    -- Only a module contains scopes.
+    if scope.path.size > 1 && !earlier.any fun parent =>
+        parent.path == scope.path.pop && parent.kind == .module then
+      ds.push <| .at "VIR-SCOPE-PARENT"
+        s!"scope `{scopeText scope.path}` is not declared after its parent module" scope.loc
+    else ds
+  let declared := scopes.map (·.path)
+  tables.names.foldl (init := scopeErrors) fun ds name =>
+    if name.namespaceId != owner || name.scope.isEmpty || declared.contains name.scope then ds
+    else ds.push <| .error "VIR-SCOPE-UNDECLARED"
+      s!"`{name.name}` is named in scope `{scopeText name.scope}`, which namespace {owner.index} does not declare"
+      anchor
+
 private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
     (expectedId : Nat) (ns : RawNamespace) : Array Diagnostic :=
   let importErrors := ns.imports.zipIdx.foldl (init := #[]) fun ds (id, index) =>
@@ -941,6 +1268,7 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
       (ns.specVars.map fun declaration => (declaration.name, declaration.loc)) ++
     checkDeclarationNames unit.tables ns.identity "lemma"
       (ns.lemmas.map fun declaration => (declaration.name, declaration.loc))
+  let scopeErrors := checkScopes unit.tables ns.identity ns.scopes (some ns.loc)
   let exprErrors := ns.expressions.foldl (fun ds expr =>
     ds ++ checkLoc unit.tables expr.loc ++ checkTypeId unit.tables expr.typeId (some expr.loc) ++
       checkExprKind registry unit ns expr) #[]
@@ -970,7 +1298,41 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
       (ns.patterns[index]?).map (patternChildren ·.kind |>.map (·.index)) |>.getD #[] ++
     checkAcyclic "place" ns.places.size fun index =>
       (ns.places[index]?).map (placeChildren · |>.map (·.index)) |>.getD #[]
-  let declErrors := ns.functions.foldl (fun ds function =>
+  let shapeErrors := ns.functions.foldl (fun ds function =>
+    ds ++ checkShapes registry unit function ++
+      (if function.profileData.any (·.tag == rustShapeOnlyTag) &&
+          (!function.contract.conditions.isEmpty || function.contract.hasFrame ||
+            !function.contract.parameterFrames.isEmpty) then
+        #[.at "VIR-SHAPE-REQUIRED"
+          "a dependency with promoted associated types requires a contract at a shape"
+          function.loc]
+      else #[])) #[]
+  let methodEvidenceErrors := ns.functions.flatMap fun function =>
+    function.attributes.filterMap fun attr => do
+      let .assign key value _ := attr | none
+      if key != "method_evidence" && key != "scoped_method_evidence" then none else
+      let valid := Id.run do
+        unless function.profile == .rust do return false
+        let .constant (.integer index) := value | return false
+        if index < 0 then return false
+        let some parameter := function.signature.parameters[index.toNat]? | return false
+        let some (.function parameters _ _) := unit.tables.types[parameter.typeUse.typeId.index]?
+          | return false
+        -- The receiver is explicit, including an owned receiver for consuming
+        -- methods. Ordinary type and invocation checks validate its use.
+        if parameters.isEmpty then return false
+        if key == "scoped_method_evidence" then
+          unless function.attributes.any (fun
+            | .assign "method_evidence" (.constant (.integer other)) _ => other == index
+            | _ => false) do return false
+          let some (receiver : TypeId) := parameters[0]? | return false
+          let some (Ty.reference _) := unit.tables.types[receiver.index]? | return false
+          if function.body matches .absent then return false
+        return true
+      if valid then none else some (.at "VIR-METHOD-EVIDENCE"
+        "method evidence must name a function-typed parameter with an explicit receiver" function.loc)
+  let declErrors := (ns.functions.flatMap fun function =>
+      #[function] ++ function.shapes.map function.atShape).foldl (fun ds function =>
     let functionBinders := binderKinds function.signature.generics
     ds ++ checkLoc unit.tables function.loc ++ checkName unit.tables function.name (some function.loc) ++
       checkProfile unit function.profile (some function.loc) ++
@@ -987,6 +1349,14 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
         ds ++ checkProfileValue registry unit value ProfileSchema.checkProperty) #[] ++
       checkAttributes registry unit unit.tables function.attributes ++
       checkRawBody registry unit ns function.locals.size function.loc function.body ++
+      (match (profileSchema? registry function.profile).bind (·.bodiless function.profileData) with
+       | some declared =>
+           if declared == (function.body matches .absent) then #[] else
+             #[.at "VIR-FUNCTION-BODY"
+               (if declared then "a function its profile declares bodiless has a body"
+                else "a function without a body is not declared bodiless by its profile")
+               function.loc]
+       | none => #[]) ++
       (match ns.profile with
        | some profile => if profile == function.profile then #[] else
            #[.at "VIR-PROFILE-MISMATCH" "function profile differs from its namespace profile" function.loc]
@@ -1016,7 +1386,8 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
       checkParameterFrames unit ns
         (struct.fields.map fun field => { name := "", typeUse := field.type })
         struct.locals struct.contract.parameterFrames ++
-      checkAttributes registry unit unit.tables struct.attributes
+      checkAttributes registry unit unit.tables struct.attributes ++
+      moveReferenceFieldDiagnostics unit.tables ns.profile struct
     let ds := if !struct.fields.isEmpty && !struct.variants.isEmpty then
         ds.push <| .at "VIR-NOMINAL-SHAPE"
           "a nominal declaration cannot contain both struct fields and enum variants" struct.loc
@@ -1206,8 +1577,8 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
   let surfaceErrors := checkAttributes registry unit unit.tables ns.attributes ++
     checkAttributes registry unit unit.tables ns.pragmas ++
     ns.comments.foldl (fun ds comment => ds ++ checkLoc unit.tables comment.loc) #[]
-  headerErrors ++ declarationNameErrors ++ exprErrors ++ patternErrors ++ placeErrors ++ arenaErrors ++
-    declErrors ++ constantErrors ++ structErrors ++ associatedItemErrors ++ traitErrors ++
+  headerErrors ++ declarationNameErrors ++ scopeErrors ++ exprErrors ++ patternErrors ++ placeErrors ++ arenaErrors ++
+    declErrors ++ shapeErrors ++ methodEvidenceErrors ++ constantErrors ++ structErrors ++ associatedItemErrors ++ traitErrors ++
     implementationErrors ++ specFunctionErrors ++ specVarErrors ++ lemmaErrors ++ invariantErrors ++
     intrinsicErrors ++ traitCycleErrors ++ metadataErrors ++ surfaceErrors
 
@@ -1244,6 +1615,54 @@ private def normalizeValueBorrows (tables : Tables) (ns : RawNamespace) : RawNam
         | _, _ => (expressions.push expression, places)
     | _ => (expressions.push expression, places)
   { ns with expressions, places }
+
+/-- The nodes a structured function reaches that its frontend could not state:
+an opaque constant, and a call of an opaque function. Only a diverging region
+holds one, and the import collapses those, so a survivor has no meaning. Nodes
+a function does not reach are not read: a collapse leaves them in the arena. -/
+private partial def opaqueSurvivors (tables : Tables) (namespaces : Array (Namespace FunctionBody))
+    (ns : Namespace FunctionBody) : Array Diagnostic :=
+  let (_, found) := ns.functions.foldl (init := ((#[] : Array Bool), (#[] : Array Diagnostic)))
+    fun state function => match function.body with
+      | .structured root => visit root state
+      | .absent => state
+  found
+where
+  visit (id : ExprId) : Array Bool × Array Diagnostic → Array Bool × Array Diagnostic
+    | (seen, found) =>
+      if seen.getD id.index false then (seen, found) else
+      match ns.expressions[id.index]? with
+      | none => (seen, found)
+      | some expression =>
+          let seen := (seen ++ Array.replicate (id.index + 1 - seen.size) false).set! id.index true
+          let found := match survivor expression with
+            | some message => found.push (.at "VIR-OPAQUE-SURVIVOR" message expression.loc)
+            | none => found
+          (expressionChildren expression.kind).foldl (fun state child => visit child state)
+            (seen, found)
+  survivor (expression : Expr) : Option String :=
+    match expression.kind with
+    | .value (.opaque description) _ => some <|
+        s!"a constant of `{description}` the exporter could not state survives import: \
+        only a diverging region may hold one, and the import collapses those"
+    | .operation (.call (.function callee)) _ _ _ => do
+        let target ← namespaces[callee.namespaceId.index]?
+        let declaration ← target.functions.find? (·.name == callee.name)
+        guard <| declaration.profileData.any (·.tag == rustOpaqueFunctionTag)
+        let name := (tables.names[callee.name.index]?.map (·.name)).getD "?"
+        return s!"a call of `{name}` survives import: the exporter declares it opaque, for its \
+          unsafety or a signature it cannot state; only a diverging region may hold one, and \
+          the import collapses those"
+    | _ => none
+
+/-- The opaque functions a namespace declares: a false interface, which a user could
+specify and a crate could link against, and the import prunes one nothing calls. -/
+private def opaqueDeclarations (tables : Tables) (ns : Namespace FunctionBody) :
+    Array Diagnostic :=
+  (ns.functions.filter (·.profileData.any (·.tag == rustOpaqueFunctionTag))).map fun function =>
+    let name := (tables.names[function.name.index]?.map (·.name)).getD "?"
+    .at "VIR-OPAQUE-SURVIVOR"
+      s!"the opaque function `{name}` survives import, which prunes one nothing calls" function.loc
 
 /-- Namespace after structurization, paired with the data needed to check
 exactly the content that pass added: the pre-structurization arena sizes and
@@ -1357,9 +1776,10 @@ carries the declaration's shape — its binders, abilities, fields, and variants
 and nothing that belongs to a body: contracts and locals stay with the
 declaring unit. -/
 private def checkInterfaceStruct (registry : ProfileRegistry) (unit : RawUnit)
-    (owner : NamespaceId) (struct : StructDecl) : Array Diagnostic :=
+    (owner : NamespaceId) (profile : Option Profile) (struct : StructDecl) : Array Diagnostic :=
   let binders := binderKinds struct.generics
   let ds := checkLoc unit.tables struct.loc ++
+    moveReferenceFieldDiagnostics unit.tables profile struct ++
     checkName unit.tables struct.name (some struct.loc) ++
     checkGenericBinders registry unit unit.tables 0 struct.generics ++
     checkAbilityList "nominal declaration" struct.abilities (some struct.loc) ++
@@ -1411,6 +1831,7 @@ private def checkDependencies (registry : ProfileRegistry) (unit : RawUnit) : Ar
     let ds := match dependency.profile with
       | some profile => ds ++ checkProfile unit profile
       | none => ds
+    let ds := ds ++ checkScopes unit.tables dependency.namespaceId dependency.scopes none
     let ds := dependency.functions.foldl (init := ds) fun ds function =>
       let ds := ds ++ checkLoc unit.tables function.loc ++
         checkName unit.tables function.name (some function.loc) ++
@@ -1421,7 +1842,7 @@ private def checkDependencies (registry : ProfileRegistry) (unit : RawUnit) : Ar
           (some function.loc) ++
         checkAttributes registry unit unit.tables function.attributes
       let ds := if function.body matches .absent && function.contract == ({} : FunctionContract) &&
-          function.locals.isEmpty then ds else
+          function.locals.isEmpty && function.shapes.isEmpty then ds else
         ds.push <| .at "VIR-DEPENDENCY-INTERFACE"
           "a dependency interface function carries a signature only" function.loc
       match unit.tables.names[function.name.index]? with
@@ -1446,7 +1867,7 @@ private def checkDependencies (registry : ProfileRegistry) (unit : RawUnit) : Ar
             function.loc
       | none => ds
     let ds := dependency.structs.zipIdx.foldl (init := ds) fun ds (struct, structIndex) =>
-      let ds := ds ++ checkInterfaceStruct registry unit dependency.namespaceId struct
+      let ds := ds ++ checkInterfaceStruct registry unit dependency.namespaceId dependency.profile struct
       if dependency.structs.take structIndex |>.any (·.name == struct.name) then
         ds.push <| .at "VIR-DEPENDENCY-NAME-DUPLICATE"
           s!"dependency namespace {dependency.namespaceId.index} declares nominal {struct.name.index} more than once"
@@ -1527,7 +1948,8 @@ private def placeRootLocal? (places : Array Place) : Nat → PlaceId → Option 
       match places[id.index]? with
       | some (.localVar localId) => some localId
       | some (.deref base) | some (.field base ..) | some (.ghostField base ..)
-      | some (.index base _) | some (.subslice base ..) | some (.downcast base _) =>
+      | some (.index base _) | some (.subslice base ..) | some (.unsize base)
+      | some (.downcast base _) =>
           placeRootLocal? places fuel base
       | none => none
 
@@ -1572,7 +1994,7 @@ private def collectLocalUses (expressions : Array Expr) (places : Array Place)
         | .localVar localId => uses.use localId
         | .operation operation _ _ _ =>
             match operation with
-            | .move place | .copy place | .read place | .borrow _ place | .write place
+            | .move place | .copy place | .read place | .readDiscriminant place | .borrow _ place | .write place
             | .drop place => rootUse uses place
             | _ => uses
         | .assign place _ => rootUse uses place
@@ -1716,7 +2138,17 @@ private def normalizeReferenceCopies (unit : RawUnit) : RawUnit :=
                     | some (.assign place value) =>
                         match places[place.index]? with
                         | some (.localVar _) => bound tables expressions places site value
-                        | _ => (tables, expressions, places)
+                        | _ =>
+                            if ns.profile == some .move then (tables, expressions, places)
+                            else bound tables expressions places site value
+                    -- An aggregate holds the copy as a binding does. Only Move
+                    -- builds no aggregate that a loan rests in beyond its return.
+                    | some (.operation (.call (.constructor ..)) _ arguments _)
+                    | some (.operation (.primitive .tuple) _ arguments _) =>
+                        if ns.profile == some .move then (tables, expressions, places) else
+                        arguments.foldl (init := (tables, expressions, places))
+                          fun (tables, expressions, places) argument =>
+                            bound tables expressions places site argument
                     | _ => (tables, expressions, places)
             | _ => (tables, expressions, places)
       (tables, namespaces.push { ns with expressions, places })
@@ -1738,9 +2170,13 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
   let rawDiagnostics := checkUnit registry rawUnit
   if rawDiagnostics.any (·.severity == .error) then
     throw (dedupDiagnostics rawDiagnostics)
+  let pointerWidth := do
+    let config ← profileConfig? rawUnit.profiles .rust
+    let option ← config.options.find? (·.1 == "target_pointer_width")
+    supportedTargetPointerWidth? option.2
   let structurized ← rawUnit.namespaces.zipIdx.mapM fun (ns, index) => do
     let (structuredNs, witnesses) ←
-      Import.Structurize.structurizeNamespace rawUnit.tables ⟨index⟩ ns
+      Import.Structurize.structurizeNamespace rawUnit.tables pointerWidth ⟨index⟩ ns
     return { ns := structuredNs
              witnesses
              expressionBase := ns.expressions.size
@@ -1755,15 +2191,24 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
   if appendixDiagnostics.any (·.severity == .error) then
     throw (dedupDiagnostics appendixDiagnostics)
   let structuredNamespaces := structurized.map (·.ns)
+  let survivors := structuredNamespaces.flatMap
+    (opaqueSurvivors rawUnit.tables structuredNamespaces)
+  unless survivors.isEmpty do
+    throw (dedupDiagnostics survivors)
+  let declarations := structuredNamespaces.flatMap (opaqueDeclarations rawUnit.tables)
+  unless declarations.isEmpty do
+    throw declarations
   let resolution := ResolutionIndex.build rawUnit.tables structuredNamespaces
     rawUnit.dependencies
   let resolutionDiagnostics := resolveUseSites rawUnit.tables resolution
     rawUnit.namespaces.size structuredNamespaces
   if resolutionDiagnostics.any (·.severity == .error) then
     throw (dedupDiagnostics resolutionDiagnostics)
-  let orders := valueOrdersOf rawUnit.tables structuredNamespaces
+  let orders := valueOrdersOf (structuredNamespaces.map (rawUnit.tables, ·))
   let namespaces := structurized.zipIdx.map fun (s, index) =>
-    ({ toNamespace := s.ns, tables := rawUnit.tables, orders, holders := holders[index]?.getD #[] }
+    ({ toNamespace := s.ns, tables := rawUnit.tables, links := .identity rawUnit.tables
+       localTables := rawUnit.tables, orders, holders := holders[index]?.getD #[]
+       witnesses := s.witnesses }
       : ValidatedNamespace)
   let unit := Internal.mkValidatedUnit rawUnit.tables rawUnit.profiles namespaces
     (rawUnit.dependencies.map fun dep => {
@@ -1774,24 +2219,37 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
       -- An interface declares signatures only, so every body is absent on
       -- both sides of this conversion.
       functions := dep.functions.map fun declaration => declaration.withBody .absent
-      specFunctions := dep.specFunctions })
+      specFunctions := dep.specFunctions
+      scopes := dep.scopes })
     (rawUnit.evidence.map fun evidence => {
       producer := evidence.producer
       description := evidence.description
       trusted := evidence.trusted })
     { namespaceCount := namespaces.size
       functionCounts := namespaces.map (·.functions.size) }
-    (structurized.flatMap (·.witnesses))
     resolution
   let unit := Internal.mkValidatedUnit unit.tables unit.profiles
     (unit.namespaces.map (inferLocalAccess unit)) unit.dependencies unit.evidence unit.indexes
-    unit.structurizationWitnesses unit.resolution
+    unit.resolution
+  -- Recorded with the borrow analysis's rejections, which preparation replays.
+  let moveDiagnostics : Array OwnedDiagnostic := unit.namespaces.flatMap fun ns =>
+    (componentMoveDiagnostics unit ns).map ({ namespaceId := ns.identity, diagnostic := · })
+  let unit := Internal.mkValidatedUnit unit.tables unit.profiles
+    (unit.namespaces.map reborrowMovedComponents) unit.dependencies unit.evidence unit.indexes
+    unit.resolution
   let typingErrors := typingDiagnostics unit
   if typingErrors.any (·.severity == .error) then
     throw (dedupDiagnostics typingErrors)
   let unit := Internal.mkValidatedUnit unit.tables unit.profiles
     (unit.namespaces.map (inferInstantiations unit)) unit.dependencies unit.evidence unit.indexes
-    unit.structurizationWitnesses unit.resolution
+    unit.resolution
+  -- A scoped dictionary annotation is a requirement, never a certificate.
+  -- Check all supplied values before borrow analysis may shorten its receiver loan.
+  let receiverSummaries := ReceiverNoEscape.summaries unit
+  let scopedErrors := unit.namespaces.flatMap fun ns =>
+    ns.functions.flatMap (ReceiverNoEscape.supplyDiagnostics unit receiverSummaries ns)
+  if scopedErrors.any (·.severity == .error) then
+    throw (dedupDiagnostics scopedErrors)
   -- Definite initialization and the borrow analysis run exactly once here;
   -- preparation copies the certificates instead of re-running the analyses.
   -- Initialization failures are validate errors. Borrow-analysis rejections
@@ -1800,13 +2258,16 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
   -- errors would reject legitimate source programs.
   let (initializationErrors, initializationCertificates, borrowCertificates,
       borrowDiagnostics) :=
-    unit.namespaces.foldl (init := (#[], #[], #[], #[])) fun acc ns =>
+    unit.namespaces.foldl
+        (init := ((#[] : Array Diagnostic), (#[] : Array InitializationCertificate),
+          (#[] : Array BorrowCertificate), (#[] : Array OwnedDiagnostic))) fun acc ns =>
       ns.functions.zipIdx.foldl (init := acc)
         fun (initDs, inits, borrows, borrowDs) (function, index) =>
           let (functionInitDs, initCert) :=
-            initializationOutcome ns.identity ⟨index⟩ ns function
+            initializationOutcome ns.identity ⟨index⟩ unit ns function
           let (functionBorrowDs, borrowCert) :=
             borrowOutcome ns.identity ⟨index⟩ unit ns function
+              (ReceiverNoEscape.summaryParameters receiverSummaries ns.identity function.name)
           (initDs ++ functionInitDs,
             match initCert with | some c => inits.push c | none => inits,
             match borrowCert with
@@ -1823,9 +2284,13 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
     match folded[certificate.namespaceId.index]? with
     | some (_, expressions) => certificate.withoutLoans expressions
     | none => certificate
-  return Internal.mkValidatedUnit unit.tables unit.profiles (folded.map (·.1))
-    unit.dependencies unit.evidence unit.indexes unit.structurizationWitnesses
-    unit.resolution initializationCertificates borrowCertificates borrowDiagnostics
+  -- Each namespace holds its results, its identity being its unit index.
+  let namespaces := folded.map fun (ns, _) => { ns with
+    initializationCertificates := initializationCertificates.filter (·.namespaceId == ns.identity)
+    borrowCertificates := borrowCertificates.filter (·.namespaceId == ns.identity)
+    borrowRejections := (moveDiagnostics ++ borrowDiagnostics).filter (·.namespaceId == ns.identity) }
+  return Internal.mkValidatedUnit unit.tables unit.profiles namespaces
+    unit.dependencies unit.evidence unit.indexes unit.resolution
 
 def ValidatedUnit.namespace? (unit : ValidatedUnit) (id : NamespaceId) : Option ValidatedNamespace :=
   unit.namespaces[id.index]?

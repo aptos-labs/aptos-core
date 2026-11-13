@@ -52,7 +52,7 @@ carry their resolved qualified spelling so pattern matching remains stable
 across namespace-local `NameId` tables.
 
 References follow the prophetic ownership model
-(`designs/prophetic-references.md`): a mutable borrow owns the current value
+(`doc/designs/prophetic-references.md`): a mutable borrow owns the current value
 of its loan and leaves `loanHole` where the value was taken. `loan` is the
 dynamic loan instance minted at the borrow; the lexically recorded loan
 deaths reunite hole and current (`settleLoans`). A shared reference is not a
@@ -72,7 +72,7 @@ inductive RuntimeValue where
   | nominal (source : StructHandle) (variant : Option String)
       (fields : Array RuntimeValue)
   /-- A ghost field's slot in a nominal value, after its declared fields
-  (`designs/ghost-fields.md`). The runtime holds `.unit` in it; the
+  (`doc/designs/ghost-fields.md`). The runtime holds `.unit` in it; the
   denotation holds the ghost's value, and its equality reads none. -/
   | ghost (value : RuntimeValue)
   /-- A function value: its target, the mask of the parameters it
@@ -82,6 +82,9 @@ inductive RuntimeValue where
       (typeInstantiation : Array (TypeId × TypeId)) (captures : Array RuntimeValue)
   | borrow (loan : Nat) (current : RuntimeValue)
   | loanHole (loan : Nat)
+  /-- What a settled borrow leaves where it rested: a reference whose loan has ended,
+  which nothing reads. -/
+  | retired
   deriving Repr, Inhabited
 
 /-! Structural equality of runtime values, as the `==` primitive decides
@@ -123,6 +126,7 @@ def RuntimeValue.beq : RuntimeValue → RuntimeValue → Bool
   | .borrow leftLoan leftCurrent, .borrow rightLoan rightCurrent =>
       leftLoan == rightLoan && RuntimeValue.beq leftCurrent rightCurrent
   | .loanHole left, .loanHole right => left == right
+  | .retired, .retired => true
   | _, _ => false
 termination_by left right => sizeOf left + sizeOf right
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
@@ -296,6 +300,7 @@ def RuntimeValue.kindRank : RuntimeValue → Nat
   | .borrow .. => 12
   | .loanHole _ => 13
   | .ghost _ => 14
+  | .retired => 15
 
 /-- What the order of runtime values reads from the unit: each enum
 variant's declaration position, and each function's position in the order
@@ -397,6 +402,7 @@ def RuntimeValue.observe : RuntimeValue → RuntimeValue
   | .ghost contents => .ghost contents.observe
   | .borrow _ current => current.observe
   | .loanHole _ => .unit
+  | .retired => .retired
   | .unit => .unit
   | .bool value => .bool value
   | .character value => .character value
@@ -415,6 +421,77 @@ def RuntimeValue.observeList : List RuntimeValue → List RuntimeValue
 termination_by values => sizeOf values
 decreasing_by all_goals (simp_wf; omega)
 end
+
+theorem RuntimeValue.observeList_length : (values : List RuntimeValue) →
+    (RuntimeValue.observeList values).length = values.length
+  | [] => by rw [RuntimeValue.observeList]
+  | _ :: values => by
+      rw [RuntimeValue.observeList, List.length_cons, List.length_cons,
+        RuntimeValue.observeList_length values]
+
+mutual
+/-- Whether a value holds no hole, within a borrow or not. -/
+def RuntimeValue.holeless : RuntimeValue → Bool
+  | .vector elements | .tuple elements | .nominal _ _ elements | .closure _ _ _ elements =>
+      RuntimeValue.holelessList elements.toList
+  | .borrow _ current => current.holeless
+  | .ghost contents => contents.holeless
+  | .loanHole _ => false
+  | .retired | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .bytes _ => true
+termination_by value => sizeOf value
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
+
+def RuntimeValue.holelessList : List RuntimeValue → Bool
+  | [] => true
+  | value :: values => value.holeless && RuntimeValue.holelessList values
+termination_by values => sizeOf values
+decreasing_by all_goals (simp_wf; omega)
+end
+
+/-- What a shared view holds of a place: stuck on a hole, which the borrow analysis
+rules out as a conflict. -/
+def RuntimeValue.view? (value : RuntimeValue) : Option RuntimeValue :=
+  if value.holeless then some value.observe else none
+
+theorem RuntimeValue.view?_some {value viewed : RuntimeValue} (view : value.view? = some viewed) :
+    value.holeless = true ∧ viewed = value.observe := by
+  unfold RuntimeValue.view? at view
+  split at view
+  · exact ⟨‹_›, (Option.some.inj view).symm⟩
+  · cases view
+
+theorem RuntimeValue.view?_of_holeless {value : RuntimeValue} (holeless : value.holeless = true) :
+    value.view? = some value.observe := by
+  simp [RuntimeValue.view?, holeless]
+
+/-- A shared view's result, from the frame and state that took it. -/
+theorem RuntimeValue.view?_map_some {α β : Type} {value : RuntimeValue} {first first' : α}
+    {second second' : β} {viewed : RuntimeValue}
+    (view : value.view?.map (first, second, ·) = some (first', second', viewed)) :
+    first' = first ∧ second' = second ∧ value.holeless = true ∧ viewed = value.observe := by
+  obtain ⟨seen, seen_eq, same⟩ := Option.map_eq_some_iff.mp view
+  simp only [Prod.mk.injEq] at same
+  obtain ⟨rfl, rfl, rfl⟩ := same
+  obtain ⟨holeless, rfl⟩ := RuntimeValue.view?_some seen_eq
+  exact ⟨rfl, rfl, holeless, rfl⟩
+
+/-- Whether a value is a live borrow, the hole of one, or what a retired one leaves:
+what a shared dereference is stuck on. -/
+def RuntimeValue.live : RuntimeValue → Bool
+  | .borrow .. | .loanHole _ | .retired => true
+  | _ => false
+
+/-- An observation is neither a borrow nor a hole: at most what a retired borrow left. -/
+theorem RuntimeValue.observe_live : (value : RuntimeValue) →
+    value.observe.live = false ∨ value.observe = .retired
+  | .borrow _ current => by
+      rw [RuntimeValue.observe]
+      exact RuntimeValue.observe_live current
+  | .retired => by simp [RuntimeValue.observe]
+  | .vector _ | .tuple _ | .nominal .. | .closure .. | .ghost _ | .loanHole _ | .unit | .bool _
+  | .character _ | .integer _ | .address _ | .signer _ | .string _ | .bytes _ => by
+      simp [RuntimeValue.observe, RuntimeValue.live]
 
 /-- An ordering as the integer `compare` returns. -/
 def orderValue : Ordering → Int
@@ -477,7 +554,7 @@ def RuntimeValue.variant? : RuntimeValue → Option String
 
 /-! ## Storage keys
 
-Global memory is a map, and a map's laws — reading back what was written,
+Global memory is a map, and a map's lemmas — reading back what was written,
 and leaving every other key alone — need key equality to be decidable.
 Runtime values as a whole do not have it: `RuntimeValue` recurses through
 arrays, so its derived `BEq` is a `partial` definition with no equations,
@@ -530,7 +607,7 @@ theorem RuntimeValue.storageKey?_eq_some {value : RuntimeValue} {key : StorageKe
 Global memory is a finite map from keys to published resources.  Its
 operations are the vocabulary a specification speaks, so a program's read of
 a key and a clause's read of the same key are one term with nothing between
-them.  The array of entries is an implementation of the map; the laws below
+them.  The array of entries is an implementation of the map; the lemmas below
 are what execution and specification both rely on, and no consumer outside
 this section looks at the entries. -/
 
@@ -700,7 +777,7 @@ theorem insertSlot_sorted {slot : GlobalSlot} :
         · exact greater
         · exact sorted.1 _ ⟨member, member_in, rfl⟩
 
-/-! The map laws.  Distinct keys are disjoint locations, which is what lets a
+/-! The map lemmas.  Distinct keys are disjoint locations, which is what lets a
 contract frame the global memory it does not modify. -/
 
 private theorem listFind?_filter_ne {entries : List GlobalSlot} {written query : GlobalKey}
@@ -888,11 +965,11 @@ theorem ext {left right : GlobalMap} (sorted : left.Sorted) (sorted' : right.Sor
   exact list_ext sorted sorted' fun key => by
     simpa only [lookup, ← Array.find?_toList] using same key
 
-/-! The map is an abstraction, and these laws are its whole interface.
+/-! The map is an abstraction, and these lemmas are its whole interface.
 Sealing the operations keeps it that way: against a state a contract
 quantifies over, none of them has a normal form, and unfolding one would
 expose the search or filter behind the map to every reduction that walks
-past.  A write therefore stays the folded `insert`/`erase` the laws read. -/
+past.  A write therefore stays the folded `insert`/`erase` the lemmas read. -/
 
 attribute [irreducible] lookup erase insert
 
@@ -943,7 +1020,7 @@ ancestor frame: a callee's dying borrow exports its current value here, and
 every caller applies what becomes visible at its call site.  A table is a
 value, its entries in its owner's last field; `tableHandles` are the handles
 allocated so far, which a destroyed table keeps, so that a table's identity,
-its handle, is never taken again (`designs/intrinsic-maps.md`, "Tables in
+its handle, is never taken again (`doc/designs/intrinsic-maps.md`, "Tables in
 the runtime semantics"). -/
 structure RuntimeState where
   globals : GlobalMap := {}
@@ -960,11 +1037,11 @@ structure RuntimeLocation where
   deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- Resolve a runtime source point back through the validated namespace's
-location table. -/
+own location table. -/
 def RuntimeLocation.resolve? (unit : ValidatedUnit) (location : RuntimeLocation) :
     Option Location := do
   let targetNamespace ← unit.namespaces[location.namespaceId.index]?
-  targetNamespace.tables.locations[location.loc.index]?
+  targetNamespace.location? location.loc
 
 /-- Primary authored byte range for a runtime source point, when supplied by
 the frontend. -/
@@ -1024,7 +1101,7 @@ def RuntimeValue.holeFree? : RuntimeValue → Bool
       RuntimeValue.holeFreeList? elements.toList
   | .loanHole _ => false
   | .ghost value => value.holeFree?
-  | .borrow .. | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _
+  | .retired | .borrow .. | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _
   | .string _ | .bytes _ => true
 termination_by value => sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
@@ -1052,6 +1129,8 @@ inductive InterpreterError where
   | unknownConstant (reference : QualifiedRef)
   | functionHasNoBody (function : FunctionHandle)
   | argumentArity (expected actual : Nat)
+  /-- A scoped dictionary argument has no checked receiver receipt. -/
+  | unscopedMethodEvidence
   | resultArity (expected actual : Nat)
   /-- A function's results hold a loan hole outside a borrow. -/
   | returnedLoanHole
@@ -1065,6 +1144,9 @@ inductive InterpreterError where
   | invalidConstructor (reference : QualifiedRef) (variant : Option String)
   | invalidDataOperation (operation : DataOperation)
   | invalidProfileOperation (value : ProfileValue)
+  /-- A primitive operation has no outcome on its operands: an unchecked
+  operation outside its domain. -/
+  | undefinedOperation (operation : PrimitiveOperation)
   | patternMismatch
   | nonExhaustiveMatch
   | invalidPlace (placeId : PlaceId)
@@ -1081,6 +1163,7 @@ def InterpreterError.code : InterpreterError → String
   | .unknownConstant _ => "VIR-EXEC-CONSTANT"
   | .functionHasNoBody _ => "VIR-EXEC-NO-BODY"
   | .argumentArity .. => "VIR-EXEC-ARGUMENT-ARITY"
+  | .unscopedMethodEvidence => "VIR-EXEC-UNSCOPED-METHOD-EVIDENCE"
   | .resultArity .. => "VIR-EXEC-RESULT-ARITY"
   | .returnedLoanHole => "VIR-EXEC-RETURNED-HOLE"
   | .uninitializedLocal _ => "VIR-EXEC-UNINITIALIZED-LOCAL"
@@ -1091,6 +1174,7 @@ def InterpreterError.code : InterpreterError → String
   | .invalidConstructor .. => "VIR-EXEC-CONSTRUCTOR"
   | .invalidDataOperation _ => "VIR-EXEC-DATA-OPERATION"
   | .invalidProfileOperation _ => "VIR-EXEC-PROFILE-OPERATION"
+  | .undefinedOperation _ => "VIR-EXEC-UNDEFINED-OPERATION"
   | .patternMismatch => "VIR-EXEC-PATTERN"
   | .nonExhaustiveMatch => "VIR-EXEC-NONEXHAUSTIVE-MATCH"
   | .invalidPlace _ => "VIR-EXEC-PLACE"

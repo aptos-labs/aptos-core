@@ -35,6 +35,7 @@ pub const STORAGE_SYNCHRONIZER_COMMIT_CHUNK: &str = "commit_chunk";
 pub const STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESS: &str = "commit_post_process";
 pub const STORAGE_SYNCHRONIZER_STATE_VALUE_CHUNK: &str = "state_value_chunk";
 pub const STORAGE_SYNCHRONIZER_POSITION_STATE_VALUE_CHUNK: &str = "position_state_value_chunk";
+pub const STORAGE_SYNCHRONIZER_ORDER_STATE_VALUE_CHUNK: &str = "order_state_value_chunk";
 pub const STORAGE_SYNCHRONIZER_HOT_STATE_VALUE_CHUNK: &str = "hot_state_value_chunk";
 
 /// Storage synchronizer pipeline channel labels
@@ -73,6 +74,7 @@ pub enum StorageSynchronizerOperations {
     SyncedIncremental, // The latest synced version (calculated as the sum of all processed transactions)
     SyncedStates,      // The total number of synced states
     SyncedPositionStates, // The total number of synced native-position states
+    SyncedOrderStates, // The total number of synced native-order states
     SyncedHotStates,   // The total number of synced hot states
     SyncedEpoch,       // The latest synced epoch (as read from storage)
     SyncedEpochIncremental, // The latest synced epoch (calculated as the sum of all processed epochs)
@@ -89,6 +91,7 @@ impl StorageSynchronizerOperations {
             StorageSynchronizerOperations::SyncedIncremental => "synced_incremental",
             StorageSynchronizerOperations::SyncedStates => "synced_states",
             StorageSynchronizerOperations::SyncedPositionStates => "synced_position_states",
+            StorageSynchronizerOperations::SyncedOrderStates => "synced_order_states",
             StorageSynchronizerOperations::SyncedHotStates => "synced_hot_states",
             StorageSynchronizerOperations::SyncedEpoch => "synced_epoch",
             StorageSynchronizerOperations::SyncedEpochIncremental => "synced_epoch_incremental",

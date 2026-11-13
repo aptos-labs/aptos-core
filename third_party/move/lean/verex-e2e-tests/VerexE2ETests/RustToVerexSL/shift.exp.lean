@@ -4,8 +4,6 @@
 import VerexSL
 
 verex namespace shift where
-  fun shifts(value : u32, distance : u8) -> (u32, u32) :=
-    if distance < 32u8 then
-      if distance < 32u8 then (value << distance, value >> distance)
-      else panic()
-    else panic()
+  fun shifts(value : u32, distance : u8) -> (u32, u32) := do
+    let _3 := core.prim.checkedShiftLeftPanic(value, distance)
+    (_3, core.prim.checkedShiftRightPanic(value, distance))

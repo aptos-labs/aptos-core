@@ -84,6 +84,10 @@ pub fn run_move_prover_v2<W: WriteColor>(
         // solver on spec-function specializations of accumulating HOFs.
         experiments.push(Experiment::SPEC_REWRITE_PURE_FUNS.to_string());
     }
+    // The Boogie pipeline carries a deferred closure's effects into usage summaries and
+    // loop havoc, so it may let a callee leave a closure's frame to the call site. The
+    // Lean backend (above) does not, and keeps every undeclared closure frame empty.
+    experiments.push(Experiment::DEFERRED_CLOSURE_FRAMES.to_string());
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
     if options.inference.inference {
         inference::run_spec_inference_with_model(&mut env, error_writer, options, now)
@@ -716,4 +720,77 @@ mod tests {
         assert_eq!(output, "kept.bpl");
         assert!(temporary_dir.is_none());
     }
+
+    /// The opaque `$apply` variant takes its result from the carrier for a
+    /// target whose specification determines it, and havocs it otherwise.
+    #[test]
+    fn apply_binds_results_only_to_determined_carriers() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("carrier_shape.move");
+        fs::write(&source, CARRIER_SHAPE_SOURCE).unwrap();
+        let mut options = Options {
+            move_sources: vec![source.to_string_lossy().to_string()],
+            output_path: dir.path().join("out.bpl").to_string_lossy().to_string(),
+            ..Default::default()
+        };
+        options.prover.generate_only = true;
+        options.backend.boogie_exe = String::new();
+        options.backend.timeout_analysis = false;
+        options.backend.keep_artifacts = true;
+        let mut errors = codespan_reporting::term::termcolor::Buffer::no_color();
+        run_move_prover_v2(&mut errors, options, vec![])
+            .unwrap_or_else(|err| panic!("{err}\n{}", String::from_utf8_lossy(errors.as_slice())));
+        let mut boogie = String::new();
+        for entry in fs::read_dir(dir.path()).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_some_and(|ext| ext == "bpl") {
+                boogie.push_str(&fs::read_to_string(path).unwrap());
+            }
+        }
+        // The variant procedure dispatching over closure tags, not the one
+        // for the function parameter.
+        let start = boogie
+            .find("procedure {:inline 3} $apply'$fun1_u64_1_u64'")
+            .expect("no closure `$apply` procedure");
+        let end = start
+            + boogie[start..]
+                .find("\n}\n")
+                .expect("unterminated procedure");
+        let body = &boogie[start..end];
+        let (determined, undetermined) = body
+            .split_once("$closure'$42.carrier_shape.undetermined'")
+            .expect("no variant for the undetermined target");
+        assert!(
+            determined.contains("r0 := $bp_ensures_of_result'$42.carrier_shape.determined'(p0);"),
+            "determined target lost its carrier binding:\n{body}"
+        );
+        assert!(
+            undetermined.contains("havoc r0;") && !undetermined.contains("$bp_ensures_of_result'"),
+            "undetermined target's result is bound to its carrier:\n{body}"
+        );
+    }
+
+    const CARRIER_SHAPE_SOURCE: &str = r#"
+module 0x42::carrier_shape {
+    fun determined(x: u64): u64 { x }
+    spec determined {
+        pragma opaque;
+        ensures result == x;
+        aborts_if false;
+    }
+
+    fun undetermined(x: u64): u64 { x }
+    spec undetermined {
+        pragma opaque;
+        ensures result <= x;
+        aborts_if false;
+    }
+
+    fun apply(f: |u64| u64 has drop, x: u64): u64 { f(x) }
+
+    fun call_both(x: u64): u64 {
+        apply(determined, x) + apply(undetermined, x)
+    }
+}
+"#;
 }

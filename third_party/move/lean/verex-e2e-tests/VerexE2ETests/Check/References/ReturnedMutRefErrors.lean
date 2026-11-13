@@ -126,7 +126,7 @@ run_cmd do
           throwError "bound, direct, and shared global returns must all be rejected: {repr diagnostics}"
 
 -- A caller reasons over a native through its contract, which states no final
--- value of the reference it returns (`designs/denotation.md`).
+-- value of the reference it returns (`doc/designs/denotation.md`).
 /--
 error: `call_native_return_reference` calls the native `native_return_reference`, which returns a mutable reference without stating its `final` value: a caller reasons over such a callee through its body, and a native has none
 -/

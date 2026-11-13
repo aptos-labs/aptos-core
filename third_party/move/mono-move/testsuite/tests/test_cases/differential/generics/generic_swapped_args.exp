@@ -22,7 +22,7 @@ fun entry(r0): u64 {
   code:
   L0:
     0: x0 := ld_u64 99 @0
-    1: [x0] := call pick_second<u64, u64>, [x0, r0] @2
+    1: [x0] := call_exempt pick_second<u64, u64>, [x0, r0] @2
     2: ret [x0] @3
 }
 
@@ -43,7 +43,7 @@ fun entry() {
   code:
     0: StoreImm8 [32] <- #99 @0
     1: Move8 [40] <- [0] @2
-    2: CallIndirect 0x1::test::pick_second<u64, u64> @2
+    2: CallByNameExempt 0x1::test::pick_second<u64, u64> @2
     3: Move8 [0] <- [32] @3
     4: Return @3
 }

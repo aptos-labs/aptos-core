@@ -7,7 +7,7 @@ verex proofs for "simple_vector_client.move"
 verex proofs where
 
 -- Literal list normalization is supplied by the shared proof library.
-verify test_contains by
+verify test_contains by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals simp_all [vir_denote_norm]
@@ -20,7 +20,7 @@ verify test_contains by
   · exact ⟨_, ⟨1, by decide, by decide, rfl⟩, rfl⟩
   · exact ⟨_, ⟨0, by decide, by decide, rfl⟩, rfl⟩
 
-verify test_index_of by
+verify test_index_of by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals simp_all [vir_denote_norm]

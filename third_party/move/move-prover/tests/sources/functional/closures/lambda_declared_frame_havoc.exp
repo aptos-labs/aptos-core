@@ -1,0 +1,31 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_declared_frame_havoc.move:41:9
+   │
+41 │         ensures global<Counter>(addr).n == old(global<Counter>(addr).n);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_declared_frame_havoc.move:32: claims_unchanged
+   =         b = <redacted>
+   =         addr = <redacted>
+   =     at tests/sources/functional/closures/lambda_declared_frame_havoc.move:33: claims_unchanged
+   =         b = <redacted>
+   =     at tests/sources/functional/closures/lambda_declared_frame_havoc.move:41: claims_unchanged (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_declared_frame_havoc.move:59:9
+   │
+59 │         ensures result;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_declared_frame_havoc.move:47: claims_unchanged_no_caller_modifies
+   =         b = <redacted>
+   =         addr = <redacted>
+   =     at tests/sources/functional/closures/lambda_declared_frame_havoc.move:50: claims_unchanged_no_caller_modifies
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/lambda_declared_frame_havoc.move:51: claims_unchanged_no_caller_modifies
+   =     at tests/sources/functional/closures/lambda_declared_frame_havoc.move:55: claims_unchanged_no_caller_modifies
+   =     at tests/sources/functional/closures/lambda_declared_frame_havoc.move:49: claims_unchanged_no_caller_modifies
+   =         result = <redacted>
+   =         b = <redacted>
+   =     at tests/sources/functional/closures/lambda_declared_frame_havoc.move:59: claims_unchanged_no_caller_modifies (spec)

@@ -1,0 +1,57 @@
+Move prover returns: exiting with verification errors
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+   ┌─ tests/sources/functional/closures/result_of_transition_state_label_let.move:49:19
+   │
+49 │     fun pre_false(a: address): u64 {
+   │                   ^
+
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+   ┌─ tests/sources/functional/closures/result_of_transition_state_label_let.move:80:20
+   │
+80 │     fun post_false(a: address): u64 {
+   │                    ^
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_state_label_let.move:45:9
+   │
+45 │         ensures forall r: u64: !ensures_of<bump_pre>(_a, r);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:41: pre_holds_false
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:43: pre_holds_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:44: pre_holds_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:41: pre_holds_false
+   =         _a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:45: pre_holds_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_state_label_let.move:57:9
+   │
+57 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:49: pre_false
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:54: pre_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:55: pre_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:49: pre_false
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:50: pre_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:56: pre_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:57: pre_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_state_label_let.move:88:9
+   │
+88 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:80: post_false
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:85: post_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:86: post_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:80: post_false
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:81: post_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:87: post_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_state_label_let.move:88: post_false (spec)

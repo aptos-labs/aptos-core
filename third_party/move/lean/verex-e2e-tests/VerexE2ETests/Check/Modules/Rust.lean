@@ -19,7 +19,7 @@ abort.  A Move-shaped `aborts_if` on the same function would be
 unprovable, and correctly so.
 
 One shape does not yet verify in this profile and is recorded with its
-evidence in `designs/historical/verification-v2.md`: a field read from a struct
+evidence in `doc/historical/verification-v2.md`: a field read from a struct
 passed by reference.
 -/
 

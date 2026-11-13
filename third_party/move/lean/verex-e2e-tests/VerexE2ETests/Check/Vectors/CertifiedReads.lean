@@ -38,7 +38,7 @@ verex module 0x42::certified_reads where
 error: the specification clause `ensures values[index] >= 0` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_nonnegative` failed; provide a proof in the module:
-  verify wrong_nonnegative by
+  verify wrong_nonnegative by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

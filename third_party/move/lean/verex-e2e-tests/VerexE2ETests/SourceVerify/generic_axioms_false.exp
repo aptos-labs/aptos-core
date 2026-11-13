@@ -1,6 +1,6 @@
 VerexE2ETests/SourceVerify/generic_axioms_false.move:18:9: error: the specification clause `ensures result == (a != b)` is not established
 VerexE2ETests/SourceVerify/generic_axioms_false.move:17:5: error: verex verification failed: the automatic verification of `distinct` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_axioms_false.proof.lean`:
-  verify distinct by
+  verify distinct by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

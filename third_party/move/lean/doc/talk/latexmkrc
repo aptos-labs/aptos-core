@@ -1,0 +1,6 @@
+@default_files = ("verex_lean_stack.tex", "verex_vision.tex");  # bare `latexmk` must not pick up prelude-talk.tex
+$pdf_mode      = 1;             # produce PDF via pdflatex
+$aux_dir       = 'build';       # all .aux/.log/.fls/.fdb_latexmk/... land here
+$out_dir       = '.';           # PDFs end up beside their .tex
+$go_mode       = 2;             # always rerun everything, even if "up to date"
+$clean_ext     = 'synctex.gz synctex.gz(busy) run.xml tex.bak fdb_latexmk run tdo';

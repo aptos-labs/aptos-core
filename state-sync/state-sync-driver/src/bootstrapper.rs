@@ -42,10 +42,11 @@ pub const GENESIS_TRANSACTION_VERSION: u64 = 0; // The expected version of the g
 // The snapshot stores synced during fast sync, in drive order. They are peers
 // (independent stores at the same version), and the fast sync is finalized once
 // all of them are written, so this order carries no dependency between them.
-const FAST_SYNC_SNAPSHOT_KINDS: [SnapshotKind; 3] = [
+const FAST_SYNC_SNAPSHOT_KINDS: [SnapshotKind; 4] = [
     SnapshotKind::MAIN_STATE,
     SnapshotKind::HOT_STATE,
     SnapshotKind::POSITION,
+    SnapshotKind::ORDER,
 ];
 
 /// A simple container for verified epoch states and epoch ending ledger infos
@@ -330,6 +331,9 @@ pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
     // The component used to sync native-position state values
     position_value_syncer: StateValueSyncer,
 
+    // The component used to sync native-order state values
+    order_value_syncer: StateValueSyncer,
+
     // The component used to sync hot state values
     hot_state_value_syncer: StateValueSyncer,
 
@@ -368,6 +372,7 @@ impl<
         Self {
             state_value_syncer: StateValueSyncer::new(),
             position_value_syncer: StateValueSyncer::new(),
+            order_value_syncer: StateValueSyncer::new(),
             hot_state_value_syncer: StateValueSyncer::new(),
             active_data_stream: None,
             active_snapshot_kind: None,
@@ -1060,6 +1065,7 @@ impl<
         match kind {
             SnapshotKind::MAIN_STATE => &self.state_value_syncer,
             SnapshotKind::POSITION => &self.position_value_syncer,
+            SnapshotKind::ORDER => &self.order_value_syncer,
             SnapshotKind::HOT_STATE => &self.hot_state_value_syncer,
         }
     }
@@ -1069,13 +1075,14 @@ impl<
         match kind {
             SnapshotKind::MAIN_STATE => &mut self.state_value_syncer,
             SnapshotKind::POSITION => &mut self.position_value_syncer,
+            SnapshotKind::ORDER => &mut self.order_value_syncer,
             SnapshotKind::HOT_STATE => &mut self.hot_state_value_syncer,
         }
     }
 
     /// The snapshot root committed for the given kind by the target transaction
-    /// info: main state's state checkpoint hash, or the position/hot state root
-    /// (if committed). All kinds share the target version, so this is taken from
+    /// info: main state's state checkpoint hash, or the position, order or hot
+    /// state root (if committed). All kinds share the target version, so this is taken from
     /// the target output, not a storage read.
     fn committed_snapshot_root(&mut self, kind: SnapshotKind) -> Result<Option<HashValue>, Error> {
         let transaction_output_to_sync = self.get_transaction_output_to_sync()?;
@@ -1090,6 +1097,7 @@ impl<
         Ok(match kind {
             SnapshotKind::MAIN_STATE => target_transaction_info.state_checkpoint_hash(),
             SnapshotKind::POSITION => target_transaction_info.position_state_checkpoint_hash(),
+            SnapshotKind::ORDER => target_transaction_info.order_state_checkpoint_hash(),
             SnapshotKind::HOT_STATE => target_transaction_info.hot_state_checkpoint_hash(),
         })
     }
@@ -1212,7 +1220,7 @@ impl<
     }
 
     /// Whether the given snapshot kind participates in the fast sync to this
-    /// target. Main state always does. Native-position and hot state only
+    /// target. Main state always does. The native stores and hot state only
     /// participate once the target's `TransactionInfo` commits their root: until
     /// the executor sets it there is no authenticated snapshot to sync, so the
     /// stage is skipped rather than trusting an unproved peer-supplied root.
@@ -1223,7 +1231,7 @@ impl<
     fn snapshot_kind_applies_to_target(&mut self, kind: SnapshotKind) -> Result<bool, Error> {
         match kind {
             SnapshotKind::MAIN_STATE => Ok(true),
-            SnapshotKind::POSITION | SnapshotKind::HOT_STATE => {
+            SnapshotKind::POSITION | SnapshotKind::ORDER | SnapshotKind::HOT_STATE => {
                 Ok(self.committed_snapshot_root(kind)?.is_some())
             },
         }
@@ -1757,8 +1765,7 @@ impl<
                 Error::UnexpectedError(format!("The {:?} ledger info to sync is missing!", kind))
             })?;
         if self.expected_snapshot_root(kind)? == *SPARSE_MERKLE_PLACEHOLDER_HASH {
-            // TODO(HotState): an empty hot snapshot should still write its (null)
-            // root node at the version, for later hot state updates to build on.
+            // Storage writes the empty hot state root when finalizing the snapshot.
             self.metadata_storage.update_last_persisted_index(
                 &target_ledger_info,
                 0,

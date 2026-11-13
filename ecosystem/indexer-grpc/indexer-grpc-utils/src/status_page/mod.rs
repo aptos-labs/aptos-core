@@ -108,7 +108,7 @@ pub fn get_throughput_from_samples(
             return format!(
                 "{} tps, {} / s",
                 tps as u64,
-                bytesize::to_string(bps as u64, /*si_prefix=*/ false)
+                bytesize::ByteSize::b(bps as u64).display().si()
             );
         }
     }

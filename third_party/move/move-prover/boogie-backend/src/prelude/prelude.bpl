@@ -491,7 +491,8 @@ datatype $Memory<T> {
     $Memory(domain: [int]bool, contents: [int]T)
 }
 
-// Tuple Types (2-11 elements) for spec functions returning multiple values
+// Tuple Types (2-20 elements) for spec functions returning multiple values and
+// for the parameter tuples of behavioral predicates over function values
 datatype $Tuple2<T1, T2> {
     $Tuple2($0: T1, $1: T2)
 }
@@ -530,6 +531,42 @@ datatype $Tuple10<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> {
 
 datatype $Tuple11<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> {
     $Tuple11($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11)
+}
+
+datatype $Tuple12<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> {
+    $Tuple12($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11, $11: T12)
+}
+
+datatype $Tuple13<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> {
+    $Tuple13($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11, $11: T12, $12: T13)
+}
+
+datatype $Tuple14<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> {
+    $Tuple14($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11, $11: T12, $12: T13, $13: T14)
+}
+
+datatype $Tuple15<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> {
+    $Tuple15($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11, $11: T12, $12: T13, $13: T14, $14: T15)
+}
+
+datatype $Tuple16<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> {
+    $Tuple16($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11, $11: T12, $12: T13, $13: T14, $14: T15, $15: T16)
+}
+
+datatype $Tuple17<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17> {
+    $Tuple17($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11, $11: T12, $12: T13, $13: T14, $14: T15, $15: T16, $16: T17)
+}
+
+datatype $Tuple18<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18> {
+    $Tuple18($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11, $11: T12, $12: T13, $13: T14, $14: T15, $15: T16, $16: T17, $17: T18)
+}
+
+datatype $Tuple19<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19> {
+    $Tuple19($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11, $11: T12, $12: T13, $13: T14, $14: T15, $15: T16, $16: T17, $17: T18, $18: T19)
+}
+
+datatype $Tuple20<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20> {
+    $Tuple20($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11, $11: T12, $12: T13, $13: T14, $14: T15, $15: T16, $16: T17, $17: T18, $18: T19, $19: T20)
 }
 
 {%- for tuple in tuple_instances %}

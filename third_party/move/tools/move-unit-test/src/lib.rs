@@ -3,13 +3,16 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub mod backend;
+mod differential;
 pub mod extensions;
 pub mod package_test;
 pub mod test_reporter;
 pub mod test_runner;
 pub mod test_validation;
+pub mod v1_backend;
 
-use crate::test_runner::TestRunner;
+use crate::{backend::Backends, test_runner::TestRunner, v1_backend::V1BackendFactory};
 use clap::*;
 use legacy_move_compiler::{
     self,
@@ -24,7 +27,7 @@ use move_package::compilation::compiled_package::build_and_report_v2_driver;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use std::{
     collections::BTreeMap,
-    io::{Result, Write},
+    io::{Error, Result, Write},
     marker::Send,
     sync::Mutex,
 };
@@ -104,6 +107,10 @@ pub struct UnitTestingConfig {
     /// Fail Fast mode: stop at the first test failure
     #[clap(long = "fail-fast")]
     pub fail_fast: bool,
+
+    /// Pass the run even if some tests are inconclusive: unsupported, or incomparable across backends
+    #[clap(long = "allow-inconclusive", hide = true)]
+    pub allow_inconclusive: bool,
 }
 
 fn format_module_id(module_id: &ModuleId) -> String {
@@ -129,6 +136,7 @@ impl Default for UnitTestingConfig {
             list: false,
             named_address_values: vec![],
             fail_fast: false,
+            allow_inconclusive: false,
         }
     }
 }
@@ -197,8 +205,31 @@ impl UnitTestingConfig {
         enable_enum_option: bool,
         fail_fast: bool,
     ) -> Result<(W, bool)> {
+        let factory = V1BackendFactory::new(native_function_table, enable_enum_option, factory);
+        let config = UnitTestingConfig {
+            fail_fast,
+            ..self.clone()
+        };
+        config.run_and_report_unit_tests_with_backends(
+            test_plan,
+            Backends::Single(&factory),
+            genesis_state.unwrap_or_else(ChangeSet::new),
+            writer,
+        )
+    }
+
+    /// Runs and reports the unit tests in `test_plan` on `backends`, each test
+    /// starting from `genesis_state`. Returns the writer and whether the run
+    /// passed. Unsupported and incomparable tests prevent a pass unless
+    /// `allow_inconclusive` is set.
+    pub fn run_and_report_unit_tests_with_backends<W: Write + Send>(
+        &self,
+        test_plan: TestPlan,
+        backends: Backends<'_>,
+        genesis_state: ChangeSet,
+        writer: W,
+    ) -> Result<(W, bool)> {
         let shared_writer = Mutex::new(writer);
-        let shared_options = Mutex::new(factory);
 
         if self.list {
             for (module_id, test_plan) in &test_plan.module_tests {
@@ -215,24 +246,14 @@ impl UnitTestingConfig {
         }
 
         writeln!(shared_writer.lock().unwrap(), "Running Move unit tests")?;
-        let mut test_runner = TestRunner::new(
-            self.num_threads,
-            self.report_storage_on_error,
-            self.report_stacktrace_on_abort,
-            test_plan,
-            native_function_table,
-            genesis_state,
-            self.verbose,
-            enable_enum_option,
-            fail_fast,
-        )
-        .unwrap();
+        let mut test_runner = TestRunner::new(self, test_plan, backends, genesis_state)
+            .map_err(|err| Error::other(format!("{err:#}")))?;
 
         if let Some(filter_str) = &self.filter {
             test_runner.filter(filter_str)
         }
 
-        let test_results = test_runner.run(&shared_writer, &shared_options).unwrap();
+        let test_results = test_runner.run(&shared_writer).unwrap();
         if self.report_statistics {
             test_results.report_statistics(&shared_writer)?;
         }
@@ -241,7 +262,7 @@ impl UnitTestingConfig {
             test_results.report_goldens(&shared_writer)?;
         }
 
-        let ok = test_results.summarize(&shared_writer)?;
+        let ok = test_results.summarize(&shared_writer, self.allow_inconclusive)?;
 
         let writer = shared_writer.into_inner().unwrap();
         Ok((writer, ok))

@@ -1,0 +1,123 @@
+
+Diagnostics:
+error: function acquires global `m::R` which is currently borrowed
+   ┌─ tests/reference-safety/bug_20816_borrow_edge_overflow.move:70:9
+   │
+ 9 │     fun mutate_global(ref_r: &R) acquires R {
+   │                                           -- `acquires` declared here
+   ·
+68 │             borrowed = borrow_global<R>(@0x42);
+   │                        ----------------------- struct `m::R` previously borrowed here
+69 │         };
+70 │         mutate_global(borrowed);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^ function called here
+
+error: function acquires global `m::R` which is currently borrowed
+    ┌─ tests/reference-safety/bug_20816_borrow_edge_overflow.move:109:9
+    │
+  9 │     fun mutate_global(ref_r: &R) acquires R {
+    │                                           -- `acquires` declared here
+    ·
+105 │             borrowed = &local9;
+    │                        ------- previously borrowed here (too many borrow sources to track individually, so all locals and globals are considered borrowed)
+    ·
+109 │         mutate_global(borrowed);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^ function called here
+
+error: function acquires global `m::R` which is currently borrowed
+    ┌─ tests/reference-safety/bug_20816_borrow_edge_overflow.move:116:9
+    │
+  9 │     fun mutate_global(ref_r: &R) acquires R {
+    │                                           -- `acquires` declared here
+    ·
+116 │         mutate_global(pick(&l0, &l1, &l2, &l3, &l4, &l5, &l6, &l7, &l8, &l9, &l10));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │         │             │
+    │         │             previously borrowed here (too many borrow sources to track individually, so all locals and globals are considered borrowed)
+    │         function called here
+
+error: function acquires global `m::R` which is currently mutably borrowed
+    ┌─ tests/reference-safety/bug_20816_borrow_edge_overflow.move:127:9
+    │
+ 14 │       fun touch_global() acquires R {
+    │                                   -- `acquires` declared here
+    ·
+123 │           let borrowed = pick_mut(
+    │ ╭────────────────────────'
+124 │ │             &mut l0, &mut l1, &mut l2, &mut l3, &mut l4, &mut l5, &mut l6, &mut l7, &mut l8, &mut l9,
+125 │ │             &mut l10
+126 │ │         );
+    │ ╰─────────' previously mutably borrowed here (too many borrow sources to track individually, so all locals and globals are considered borrowed)
+127 │           touch_global();
+    │           ^^^^^^^^^^^^^^ function called here
+128 │           consume_mut(borrowed);
+    │           --------------------- conflicting reference `borrowed` used here
+
+error: cannot return a reference derived from a local or global since it is not based on a parameter
+    ┌─ tests/reference-safety/bug_20816_borrow_edge_overflow.move:134:9
+    │
+134 │         pick(&l0, &l1, &l2, &l3, &l4, &l5, &l6, &l7, &l8, &l9, &l10)
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │         │
+    │         return attempted here
+    │         previously borrowed here (too many borrow sources to track individually, so all locals and globals are considered borrowed)
+
+error: cannot drop local `copied` which is still borrowed
+    ┌─ tests/reference-safety/bug_20816_borrow_edge_overflow.move:141:22
+    │
+140 │         let borrowed = pick(&l0, &l1, &l2, &l3, &l4, &l5, &l6, &l7, &l8, &l9, &l10);
+    │                        ------------------------------------------------------------ previously borrowed here (too many borrow sources to track individually, so all locals and globals are considered borrowed)
+141 │         let copied = other;
+    │                      ^^^^^ dropped here
+142 │         borrowed.x + copied
+    │         ---------- conflicting reference `borrowed` used here
+
+error: cannot drop value which is still borrowed
+    ┌─ tests/reference-safety/bug_20816_borrow_edge_overflow.move:142:9
+    │
+140 │         let borrowed = pick(&l0, &l1, &l2, &l3, &l4, &l5, &l6, &l7, &l8, &l9, &l10);
+    │                        ------------------------------------------------------------ previously borrowed here (too many borrow sources to track individually, so all locals and globals are considered borrowed)
+141 │         let copied = other;
+142 │         borrowed.x + copied
+    │         ^^^^^^^^^^ dropped here
+
+error: cannot drop value which is still borrowed
+    ┌─ tests/reference-safety/bug_20816_borrow_edge_overflow.move:142:9
+    │
+142 │         borrowed.x + copied
+    │         ^^^^^^^^^^
+    │         │
+    │         dropped here
+    │         previously borrowed here (too many borrow sources to track individually, so all locals and globals are considered borrowed)
+
+error: cannot drop value which is still borrowed
+    ┌─ tests/reference-safety/bug_20816_borrow_edge_overflow.move:152:21
+    │
+151 │         let borrowed = pick(&l0, &l1, &l2, &l3, &l4, &l5, &l6, &l7, &l8, &l9, &l10);
+    │                        ------------------------------------------------------------ previously borrowed here (too many borrow sources to track individually, so all locals and globals are considered borrowed)
+152 │         consume_mut(&mut other);
+    │                     ^^^^^^^^^^ dropped here
+153 │         consume(borrowed);
+    │         ----------------- conflicting reference `borrowed` used here
+
+error: cannot mutably borrow local `other` which is already borrowed
+    ┌─ tests/reference-safety/bug_20816_borrow_edge_overflow.move:152:21
+    │
+151 │         let borrowed = pick(&l0, &l1, &l2, &l3, &l4, &l5, &l6, &l7, &l8, &l9, &l10);
+    │                        ------------------------------------------------------------ previously borrowed here (too many borrow sources to track individually, so all locals and globals are considered borrowed)
+152 │         consume_mut(&mut other);
+    │                     ^^^^^^^^^^ borrow attempted here
+153 │         consume(borrowed);
+    │         ----------------- conflicting reference `borrowed` used here
+
+error: cannot transfer mutable value since it is borrowed
+    ┌─ tests/reference-safety/bug_20816_borrow_edge_overflow.move:152:9
+    │
+150 │         let field = &other.x;
+    │                     -------- field `x` previously borrowed here
+151 │         let borrowed = pick(&l0, &l1, &l2, &l3, &l4, &l5, &l6, &l7, &l8, &l9, &l10);
+152 │         consume_mut(&mut other);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
+153 │         consume(borrowed);
+154 │         *field;
+    │         ------ conflicting reference `field` used here

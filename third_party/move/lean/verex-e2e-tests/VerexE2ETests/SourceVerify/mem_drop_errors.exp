@@ -1,0 +1,6 @@
+VerexE2ETests/SourceVerify/mem_drop_errors.rs:50:5: error: no denotation for `generic_at_guard`: a call dropping a type parameter at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/mem_drop_errors.rs:27:5: error: no denotation for `value`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/mem_drop_errors.rs:32:5: error: no denotation for `boxed`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/mem_drop_errors.rs:39:5: error: no denotation for `holder`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/mem_drop_errors.rs:57:5: error: no denotation for `generic_at_holder`: a call dropping a type parameter at a type holding a mutable reference is not carried by the denotation
+VerexE2ETests/SourceVerify/mem_drop_errors.rs:64:5: error: no denotation for `scope_end_at_guard`: a call dropping a type parameter at a type with a destructor is not carried by the denotation

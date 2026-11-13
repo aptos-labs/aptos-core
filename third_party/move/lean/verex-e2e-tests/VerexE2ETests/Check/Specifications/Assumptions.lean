@@ -52,11 +52,14 @@ example {registry : VerexIR.Validation.SemanticsRegistry}
     (prepared : VerexIR.Validation.prepareExecution registry
       «0x42».in_body_assumptions.unit = .ok executable)
     (preserved : VerexIR.Proofs.Denote.GlobalsPreserved executable)
+    (integral : VerexIR.Proofs.Denote.FailuresIntegral executable)
     (holds : ∀ {Θ : VerexIR.Proofs.Denote.Skolems «0x42».in_body_assumptions.unit}
       {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)},
       VerexIR.Proofs.AssumptionsHold
-        (@«0x42».in_body_assumptions.difference.plainMeaning executable Θ typeInstantiation)
-        (@«0x42».in_body_assumptions.difference.assumedMeaning executable Θ typeInstantiation)) :=
-  «0x42».in_body_assumptions.calls_difference.verified prepared preserved holds
+        (@«0x42».in_body_assumptions.difference.plainMeaning executable Θ
+          (VerexIR.Proofs.Denote.closedMeanings executable typeInstantiation))
+        (@«0x42».in_body_assumptions.difference.assumedMeaning executable Θ
+          (VerexIR.Proofs.Denote.closedMeanings executable typeInstantiation) executable)) :=
+  «0x42».in_body_assumptions.calls_difference.verified prepared preserved integral holds
 
 end VerexSL.Tests.Check.Specifications.Assumptions

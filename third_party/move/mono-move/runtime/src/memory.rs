@@ -1,14 +1,16 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Heap-object header access. The owned VM memory buffer ([`MemoryRegion`])
-//! lives in [`mono_move_alloc`] and the raw value read/write helpers in
-//! [`mono_move_core::memory`]; both are re-exported here.
+//! Heap-object header access. The raw value read/write helpers and the owned
+//! VM memory buffer ([`MemoryRegion`]) are re-exported from
+//! [`mono_move_core::memory`].
 
 use crate::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
-pub use mono_move_alloc::MemoryRegion;
 pub use mono_move_core::memory::*;
-use mono_move_core::{DescriptorId, ENUM_TAG_OFFSET};
+use mono_move_core::{
+    ClosureFuncRef, DescriptorId, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, ENUM_TAG_OFFSET,
+    FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED,
+};
 
 /// Reads a vector's length, treating the null pointer as the empty vector.
 ///
@@ -44,6 +46,39 @@ pub unsafe fn read_enum_tag(obj_ptr: *const u8) -> u64 {
 pub unsafe fn write_enum_tag(obj_ptr: *mut u8, tag: u64) {
     // SAFETY: caller guarantees this is an enum object.
     unsafe { write_u64(obj_ptr, ENUM_TAG_OFFSET, tag) }
+}
+
+/// Writes the `func_ref` enum and the capture `mask` into a freshly allocated
+/// closure heap object.
+///
+/// # Safety
+///
+/// `closure` points at a live closure object, allocated under
+/// [`CLOSURE_DESCRIPTOR_ID`](mono_move_core::CLOSURE_DESCRIPTOR_ID).
+#[inline]
+pub(crate) unsafe fn write_closure_func_ref_and_mask(
+    closure: *mut u8,
+    func_ref: &ClosureFuncRef,
+    mask: u64,
+) {
+    let (tag, payload) = match func_ref {
+        ClosureFuncRef::Resolved(func_ptr) => (
+            FUNC_REF_TAG_RESOLVED,
+            func_ptr.as_non_null().as_ptr() as *const u8,
+        ),
+        ClosureFuncRef::Unresolved(func_ref) => {
+            (FUNC_REF_TAG_UNRESOLVED, func_ref.as_raw_ptr() as *const u8)
+        },
+    };
+    unsafe {
+        *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = tag;
+        write_ptr(
+            closure,
+            CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
+            payload,
+        );
+        write_u64(closure, CLOSURE_MASK_OFFSET, mask);
+    }
 }
 
 /// Pointer to the `idx`-th element inside a vector's data region.

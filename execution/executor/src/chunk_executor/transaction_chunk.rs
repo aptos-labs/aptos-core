@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    chunk_executor::chunk_onchain_config,
+    chunk_executor::{chunk_onchain_config, num_txns_in_blocks},
     metrics::{CHUNK_DISCARDED_OUTPUTS, CHUNK_OTHER_TIMERS, VM_EXECUTE_CHUNK},
     workflow::do_get_execution_output::DoGetExecutionOutput,
 };
@@ -11,7 +11,8 @@ use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
-    positions::PositionParent, state::LedgerState, state_view::cached_state_view::CachedStateView,
+    collateral::CollateralParent, orders::OrderParent, positions::PositionParent,
+    state::LedgerState, state_view::cached_state_view::CachedStateView,
 };
 use aptos_types::{
     block_executor::transaction_slice_metadata::TransactionSliceMetadata,
@@ -85,12 +86,8 @@ impl TransactionChunk {
     /// Splits off the transactions after the last block end, i.e. the last `TransactionInfo`
     /// with a state checkpoint hash. They can't be executed until the rest of the block comes.
     pub fn split_off_partial_block(&mut self) -> Option<Self> {
-        let num_txns_in_blocks = self
-            .transaction_infos
-            .iter()
-            .rposition(TransactionInfo::has_state_checkpoint_hash)
-            .map_or(0, |idx| idx + 1);
-        (num_txns_in_blocks < self.len()).then(|| self.split_off(num_txns_in_blocks))
+        let at = num_txns_in_blocks(&self.transaction_infos);
+        (at < self.len()).then(|| self.split_off(at))
     }
 
     fn split_off(&mut self, at: usize) -> Self {
@@ -110,6 +107,8 @@ impl TransactionChunk {
         self,
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
+        parent_orders: Option<OrderParent<'_>>,
+        parent_collateral: Option<CollateralParent<'_>>,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
         let Self {
@@ -127,6 +126,8 @@ impl TransactionChunk {
                 persisted_aux_info,
                 parent_state,
                 parent_positions,
+                parent_orders,
+                parent_collateral,
                 state_view,
             ),
             None => Self::execute::<V>(
@@ -134,6 +135,8 @@ impl TransactionChunk {
                 persisted_aux_info,
                 parent_state,
                 parent_positions,
+                parent_orders,
+                parent_collateral,
                 state_view,
             ),
         }
@@ -144,6 +147,8 @@ impl TransactionChunk {
         persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
+        parent_orders: Option<OrderParent<'_>>,
+        parent_collateral: Option<CollateralParent<'_>>,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
         assert_eq!(
@@ -178,6 +183,8 @@ impl TransactionChunk {
                 .collect(),
             parent_state,
             parent_positions,
+            parent_orders,
+            parent_collateral,
             state_view,
             onchain_config,
             TransactionSliceMetadata::unknown(),
@@ -190,6 +197,8 @@ impl TransactionChunk {
         persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
+        parent_orders: Option<OrderParent<'_>>,
+        parent_collateral: Option<CollateralParent<'_>>,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
         let onchain_config = chunk_onchain_config(&state_view)?;
@@ -202,6 +211,8 @@ impl TransactionChunk {
                 .collect(),
             parent_state,
             parent_positions,
+            parent_orders,
+            parent_collateral,
             state_view,
             onchain_config,
         )

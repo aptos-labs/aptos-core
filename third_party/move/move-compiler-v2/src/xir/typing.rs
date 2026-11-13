@@ -472,7 +472,7 @@ impl FunctionTranslator<'_> {
     }
 
     /// `borrow_field`, or with `variants`, `borrow_variant_field`, whose field
-    /// must have one type across every named variant.
+    /// must have one declared type across every named variant.
     fn borrow_field_rule(
         &self,
         source: Type,
@@ -490,15 +490,20 @@ impl FunctionTranslator<'_> {
                 let (first, others) = variants
                     .split_first()
                     .with_context(|| format!("{oper:?} names no variant"))?;
-                let field_type = self.field_type(sid, &args, Some(*first), field)?;
+                let declared_type = |variant: usize| {
+                    self.declared_field_types(sid, Some(variant))?
+                        .into_iter()
+                        .nth(field)
+                        .with_context(|| format!("field id {field} is out of range"))
+                };
+                let declared = declared_type(*first)?;
                 for variant in others {
-                    let other = self.field_type(sid, &args, Some(*variant), field)?;
                     ensure!(
-                        other == field_type,
-                        "{oper:?}: field {field} has different types in the named variants"
+                        declared_type(*variant)? == declared,
+                        "{oper:?}: field {field} has different declared types in the named variants"
                     );
                 }
-                field_type
+                declared.instantiate(&args)
             },
         };
         let result = self.borrow_result(result, kind, field_type, oper)?;
@@ -594,6 +599,16 @@ impl FunctionTranslator<'_> {
             decl.type_parameters.len(),
             args.len()
         );
+        Ok(Type::instantiate_vec(
+            self.declared_field_types(sid, variant)?,
+            args,
+        ))
+    }
+
+    /// The field types of struct `sid`, or of one of its variants, as
+    /// declared (uninstantiated).
+    fn declared_field_types(&self, sid: StructId, variant: Option<usize>) -> Result<Vec<Type>> {
+        let decl = &self.xir.structs[self.struct_index(sid)?];
         let fields = match (variant, &decl.variants) {
             (None, None) => &decl.fields,
             (Some(variant), Some(variants)) => {
@@ -608,7 +623,7 @@ impl FunctionTranslator<'_> {
         let scope = self.scope();
         fields
             .iter()
-            .map(|field| Ok(model_type(&field.ty, &scope)?.instantiate(args)))
+            .map(|field| model_type(&field.ty, &scope))
             .collect()
     }
 
@@ -776,11 +791,12 @@ mod tests {
     /// | 26    | `GE<u64>`       | 27    | `&GE<u64>`        |
     /// | 28    | `R<u64>`        | 29    | `&R<u64>`         |
     /// | 30    | `&mut E`        | 31    | `&mut GE<u64>`    |
-    /// | 32    | `&G<u64>`       |       |                   |
+    /// | 32    | `&G<u64>`       | 36    | `&D<u64, u64>`    |
     ///
     /// Structs: 0 `BalanceValue { value: u64 }`, 1 `Balance { balance }` (the
     /// golden module), 2 `G<T> { x: T }`, 3 `enum E { A(u64), B(bool) }`,
-    /// 4 `P<A, B>`, 5 `enum GE<T> { A(T), B(bool) }`, 6 `R<T: store> has key`.
+    /// 4 `P<A, B>`, 5 `enum GE<T> { A(T), B(bool) }`, 6 `R<T: store> has key`,
+    /// 7 `enum D<A, B> { A(A), B(B), C(A) }`.
     /// Functions: 1 `callee(u64, bool): u64`, 2 `id<T>(T): T`.
     fn module_with(instrs: Vec<Instr>, term: Term, returns: Vec<Ty>) -> XirModule {
         let golden = std::fs::read_to_string(
@@ -871,6 +887,29 @@ mod tests {
             variants: None,
             attributes: vec![],
         });
+        // 7: `enum D<A, B> { A(A), B(B), C(A) }`.
+        module.structs.push(StructDecl {
+            name: "D".to_owned(),
+            visibility: XirVisibility::Private,
+            abilities: copy_drop(),
+            type_parameters: vec![param("A", &["copy", "drop"]), param("B", &["copy", "drop"])],
+            fields: vec![],
+            variants: Some(vec![
+                Variant {
+                    name: "A".to_owned(),
+                    fields: vec![field(Ty::TypeParameter(0))],
+                },
+                Variant {
+                    name: "B".to_owned(),
+                    fields: vec![field(Ty::TypeParameter(1))],
+                },
+                Variant {
+                    name: "C".to_owned(),
+                    fields: vec![field(Ty::TypeParameter(0))],
+                },
+            ]),
+            attributes: vec![],
+        });
         let base = module.functions[0].clone();
         let function = |name: &str,
                         type_parameters: Vec<TypeParameterDecl>,
@@ -937,6 +976,7 @@ mod tests {
                 "drop".to_owned()
             ]),
             Ty::Function(vec![Ty::U64], vec![Ty::U64], vec!["drop".to_owned()]),
+            r(Ty::EnumInst(7, vec![Ty::U64, Ty::U64])),
         ];
         module.functions = vec![
             function("f", vec![], 0, locals, returns, instrs, term),
@@ -1079,6 +1119,7 @@ mod tests {
 
     #[test]
     fn enums() {
+        let d = || vec![Ty::U64, Ty::U64];
         check(vec![
             (true, call(&[12], Oper::PackVariant(0), &[0])),
             (true, call(&[12], Oper::PackVariant(1), &[3])),
@@ -1098,6 +1139,20 @@ mod tests {
             (
                 false,
                 call(&[15], Oper::BorrowVariantField(vec![0, 1], 0), &[21]),
+            ),
+            // `D<u64, u64>`: `A` and `C` declare the field as `A`; `B`
+            // declares it as `B`, which coincides only after instantiation.
+            (
+                true,
+                call(&[15], Oper::BorrowVariantFieldInst(vec![0, 2], 0, d()), &[
+                    36,
+                ]),
+            ),
+            (
+                false,
+                call(&[15], Oper::BorrowVariantFieldInst(vec![0, 1], 0, d()), &[
+                    36,
+                ]),
             ),
         ]);
     }

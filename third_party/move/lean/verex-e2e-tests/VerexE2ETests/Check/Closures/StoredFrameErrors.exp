@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Closures/StoredFrameErrors.lean:9:4: error: the data invariant `action : Fn(Address, u64) -> u64 has Copy, Drop, Store` does not hold where a value is constructed
 VerexE2ETests/Check/Closures/StoredFrameErrors.lean:18:6: error: verex verification failed: the automatic verification of `bad` failed; provide a proof in the module:
-  verify bad by
+  verify bad by lean =>
     verex_obligations
     verex_on
     | data_invariant => verex_prepare; sorry
@@ -8,7 +8,7 @@ VerexE2ETests/Check/Closures/StoredFrameErrors.lean:18:6: error: verex verificat
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Closures/StoredFrameErrors.lean:9:4: error: the specification clause `action : Fn(Address, u64) -> u64 has Copy, Drop, Store` is not established
 VerexE2ETests/Check/Closures/StoredFrameErrors.lean:22:6: error: verex verification failed: the automatic verification of `bad_replacement` failed; provide a proof in the module:
-  verify bad_replacement by
+  verify bad_replacement by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry

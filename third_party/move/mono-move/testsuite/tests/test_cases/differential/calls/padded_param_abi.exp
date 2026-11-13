@@ -35,7 +35,7 @@ fun driver(r0, r1): u64 {
     r1: u64
   code:
   L0:
-    0: [x0] := call keep_u64, [r0, r1] @2
+    0: [x0] := call_exempt keep_u64, [r0, r1] @2
     1: ret [x0] @3
 }
 
@@ -68,7 +68,7 @@ fun driver() {
   code:
     0: Move8 [48] <- [8] @2
     1: Move(1) [40] <- [0] @2
-    2: CallIndirect 0x66::padded_param::keep_u64 @2
+    2: CallByNameExempt 0x66::padded_param::keep_u64 @2
     3: Move8 [0] <- [40] @3
     4: Return @3
 }

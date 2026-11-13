@@ -7,4 +7,3 @@ error: failed to parse manifest
 5 | [dev-addresses]
 6 | addr1 = "_"
   |         ^^^ Hex characters are invalid: Invalid character '_' at position 63
-  |

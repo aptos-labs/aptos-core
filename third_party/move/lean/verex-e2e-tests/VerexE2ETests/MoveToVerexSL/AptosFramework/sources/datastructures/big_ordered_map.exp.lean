@@ -602,7 +602,7 @@ verex module aptos_framework::big_ordered_map where
         some(
           do
             let child := destroy_some(self)
-            spec assume save_state_anchor!(105)
+            spec assume save_state_anchor!(109)
             let Child<V>::Leaf { value := value } := child
             value)
       else
@@ -648,7 +648,7 @@ verex module aptos_framework::big_ordered_map where
     self' := core.prim.reverseSliceVector(self', 0, self'.length)
     v2 := core.prim.reverseSliceVector(*&v2, 0, v2.length)
     let mut (self', v2) := (self', v2)
-    spec assume folds_capture_anchor!(101)
+    spec assume folds_capture_anchor!(105)
     let len := self'.length
     assert!(len == v2.length, 131074)
     while len > 0 do
@@ -669,15 +669,15 @@ verex module aptos_framework::big_ordered_map where
       self.add(key, value)
       len := len - 1
     where
-      invariant with_state_anchor!(101, old(self')).length >= len
+      invariant with_state_anchor!(105, old(self')).length >= len
       invariant len == self'.length
       invariant len == v2.length
-      invariant with_state_anchor!(101, old(self')).length
-        == with_state_anchor!(101, old(v2)).length
+      invariant with_state_anchor!(105, old(self')).length
+        == with_state_anchor!(105, old(v2)).length
       invariant ∀ (j in 0 .. len),
-        self'[j] == with_state_anchor!(101, old(self'))[j]
-      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(101, old(v2))[j]
-      invariant ∀ (j in len .. with_state_anchor!(101, old(self')).length), true
+        self'[j] == with_state_anchor!(105, old(self'))[j]
+      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(105, old(v2))[j]
+      invariant ∀ (j in len .. with_state_anchor!(105, old(self')).length), true
       invariant true
     core.prim.destroyEmptyVector(self')
     core.prim.destroyEmptyVector(v2)
@@ -1765,11 +1765,11 @@ verex module aptos_framework::big_ordered_map where
   ) -> Option<Child<V> > := do
     let node_index :=
       do
-        let _t6 := &mut path_to_node
-        if _t6.length == 0 then moveVectorError(2)
-        let (_t7, _t8) := core.prim.removeVector(*_t6, _t6.length - 1)
-        *_t6 := _t8
-        _t7
+        let _t0 := &mut path_to_node
+        if _t0.length == 0 then moveVectorError(2)
+        let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+        *_t0 := _t2
+        _t1
     let node :=
       do
         let (self, node_index) := (self, node_index)
@@ -1958,11 +1958,11 @@ verex module aptos_framework::big_ordered_map where
     while !(path_to_node.length == 0) do
       let node_index :=
         do
-          let _t14 := &mut path_to_node
-          if _t14.length == 0 then moveVectorError(2)
-          let (_t15, _t16) := core.prim.removeVector(*_t14, _t14.length - 1)
-          *_t14 := _t16
-          _t15
+          let _t0 := &mut path_to_node
+          if _t0.length == 0 then moveVectorError(2)
+          let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+          *_t0 := _t2
+          _t1
       let node :=
         do
           let (self, node_index) := (self, node_index)
@@ -1986,11 +1986,11 @@ verex module aptos_framework::big_ordered_map where
   ) -> Option<Child<V> > := do
     let node_index :=
       do
-        let _t11 := &mut path_to_node
-        if _t11.length == 0 then moveVectorError(2)
-        let (_t12, _t13) := core.prim.removeVector(*_t11, _t11.length - 1)
-        *_t11 := _t13
-        _t12
+        let _t0 := &mut path_to_node
+        if _t0.length == 0 then moveVectorError(2)
+        let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+        *_t0 := _t2
+        _t1
     let old_child :=
       do
         let node :=

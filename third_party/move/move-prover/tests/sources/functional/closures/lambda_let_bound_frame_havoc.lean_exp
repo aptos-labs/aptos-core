@@ -1,0 +1,6 @@
+Move prover returns: exiting with model building errors
+error: function argument accesses resource `lambda_let_bound_frame_havoc::Counter` which is not declared in `modifies_of`/`reads_of` for `f`
+   ┌─ tests/sources/functional/closures/lambda_let_bound_frame_havoc.move:36:9
+   │
+36 │         apply(b, f)
+   │         ^^^^^^^^^^^

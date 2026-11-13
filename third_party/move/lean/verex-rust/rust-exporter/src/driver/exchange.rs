@@ -13,7 +13,7 @@ use serde_json::Number;
 
 macro_rules! id_type {
     ($($name:ident),+ $(,)?) => {$ (
-        #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+        #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
         #[serde(deny_unknown_fields)]
         pub(super) struct $name {
             pub index: usize,
@@ -61,7 +61,7 @@ pub(super) struct ImportEvidence {
     pub trusted: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) enum Profile {
     Rust,
@@ -148,9 +148,29 @@ pub(super) struct NamespaceRef {
 pub(super) struct QualifiedName {
     pub name: String,
     pub namespace_id: NamespaceId,
+    /// The module path the name is declared in, relative to its namespace.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scope: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(super) struct ScopeDecl {
+    pub kind: ScopeKind,
+    pub loc: LocId,
+    pub path: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(super) enum ScopeKind {
+    Module,
+    Inherent,
+    Implementation,
+    Trait,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) enum Ty {
     Unit,
@@ -169,6 +189,9 @@ pub(super) enum Ty {
         element: TypeId,
         length: Option<ConstValue>,
     },
+    Slice {
+        element: TypeId,
+    },
     Nominal {
         arguments: Vec<GenericArgument>,
         name: NameId,
@@ -186,7 +209,7 @@ pub(super) enum Ty {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) enum Ability {
     Copy,
@@ -195,7 +218,7 @@ pub(super) enum Ability {
     Key,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(
     deny_unknown_fields,
     rename_all = "camelCase",
@@ -219,17 +242,26 @@ pub(super) enum BinderKind {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(super) enum GenericPredicate {
+    LifetimeOutlives {
+        longer: LifetimeId,
+        shorter: LifetimeId,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct GenericBinder {
-    pub abilities: Vec<UnsupportedNode>,
+    pub abilities: Vec<Ability>,
     pub kind: BinderKind,
     pub loc: LocId,
     pub name: String,
-    pub predicates: Vec<UnsupportedNode>,
+    pub predicates: Vec<GenericPredicate>,
     #[serde(rename = "type")]
     pub type_: Option<TypeUse>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct ReferenceType {
     pub kind: ReferenceKind,
@@ -238,7 +270,7 @@ pub(super) struct ReferenceType {
     pub referent: TypeId,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) enum ReferenceKind {
     Shared,
@@ -266,7 +298,7 @@ pub(super) enum LifetimeKind {
     Local,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(
     deny_unknown_fields,
     rename_all = "camelCase",
@@ -299,14 +331,14 @@ pub(super) struct ProfileConfig {
     pub version: usize,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct TypeUse {
     pub loc: LocId,
     pub type_id: TypeId,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(
     deny_unknown_fields,
     rename_all = "camelCase",
@@ -314,9 +346,24 @@ pub(super) struct TypeUse {
 )]
 pub(super) enum ConstValue {
     Unit,
-    Bool { value: bool },
-    Character { value: usize },
-    Integer { value: Number },
+    Bool {
+        value: bool,
+    },
+    Character {
+        value: usize,
+    },
+    Integer {
+        value: Number,
+    },
+    String {
+        value: String,
+    },
+    /// A constant the exporter cannot state, described by its type. An import
+    /// pass collapses the diverging regions holding these, and validation rejects
+    /// a survivor.
+    Opaque {
+        description: String,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -355,6 +402,7 @@ pub(super) enum Operation {
     Move { place: PlaceId },
     Copy { place: PlaceId },
     Read { place: PlaceId },
+    ReadDiscriminant { place: PlaceId },
     Borrow { kind: BorrowKind, place: PlaceId },
     Reference { kind: ReferenceOperation },
     Primitive { kind: PrimitiveOperation },
@@ -363,8 +411,16 @@ pub(super) enum Operation {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(
+    deny_unknown_fields,
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub(super) enum ReferenceOperation {
+    /// A shared borrow of a computed value, which is that value.
+    Borrow {
+        kind: BorrowKind,
+    },
     Dereference,
 }
 
@@ -375,6 +431,8 @@ pub(super) enum ReferenceOperation {
     rename_all_fields = "camelCase"
 )]
 pub(super) enum DataOperation {
+    // Still part of the shared RawUnit schema for value/specification enum
+    // inspection. Rust MIR uses the place-based Operation::ReadDiscriminant.
     Discriminant {
         #[serde(rename = "type")]
         type_: QualifiedRef,
@@ -382,10 +440,15 @@ pub(super) enum DataOperation {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(
+    deny_unknown_fields,
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub(super) enum BorrowKind {
     Immutable,
     Mutable,
+    Profile { value: ProfileValue },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -477,6 +540,9 @@ pub(super) enum Place {
         from_end: bool,
         start: usize,
         stop: usize,
+    },
+    Unsize {
+        base: PlaceId,
     },
     Downcast {
         base: PlaceId,
@@ -611,7 +677,11 @@ id_type!(BlockId);
     rename_all_fields = "camelCase"
 )]
 pub(super) enum RawBody {
-    Cfg { graph: RawCfg },
+    /// A dependency function's: its body is not exported.
+    Absent,
+    Cfg {
+        graph: RawCfg,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -627,7 +697,7 @@ pub(super) struct Parameter {
 pub(super) struct Signature {
     pub generics: Vec<GenericBinder>,
     pub parameters: Vec<Parameter>,
-    pub predicates: Vec<UnsupportedNode>,
+    pub predicates: Vec<GenericPredicate>,
     pub results: Vec<TypeUse>,
 }
 
@@ -660,7 +730,7 @@ pub(super) struct FunctionContract {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct FunctionDecl {
     pub alignment: AlignmentId,
-    pub attributes: Vec<UnsupportedNode>,
+    pub attributes: Vec<Attribute>,
     pub body: RawBody,
     pub contract: FunctionContract,
     pub doc: String,
@@ -668,9 +738,9 @@ pub(super) struct FunctionDecl {
     pub locals: Vec<LocalDecl>,
     pub name: NameId,
     pub origin: OriginId,
-    pub pragmas: Vec<UnsupportedNode>,
+    pub pragmas: Vec<Attribute>,
     pub profile: Profile,
-    pub profile_data: Vec<UnsupportedNode>,
+    pub profile_data: Vec<ProfileValue>,
     pub signature: Signature,
 }
 
@@ -696,7 +766,7 @@ pub(super) struct VariantDecl {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct StructDecl {
-    pub abilities: Vec<UnsupportedNode>,
+    pub abilities: Vec<Ability>,
     pub attributes: Vec<UnsupportedNode>,
     pub contract: FunctionContract,
     pub doc: String,
@@ -706,8 +776,44 @@ pub(super) struct StructDecl {
     pub loc: LocId,
     pub locals: Vec<UnsupportedNode>,
     pub name: NameId,
-    pub properties: Vec<UnsupportedNode>,
+    pub properties: Vec<ProfileValue>,
     pub variants: Vec<VariantDecl>,
+}
+
+/// A profile-owned value: here the Rust profile's `struct.opaque`,
+/// `struct.destructor`, `function.dependency`, and `function.opaque` properties.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(super) struct ProfileValue {
+    pub payload: String,
+    pub profile: Profile,
+    pub tag: String,
+}
+
+/// A declaration's pragma: here `verify = false` on a dependency crate's
+/// namespace, which is not a verification target.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(
+    deny_unknown_fields,
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(super) enum Attribute {
+    Assign {
+        loc: Option<LocId>,
+        name: String,
+        value: AttributeValue,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(
+    deny_unknown_fields,
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(super) enum AttributeValue {
+    Constant { value: ConstValue },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -729,9 +835,10 @@ pub(super) struct RawNamespace {
     pub loc: LocId,
     pub patterns: Vec<UnsupportedNode>,
     pub places: Vec<Place>,
-    pub pragmas: Vec<UnsupportedNode>,
+    pub pragmas: Vec<Attribute>,
     pub profile: Option<Profile>,
     pub profile_metadata: Vec<UnsupportedNode>,
+    pub scopes: Vec<ScopeDecl>,
     pub spec_functions: Vec<UnsupportedNode>,
     pub spec_vars: Vec<UnsupportedNode>,
     pub structs: Vec<StructDecl>,

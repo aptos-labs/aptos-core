@@ -37,9 +37,9 @@ fun fib(r0): u64 {
     1: ret [r0] @5
   L0:
     2: x0 := sub r0, #1 @8
-    3: [r1] := call fib, [x0] @9
+    3: [r1] := call_exempt fib, [x0] @9
     4: x0 := sub r0, #2 @12
-    5: [x0] := call fib, [x0] @13
+    5: [x0] := call_exempt fib, [x0] @13
     6: r1 := add r1, x0 @14
     7: ret [r1] @15
 }
@@ -53,10 +53,10 @@ fun fib() {
     0: JumpGreaterU64Imm @2 [0] > #1 gas_taken=167 gas_fallthrough=54 @1
     1: Return @5
     2: SubU64Imm [40] <- [0] - #1 @8
-    3: CallIndirect 0x1::test::fib @9
+    3: CallByNameExempt 0x1::test::fib @9
     4: Move8 [8] <- [40] @9
     5: SubU64Imm [40] <- [0] - #2 @12
-    6: CallIndirect 0x1::test::fib @13
+    6: CallByNameExempt 0x1::test::fib @13
     7: AddU64 [8] <- [8] + [40] @14
     8: Move8 [0] <- [8] @15
     9: Return @15

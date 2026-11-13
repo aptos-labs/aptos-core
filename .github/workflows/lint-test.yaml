@@ -11,6 +11,12 @@ on:
       - aptos-node-v*
       - aptos-release-v*
   workflow_dispatch:
+    inputs:
+      rust_ci_provider:
+        description: "Rust CI provider (default honors RUST_CI_PROVIDER, otherwise hosted)"
+        type: choice
+        default: default
+        options: [default, hosted, aws]
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
@@ -28,12 +34,41 @@ permissions:
 
 
 jobs:
+  rust-ci-provider:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      provider: ${{ steps.select.outputs.provider }}
+    steps:
+      - id: select
+        env:
+          MANUAL_PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.rust_ci_provider || 'default' }}
+          CONFIGURED_PROVIDER: ${{ vars.RUST_CI_PROVIDER }}
+        run: |
+          provider="${CONFIGURED_PROVIDER:-hosted}"
+          if [ "$MANUAL_PROVIDER" != default ]; then
+            provider="$MANUAL_PROVIDER"
+          fi
+          case "$provider" in
+            hosted|aws) printf 'provider=%s\n' "$provider" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::RUST_CI_PROVIDER must be hosted or aws"; exit 1 ;;
+          esac
+
   file_change_determinator:
     runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
+      run_freshness: ${{ steps.classify_event.outputs.run_freshness }}
+      run_targeted_tests: ${{ steps.classify_event.outputs.run_targeted_tests }}
+      run_full_tests: ${{ steps.classify_event.outputs.run_full_tests }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Classify Lint+Test event
+        id: classify_event
+        run: python3 .github/actions/lint-test-classifier/classify_lint_event.py
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          CI_REF_NAME: ${{ github.ref_name }}
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
@@ -43,7 +78,7 @@ jobs:
     needs: file_change_determinator
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           fetch-depth: 0 # get all the history because python-lint-tests requires it.
@@ -58,13 +93,17 @@ jobs:
 
   # Run all rust lints. This is a PR required job.
   rust-lints:
-    needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    needs: [file_change_determinator, rust-ci-provider]
+    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu24-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.file_change_determinator.outputs.only_docs_changed != 'true' && needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-rust-lints
       - name: Run rust lints
         uses: ./.github/actions/rust-lints
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -78,7 +117,7 @@ jobs:
     needs: file_change_determinator
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
       - uses: EmbarkStudios/cargo-deny-action@v2
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -87,40 +126,43 @@ jobs:
       - run: echo "Skipping cargo deny! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
-  # Check the freshness of the merge base. This is a PR required job.
+  # Skip release freshness checks: cherry-picks don't advance the merge base.
   rust-check-merge-base:
-    if: | # Don't run on release branches
-      (
-        !contains(github.event.pull_request.base.ref, '-release-')
-      )
-    needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    if: needs.file_change_determinator.outputs.run_freshness == 'true'
+    needs: [file_change_determinator, rust-ci-provider]
+    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu24-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-rust-freshness
       - name: Run the merge base freshness check
         uses: ./.github/actions/rust-check-merge-base
         with:
+          PREBUILT_TOOLS: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
           BASE_REF: origin/${{ github.base_ref || 'main' }}
 
-  # Run only the targeted rust unit tests. This is a PR required job.
   rust-targeted-unit-tests:
-    if: | # Don't run on release branches. Instead, all unit tests will be triggered.
-      (
-        !contains(github.event.pull_request.base.ref, '-release-')
-      )
-    needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    if: needs.file_change_determinator.outputs.run_targeted_tests == 'true'
+    needs: [file_change_determinator, rust-ci-provider]
+    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu24-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
 
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-rust-targeted
       - name: Run dev_setup.sh
+        if: ${{ needs.rust-ci-provider.outputs.provider == 'aws' }}
         run: |
           scripts/dev_setup.sh -b -p -r -y -P -t
 
@@ -131,23 +173,11 @@ jobs:
           DETERMINATOR_MODE: ${{ vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
           BASE_REF: origin/${{ github.base_ref || 'main' }}
 
-  # Run all rust unit tests. This is not a PR required job.
   rust-unit-tests:
-    if: | # Only run when an appropriate event occurs
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'push' ||
-        contains(github.event.pull_request.base.ref, '-release-')
-      )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    steps:
-      - uses: actions/checkout@v4
-      # Install Move Prover tools
-      - name: Run dev_setup.sh
-        run: |
-          scripts/dev_setup.sh -b -y
-      - name: Run rust unit tests
-        uses: ./.github/actions/rust-unit-tests
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-          TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
+    needs: [file_change_determinator, rust-ci-provider]
+    if: needs.file_change_determinator.outputs.run_full_tests == 'true'
+    uses: ./.github/workflows/hosted-rust-unit-tests.yaml
+    with:
+      provider: ${{ needs.rust-ci-provider.outputs.provider }}
+    secrets:
+      TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}

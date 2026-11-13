@@ -62,7 +62,7 @@ use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
 use move_model::{
-    model::{GlobalEnv, Loc, ModuleId, MoveIrLoc},
+    model::{DeferredClosureFrames, GlobalEnv, Loc, ModuleId, MoveIrLoc},
     PackageInfo,
 };
 use move_stackless_bytecode::function_target_pipeline::{
@@ -372,6 +372,9 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
         env.treat_everything_as_target(true);
     }
     env.set_verify_mode(options.compile_verify_code);
+    env.set_extension(DeferredClosureFrames(
+        options.experiment_on(Experiment::DEFERRED_CLOSURE_FRAMES),
+    ));
     // Store options in env, for later access
     env.set_extension(options);
     Ok(env)

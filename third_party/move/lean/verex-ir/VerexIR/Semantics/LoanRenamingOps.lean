@@ -8,7 +8,7 @@ import VerexIR.Semantics.LoanRenaming
 
 Each runtime operation applied to a frame and state with their loans
 renamed injectively is the operation applied to the originals, renamed
-(`designs/static-typing.md`, "Loan independence").
+(`doc/historical/static-typing.md`, "Loan independence").
 -/
 
 namespace VerexIR
@@ -288,7 +288,13 @@ theorem resolvePlaceFuel?_rename (unit : Validation.ValidatedUnit) (ns : Validat
             | deref base =>
                 simp only [places]
                 split
-                · rfl
+                · cases resolvePlaceFuel? unit ns frame state fuel base with
+                  | none => rfl
+                  | some basePlace =>
+                      simp only [Option.bind_some, read]
+                      cases readRuntimePlace? frame state basePlace with
+                      | none => rfl
+                      | some value => simp [RuntimeValue.live_rename]
                 · cases resolvePlaceFuel? unit ns frame state fuel base with
                   | none => rfl
                   | some basePlace =>
@@ -320,6 +326,15 @@ theorem resolvePlaceFuel?_rename (unit : Validation.ValidatedUnit) (ns : Validat
                         | none => rfl
                         | some value => cases value <;> simp
             | subslice base start stop fromEnd => simp only [places]
+            | unsize base =>
+                simp only [places]
+                cases resolvePlaceFuel? unit ns frame state fuel base with
+                | none => rfl
+                | some basePlace =>
+                    simp only [Option.bind_some, read]
+                    cases readRuntimePlace? frame state basePlace with
+                    | none => rfl
+                    | some value => cases value <;> simp
             | downcast base variant =>
                 simp only [places]
                 cases resolvePlaceFuel? unit ns frame state fuel base with
@@ -390,7 +405,7 @@ theorem placeVariantMismatchFuel?_rename (unit : Validation.ValidatedUnit)
                   | some value =>
                       cases value <;> try simp
                       rename_i source variant values
-                      cases variant <;> cases resolveStruct? unit ns.identity owner <;>
+                      cases variant <;> cases resolveStruct? unit ns.unitIdentity owner <;>
                         cases sourceFieldName? ns field <;> rfl
           | downcast base variant =>
               simp only [resolve, ih]
@@ -408,6 +423,7 @@ theorem placeVariantMismatchFuel?_rename (unit : Validation.ValidatedUnit)
           | ghostField base _ _ => simp only [resolve, ih]
           | index base _ => simp only [resolve, ih]
           | subslice base _ _ _ => simp only [resolve, ih]
+          | unsize base => simp only [resolve, ih]
 
 theorem variantMismatch?_rename (unit : Validation.ValidatedUnit)
     (ns : Validation.ValidatedNamespace) (operation : Operation) (arguments : Array RuntimeValue)
@@ -424,11 +440,11 @@ theorem variantMismatch?_rename (unit : Validation.ValidatedUnit)
           · rfl
           · cases a <;> try simp
             rename_i source variant values
-            cases variant <;> cases resolveStruct? unit ns.identity reference <;> rfl
+            cases variant <;> cases resolveStruct? unit ns.unitIdentity reference <;> rfl
           · simp only [List.map_cons]
             cases a <;> simp only [RuntimeValue.rename]
       | _ => rfl
-  | copy place | read place | move place | borrow _ place | write place | drop place =>
+  | copy place | read place | readDiscriminant place | move place | borrow _ place | write place | drop place =>
       simp only [variantMismatch?, placeVariantMismatchFuel?_rename unit ns globals_eq]
   | _ => rfl
 
@@ -481,6 +497,7 @@ theorem constValue?_plain : ∀ (fuel : Nat) (literal : ConstValue), sizeOf lite
           · cases value_eq; exact .character _
           · cases value_eq
       | profile _ => simp [constValue?] at value_eq
+      | «opaque» _ => simp [constValue?] at value_eq
       | unit | bool _ | integer _ | address _ | string _ | bytes _ =>
           simp only [constValue?, Option.some.injEq] at value_eq
           subst value_eq
@@ -529,7 +546,7 @@ theorem bindPatternFuel_rename (injective : Function.Injective ρ) (unit : Valid
               · simp [RuntimeFrame.rename, Array.map_setIfInBounds, pure]
               · rfl
           case tuple elements =>
-              cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_unit, RuntimeValue.rename_bool,
+              cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_retired, RuntimeValue.rename_unit, RuntimeValue.rename_bool,
                 RuntimeValue.rename_character, RuntimeValue.rename_integer, RuntimeValue.rename_address,
                 RuntimeValue.rename_signer, RuntimeValue.rename_string, RuntimeValue.rename_bytes,
                 RuntimeValue.rename_vector, RuntimeValue.rename_nominal, RuntimeValue.rename_closure,
@@ -549,20 +566,20 @@ theorem bindPatternFuel_rename (injective : Function.Injective ρ) (unit : Valid
                     RuntimeValue.rename_of_plain ρ plain]
                   split <;> rfl
           case range lower upper inclusive =>
-              cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_unit, RuntimeValue.rename_bool,
+              cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_retired, RuntimeValue.rename_unit, RuntimeValue.rename_bool,
                 RuntimeValue.rename_character, RuntimeValue.rename_integer, RuntimeValue.rename_address,
                 RuntimeValue.rename_signer, RuntimeValue.rename_string, RuntimeValue.rename_bytes,
                 RuntimeValue.rename_vector, RuntimeValue.rename_nominal, RuntimeValue.rename_closure,
                 RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole, RuntimeValue.rename_ghost] <;> try rfl
               all_goals (repeat' split) <;> simp_all
           case constructor name spelled variant fields =>
-              cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_unit, RuntimeValue.rename_bool,
+              cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_retired, RuntimeValue.rename_unit, RuntimeValue.rename_bool,
                 RuntimeValue.rename_character, RuntimeValue.rename_integer, RuntimeValue.rename_address,
                 RuntimeValue.rename_signer, RuntimeValue.rename_string, RuntimeValue.rename_bytes,
                 RuntimeValue.rename_vector, RuntimeValue.rename_nominal, RuntimeValue.rename_closure,
                 RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole, RuntimeValue.rename_ghost] <;> try rfl
               case nominal source actualVariant values =>
-                cases resolveNominal? unit ns name with
+                cases resolveNominal? unit ns (ns.nameId name) with
                 | none => rfl
                 | some expected =>
                     simp only [Option.bind_some, Array.size_map]
@@ -1273,13 +1290,161 @@ theorem settleLoans_rename {loans : Array LoanId} {frame : RuntimeFrame}
               rw [write_eq]
               exact ⟨rfl, written, written_within⟩
 
-theorem settleAfter_rename {loans : Array LoanId} {control : Control} {frame : RuntimeFrame}
+theorem heldAt?_rename (unit : Validation.ValidatedUnit) (ns : Validation.ValidatedNamespace)
+    (path : List Validation.LoanProjection) (value : RuntimeValue) :
+    heldAt? unit ns (value.rename ρ) path = (heldAt? unit ns value path).map (·.rename ρ) := by
+  induction path generalizing value with
+  | nil => simp [heldAt?]
+  | cons step rest ih =>
+      cases step with
+      | dereference =>
+          cases value <;> simp [heldAt?, ih]
+      | field name =>
+          cases value <;> simp [heldAt?]
+          rename_i source variant fields
+          cases sourceFieldName? ns name <;> simp
+          rename_i fieldName
+          cases handleFieldIndex? unit source variant fieldName <;> simp
+          rename_i index
+          cases fields[index]? <;> simp [ih]
+      | index literal =>
+          cases literal with
+          | none => cases value <;> simp [heldAt?]
+          | some index =>
+              cases value <;> simp [heldAt?]
+              all_goals
+                rename_i elements
+                cases elements[index]? <;> simp [ih]
+      | subslice start stop fromEnd => cases value <;> simp [heldAt?]
+      | downcast variant =>
+          cases value <;> simp [heldAt?]
+          rename_i source variant fields
+          simpa using ih (.nominal source variant fields)
+
+theorem heldAt?_within (unit : Validation.ValidatedUnit) (ns : Validation.ValidatedNamespace)
+    {inside : Nat → Prop} (path : List Validation.LoanProjection) {value held : RuntimeValue}
+    (within : value.Within inside) (found : heldAt? unit ns value path = some held) :
+    held.Within inside := by
+  induction path generalizing value with
+  | nil =>
+      simp only [heldAt?, Option.some.injEq] at found
+      exact found ▸ within
+  | cons step rest ih =>
+      cases step with
+      | dereference =>
+          cases value <;> simp [heldAt?] at found
+          exact ih ((RuntimeValue.within_borrow _ _ _).mp within).2 found
+      | field name =>
+          cases value <;> first | (simp [heldAt?] at found; done) | skip
+          simp only [heldAt?, Option.bind_eq_bind, Option.bind_eq_some_iff] at found
+          obtain ⟨fieldName, -, index, -, field, member, found⟩ := found
+          exact ih ((RuntimeValue.within_nominal _ _ _ _).mp within field
+            (Array.mem_of_getElem? member)) found
+      | index literal =>
+          cases literal with
+          | none => cases value <;> simp [heldAt?] at found
+          | some index =>
+              cases value <;> first | (simp [heldAt?] at found; done) | skip
+              all_goals
+                simp only [heldAt?, Option.bind_eq_bind, Option.bind_eq_some_iff] at found
+                obtain ⟨element, member, found⟩ := found
+              · exact ih ((RuntimeValue.within_vector _ _).mp within element
+                  (Array.mem_of_getElem? member)) found
+              · exact ih ((RuntimeValue.within_tuple _ _).mp within element
+                  (Array.mem_of_getElem? member)) found
+      | subslice start stop fromEnd => cases value <;> simp [heldAt?] at found
+      | downcast variant =>
+          cases value <;> simp [heldAt?] at found
+          exact ih within found
+
+theorem retirePlace_rename {unit : Validation.ValidatedUnit} {ns : Validation.ValidatedNamespace}
+    {place : LocalId × List Validation.LoanProjection} {frame : RuntimeFrame}
     (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
     (frame_within : frame.Within inside) :
-    Mirrors ρ offset frontier inside inert inert' (settleAfter loans control frame state)
-      (settleAfter loans (control.rename ρ) (frame.rename ρ) state₂) := by
+    Mirrors ρ offset frontier inside inert inert' (retirePlace unit ns frame state place)
+      (retirePlace unit ns (frame.rename ρ) state₂ place) := by
+  obtain ⟨holder, path⟩ := place
+  have held_eq : (((frame.rename ρ).locals[holder.index]?).bind id).bind
+      (heldAt? unit ns · path) = (((frame.locals[holder.index]?).bind id).bind
+        (heldAt? unit ns · path)).map (·.rename ρ) := by
+    simp only [RuntimeFrame.rename, Array.getElem?_map]
+    cases frame.locals[holder.index]? with
+    | none => rfl
+    | some slot =>
+        cases slot with
+        | none => rfl
+        | some value => simpa using heldAt?_rename unit ns path value
+  have held_within : ∀ held, ((frame.locals[holder.index]?).bind id).bind
+      (heldAt? unit ns · path) = some held → held.Within inside := by
+    intro held found
+    cases slot_eq : frame.locals[holder.index]? with
+    | none => simp [slot_eq] at found
+    | some slot =>
+        cases slot with
+        | none => simp [slot_eq] at found
+        | some value =>
+            simp only [slot_eq, Option.bind_some, id] at found
+            exact heldAt?_within unit ns path
+              (frame_within.locals _ (Array.mem_of_getElem? slot_eq) _ rfl) found
+  unfold retirePlace
+  dsimp only
+  rw [held_eq]
+  cases found : ((frame.locals[holder.index]?).bind id).bind (heldAt? unit ns · path) with
+  | none => exact ⟨rfl, shifted, frame_within⟩
+  | some held =>
+      cases held with
+      | borrow loan current =>
+          have loan_within := ((RuntimeValue.within_borrow _ _ _).mp (held_within _ found)).1
+          simp only [Option.map_some, RuntimeValue.rename_borrow]
+          rw [findBorrowValue?_rename shifted]
+          cases borrow_eq : findBorrowValue? frame state loan with
+          | none => exact ⟨rfl, shifted, frame_within⟩
+          | some value =>
+              have value_within := findBorrowValue?_within shifted frame_within loan_within borrow_eq
+              obtain ⟨cleared₂, clear_eq, cleared, cleared_within⟩ :=
+                clearBorrowValue_rename shifted frame_within loan_within
+              simp only [Option.map_some, clear_eq]
+              obtain ⟨written₂, write_eq, written, written_within⟩ :=
+                applyWriteBack_rename cleared cleared_within loan_within value_within
+              rw [write_eq]
+              exact ⟨rfl, written, written_within⟩
+      | _ => simp [Option.map_some]; exact ⟨rfl, shifted, frame_within⟩
+
+theorem settleDeaths_rename {unit : Validation.ValidatedUnit} {namespaceId : NamespaceId}
+    {loans : Array LoanId} {places : Array (LocalId × List Validation.LoanProjection)} {frame : RuntimeFrame}
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (frame_within : frame.Within inside) :
+    Mirrors ρ offset frontier inside inert inert'
+      (settleDeaths unit namespaceId loans places frame state)
+      (settleDeaths unit namespaceId loans places (frame.rename ρ) state₂) := by
+  have settled := settleLoans_rename (loans := loans) shifted frame_within
+  unfold settleDeaths
+  dsimp only
+  split
+  · rw [← Array.foldl_toList, ← Array.foldl_toList]
+    generalize settleLoans loans frame state = first at settled ⊢
+    generalize settleLoans loans (frame.rename ρ) state₂ = second at settled ⊢
+    induction places.toList generalizing first second with
+    | nil => exact settled
+    | cons place rest ih =>
+        obtain ⟨current₁, state₁⟩ := first
+        obtain ⟨current₂, state₂'⟩ := second
+        obtain ⟨same, related, above⟩ := settled
+        simp only at same related above
+        subst same
+        exact ih _ _ (retirePlace_rename related above)
+  · exact settled
+
+theorem settleAfter_rename {unit : Validation.ValidatedUnit} {namespaceId : NamespaceId}
+    {loans : Array LoanId} {places : Array (LocalId × List Validation.LoanProjection)}
+    {control : Control} {frame : RuntimeFrame}
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (frame_within : frame.Within inside) :
+    Mirrors ρ offset frontier inside inert inert'
+      (settleAfter unit namespaceId loans places control frame state)
+      (settleAfter unit namespaceId loans places (control.rename ρ) (frame.rename ρ) state₂) := by
   cases control <;> simp only [settleAfter, Control.rename]
-  · exact settleLoans_rename shifted frame_within
+  · exact settleDeaths_rename shifted frame_within
   all_goals exact ⟨rfl, shifted, frame_within⟩
 
 end States
@@ -1605,7 +1770,7 @@ theorem destructNominal?_rename (unit : Validation.ValidatedUnit) (sourceNamespa
       (destructNominal? unit sourceNamespace reference variant value).map
         (·.map (·.rename ρ)) := by
   unfold destructNominal?
-  cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_unit,
+  cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_retired, RuntimeValue.rename_unit,
     RuntimeValue.rename_bool, RuntimeValue.rename_character, RuntimeValue.rename_integer,
     RuntimeValue.rename_address, RuntimeValue.rename_signer, RuntimeValue.rename_string,
     RuntimeValue.rename_bytes, RuntimeValue.rename_vector, RuntimeValue.rename_nominal,
@@ -1681,6 +1846,7 @@ theorem toConst?_rename :
         cases elements
         exact toConst?_rename fuel element (by simp at size this; omega)
       cases value with
+      | retired => simp [RuntimeValue.toConst?]
       | vector values =>
           rw [RuntimeValue.rename_vector]
           simp only [RuntimeValue.toConst?]

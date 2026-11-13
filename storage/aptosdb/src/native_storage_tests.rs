@@ -7,8 +7,9 @@
 
 use crate::{
     native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
+    native_state_store::decode_position_writes,
     native_store::kv_db::PositionDb,
-    schema::stale_position_value_index::{StalePositionValueIndex, StalePositionValueIndexSchema},
+    schema::native_stale_value_index::{NativeStaleValueIndex, NativeStaleValueIndexSchema},
     utils::truncation_helper::{get_native_commit_progress, truncate_native_kv_db_shards},
 };
 use aptos_crypto::hash::CryptoHash;
@@ -83,28 +84,21 @@ fn delete() -> WriteOp {
 }
 
 /// Commit one position write at `version` using the committer's
-/// per-chunk-batched path. Returns the decoded `PositionWrite`s the
-/// committer emitted for this chunk.
-fn commit_one(
-    db: &Arc<PositionDb>,
-    version: Version,
-    key: StateKey,
-    op: WriteOp,
-) -> crate::native_state_store::PositionWrites {
+/// per-chunk-batched path.
+fn commit_one(db: &Arc<PositionDb>, version: Version, key: StateKey, op: WriteOp) {
     let committer = NativeStateCommitter::new(Arc::clone(db));
     let mut sharded_kv_batches = new_sharded_kv_batches();
     let mut in_chunk_prior = InChunkPriorVersions::new();
-    let writes = committer
+    committer
         .apply(
             version,
-            std::iter::once((key, op)),
+            std::iter::once((&key, &op)),
             &mut sharded_kv_batches,
             &mut in_chunk_prior,
         )
         .expect("apply");
     db.commit(version, None, sharded_kv_batches)
         .expect("position_db commit");
-    writes
 }
 
 #[test]
@@ -143,10 +137,10 @@ fn apply_emits_no_prev_version_sentinel_for_first_write() {
     let shard = crate::sharded_kv_db::ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
         .shard(shard)
-        .iter::<StalePositionValueIndexSchema>()
+        .iter::<NativeStaleValueIndexSchema>()
         .unwrap();
     iter.seek_to_first();
-    let mut entries: Vec<StalePositionValueIndex> = Vec::new();
+    let mut entries: Vec<NativeStaleValueIndex> = Vec::new();
     for row in iter {
         let (idx, _) = row.unwrap();
         if idx.state_key_hash == hash {
@@ -173,10 +167,10 @@ fn apply_emits_prior_version_on_overwrite() {
     let shard = crate::sharded_kv_db::ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
         .shard(shard)
-        .iter::<StalePositionValueIndexSchema>()
+        .iter::<NativeStaleValueIndexSchema>()
         .unwrap();
     iter.seek_to_first();
-    let mut entries: Vec<StalePositionValueIndex> = Vec::new();
+    let mut entries: Vec<NativeStaleValueIndex> = Vec::new();
     for row in iter {
         let (idx, _) = row.unwrap();
         if idx.state_key_hash == hash {
@@ -201,47 +195,27 @@ fn apply_emits_prior_version_on_overwrite() {
     assert_eq!(v5.version, 0);
 }
 
-#[test]
-fn apply_emits_typed_position_for_upsert_none_for_delete() {
-    let (_tmp, db) = open_position_db();
-    let key = position_key(1);
-
-    let upserts = commit_one(&db, 0, key.clone(), upsert(7));
-    assert_eq!(upserts.len(), 1);
-    let pos = upserts[0]
-        .1
-        .as_ref()
-        .expect("upsert carries the decoded value");
-    assert_eq!(pos.size(), 7, "decoded NativePosition's tag survives apply");
-
-    let deletes = commit_one(&db, 1, key.clone(), delete());
-    assert_eq!(deletes.len(), 1);
-    assert!(deletes[0].1.is_none(), "delete carries no value");
-}
-
 /// One `PositionWrite` per input, in arrival order, correctly decoded.
 #[test]
-fn apply_emits_one_position_write_per_input() {
-    let (_tmp, db) = open_position_db();
-    let committer = NativeStateCommitter::new(Arc::clone(&db));
-    let mut sharded_kv_batches = new_sharded_kv_batches();
-    let mut in_chunk_prior = InChunkPriorVersions::new();
-
+fn decode_emits_one_position_write_per_input() {
     let exch = exchange(1);
     let acct_a = account(2);
     let acct_b = account(3);
     let market_x = market(7);
     let market_y = market(8);
 
-    let inputs = vec![
+    let inputs = [
         (StateKey::position(exch, acct_a, market_x), upsert(100)),
         (StateKey::position(exch, acct_b, market_y), upsert(200)),
         (StateKey::position(exch, acct_a, market_y), delete()),
     ];
 
-    let writes = committer
-        .apply(0, inputs, &mut sharded_kv_batches, &mut in_chunk_prior)
-        .expect("apply");
+    let writes = decode_position_writes(
+        inputs
+            .iter()
+            .map(|(key, op)| (key, op.as_state_value_opt())),
+    )
+    .expect("decode");
 
     assert_eq!(writes.len(), 3, "one PositionWrite per input");
 
@@ -280,7 +254,7 @@ fn truncate_advances_overall_position_commit_progress() {
     let shard = crate::sharded_kv_db::ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
         .shard(shard)
-        .iter::<StalePositionValueIndexSchema>()
+        .iter::<NativeStaleValueIndexSchema>()
         .unwrap();
     iter.seek_to_first();
     let stale_since_versions: Vec<Version> = iter
@@ -306,7 +280,7 @@ fn in_chunk_writes_chain_stale_index_versions() {
         committer
             .apply(
                 i as Version,
-                std::iter::once((key.clone(), upsert(*tag))),
+                std::iter::once((&key, &upsert(*tag))),
                 &mut sharded_kv_batches,
                 &mut in_chunk_prior,
             )
@@ -318,10 +292,10 @@ fn in_chunk_writes_chain_stale_index_versions() {
     let shard = crate::sharded_kv_db::ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
         .shard(shard)
-        .iter::<StalePositionValueIndexSchema>()
+        .iter::<NativeStaleValueIndexSchema>()
         .unwrap();
     iter.seek_to_first();
-    let mut entries: Vec<StalePositionValueIndex> = iter
+    let mut entries: Vec<NativeStaleValueIndex> = iter
         .filter_map(|r| r.ok())
         .map(|(idx, _)| idx)
         .filter(|i| i.state_key_hash == hash)
@@ -805,6 +779,7 @@ mod verify {
             .unwrap()
             .expect("synced version");
         let snapshot = bundle
+            .store
             .merkle_db
             .latest_snapshot_version_at_or_before(tip)
             .unwrap()
@@ -819,7 +794,7 @@ mod verify {
             .unwrap();
         match txn_info.position_state_checkpoint_hash() {
             Some(committed_root) => {
-                let jmt_root = bundle.merkle_db.get_root_hash(snapshot).unwrap();
+                let jmt_root = bundle.store.merkle_db.get_root_hash(snapshot).unwrap();
                 assert_eq!(
                     committed_root, jmt_root,
                     "position root in TransactionInfo@{snapshot} disagrees with the JMT"
@@ -909,13 +884,15 @@ mod verify {
         // Durable: JMT leaves at the snapshot, each agreeing with its KV row.
         let mut on_disk: BTreeMap<PositionKey, Vec<u8>> = BTreeMap::new();
         let leaves = bundle
+            .store
             .merkle_db
-            .iter_active_leaves_with_values(Arc::clone(&bundle.kv_db), snapshot, 0)
+            .iter_active_leaves_with_values(Arc::clone(&bundle.store.kv_db), snapshot, 0)
             .unwrap();
         for row in leaves {
             let (key, value) = row.unwrap();
             let pk = position_key_of(&key).unwrap();
             let kv = bundle
+                .store
                 .kv_db
                 .expect_value_by_version(&key, snapshot)
                 .unwrap();
@@ -1039,7 +1016,7 @@ mod reopen {
             BlockEndInfo, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionInfo,
             TransactionToCommit, Version,
         },
-        write_set::{NativePositionOp, WriteOp, WriteSet},
+        write_set::{NativeCollateralOp, NativeOrderOp, NativePositionOp, WriteOp, WriteSet},
     };
     use std::collections::BTreeMap;
 
@@ -1063,6 +1040,16 @@ mod reopen {
     /// A one-transaction block whose write set sets each `(key, tag)`;
     /// its transaction info commits `position_root` when given.
     fn block(writes: &[(StateKey, u64)], position_root: Option<HashValue>) -> TransactionToCommit {
+        block_with_orders(writes, &[], position_root, None)
+    }
+
+    /// As [`block`], also writing each `(order key, value)`; `None` deletes.
+    fn block_with_orders(
+        writes: &[(StateKey, u64)],
+        orders: &[(StateKey, Option<&[u8]>)],
+        position_root: Option<HashValue>,
+        order_root: Option<HashValue>,
+    ) -> TransactionToCommit {
         let txn_info = TransactionInfo::builder_v1()
             .transaction_hash(HashValue::random())
             .state_change_hash(HashValue::random())
@@ -1071,6 +1058,7 @@ mod reopen {
             .gas_used(0)
             .status(ExecutionStatus::Success)
             .maybe_position_state_checkpoint_hash(position_root)
+            .maybe_order_state_checkpoint_hash(order_root)
             .build();
         let positions: BTreeMap<_, _> = writes
             .iter()
@@ -1081,6 +1069,67 @@ mod reopen {
             .collect();
         let mut write_set = WriteSet::default().into_v1();
         write_set.add_native_positions(positions);
+        if !orders.is_empty() {
+            write_set.add_native_orders(
+                orders
+                    .iter()
+                    .map(|(key, value)| {
+                        let op = match value {
+                            Some(bytes) => WriteOp::legacy_modification(bytes.to_vec().into()),
+                            None => WriteOp::legacy_deletion(),
+                        };
+                        (key.clone(), NativeOrderOp::from_write_op(op))
+                    })
+                    .collect(),
+            );
+        }
+        TransactionToCommit::new(
+            Transaction::block_epilogue_v0(HashValue::zero(), BlockEndInfo::new_empty()),
+            txn_info,
+            write_set,
+            vec![],
+            false,
+            TransactionAuxiliaryData::default(),
+        )
+    }
+
+    /// As [`block_with_orders`], writing each `(collateral key, value)`
+    /// instead of orders; `None` deletes.
+    fn block_with_collateral(
+        writes: &[(StateKey, u64)],
+        collateral: &[(StateKey, Option<&[u8]>)],
+        collateral_root: Option<HashValue>,
+    ) -> TransactionToCommit {
+        let txn_info = TransactionInfo::builder_v1()
+            .transaction_hash(HashValue::random())
+            .state_change_hash(HashValue::random())
+            .event_root_hash(HashValue::random())
+            .state_checkpoint_hash(HashValue::random())
+            .gas_used(0)
+            .status(ExecutionStatus::Success)
+            .maybe_collateral_state_checkpoint_hash(collateral_root)
+            .build();
+        let positions: BTreeMap<_, _> = writes
+            .iter()
+            .map(|(key, tag)| {
+                let op = WriteOp::legacy_modification(position_bytes(*tag).into());
+                (key.clone(), NativePositionOp::from_write_op(op))
+            })
+            .collect();
+        let mut write_set = WriteSet::default().into_v1();
+        write_set.add_native_positions(positions);
+        write_set.add_native_collateral(
+            collateral
+                .iter()
+                .map(|(key, value)| {
+                    let op = match value {
+                        Some(bytes) => WriteOp::legacy_modification(bytes.to_vec().into()),
+                        None => WriteOp::legacy_deletion(),
+                    };
+                    (key.clone(), NativeCollateralOp::from_write_op(op))
+                })
+                .collect(),
+        );
         TransactionToCommit::new(
             Transaction::block_epilogue_v0(HashValue::zero(), BlockEndInfo::new_empty()),
             txn_info,
@@ -1108,7 +1157,7 @@ mod reopen {
     fn position_root(db: &AptosDB) -> HashValue {
         db.get_pre_committed_position_state_summary()
             .expect("position summary")
-            .latest()
+            .last_checkpoint()
             .root_hash()
     }
 
@@ -1288,7 +1337,7 @@ mod reopen {
         {
             let db = open(&dir, true);
             let bundle = db.position().unwrap();
-            crate::utils::truncation_helper::truncate_native_merkle_db(&bundle.merkle_db, 0)
+            crate::utils::truncation_helper::truncate_native_merkle_db(&bundle.store.merkle_db, 0)
                 .unwrap();
         }
         let db = Arc::new(
@@ -1315,5 +1364,1430 @@ mod reopen {
         assert_eq!(position_root(&db), root);
         assert_eq!(size_of(&db, 1), Some(11));
         assert_eq!(size_of(&db, 2), Some(20));
+    }
+
+    /// A readonly open loads the index: the snapshot cold-loads and the tail
+    /// past it replays into the overlay, so readers see every position.
+    #[test]
+    fn readonly_open_loads_the_index() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+            commit(&db, 1, &[(position_key(2), 20)]);
+            commit(&db, 2, &[(position_key(1), 11), (position_key(3), 30)]);
+        }
+        // Leave the tail past version 0 un-merklized.
+        {
+            let db = open(&dir, true);
+            crate::utils::truncation_helper::truncate_native_merkle_db(
+                &db.position().unwrap().store.merkle_db,
+                0,
+            )
+            .unwrap();
+        }
+        let db = AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            true, /* readonly */
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig {
+                delete_on_restart: false,
+                ..Default::default()
+            },
+        )
+        .expect("readonly open");
+        assert_eq!(size_of(&db, 1), Some(11));
+        assert_eq!(size_of(&db, 2), Some(20));
+        assert_eq!(size_of(&db, 3), Some(30));
+    }
+
+    /// Both replays past a position snapshot refuse a gap they would have to
+    /// materialize whole, rather than allocating without bound.
+    #[test]
+    fn replay_refuses_an_unbounded_gap() {
+        use crate::native_store::{
+            buffered_state::MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT, bundle::NativeStoreBundle,
+            PositionStore,
+        };
+
+        let dir = TempPath::new();
+        let db = open(&dir, true);
+        let err = NativeStoreBundle::<PositionStore>::write_sets_after_snapshot(
+            &db.ledger_db,
+            0,
+            MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT + 1,
+        )
+        .expect_err("gap above the limit");
+        assert!(
+            err.to_string().contains("Too many versions to replay"),
+            "{err}"
+        );
+    }
+
+    /// A serialized single order, told apart by `tag`.
+    fn order_value(tag: u8) -> Vec<u8> {
+        use aptos_types::state_store::native_order::{
+            NativeSingleOrder, SingleOrderV1, TimeInForce,
+        };
+        NativeSingleOrder::V1(SingleOrderV1 {
+            account: super::account(2),
+            order_id: 0,
+            client_order_id: None,
+            price: u64::from(tag),
+            orig_size: 1,
+            remaining_size: 1,
+            is_bid: true,
+            trigger_condition: None,
+            time_in_force: TimeInForce::Gtc,
+            creation_time_micros: 0,
+            unique_priority_idx: 0,
+            metadata: vec![].into(),
+        })
+        .serialize()
+        .unwrap()
+    }
+
+    fn order_key(order_id: u128) -> StateKey {
+        StateKey::order(exchange(1), super::market(7), order_id)
+    }
+
+    fn commit_orders(
+        db: &AptosDB,
+        version: Version,
+        positions: &[(StateKey, u64)],
+        orders: &[(StateKey, Option<&[u8]>)],
+    ) {
+        commit_orders_with_root(db, version, positions, orders, None);
+    }
+
+    fn commit_orders_with_root(
+        db: &AptosDB,
+        version: Version,
+        positions: &[(StateKey, u64)],
+        orders: &[(StateKey, Option<&[u8]>)],
+        order_root: Option<HashValue>,
+    ) {
+        db.save_transactions_for_test(
+            &[block_with_orders(positions, orders, None, order_root)],
+            version,
+            None,
+            true,
+        )
+        .expect("commit");
+    }
+
+    fn order_root(db: &AptosDB) -> HashValue {
+        db.get_pre_committed_order_state_summary()
+            .expect("order summary")
+            .last_checkpoint()
+            .root_hash()
+    }
+
+    /// The order store's live rows at its latest JMT snapshot, which must be
+    /// at the ledger tip.
+    fn order_rows(db: &AptosDB) -> BTreeMap<StateKey, Vec<u8>> {
+        let order = db.order.as_ref().expect("order store attached");
+        let tip = db.get_synced_version().unwrap().expect("synced version");
+        let snapshot = order
+            .store
+            .merkle_db
+            .latest_snapshot_version_at_or_before(tip)
+            .unwrap();
+        assert_eq!(snapshot, Some(tip), "order snapshot at the tip");
+        order
+            .store
+            .snapshot_rows(tip)
+            .unwrap()
+            .map(|row| {
+                let (key, value) = row.unwrap();
+                (key, value.bytes().to_vec())
+            })
+            .collect()
+    }
+
+    fn position_row_keys(db: &AptosDB) -> Vec<StateKey> {
+        let bundle = db.position().expect("position store attached");
+        let tip = db.get_synced_version().unwrap().expect("synced version");
+        let snapshot = bundle
+            .store
+            .merkle_db
+            .latest_snapshot_version_at_or_before(tip)
+            .unwrap()
+            .expect("position snapshot");
+        bundle
+            .store
+            .snapshot_rows(snapshot)
+            .unwrap()
+            .map(|row| row.unwrap().0)
+            .collect()
+    }
+
+    /// Order writes land in the order store, latest-wins with deletes, and
+    /// a reopen sees them from the JMT; positions in the same blocks stay
+    /// in the position store.
+    #[test]
+    fn orders_commit_to_their_own_store_and_survive_reopen() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[(position_key(1), 10)], &[
+                (order_key(1), Some(&order_value(b'a'))),
+                (order_key(2), Some(&order_value(b'b'))),
+            ]);
+            commit_orders(&db, 1, &[], &[
+                (order_key(1), None),
+                (order_key(3), Some(&order_value(b'c'))),
+            ]);
+            commit_orders(&db, 2, &[(position_key(2), 20)], &[(
+                order_key(2),
+                Some(&order_value(b'B')),
+            )]);
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            order_rows(&db),
+            BTreeMap::from([
+                (order_key(2), order_value(b'B')),
+                (order_key(3), order_value(b'c')),
+            ])
+        );
+        let positions = position_row_keys(&db);
+        assert_eq!(positions.len(), 2, "{positions:?}");
+        assert!(positions.contains(&position_key(1)) && positions.contains(&position_key(2)));
+        assert_eq!(size_of(&db, 1), Some(10));
+        assert_eq!(size_of(&db, 2), Some(20));
+    }
+
+    /// Flag on through v0, off for v1..=v2, on again: the reopen replays the
+    /// gap into the order store.
+    #[test]
+    fn reenabling_replays_the_gap_into_the_order_store() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+        }
+        {
+            let db = open(&dir, false);
+            assert!(db.order.is_none());
+            commit_orders(&db, 1, &[], &[(order_key(1), Some(&order_value(b'b')))]);
+            commit_orders(&db, 2, &[], &[(order_key(2), Some(&order_value(b'c')))]);
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            order_rows(&db),
+            BTreeMap::from([
+                (order_key(1), order_value(b'b')),
+                (order_key(2), order_value(b'c')),
+            ])
+        );
+    }
+
+    /// Positions-only blocks leave the order store empty.
+    #[test]
+    fn position_writes_never_reach_the_order_store() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+        }
+        let db = open(&dir, true);
+        assert!(order_rows(&db).is_empty(), "no order was ever written");
+        assert_eq!(size_of(&db, 1), Some(10));
+    }
+
+    /// A crash between the order commit and the ledger's progress write
+    /// leaves order rows above the chain; the reopen truncates them.
+    #[test]
+    fn reopening_truncates_order_rows_ahead_of_the_ledger() {
+        use crate::{
+            native_state_committer::{
+                new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter,
+            },
+            utils::truncation_helper::get_native_commit_progress,
+        };
+        use aptos_crypto::hash::CryptoHash;
+        use std::sync::Arc;
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+            commit_orders(&db, 1, &[], &[(order_key(2), Some(&order_value(b'b')))]);
+
+            let order = db.order.as_ref().unwrap();
+            let committer = NativeStateCommitter::new(Arc::clone(&order.store.kv_db));
+            let mut batches = new_sharded_kv_batches();
+            let mut in_chunk_prior = InChunkPriorVersions::new();
+            let ahead = WriteOp::legacy_modification(order_value(b'x').into());
+            committer
+                .apply(
+                    2,
+                    std::iter::once((&order_key(1), &ahead)),
+                    &mut batches,
+                    &mut in_chunk_prior,
+                )
+                .unwrap();
+            order.store.kv_db.commit(2, None, batches).unwrap();
+            assert_eq!(
+                get_native_commit_progress(&order.store.kv_db).unwrap(),
+                Some(2)
+            );
+        }
+        let db = open(&dir, true);
+        let order = db.order.as_ref().unwrap();
+        assert_eq!(
+            get_native_commit_progress(&order.store.kv_db).unwrap(),
+            Some(1)
+        );
+        let (version, value) = order
+            .store
+            .kv_db
+            .get_value(order_key(1).hash(), 2)
+            .unwrap()
+            .expect("v0 row survives");
+        assert_eq!(version, 0, "the row ahead of the ledger is gone");
+        assert_eq!(value.bytes().as_ref(), order_value(b'a'));
+        assert_eq!(
+            order_rows(&db),
+            BTreeMap::from([
+                (order_key(1), order_value(b'a')),
+                (order_key(2), order_value(b'b')),
+            ])
+        );
+    }
+
+    /// Commits wake the order value pruner, so superseded order rows are
+    /// pruned while the node stays up, not only after a restart.
+    #[test]
+    fn commits_drive_the_order_value_pruner() {
+        use crate::pruner::PrunerManager;
+        use aptos_config::config::{LedgerPrunerConfig, PrunerConfig};
+        use aptos_crypto::hash::CryptoHash;
+
+        let dir = TempPath::new();
+        let db = AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            false,
+            PrunerConfig {
+                ledger_pruner_config: LedgerPrunerConfig {
+                    enable: true,
+                    prune_window: 0,
+                    batch_size: 1,
+                    user_pruning_window_offset: 0,
+                },
+                ..NO_OP_STORAGE_PRUNER_CONFIG
+            },
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig::default(),
+        )
+        .expect("open");
+        commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+        commit_orders(&db, 1, &[], &[(order_key(1), Some(&order_value(b'b')))]);
+        commit_orders(&db, 2, &[], &[(order_key(2), Some(&order_value(b'c')))]);
+
+        let order = db.order.as_ref().unwrap();
+        let value_pruner = &order.store.pruner.as_ref().unwrap().value_pruner;
+        value_pruner.wait_for_pruner().unwrap();
+        assert_eq!(value_pruner.get_min_readable_version(), 2);
+        assert!(
+            order
+                .store
+                .kv_db
+                .get_value(order_key(1).hash(), 0)
+                .unwrap()
+                .is_none(),
+            "the superseded v0 row is pruned"
+        );
+        let (version, _) = order
+            .store
+            .kv_db
+            .get_value(order_key(1).hash(), 2)
+            .unwrap()
+            .expect("live row kept");
+        assert_eq!(version, 1);
+    }
+
+    /// Storage enabled on a running chain, as `test_enable_native_positions_on_running_chain`
+    /// does: blocks without order writes must keep committing.
+    #[test]
+    fn enabling_on_a_running_chain_then_committing_without_orders() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit(&db, 0, &[]);
+            commit(&db, 1, &[]);
+        }
+        {
+            let db = open(&dir, true);
+            commit(&db, 2, &[(position_key(1), 10)]);
+            commit(&db, 3, &[]);
+        }
+        let db = open(&dir, true);
+        commit(&db, 4, &[]);
+        assert_eq!(size_of(&db, 1), Some(10));
+    }
+
+    /// The order tree follows the chain through blocks with no order writes,
+    /// so it persists snapshots and a reopen replays only past the latest.
+    /// Otherwise a reopen replays from version 0, which a restored or pruned
+    /// ledger cannot serve.
+    #[test]
+    fn order_snapshots_track_the_chain_without_order_writes() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+            commit(&db, 1, &[]);
+            commit(&db, 2, &[]);
+        }
+        let db = open(&dir, true);
+        let order = db.order.as_ref().expect("order store attached");
+        assert_eq!(
+            order
+                .store
+                .merkle_db
+                .latest_snapshot_version_at_or_before(Version::MAX)
+                .unwrap(),
+            Some(2),
+        );
+    }
+
+    /// A serialized collateral entry, told apart by `tag`.
+    fn collateral_value(tag: u8) -> Vec<u8> {
+        use aptos_types::state_store::native_collateral::NativeCollateral;
+        NativeCollateral::V1 {
+            primary_offset: 1 << 63,
+            secondaries: vec![],
+            reserved: u64::from(tag),
+        }
+        .serialize()
+        .unwrap()
+    }
+
+    fn collateral_key(account: u8) -> StateKey {
+        use aptos_types::state_store::state_key::inner::CollateralScope;
+        StateKey::collateral(exchange(1), super::account(account), CollateralScope::Cross)
+    }
+
+    fn commit_collateral(
+        db: &AptosDB,
+        version: Version,
+        positions: &[(StateKey, u64)],
+        collateral: &[(StateKey, Option<&[u8]>)],
+    ) {
+        commit_collateral_with_root(db, version, positions, collateral, None);
+    }
+
+    fn commit_collateral_with_root(
+        db: &AptosDB,
+        version: Version,
+        positions: &[(StateKey, u64)],
+        collateral: &[(StateKey, Option<&[u8]>)],
+        collateral_root: Option<HashValue>,
+    ) {
+        db.save_transactions_for_test(
+            &[block_with_collateral(
+                positions,
+                collateral,
+                collateral_root,
+            )],
+            version,
+            None,
+            true,
+        )
+        .expect("commit");
+    }
+
+    fn collateral_root(db: &AptosDB) -> HashValue {
+        db.get_pre_committed_collateral_state_summary()
+            .expect("collateral summary")
+            .last_checkpoint()
+            .root_hash()
+    }
+
+    /// A node whose collateral store disagrees with the collateral root the
+    /// ledger commits refuses to open: here storage is enabled on a node that
+    /// committed collateral it never stored.
+    #[test]
+    fn reopening_refuses_a_collateral_store_that_disagrees_with_the_committed_root() {
+        let root = {
+            let reference_dir = TempPath::new();
+            let db = open(&reference_dir, true);
+            commit_collateral(&db, 0, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'a')),
+            )]);
+            collateral_root(&db)
+        };
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_collateral_with_root(
+                &db,
+                0,
+                &[],
+                &[(collateral_key(1), Some(&collateral_value(b'a')))],
+                Some(root),
+            );
+        }
+        let err = match AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            false,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig::default(),
+        ) {
+            Ok(_) => panic!("open must fail"),
+            Err(err) => err,
+        };
+        assert!(
+            err.to_string()
+                .contains("disagrees with the collateral root"),
+            "{err}"
+        );
+    }
+
+    /// A node with storage on throughout reopens cleanly against a ledger
+    /// that commits collateral roots.
+    #[test]
+    fn reopening_with_matching_collateral_roots_succeeds() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'a')),
+            )]);
+            let root = collateral_root(&db);
+            commit_collateral_with_root(&db, 1, &[], &[], Some(root));
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            collateral_rows(&db),
+            BTreeMap::from([(collateral_key(1), collateral_value(b'a'))])
+        );
+    }
+
+    /// Enabling on a ledger whose committed collateral root is the empty tree
+    /// (roots on, no collateral yet) is the normal rollout path and opens.
+    #[test]
+    fn enabling_on_a_ledger_with_an_empty_collateral_root_opens() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_collateral_with_root(&db, 0, &[], &[], Some(*SPARSE_MERKLE_PLACEHOLDER_HASH));
+        }
+        let db = open(&dir, true);
+        commit_collateral(&db, 1, &[], &[(
+            collateral_key(1),
+            Some(&collateral_value(b'a')),
+        )]);
+        assert_eq!(collateral_rows(&db).len(), 1);
+    }
+
+    /// Generated blocks commit collateral roots that the storage pipeline
+    /// reproduces, and reopen passes the open-time root check.
+    #[test]
+    fn generated_collateral_blocks_match_committed_roots() {
+        use crate::db::test_helper::arb_blocks_to_commit_with_collateral;
+        use aptos_proptest_helpers::ValueGenerator;
+
+        let dir = TempPath::new();
+        let blocks = ValueGenerator::new().generate(arb_blocks_to_commit_with_collateral());
+        let mut last_root = None;
+        {
+            let db = open(&dir, true);
+            let mut version = 0;
+            for (txns, li) in &blocks {
+                db.save_transactions_for_test(txns, version, Some(li), true)
+                    .expect("commit");
+                version += txns.len() as Version;
+                last_root = txns
+                    .last()
+                    .unwrap()
+                    .transaction_info()
+                    .collateral_state_checkpoint_hash();
+            }
+            assert_eq!(Some(collateral_root(&db)), last_root);
+        }
+        let db = open(&dir, true);
+        assert_eq!(Some(collateral_root(&db)), last_root);
+    }
+
+    /// A restore-mode open leaves the collateral store where it was
+    /// persisted; the reset a replay runs first brings it to the ledger tip.
+    #[test]
+    fn restore_reset_catches_collateral_up_to_the_ledger() {
+        use crate::get_restore_handler::GetRestoreHandler;
+        use aptos_storage_interface::state_store::collateral::CollateralKey;
+        use aptos_types::state_store::{
+            native_collateral::NativeCollateral, state_key::inner::CollateralScope,
+        };
+        use std::sync::Arc;
+
+        fn read(db: &AptosDB, account: u8) -> Option<NativeCollateral> {
+            let bundle = db.collateral().expect("collateral store attached");
+            let tip = bundle.collateral.lock().clone();
+            let key = CollateralKey {
+                exchange: exchange(1),
+                account: super::account(account),
+                scope: CollateralScope::Cross,
+            };
+            bundle
+                .collateral_base
+                .with_view(&tip, |view| view.get(&key))
+        }
+        fn decoded(tag: u8) -> NativeCollateral {
+            NativeCollateral::deserialize(&collateral_value(tag)).unwrap()
+        }
+
+        let dir = TempPath::new();
+        let root = {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'a')),
+            )]);
+            commit_collateral(&db, 1, &[], &[(
+                collateral_key(2),
+                Some(&collateral_value(b'b')),
+            )]);
+            commit_collateral(&db, 2, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'c')),
+            )]);
+            collateral_root(&db)
+        };
+        // Lose the in-memory tip: only the oldest snapshot is on disk. The
+        // ledger past it stands in for what a previous restore run replayed.
+        {
+            let db = open(&dir, true);
+            let bundle = db.collateral().unwrap();
+            crate::utils::truncation_helper::truncate_native_merkle_db(&bundle.store.merkle_db, 0)
+                .unwrap();
+        }
+        let db = Arc::new(
+            AptosDB::open_kv_only(
+                StorageDirPaths::from_path(dir.path()),
+                false,
+                NO_OP_STORAGE_PRUNER_CONFIG,
+                RocksdbConfigs {
+                    enable_trading_native: true,
+                    ..Default::default()
+                },
+                BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                None,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            read(&db, 1),
+            Some(decoded(b'a')),
+            "restore-mode open does not catch up"
+        );
+        assert_eq!(read(&db, 2), None);
+        db.get_restore_handler().reset_state_store().unwrap();
+        assert_eq!(collateral_root(&db), root);
+        assert_eq!(read(&db, 1), Some(decoded(b'c')));
+        assert_eq!(read(&db, 2), Some(decoded(b'b')));
+    }
+
+    /// The collateral store's live rows at its latest JMT snapshot, which
+    /// must be at the ledger tip.
+    fn collateral_rows(db: &AptosDB) -> BTreeMap<StateKey, Vec<u8>> {
+        let collateral = db.collateral.as_ref().expect("collateral store attached");
+        let tip = db.get_synced_version().unwrap().expect("synced version");
+        let snapshot = collateral
+            .store
+            .merkle_db
+            .latest_snapshot_version_at_or_before(tip)
+            .unwrap();
+        assert_eq!(snapshot, Some(tip), "collateral snapshot at the tip");
+        collateral
+            .store
+            .snapshot_rows(tip)
+            .unwrap()
+            .map(|row| {
+                let (key, value) = row.unwrap();
+                (key, value.bytes().to_vec())
+            })
+            .collect()
+    }
+
+    /// Collateral writes land in the collateral store, latest-wins with
+    /// deletes, and a reopen sees them from the JMT; positions in the same
+    /// blocks stay in the position store.
+    #[test]
+    fn collateral_commits_to_its_own_store_and_survives_reopen() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[(position_key(1), 10)], &[
+                (collateral_key(1), Some(&collateral_value(b'a'))),
+                (collateral_key(2), Some(&collateral_value(b'b'))),
+            ]);
+            commit_collateral(&db, 1, &[], &[
+                (collateral_key(1), None),
+                (collateral_key(3), Some(&collateral_value(b'c'))),
+            ]);
+            commit_collateral(&db, 2, &[(position_key(2), 20)], &[(
+                collateral_key(2),
+                Some(&collateral_value(b'B')),
+            )]);
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            collateral_rows(&db),
+            BTreeMap::from([
+                (collateral_key(2), collateral_value(b'B')),
+                (collateral_key(3), collateral_value(b'c')),
+            ])
+        );
+        let positions = position_row_keys(&db);
+        assert_eq!(positions.len(), 2, "{positions:?}");
+        assert!(order_rows(&db).is_empty(), "no order was ever written");
+        assert_eq!(size_of(&db, 1), Some(10));
+        assert_eq!(size_of(&db, 2), Some(20));
+    }
+
+    /// Flag on through v0, off for v1..=v2, on again: the reopen replays the
+    /// gap into the collateral store.
+    #[test]
+    fn reenabling_replays_the_gap_into_the_collateral_store() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'a')),
+            )]);
+        }
+        {
+            let db = open(&dir, false);
+            assert!(db.collateral.as_ref().is_none());
+            commit_collateral(&db, 1, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'b')),
+            )]);
+            commit_collateral(&db, 2, &[], &[(
+                collateral_key(2),
+                Some(&collateral_value(b'c')),
+            )]);
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            collateral_rows(&db),
+            BTreeMap::from([
+                (collateral_key(1), collateral_value(b'b')),
+                (collateral_key(2), collateral_value(b'c')),
+            ])
+        );
+    }
+
+    /// Position and order writes leave the collateral store empty.
+    #[test]
+    fn other_native_writes_never_reach_the_collateral_store() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[(position_key(1), 10)], &[(
+                order_key(1),
+                Some(&order_value(b'a')),
+            )]);
+        }
+        let db = open(&dir, true);
+        assert!(
+            collateral_rows(&db).is_empty(),
+            "no collateral was ever written"
+        );
+        assert_eq!(order_rows(&db).len(), 1);
+        assert_eq!(size_of(&db, 1), Some(10));
+    }
+
+    /// A crash between the collateral commit and the ledger's progress write
+    /// leaves collateral rows above the chain; the reopen truncates them.
+    #[test]
+    fn reopening_truncates_collateral_rows_ahead_of_the_ledger() {
+        use crate::{
+            native_state_committer::{
+                new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter,
+            },
+            utils::truncation_helper::get_native_commit_progress,
+        };
+        use aptos_crypto::hash::CryptoHash;
+        use std::sync::Arc;
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'a')),
+            )]);
+            commit_collateral(&db, 1, &[], &[(
+                collateral_key(2),
+                Some(&collateral_value(b'b')),
+            )]);
+
+            let collateral = db.collateral.as_ref().unwrap();
+            let committer = NativeStateCommitter::new(Arc::clone(&collateral.store.kv_db));
+            let mut batches = new_sharded_kv_batches();
+            let mut in_chunk_prior = InChunkPriorVersions::new();
+            let ahead = WriteOp::legacy_modification(collateral_value(b'x').into());
+            committer
+                .apply(
+                    2,
+                    std::iter::once((&collateral_key(1), &ahead)),
+                    &mut batches,
+                    &mut in_chunk_prior,
+                )
+                .unwrap();
+            collateral.store.kv_db.commit(2, None, batches).unwrap();
+            assert_eq!(
+                get_native_commit_progress(&collateral.store.kv_db).unwrap(),
+                Some(2)
+            );
+        }
+        let db = open(&dir, true);
+        let collateral = db.collateral.as_ref().unwrap();
+        assert_eq!(
+            get_native_commit_progress(&collateral.store.kv_db).unwrap(),
+            Some(1)
+        );
+        let (version, value) = collateral
+            .store
+            .kv_db
+            .get_value(collateral_key(1).hash(), 2)
+            .unwrap()
+            .expect("v0 row survives");
+        assert_eq!(version, 0, "the row ahead of the ledger is gone");
+        assert_eq!(value.bytes().as_ref(), collateral_value(b'a'));
+        assert_eq!(
+            collateral_rows(&db),
+            BTreeMap::from([
+                (collateral_key(1), collateral_value(b'a')),
+                (collateral_key(2), collateral_value(b'b')),
+            ])
+        );
+    }
+
+    /// Commits wake the collateral value pruner, so superseded collateral
+    /// rows are pruned while the node stays up, not only after a restart.
+    #[test]
+    fn commits_drive_the_collateral_value_pruner() {
+        use crate::pruner::PrunerManager;
+        use aptos_config::config::{LedgerPrunerConfig, PrunerConfig};
+        use aptos_crypto::hash::CryptoHash;
+
+        let dir = TempPath::new();
+        let db = AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            false,
+            PrunerConfig {
+                ledger_pruner_config: LedgerPrunerConfig {
+                    enable: true,
+                    prune_window: 0,
+                    batch_size: 1,
+                    user_pruning_window_offset: 0,
+                },
+                ..NO_OP_STORAGE_PRUNER_CONFIG
+            },
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig::default(),
+        )
+        .expect("open");
+        commit_collateral(&db, 0, &[], &[(
+            collateral_key(1),
+            Some(&collateral_value(b'a')),
+        )]);
+        commit_collateral(&db, 1, &[], &[(
+            collateral_key(1),
+            Some(&collateral_value(b'b')),
+        )]);
+        commit_collateral(&db, 2, &[], &[(
+            collateral_key(2),
+            Some(&collateral_value(b'c')),
+        )]);
+
+        let collateral = db.collateral.as_ref().unwrap();
+        let value_pruner = &collateral.store.pruner.as_ref().unwrap().value_pruner;
+        value_pruner.wait_for_pruner().unwrap();
+        assert_eq!(value_pruner.get_min_readable_version(), 2);
+        assert!(
+            collateral
+                .store
+                .kv_db
+                .get_value(collateral_key(1).hash(), 0)
+                .unwrap()
+                .is_none(),
+            "the superseded v0 row is pruned"
+        );
+        let (version, _) = collateral
+            .store
+            .kv_db
+            .get_value(collateral_key(1).hash(), 2)
+            .unwrap()
+            .expect("live row kept");
+        assert_eq!(version, 1);
+    }
+
+    /// The collateral tree follows the chain through blocks with no
+    /// collateral writes, so it persists snapshots and a reopen replays only
+    /// past the latest.
+    #[test]
+    fn collateral_snapshots_track_the_chain_without_collateral_writes() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+            commit(&db, 1, &[]);
+            commit(&db, 2, &[]);
+        }
+        let db = open(&dir, true);
+        let collateral = db.collateral.as_ref().expect("collateral store attached");
+        assert_eq!(
+            collateral
+                .store
+                .merkle_db
+                .latest_snapshot_version_at_or_before(Version::MAX)
+                .unwrap(),
+            Some(2),
+        );
+    }
+
+    /// The collateral index follows commits through the published tip, folds
+    /// into its base, and cold-loads the same collateral from the collateral
+    /// JMT on reopen.
+    #[test]
+    fn collateral_index_follows_commits_and_cold_loads() {
+        use aptos_storage_interface::{state_store::collateral::CollateralKey, DbWriter};
+        use aptos_types::state_store::{
+            native_collateral::NativeCollateral, state_key::inner::CollateralScope,
+        };
+
+        fn key(account: u8) -> CollateralKey {
+            CollateralKey {
+                exchange: exchange(1),
+                account: super::account(account),
+                scope: CollateralScope::Cross,
+            }
+        }
+        fn read(db: &AptosDB, account: u8) -> Option<NativeCollateral> {
+            let bundle = db.collateral().expect("collateral store attached");
+            let tip = bundle.collateral.lock().clone();
+            bundle
+                .collateral_base
+                .with_view(&tip, |view| view.get(&key(account)))
+        }
+        fn decoded(tag: u8) -> NativeCollateral {
+            NativeCollateral::deserialize(&collateral_value(tag)).unwrap()
+        }
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[], &[
+                (collateral_key(1), Some(&collateral_value(b'a'))),
+                (collateral_key(2), Some(&collateral_value(b'b'))),
+            ]);
+            commit_collateral(&db, 1, &[], &[
+                (collateral_key(1), None),
+                (collateral_key(3), Some(&collateral_value(b'c'))),
+            ]);
+            assert_eq!(read(&db, 1), None);
+            assert_eq!(read(&db, 2), Some(decoded(b'b')));
+            assert_eq!(read(&db, 3), Some(decoded(b'c')));
+
+            let bundle = db.collateral().unwrap();
+            let tip = bundle.collateral.lock().clone();
+            db.advance_collateral_base(Some(&tip)).unwrap();
+            assert_eq!(bundle.collateral_base.version(), Some(1));
+            bundle
+                .collateral_base
+                .read(|view| assert_eq!(view.num_entries(), 2));
+        }
+        let db = open(&dir, true);
+        let bundle = db.collateral().unwrap();
+        bundle.collateral_base.read(|view| {
+            assert_eq!(view.version(), Some(1), "cold-loaded at the snapshot");
+            assert_eq!(view.num_entries(), 2);
+        });
+        assert_eq!(read(&db, 2), Some(decoded(b'b')));
+        assert_eq!(read(&db, 3), Some(decoded(b'c')));
+    }
+
+    /// The order index follows commits through the published tip, folds into
+    /// its base, and cold-loads the same orders from the order JMT on reopen.
+    #[test]
+    fn order_index_follows_commits_and_cold_loads() {
+        use aptos_storage_interface::{
+            state_store::orders::{NativeOrder, OrderKey},
+            DbWriter,
+        };
+        use aptos_types::state_store::native_order::{
+            NativeSingleOrder, SingleOrderV1, TimeInForce,
+        };
+
+        fn order(order_id: u128, price: u64) -> NativeSingleOrder {
+            NativeSingleOrder::V1(SingleOrderV1 {
+                account: super::account(2),
+                order_id,
+                client_order_id: None,
+                price,
+                orig_size: 10,
+                remaining_size: 10,
+                is_bid: true,
+                trigger_condition: None,
+                time_in_force: TimeInForce::Gtc,
+                creation_time_micros: 0,
+                unique_priority_idx: order_id,
+                metadata: vec![].into(),
+            })
+        }
+        fn bytes(order_id: u128, price: u64) -> Vec<u8> {
+            order(order_id, price).serialize().unwrap()
+        }
+        fn key(order_id: u128) -> OrderKey {
+            OrderKey::Single {
+                exchange: exchange(1),
+                market: super::market(7),
+                order_id,
+            }
+        }
+        fn read(db: &AptosDB, order_id: u128) -> Option<NativeOrder> {
+            let bundle = db.order().expect("order store attached");
+            let tip = bundle.orders.lock().clone();
+            bundle
+                .order_base
+                .with_view(&tip, |view| view.get(&key(order_id)))
+        }
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[], &[
+                (order_key(1), Some(&bytes(1, 100))),
+                (order_key(2), Some(&bytes(2, 101))),
+            ]);
+            commit_orders(&db, 1, &[], &[
+                (order_key(1), None),
+                (order_key(3), Some(&bytes(3, 102))),
+            ]);
+            assert_eq!(read(&db, 1), None);
+            assert_eq!(read(&db, 2), Some(NativeOrder::Single(order(2, 101))));
+            assert_eq!(read(&db, 3), Some(NativeOrder::Single(order(3, 102))));
+
+            let bundle = db.order().unwrap();
+            let tip = bundle.orders.lock().clone();
+            db.advance_order_base(Some(&tip)).unwrap();
+            assert_eq!(bundle.order_base.version(), Some(1));
+            bundle
+                .order_base
+                .read(|view| assert_eq!(view.num_orders(), 2));
+        }
+        let db = open(&dir, true);
+        let bundle = db.order().unwrap();
+        bundle.order_base.read(|view| {
+            assert_eq!(view.version(), Some(1), "cold-loaded at the snapshot");
+            assert_eq!(view.num_orders(), 2);
+        });
+        assert_eq!(read(&db, 2), Some(NativeOrder::Single(order(2, 101))));
+        assert_eq!(read(&db, 3), Some(NativeOrder::Single(order(3, 102))));
+    }
+
+    /// A node whose order store disagrees with the order root the ledger
+    /// commits refuses to open: here storage is enabled on a node that
+    /// committed orders it never stored.
+    #[test]
+    fn reopening_refuses_an_order_store_that_disagrees_with_the_committed_root() {
+        let root = {
+            let reference_dir = TempPath::new();
+            let db = open(&reference_dir, true);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+            order_root(&db)
+        };
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_orders_with_root(
+                &db,
+                0,
+                &[],
+                &[(order_key(1), Some(&order_value(b'a')))],
+                Some(root),
+            );
+        }
+        let err = match AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            false,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig::default(),
+        ) {
+            Ok(_) => panic!("open must fail"),
+            Err(err) => err,
+        };
+        assert!(
+            err.to_string().contains("disagrees with the order root"),
+            "{err}"
+        );
+    }
+
+    /// A node with storage on throughout reopens cleanly against a ledger
+    /// that commits order roots.
+    #[test]
+    fn reopening_with_matching_order_roots_succeeds() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+            let root = order_root(&db);
+            commit_orders_with_root(&db, 1, &[], &[], Some(root));
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            order_rows(&db),
+            BTreeMap::from([(order_key(1), order_value(b'a'))])
+        );
+    }
+
+    /// Enabling on a ledger whose committed order root is the empty tree
+    /// (roots on, no orders yet) is the normal rollout path and opens.
+    #[test]
+    fn enabling_on_a_ledger_with_an_empty_order_root_opens() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_orders_with_root(&db, 0, &[], &[], Some(*SPARSE_MERKLE_PLACEHOLDER_HASH));
+        }
+        let db = open(&dir, true);
+        commit_orders(&db, 1, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+        assert_eq!(order_rows(&db).len(), 1);
+    }
+
+    /// Generated blocks commit order roots that the storage pipeline
+    /// reproduces, and reopen passes the open-time root check.
+    #[test]
+    fn generated_order_blocks_match_committed_roots() {
+        use crate::db::test_helper::arb_blocks_to_commit_with_orders;
+        use aptos_proptest_helpers::ValueGenerator;
+
+        let dir = TempPath::new();
+        let blocks = ValueGenerator::new().generate(arb_blocks_to_commit_with_orders());
+        let mut last_root = None;
+        {
+            let db = open(&dir, true);
+            let mut version = 0;
+            for (txns, li) in &blocks {
+                db.save_transactions_for_test(txns, version, Some(li), true)
+                    .expect("commit");
+                version += txns.len() as Version;
+                last_root = txns
+                    .last()
+                    .unwrap()
+                    .transaction_info()
+                    .order_state_checkpoint_hash();
+            }
+            assert_eq!(Some(order_root(&db)), last_root);
+        }
+        let db = open(&dir, true);
+        assert_eq!(Some(order_root(&db)), last_root);
+    }
+
+    /// A restore-mode open leaves the order store where it was persisted;
+    /// the reset a replay runs first brings it to the ledger tip.
+    #[test]
+    fn restore_reset_catches_orders_up_to_the_ledger() {
+        use crate::get_restore_handler::GetRestoreHandler;
+        use aptos_storage_interface::state_store::orders::{NativeOrder, OrderKey};
+        use aptos_types::state_store::native_order::NativeSingleOrder;
+        use std::sync::Arc;
+
+        fn read(db: &AptosDB, order_id: u128) -> Option<NativeOrder> {
+            let bundle = db.order().expect("order store attached");
+            let tip = bundle.orders.lock().clone();
+            let key = OrderKey::Single {
+                exchange: exchange(1),
+                market: super::market(7),
+                order_id,
+            };
+            bundle.order_base.with_view(&tip, |view| view.get(&key))
+        }
+        fn decoded(tag: u8) -> Option<NativeOrder> {
+            Some(NativeOrder::Single(
+                NativeSingleOrder::deserialize(&order_value(tag)).unwrap(),
+            ))
+        }
+
+        let dir = TempPath::new();
+        let root = {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+            commit_orders(&db, 1, &[], &[(order_key(2), Some(&order_value(b'b')))]);
+            commit_orders(&db, 2, &[], &[(order_key(1), Some(&order_value(b'c')))]);
+            order_root(&db)
+        };
+        // Lose the in-memory tip: only the oldest snapshot is on disk. The
+        // ledger past it stands in for what a previous restore run replayed.
+        {
+            let db = open(&dir, true);
+            let bundle = db.order().unwrap();
+            crate::utils::truncation_helper::truncate_native_merkle_db(&bundle.store.merkle_db, 0)
+                .unwrap();
+        }
+        let db = Arc::new(
+            AptosDB::open_kv_only(
+                StorageDirPaths::from_path(dir.path()),
+                false,
+                NO_OP_STORAGE_PRUNER_CONFIG,
+                RocksdbConfigs {
+                    enable_trading_native: true,
+                    ..Default::default()
+                },
+                BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                None,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            read(&db, 1),
+            decoded(b'a'),
+            "restore-mode open does not catch up"
+        );
+        assert_eq!(read(&db, 2), None);
+        db.get_restore_handler().reset_state_store().unwrap();
+        assert_eq!(order_root(&db), root);
+        assert_eq!(read(&db, 1), decoded(b'c'));
+        assert_eq!(read(&db, 2), decoded(b'b'));
+    }
+
+    /// Fast sync to a target whose order root is the empty-tree placeholder,
+    /// then commit orders on top.
+    #[test]
+    fn fast_sync_to_an_empty_order_tree_then_commit() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_orders(&db, 0, &[], &[]);
+            commit_orders(&db, 1, &[], &[]);
+        }
+        let db = open(&dir, true);
+        db.reset_order_after_fast_sync(1, *SPARSE_MERKLE_PLACEHOLDER_HASH)
+            .expect("reset");
+        commit_orders(&db, 2, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+        assert_eq!(order_rows(&db).len(), 1);
+        drop(db);
+        let db = open(&dir, true);
+        assert_eq!(order_rows(&db).len(), 1, "cold load");
+    }
+
+    /// Fast sync streams the order snapshot a target commits a root for,
+    /// finalizes onto it, and reopens past the open-time root check.
+    #[test]
+    fn fast_sync_restores_orders_then_commits() {
+        use aptos_storage_interface::{
+            state_store::orders::{NativeOrder, OrderKey},
+            DbWriter, StateKind,
+        };
+        use aptos_types::{
+            aggregate_signature::AggregateSignature,
+            block_info::BlockInfo,
+            ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+            state_store::{native_order::NativeSingleOrder, state_value::StateValue},
+        };
+
+        /// A block with one main-state write, so main state has a snapshot
+        /// to restore, and `roots` (position, order) committed.
+        fn block(
+            seq: u8,
+            orders: &[(StateKey, Option<&[u8]>)],
+            roots: Option<(HashValue, HashValue)>,
+        ) -> TransactionToCommit {
+            let txn_info = TransactionInfo::builder_v1()
+                .transaction_hash(HashValue::random())
+                .state_change_hash(HashValue::random())
+                .event_root_hash(HashValue::random())
+                .state_checkpoint_hash(HashValue::random())
+                .gas_used(0)
+                .status(ExecutionStatus::Success)
+                .maybe_position_state_checkpoint_hash(roots.map(|(position, _)| position))
+                .maybe_order_state_checkpoint_hash(roots.map(|(_, order)| order))
+                .build();
+            let mut write_set = WriteSet::new_for_test(vec![(
+                StateKey::raw(&[seq]),
+                Some(StateValue::new_legacy(vec![seq].into())),
+            )])
+            .into_v1();
+            write_set.add_native_orders(
+                orders
+                    .iter()
+                    .map(|(key, value)| {
+                        let op = match value {
+                            Some(bytes) => WriteOp::legacy_modification(bytes.to_vec().into()),
+                            None => WriteOp::legacy_deletion(),
+                        };
+                        (key.clone(), NativeOrderOp::from_write_op(op))
+                    })
+                    .collect(),
+            );
+            TransactionToCommit::new(
+                Transaction::block_epilogue_v0(HashValue::zero(), BlockEndInfo::new_empty()),
+                txn_info,
+                write_set,
+                vec![],
+                false,
+                TransactionAuxiliaryData::default(),
+            )
+        }
+        fn restore(
+            src: &AptosDB,
+            dst: &AptosDB,
+            version: Version,
+            kind: StateKind,
+            root: HashValue,
+        ) {
+            let num_items = src.get_state_item_count(version, kind).unwrap();
+            let mut receiver = dst
+                .get_state_snapshot_receiver(version, root, kind)
+                .unwrap();
+            let mut first_index = 0;
+            while first_index < num_items {
+                let chunk = src
+                    .get_state_value_chunk_with_proof(version, first_index, 1, kind)
+                    .unwrap();
+                first_index += chunk.raw_values.len();
+                receiver.add_chunk(chunk.raw_values, chunk.proof).unwrap();
+            }
+            receiver.finish_box().unwrap();
+        }
+        fn read(db: &AptosDB, order_id: u128) -> Option<NativeOrder> {
+            let bundle = db.order().expect("order store attached");
+            let tip = bundle.orders.lock().clone();
+            let key = OrderKey::Single {
+                exchange: exchange(1),
+                market: super::market(7),
+                order_id,
+            };
+            bundle.order_base.with_view(&tip, |view| view.get(&key))
+        }
+        fn decoded(tag: u8) -> Option<NativeOrder> {
+            Some(NativeOrder::Single(
+                NativeSingleOrder::deserialize(&order_value(tag)).unwrap(),
+            ))
+        }
+
+        let (a, b, c) = (order_value(b'a'), order_value(b'b'), order_value(b'c'));
+        let writes: Vec<Vec<(StateKey, Option<&[u8]>)>> = vec![
+            vec![(order_key(1), Some(&a)), (order_key(2), Some(&b))],
+            vec![(order_key(1), None), (order_key(3), Some(&c))],
+        ];
+        let target = writes.len() as Version - 1;
+        // A reference node supplies the roots the target commits.
+        let roots = {
+            let dir = TempPath::new();
+            let db = open(&dir, true);
+            for (version, w) in writes.iter().enumerate() {
+                commit_orders(&db, version as Version, &[], w);
+            }
+            (position_root(&db), order_root(&db))
+        };
+        let src_dir = TempPath::new();
+        let src = open(&src_dir, true);
+        for (version, w) in writes.iter().enumerate() {
+            let version = version as Version;
+            src.save_transactions_for_test(
+                &[block(
+                    version as u8,
+                    w,
+                    (version == target).then_some(roots),
+                )],
+                version,
+                None,
+                true,
+            )
+            .unwrap();
+        }
+        assert_eq!(order_root(&src), roots.1);
+
+        let dst_dir = TempPath::new();
+        {
+            let dst = open(&dst_dir, true);
+            let main_root = src.state_store.get_root_hash(target).unwrap();
+            restore(&src, &dst, target, StateKind::MainState, main_root);
+            restore(&src, &dst, target, StateKind::Order, roots.1);
+            let ledger_info = LedgerInfoWithSignatures::new(
+                LedgerInfo::new(
+                    BlockInfo::new(
+                        0,
+                        0,
+                        HashValue::zero(),
+                        src.get_accumulator_root_hash(target).unwrap(),
+                        target,
+                        0,
+                        None,
+                    ),
+                    HashValue::zero(),
+                ),
+                AggregateSignature::empty(),
+            );
+            dst.finalize_state_snapshot(
+                target,
+                src.get_transaction_outputs(target, 1, target).unwrap(),
+                &[ledger_info],
+            )
+            .unwrap();
+
+            assert_eq!(order_root(&dst), roots.1);
+            assert_eq!(order_rows(&dst), order_rows(&src));
+            assert_eq!(read(&dst, 1), None);
+            assert_eq!(read(&dst, 2), decoded(b'b'));
+            assert_eq!(read(&dst, 3), decoded(b'c'));
+        }
+
+        let dst = open(&dst_dir, true);
+        assert_eq!(order_root(&dst), roots.1, "cold load");
+        assert_eq!(read(&dst, 3), decoded(b'c'));
+        commit_orders(&dst, target + 1, &[], &[(
+            order_key(2),
+            Some(&order_value(b'd')),
+        )]);
+        assert_eq!(read(&dst, 2), decoded(b'd'));
+        assert_eq!(read(&dst, 3), decoded(b'c'));
     }
 }

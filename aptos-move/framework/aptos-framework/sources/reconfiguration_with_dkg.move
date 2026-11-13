@@ -12,6 +12,7 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::event;
     use aptos_framework::execution_config;
     use aptos_framework::gas_schedule;
+    use aptos_framework::hot_state_config;
     use aptos_framework::jwk_consensus_config;
     use aptos_framework::jwks;
     use aptos_framework::keyless_account;
@@ -100,6 +101,7 @@ module aptos_framework::reconfiguration_with_dkg {
         consensus_config::on_new_epoch(framework);
         execution_config::on_new_epoch(framework);
         gas_schedule::on_new_epoch(framework);
+        hot_state_config::on_new_epoch(framework);
         std::version::on_new_epoch(framework);
         features::on_new_epoch(framework);
         jwk_consensus_config::on_new_epoch(framework);

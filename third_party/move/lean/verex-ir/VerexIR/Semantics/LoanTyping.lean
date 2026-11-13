@@ -53,7 +53,7 @@ theorem HasType.transport {unit : ValidatedUnit} {loans : LoanTypes} {value : Ru
 /-- A hole has the types of its loan's referent. -/
 theorem HasType.hole_referent {unit : ValidatedUnit} {loans : LoanTypes} {loan : Nat} :
     ∀ {type : SemTy}, HasType unit loans (.loanHole loan) type →
-      ∃ referent, loans loan = some referent ∧ referent.unshared = type.unshared
+      ∃ referent, loans loan = some referent ∧ StorageView referent.unshared type.unshared
   | _, .hole _ referent _ loan_eq same _ => ⟨referent, loan_eq, same⟩
   | _, .shared _ _ typed => by
       obtain ⟨referent, loan_eq, same⟩ := HasType.hole_referent typed
@@ -64,7 +64,7 @@ theorem HasType.borrow_current {unit : ValidatedUnit} {loans : LoanTypes} {loan 
     {current : RuntimeValue} :
     ∀ {type : SemTy}, HasType unit loans (.borrow loan current) type →
       ∃ referent, loans loan = some referent ∧ HasType unit loans current referent
-  | _, .borrow _ _ referent loan_eq current_typed => ⟨referent, loan_eq, current_typed⟩
+  | _, .borrow _ _ _ loan_eq current_typed _ => ⟨_, loan_eq, current_typed⟩
   | _, .shared _ _ typed => HasType.borrow_current typed
 
 /-! ## Subsumption -/
@@ -86,18 +86,19 @@ theorem Subsumes.fill {unit : ValidatedUnit} {loans : LoanTypes} {loan : Nat}
   obtain ⟨referent', loan_eq', same⟩ := hole.hole_referent
   rw [loan_eq, Option.some.injEq] at loan_eq'
   subst loan_eq'
-  exact typed.transport same
+  exact (typed.toUnshared.storageView same).ofUnshared
 
-/-- A retired borrow: the unit a settled borrow leaves is a dead reference. -/
+/-- A retired borrow is a dead reference. -/
 theorem Subsumes.clear {unit : ValidatedUnit} {loans : LoanTypes} {loan : Nat}
-    {current : RuntimeValue} : Subsumes unit loans .unit (.borrow loan current) := by
+    {current : RuntimeValue} : Subsumes unit loans .retired (.borrow loan current) := by
   intro type typed
   exact go typed
 where
   go : ∀ {type : SemTy}, HasType unit loans (.borrow loan current) type →
-      HasType unit loans .unit type
-    | _, .borrow _ _ referent _ _ => .dead referent
+      HasType unit loans .retired type
+    | _, .borrow _ _ referent _ _ _ => .dead referent
     | _, .shared _ _ typed => .shared _ _ (go typed)
+    | _, .observed _ _ settled _ => by simp [RuntimeValue.live] at settled
 
 /-- A borrow whose current is replaced by a value of its loan's referent. -/
 theorem Subsumes.rewrite {unit : ValidatedUnit} {loans : LoanTypes} {loan : Nat}
@@ -110,11 +111,12 @@ theorem Subsumes.rewrite {unit : ValidatedUnit} {loans : LoanTypes} {loan : Nat}
 where
   go : ∀ {type : SemTy}, HasType unit loans (.borrow loan current) type →
       HasType unit loans (.borrow loan replacement) type
-    | _, .borrow _ _ referent' loan_eq' _ => by
+    | _, .borrow _ _ referent' loan_eq' _ view => by
         rw [loan_eq, Option.some.injEq] at loan_eq'
         subst loan_eq'
-        exact .borrow _ _ _ loan_eq typed
+        exact .borrow _ _ _ loan_eq typed view
     | _, .shared _ _ typed => .shared _ _ (go typed)
+    | _, .observed _ _ settled _ => by simp [RuntimeValue.live] at settled
 
 theorem rewriteFirstList_length {f : RuntimeValue → Option RuntimeValue} :
     ∀ {values rewritten : List RuntimeValue}, rewriteFirstList f values = some rewritten →
@@ -172,6 +174,21 @@ private theorem rewriteFirst_via {value replacement : RuntimeValue} {type : SemT
       rw [matched, Option.none_or] at rewrite
       exact inside rewrite
 
+omit node in
+/-- Rewriting inside a value keeps its form. -/
+theorem rewriteChildren_live {f : RuntimeValue → Option RuntimeValue} :
+    {value replacement : RuntimeValue} → rewriteChildren f value = some replacement →
+      replacement.live = value.live
+  | .vector _, _, rewrite | .tuple _, _, rewrite | .nominal .., _, rewrite | .closure .., _, rewrite
+  | .borrow .., _, rewrite => by
+      simp only [rewriteChildren, Option.map_eq_some_iff] at rewrite
+      obtain ⟨_, _, rfl⟩ := rewrite
+      rfl
+  | .ghost _, _, rewrite | .loanHole _, _, rewrite | .unit, _, rewrite | .bool _, _, rewrite
+  | .character _, _, rewrite | .integer _, _, rewrite | .address _, _, rewrite
+  | .signer _, _, rewrite | .string _, _, rewrite | .bytes _, _, rewrite => by
+      simp [rewriteChildren] at rewrite
+
 include node in
 mutual
 /-- Rewriting inside the children of a value with a node-subsuming `f`
@@ -183,6 +200,10 @@ theorem rewriteChildren_typed :
       simp only [rewriteChildren, Option.map_eq_some_iff] at inside
       obtain ⟨rewritten, rewritten_eq, rfl⟩ := inside
       exact .tuple _ _ (by simpa using rewriteFirstList_types elements rewritten_eq)
+  | _, _, _, .slice _ _ elements, inside => by
+      simp only [rewriteChildren, Option.map_eq_some_iff] at inside
+      obtain ⟨rewritten, rewritten_eq, rfl⟩ := inside
+      exact .slice _ _ (by simpa using rewriteFirstList_each elements rewritten_eq)
   | _, _, _, .vector _ _ _ length_matches elements, inside => by
       simp only [rewriteChildren, Option.map_eq_some_iff] at inside
       obtain ⟨rewritten, rewritten_eq, rfl⟩ := inside
@@ -195,19 +216,21 @@ theorem rewriteChildren_typed :
       exact .nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq handle_eq
         resolved ghostsResolved (by simpa using rewriteFirstList_types fields_typed rewritten_eq)
   | _, _, _, .closure _ _ _ _ _ _ targetNs declaration arguments allParameters results
-      namespace_eq declaration_eq signature_eq faithful mask_bound captures_typed
+      namespace_eq declaration_eq signature_eq faithful sized_arguments mask_bound captures_typed
       parameters_eq packs, inside => by
       simp only [rewriteChildren, Option.map_eq_some_iff] at inside
       obtain ⟨rewritten, rewritten_eq, rfl⟩ := inside
       exact .closure _ _ _ _ _ _ targetNs declaration arguments allParameters results
-        namespace_eq declaration_eq signature_eq faithful mask_bound
+        namespace_eq declaration_eq signature_eq faithful sized_arguments mask_bound
         (by simpa using rewriteFirstList_types captures_typed rewritten_eq) parameters_eq packs
-  | _, _, _, .borrow _ _ _ loan_eq current_typed, inside => by
+  | _, _, _, .borrow _ _ _ loan_eq current_typed view, inside => by
       simp only [rewriteChildren, Option.map_eq_some_iff] at inside
       obtain ⟨rewritten, rewritten_eq, rfl⟩ := inside
       exact .borrow _ _ _ loan_eq (rewriteFirst_via node current_typed rewritten_eq
-        (rewriteChildren_typed current_typed))
+        (rewriteChildren_typed current_typed)) view
   | _, _, _, .shared _ _ inner, inside => .shared _ _ (rewriteChildren_typed inner inside)
+  | _, _, _, .observed _ _ settled inner, inside =>
+      .observed _ _ (rewriteChildren_live inside ▸ settled) (rewriteChildren_typed inner inside)
   | _, _, _, .unit, inside | _, _, _, .bool _, inside | _, _, _, .character _ _, inside
   | _, _, _, .string _, inside | _, _, _, .bytes _, inside | _, _, _, .integer _ _ _ _, inside
   | _, _, _, .address _, inside | _, _, _, .signer _, inside | _, _, _, .dead _, inside
@@ -335,13 +358,15 @@ theorem findChildren_typed :
       findChildren f value = some found → P found
   | _, _, _, .tuple _ _ elements, query => findFirstList_types elements query
   | _, _, _, .vector _ _ _ _ elements, query => findFirstList_each elements query
+  | _, _, _, .slice _ _ elements, query => findFirstList_each elements query
   | _, _, _, .nominal _ _ _ _ _ _ _ _ _ _ _ _ _ fields_typed, query =>
       findFirstList_types fields_typed query
-  | _, _, _, .closure _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ captures_typed _ _, query =>
+  | _, _, _, .closure _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ captures_typed _ _, query =>
       findFirstList_types captures_typed query
-  | _, _, _, .borrow _ _ _ _ current_typed, query =>
+  | _, _, _, .borrow _ _ _ _ current_typed _, query =>
       findFirst_via node current_typed query (findChildren_typed current_typed)
   | _, _, _, .shared _ _ inner, query => findChildren_typed inner query
+  | _, _, _, .observed _ _ _ inner, query => findChildren_typed inner query
   | _, _, _, .unit, query | _, _, _, .bool _, query | _, _, _, .character _ _, query
   | _, _, _, .string _, query | _, _, _, .bytes _, query | _, _, _, .integer _ _ _ _, query
   | _, _, _, .address _, query | _, _, _, .signer _, query | _, _, _, .dead _, query
@@ -390,13 +415,15 @@ theorem collectChildren_typed :
       found ∈ collectChildren f value → P found
   | _, _, _, .tuple _ _ elements, member => collectPrunedList_types elements member
   | _, _, _, .vector _ _ _ _ elements, member => collectPrunedList_each elements member
+  | _, _, _, .slice _ _ elements, member => collectPrunedList_each elements member
   | _, _, _, .nominal _ _ _ _ _ _ _ _ _ _ _ _ _ fields_typed, member =>
       collectPrunedList_types fields_typed member
-  | _, _, _, .closure _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ captures_typed _ _, member =>
+  | _, _, _, .closure _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ captures_typed _ _, member =>
       collectPrunedList_types captures_typed member
-  | _, _, _, .borrow _ _ _ _ current_typed, member =>
+  | _, _, _, .borrow _ _ _ _ current_typed _, member =>
       collectPruned_via node current_typed member (collectChildren_typed current_typed)
   | _, _, _, .shared _ _ inner, member => collectChildren_typed inner member
+  | _, _, _, .observed _ _ _ inner, member => collectChildren_typed inner member
   | _, _, _, .unit, member | _, _, _, .bool _, member | _, _, _, .character _ _, member
   | _, _, _, .string _, member | _, _, _, .bytes _, member | _, _, _, .integer _ _ _ _, member
   | _, _, _, .address _, member | _, _, _, .signer _, member | _, _, _, .dead _, member
@@ -641,6 +668,7 @@ where
           (by simpa [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] using
             typed.set_subsumes (by simpa using part_eq) subsumes)
     | _, .shared _ _ inner => .shared _ _ (go inner)
+    | _, .observed _ _ _ inner => .observed _ _ rfl (go inner)
 
 private theorem vectorIndex_subsumes {unit : ValidatedUnit} {loans : LoanTypes}
     {elements : Array RuntimeValue} {index : Nat} {part part' : RuntimeValue}
@@ -650,11 +678,15 @@ private theorem vectorIndex_subsumes {unit : ValidatedUnit} {loans : LoanTypes}
 where
   go : ∀ {type : SemTy}, HasType unit loans (.vector elements) type →
       HasType unit loans (.vector (elements.set! index part')) type
+    | _, .slice _ _ typed =>
+        .slice _ _ (by simpa [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] using
+          typed.set_subsumes (by simpa using part_eq) subsumes)
     | _, .vector _ _ _ length_matches typed =>
         .vector _ _ _ (by simpa using length_matches)
           (by simpa [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] using
             typed.set_subsumes (by simpa using part_eq) subsumes)
     | _, .shared _ _ inner => .shared _ _ (go inner)
+    | _, .observed _ _ _ inner => .observed _ _ rfl (go inner)
 
 private theorem tupleIndex_subsumes {unit : ValidatedUnit} {loans : LoanTypes}
     {elements : Array RuntimeValue} {index : Nat} {part part' : RuntimeValue}
@@ -669,6 +701,7 @@ where
         .tuple _ _ (by simpa [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] using
           typed.set_subsumes (by simpa using part_eq) subsumes)
     | _, _, same, .shared _ _ inner => .shared _ _ (go same inner)
+    | _, _, same, .observed _ _ _ inner => .observed _ _ rfl (go same inner)
     | _, _, same, .emptyTupleUnit => by subst same; simp at part_eq
 
 private theorem deref_subsumes {unit : ValidatedUnit} {loans : LoanTypes} {loan : Nat}
@@ -677,8 +710,9 @@ private theorem deref_subsumes {unit : ValidatedUnit} {loans : LoanTypes} {loan 
 where
   go : ∀ {type : SemTy}, HasType unit loans (.borrow loan current) type →
       HasType unit loans (.borrow loan current') type
-    | _, .borrow _ _ referent loan_eq typed => .borrow _ _ _ loan_eq (subsumes referent typed)
+    | _, .borrow _ _ _ loan_eq typed view => .borrow _ _ _ loan_eq (subsumes _ typed) view
     | _, .shared _ _ inner => .shared _ _ (go inner)
+    | _, .observed _ _ settled _ => by simp [RuntimeValue.live] at settled
 
 private theorem subslice_subsumes {unit : ValidatedUnit} {loans : LoanTypes}
     {elements inner : Array RuntimeValue} {first last : Nat}
@@ -692,6 +726,23 @@ where
   go : ∀ {type : SemTy}, HasType unit loans (.vector elements) type →
       HasType unit loans
         (.vector (elements.extract 0 first ++ inner ++ elements.extract last elements.size)) type
+    | _, .slice _ element typed => by
+        have extract_typed : HasType unit loans (.vector (elements.extract first last))
+            (.slice element) :=
+          .slice _ _ (HasTypeEach.of_forall fun value member =>
+            typed.mem value (by
+              obtain ⟨_, _, rfl⟩ := Array.mem_extract_iff_getElem.mp
+                (Array.mem_toList_iff.mp member)
+              simp))
+        have inner_typed := (subsumes _ extract_typed).slice_elements
+        refine .slice _ _ (HasTypeEach.of_forall fun value member => ?_)
+        simp only [Array.toList_append, List.mem_append] at member
+        rcases member with (member | member) | member
+        · obtain ⟨_, _, rfl⟩ := Array.mem_extract_iff_getElem.mp (Array.mem_toList_iff.mp member)
+          exact typed.mem _ (by simp)
+        · exact inner_typed.mem value member
+        · obtain ⟨_, _, rfl⟩ := Array.mem_extract_iff_getElem.mp (Array.mem_toList_iff.mp member)
+          exact typed.mem _ (by simp)
     | _, .vector _ element _ length_matches typed => by
         have extract_typed : HasType unit loans (.vector (elements.extract first last))
             (.vector element none) :=
@@ -716,6 +767,7 @@ where
           · obtain ⟨_, _, rfl⟩ := Array.mem_extract_iff_getElem.mp (Array.mem_toList_iff.mp member)
             exact typed.mem _ (by simp)
     | _, .shared _ _ inner => .shared _ _ (go inner)
+    | _, .observed _ _ _ inner => .observed _ _ rfl (go inner)
 
 /-- Writing a value with every type of the one a path reaches keeps every
 type of the whole. -/
@@ -1187,16 +1239,55 @@ theorem settleLoans_typed {unit : ValidatedUnit} {loans : LoanTypes}
 
 /-- Ending a node's loans after a value, or skipping them, keeps frame and
 state typed. -/
-theorem settleAfter_typed {unit : ValidatedUnit} {loans : LoanTypes}
-    {ns : ValidatedNamespace} {locals : Array LocalDecl} {env : Array SemArg}
-    {frame : RuntimeFrame} {state : RuntimeState} {ended : Array LoanId} {control : Control}
+theorem retirePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
+    {ns ns' : ValidatedNamespace} {locals : Array LocalDecl} {env : Array SemArg}
+    {frame : RuntimeFrame} {state : RuntimeState} {place : LocalId × List LoanProjection}
     (frameTyped : TypedFrame unit loans ns locals env frame)
     (stateTyped : TypedState unit loans inert state) :
-    TypedFrame unit loans ns locals env (settleAfter ended control frame state).1 ∧
-      TypedState unit loans inert (settleAfter ended control frame state).2 := by
+    TypedFrame unit loans ns locals env (retirePlace unit ns' frame state place).1 ∧
+      TypedState unit loans inert (retirePlace unit ns' frame state place).2 := by
+  unfold retirePlace
+  split
+  · split
+    · rename_i current current_eq
+      obtain ⟨referent, loan_eq, current_typed⟩ :=
+        findBorrowValue?_typed frameTyped stateTyped current_eq
+      obtain ⟨cleared, clearedState⟩ := clearBorrowValue_typed (loan := _) frameTyped stateTyped
+      exact applyWriteBack_typed cleared clearedState loan_eq current_typed
+    · exact ⟨frameTyped, stateTyped⟩
+  · exact ⟨frameTyped, stateTyped⟩
+
+theorem settleDeaths_typed {unit : ValidatedUnit} {loans : LoanTypes}
+    {ns : ValidatedNamespace} {locals : Array LocalDecl} {env : Array SemArg}
+    {frame : RuntimeFrame} {state : RuntimeState} {namespaceId : NamespaceId}
+    {ended : Array LoanId} {places : Array (LocalId × List LoanProjection)}
+    (frameTyped : TypedFrame unit loans ns locals env frame)
+    (stateTyped : TypedState unit loans inert state) :
+    TypedFrame unit loans ns locals env (settleDeaths unit namespaceId ended places frame state).1 ∧
+      TypedState unit loans inert (settleDeaths unit namespaceId ended places frame state).2 := by
+  have settled := settleLoans_typed (ended := ended) frameTyped stateTyped
+  unfold settleDeaths
+  dsimp only
+  split
+  · refine Array.foldl_preserves
+      (fun (pair : RuntimeFrame × RuntimeState) =>
+        TypedFrame unit loans ns locals env pair.1 ∧ TypedState unit loans inert pair.2) _ _
+      _ settled fun _ _ _ held => retirePlace_typed held.1 held.2
+  · exact settled
+
+theorem settleAfter_typed {unit : ValidatedUnit} {loans : LoanTypes}
+    {ns : ValidatedNamespace} {locals : Array LocalDecl} {env : Array SemArg}
+    {frame : RuntimeFrame} {state : RuntimeState} {namespaceId : NamespaceId}
+    {ended : Array LoanId} {places : Array (LocalId × List LoanProjection)} {control : Control}
+    (frameTyped : TypedFrame unit loans ns locals env frame)
+    (stateTyped : TypedState unit loans inert state) :
+    TypedFrame unit loans ns locals env
+        (settleAfter unit namespaceId ended places control frame state).1 ∧
+      TypedState unit loans inert
+        (settleAfter unit namespaceId ended places control frame state).2 := by
   unfold settleAfter
   split
-  · exact settleLoans_typed frameTyped stateTyped
+  · exact settleDeaths_typed frameTyped stateTyped
   · exact ⟨frameTyped, stateTyped⟩
 
 /-- Settling the loans whose holes die with a frame keeps it typed. -/
@@ -1261,6 +1352,15 @@ theorem maskReturnedBorrowList_length (masked : Array Nat) :
   | _ :: values => by simp [maskReturnedBorrowList, maskReturnedBorrowList_length masked values]
 
 mutual
+/-- Masking keeps a value neither a borrow nor a hole. -/
+theorem maskReturnedBorrows_live {loans : Array Nat} :
+    {value : RuntimeValue} → value.live = false → (maskReturnedBorrows loans value).live = false
+  | .borrow .., settled | .loanHole _, settled => by simp [RuntimeValue.live] at settled
+  | .vector _, _ | .tuple _, _ | .nominal .., _ | .closure .., _ | .ghost _, _ | .unit, _ | .bool _, _
+  | .character _, _ | .integer _, _ | .address _, _ | .signer _, _ | .string _, _ | .bytes _, _ => by
+      unfold maskReturnedBorrows
+      rfl
+
 /-- Masking returned borrows keeps every type of a value: a masked borrow
 leaves a dead reference. -/
 theorem maskReturnedBorrows_typed {unit : ValidatedUnit} {loans : LoanTypes}
@@ -1270,6 +1370,9 @@ theorem maskReturnedBorrows_typed {unit : ValidatedUnit} {loans : LoanTypes}
   | _, _, .tuple _ _ elements => by
       unfold maskReturnedBorrows
       exact .tuple _ _ (by simpa using maskReturnedBorrowList_types elements)
+  | _, _, .slice _ _ elements => by
+      unfold maskReturnedBorrows
+      exact .slice _ _ (by simpa using maskReturnedBorrowList_each elements)
   | _, _, .vector _ _ _ length_matches elements => by
       unfold maskReturnedBorrows
       refine .vector _ _ _ ?_ (by simpa using maskReturnedBorrowList_each elements)
@@ -1280,26 +1383,34 @@ theorem maskReturnedBorrows_typed {unit : ValidatedUnit} {loans : LoanTypes}
       exact .nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq handle_eq
         resolved ghostsResolved (by simpa using maskReturnedBorrowList_types fields_typed)
   | _, _, .closure _ _ _ _ _ _ targetNs declaration arguments allParameters results
-      namespace_eq declaration_eq signature_eq faithful mask_bound captures_typed
+      namespace_eq declaration_eq signature_eq faithful sized_arguments mask_bound captures_typed
       parameters_eq packs => by
       unfold maskReturnedBorrows
       exact .closure _ _ _ _ _ _ targetNs declaration arguments allParameters results
-        namespace_eq declaration_eq signature_eq faithful mask_bound
+        namespace_eq declaration_eq signature_eq faithful sized_arguments mask_bound
         (by simpa using maskReturnedBorrowList_types captures_typed) parameters_eq packs
   | _, _, .ghost _ _ plain => by
       unfold maskReturnedBorrows
       exact .ghost _ _ (by rw [plain.maskReturnedBorrows_eq_self]; exact plain)
-  | _, _, .borrow _ _ referent loan_eq current_typed => by
+  | _, _, .borrow _ _ referent loan_eq current_typed view => by
       unfold maskReturnedBorrows
       split
       · exact .dead referent
-      · exact .borrow _ _ _ loan_eq current_typed
+      · exact .borrow _ _ _ loan_eq current_typed view
   | _, _, .shared _ _ inner => .shared _ _ (maskReturnedBorrows_typed inner)
+  | _, _, .observed _ _ settled inner =>
+      .observed _ _ (maskReturnedBorrows_live settled) (maskReturnedBorrows_typed inner)
   | _, _, .unit | _, _, .bool _ | _, _, .character _ _ | _, _, .string _ | _, _, .bytes _
-  | _, _, .integer _ _ _ _ | _, _, .address _ | _, _, .signer _ | _, _, .dead _
-  | _, _, .hole _ _ _ _ _ _ | _, _, .unitEmptyTuple => by
+  | _, _, .integer _ _ _ _ | _, _, .address _ | _, _, .signer _
+  | _, _, .hole _ _ _ _ _ _ => by
       unfold maskReturnedBorrows
       constructor <;> assumption
+  | _, _, .dead referent => by
+      unfold maskReturnedBorrows
+      exact .dead referent
+  | _, _, .unitEmptyTuple => by
+      unfold maskReturnedBorrows
+      exact .unitEmptyTuple
   | _, _, .emptyTupleUnit => by
       unfold maskReturnedBorrows
       simpa [maskReturnedBorrowList] using HasType.emptyTupleUnit
@@ -1418,6 +1529,7 @@ theorem mutateBorrow?_typed {unit : ValidatedUnit} {loans : LoanTypes}
     {reference value result : RuntimeValue}
     (frameTyped : TypedFrame unit loans ns locals env frame)
     (stateTyped : TypedState unit loans inert state)
+    (sized : referent.sized = true)
     (reference_typed : HasType unit loans reference (.reference .mutable referent))
     (value_typed : HasType unit loans value referent)
     (packed : StaticTyping.packs [] type = true)
@@ -1432,9 +1544,10 @@ theorem mutateBorrow?_typed {unit : ValidatedUnit} {loans : LoanTypes}
     obtain ⟨referent', loan_eq, -⟩ := reference_typed.borrow_current
     have same : referent' = referent := by
       cases reference_typed with
-      | borrow _ _ _ loan_eq' _ =>
+      | borrow _ _ _ loan_eq' _ view =>
           rw [loan_eq, Option.some.injEq] at loan_eq'
-          exact loan_eq'
+          exact loan_eq'.trans (view.sized sized)
+      | observed _ _ settled _ => simp [RuntimeValue.live] at settled
     subst same
     split at mutate
     · rename_i updated update_eq
@@ -1554,9 +1667,8 @@ theorem borrowRuntimePlace?_shared_typed {unit : ValidatedUnit} {loans : LoanTyp
   split at borrow
   · cases borrow
   obtain ⟨value, read, borrow⟩ := Option.bind_eq_some_iff.mp borrow
-  simp only [Option.some.injEq, Prod.mk.injEq] at borrow
-  obtain ⟨rfl, rfl, rfl⟩ := borrow
-  exact ⟨rfl, rfl, .shared _ _ (placeTyped.read read)⟩
+  obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some borrow
+  exact ⟨rfl, rfl, .shared _ _ ((placeTyped.read read).observe holeless)⟩
 
 /-- A mutable borrow mints a loan at the place's type: its hole stays in
 the place, and the borrow carries the value. -/
@@ -1567,6 +1679,7 @@ theorem borrowRuntimePlace?_mutable_typed {unit : ValidatedUnit} {loans : LoanTy
     {variant : Option String} {result : RuntimeValue}
     (frameTyped : TypedFrame unit loans context.ns context.locals context.env frame)
     (stateTyped : TypedState unit loans inert state)
+    (sized : type.sized = true)
     (placed : ∀ loans', TypedFrame unit loans' context.ns context.locals context.env frame →
       PlaceTyped unit loans' context frame place type variant)
     (borrow : borrowRuntimePlace? unit ns site referenceType .mutable frame state place =
@@ -1582,15 +1695,102 @@ theorem borrowRuntimePlace?_mutable_typed {unit : ValidatedUnit} {loans : LoanTy
   split at borrow
   · cases borrow
   obtain ⟨value, read, borrow⟩ := Option.bind_eq_some_iff.mp borrow
+  split at borrow
+  · cases borrow
   obtain ⟨lexical, -, borrow⟩ := Option.bind_eq_some_iff.mp borrow
   obtain ⟨⟨written, writtenState⟩, write, borrow⟩ := Option.bind_eq_some_iff.mp borrow
   simp only [Option.some.injEq, Prod.mk.injEq] at borrow
   obtain ⟨rfl, rfl, rfl⟩ := borrow
   have hole : HasType unit loans' (.loanHole state.nextLoan) type :=
-    .hole _ type type (LoanTypes.extend_self _ _ _) rfl (placeTyped.read read).inhabited
-  obtain ⟨writtenTyped, rfl⟩ := placeTyped.write (frameTyped.weaken extends_) hole write
+    .hole _ type type (LoanTypes.extend_self _ _ _) (.same _) (placeTyped.read read).inhabited
+  obtain ⟨writtenTyped, rfl⟩ := placeTyped.write (frameTyped.weaken extends_) sized hole write
   refine ⟨writtenTyped.of_locals rfl, ?_, .borrow _ _ _ (LoanTypes.extend_self _ _ _)
-    (placeTyped.read read), ?_⟩
+    (placeTyped.read read) (.same _ sized), ?_⟩
+  · split
+    · exact advanced.of_eq rfl rfl rfl
+    · exact advanced
+  · split <;> rfl
+
+/-- A slice view's fixed-extent loan leaves a hole at the actual lender type. -/
+private theorem sliceLoanHole_storage {unit : ValidatedUnit} {loans : LoanTypes}
+    {loan : Nat} {element storage : SemTy} {values : Array RuntimeValue}
+    (view : PlaceView storage (.slice element))
+    (typed : HasType unit loans (.vector values) storage)
+    (loan_eq : loans loan = some (.vector element (some (.integer values.size)))) :
+    HasType unit loans (.loanHole loan) storage := by
+  cases view with
+  | same =>
+      exact .hole _ _ _ loan_eq (.slice element values.size) (by simp [SemTy.unshared])
+  | slice element length =>
+      cases typed with
+      | vector _ _ _ length_matches _ =>
+          cases length with
+          | none =>
+              exact .hole _ _ _ loan_eq (.vector element values.size) (by simp [SemTy.unshared])
+          | some length =>
+              cases length <;> simp only [VectorLengthMatches] at length_matches
+              case integer length =>
+                subst length
+                exact .hole _ _ _ loan_eq (.same _) (by simp [SemTy.unshared])
+
+/-- A mutable slice borrows fixed storage at its observed extent. Its exposed
+slice type never permits replacing that storage with a differently sized value. -/
+theorem borrowRuntimePlace?_slice_typed {unit : ValidatedUnit} {loans : LoanTypes}
+    {context : StaticTyping.Context} {ns : ValidatedNamespace} {site : ExprId}
+    {referenceType : ReferenceType} {frame frame' : RuntimeFrame}
+    {state state' : RuntimeState} {place : RuntimePlace} {element : SemTy}
+    {variant : Option String} {result : RuntimeValue}
+    (frameTyped : TypedFrame unit loans context.ns context.locals context.env frame)
+    (stateTyped : TypedState unit loans inert state)
+    (sliceShape : ∃ elementId,
+      ns.tables.types[referenceType.referent.index]? = some (.slice elementId))
+    (placed : ∀ loans', TypedFrame unit loans' context.ns context.locals context.env frame →
+      PlaceTyped unit loans' context frame place (.slice element) variant)
+    (borrow : borrowRuntimePlace? unit ns site referenceType .mutable frame state place =
+      some (frame', state', result)) :
+    ∃ extent : Nat, let loans' := loans.extend state.nextLoan (.vector element (some (.integer extent)));
+      TypedFrame unit loans' context.ns context.locals context.env frame' ∧
+        TypedState unit loans' inert state' ∧
+        HasType unit loans' result (.reference .mutable (.slice element)) ∧
+        state'.nextLoan = state.nextLoan + 1 := by
+  simp only [borrowRuntimePlace?, Option.bind_eq_bind, Option.bind_some] at borrow
+  split at borrow
+  · cases borrow
+  rename_i allowed
+  have writable : place.writable = true := by
+    cases eq : place.writable
+    · have selfEq : (ReferenceKind.mutable == ReferenceKind.mutable) = true := rfl
+      simp [eq, selfEq] at allowed
+    · rfl
+  obtain ⟨value, read, borrow⟩ := Option.bind_eq_some_iff.mp borrow
+  split at borrow
+  · cases borrow
+  rename_i allowedValue
+  obtain ⟨elementId, sliceShape⟩ := sliceShape
+  have current := (placed loans frameTyped).read read
+  obtain ⟨values, rfl, elements⟩ : ∃ values, value = .vector values ∧
+      HasTypeEach unit loans values.toList element := by
+    cases current with
+    | slice values _ elements => exact ⟨values, rfl, elements⟩
+    | hole => simp [sliceShape, borrowStorageShape] at allowedValue
+  obtain ⟨lexical, -, borrow⟩ := Option.bind_eq_some_iff.mp borrow
+  obtain ⟨⟨written, writtenState⟩, write, borrow⟩ := Option.bind_eq_some_iff.mp borrow
+  simp only [Option.some.injEq, Prod.mk.injEq] at borrow
+  obtain ⟨rfl, rfl, rfl⟩ := borrow
+  let fixed := SemTy.vector element (some (.integer values.size))
+  let loans' := loans.extend state.nextLoan fixed
+  obtain ⟨extends_, advanced⟩ := stateTyped.mint (referent := fixed)
+  have placeTyped := placed loans' (frameTyped.weaken extends_)
+  have advancedRead : readRuntimePlace? frame { state with nextLoan := state.nextLoan + 1 }
+      place = some (.vector values) := read
+  obtain ⟨storage, view, stored, store⟩ := placeTyped.storage
+    (frameTyped.weaken extends_) writable advancedRead
+  have hole : HasType unit loans' (.loanHole state.nextLoan) storage :=
+    sliceLoanHole_storage view stored (LoanTypes.extend_self _ _ _)
+  obtain ⟨writtenTyped, rfl⟩ := store hole write
+  refine ⟨values.size, writtenTyped.of_locals rfl, ?_,
+    .borrow _ _ _ (LoanTypes.extend_self _ _ _)
+      (.vector _ _ _ rfl (elements.weaken extends_)) (.slice element values.size), ?_⟩
   · split
     · exact advanced.of_eq rfl rfl rfl
     · exact advanced
@@ -1630,9 +1830,9 @@ type. -/
 theorem TypedState.resource {unit : ValidatedUnit} {loans : LoanTypes} {state : RuntimeState}
     {ns : ValidatedNamespace} {resourceType : TypeId} {type : SemTy}
     {key value : RuntimeValue} (typed : TypedState unit loans inert state)
-    (ns_eq : unit.namespaces[ns.identity.index]? = some ns)
+    (ns_eq : unit.namespaces[ns.unitIdentity.index]? = some ns)
     (resolves : Resolves ns.tables #[] resourceType type)
-    (lookup_eq : state.globals.lookup (globalKey ns.identity resourceType key) = some value) :
+    (lookup_eq : state.globals.lookup (globalKey ns.unitIdentity resourceType key) = some value) :
     HasType unit loans value type := by
   obtain ⟨ns', type', ns'_eq, resolves', value_typed⟩ := typed.lookup lookup_eq
   simp only [globalKey] at ns'_eq resolves'
@@ -1677,7 +1877,7 @@ theorem evaluateGlobal_contains_typed
   · cases eval
 
 theorem evaluateGlobal_take_typed
-    (ns_eq : unit.namespaces[ns.identity.index]? = some ns)
+    (ns_eq : unit.namespaces[ns.unitIdentity.index]? = some ns)
     (resolves : Resolves ns.tables #[]
       (instantiatedTypeId frame.typeInstantiation resource.typeId) resourceType)
     (frameTyped : TypedFrame unit loans ns locals env frame)
@@ -1702,7 +1902,7 @@ theorem evaluateGlobal_take_typed
   · cases eval
 
 theorem evaluateGlobal_publish_typed
-    (ns_eq : unit.namespaces[ns.identity.index]? = some ns)
+    (ns_eq : unit.namespaces[ns.unitIdentity.index]? = some ns)
     (resolves : Resolves ns.tables #[]
       (instantiatedTypeId frame.typeInstantiation resource.typeId) resourceType)
     (frameTyped : TypedFrame unit loans ns locals env frame)
@@ -1735,19 +1935,20 @@ mutable one mints a loan at its type and leaves the hole in the slot. -/
 theorem borrowRuntimePlace?_global_typed {referenceType : ReferenceType} {kind : BorrowKind}
     {referenceKind : ReferenceKind} {resourceTypeId : TypeId} {key : RuntimeValue}
     {frame' : RuntimeFrame} {state' : RuntimeState} {value : RuntimeValue}
-    (ns_eq : unit.namespaces[ns.identity.index]? = some ns)
+    (ns_eq : unit.namespaces[ns.unitIdentity.index]? = some ns)
     (resolves : Resolves ns.tables #[] resourceTypeId resourceType)
+    (sized : resourceType.sized = true)
     (kind_eq : StaticTyping.borrowedKind kind = some referenceKind)
     (frameTyped : TypedFrame unit loans ns locals env frame)
     (stateTyped : TypedState unit loans inert state)
     (borrow : borrowRuntimePlace? unit ns site referenceType kind frame state
-      { root := .global (globalKey ns.identity resourceTypeId key) } =
+      { root := .global (globalKey ns.unitIdentity resourceTypeId key) } =
         some (frame', state', value)) :
     ∃ loans', loans'.Extends loans ∧ TypedFrame unit loans' ns locals env frame' ∧
       TypedState unit loans' inert state' ∧
       HasType unit loans' value (.reference referenceKind resourceType) := by
   have reads : ∀ value, readRuntimePlace? frame state
-      { root := .global (globalKey ns.identity resourceTypeId key) } = some value →
+      { root := .global (globalKey ns.unitIdentity resourceTypeId key) } = some value →
       HasType unit loans value resourceType := by
     intro value read
     simp only [readRuntimePlace?, readRoot?, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
@@ -1763,9 +1964,8 @@ theorem borrowRuntimePlace?_global_typed {referenceType : ReferenceType} {kind :
       split at borrow
       · cases borrow
       obtain ⟨read, read_eq, borrow⟩ := Option.bind_eq_some_iff.mp borrow
-      simp only [Option.some.injEq, Prod.mk.injEq] at borrow
-      obtain ⟨rfl, rfl, rfl⟩ := borrow
-      exact ⟨loans, .refl _, frameTyped, stateTyped, .shared _ _ (reads _ read_eq)⟩
+      obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some borrow
+      exact ⟨loans, .refl _, frameTyped, stateTyped, .shared _ _ ((reads _ read_eq).observe holeless)⟩
   | mutable =>
       simp only [StaticTyping.borrowedKind, Option.some.injEq] at kind_eq
       subst kind_eq
@@ -1774,6 +1974,8 @@ theorem borrowRuntimePlace?_global_typed {referenceType : ReferenceType} {kind :
       split at borrow
       · cases borrow
       obtain ⟨read, read_eq, borrow⟩ := Option.bind_eq_some_iff.mp borrow
+      split at borrow
+      · cases borrow
       obtain ⟨lexical, -, borrow⟩ := Option.bind_eq_some_iff.mp borrow
       obtain ⟨⟨written, writtenState⟩, write, borrow⟩ := Option.bind_eq_some_iff.mp borrow
       simp only [Option.some.injEq, Prod.mk.injEq] at borrow
@@ -1784,18 +1986,19 @@ theorem borrowRuntimePlace?_global_typed {referenceType : ReferenceType} {kind :
       obtain ⟨_, -, rfl, rfl⟩ := write
       have hole : HasType unit (loans.extend state.nextLoan resourceType)
           (.loanHole state.nextLoan) resourceType :=
-        .hole _ resourceType resourceType (LoanTypes.extend_self _ _ _) rfl
+        .hole _ resourceType resourceType (LoanTypes.extend_self _ _ _) (.same _)
           (reads _ read_eq).inhabited
       refine ⟨_, extends_, (frameTyped.weaken extends_).of_locals rfl, ?_,
-        .borrow _ _ _ (LoanTypes.extend_self _ _ _) ((reads _ read_eq).weaken extends_)⟩
+        .borrow _ _ _ (LoanTypes.extend_self _ _ _) ((reads _ read_eq).weaken extends_) (.same _ sized)⟩
       exact (advanced.insert (by simpa [globalKey] using ns_eq) (by simpa [globalKey] using resolves)
         hole).of_eq rfl rfl rfl
   | profile _ => simp [StaticTyping.borrowedKind] at kind_eq
 
 theorem evaluateGlobal_borrow_typed {kind : BorrowKind} {referenceKind : ReferenceKind}
-    (ns_eq : unit.namespaces[ns.identity.index]? = some ns)
+    (ns_eq : unit.namespaces[ns.unitIdentity.index]? = some ns)
     (resolves : Resolves ns.tables #[]
       (instantiatedTypeId frame.typeInstantiation resource.typeId) resourceType)
+    (sized : resourceType.sized = true)
     (kind_eq : StaticTyping.borrowedKind kind = some referenceKind)
     (frameTyped : TypedFrame unit loans ns locals env frame)
     (stateTyped : TypedState unit loans inert state)
@@ -1818,7 +2021,7 @@ theorem evaluateGlobal_borrow_typed {kind : BorrowKind} {referenceKind : Referen
           obtain ⟨⟨frame', state', value⟩, borrow, eval⟩ := Option.bind_eq_some_iff.mp eval
           simp only [Option.some.injEq] at eval
           subst eval
-          exact borrowRuntimePlace?_global_typed ns_eq resolves kind_eq frameTyped stateTyped
+          exact borrowRuntimePlace?_global_typed ns_eq resolves sized kind_eq frameTyped stateTyped
             borrow
       | _ => cases eval
   · cases eval
@@ -2007,7 +2210,7 @@ theorem bindPatternFuel_typed {unit : ValidatedUnit} {loans : LoanTypes}
               have contentsEmpty : contentsTypes unit expected variant arguments.toList = [] := by
                 have typedLength := HasTypes.length_eq fieldsTyped
                 have ghostLength := ResolvesAll.length_eq ghostsResolved
-                simp only [ghostTypeIds, List.length_map, Array.length_toList] at ghostLength
+                rw [ghostTypeIds_length] at ghostLength
                 simp only [Array.length_toList, List.length_append, List.length_map] at typedLength
                 exact List.eq_nil_of_length_eq_zero (by omega)
               rw [contentsEmpty, List.append_nil] at fieldsTyped

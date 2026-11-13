@@ -1,0 +1,25 @@
+VerexE2ETests/Check/References/SharedViewErrors.lean:11:0: error: execution preparation refuses the unit under every registry, so its theorems would be vacuous:
+VIR-SEMANTIC-TYPE: in fun f: mutable borrow targets an immutable place
+VerexE2ETests/Check/References/SharedViewErrors.lean:23:0: error: execution preparation refuses the unit under every registry, so its theorems would be vacuous:
+VIR-SEMANTIC-TYPE: in fun f: mutable borrow targets an immutable place
+VerexE2ETests/Check/References/SharedViewErrors.lean:35:0: error: execution preparation refuses the unit under every registry, so its theorems would be vacuous:
+VIR-SEMANTIC-TYPE: in fun f: mutable borrow targets an immutable place
+VerexE2ETests/Check/References/SharedViewErrors.lean:47:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active mutable loan at VerexE2ETests/Check/References/SharedViewErrors.lean:54:5
+  active loan originates here: VerexE2ETests/Check/References/SharedViewErrors.lean:53:32
+VerexE2ETests/Check/References/SharedViewErrors.lean:62:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active mutable loan at VerexE2ETests/Check/References/SharedViewErrors.lean:70:14
+  active loan originates here: VerexE2ETests/Check/References/SharedViewErrors.lean:69:14
+VerexE2ETests/Check/References/SharedViewErrors.lean:79:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active mutable loan at VerexE2ETests/Check/References/SharedViewErrors.lean:87:14
+  active loan originates here: VerexE2ETests/Check/References/SharedViewErrors.lean:86:14
+VerexE2ETests/Check/References/SharedViewErrors.lean:94:0: error: `final` reads a place only in a loop invariant
+VerexE2ETests/Check/References/SharedViewErrors.lean:104:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active mutable loan at VerexE2ETests/Check/References/SharedViewErrors.lean:111:5
+  active loan originates here: VerexE2ETests/Check/References/SharedViewErrors.lean:110:32
+VIR-SEMANTIC-BORROW-CONFLICT: local read conflicts with an active mutable loan at VerexE2ETests/Check/References/SharedViewErrors.lean:112:6
+  active loan originates here: VerexE2ETests/Check/References/SharedViewErrors.lean:110:32
+VIR-SEMANTIC-BORROW-ESCAPE: a local or Move global loan may escape through a reference-bearing function result at VerexE2ETests/Check/References/SharedViewErrors.lean:108:3
+VerexE2ETests/Check/References/SharedViewErrors.lean:116:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active mutable loan at VerexE2ETests/Check/References/SharedViewErrors.lean:122:5
+  active loan originates here: VerexE2ETests/Check/References/SharedViewErrors.lean:121:32

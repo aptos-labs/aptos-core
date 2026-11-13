@@ -3,6 +3,7 @@
 
 import VerexIR.Proofs.Interpreter
 import VerexIR.Proofs.Denote.Types
+import VerexIR.Proofs.Denote.Closures
 import VerexIR.Validation.Check
 
 namespace VerexIR.Tests.Closures
@@ -90,23 +91,25 @@ split by its mask, are the type's, and its captures inhabit the captured row
 
 #guard match executable? with
   | some ⟨unit, _⟩ =>
-      NTy.admits unit (.function boolRow [false] boolRow)
+      NTy.admits unit (.function boolRow ⟨[false], [false]⟩ boolRow)
         (.closure ⟨⟨0⟩, ⟨1⟩⟩ 1 #[] #[.bool true])
   | none => false
 
--- Not at another parameter row, not with a parameter its target takes by
--- value marked shared, not with a capture of another type, and not under an
--- instantiation the runtime does not build for a target without type
--- parameters.
+-- Not at another parameter row, not with a parameter or result its target
+-- takes or returns by value marked shared, not with a capture of another
+-- type, and not under an instantiation the runtime does not build for a
+-- target without type parameters.
 #guard match executable? with
   | some ⟨unit, _⟩ =>
-      !NTy.admits unit (.function boolRow [false] boolRow)
+      !NTy.admits unit (.function boolRow ⟨[false], [false]⟩ boolRow)
         (.closure ⟨⟨0⟩, ⟨1⟩⟩ 1 #[(⟨0⟩, ⟨0⟩)] #[.bool true]) &&
-      !NTy.admits unit (.function (.cons (.int 64 false) .nil) [false] boolRow)
+      !NTy.admits unit (.function (.cons (.int 64 false) .nil) ⟨[false], [false]⟩ boolRow)
         (.closure ⟨⟨0⟩, ⟨1⟩⟩ 1 #[] #[.bool true]) &&
-      !NTy.admits unit (.function boolRow [true] boolRow)
+      !NTy.admits unit (.function boolRow ⟨[true], [false]⟩ boolRow)
         (.closure ⟨⟨0⟩, ⟨1⟩⟩ 1 #[] #[.bool true]) &&
-      !NTy.admits unit (.function boolRow [false] boolRow)
+      !NTy.admits unit (.function boolRow ⟨[false], [true]⟩ boolRow)
+        (.closure ⟨⟨0⟩, ⟨1⟩⟩ 1 #[] #[.bool true]) &&
+      !NTy.admits unit (.function boolRow ⟨[false], [false]⟩ boolRow)
         (.closure ⟨⟨0⟩, ⟨1⟩⟩ 1 #[] #[.integer 1])
   | none => false
 
@@ -360,5 +363,67 @@ example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
   apply successfulRunHasDerivation prepared 32
     { namespaceId := ⟨0⟩, functionId := ⟨0⟩ } #[]
   native_decide
+
+section FrameLookup
+
+open VerexIR.Proofs.Denote
+
+-- A local fact whose default-transparency reduction is deliberately expensive.
+-- Frame lookup must never unfold it merely to see whether it states coherence.
+private def unrelatedFact : Nat → Prop
+  | 0 => True
+  | n + 1 => unrelatedFact n
+
+open Lean Meta Elab Tactic in
+elab "test_frame_lookup" : tactic => do
+  let goal ← getMainGoal
+  goal.withContext do
+    withLocalDeclD `unrelated (mkApp (mkConst ``unrelatedFact) (mkNatLit 1000000)) fun _ => do
+      let type ← goal.getType
+      let proof ← if type.isAppOf ``Coherent then coherentProof? type else closureFrameProof? type
+      let some proof := proof | throwError "frame hypothesis was not found"
+      goal.assign proof
+
+variable {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
+  (handle : FunctionHandle) (instantiation : Array (TypeId × TypeId))
+
+private abbrev CoherenceAlias := Coherent unit handle instantiation
+private abbrev FrameAlias := ClosureFrame unit handle instantiation
+
+example (frame : Coherent unit handle instantiation) :
+    Coherent unit handle instantiation := by test_frame_lookup
+
+example (frame : CoherenceAlias (unit := unit) handle instantiation) :
+    Coherent unit handle instantiation := by test_frame_lookup
+
+example (frame : FrameAlias (unit := unit) handle instantiation) :
+    Coherent unit handle instantiation := by test_frame_lookup
+
+example (frame : FrameAlias (unit := unit) handle instantiation) :
+    ClosureFrame unit handle instantiation := by test_frame_lookup
+
+example (frame : Coherent unit handle instantiation ∧
+    closureFaithful unit handle instantiation = true) :
+    ClosureFrame unit handle instantiation := by test_frame_lookup
+
+-- Even another coherence fact must not force evaluation of a different
+-- instantiation while searching for the matching frame.
+private def unrelatedInstantiation : Nat → Array (TypeId × TypeId)
+  | 0 => #[]
+  | n + 1 => unrelatedInstantiation n
+
+example (frame : Coherent unit handle #[])
+    (_unrelated : Coherent unit handle (unrelatedInstantiation 1000000)) :
+    Coherent unit handle #[] := by test_frame_lookup
+
+example (frame : ClosureFrame unit handle #[])
+    (_unrelated : ClosureFrame unit handle (unrelatedInstantiation 1000000)) :
+    Coherent unit handle #[] := by test_frame_lookup
+
+example (frame : ClosureFrame unit handle #[])
+    (_unrelated : ClosureFrame unit handle (unrelatedInstantiation 1000000)) :
+    ClosureFrame unit handle #[] := by test_frame_lookup
+
+end FrameLookup
 
 end VerexIR.Tests.Closures

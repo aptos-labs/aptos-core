@@ -285,8 +285,8 @@ class E2eSelectionTest(unittest.TestCase):
         )
         self.assertNotIn("rust-targeted-unit-tests", gated)
         self.assertNotIn("general-lints", gated)
-        # Release PRs run all unit tests on code changes only.
-        self.assertIn("'-release-'", self.workflow_job(static, "rust-unit-tests"))
+        # Full unit tests run from the classifier, which includes release PRs.
+        self.assertIn("run_full_tests == 'true'", self.workflow_job(static, "rust-unit-tests"))
         self.assertNotIn("  rust-unit-tests:", gated)
         self.assertIn("gated_file_change_determinator", gated)
         self.assertNotEqual(static.splitlines()[0], gated.splitlines()[0])
@@ -314,6 +314,19 @@ class E2eSelectionTest(unittest.TestCase):
         root = Path(__file__).resolve().parents[3]
         selection = (root / ".github/workflows/e2e-test-selection.yaml").read_text()
         self.assertIn("CICD:run-forge-e2e-perf", selection)
+
+    def test_release_branch_prs_use_legacy_e2e_selection(self):
+        root = Path(__file__).resolve().parents[3]
+        selection = (root / ".github/workflows/e2e-test-selection.yaml").read_text()
+        mode = next(line for line in selection.splitlines() if "E2E_MODE:" in line)
+        legacy_gate = mode.split("&& 'legacy'", 1)[0]
+        # Match the release branches of the Lint+Test classifier.
+        for gate in (
+            "startsWith(github.base_ref, 'aptos-release-v')",
+            "startsWith(github.base_ref, 'aptos-node-v')",
+            """contains(fromJSON('["devnet","testnet","mainnet"]'), github.base_ref)""",
+        ):
+            self.assertIn(gate, legacy_gate)
 
     def test_selected_reusable_jobs_reach_their_work(self):
         root = Path(__file__).resolve().parents[3]

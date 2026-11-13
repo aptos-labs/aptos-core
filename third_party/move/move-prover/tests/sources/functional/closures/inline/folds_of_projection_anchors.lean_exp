@@ -1,0 +1,97 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/folds_of_projection_anchors.move:31:5: error: the loop invariant `a
+        == «spec_fold_idx$lambda$0»(
+          with_state_anchor!(4, old(a)), n - remaining,
+          with_state_anchor!(0, old(v1)), n
+        )
+        && b
+          == «spec_fold_idx$lambda$0»(
+            with_state_anchor!(4, old(b)), n - remaining,
+            with_state_anchor!(0, old(v2)), n
+          )
+        && (∀ (_j_6 in 0 .. n - remaining),
+          !(«spec_fold_idx$lambda$0»(
+            with_state_anchor!(
+              4, old(a)
+            ), _j_6, with_state_anchor!(0, old(v1)), n
+          )
+            + with_state_anchor!(0, old(v1))[n - 1 - _j_6]
+            > MAX_U64
+            || «spec_fold_idx$lambda$0»(
+              with_state_anchor!(
+                4, old(b)
+              ), _j_6, with_state_anchor!(0, old(v2)), n
+            )
+              + with_state_anchor!(0, old(v2))[n - 1 - _j_6]
+              > MAX_U64))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_projection_anchors.move:41:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/folds_of_projection_anchors.move:40:5: error: verex verification failed: the automatic verification of `both` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_projection_anchors.proof.lean`:
+  verify both by lean =>
+    verex_obligations
+    verex_on
+    | invariant_6_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/folds_of_projection_anchors.move:46:5: error: the loop invariant `b
+        == «spec_fold_idx$lambda$0»(
+          with_state_anchor!(10, old(b)), n - remaining,
+          with_state_anchor!(7, old(v2)), n
+        )
+        && (∀ (_j_11 in 0 .. n - remaining),
+          !(«spec_fold_idx$lambda$0»(
+            with_state_anchor!(
+              10, old(
+                b
+              )
+            ), _j_11, with_state_anchor!(7, old(v2)), n
+          )
+            + with_state_anchor!(7, old(v2))[n - 1 - _j_11]
+            > MAX_U64))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_projection_anchors.move:52:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/folds_of_projection_anchors.move:51:5: error: verex verification failed: the automatic verification of `second` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_projection_anchors.proof.lean`:
+  verify second by lean =>
+    verex_obligations
+    verex_on
+    | invariant_6_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/folds_of_projection_anchors.move:56:5: error: the loop invariant `a
+        == «spec_fold_idx$lambda$0»(
+          with_state_anchor!(15, old(a)), n - remaining,
+          with_state_anchor!(12, old(v1)), n
+        )
+        && b
+          == «spec_fold_idx$lambda$0»(
+            with_state_anchor!(15, old(b)), n - remaining,
+            with_state_anchor!(12, old(v2)), n
+          )
+        && (∀ (_j_17 in 0 .. n - remaining),
+          !(«spec_fold_idx$lambda$0»(
+            with_state_anchor!(
+              15, old(a)
+            ), _j_17, with_state_anchor!(12, old(v1)),
+            n
+          )
+            + with_state_anchor!(12, old(v1))[n - 1 - _j_17]
+            > MAX_U64
+            || «spec_fold_idx$lambda$0»(
+              with_state_anchor!(
+                15, old(b)
+              ), _j_17, with_state_anchor!(12, old(v2)),
+              n
+            )
+              + with_state_anchor!(12, old(v2))[n - 1 - _j_17]
+              > MAX_U64))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_projection_anchors.move:66:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/folds_of_projection_anchors.move:67:9: error: the specification clause `ensures result == 6` is not established
+tests/sources/functional/closures/inline/folds_of_projection_anchors.move:65:5: error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_projection_anchors.proof.lean`:
+  verify wrong by lean =>
+    verex_obligations
+    verex_on
+    | invariant_6_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

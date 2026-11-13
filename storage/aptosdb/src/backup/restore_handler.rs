@@ -56,8 +56,10 @@ impl RestoreHandler {
     }
 
     pub fn reset_state_store(&self) -> Result<()> {
-        self.state_store.reset();
-        self.aptosdb.reset_position_store_to_ledger()
+        self.state_store.reload();
+        self.aptosdb.reset_position_store_to_ledger()?;
+        self.aptosdb.reset_order_store_to_ledger()?;
+        self.aptosdb.reset_collateral_store_to_ledger()
     }
 
     /// Whether this DB keeps native-position state, i.e. whether a restore
@@ -75,8 +77,8 @@ impl RestoreHandler {
             AptosDbError::Other("native-position storage is not enabled on this DB".into())
         })?;
         new_native_snapshot_restore(
-            &position.kv_db,
-            &position.merkle_db,
+            &position.store.kv_db,
+            &position.store.merkle_db,
             version,
             expected_root_hash,
         )
@@ -130,10 +132,6 @@ impl RestoreHandler {
             None,
             false,
         )
-    }
-
-    pub fn force_state_version_for_kv_restore(&self, version: Option<Version>) -> Result<()> {
-        self.state_store.init_state_ignoring_summary(version)
     }
 
     pub fn save_transactions_and_replay_kv(

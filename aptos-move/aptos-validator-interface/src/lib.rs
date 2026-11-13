@@ -132,6 +132,7 @@ pub struct DebuggerStateView {
             std::sync::mpsc::Sender<Result<Option<StateValue>>>,
         )>,
     >,
+    /// The view is the state right before transaction `version`, so reads go to `version - 1`.
     version: Version,
     /// Optional local-package overrides that shadow on-chain module bytes.
     local_overrides: Option<Arc<LocalModuleOverrides>>,
@@ -252,6 +253,7 @@ impl TStateView for DebuggerStateView {
     }
 
     fn next_version(&self) -> Version {
-        self.version + 1
+        // Reads are served at `self.version - 1`.
+        self.version
     }
 }

@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/bv_spec_literal_default.move:27:9: error: the specification clause `ensures result == x & (x | 3)` is not established
 tests/sources/functional/bv_spec_literal_default.move:25:5: error: verex verification failed: the automatic verification of `or_suffixed` failed; provide a proof in the module:
-  verify or_suffixed by
+  verify or_suffixed by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

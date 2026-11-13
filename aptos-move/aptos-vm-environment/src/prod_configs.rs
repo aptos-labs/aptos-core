@@ -5,7 +5,7 @@ pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
     gas_feature_versions::{
         RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41, RELEASE_V1_42,
-        RELEASE_V1_45, RELEASE_V1_49, RELEASE_V1_50,
+        RELEASE_V1_45, RELEASE_V1_49, RELEASE_V1_50, TESTNET_RESET_OCT_2026,
     },
     AptosGasParameters,
 };
@@ -178,6 +178,10 @@ pub fn aptos_prod_verifier_config(
     let sig_checker_v2_fix_function_signatures = gas_feature_version >= RELEASE_V1_34;
     let check_function_type_abilities =
         features.is_enabled(FeatureFlag::CHECK_FUNCTION_TYPE_ABILITIES);
+    let check_phantom_params_behind_references =
+        features.is_enabled(FeatureFlag::CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES);
+    let check_borrow_field_handle_shape =
+        features.is_enabled(FeatureFlag::CHECK_BORROW_FIELD_HANDLE_SHAPE);
     let enable_enum_types = features.is_enabled(FeatureFlag::ENABLE_ENUM_TYPES);
     // Resource access control was never enabled and has been removed. Access specifiers
     // are permanently rejected by the verifier.
@@ -187,6 +191,8 @@ pub fn aptos_prod_verifier_config(
 
     let strict_bounds = timed_features.is_enabled(TimedFeatureFlag::EnableStrictBoundsInProdConfig);
     let revised_bounds = timed_features.is_enabled(TimedFeatureFlag::RevisedBoundsInProdConfig);
+    let uniform_variant_field_handles =
+        timed_features.is_enabled(TimedFeatureFlag::UniformVariantFieldHandles);
 
     VerifierConfig {
         scope: VerificationScope::Everything,
@@ -230,6 +236,8 @@ pub fn aptos_prod_verifier_config(
         sig_checker_v2_fix_script_ty_param_count,
         sig_checker_v2_fix_function_signatures,
         check_function_type_abilities,
+        check_phantom_params_behind_references,
+        check_borrow_field_handle_shape,
         enable_enum_types,
         enable_resource_access_control,
         enable_function_values,
@@ -243,6 +251,7 @@ pub fn aptos_prod_verifier_config(
         } else {
             None
         },
+        uniform_variant_field_handles,
     }
 }
 
@@ -321,10 +330,15 @@ pub fn aptos_prod_vm_config(
         include_closure_mask_in_cmp: gas_feature_version >= RELEASE_V1_45,
         revalidate_resolved_closures: timed_features
             .is_enabled(TimedFeatureFlag::RevalidateResolvedClosures),
-        // The gas version check keeps the 1.50 parameters meaningful on a chain
-        // where the timed feature never activated.
+        // The gas version checks keep the on-chain parameters meaningful on a
+        // chain where the timed feature never activated. Type-argument metering
+        // went live with the testnet-reset version (54); captured-layout
+        // metering is a 1.50 (55) parameter.
         meter_closure_ty_args: timed_features
             .is_enabled(TimedFeatureFlag::MeterClosureTypeArguments)
+            || gas_feature_version >= TESTNET_RESET_OCT_2026,
+        meter_closure_captured_layouts: timed_features
+            .is_enabled(TimedFeatureFlag::MeterClosureCapturedLayouts)
             || gas_feature_version >= RELEASE_V1_50,
     };
 

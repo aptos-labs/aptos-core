@@ -152,6 +152,18 @@ theorem bitwiseAnd_bounds {left right : Int} (leftNonnegative : 0 ≤ left)
   have rightCast := Int.toNat_of_nonneg rightNonnegative
   refine ⟨Int.natCast_nonneg _, ?_, ?_⟩ <;> omega
 
+/-- A conjunction with a mask of low ones is the remainder modulo the mask's
+successor. -/
+theorem bitwiseAnd_mask {value mask : Int} (bits : Nat) (nonnegative : 0 ≤ value)
+    (isMask : mask = 2 ^ bits - 1) : bitwiseAnd value mask = value % 2 ^ bits := by
+  have power : ((2 ^ bits : Nat) : Int) = 2 ^ bits := Int.natCast_pow 2 bits
+  have positive := Nat.two_pow_pos bits
+  have maskNonnegative : 0 ≤ mask := by subst isMask; omega
+  rw [bitwiseAnd_nonnegative value mask nonnegative maskNonnegative, Int.ofNat_eq_natCast]
+  have maskNat : mask.toNat = 2 ^ bits - 1 := by subst isMask; omega
+  rw [maskNat, Nat.and_two_pow_sub_one_eq_mod, Int.natCast_emod, power,
+    Int.toNat_of_nonneg nonnegative]
+
 theorem bitwiseAnd_mod (left right modulus : Int)
     (leftLower : 0 ≤ left) (leftUpper : left < modulus)
     (rightLower : 0 ≤ right) (rightUpper : right < modulus) :

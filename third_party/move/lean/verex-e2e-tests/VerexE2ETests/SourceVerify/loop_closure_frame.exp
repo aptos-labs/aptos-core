@@ -1,6 +1,6 @@
 VerexE2ETests/SourceVerify/loop_closure_frame.move:49:9: error: the specification clause `ensures result == n * 2` is not established
 VerexE2ETests/SourceVerify/loop_closure_frame.move:47:5: error: verex verification failed: the automatic verification of `doubled_wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/loop_closure_frame.proof.lean`:
-  verify doubled_wrong by
+  verify doubled_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

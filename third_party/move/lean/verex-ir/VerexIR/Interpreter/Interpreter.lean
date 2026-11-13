@@ -89,6 +89,8 @@ mutual
         if arguments.size != declaration.signature.parameters.size then
           failAt handle.namespaceId declaration.loc
             (.argumentArity declaration.signature.parameters.size arguments.size)
+        unless scopedArguments unit declaration arguments do
+          failAt handle.namespaceId declaration.loc .unscopedMethodEvidence
         if BigStep.runtimeProvided unit handle declaration then
           -- A function the runtime provides, without a body or a role of a
           -- table owner, runs as the runtime implements it.
@@ -153,9 +155,11 @@ mutual
         failAt namespaceId loc .outOfFuel
     | fuel + 1, executable, namespaceId, frame, state, exprId => do
         let deaths := loanDeathsAt unit namespaceId exprId
-        let started := settleLoans deaths.before frame state
+        let dead := deadPlacesAt unit namespaceId exprId
+        let started := settleDeaths unit namespaceId deaths.before dead.before frame state
         let evaluation ← evalNode fuel executable namespaceId started.1 started.2 exprId
-        let settled := settleAfter deaths.after evaluation.control.value evaluation.frame
+        let settled := settleAfter unit namespaceId deaths.after dead.after
+          evaluation.control.value evaluation.frame
           evaluation.state
         return { evaluation with frame := settled.1, state := settled.2 }
 
@@ -205,7 +209,7 @@ mutual
                 let some handle := resolveFunction? unit namespaceId reference
                   | failAt namespaceId expression.loc (.unknownFunction reference)
                 let typeInstantiation := callTypeInstantiation unit handle
-                  frame.typeInstantiation instantiations
+                  frame.typeInstantiation (ns.genericArguments instantiations)
                 let result ← match evalFunction fuel executable handle typeInstantiation
                     state values.toArray with
                   | .ok result => pure result
@@ -238,7 +242,8 @@ mutual
                 let some handle := resolveFunction? unit namespaceId reference
                   | failAt namespaceId expression.loc (.unknownFunction reference)
                 return normal state frame (.closure handle mask
-                  (callTypeInstantiation unit handle frame.typeInstantiation instantiations)
+                  (callTypeInstantiation unit handle frame.typeInstantiation
+                    (ns.genericArguments instantiations))
                   values.toArray)
         | .operation (.call .invoke) _ arguments _ =>
             let operands ← evalValues fuel executable namespaceId frame state arguments.toList
@@ -263,7 +268,7 @@ mutual
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
-                match evaluateProfileOperation? executable ns expression.typeId operation values.toArray with
+                match evaluateProfileOperation? executable ns (ns.typeId expression.typeId) operation values.toArray with
                 | some (.ok value) => return normal state frame value
                 | some (.error (kind, thrown)) => return {
                     state, frame, control := located namespaceId expression.loc (.throw_ kind thrown) }
@@ -273,18 +278,18 @@ mutual
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
-                match evaluatePrimitiveOperation? ns expression.typeId operation values.toArray
+                match evaluatePrimitiveOperation? ns (ns.typeId expression.typeId) operation values.toArray
                     executable.targetPointerWidth with
                 | some (.ok value) => return normal state frame value
                 | some (.error (kind, thrown)) => return {
                     state, frame, control := located namespaceId expression.loc (.throw_ kind thrown) }
-                | none => failAt namespaceId expression.loc .unsupportedPreparedNode
+                | none => failAt namespaceId expression.loc (.undefinedOperation operation)
         | .operation (.data operation) _ arguments _ =>
             let operands ← evalValues fuel executable namespaceId frame state arguments.toList
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
-                match evaluateDataOperation? unit ns.identity operation values.toArray with
+                match evaluateDataOperation? unit ns.unitIdentity operation values.toArray with
                 | some value => return normal state frame value
                 | none =>
                     match variantMismatch? unit ns (.data operation) values.toArray frame
@@ -298,8 +303,8 @@ mutual
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
-                match evaluateGlobalOperation? unit ns expression.typeId exprId kind
-                    instantiations values.toArray frame state with
+                match evaluateGlobalOperation? unit ns (ns.typeId expression.typeId) exprId kind
+                    (ns.genericArguments instantiations) values.toArray frame state with
                 | some (.value frame state value) => return normal state frame value
                 | some (.throw_ frame state kind thrown) => return {
                     state, frame, control := located namespaceId expression.loc (.throw_ kind thrown) }
@@ -319,7 +324,7 @@ mutual
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
                 let some (frame', state', value) := evaluatePlaceOperation? unit ns
-                    expression.typeId exprId operation values.toArray frame state
+                    (ns.typeId expression.typeId) exprId operation values.toArray frame state
                   | match variantMismatch? unit ns operation values.toArray frame state,
                         patternMismatchThrow? ns.profile with
                     | true, some (kind, thrown) =>
