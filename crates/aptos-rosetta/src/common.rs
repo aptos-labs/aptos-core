@@ -87,7 +87,10 @@ pub fn sanitize_forward_headers(mut forward_headers: HashSet<HeaderName>) -> Has
 /// Copies only headers present in `allowlist` (assumed already sanitized via
 /// [`sanitize_forward_headers`]) from `incoming_headers`, excluding any connection-specific
 /// headers nominated by an incoming `Connection` header.
-pub fn filter_headers(incoming_headers: &HeaderMap, allowlist: &HashSet<HeaderName>) -> HeaderMap {
+pub(crate) fn filter_headers(
+    incoming_headers: &HeaderMap,
+    allowlist: &HashSet<HeaderName>,
+) -> HeaderMap {
     let mut connection_scoped = HashSet::new();
     for val in incoming_headers.get_all(header::CONNECTION) {
         if let Ok(s) = val.to_str() {

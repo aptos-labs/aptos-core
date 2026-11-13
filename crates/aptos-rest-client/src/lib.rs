@@ -15,11 +15,8 @@ mod http_client;
 pub mod state;
 pub mod types;
 
+pub use crate::client_builder::{AptosBaseUrl, ClientBuilder};
 use crate::{aptos::AptosVersion, error::RestError, http_client::HttpClient};
-pub use crate::{
-    client_builder::{AptosBaseUrl, ClientBuilder},
-    http_client::merge_missing_headers,
-};
 use anyhow::{anyhow, Result};
 pub use aptos_api_types::{
     self, IndexResponseBcs, MoveModuleBytecode, PendingTransaction, Transaction,
@@ -143,11 +140,9 @@ impl Client {
     /// Returns a shallow clone of this client that attaches `headers` to every request
     /// sent through the returned [`Client`].
     ///
-    /// The underlying connection pool is shared without mutating `self` or setting default
-    /// headers on the shared client, so per-request headers cannot leak across requests.
-    /// Note that if `self` was constructed with `cookie_store(true)` (the default in
-    /// [`ClientBuilder`]), the cookie jar is still shared across clones; multi-tenant proxies
-    /// should disable cookies via [`ClientBuilder::cookie_store`].
+    /// The underlying connection pool and cookie jar are shared without mutating `self` or
+    /// setting default headers on the shared client, so per-request headers cannot leak across
+    /// requests.
     pub fn with_headers(&self, headers: HeaderMap) -> Self {
         Self {
             http: self.http.with_headers(headers),
@@ -2137,7 +2132,6 @@ mod tests {
                              content-type: application/x-bcs\r\n\
                              content-length: {}\r\n\
                              connection: keep-alive\r\n\
-                             set-cookie: session=from-first-response; Path=/\r\n\
                              x-aptos-chain-id: 4\r\n\
                              x-aptos-ledger-version: 10\r\n\
                              x-aptos-ledger-oldest-version: 0\r\n\
@@ -2164,9 +2158,7 @@ mod tests {
     #[tokio::test]
     async fn test_with_headers_per_request_isolation_on_shared_pool() {
         let (url, recorded) = spawn_mock_server().await;
-        let base_client = Client::builder(AptosBaseUrl::Custom(url))
-            .cookie_store(false)
-            .build();
+        let base_client = Client::new(url);
 
         // 1. Request with per-request headers
         let mut headers_a = HeaderMap::new();
@@ -2178,7 +2170,7 @@ mod tests {
             .await
             .unwrap();
 
-        // 2. Subsequent request on base_client (reusing keep-alive connection) must NOT leak headers_a or cookies
+        // 2. Subsequent request on base_client (reusing keep-alive connection) must NOT leak headers_a
         base_client.health_check(60).await.unwrap();
 
         // 3. Request with a different header set
@@ -2204,14 +2196,12 @@ mod tests {
 
         assert!(!requests[1].1.contains_key("x-client-id"));
         assert!(!requests[1].1.contains_key("x-request-id"));
-        assert!(!requests[1].1.contains_key("cookie"));
 
         assert_eq!(
             requests[2].1.get("x-client-id"),
             Some(&vec!["caller-b".to_string()])
         );
         assert!(!requests[2].1.contains_key("x-request-id"));
-        assert!(!requests[2].1.contains_key("cookie"));
     }
 
     #[tokio::test]

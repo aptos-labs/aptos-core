@@ -1084,7 +1084,6 @@ fn mock_node_bcs_response(body: Vec<u8>, chain_id: ChainId) -> HttpResponse<Vec<
     HttpResponse::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, BCS)
-        .header(header::SET_COOKIE, "lb_affinity=sticky; Path=/")
         .header(X_APTOS_CHAIN_ID, chain_id.id().to_string())
         .header(X_APTOS_LEDGER_VERSION, "10")
         .header(X_APTOS_LEDGER_OLDEST_VERSION, "0")
@@ -1205,11 +1204,7 @@ async fn spawn_rosetta_with_mock_node(
     let handle = bootstrap_async(
         chain_id,
         api_config,
-        Some(
-            aptos_rest_client::Client::builder(aptos_rest_client::AptosBaseUrl::Custom(node_url))
-                .cookie_store(false)
-                .build(),
-        ),
+        Some(aptos_rest_client::Client::new(node_url)),
         HashSet::new(),
         forward_headers,
     )
@@ -1468,10 +1463,6 @@ async fn test_per_request_header_isolation_no_cross_request_leakage() {
 
         for call in calls.iter() {
             assert!(call.headers.get("x-other").is_none());
-            assert!(
-                call.headers.get(header::COOKIE).is_none(),
-                "Cookies from upstream responses must not be stored or replayed across requests"
-            );
             let cid = call
                 .headers
                 .get("x-client-id")

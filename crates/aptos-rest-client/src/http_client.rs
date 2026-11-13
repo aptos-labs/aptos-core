@@ -37,9 +37,7 @@ impl PreparedRequest {
     }
 }
 
-/// Appends any headers in `extra` whose header name is not already present on `dst`,
-/// preserving multi-value headers while leaving explicit protocol headers intact.
-pub fn merge_missing_headers(dst: &mut HeaderMap, extra: &HeaderMap) {
+pub(crate) fn merge_missing_headers(dst: &mut HeaderMap, extra: &HeaderMap) {
     for name in extra.keys() {
         if !dst.contains_key(name) {
             for value in extra.get_all(name) {

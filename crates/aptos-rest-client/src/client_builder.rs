@@ -37,7 +37,6 @@ pub struct ClientBuilder {
     base_url: Url,
     timeout: Duration,
     headers: HeaderMap,
-    cookie_store: bool,
 }
 
 impl ClientBuilder {
@@ -54,7 +53,6 @@ impl ClientBuilder {
             version_path_base: DEFAULT_VERSION_PATH_BASE.to_string(),
             timeout: Duration::from_secs(10), // Default to 10 seconds
             headers,
-            cookie_store: true,
         };
 
         if let Ok(key) = env::var("X_API_KEY") {
@@ -94,11 +92,6 @@ impl ClientBuilder {
         self
     }
 
-    pub fn cookie_store(mut self, enable: bool) -> Self {
-        self.cookie_store = enable;
-        self
-    }
-
     pub fn build(self) -> Client {
         let version_path_base = get_version_path_with_base(self.base_url.clone());
 
@@ -107,7 +100,7 @@ impl ClientBuilder {
                 self.reqwest_builder
                     .default_headers(self.headers)
                     .timeout(self.timeout)
-                    .cookie_store(self.cookie_store)
+                    .cookie_store(true)
                     .build()
                     .unwrap(),
             ),

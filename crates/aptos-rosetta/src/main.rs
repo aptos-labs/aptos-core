@@ -314,13 +314,7 @@ impl ServerArgs for OnlineRemoteArgs {
     }
 
     fn rest_client(&self) -> Option<aptos_rest_client::Client> {
-        Some(
-            aptos_rest_client::Client::builder(aptos_rest_client::AptosBaseUrl::Custom(
-                self.rest_api_url.clone(),
-            ))
-            .cookie_store(false)
-            .build(),
-        )
+        Some(aptos_rest_client::Client::new(self.rest_api_url.clone()))
     }
 
     fn chain_id(&self) -> ChainId {
