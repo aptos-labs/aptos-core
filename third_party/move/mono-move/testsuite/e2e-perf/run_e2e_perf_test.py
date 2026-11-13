@@ -40,6 +40,7 @@ import sys
 import tempfile
 import threading
 import time
+import dataclasses
 from dataclasses import dataclass, field
 from subprocess import Popen, PIPE, STDOUT
 
@@ -283,6 +284,13 @@ if RUN_SOURCE not in ("ci", "manual", "local"):
 BUILD_FLAG = "--release" if BUILD == "release" else "--profile performance"
 BUILD_FOLDER = f"target/{BUILD}"
 
+# Experiment overrides: one block size for every workload, and how many
+# consecutive transactions each sender gets in a block (benchmark default 5).
+BLOCK_SIZE = os.environ.get("BLOCK_SIZE")
+TXNS_PER_SENDER = os.environ.get("TXNS_PER_SENDER")
+if BLOCK_SIZE:
+    WORKLOADS = [dataclasses.replace(w, block_size=int(BLOCK_SIZE)) for w in WORKLOADS]
+
 MAX_BLOCK_SIZE = max(w.block_size for w in WORKLOADS)
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 ADDITIONAL_DST_POOL_ACCOUNTS = 2 * MAX_BLOCK_SIZE * NUM_BLOCKS
@@ -521,7 +529,8 @@ def common_flags(workload, db_dir, checkpoint_dir):
         # workload that draws the same account twice in a block then lands its
         # transactions reversed, and the second one is discarded.
         f"--num-generator-workers 1 "
-        f"--block-size {workload.block_size} "
+        + (f"--transactions-per-sender {TXNS_PER_SENDER} " if TXNS_PER_SENDER else "")
+        + f"--block-size {workload.block_size} "
         f"run-executor "
         f"--data-dir {db_dir} --checkpoint-dir {checkpoint_dir}"
     )
