@@ -95,7 +95,7 @@ pub fn get_path(
     }
 
     // See if it is present in the path where we usually install additional binaries.
-    let path = get_additional_binaries_dir().join(binary_name);
+    let path = get_additional_binaries_dir().join(format!("{}{}", binary_name, EXE_SUFFIX));
     if path.exists() && path.is_file() {
         return Ok(path);
     }
