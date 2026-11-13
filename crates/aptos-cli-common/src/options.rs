@@ -961,6 +961,31 @@ pub struct GasOptions {
     pub expiration_secs: u64,
 }
 
+/// Default max gas used by session / local simulation when the user does not
+/// pass `--max-gas`.
+pub const DEFAULT_SESSION_MAX_GAS: u64 = 2_000_000;
+
+/// Resolve `--max-gas` for session / local simulation.
+///
+/// When `sponsor_gas` is set (fee payer `@0x0`), gas is not charged from the
+/// sender, so the default must not be capped by the sender's APT balance —
+/// otherwise a zero-balance sender gets `max_gas = 0` and the txn fails before
+/// any useful simulation.
+pub fn estimate_session_max_gas(
+    explicit: Option<u64>,
+    balance: u64,
+    gas_unit_price: u64,
+    sponsor_gas: bool,
+) -> u64 {
+    explicit.unwrap_or_else(|| {
+        if sponsor_gas || gas_unit_price == 0 {
+            DEFAULT_SESSION_MAX_GAS
+        } else {
+            std::cmp::min(balance / gas_unit_price, DEFAULT_SESSION_MAX_GAS)
+        }
+    })
+}
+
 impl Default for GasOptions {
     fn default() -> Self {
         GasOptions {
@@ -1036,6 +1061,46 @@ pub struct TransactionOptions {
     #[clap(long)]
     pub session: Option<PathBuf>,
 
+    /// Execute inside a `--session` without authenticating the sender.
+    ///
+    /// Builds a transaction with `NoAccountAuthenticator` and runs it through the
+    /// simulation VM (`is_simulation = true`), so an arbitrary `--sender-account`
+    /// can be used without a private key. Successful writes update the session.
+    /// This transaction cannot be submitted to a network.
+    ///
+    /// Requires `--session` and `--sender-account`.
+    ///
+    /// Supported for `run`, `run-script`, non-chunked `publish`, `upgrade-object`
+    /// with `--session`, and `simulate --session`. Commands that derive an address
+    /// from a signing key (`deploy-object`, chunked publish) reject this flag.
+    #[clap(long, requires_all = ["session", "sender_account"])]
+    pub unauthenticated: bool,
+
+    /// When combined with `--session` and `--unauthenticated`, skip gas payment
+    /// by using fee payer `@0x0` (same rule as fullnode simulate). Default off:
+    /// gas is still charged from the sender when they are the gas payer.
+    #[clap(long, requires_all = ["session", "unauthenticated"], conflicts_with = "fee_payer_account")]
+    pub sponsor_gas: bool,
+
+    /// With `--unauthenticated`, charge gas to this account instead of the
+    /// sender. No key is needed for it.
+    #[clap(
+        long,
+        value_parser = crate::load_account_arg,
+        requires_all = ["session", "unauthenticated"]
+    )]
+    pub fee_payer_account: Option<AccountAddress>,
+
+    /// With `--unauthenticated`, extra signer accounts for multi-agent entry
+    /// functions or scripts. No keys are needed for them.
+    #[clap(
+        long,
+        value_parser = crate::load_account_arg,
+        num_args = 1..,
+        requires_all = ["session", "unauthenticated"]
+    )]
+    pub secondary_signer_accounts: Vec<AccountAddress>,
+
     /// Replay protection mechanism to use when generating the transaction.
     ///
     /// When "nonce" is chosen, the transaction will be an orderless transaction and contains a replay protection nonce.
@@ -1076,6 +1141,7 @@ impl TransactionOptions {
     /// Retrieves the private key and the associated address
     /// TODO: Cache this information
     pub fn get_key_and_address(&self) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
+        self.reject_if_unauthenticated_needs_key()?;
         self.private_key_options.extract_private_key_and_address(
             self.encoding_options.encoding,
             &self.profile_options,
@@ -1084,12 +1150,27 @@ impl TransactionOptions {
     }
 
     pub fn get_public_key_and_address(&self) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
+        self.reject_if_unauthenticated_needs_key()?;
         self.private_key_options
             .extract_ed25519_public_key_and_address(
                 self.encoding_options.encoding,
                 &self.profile_options,
                 self.sender_account,
             )
+    }
+
+    /// `--unauthenticated` has no signing key. Commands that call the key helpers
+    /// (`deploy-object`, chunked publish, and similar) must fail here instead of
+    /// asking for a private key that will not be used.
+    fn reject_if_unauthenticated_needs_key(&self) -> CliTypedResult<()> {
+        if self.unauthenticated {
+            Err(CliError::CommandArgumentError(
+                "`--unauthenticated` has no signing key. It is supported for `aptos move run`, `run-script`, non-chunked `publish`, `upgrade-object --session`, and `simulate --session`. Commands that derive an address from a key (such as `deploy-object` or chunked publish) cannot use it."
+                    .to_string(),
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
@@ -1154,4 +1235,66 @@ pub fn get_mint_site_url(address: Option<AccountAddress>) -> String {
         None => "".to_string(),
     };
     format!("https://aptos.dev/network/faucet{}", params)
+}
+
+#[cfg(test)]
+mod estimate_session_max_gas_tests {
+    use super::{estimate_session_max_gas, DEFAULT_SESSION_MAX_GAS};
+
+    #[test]
+    fn uses_explicit_max_gas_when_provided() {
+        assert_eq!(estimate_session_max_gas(Some(42), 0, 100, true), 42);
+        assert_eq!(estimate_session_max_gas(Some(42), 0, 100, false), 42);
+    }
+
+    #[test]
+    fn sponsor_gas_ignores_zero_sender_balance() {
+        assert_eq!(
+            estimate_session_max_gas(None, 0, 100, true),
+            DEFAULT_SESSION_MAX_GAS
+        );
+    }
+
+    #[test]
+    fn without_sponsor_caps_to_sender_balance() {
+        assert_eq!(estimate_session_max_gas(None, 50_000, 100, false), 500);
+        assert_eq!(estimate_session_max_gas(None, 0, 100, false), 0);
+    }
+
+    #[test]
+    fn zero_gas_unit_price_uses_default() {
+        assert_eq!(
+            estimate_session_max_gas(None, 0, 0, false),
+            DEFAULT_SESSION_MAX_GAS
+        );
+    }
+}
+
+#[cfg(test)]
+mod unauthenticated_key_tests {
+    use super::TransactionOptions;
+    use move_core_types::account_address::AccountAddress;
+
+    #[test]
+    fn unauthenticated_key_lookup_explains_the_limitation() {
+        let options = TransactionOptions {
+            unauthenticated: true,
+            sender_account: Some(AccountAddress::ONE),
+            ..Default::default()
+        };
+
+        let private_key_err = options
+            .get_key_and_address()
+            .expect_err("unauthenticated must not ask for a private key");
+        let public_key_err = options
+            .get_public_key_and_address()
+            .expect_err("unauthenticated must not ask for a public key");
+        for err in [private_key_err, public_key_err] {
+            let msg = err.to_string();
+            assert!(
+                msg.contains("unauthenticated") && msg.contains("deploy-object"),
+                "unexpected error: {msg}"
+            );
+        }
+    }
 }
