@@ -9,21 +9,25 @@
 //! a second copy of it.
 //!
 //! Deltas, modules, delayed fields and group size queries are out of scope for
-//! MonoMove, so a spec carrying any of them is rejected.
+//! MonoMove, so a spec carrying any of them is rejected. MonoMove reads a
+//! group's size and metadata only to write the group, so those reads are what
+//! the mock reports to the baseline.
 
 use crate::{
     captured_reads::TxnInput,
     code_cache_global::GlobalModuleCache,
     combinatorial_tests::{
         mock_executor::{mock_fee_statement, MockEvent, MockOutput},
-        types::{KeyType, MockIncarnation, MockTransaction, ValueType, RESERVED_TAG},
+        types::{
+            GroupSizeOrMetadata, KeyType, MockIncarnation, MockTransaction, ValueType, RESERVED_TAG,
+        },
     },
     errors::ResourceGroupSerializationError,
     executor_utilities::Materializer,
     mono_move::{
         group_chain::{
             committed_value, finish_group_post_commit, unbuilt_metadata_before,
-            validate_size_before, GroupMetadata, GroupView,
+            validate_slot_before, GroupMetadata, GroupView,
         },
         version_matches, MonoValue, ParallelReader,
     },
@@ -53,8 +57,9 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use bytes::Bytes;
-use mono_move_core::storage::resource_provider::{
-    ReadPin, ResourceProviderError, StorageRead, Version,
+use mono_move_core::{
+    storage::resource_provider::{ReadPin, ResourceProviderError, StorageRead, Version},
+    GroupSlot,
 };
 use mono_move_global_context::GlobalContext;
 use move_binary_format::CompiledModule;
@@ -86,6 +91,7 @@ fn mock_value(bytes: &[u8], kind: WriteOpKind) -> MonoValue<MockKey> {
     MonoValue::Write {
         ptr,
         bcs_size: bytes.len(),
+        metadata: StateValueMetadata::none(),
         kind,
         pin: blob,
     }
@@ -214,6 +220,9 @@ pub(crate) struct ExecutedTxn {
     read_results: Vec<Option<Vec<u8>>>,
     resource_writes: HashMap<KeyType<[u8; 32]>, MonoValue<MockKey>>,
     group_writes: HashMap<KeyType<[u8; 32]>, MockGroupWrite>,
+    /// The size and the metadata of each written group's slot, as read before
+    /// the writes.
+    group_slot_reads: Vec<(KeyType<[u8; 32]>, GroupSizeOrMetadata)>,
     /// What Block-STM versions: the resource writes, each group member under
     /// its own key, and one metadata entry per written group.
     versioned_writes: HashMap<MockKey, MonoValue<MockKey>>,
@@ -353,7 +362,7 @@ impl TxnOutput for MonoMockOutput {
 pub(crate) struct MockReads {
     reads: HashMap<MockKey, Version>,
     /// The metadata of the groups the incarnation wrote, each built on a read
-    /// of its group's size.
+    /// of its group's slot.
     group_metadata: Vec<(MockKey, Arc<GroupMetadata<MockKey>>)>,
     incarnation: Incarnation,
     speculative_failure: bool,
@@ -390,7 +399,7 @@ impl TxnInput for MockReads {
                 }
             })
             && self.group_metadata.iter().all(|(group_key, metadata)| {
-                validate_size_before(data_map, group_key, idx_to_validate, metadata)
+                validate_slot_before(data_map, group_key, idx_to_validate, metadata)
             })
     }
 
@@ -520,18 +529,19 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
     fn get_pre_block_group(
         &self,
         group_key: &KeyType<[u8; 32]>,
-    ) -> Result<GroupView, ResourceProviderError> {
+    ) -> Result<(GroupView, Option<StateValueMetadata>), ResourceProviderError> {
         let Some(value) = self.get_pre_block_value(group_key)? else {
-            return Ok(GroupView::default());
+            return Ok((GroupView::default(), None));
         };
         let members: BTreeMap<u32, Bytes> = bcs::from_bytes(value.bytes()).map_err(|e| {
             ResourceProviderError::InvariantViolation(format!("Stored group failed to decode: {e}"))
         })?;
-        Ok(GroupView::new(
+        let view = GroupView::new(
             members
                 .into_iter()
                 .map(|(tag, bytes)| (tag_bytes(tag), bytes)),
-        ))
+        );
+        Ok((view, Some(value.into_metadata())))
     }
 
     /// Serves a read from the cache, or through `read` on the first one.
@@ -585,6 +595,7 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
             .collect::<HashMap<_, _>>();
 
         let mut group_writes = HashMap::new();
+        let mut group_slot_reads = vec![];
         for (group_key, metadata, inner_ops) in &behavior.group_writes {
             let mut members = BTreeMap::new();
             for (tag, (inner_op, _)) in inner_ops {
@@ -599,10 +610,18 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
                 continue;
             }
             let group_slot = MockKey::Resource(*group_key);
-            let size_before = self
+            let slot_before = self
                 .reader
-                .read_group_size(&group_slot, || self.get_pre_block_group(group_key))?;
-            let mut size = size_before;
+                .read_group_slot(&group_slot, || self.get_pre_block_group(group_key))?;
+            group_slot_reads.push((
+                *group_key,
+                GroupSizeOrMetadata::Size(slot_before.size.bcs_size() as u64),
+            ));
+            group_slot_reads.push((
+                *group_key,
+                GroupSizeOrMetadata::Metadata(slot_before.metadata.clone()),
+            ));
+            let mut size = slot_before.size;
             // Only reads that are inconsistent with each other make the sizes
             // not add up.
             let inconsistent = || {
@@ -625,13 +644,18 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
                     MonoValue::Deletion | MonoValue::GroupMetadata { .. } => {},
                 }
             }
+            // The spec chooses the metadata of the slots it writes.
+            let slot = GroupSlot {
+                size,
+                metadata: (size.bcs_size() != 0).then(|| metadata.clone()),
+            };
             let group_metadata = Arc::new(GroupMetadata::from_changes(
                 members
                     .keys()
                     .map(|tag| MockKey::GroupMember(*group_key, *tag))
                     .collect(),
-                size_before,
-                size,
+                slot_before,
+                slot,
             ));
             self.reads
                 .group_metadata
@@ -650,6 +674,7 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
             read_results,
             resource_writes,
             group_writes,
+            group_slot_reads,
             versioned_writes,
             events: behavior.events.clone(),
             gas: behavior.gas,
@@ -709,6 +734,7 @@ impl MonoMockExecutor {
 
         let mut output = MockOutput::empty_success_output();
         output.read_results = txn.read_results;
+        output.read_group_size_or_metadata = txn.group_slot_reads;
         output.total_gas = txn.gas;
         output.events = txn.events;
         output.writes = txn

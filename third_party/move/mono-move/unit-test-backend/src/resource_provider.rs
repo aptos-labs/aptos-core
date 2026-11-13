@@ -9,6 +9,7 @@
 //! Materialization is lazy because a type's layout and GC descriptor are only
 //! published once the function that accesses it has been lowered.
 
+use aptos_types::state_store::state_value::StateValueMetadata;
 use bytes::Bytes;
 use mono_move_core::{
     nominal_tag,
@@ -16,7 +17,7 @@ use mono_move_core::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
     },
     types::InternedType,
-    GroupSize,
+    GroupSlot,
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::SegmentedArena;
@@ -73,6 +74,7 @@ where
         let read = StorageRead::ExternalHeap {
             ptr,
             bcs_size: blob.len(),
+            metadata: StateValueMetadata::none(),
             version: None,
             pin,
         };
@@ -115,11 +117,11 @@ where
         }
     }
 
-    fn get_resource_group_size(
+    fn get_resource_group_slot(
         &self,
         _group_key: &InMemoryStorageKey,
-    ) -> Result<GroupSize, ResourceProviderError> {
+    ) -> Result<GroupSlot, ResourceProviderError> {
         // Groups are not served, so every group is empty.
-        Ok(GroupSize::default())
+        Ok(GroupSlot::default())
     }
 }

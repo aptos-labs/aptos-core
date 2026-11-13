@@ -190,7 +190,9 @@ impl MonoMoveBackend {
         let gas_used = self.gas_budget.saturating_sub(interpreter.gas_balance());
 
         // Return the interpreter's buffers before classifying the outcome.
-        let finished = interpreter.finish();
+        // TODO(cleanup): tests have no `0x1::timestamp`, so the slots they
+        // create are stamped with time 0.
+        let finished = interpreter.finish(0);
         let (result, v1_exact_error) = match outcome {
             Outcome::Returned(values) => (Ok(values), true),
             Outcome::Failed(error, v1_exact_error) => (Err(error), v1_exact_error),
@@ -442,7 +444,7 @@ fn test_effects(guard: &ExecutionGuard<'_>, effects: &SessionEffects) -> Result<
         let op = match class {
             WriteClass::Creation { ptr, .. } => Op::New(written(ptr)?),
             WriteClass::Modification { ptr, .. } => Op::Modify(written(ptr)?),
-            WriteClass::Deletion => Op::Delete,
+            WriteClass::Deletion { .. } => Op::Delete,
         };
         match key {
             InMemoryStorageKey::Resource { address, ty } => {

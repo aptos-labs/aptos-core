@@ -35,7 +35,10 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         };
         let FeeDistribution::V0 { amount } = fee_distribution;
         let txn_data = SystemTxnMetadata::for_block_epilogue(block_epilogue);
-        let mut interp = self.system_session(&txn_data);
+        let (mut interp, creation_time_usecs) = match self.system_session(&txn_data) {
+            Ok(session) => session,
+            Err(e) => return TxnOutcome::Panic(e),
+        };
         let result = call_block_function(
             &mut interp,
             self.symbols,
@@ -46,7 +49,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             },
         );
         match result {
-            Ok(()) => system_txn_outcome(interp),
+            Ok(()) => system_txn_outcome(interp, creation_time_usecs),
             Err(failure) => match discard_system_session(interp) {
                 Ok(()) => {
                     TxnOutcome::ExecutedNoEffects(NoEffectsReason::BlockEpilogueFailed(failure))

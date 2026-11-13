@@ -17,7 +17,7 @@ use crate::{
     executor::AptosTransactionExecutor,
     natives::extensions_with,
     outcome::TxnOutcome,
-    providers::read_config,
+    providers::{read_config, read_creation_time_usecs},
 };
 use aptos_types::{
     fee_statement::FeeStatement,
@@ -80,8 +80,17 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // transaction against, so a discard that skipped it would drop the
         // transaction's dependencies. Finishing also parks the worker's stack
         // and heap for reuse.
-        let result = self.run_session(&mut interp, txn, &txn_data);
-        match (result, interp.finish()) {
+        let (result, creation_time_usecs) =
+            match read_creation_time_usecs(&mut interp, guard, self.symbols) {
+                Ok(time) => (self.run_session(&mut interp, txn, &txn_data), time),
+                Err(e) => (
+                    Err(DiscardReason::InvariantViolation(format!(
+                        "the chain's time is unreadable: {e}"
+                    ))),
+                    0,
+                ),
+            };
+        match (result, interp.finish(creation_time_usecs)) {
             (_, Err(e)) => TxnOutcome::Panic(e),
             (Ok((status, fee_statement)), Ok(effects)) => TxnOutcome::Executed {
                 status,

@@ -1014,7 +1014,8 @@ impl<'guard> InterpreterContext<'guard> {
     }
 
     /// Consumes the context, returning the transaction's side effects for
-    /// publication. The effects are copied out of the session heap into a
+    /// publication. Slots the session created are stamped with
+    /// `creation_time_usecs`. The effects are copied out of the session heap into a
     /// buffer sized to what the session allocated, which is then frozen into
     /// them, so every heap pointer they hold stays valid for as long as they
     /// live. Their interned types are not: the effects do not borrow the guard,
@@ -1023,7 +1024,7 @@ impl<'guard> InterpreterContext<'guard> {
     ///
     /// Fails only on a VM bug. The copy leaves the session heap half-forwarded,
     /// so nothing is recoverable afterwards and the block has to be aborted.
-    pub fn finish(self) -> VMResult<SessionEffects> {
+    pub fn finish(self, creation_time_usecs: u64) -> VMResult<SessionEffects> {
         let Self {
             loader,
             read_set: _,
@@ -1055,7 +1056,14 @@ impl<'guard> InterpreterContext<'guard> {
         // type at its key, and no rollback can follow the session's end.
         unsafe { read_write_set.drop_unchanged_writes(guard) }?;
         // SAFETY: as above, and nothing mutates a written value from here on.
-        unsafe { read_write_set.compute_write_sizes(guard, resource_provider) }?;
+        unsafe {
+            read_write_set.compute_write_sizes_and_metadata(
+                guard,
+                resource_provider,
+                guard.slot_metadata_context(),
+                creation_time_usecs,
+            )
+        }?;
         // TODO(perf): the undo journal and checkpoints are dead from here on,
         // but the read-write set keeps them for as long as the effects live,
         // which Block-STM extends to the end of the block. Clear them here.

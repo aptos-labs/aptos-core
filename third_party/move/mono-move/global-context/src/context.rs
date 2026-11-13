@@ -56,7 +56,8 @@ use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard, MemoryR
 use mono_move_core::{
     reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
     FrameworkSymbols, FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
-    TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    SlotMetadataContext, TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use shared_dsa::UnorderedMap;
@@ -140,6 +141,8 @@ struct Context {
     /// Published type layouts (the type-driven walk shape, separate from the
     /// GC object descriptors above).
     layouts: Layouts,
+    /// Deposit prices for the storage slots transactions write.
+    slot_metadata_context: SlotMetadataContext,
     /// Values a client preinstalls before execution for execution guards to
     /// read, keyed by their type. See [`GlobalContext::preinstall`].
     ///
@@ -361,6 +364,7 @@ impl GlobalContext {
                 script_cache: ScriptCache::new(),
                 descriptors: Descriptors::default(),
                 layouts: Layouts::default(),
+                slot_metadata_context: SlotMetadataContext::default(),
                 preinstalled: UnorderedMap::new(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
@@ -507,6 +511,11 @@ impl<'ctx> ExecutionGuard<'ctx> {
     pub fn framework_symbols(&self) -> &'ctx FrameworkSymbols {
         self.preinstalled::<FrameworkSymbols>()
             .expect("the framework symbols are installed at construction and after every reset")
+    }
+
+    /// The deposit prices for the storage slots transactions write.
+    pub fn slot_metadata_context(&self) -> &'ctx SlotMetadataContext {
+        &self.ctx.slot_metadata_context
     }
 
     /// Inserts a loaded module into the cache, keyed by its interned ID.
@@ -1114,6 +1123,8 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             script_cache,
             descriptors,
             layouts,
+            // Holds no arena pointers.
+            slot_metadata_context: _,
             preinstalled,
         } = self.ctx;
 

@@ -292,6 +292,90 @@ fn group_member_added_then_sibling_modified_matches_v1() {
     );
 }
 
+/// A block that deletes the last member of a resource group, then adds a member
+/// again, then adds another. The group's slot is deleted, created and modified
+/// in turn, each transaction building on the slot the previous one left.
+#[test]
+fn group_deleted_then_recreated_matches_v1() {
+    use aptos_types::write_set::WriteOpKind;
+    use move_core_types::language_storage::StructTag;
+
+    let executor =
+        FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::BothComparison);
+    let mut harness = MoveHarness::new_with_executor(executor);
+
+    // The group holds one member before the measured block.
+    let publisher = harness.new_account_at(AccountAddress::ONE);
+    let path = common::test_dir_path("resource_groups.data/pack");
+    assert_eq!(
+        harness.publish_package(&publisher, &path),
+        TransactionStatus::Keep(ExecutionStatus::Success),
+    );
+    let main_account = *publisher.address();
+    let init = harness.create_entry_function(
+        &publisher,
+        str::parse("0x1::resource_groups_test::init_signer").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&b"mono-group".to_vec()).unwrap()],
+    );
+    let seed_member = set_resource(&mut harness, &publisher, main_account, 1, "base", 1);
+    for status in harness.run_block(vec![init, seed_member]) {
+        assert_eq!(status, TransactionStatus::Keep(ExecutionStatus::Success));
+    }
+
+    // Same sender and consecutive sequence numbers, so the transactions commit
+    // in order.
+    let user = Account::new();
+    harness.store_and_fund_account(&user, 1_000_000_000_000, 0);
+    let delete_last_member = harness.create_entry_function(
+        &user,
+        str::parse("0x1::resource_groups_test::unset_resource").unwrap(),
+        vec![],
+        vec![
+            bcs::to_bytes(&main_account).unwrap(),
+            bcs::to_bytes(&1u32).unwrap(),
+        ],
+    );
+    let recreate = set_resource(&mut harness, &user, main_account, 2, "recreated", 2);
+    let grow = set_resource(&mut harness, &user, main_account, 3, "grown", 3);
+    let both = run_both(&mut harness.executor, vec![
+        delete_last_member,
+        recreate,
+        grow,
+    ]);
+    assert_kept_success(&both.v1, "legacy");
+    assert_kept_success(&both.v2, "mono");
+
+    let owner =
+        aptos_types::account_address::create_resource_address(AccountAddress::ONE, b"mono-group");
+    let my_group = StructTag::from_str("0x1::resource_groups_test::MyGroup").unwrap();
+    let group_key = StateKey::resource_group(&owner, &my_group);
+
+    let expected_kinds = [
+        WriteOpKind::Deletion,
+        WriteOpKind::Creation,
+        WriteOpKind::Modification,
+    ];
+    for (i, (o1, o2)) in both.v1.iter().zip(&both.v2).enumerate() {
+        compare_outputs(o1, o2, *user.address(), i);
+        let g1 = group_write(o1, &group_key);
+        let g2 = group_write(o2, &group_key);
+        assert_eq!(g2.write_op_kind(), expected_kinds[i], "transaction {i}");
+        assert_eq!(g1.write_op_kind(), g2.write_op_kind(), "transaction {i}");
+        assert_eq!(g1.bytes(), g2.bytes(), "transaction {i}");
+        assert_eq!(g1.metadata(), g2.metadata(), "transaction {i}");
+    }
+
+    // The deleted slot carries the deposits it held, and the recreated slot
+    // takes new ones.
+    let deleted = group_write(&both.v2[0], &group_key).metadata();
+    let recreated = group_write(&both.v2[1], &group_key).metadata();
+    let grown = group_write(&both.v2[2], &group_key).metadata();
+    assert!(deleted.slot_deposit() > 0);
+    assert!(recreated.slot_deposit() > 0);
+    assert!(grown.bytes_deposit() > recreated.bytes_deposit());
+}
+
 /// The write op for the resource group at `key` in `output`, panicking if the
 /// transaction did not write it.
 fn group_write<'a>(
@@ -395,6 +479,12 @@ fn compare_outputs(
             v2_op.write_op_kind(),
             "transaction {idx}: write op kind differs at {key:?}"
         );
+        // The fee changes no value's size, so it does not reach the metadata.
+        assert_eq!(
+            v1_op.metadata(),
+            v2_op.metadata(),
+            "transaction {idx}: state value metadata differs at {key:?}"
+        );
         if v1_op.bytes() == v2_op.bytes() || fee_related.contains(key) {
             continue;
         }
@@ -454,15 +544,18 @@ fn is_gas_event(event: &aptos_types::contract_event::ContractEvent) -> bool {
 }
 
 /// The state keys whose content embeds the transaction fee: the fee payer's
-/// primary fungible store group and the APT metadata object group (supply).
+/// primary fungible store group, the APT metadata object group (supply), and
+/// the APT coin info, which a storage refund goes through.
 fn fee_related_keys(fee_payer: AccountAddress) -> Vec<StateKey> {
     use move_core_types::language_storage::StructTag;
 
     let object_group = StructTag::from_str("0x1::object::ObjectGroup").unwrap();
     let store = aptos_types::account_config::fungible_store::primary_apt_store(fee_payer);
+    let coin_info = StructTag::from_str("0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>").unwrap();
     vec![
         StateKey::resource_group(&store, &object_group),
         StateKey::resource_group(&AccountAddress::TEN, &object_group),
+        StateKey::resource(&AccountAddress::ONE, &coin_info).unwrap(),
     ]
 }
 
