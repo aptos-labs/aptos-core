@@ -228,13 +228,6 @@ pub struct OfflineArgs {
     /// ```
     #[clap(long)]
     currency_config_file: Option<PathBuf>,
-
-    /// Allowlist of incoming HTTP request header names to forward onto outbound node calls.
-    ///
-    /// Can be specified multiple times, e.g. `--forward-header x-client-id --forward-header x-request-id`.
-    /// Empty by default, so no incoming headers are forwarded unless configured.
-    #[clap(long = "forward-header", value_delimiter = ',')]
-    forward_headers: Vec<HeaderName>,
 }
 
 impl ServerArgs for OfflineArgs {
@@ -293,7 +286,7 @@ impl ServerArgs for OfflineArgs {
     }
 
     fn forward_headers(&self) -> HashSet<HeaderName> {
-        self.forward_headers.iter().cloned().collect()
+        HashSet::new()
     }
 }
 
@@ -307,6 +300,12 @@ pub struct OnlineRemoteArgs {
     /// DEPRECATED: Owner addresses file as a YAML file with a list
     #[clap(long, value_parser)]
     owner_address_file: Option<PathBuf>,
+    /// Allowlist of incoming HTTP request header names to forward onto outbound node calls.
+    ///
+    /// Can be specified multiple times, e.g. `--forward-header x-client-id --forward-header x-request-id`.
+    /// Empty by default, so no incoming headers are forwarded unless configured.
+    #[clap(long = "forward-header", value_delimiter = ',')]
+    forward_headers: Vec<HeaderName>,
 }
 
 impl ServerArgs for OnlineRemoteArgs {
@@ -315,7 +314,13 @@ impl ServerArgs for OnlineRemoteArgs {
     }
 
     fn rest_client(&self) -> Option<aptos_rest_client::Client> {
-        Some(aptos_rest_client::Client::new(self.rest_api_url.clone()))
+        Some(
+            aptos_rest_client::Client::builder(aptos_rest_client::AptosBaseUrl::Custom(
+                self.rest_api_url.clone(),
+            ))
+            .cookie_store(false)
+            .build(),
+        )
     }
 
     fn chain_id(&self) -> ChainId {
@@ -327,7 +332,7 @@ impl ServerArgs for OnlineRemoteArgs {
     }
 
     fn forward_headers(&self) -> HashSet<HeaderName> {
-        self.offline_args.forward_headers()
+        self.forward_headers.iter().cloned().collect()
     }
 }
 
@@ -345,9 +350,7 @@ impl ServerArgs for OnlineLocalArgs {
     }
 
     fn rest_client(&self) -> Option<aptos_rest_client::Client> {
-        Some(aptos_rest_client::Client::new(
-            self.online_args.rest_api_url.clone(),
-        ))
+        self.online_args.rest_client()
     }
 
     fn chain_id(&self) -> ChainId {
@@ -359,7 +362,7 @@ impl ServerArgs for OnlineLocalArgs {
     }
 
     fn forward_headers(&self) -> HashSet<HeaderName> {
-        self.online_args.offline_args.forward_headers()
+        self.online_args.forward_headers()
     }
 }
 
@@ -437,6 +440,15 @@ mod tests {
             "online-remote",
             "--forward-header",
             "",
+        ])
+        .is_err());
+
+        // Offline mode does not connect to a node, so `--forward-header` is rejected there.
+        assert!(CommandArgs::try_parse_from([
+            "aptos-rosetta",
+            "offline",
+            "--forward-header",
+            "x-client-id",
         ])
         .is_err());
     }

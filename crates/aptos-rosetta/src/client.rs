@@ -23,10 +23,9 @@ use aptos_crypto::{
 };
 use aptos_rest_client::aptos_api_types::mime_types::JSON;
 use aptos_types::{account_address::AccountAddress, transaction::RawTransaction};
-use reqwest::{
-    header::{HeaderMap, CONTENT_TYPE},
-    Client as ReqwestClient,
-};
+#[cfg(test)]
+use reqwest::header::HeaderMap;
+use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, convert::TryInto, fmt::Debug, str::FromStr};
 use url::Url;
@@ -36,6 +35,7 @@ use url::Url;
 pub struct RosettaClient {
     address: Url,
     inner: ReqwestClient,
+    #[cfg(test)]
     headers: HeaderMap,
 }
 
@@ -44,11 +44,13 @@ impl RosettaClient {
         RosettaClient {
             address,
             inner: ReqwestClient::new(),
+            #[cfg(test)]
             headers: HeaderMap::new(),
         }
     }
 
-    pub fn with_headers(&self, headers: HeaderMap) -> RosettaClient {
+    #[cfg(test)]
+    pub(crate) fn with_headers(&self, headers: HeaderMap) -> RosettaClient {
         RosettaClient {
             address: self.address.clone(),
             inner: self.inner.clone(),
@@ -146,21 +148,24 @@ impl RosettaClient {
         path: &'static str,
         request: &'a I,
     ) -> anyhow::Result<O> {
-        let mut req_builder = self
+        let req_builder = self
             .inner
             .post(self.address.join(path)?)
-            .header(CONTENT_TYPE, JSON);
-        for name in self.headers.keys() {
-            if name != CONTENT_TYPE {
-                for value in self.headers.get_all(name) {
-                    req_builder = req_builder.header(name.clone(), value.clone());
-                }
-            }
-        }
-        let response = req_builder
-            .body(serde_json::to_string(request)?)
-            .send()
-            .await?;
+            .header(CONTENT_TYPE, JSON)
+            .body(serde_json::to_string(request)?);
+
+        #[cfg(test)]
+        let response = if self.headers.is_empty() {
+            req_builder.send().await?
+        } else {
+            let mut req = req_builder.build()?;
+            aptos_rest_client::merge_missing_headers(req.headers_mut(), &self.headers);
+            self.inner.execute(req).await?
+        };
+
+        #[cfg(not(test))]
+        let response = req_builder.send().await?;
+
         if !response.status().is_success() {
             let error: Error = response.json().await?;
             return Err(anyhow!("Failed API with: {:?}", error));

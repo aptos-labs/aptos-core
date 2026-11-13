@@ -103,7 +103,7 @@ impl RosettaContext {
             (Some(block_cache), Some(rest_client)) => {
                 Some(Arc::new(block_cache.with_rest_client(rest_client.clone())))
             },
-            _ => self.block_cache.clone(),
+            (None, _) | (Some(_), None) => self.block_cache.clone(),
         };
 
         RosettaContext {

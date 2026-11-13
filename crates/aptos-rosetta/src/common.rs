@@ -21,6 +21,7 @@ use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashSet, convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
 use warp::{
+    filters::BoxedFilter,
     http::{header, HeaderMap, HeaderName},
     Filter,
 };
@@ -48,12 +49,14 @@ pub fn check_network(
     }
 }
 
-/// Returns true if `name` is an HTTP hop-by-hop or payload-framing header that must not be
-/// copied verbatim onto outbound node requests.
+/// Returns true if `name` is an HTTP hop-by-hop, payload-framing, or credential header that must
+/// not be copied verbatim onto outbound node requests.
 pub fn is_disallowed_forward_header(name: &HeaderName) -> bool {
-    name == header::CONNECTION
+    name == header::AUTHORIZATION
+        || name == header::CONNECTION
         || name == header::CONTENT_ENCODING
         || name == header::CONTENT_LENGTH
+        || name == header::COOKIE
         || name == header::HOST
         || name == header::PROXY_AUTHENTICATE
         || name == header::PROXY_AUTHORIZATION
@@ -62,14 +65,15 @@ pub fn is_disallowed_forward_header(name: &HeaderName) -> bool {
         || name == header::TRANSFER_ENCODING
         || name == header::UPGRADE
         || name.as_str() == "keep-alive"
+        || name.as_str() == "proxy-connection"
 }
 
-/// Filters `forward_headers` on startup, dropping hop-by-hop and payload-framing headers.
+/// Filters `forward_headers` on startup, dropping hop-by-hop, framing, and credential headers.
 pub fn sanitize_forward_headers(mut forward_headers: HashSet<HeaderName>) -> HashSet<HeaderName> {
     forward_headers.retain(|name| {
         if is_disallowed_forward_header(name) {
             warn!(
-                "Header '{}' is a hop-by-hop or framing header and cannot be forwarded; skipping",
+                "Header '{}' is a hop-by-hop, framing, or credential header and cannot be forwarded; skipping",
                 name
             );
             false
@@ -80,8 +84,9 @@ pub fn sanitize_forward_headers(mut forward_headers: HashSet<HeaderName>) -> Has
     forward_headers
 }
 
-/// Copies only headers present in `allowlist` from `incoming_headers`, excluding any
-/// connection-specific headers nominated by an incoming `Connection` header.
+/// Copies only headers present in `allowlist` (assumed already sanitized via
+/// [`sanitize_forward_headers`]) from `incoming_headers`, excluding any connection-specific
+/// headers nominated by an incoming `Connection` header.
 pub fn filter_headers(incoming_headers: &HeaderMap, allowlist: &HashSet<HeaderName>) -> HeaderMap {
     let mut connection_scoped = HashSet::new();
     for val in incoming_headers.get_all(header::CONNECTION) {
@@ -96,7 +101,7 @@ pub fn filter_headers(incoming_headers: &HeaderMap, allowlist: &HashSet<HeaderNa
 
     let mut forwarded = HeaderMap::new();
     for name in allowlist {
-        if is_disallowed_forward_header(name) || connection_scoped.contains(name) {
+        if connection_scoped.contains(name) {
             continue;
         }
         for value in incoming_headers.get_all(name) {
@@ -108,11 +113,16 @@ pub fn filter_headers(incoming_headers: &HeaderMap, allowlist: &HashSet<HeaderNa
 
 /// Attaches a per-request `RosettaContext` to warp paths, copying any allowlisted incoming
 /// headers onto the request's outbound REST client.
-pub fn with_context(
-    context: RosettaContext,
-) -> impl Filter<Extract = (RosettaContext,), Error = Infallible> + Clone {
-    warp::header::headers_cloned()
-        .map(move |headers: HeaderMap| context.with_forwarded_headers(&headers))
+///
+/// When `context.forward_headers` is empty (the default), skips cloning incoming headers entirely.
+pub fn with_context(context: RosettaContext) -> BoxedFilter<(RosettaContext,)> {
+    if context.forward_headers.is_empty() {
+        warp::any().map(move || context.clone()).boxed()
+    } else {
+        warp::header::headers_cloned()
+            .map(move |headers: HeaderMap| context.with_forwarded_headers(&headers))
+            .boxed()
+    }
 }
 
 /// Fills in an empty request for any REST API path that doesn't take any input body
@@ -560,11 +570,14 @@ mod test {
         let configured: HashSet<HeaderName> = [
             HeaderName::from_static("x-client-id"),
             HeaderName::from_static("x-hop-temp"),
+            header::AUTHORIZATION,
+            header::COOKIE,
             header::HOST,
             header::CONTENT_LENGTH,
             header::TRANSFER_ENCODING,
             header::CONNECTION,
             HeaderName::from_static("keep-alive"),
+            HeaderName::from_static("proxy-connection"),
         ]
         .into_iter()
         .collect();

@@ -4264,6 +4264,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-global-constants",
+ "aptos-infallible",
  "aptos-logger",
  "aptos-node",
  "aptos-rest-client",
