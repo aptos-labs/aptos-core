@@ -404,7 +404,7 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
 
         create_proposal(
             &self.args.txn_options,
-            self.pool_address_args.pool_address,
+            ProposerPool::Stake(self.pool_address_args.pool_address),
             script_hash,
             &self.args.metadata_url,
             metadata_hash,
@@ -414,10 +414,37 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
     }
 }
 
+/// The pool a proposal is made with, which decides the entry function used and
+/// who may sign.
+#[derive(Clone, Copy)]
+pub(crate) enum ProposerPool {
+    /// A stake pool, proposing through its delegated voter.
+    Stake(AccountAddress),
+    /// A delegation pool, proposing through a delegator with enough delegated votes.
+    Delegation(AccountAddress),
+}
+
+impl ProposerPool {
+    pub(crate) fn address(self) -> AccountAddress {
+        match self {
+            ProposerPool::Stake(address) | ProposerPool::Delegation(address) => address,
+        }
+    }
+}
+
+impl std::fmt::Display for ProposerPool {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProposerPool::Stake(address) => write!(f, "stake pool {}", address),
+            ProposerPool::Delegation(address) => write!(f, "delegation pool {}", address),
+        }
+    }
+}
+
 /// Create the on-chain proposal for a script's execution hash and report its id.
 async fn create_proposal(
     txn_options: &TransactionOptions,
-    pool_address: AccountAddress,
+    pool: ProposerPool,
     script_hash: HashValue,
     metadata_url: &Url,
     metadata_hash: HashValue,
@@ -425,26 +452,35 @@ async fn create_proposal(
 ) -> CliTypedResult<ProposalSubmissionSummary> {
     let metadata_url = metadata_url.to_string().as_bytes().to_vec();
     let metadata_hash = metadata_hash.to_hex().as_bytes().to_vec();
-    let payload = if is_multi_step {
-        aptos_stdlib::aptos_governance_create_proposal_v2(
+    let payload = match pool {
+        ProposerPool::Delegation(pool_address) => aptos_stdlib::delegation_pool_create_proposal(
             pool_address,
             script_hash.to_vec(),
             metadata_url,
             metadata_hash,
-            true,
-        )
-    } else {
-        aptos_stdlib::aptos_governance_create_proposal(
+            is_multi_step,
+        ),
+        ProposerPool::Stake(pool_address) if is_multi_step => {
+            aptos_stdlib::aptos_governance_create_proposal_v2(
+                pool_address,
+                script_hash.to_vec(),
+                metadata_url,
+                metadata_hash,
+                true,
+            )
+        },
+        ProposerPool::Stake(pool_address) => aptos_stdlib::aptos_governance_create_proposal(
             pool_address,
             script_hash.to_vec(),
             metadata_url,
             metadata_hash,
-        )
+        ),
     };
     let txn = txn_options.submit_transaction(payload).await?;
     Ok(ProposalSubmissionSummary {
         proposal_id: extract_proposal_id(&txn)?,
         transaction: TransactionSummary::from(&txn),
+        enabled_partial_governance_voting: None,
     })
 }
 
@@ -519,6 +555,10 @@ pub struct ProposalSubmissionSummary {
     pub proposal_id: Option<u64>,
     #[serde(flatten)]
     transaction: TransactionSummary,
+    /// The transaction that enabled partial governance voting on the delegation
+    /// pool, when proposing required it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled_partial_governance_voting: Option<TransactionSummary>,
 }
 
 /// Submit a vote on a proposal
