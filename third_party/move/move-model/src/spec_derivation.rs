@@ -870,13 +870,78 @@ pub fn functional_result_spec_values(
 }
 
 /// Whether the function's specification determines each of its results as a
-/// value over its pre-state arguments and global memory. Then the behavioral
-/// `result_of` the specification constrains is the call's actual result, even
-/// for a transparent function whose body runs in its place.
+/// value over its pre-state arguments and global memory. The behavioral
+/// `result_of` the specification constrains is then the call's actual result
+/// only under [`closure_result_is_carrier`].
 pub fn spec_determines_results(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
     let result_count = env.get_function(id).get_result_type().flatten().len();
     let determined = result_spec_values(env, id, true);
     (0..result_count).all(|idx| determined.contains_key(&idx))
+}
+
+/// [`spec_determines_results`], with no result definition applying a
+/// behavioral predicate or a function value, directly or through a
+/// specification function. Such a definition (`result == result_of<f>(x)`) is
+/// an evaluator term, which need not range over the memory the call reads.
+pub fn spec_determines_results_concretely(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
+    let result_count = env.get_function(id).get_result_type().flatten().len();
+    let definitions = result_spec_definitions(env, id, true);
+    (0..result_count).all(|idx| definitions.iter().any(|(defined, _)| *defined == idx))
+        && definitions
+            .iter()
+            .all(|(_, exp)| exp_applies_no_behavior(env, exp, &mut BTreeSet::new()))
+}
+
+/// Whether a call of `id` through a function value returns the target's
+/// `result_of` carrier: no result definition determines a `&mut` parameter's
+/// post-state, so the target must have none, and every result must be
+/// [`spec_determines_results_concretely`].
+pub fn closure_result_is_carrier(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
+    !env.get_function(id)
+        .get_parameter_types()
+        .iter()
+        .any(Type::is_mutable_reference)
+        && spec_determines_results_concretely(env, id)
+}
+
+fn exp_applies_no_behavior(
+    env: &GlobalEnv,
+    exp: &Exp,
+    visited: &mut BTreeSet<QualifiedId<SpecFunId>>,
+) -> bool {
+    let mut ok = true;
+    exp.visit_pre_order(&mut |e| {
+        match e {
+            ExpData::Call(_, Operation::Behavior(..), _) | ExpData::Invoke(..) => ok = false,
+            ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) => {
+                let qid = mid.qualified(*fid);
+                if visited.insert(qid) {
+                    if let Some(body) = env.get_spec_fun(qid).body.clone() {
+                        ok = exp_applies_no_behavior(env, &body, visited);
+                    }
+                }
+            },
+            ExpData::Call(..)
+            | ExpData::Invalid(_)
+            | ExpData::Value(..)
+            | ExpData::LocalVar(..)
+            | ExpData::Temporary(..)
+            | ExpData::Lambda(..)
+            | ExpData::Quant(..)
+            | ExpData::Block(..)
+            | ExpData::IfElse(..)
+            | ExpData::Match(..)
+            | ExpData::Return(..)
+            | ExpData::Sequence(..)
+            | ExpData::Loop(..)
+            | ExpData::LoopCont(..)
+            | ExpData::Assign(..)
+            | ExpData::Mutate(..)
+            | ExpData::SpecBlock(..) => {},
+        }
+        ok
+    });
+    ok
 }
 
 /// The results the specification determines, by index: as pure single-state
@@ -886,6 +951,17 @@ fn result_spec_values(
     id: QualifiedId<FunId>,
     allow_memory: bool,
 ) -> BTreeMap<usize, Exp> {
+    result_spec_definitions(env, id, allow_memory)
+        .into_iter()
+        .collect()
+}
+
+/// Every result definition among the specification's `ensures` conjuncts.
+fn result_spec_definitions(
+    env: &GlobalEnv,
+    id: QualifiedId<FunId>,
+    allow_memory: bool,
+) -> Vec<(usize, Exp)> {
     use crate::ast::ConditionKind;
 
     let fun = env.get_function(id);

@@ -1409,9 +1409,9 @@ fn mark_transparent_result_dependencies_solver_hard(env: &GlobalEnv) {
 /// generated carrier is not related to that runtime result and cannot justify
 /// a caller postcondition such as `result == result_of<f>(args)`.
 ///
-/// When the transparent function's own specification determines its results,
-/// the carrier it constrains is the actual result, and the condition relies
-/// on nothing unrelated.
+/// When the backend binds a call through a function value to the carrier
+/// (`spec_derivation::closure_result_is_carrier`), the carrier is the actual
+/// result, and the condition relies on nothing unrelated.
 ///
 /// Such clauses are retained for inspection but marked `sathard`; an abort
 /// clause relying on one leaves the contract partial.
@@ -1427,7 +1427,15 @@ fn condition_depends_on_transparent_result(env: &GlobalEnv, exp: &Exp) -> bool {
             && !env
                 .get_function((*module_id).qualified(*fun_id))
                 .is_opaque()
-            && !spec_derivation::spec_determines_results(env, (*module_id).qualified(*fun_id))
+            && !(spec_derivation::closure_result_is_carrier(env, (*module_id).qualified(*fun_id))
+                // The backend binds only after a successful call; a caller's
+                // clause must also hold where `requires` fails and the result is fresh.
+                && !env
+                    .get_function((*module_id).qualified(*fun_id))
+                    .get_spec()
+                    .conditions
+                    .iter()
+                    .any(|cond| cond.kind == ConditionKind::Requires))
             && !spec_derivation::has_derived_behavior(
                 env,
                 (*module_id).qualified(*fun_id),
