@@ -27,6 +27,7 @@ use aptos_executor_types::VerifyExecutionMode;
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
+use itertools::Itertools;
 use proptest::{prelude::*, sample::Index};
 use std::{convert::TryInto, sync::Arc};
 use tokio::time::Duration;
@@ -165,32 +166,41 @@ fn test_end_to_end_impl(d: TestData) {
 
     // Check
     let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
+    // The restore stops at the last block end at or before the target.
+    let restored_ver =
+        d.db.get_transaction_info_iterator(0, d.target_ver + 1)
+            .unwrap()
+            .positions(|txn_info| txn_info.unwrap().has_state_checkpoint_hash())
+            .last()
+            .unwrap() as Version;
+    assert_eq!(tgt_db.expect_synced_version(), restored_ver);
+    let num_restored = restored_ver - d.txn_start_ver + 1;
     assert_eq!(
         d.db.get_transactions(
             d.txn_start_ver,
-            num_txns_to_backup,
-            d.target_ver,
+            num_restored,
+            restored_ver,
             true /* fetch_events */
         )
         .unwrap(),
         tgt_db
             .get_transactions(
                 d.txn_start_ver,
-                num_txns_to_backup,
-                d.target_ver,
+                num_restored,
+                restored_ver,
                 true /* fetch_events */
             )
             .unwrap()
     );
     if let Some(state_snapshot_ver) = d.state_snapshot_ver {
         let first_replayed = state_snapshot_ver + 1;
-        let num_replayed = d.target_ver - state_snapshot_ver;
+        let num_replayed = restored_ver - state_snapshot_ver;
         // Events recreated:
         assert_eq!(
-            d.db.get_transactions(first_replayed, num_replayed, d.target_ver, true)
+            d.db.get_transactions(first_replayed, num_replayed, restored_ver, true)
                 .unwrap(),
             tgt_db
-                .get_transactions(first_replayed, num_replayed, d.target_ver, true)
+                .get_transactions(first_replayed, num_replayed, restored_ver, true)
                 .unwrap()
         );
     };

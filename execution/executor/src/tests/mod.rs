@@ -12,8 +12,11 @@ use aptos_executor_types::{
     BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
-    state_store::state_view::cached_state_view::CachedStateView, DbReaderWriter, LedgerSummary,
-    Result,
+    state_store::{
+        collateral::CollateralParent, orders::OrderParent, positions::PositionParent,
+        state_view::cached_state_view::CachedStateView,
+    },
+    DbReaderWriter, LedgerSummary, Result,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -504,7 +507,7 @@ fn apply_transaction_by_writeset(
     let state_view = CachedStateView::new(
         StateViewId::Miscellaneous,
         db.reader.clone(),
-        ledger_summary.state.latest().clone(),
+        ledger_summary.state.last_checkpoint().clone(),
     )
     .unwrap();
     let aux_info = txns
@@ -519,11 +522,32 @@ fn apply_transaction_by_writeset(
             )
         })
         .collect();
+    let position_floor = db.writer.advance_position_base(None).unwrap();
+    let parent_positions = ledger_summary
+        .positions
+        .as_ref()
+        .zip(position_floor.as_ref())
+        .map(|(overlay, floor)| PositionParent { overlay, floor });
+    let order_floor = db.writer.advance_order_base(None).unwrap();
+    let parent_orders = ledger_summary
+        .orders
+        .as_ref()
+        .zip(order_floor.as_ref())
+        .map(|(overlay, floor)| OrderParent { overlay, floor });
+    let collateral_floor = db.writer.advance_collateral_base(None).unwrap();
+    let parent_collateral = ledger_summary
+        .collateral
+        .as_ref()
+        .zip(collateral_floor.as_ref())
+        .map(|(overlay, floor)| CollateralParent { overlay, floor });
     let chunk_output = DoGetExecutionOutput::by_transaction_output(
         txns,
         txn_outs,
         aux_info,
         &ledger_summary.state,
+        parent_positions,
+        parent_orders,
+        parent_collateral,
         state_view,
         TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     )

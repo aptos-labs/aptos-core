@@ -1,0 +1,99 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/fun_value_equality.move:18:9
+   │
+18 │         ensures p != q;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/fun_value_equality.move:13: two_params
+   =         p = <redacted>
+   =         q = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:14: two_params
+   =         result = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:18: two_params (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/fun_value_equality.move:28:9
+   │
+28 │         ensures s.cb != p;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/fun_value_equality.move:22: param_and_field
+   =         s = <redacted>
+   =         p = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:25: param_and_field
+   =         result = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:28: param_and_field (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/fun_value_equality.move:38:9
+   │
+38 │         ensures a.cb != b.cb;
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/fun_value_equality.move:32: two_fields
+   =         a = <redacted>
+   =         b = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:35: two_fields
+   =         result = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:38: two_fields (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/fun_value_equality.move:76:9
+   │
+76 │         ensures result == false;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/fun_value_equality.move:72: boxed_params
+   =         p = <redacted>
+   =         q = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:73: boxed_params
+   =         result = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:76: boxed_params (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/fun_value_equality.move:88:9
+   │
+88 │         ensures result == false;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/fun_value_equality.move:84: captured_params
+   =         p = <redacted>
+   =         q = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:85: captured_params
+   =     at tests/sources/regression/fun_value_equality.move:79: wrap
+   =         f = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:80: wrap
+   =         result = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:79: wrap
+   =         f = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:80: wrap
+   =         result = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:88: captured_params (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/fun_value_equality.move:98:9
+   │
+98 │         ensures (p, 1) != (q, 1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/fun_value_equality.move:92: tupled_params
+   =         p = <redacted>
+   =         q = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:95: tupled_params
+   =         result = <redacted>
+   =     at tests/sources/regression/fun_value_equality.move:98: tupled_params (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/fun_value_equality.move:107:9
+    │
+107 │         ensures result == false;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/fun_value_equality.move:102: field_and_closure
+    =         s = <redacted>
+    =     at tests/sources/regression/fun_value_equality.move:103: field_and_closure
+    =         k = <redacted>
+    =     at tests/sources/regression/fun_value_equality.move:104: field_and_closure
+    =         result = <redacted>
+    =     at tests/sources/regression/fun_value_equality.move:107: field_and_closure (spec)

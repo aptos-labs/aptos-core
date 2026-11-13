@@ -1,0 +1,22 @@
+processed 3 tasks
+task 0 lines 4-38:  publish --verbose [module 0x66::a]
+task 1 lines 40-40:  run 0x66::a::move_from_missing --verbose
+Error: Function execution failed with VMError: {
+    message: Failed to move resource from 0000000000000000000000000000000000000000000000000000000000000077,
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(2), 2)] }),
+}
+task 2 lines 42-42:  run 0x66::a::move_to_existing --signers 0x66 --verbose
+Error: Function execution failed with VMError: {
+    message: Failed to move resource into 0000000000000000000000000000000000000000000000000000000000000066,
+    major_status: RESOURCE_ALREADY_EXISTS,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(3), 6)] }),
+}

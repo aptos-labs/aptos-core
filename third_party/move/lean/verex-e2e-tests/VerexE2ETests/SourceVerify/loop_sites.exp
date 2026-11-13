@@ -1,0 +1,10 @@
+VerexE2ETests/SourceVerify/loop_sites.spec.lean:23:5: info: nested: the outer invariant after an iteration
+VerexE2ETests/SourceVerify/loop_sites.spec.lean:25:5: info: nested: the inner invariant at entry
+VerexE2ETests/SourceVerify/loop_sites.spec.lean:27:5: info: nested: the inner invariant after an iteration
+VerexE2ETests/SourceVerify/loop_sites.spec.lean:28:40: info: nested: `total += 1` aborts
+VerexE2ETests/SourceVerify/loop_sites.spec.lean:29:40: info: nested: `row += 1` aborts
+VerexE2ETests/SourceVerify/loop_sites.spec.lean:47:5: info: skip_rows: the inner invariant after an iteration
+VerexE2ETests/SourceVerify/loop_sites.spec.lean:49:5: info: skip_rows: `continue` of the outer loop
+VerexE2ETests/SourceVerify/loop_sites.spec.lean:65:5: info: classify: the first loop's invariant after an iteration
+VerexE2ETests/SourceVerify/loop_sites.spec.lean:67:5: info: classify: the second loop's invariant at entry
+VerexE2ETests/SourceVerify/loop_sites.spec.lean:80:7: info: facts: at the loop's step

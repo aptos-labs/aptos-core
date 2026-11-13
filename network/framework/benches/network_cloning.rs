@@ -14,9 +14,10 @@
 //!   5. connection_notification_broadcast - broadcast clone vs move
 //!   6. direct_send_msg_clone            - Vec<u8> vs Bytes payload cloning
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    hint::black_box,
     sync::Arc,
 };
 

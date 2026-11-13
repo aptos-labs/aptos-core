@@ -158,3 +158,72 @@ fn test_push_expect_enqueued_on_drop() {
     sender.push_expect_enqueued(0, 'a').unwrap();
     assert!(sender.push_expect_enqueued(0, 'b').is_err());
 }
+
+#[test]
+fn test_filtered_receive_preserves_backlog_and_closed_channel() {
+    for style in [QueueStyle::FIFO, QueueStyle::LIFO, QueueStyle::KLAST] {
+        let (sender, mut receiver) = aptos_channel::new(style, 2, None);
+        let (status_tx, mut status_rx) = oneshot::channel();
+        sender.push_with_feedback(0, 10, Some(status_tx)).unwrap();
+        sender.push(0, 11).unwrap();
+        sender.push(1, 20).unwrap();
+        sender.push(2, 30).unwrap();
+        sender.push(1, 21).unwrap();
+        drop(sender);
+
+        let mut cx = std::task::Context::from_waker(futures::task::noop_waker_ref());
+        let (first, second) = match style {
+            QueueStyle::FIFO | QueueStyle::KLAST => (20, 21),
+            QueueStyle::LIFO => (21, 20),
+        };
+        assert_eq!(
+            receiver.poll_next_filtered(&mut cx, |key| *key != 0),
+            std::task::Poll::Ready(Some(first))
+        );
+        assert_eq!(
+            receiver.poll_next_filtered(&mut cx, |key| *key != 0),
+            std::task::Poll::Ready(Some(30))
+        );
+        assert_eq!(
+            receiver.poll_next_filtered(&mut cx, |key| *key != 0),
+            std::task::Poll::Ready(Some(second))
+        );
+        assert_eq!(
+            receiver.poll_next_filtered(&mut cx, |key| *key != 0),
+            std::task::Poll::Pending
+        );
+        assert!(!receiver.is_terminated());
+        assert_eq!(status_rx.try_recv().unwrap(), None);
+
+        let expected = match style {
+            QueueStyle::FIFO | QueueStyle::KLAST => vec![10, 11],
+            QueueStyle::LIFO => vec![11, 10],
+        };
+        for message in expected {
+            assert_eq!(block_on(receiver.next()), Some(message));
+        }
+        assert_eq!(block_on(status_rx).unwrap(), ElementStatus::Dequeued);
+        assert_eq!(block_on(receiver.next()), None);
+        assert!(receiver.is_terminated());
+    }
+}
+
+#[tokio::test]
+async fn test_filtered_receive_wakes_for_eligible_key() {
+    let (sender, mut receiver) = aptos_channel::new(QueueStyle::FIFO, 2, None);
+    sender.push(0, 10).unwrap();
+    let producer = tokio::spawn(async move {
+        sleep(Duration::from_millis(10)).await;
+        sender.push(1, 20).unwrap();
+    });
+    let message = tokio::time::timeout(
+        Duration::from_secs(1),
+        futures::future::poll_fn(|cx| receiver.poll_next_filtered(cx, |key| *key == 1)),
+    )
+    .await
+    .unwrap();
+    assert_eq!(message, Some(20));
+    producer.await.unwrap();
+    assert_eq!(receiver.next().await, Some(10));
+    assert_eq!(receiver.next().await, None);
+}

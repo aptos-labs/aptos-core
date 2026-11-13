@@ -1,0 +1,28 @@
+--- a/sources/trading/extracted_price_time_index.move
++++ b/sources/trading/extracted_price_time_index.move
+@@ -20,0 +21,6 @@ module aptos_experimental::extracted_price_time_index {
++    spec best_bid_price {
++        pragma opaque;
++        aborts_if false;
++        ensures result == self.best_bid;
++    }
++
+@@ -24,0 +31,6 @@ module aptos_experimental::extracted_price_time_index {
++    spec best_ask_price {
++        pragma opaque;
++        aborts_if false;
++        ensures result == self.best_ask;
++    }
++
+@@ -35,0 +48,11 @@ module aptos_experimental::extracted_price_time_index {
++
++    spec is_taker_order {
++        pragma opaque;
++        aborts_if false;
++        ensures is_bid ==> result == (
++            std::option::spec_is_some(self.best_ask) && price >= std::option::spec_borrow(self.best_ask)
++        );
++        ensures !is_bid ==> result == (
++            std::option::spec_is_some(self.best_bid) && price <= std::option::spec_borrow(self.best_bid)
++        );
++    }

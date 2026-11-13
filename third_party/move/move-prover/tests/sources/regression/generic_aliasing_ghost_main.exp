@@ -16,28 +16,21 @@ error: global memory invariant does not hold
    =         s = <redacted>
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:26: set_n (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:50: f
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:26: set_n (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:24: set_n
    =         s = <redacted>
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:31: set_r (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:32: set_r (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:51: f
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:31: set_r (spec)
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:32: set_r (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:29: set_r
    =         s = <redacted>
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:37: set_s (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:38: set_s (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:52: f
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:37: set_s (spec)
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:38: set_s (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:35: set_s
    =         s = <redacted>
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:43: set_q (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:44: set_q (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:53: f
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:43: set_q (spec)
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:44: set_q (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:41: set_q
    =         s = <redacted>
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:54: f
@@ -59,21 +52,16 @@ error: global memory invariant does not hold
    =         s = <redacted>
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:79: set_n (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:97: f
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:79: set_n (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:77: set_n
    =         s = <redacted>
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:84: set_r (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:85: set_r (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:98: f
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:84: set_r (spec)
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:85: set_r (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:82: set_r
    =         s = <redacted>
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:90: set_s (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:91: set_s (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:99: f
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:90: set_s (spec)
-   =     at tests/sources/regression/generic_aliasing_ghost_main.move:91: set_s (spec)
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:88: set_s
    =         s = <redacted>
    =     at tests/sources/regression/generic_aliasing_ghost_main.move:100: f

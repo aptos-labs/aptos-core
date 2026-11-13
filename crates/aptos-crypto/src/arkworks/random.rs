@@ -23,7 +23,7 @@ pub trait UniformRand {
 /// Benches suggest that when generating a *single* point, it's roughly as fast as `unsafe_random_point()` - about 30µs
 pub fn unsafe_random_point_slow<C: CurveGroup, R>(rng: &mut R) -> C
 where
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     let r: C::ScalarField = sample_field_element(rng);
 
@@ -36,7 +36,7 @@ where
 /// of hashing get reused? // TODO: Remove in the future
 pub fn unsafe_random_points_slow<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
 where
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     (0..n)
         .map(|_| unsafe_random_point_slow::<C, R>(rng))
@@ -47,7 +47,7 @@ where
 /// But still not very fast
 pub fn unsafe_random_point<A: AffineRepr, R>(rng: &mut R) -> A
 where
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     // Generate some random bytes
     let mut buf = [0u8; 32];
@@ -60,7 +60,7 @@ where
 /// Very similar, but turns affine element into group element for convenience
 pub fn unsafe_random_point_group<C: CurveGroup, R>(rng: &mut R) -> C
 where
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     unsafe_random_point::<C::Affine, _>(rng).into()
 }
@@ -69,7 +69,7 @@ where
 /// because it involves a hashing function which is sensitive to timing attacks
 pub fn unsafe_random_points<A: AffineRepr, R>(n: usize, rng: &mut R) -> Vec<A>
 where
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     (0..n).map(|_| unsafe_random_point(rng)).collect()
 }
@@ -77,7 +77,7 @@ where
 /// Very similar, but turns affine elements into group elements for convenience
 pub fn unsafe_random_points_group<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
 where
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     (0..n)
         .map(|_| unsafe_random_point::<C::Affine, _>(rng).into())

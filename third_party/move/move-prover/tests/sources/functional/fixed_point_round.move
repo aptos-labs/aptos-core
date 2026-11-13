@@ -27,6 +27,7 @@ module 0x1::fixed_point64 {
         (val >> 64 as u128)
     }
     spec ceil {
+        pragma heartbeats = 50;
         pragma opaque;
         aborts_if false;
         ensures result == spec_ceil(self);
@@ -46,6 +47,7 @@ module 0x1::fixed_point64 {
         }
     }
     spec round {
+        pragma heartbeats = 50;
         pragma opaque;
         aborts_if false;
         ensures result == spec_round(self);

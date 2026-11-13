@@ -424,6 +424,7 @@ module 0x42::loop_memory_havoc {
         };
     }
     spec rec_bump {
+        pragma opaque;
         requires exists<R>(a);
         ensures R[a].x == old(R[a].x);
     }

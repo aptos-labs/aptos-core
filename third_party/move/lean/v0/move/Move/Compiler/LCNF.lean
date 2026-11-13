@@ -8,7 +8,7 @@ import Lean.Compiler.LCNF.PrettyPrinter
 /-!
 # Access to Lean's normalized compiler IR
 
-Leaner consumes base LCNF rather than raw elaborator expressions.  This gives
+Verex consumes base LCNF rather than raw elaborator expressions.  This gives
 the backend a small, ANF-like language after notation, type classes, `do`, and
 the `StateM` presentation of `Action` have been elaborated.
 -/
@@ -27,11 +27,11 @@ def getBaseDecl (declName : Name) : CoreM (Decl .pure) := do
     | throwError "Lean did not retain base LCNF for `{declName}`"
   return decl
 
-/-- Developer aid: show precisely the LCNF consumed by the Leaner backend. -/
-syntax (name := printLeanerLCNF) "#print_leaner_lcnf " ident : command
+/-- Developer aid: show precisely the LCNF consumed by the Verex backend. -/
+syntax (name := printVerexLCNF) "#print_verex_lcnf " ident : command
 
 elab_rules : command
-  | `(#print_leaner_lcnf $decl:ident) => do
+  | `(#print_verex_lcnf $decl:ident) => do
       let declName ← liftCoreM <| resolveGlobalConstNoOverload decl
       liftCoreM do
         let ir ← getBaseDecl declName

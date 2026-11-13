@@ -7,6 +7,7 @@ use super::{
         session::FlowSession,
     },
     load_sanitized_prover_options, module_part_of, resolve_excludes, resolve_filter,
+    resolve_filters,
 };
 use crate::{
     evaluation::LOOP_INVARIANT_EVIDENCE_DEPTH,
@@ -31,6 +32,9 @@ struct MovePackageVerifyParams {
     /// A module name without an address must be unambiguous.
     /// When omitted, all target modules are verified.
     filter: Option<String>,
+    /// Optional list of functions to verify together, each in the format of a
+    /// function `filter`. Use instead of `filter`.
+    functions: Option<Vec<String>>,
     /// Optional list of targets to exclude from verification.
     /// Each entry follows the same format as `filter`.
     /// Exclusions take precedence over the filter scope.
@@ -63,15 +67,16 @@ const MIN_ATTRIBUTION_BUDGET_SECS: u64 = 20;
 fn attribute_timeout(
     env: &GlobalEnv,
     package: &std::path::Path,
-    filter: &Option<String>,
+    filters: &[String],
     vc_timeout: usize,
     budget: std::time::Duration,
 ) -> String {
-    let Some(filter) = filter else {
-        return String::new();
-    };
     // Naming the functions in scope needs a model, and the session holds one.
-    let scoped = scoped_function_names(env, Some(filter));
+    let scoped = match filters {
+        [] => return String::new(),
+        [filter] => scoped_function_names(env, Some(filter)),
+        functions => functions.to_vec(),
+    };
     if budget < std::time::Duration::from_secs(MIN_ATTRIBUTION_BUDGET_SECS) {
         return String::new();
     }
@@ -97,8 +102,8 @@ fn count_reported_errors(env: &GlobalEnv) -> usize {
 ///
 /// Answered from the model the session already holds, so a scope with no loop
 /// costs nothing to rule out.
-fn scope_contains_loop(env: &GlobalEnv, filter: &Option<String>) -> bool {
-    let selected = match resolve_filter(env, filter.as_deref()) {
+fn scope_contains_loop(env: &GlobalEnv, filters: &[String]) -> bool {
+    let selected = match resolve_filters(env, filters) {
         Ok((scope, _)) => scope,
         // An unresolvable filter is reported elsewhere; do not suppress
         // evidence on account of it.
@@ -111,6 +116,7 @@ fn scope_contains_loop(env: &GlobalEnv, filter: &Option<String>) -> bool {
             VerifiedScope::Package => true,
             VerifiedScope::Module(id) => function.module_env.get_id() == *id,
             VerifiedScope::Function(id) => function.get_qualified_id() == *id,
+            VerifiedScope::Functions(ids) => ids.contains(&function.get_qualified_id()),
         })
         .any(|function| {
             function.get_def().is_some_and(|def| {
@@ -130,11 +136,7 @@ fn scope_contains_loop(env: &GlobalEnv, filter: &Option<String>) -> bool {
 ///
 /// Inference runs on a throwaway model and writes nothing: only its
 /// diagnostics are kept.
-fn loop_invariant_evidence(
-    package: &std::path::Path,
-    filter: &Option<String>,
-    depth: usize,
-) -> String {
+fn loop_invariant_evidence(package: &std::path::Path, filters: &[String], depth: usize) -> String {
     let mut options = match load_sanitized_prover_options(package) {
         Ok(options) => options,
         Err(_) => return String::new(),
@@ -160,8 +162,8 @@ fn loop_invariant_evidence(
         Ok(env) => env,
         Err(_) => return String::new(),
     };
-    if let Some(filter) = filter {
-        match resolve_filter(&env, Some(filter.as_str())) {
+    if !filters.is_empty() {
+        match resolve_filters(&env, filters) {
             Ok((_, scope)) => options.prover.verify_scope = scope,
             Err(_) => return String::new(),
         }
@@ -219,10 +221,11 @@ impl FlowSession {
         Parameters(params): Parameters<MovePackageVerifyParams>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         log::info!(
-            "move_package_verify({}, filter={:?}, exclude={:?}, timeout={:?}, \
+            "move_package_verify({}, filter={:?}, functions={:?}, exclude={:?}, timeout={:?}, \
              split_vcs_by_assert={:?}, error_limit={:?})",
             params.package_path,
             params.filter,
+            params.functions,
             params.exclude,
             params.timeout,
             params.split_vcs_by_assert,
@@ -234,8 +237,22 @@ impl FlowSession {
             &self.resolve_package_path(&params.package_path)?,
         ))?;
         let (pkg, _) = self.resolve_package(&params.package_path).await?;
-        let filter = params.filter.clone();
-        let verification_filter = params.filter.clone();
+        let filters: Vec<String> = match (params.filter.clone(), params.functions.clone()) {
+            (Some(_), Some(_)) => {
+                return Ok(CallToolResult::error(vec![Content::text(
+                    "give either `filter` or `functions`, not both",
+                )]))
+            },
+            (None, Some(functions)) if functions.is_empty() => {
+                return Ok(CallToolResult::error(vec![Content::text(
+                    "`functions` names no function",
+                )]))
+            },
+            (Some(filter), None) => vec![filter],
+            (None, Some(functions)) => functions,
+            (None, None) => vec![],
+        };
+        let verification_filters = filters.clone();
         let attribute_timeouts = self.evaluation().feedback_level.acceptance_check_enabled();
         let evidence_depth = Some(LOOP_INVARIANT_EVIDENCE_DEPTH);
         let exclude = params.exclude.clone();
@@ -244,7 +261,7 @@ impl FlowSession {
         let error_limit = params.error_limit;
         let telemetry = self.telemetry().clone();
         let telemetry_package = self.resolve_package_path(&params.package_path)?;
-        let telemetry_filter = filter.clone();
+        let telemetry_filter = (!filters.is_empty()).then(|| filters.join(", "));
         let package_timeout_secs = self.tool_timeout().as_secs().max(1);
 
         if vc_timeout == 0 || vc_timeout > MAX_VC_TIMEOUT {
@@ -263,8 +280,8 @@ impl FlowSession {
         // No tool-level deadline: the prover's own watchdog bounds every Boogie
         // process and kills its solver process group.
         let result = tokio::task::spawn_blocking(move || {
-            let (verification_filter, attribute_timeouts, evidence_depth) =
-                (verification_filter, attribute_timeouts, evidence_depth);
+            let (verification_filters, attribute_timeouts, evidence_depth) =
+                (verification_filters, attribute_timeouts, evidence_depth);
             let mut data = pkg.lock().unwrap();
 
             // 1. Check for compilation errors.
@@ -275,7 +292,7 @@ impl FlowSession {
             }
 
             // 2. Resolve filter into (VerifiedScope, VerificationScope).
-            let (scope, verification_scope) = resolve_filter(data.env(), filter.as_deref())?;
+            let (scope, verification_scope) = resolve_filters(data.env(), &filters)?;
             let verify_exclude = resolve_excludes(exclude.as_deref());
             let has_excludes = !verify_exclude.is_empty();
 
@@ -381,14 +398,14 @@ impl FlowSession {
                 .as_deref()
                 .map(|v| v.iter().filter(|e| !e.contains("::")).cloned().collect())
                 .unwrap_or_default();
-            let needs_filtered_env = filter.is_some() || !excluded_modules.is_empty();
+            let needs_filtered_env = !filters.is_empty() || !excluded_modules.is_empty();
             let mut maybe_filtered_env = if needs_filtered_env {
-                match data.build_filtered_env(filter.as_deref(), &excluded_modules) {
+                match data.build_filtered_env(&filters, &excluded_modules) {
                     Ok(env) => Some(env),
                     Err(e) => {
                         return Ok(CallToolResult::error(vec![Content::text(format!(
                             "failed to rebuild env for filter `{:?}` exclude `{:?}`: {}",
-                            filter, excluded_modules, e
+                            filters, excluded_modules, e
                         ))]))
                     },
                 }
@@ -403,20 +420,28 @@ impl FlowSession {
             // modules that survived (e.g. via soft fallback on file-share)
             // remain so the prover still applies them.
             let env_for_check = maybe_filtered_env.as_ref().unwrap_or_else(|| data.env());
+            let module_is_target = |module_name: &str| {
+                env_for_check
+                    .get_modules()
+                    .any(|m| m.is_target() && m.matches_name(module_name))
+            };
             let prover_verify_exclude: Vec<_> = verify_exclude
                 .iter()
-                .filter(|s| {
+                .filter_map(|s| {
                     use move_model::model::VerificationScope::*;
-                    let module_name = match s {
-                        OnlyModule(name) => name.as_str(),
-                        Only(qname) => module_part_of(qname),
-                        _ => return true,
-                    };
-                    env_for_check
-                        .get_modules()
-                        .any(|m| m.is_target() && m.matches_name(module_name))
+                    match s {
+                        OnlyModule(name) => module_is_target(name).then(|| s.clone()),
+                        Only(qnames) => {
+                            let kept: Vec<_> = qnames
+                                .iter()
+                                .filter(|qname| module_is_target(module_part_of(qname)))
+                                .cloned()
+                                .collect();
+                            (!kept.is_empty()).then_some(Only(kept))
+                        },
+                        _ => Some(s.clone()),
+                    }
                 })
-                .cloned()
                 .collect();
 
             // 6. Build prover options.
@@ -551,7 +576,7 @@ impl FlowSession {
                             attribute_timeout(
                                 data.env(),
                                 data.path(),
-                                &verification_filter,
+                                &verification_filters,
                                 vc_timeout,
                                 attribution_budget,
                             )
@@ -564,9 +589,9 @@ impl FlowSession {
                         // and most failures here are not about loops.
                         let evidence = match evidence_depth {
                             Some(depth)
-                                if scope_contains_loop(data.env(), &verification_filter) =>
+                                if scope_contains_loop(data.env(), &verification_filters) =>
                             {
-                                loop_invariant_evidence(data.path(), &verification_filter, depth)
+                                loop_invariant_evidence(data.path(), &verification_filters, depth)
                             },
                             _ => String::new(),
                         };

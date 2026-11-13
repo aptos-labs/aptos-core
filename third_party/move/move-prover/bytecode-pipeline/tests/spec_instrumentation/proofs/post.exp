@@ -49,13 +49,12 @@ fun TestPost::scale($t0|x: u64, $t1|factor: u64): u64 {
 fun TestPost::double($t0|x: u64): u64 {
      var $t1: u64
      var $t2: num
-  0: assume Le(Add($t0, $t0), 18446744073709551615)
      # VC: proof assertion not satisfied at tests/spec_instrumentation/proofs/post.move:17:9+22
-  1: assert Eq<num>(Add($t0, $t0), Mul(2, $t0))
-  2: $t1 := +($t0, $t0) on_abort goto 4 with $t2
-  3: return $t1
-  4: label L1
-  5: abort($t2)
+  0: assert Eq<num>(Add($t0, $t0), Mul(2, $t0))
+  1: $t1 := +($t0, $t0) on_abort goto 3 with $t2
+  2: return $t1
+  3: label L1
+  4: abort($t2)
 }
 
 
@@ -123,11 +122,10 @@ fun TestPost::scale($t0|x: u64, $t1|factor: u64): u64 {
      var $t3: u64
      var $t4: num
   0: assume Identical($t2, Mul($t0, $t1))
-  1: assume Le(Mul($t0, $t1), 18446744073709551615)
-  2: $t3 := *($t0, $t1) on_abort goto 4 with $t4
-  3: return $t3
-  4: label L1
-  5: abort($t4)
+  1: $t3 := *($t0, $t1) on_abort goto 3 with $t4
+  2: return $t3
+  3: label L1
+  4: abort($t4)
 }
 
 

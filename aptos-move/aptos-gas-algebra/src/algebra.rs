@@ -27,6 +27,8 @@ pub type NumTypeTagPseudoGasUnits = GasQuantity<TypeTagPseudoGasUnit>;
 pub type AbstractValueSizePerTypeTagPseudoGasUnit =
     GasQuantity<UnitDiv<AbstractValueUnit, TypeTagPseudoGasUnit>>;
 
+pub type AbstractValueSizePerByte = GasQuantity<UnitDiv<AbstractValueUnit, Byte>>;
+
 /// Unit of (external) gas.
 pub enum GasUnit {}
 
@@ -44,6 +46,9 @@ pub type Fee = GasQuantity<Octa>;
 
 pub type FeePerGasUnit = GasQuantity<UnitDiv<Octa, GasUnit>>;
 
+/// A unitless multiplier on gas.
+pub type GasMultiplier = GasQuantity<UnitDiv<GasUnit, GasUnit>>;
+
 /// Unit of storage slot
 pub enum Slot {}
 
@@ -57,6 +62,11 @@ pub type FeePerByte = GasQuantity<UnitDiv<Octa, Byte>>;
 pub enum Module {}
 
 pub type NumModules = GasQuantity<Module>;
+
+/// Unit of bytecode (file format) version.
+pub enum BytecodeVersionUnit {}
+
+pub type BytecodeVersion = GasQuantity<BytecodeVersionUnit>;
 
 /***************************************************************************************************
  * Unit Conversion

@@ -240,9 +240,34 @@ impl Context {
             .map_err(|e| E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError))
     }
 
+    /// Whether the node has committed any data yet.
+    ///
+    /// A node that is still bootstrapping (e.g. one that is fast syncing) is
+    /// given the genesis ledger info up front so it can establish provenance,
+    /// but holds none of the ledger data behind it until its snapshot lands.
+    ///
+    /// A failure to read is an error rather than an absence of data: a node
+    /// whose storage is broken must not be mistaken for one that is merely
+    /// still catching up.
+    pub fn is_bootstrapped<E: ServiceUnavailableError>(&self) -> Result<bool, E> {
+        self.db
+            .get_synced_version()
+            .map(|version| version.is_some())
+            .map_err(|error| {
+                E::service_unavailable_with_code_no_info(error, AptosErrorCode::InternalError)
+            })
+    }
+
     pub fn get_latest_storage_ledger_info<E: ServiceUnavailableError>(
         &self,
     ) -> Result<LedgerInfo, E> {
+        if !self.is_bootstrapped()? {
+            return Err(E::service_unavailable_with_code_no_info(
+                "The node has not finished bootstrapping and has no ledger data to serve yet",
+                AptosErrorCode::NodeNotBootstrapped,
+            ));
+        }
+
         let ledger_info = self
             .get_latest_ledger_info_with_signatures()
             .context("Failed to retrieve latest ledger info")
@@ -275,6 +300,16 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info<E: ServiceUnavailableError>(&self) -> Result<LedgerInfo, E> {
+        // Checked before dispatching: the indexer path below reports its own
+        // lack of data as an internal error, which reads the same as a broken
+        // store.
+        if !self.is_bootstrapped()? {
+            return Err(E::service_unavailable_with_code_no_info(
+                "The node has not finished bootstrapping and has no ledger data to serve yet",
+                AptosErrorCode::NodeNotBootstrapped,
+            ));
+        }
+
         if let Some(indexer_reader) = self.indexer_reader.as_ref() {
             if indexer_reader.is_internal_indexer_enabled() {
                 return self.get_latest_internal_indexer_ledger_info();
@@ -368,7 +403,7 @@ impl Context {
                     // Indexer doesn't have data yet as DB is boostrapping.
                     return Err(E::service_unavailable_with_code_no_info(
                         "DB is bootstrapping",
-                        AptosErrorCode::InternalError,
+                        AptosErrorCode::NodeNotBootstrapped,
                     ));
                 }
             }

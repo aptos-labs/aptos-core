@@ -57,7 +57,7 @@ fn get_metric_families() -> Vec<MetricFamily> {
         let family_count = metric_family.get_metric().len();
         if family_count > 2000 {
             families_over_2000 = families_over_2000.saturating_add(1);
-            let name = metric_family.get_name();
+            let name = metric_family.name();
             warn!(
                 count = family_count,
                 metric_family = name,
@@ -115,10 +115,10 @@ fn get_metrics_map(metric_families: Vec<MetricFamily>) -> HashMap<String, String
             let label_strings: Vec<String> = m
                 .get_label()
                 .iter()
-                .map(|l| format!("{}={}", l.get_name(), l.get_value()))
+                .map(|l| format!("{}={}", l.name(), l.value()))
                 .collect();
             let labels_string = format!("{{{}}}", label_strings.join(","));
-            format!("{}{}", metric_family.get_name(), labels_string)
+            format!("{}{}", metric_family.name(), labels_string)
         });
 
         for (name, value) in metric_names.zip(values) {

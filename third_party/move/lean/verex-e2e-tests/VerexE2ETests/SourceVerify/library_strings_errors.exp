@@ -1,0 +1,40 @@
+VerexE2ETests/SourceVerify/library_strings_errors.spec.lean:5:3: error: the specification clause `ensures result == old(text).length` is not established
+VerexE2ETests/SourceVerify/library_strings_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `append` failed; provide a proof in the module:
+  verify append by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_strings_errors.spec.lean:8:3: error: the specification clause `ensures text == old(text)` is not established
+VerexE2ETests/SourceVerify/library_strings_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `append_char` failed; provide a proof in the module:
+  verify append_char by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_strings_errors.spec.lean:11:3: error: the specification clause `ensures result.length == 0` is not established
+VerexE2ETests/SourceVerify/library_strings_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `bytes_of` failed; provide a proof in the module:
+  verify bytes_of by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_strings_errors.spec.lean:14:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_strings_errors.spec.lean:13:6: error: verex verification failed: the automatic verification of `same_length` failed; provide a proof in the module:
+  verify same_length by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_strings_errors.spec.lean:17:3: error: the specification clause `ensures result == 0` is not established
+VerexE2ETests/SourceVerify/library_strings_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `view_bytes` failed; provide a proof in the module:
+  verify view_bytes by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

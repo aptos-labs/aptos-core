@@ -4,16 +4,16 @@
 use anyhow::anyhow;
 use std::{env, fs, path::Path};
 
-datatest_stable::harness!(
-    parse_framework_manifests,
+datatest_stable::harness! {
     {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
+        test = parse_framework_manifests,
+        root = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../../aptos-move/framework")
             .display()
-            .to_string()
+            .to_string(),
+        pattern = r"\bMove\.toml$",
     },
-    r"\bMove\.toml$"
-);
+}
 
 fn parse_framework_manifests(path: &Path) -> datatest_stable::Result<()> {
     let path = fs::canonicalize(path)?;

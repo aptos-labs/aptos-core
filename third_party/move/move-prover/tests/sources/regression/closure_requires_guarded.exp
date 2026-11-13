@@ -1,0 +1,119 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:104:9
+    │
+104 │         ensures R[a].v == 0 ==> result;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:96: opaque_post_state_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:102: opaque_post_state_fails (spec)
+    =     at tests/sources/regression/closure_requires_guarded.move:103: opaque_post_state_fails (spec)
+    =     at tests/sources/regression/closure_requires_guarded.move:96: opaque_post_state_fails
+    =         a = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:97: opaque_post_state_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:98: opaque_post_state_fails
+    =         result = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:104: opaque_post_state_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:122:33
+    │
+122 │     spec opaque_ensures_fails { ensures result == false; }
+    │                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:119: opaque_ensures_fails
+    =         f = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:120: opaque_ensures_fails
+    =         result = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:122: opaque_ensures_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:142:9
+    │
+142 │         ensures result == result_of<narrow>(100);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:137: opaque_result_of_unprovable
+    =         f = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:138: opaque_result_of_unprovable
+    =         result = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:142: opaque_result_of_unprovable (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:151:26
+    │
+151 │     spec mut_ref_fails { ensures result == 0; }
+    │                          ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:146: mut_ref_fails
+    =         v = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:147: mut_ref_fails
+    =         f = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:148: mut_ref_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:43: add
+    =         r = <redacted>
+    =         x = <redacted>
+    =         r = <redacted>
+    =         v = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:149: mut_ref_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:145: mut_ref_fails
+    =         result = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:151: mut_ref_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:165:30
+    │
+165 │     spec transparent_fails { ensures result == 0; }
+    │                              ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:162: transparent_fails
+    =         f = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:163: transparent_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:12: g
+    =         x = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:165: transparent_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:176:30
+    │
+176 │     spec through_hof_fails { ensures result == 0; }
+    │                              ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:174: through_hof_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:50: apply
+    =         f = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:12: g
+    =         x = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:176: through_hof_fails (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/regression/closure_requires_guarded.move:187:5
+    │
+185 │         f(100)
+    │         ------ abort happened here with code 0x3
+186 │     }
+187 │     spec opaque_abort_fails { aborts_if false; }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:184: opaque_abort_fails
+    =         f = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:185: opaque_abort_fails
+    =         ABORTED
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:205:9
+    │
+205 │         ensures R[a] == old(R[a]);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:198: opaque_frame_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:204: opaque_frame_fails (spec)
+    =     at tests/sources/regression/closure_requires_guarded.move:198: opaque_frame_fails
+    =         a = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:199: opaque_frame_fails
+    =         f = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:200: opaque_frame_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:205: opaque_frame_fails (spec)

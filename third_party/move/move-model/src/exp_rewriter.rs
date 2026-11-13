@@ -424,15 +424,22 @@ pub trait ExpRewriterFunctions {
             },
             Quant(id, kind, ranges, triggers, cond, body) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
-                let (ranges_changed, new_ranges) = self.internal_rewrite_quant_ranges(ranges);
-                self.rewrite_enter_scope(
-                    new_id,
-                    ranges
-                        .iter()
-                        .flat_map(|(pat, _)| pat.vars())
-                        .collect::<Vec<_>>()
-                        .iter(),
-                );
+                // Each range is rewritten with the binders of the ranges before it in scope. A
+                // state-domain binder names a state, not a local, so it scopes nothing.
+                let mut ranges_changed = false;
+                let mut new_ranges = Vec::with_capacity(ranges.len());
+                for (pat, range) in ranges {
+                    let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
+                    let (range_changed, new_range) = self.internal_rewrite_exp(range);
+                    ranges_changed = ranges_changed || pat_changed || range_changed;
+                    let binders = if matches!(range.as_ref(), Call(_, Operation::StateDomain, _)) {
+                        vec![]
+                    } else {
+                        new_pat.vars()
+                    };
+                    self.rewrite_enter_scope(new_id, binders.iter());
+                    new_ranges.push((new_pat, new_range));
+                }
                 let mut triggers_changed = false;
                 let new_triggers = triggers
                     .iter()
@@ -452,7 +459,9 @@ pub trait ExpRewriterFunctions {
                     new_c
                 });
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
-                self.rewrite_exit_scope(new_id);
+                for _ in ranges {
+                    self.rewrite_exit_scope(new_id);
+                }
                 if let Some(new_exp) =
                     self.rewrite_quant(new_id, &new_ranges, &new_triggers, &new_cond, &new_body)
                 {
@@ -909,22 +918,6 @@ pub trait ExpRewriterFunctions {
                 (changed, Proof::Post(loc.clone(), Box::new(new_inner)))
             },
         }
-    }
-
-    fn internal_rewrite_quant_ranges(
-        &mut self,
-        ranges: &[(Pattern, Exp)],
-    ) -> (bool, Vec<(Pattern, Exp)>) {
-        let (changevec, new_ranges): (Vec<_>, Vec<_>) = ranges
-            .iter()
-            .map(|(pat, exp)| {
-                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
-                let (exp_changed, new_exp) = self.internal_rewrite_exp(exp);
-                (pat_changed || exp_changed, (new_pat, new_exp))
-            })
-            .unzip();
-        let change = changevec.into_iter().any(|x| x);
-        (change, new_ranges)
     }
 }
 

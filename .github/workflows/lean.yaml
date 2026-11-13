@@ -2,45 +2,39 @@ name: Lean
 
 on:
   pull_request:
-    paths:
-      - ".github/workflows/lean.yaml"
-      - "aptos-move/cli/**"
-      - "scripts/dev_setup.sh"
-      - "third_party/move/lean/**"
-      - "third_party/move/move-compiler-v2/**"
-      - "third_party/move/move-model/bytecode/**"
-      - "third_party/move/move-model/exchange/**"
-      - "third_party/move/tools/move-asm/**"
-      - "Cargo.lock"
-      - "Cargo.toml"
   push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/lean.yaml"
-      - "aptos-move/cli/**"
-      - "scripts/dev_setup.sh"
-      - "third_party/move/lean/**"
-      - "third_party/move/move-compiler-v2/**"
-      - "third_party/move/move-model/bytecode/**"
-      - "third_party/move/move-model/exchange/**"
-      - "third_party/move/tools/move-asm/**"
-      - "Cargo.lock"
-      - "Cargo.toml"
+    branches: [main]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: lean-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  e2e-selection:
+    uses: ./.github/workflows/e2e-test-selection.yaml
+    with:
+      ARTIFACT_NAME: lean
+      GIT_SHA: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}
+      FORCE_FULL: ${{ inputs.GIT_SHA != '' }}
+
   build-and-test:
+    needs: e2e-selection
+    # A pre-rollout trusted registry cannot select Lean yet; run it in full.
+    if: (!contains(fromJSON(needs.e2e-selection.outputs.known_e2e_tests || '[]'), 'lean') || contains(fromJSON(needs.e2e-selection.outputs.selected_e2e_tests || '[]'), 'lean'))
     runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}
 
       - name: Install Lean toolchain
         run: |
@@ -59,45 +53,84 @@ jobs:
         # The Lean suites build the exporter from several modules at once; a
         # first use of its pinned nightly would install it from each build,
         # and concurrent rustup installs of one toolchain collide.
-        working-directory: third_party/move/lean/leaner-rust/rust-exporter
+        working-directory: third_party/move/lean/verex-rust/rust-exporter
         run: cargo --version
 
-      - name: Test LeanerIR
-        working-directory: third_party/move/lean/leaner-ir
+      - name: Test the Rust exporter
+        # A standalone crate on its pinned nightly with `rustc-dev`, so not a
+        # member of the stable root workspace.
+        working-directory: third_party/move/lean/verex-rust/rust-exporter
+        run: cargo test --locked --features rustc-public
+
+      - name: Test VerexIR
+        working-directory: third_party/move/lean/verex-ir
         run: |
           source "$HOME/.profile"
           lake test
 
-      - name: Test Leaner Move profile
-        working-directory: third_party/move/lean/leaner-move
+      - name: Test Verex Move profile
+        working-directory: third_party/move/lean/verex-move
         run: |
           source "$HOME/.profile"
           lake test
 
-      - name: Test Leaner Rust profile
-        working-directory: third_party/move/lean/leaner-rust
+      - name: Test Verex Rust profile
+        working-directory: third_party/move/lean/verex-rust
         run: |
           source "$HOME/.profile"
           lake test
 
       - name: Test end-to-end baselines
-        working-directory: third_party/move/lean/leaner-e2e-tests
+        working-directory: third_party/move/lean/verex-e2e-tests
         # The driver manages its own ci-profile exchange frontend; the build
         # step above just gives cargo failures their own step.
         run: |
           source "$HOME/.profile"
           lake test
 
-      - name: Build the Lean-authored Move library for compiler-v2
-        # compiler-v2 elaborates `.lean` sources against this package; its
-        # tests also compile two of its fixtures.
-        working-directory: third_party/move/lean/v0/move
+      - name: Build the verification benchmark
+        # Run nightly by verex-bench.yaml; built here so a change breaking
+        # it shows on the pull request.
+        working-directory: third_party/move/lean/verex-e2e-tests
         run: |
           source "$HOME/.profile"
-          lake build Move Move.Tests.Verification.Account Move.Tests.Compiler.MultipleModules
+          lake build verex-bench
+
+      - name: Test Verex through the Move Prover and CLI
+        # These tests skip where the verifier is not built; here they must run.
+        env:
+          VEREX_MOVE_REQUIRED: 1
+        run: |
+          source "$HOME/.profile"
+          (cd third_party/move/lean/verex-move && lake build verex-move)
+          MVP_TEST_FEATURE=lean cargo test --locked --profile ci -p move-prover --test testsuite
+          cargo test --locked --profile ci -p aptos-move-cli --lib -- tests::prove::lean
+          cargo test --locked --profile ci -p aptos-framework --test move_prover_tests \
+            -- move_stdlib_lean_prover_tests
 
       - name: Test compiler-v2 Lean integration
+        # compiler-v2 elaborates `.lean` sources in verex-move, which the
+        # Verex Move step above has built.
         run: |
-          cargo test --locked -p move-compiler-v2 leaner::tests
+          cargo test --locked -p move-compiler-v2 verex::tests
           cargo test --locked -p move-compiler-v2-transactional-tests \
-            --test tests -- leaner/
+            --test tests -- verex/
+
+  result:
+    name: Lean integration result
+    if: always()
+    needs: [e2e-selection, build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check selection and execution
+        env:
+          SELECTION_RESULT: ${{ needs.e2e-selection.result }}
+          SELECTED: ${{ (!contains(fromJSON(needs.e2e-selection.outputs.known_e2e_tests || '[]'), 'lean') || contains(fromJSON(needs.e2e-selection.outputs.selected_e2e_tests || '[]'), 'lean')) }}
+          TEST_RESULT: ${{ needs.build-and-test.result }}
+        run: |
+          test "$SELECTION_RESULT" = success
+          if [ "$SELECTED" = true ]; then
+            test "$TEST_RESULT" = success
+          else
+            test "$TEST_RESULT" = skipped
+          fi

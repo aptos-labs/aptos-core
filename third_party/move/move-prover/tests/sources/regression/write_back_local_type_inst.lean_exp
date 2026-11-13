@@ -1,0 +1,2 @@
+tests/sources/regression/write_back_local_type_inst.move:7:1: info: `f` uses concrete verification: Given interpretation does not yet support storage interpretation
+tests/sources/regression/write_back_local_type_inst.move:7:1: info: `h` uses concrete verification: Given interpretation does not yet support storage interpretation

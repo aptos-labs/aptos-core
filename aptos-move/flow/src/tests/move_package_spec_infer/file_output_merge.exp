@@ -1,5 +1,22 @@
-inference succeeded, wrote spec files for 1 file(s) (read the files to see the changes):
+inference succeeded, wrote spec files for 1 file(s); the inferred specification blocks as they now read:
 - <TEMPDIR>/mergetest.spec.move
+    6 |     spec add_one(x: u64): u64 {
+    7 |         ensures result == helper(x);
+    8 |         pragma opaque = true;
+    9 |         ensures [inferred] result == x + 1;
+   10 |         aborts_if [inferred] x == MAX_U64;
+   11 |     }
+   12 |     spec double(x: u64): u64 {
+   13 |         pragma opaque = true;
+   14 |         ensures [inferred] result == x * 2;
+   15 |         aborts_if [inferred] x * 2 > MAX_U64;
+   16 |     }
+   18 |     spec identity(value: 0xcafe::types::External): 0xcafe::types::External {
+   19 |         use 0xcafe::types;
+   20 |         pragma opaque = true;
+   21 |         ensures [inferred] result == value;
+   22 |         aborts_if [inferred] false;
+   23 |     }
 
 === source (untouched) ===
 module 0xCAFE::mergetest {

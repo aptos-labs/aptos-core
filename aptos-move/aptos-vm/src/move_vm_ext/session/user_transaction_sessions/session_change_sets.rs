@@ -44,6 +44,30 @@ impl ChangeSetInterface for UserSessionChangeSet {
         self.change_set.num_write_ops() + self.module_write_set.num_write_ops()
     }
 
+    fn num_position_write_ops(&self) -> usize {
+        self.change_set.num_position_write_ops()
+    }
+
+    fn position_write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
+        self.change_set.position_write_set_size_iter()
+    }
+
+    fn num_order_write_ops(&self) -> usize {
+        self.change_set.num_order_write_ops()
+    }
+
+    fn order_write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
+        self.change_set.order_write_set_size_iter()
+    }
+
+    fn num_collateral_write_ops(&self) -> usize {
+        self.change_set.num_collateral_write_ops()
+    }
+
+    fn collateral_write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
+        self.change_set.collateral_write_set_size_iter()
+    }
+
     fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
         self.change_set
             .write_set_size_iter()
@@ -95,6 +119,30 @@ impl SystemSessionChangeSet {
 impl ChangeSetInterface for SystemSessionChangeSet {
     fn num_write_ops(&self) -> usize {
         self.change_set.num_write_ops()
+    }
+
+    fn num_position_write_ops(&self) -> usize {
+        self.change_set.num_position_write_ops()
+    }
+
+    fn position_write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
+        self.change_set.position_write_set_size_iter()
+    }
+
+    fn num_order_write_ops(&self) -> usize {
+        self.change_set.num_order_write_ops()
+    }
+
+    fn order_write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
+        self.change_set.order_write_set_size_iter()
+    }
+
+    fn num_collateral_write_ops(&self) -> usize {
+        self.change_set.num_collateral_write_ops()
+    }
+
+    fn collateral_write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
+        self.change_set.collateral_write_set_size_iter()
     }
 
     fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {

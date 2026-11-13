@@ -1,14 +1,22 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Raw, typed read/write of values at a byte offset from a base pointer.
+//! Typed value access at byte offsets and an owned, `MAX_ALIGN`-aligned
+//! [`MemoryRegion`] buffer.
+//!
+//! Typed reads require an initialized value of the accessed type. Copy arbitrary
+//! value bytes, which may contain pointers and uninitialized padding, with
+//! [`copy_8`], `ptr::copy`, or `ptr::copy_nonoverlapping`. Integer loads do not
+//! preserve pointer provenance and require initialized bytes.
 //!
 //! TODO(correctness): audit every caller of the aligned accessors below —
 //! any slot or field offset not guaranteed to meet the accessed type's
 //! alignment must use an unaligned access instead.
 
 use crate::align::MAX_ALIGN;
+pub use mono_move_alloc::MemoryRegion;
 use move_core_types::account_address::AccountAddress;
+use std::mem::MaybeUninit;
 
 /// # Safety
 /// `base.add(byte_offset)` must be valid and point to an initialized `u8`.
@@ -64,6 +72,21 @@ pub unsafe fn read_u64(base: *const u8, byte_offset: impl Into<usize>) -> u64 {
 pub unsafe fn write_u64(base: *mut u8, byte_offset: impl Into<usize>, val: u64) {
     // SAFETY: caller must uphold the documented pointer requirements.
     unsafe { (base.add(byte_offset.into()) as *mut u64).write(val) }
+}
+
+/// Copies 8 bytes from `src` to `dst`, preserving pointer provenance and
+/// uninitialized bytes. The addresses may be unaligned, and the ranges may overlap.
+///
+/// # Safety
+/// `src` must be valid for an 8-byte read and `dst` for an 8-byte write.
+#[inline(always)]
+pub unsafe fn copy_8(src: *const u8, dst: *mut u8) {
+    // SAFETY: the caller guarantees valid source and destination ranges.
+    // Loading all 8 bytes before writing them permits overlap.
+    unsafe {
+        let bytes = (src as *const MaybeUninit<u64>).read_unaligned();
+        (dst as *mut MaybeUninit<u64>).write_unaligned(bytes);
+    }
 }
 
 /// # Safety
@@ -139,6 +162,45 @@ pub unsafe fn read_u32(base: *const u8, byte_offset: impl Into<usize>) -> u32 {
 pub unsafe fn write_u32(base: *mut u8, byte_offset: impl Into<usize>, val: u32) {
     // SAFETY: caller must uphold the documented pointer requirements.
     unsafe { (base.add(byte_offset.into()) as *mut u32).write(val) }
+}
+
+/// Read a `T`-sized value from `base + byte_offset`. Aligned access for
+/// `T` whose alignment fits the VM's [`MAX_ALIGN`] cap, unaligned otherwise.
+///
+/// TODO(correctness): this reads with native endianness, but `StoreImm*` writes immediates
+/// as little-endian bytes. Consistent on LE hosts (all current targets); force
+/// LE here (`from_le`/`to_le`, no-op on LE) to be portable.
+///
+/// # Safety
+/// `base.add(byte_offset)` must be valid for a read of `size_of::<T>()`
+/// bytes, with the appropriate alignment when `align_of::<T>() <= MAX_ALIGN`.
+#[inline(always)]
+pub unsafe fn read_int<T: Copy>(base: *const u8, byte_offset: impl Into<usize>) -> T {
+    let ptr = unsafe { base.add(byte_offset.into()) as *const T };
+    unsafe {
+        if std::mem::align_of::<T>() <= MAX_ALIGN {
+            ptr.read()
+        } else {
+            ptr.read_unaligned()
+        }
+    }
+}
+
+/// Mirror of [`read_int`] for writes.
+///
+/// # Safety
+/// `base.add(byte_offset)` must be valid for a write of `size_of::<T>()`
+/// bytes, with the appropriate alignment when `align_of::<T>() <= MAX_ALIGN`.
+#[inline(always)]
+pub unsafe fn write_int<T: Copy>(base: *mut u8, byte_offset: impl Into<usize>, val: T) {
+    let ptr = unsafe { base.add(byte_offset.into()) as *mut T };
+    unsafe {
+        if std::mem::align_of::<T>() <= MAX_ALIGN {
+            ptr.write(val)
+        } else {
+            ptr.write_unaligned(val)
+        }
+    }
 }
 
 /// Read a 32-byte [`AccountAddress`] starting at `byte_offset`. Reads aligned

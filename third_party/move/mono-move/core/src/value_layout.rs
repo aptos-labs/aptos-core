@@ -17,11 +17,17 @@
 //! header.
 
 use crate::{
-    types::{intrinsic_slot_size_and_align, view_type, Alignment, InternedType, Size, Type},
+    interner::InternedIdentifier,
+    types::{
+        intrinsic_slot_size_and_align, view_type, Alignment, InternedType, Size, Type, ADDRESS_TY,
+        BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY, I64_TY, I8_TY, SIGNER_TY, U128_TY, U16_TY,
+        U256_TY, U32_TY, U64_TY, U8_TY,
+    },
     DescriptorId, MAX_ALIGN,
 };
 use bitflags::bitflags;
-use std::{collections::HashMap, fmt};
+use shared_dsa::UnorderedMap;
+use std::fmt;
 
 /// Typed index into the program's [`ValueLayout`] table.
 #[repr(transparent)]
@@ -79,6 +85,16 @@ pub struct ValueLayout {
     pub flags: LayoutFlags,
     /// Describes layout's shape.
     pub kind: LayoutKind,
+    /// The type this layout describes.
+    ///
+    /// Set to [`None`] for
+    /// - references and function values, which all share one layout and so
+    ///   name no single type
+    /// - enum variant bodies, which are not a type of their own
+    //
+    // TODO(perf): consider moving this into a side table indexed by
+    // `LayoutId`, so the walks that never read it get a smaller `ValueLayout`.
+    pub ty: Option<InternedType>,
 }
 
 impl fmt::Display for ValueLayout {
@@ -104,6 +120,16 @@ impl fmt::Display for ValueLayout {
 pub struct FieldValueLayout {
     pub offset: u32,
     pub id: LayoutId,
+    /// Declared field name.
+    pub name: InternedIdentifier,
+}
+
+/// Layout information for one variant of an enum.
+pub struct VariantValueLayout {
+    /// Declared variant name.
+    pub name: InternedIdentifier,
+    /// Layout of the variant's body, a [`LayoutKind::Struct`] over its fields.
+    pub id: LayoutId,
 }
 
 /// Shape-specific layout data.
@@ -122,7 +148,7 @@ pub enum LayoutKind {
     /// An inline struct: fields laid out flat in the parent's payload.
     /// TODO(completeness): for non-inline structs (resources), we need a descriptor ID.
     Struct {
-        /// Byte offsets and IDs of each field within the struct payload.
+        /// Byte offsets, names and IDs of each field within the struct payload.
         fields: Box<[FieldValueLayout]>,
     },
     /// A vector: an 8-byte heap-pointer slot. `elem_id` is the element layout
@@ -139,8 +165,8 @@ pub enum LayoutKind {
     /// TODO(completeness): revisit with upgrade story, might not need to be frozen.
     FrozenEnum {
         descriptor_id: DescriptorId,
-        /// One layout per variant body, indexed by variant tag.
-        variants: Box<[LayoutId]>,
+        /// One entry per variant body, indexed by variant tag.
+        variants: Box<[VariantValueLayout]>,
         /// Size of the enum object's data region: the 8-byte tag plus the
         /// widest variant body, rounded up to 8-byte alignment. Sized to the
         /// largest variant so any variant fits.
@@ -157,6 +183,7 @@ impl ValueLayout {
     /// Builds a layout from its parts. The flag computation lives in the
     /// builder (it needs child layouts), so this is a plain constructor.
     pub fn new(
+        ty: Option<InternedType>,
         size: u32,
         align: u32,
         fixed_bcs_size: Option<u32>,
@@ -173,6 +200,7 @@ impl ValueLayout {
             fixed_bcs_size,
             flags,
             kind,
+            ty,
         }
     }
 
@@ -203,67 +231,68 @@ impl ValueLayout {
             fixed_bcs_size: Some(1),
             flags: LayoutFlags::NO_POINTERS_NO_PADDING,
             kind: LayoutKind::Bool,
+            ty: Some(BOOL_TY),
         }
     }
 
     /// Layout of `u8`.
     pub fn u8() -> Self {
-        Self::unsigned_int(1, 1)
+        Self::unsigned_int(U8_TY)
     }
 
     /// Layout of `u16`.
     pub fn u16() -> Self {
-        Self::unsigned_int(2, 2)
+        Self::unsigned_int(U16_TY)
     }
 
     /// Layout of `u32`.
     pub fn u32() -> Self {
-        Self::unsigned_int(4, 4)
+        Self::unsigned_int(U32_TY)
     }
 
     /// Layout of `u64`.
     pub fn u64() -> Self {
-        Self::unsigned_int(8, 8)
+        Self::unsigned_int(U64_TY)
     }
 
     /// Layout of `u128`.
     pub fn u128() -> Self {
-        Self::unsigned_int(16, MAX_ALIGN as u32)
+        Self::unsigned_int(U128_TY)
     }
 
     /// Layout of `u256`.
     pub fn u256() -> Self {
-        Self::unsigned_int(32, MAX_ALIGN as u32)
+        Self::unsigned_int(U256_TY)
     }
 
     /// Layout of `i8`.
     pub fn i8() -> Self {
-        Self::signed_int(1, 1)
+        Self::signed_int(I8_TY)
     }
 
     /// Layout of `i16`.
     pub fn i16() -> Self {
-        Self::signed_int(2, 2)
+        Self::signed_int(I16_TY)
     }
 
     /// Layout of `i32`.
     pub fn i32() -> Self {
-        Self::signed_int(4, 4)
+        Self::signed_int(I32_TY)
     }
 
     /// Layout of `i64`.
     pub fn i64() -> Self {
-        Self::signed_int(8, 8)
+        Self::signed_int(I64_TY)
     }
 
     /// Layout of `i128`.
     pub fn i128() -> Self {
-        Self::signed_int(16, MAX_ALIGN as u32)
+        Self::signed_int(I128_TY)
     }
 
     /// Layout of `i256`.
     pub fn i256() -> Self {
-        Self::signed_int(32, MAX_ALIGN as u32)
+        Self::signed_int(I256_TY)
     }
 
     /// Layout of `address`.
@@ -274,6 +303,7 @@ impl ValueLayout {
             fixed_bcs_size: Some(32),
             flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
             kind: LayoutKind::Address,
+            ty: Some(ADDRESS_TY),
         }
     }
 
@@ -289,6 +319,7 @@ impl ValueLayout {
             // per-byte path, which rejects `signer` instead of copying the bytes.
             flags: LayoutFlags::NO_POINTERS_NO_PADDING,
             kind: LayoutKind::Signer,
+            ty: Some(SIGNER_TY),
         }
     }
 
@@ -300,6 +331,7 @@ impl ValueLayout {
             fixed_bcs_size: None,
             flags: LayoutFlags::empty(),
             kind: LayoutKind::Ref,
+            ty: None,
         }
     }
 
@@ -311,11 +343,12 @@ impl ValueLayout {
             fixed_bcs_size: None,
             flags: LayoutFlags::empty(),
             kind: LayoutKind::Function,
+            ty: None,
         }
     }
 
     /// Layout for vectors (heap pointer slot).
-    pub fn vector(elem_id: LayoutId, descriptor_id: DescriptorId) -> Self {
+    pub fn vector(ty: InternedType, elem_id: LayoutId, descriptor_id: DescriptorId) -> Self {
         Self {
             size: 8,
             align: MAX_ALIGN as u32,
@@ -328,11 +361,14 @@ impl ValueLayout {
                 elem_id,
                 descriptor_id,
             },
+            ty: Some(ty),
         }
     }
 
-    /// Layout for a struct.
+    /// Layout for a struct, or for an enum variant body, which has no type of
+    /// its own.
     pub fn struct_layout(
+        ty: Option<InternedType>,
         size: u32,
         align: u32,
         fixed_bcs_size: Option<u32>,
@@ -349,13 +385,15 @@ impl ValueLayout {
             fixed_bcs_size,
             flags,
             kind: LayoutKind::Struct { fields },
+            ty,
         }
     }
 
     /// Layout for a frozen enum.
     pub fn frozen_enum(
+        ty: InternedType,
         descriptor_id: DescriptorId,
-        variants: Box<[LayoutId]>,
+        variants: Box<[VariantValueLayout]>,
         max_size_across_variants: u32,
     ) -> ValueLayout {
         Self {
@@ -368,26 +406,29 @@ impl ValueLayout {
                 variants,
                 max_size_across_variants,
             },
+            ty: Some(ty),
         }
     }
 
-    fn unsigned_int(size: u32, align: u32) -> Self {
+    fn unsigned_int(ty: InternedType) -> Self {
+        Self::int(ty, LayoutKind::UnsignedInt)
+    }
+
+    fn signed_int(ty: InternedType) -> Self {
+        Self::int(ty, LayoutKind::SignedInt)
+    }
+
+    /// Layout for an integer type, whose size and alignment follow from it.
+    fn int(ty: InternedType, kind: LayoutKind) -> Self {
+        let (size, align) = intrinsic_slot_size_and_align(view_type(ty))
+            .expect("an integer type has an intrinsic size and alignment");
         Self {
             size,
             align,
             fixed_bcs_size: Some(size),
             flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
-            kind: LayoutKind::UnsignedInt,
-        }
-    }
-
-    fn signed_int(size: u32, align: u32) -> Self {
-        Self {
-            size,
-            align,
-            fixed_bcs_size: Some(size),
-            flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
-            kind: LayoutKind::SignedInt,
+            kind,
+            ty: Some(ty),
         }
     }
 }
@@ -535,21 +576,30 @@ pub trait LayoutProvider {
 /// [`LayoutProvider`].
 pub struct ValueLayoutTable {
     table: Vec<ValueLayout>,
-    by_ty: HashMap<InternedType, LayoutId>,
+    by_ty: UnorderedMap<InternedType, LayoutId>,
 }
 
 impl ValueLayoutTable {
     pub fn new() -> Self {
         Self {
             table: reserved_layouts(),
-            by_ty: HashMap::new(),
+            by_ty: UnorderedMap::new(),
         }
     }
 
-    pub fn push(&mut self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+    /// Publishes `layout` for the type it was built for.
+    pub fn push(&mut self, layout: ValueLayout) -> LayoutId {
+        let ty = layout.ty.expect("a published layout carries its type");
+        let id = self.push_anonymous(layout);
+        self.by_ty.insert(ty, id);
+        id
+    }
+
+    /// Publishes a layout that is not a type's own, such as an enum variant
+    /// body.
+    pub fn push_anonymous(&mut self, layout: ValueLayout) -> LayoutId {
         let id = LayoutId::from_usize(self.table.len());
         self.table.push(layout);
-        self.by_ty.insert(ty, id);
         id
     }
 }

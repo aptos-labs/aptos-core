@@ -23,13 +23,19 @@ use crate::{
     read_set::{ModuleRead, ModuleReadSet, ModuleState},
 };
 use mono_move_core::{
+    abilities::{AbilityCalculator, AbilityError},
     interner::{
-        script_module_id, view_module_id, InternedIdentifier, InternedModuleId, SCRIPT_MAIN,
+        is_script_module_id, script_module_id, view_module_id, InternedFunctionRef,
+        InternedIdentifier, InternedModuleId, SCRIPT_MAIN,
     },
-    native::NativeResolver,
-    types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, ErrorLocation, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter,
-    Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider, VMInternalError, VMResult,
+    native::{FunctionResolutionError, NativeResolver},
+    types::{
+        infer_function_type_args, view_name, view_type, view_type_list, FunctionTypeMismatch,
+        InternedType, InternedTypeList, Type, EMPTY_TYPE_LIST,
+    },
+    verify_function, DescriptorId, ErrorLocation, ExecutionErrorKind, FrameOffset,
+    FrameworkSymbols, Function, FunctionPtr, GasMeter, Interner, LayoutId, LayoutProvider,
+    ModuleId, ModuleProvider, NominalFields, PreparedModule, VMInternalError, VMResult,
     ValueLayout,
 };
 use mono_move_global_context::{
@@ -37,14 +43,18 @@ use mono_move_global_context::{
     ModuleMandatoryDependencies, ModuleSlot, ScriptHash,
 };
 use move_binary_format::{
-    access::ScriptAccess, errors::VMError, file_format::CompiledScript,
+    access::{ModuleAccess, ScriptAccess},
+    errors::VMError,
+    file_format::{CompiledScript, Visibility},
     module_script_conversion::script_into_module,
 };
-use shared_dsa::UnorderedSet;
+use move_core_types::{ability::AbilitySet, identifier::IdentStr};
+use shared_dsa::{UnorderedMap, UnorderedSet};
 use specializer::{
     lower::context::{
-        try_discover_types_for_lowering_in_function, try_discover_types_for_lowering_in_module,
-        try_lower_function, LoweringOutcome, SpecializerContext,
+        publish_resource_type, try_discover_types_for_lowering_in_function,
+        try_discover_types_for_lowering_in_module, try_lower_function, LoweringOutcome,
+        SpecializerContext,
     },
     ModuleIR,
 };
@@ -161,9 +171,9 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     }
 
     // TODO(cleanup): Revisit the handling of native functions here.
-    //
     // Need to make sure:
-    // 1. A registered native function impl does not shadow a Move-body function with the same name.
+    // 1. Registered natives must not shadow functions with Move bodies. See the
+    //    note on `CallNative` selection in the specializer's `lower/context.rs`.
     // 2. A missing native function impl only triggers an error when it's actually being called, not
     //    during load time.
     pub fn load_function(
@@ -197,6 +207,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             // or genuinely absent: report which.
             let slot = module.get_function_slot(func_name).ok_or_else(|| {
                 match module.get_function_ir(func_name) {
+                    // TODO(completeness): a closure over a native is packable
+                    // but not callable, where the legacy VM calls it. A call
+                    // site has no `NativeABI`, so the fix is to synthesize one
+                    // per instantiation at load time.
                     FunctionIrLookup::Native => LoaderError::NativeFunctionNotLoadable {
                         address: *id.address(),
                         module: id.name().to_string(),
@@ -263,6 +277,160 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let (function, function_ms) =
             self.lower_function_with_ty_args(read_set, gas_meter, module, func_name, ty_args)?;
         Ok(module.set_instantiated_function(func_name, ty_args, function, function_ms))
+    }
+
+    /// Publishes the layout and GC descriptor of the resource type `ty`, so a
+    /// read of it can be materialized outside lowered code. Loads and charges
+    /// for the modules its definition pulls in.
+    pub fn publish_resource_type(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        ty: InternedType,
+    ) -> VMResult<()> {
+        let mut ctx = LoweringContext::new(self, read_set);
+        let published = publish_resource_type(&mut ctx, self.guard, ty)?;
+        let discovered = Arc::<[LoadedModuleSlot]>::from(ctx.discovered);
+        self.record_loaded_and_charge_slots(read_set, gas_meter, &discovered, |_, _| {
+            invariant_violation!(UnexpectedReadSetMiss);
+        })?;
+        if !published {
+            return Err(VMInternalError::new(
+                LoaderError::ResourceLayoutNotDerivable,
+            ));
+        }
+        Ok(())
+    }
+
+    /// Resolves `module_id::func_name` and checks its type matches the
+    /// expected type. If the type turns out to be different, resolution fails.
+    pub fn resolve_function(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        module_id: InternedModuleId,
+        func_name: &IdentStr,
+        expected_ty: InternedType,
+    ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>> {
+        use FunctionResolutionError::*;
+
+        // Every script loads under this one ID, so it names a different `main`
+        // in each transaction. Scripts are never stored as modules.
+        if is_script_module_id(module_id) {
+            return Ok(Err(FunctionNotFound));
+        }
+
+        // Every load that succeeds leaves the entry loaded, so a pending entry
+        // means an earlier load of this module failed and left it behind.
+        // Resolution is the one caller that survives a failed load, so it has
+        // to fail the same way again instead of tripping over the leftover.
+        let id = self.guard.arena_ref_for_module_id(module_id);
+        if matches!(read_set.get(id), Some(ModuleRead::Pending)) {
+            return Ok(Err(FunctionNotFound));
+        }
+
+        let module = match self.get_or_load_module(read_set, gas_meter, module_id) {
+            Ok(module) => module,
+            // TODO(completeness): under `LoadingPolicy::Package`, a missing
+            // module fails with a provider error or an invariant violation,
+            // not a linking error. Resolution then aborts instead of returning
+            // `FunctionNotFound`, so it is only correct under the Lazy policies.
+            Err(err) if err.kind() == ExecutionErrorKind::LinkingError => {
+                return Ok(Err(FunctionNotFound))
+            },
+            Err(err) => return Err(err),
+        };
+        // TODO(security): a caller-supplied name that names nothing still ends
+        // up in the process-global interner. Same class as the `TODO(metering)`
+        // on `ExecutionGuard::intern_identifier_internal`.
+        let func_name = self
+            .guard
+            .intern_identifier(func_name)
+            .into_global_arena_ptr();
+        let Some(def_idx) = module.function_def_idx(func_name) else {
+            return Ok(Err(FunctionNotFound));
+        };
+
+        let prepared = &module.ir().module;
+        let def = prepared.function_def_at(def_idx);
+        if !matches!(def.visibility, Visibility::Public) {
+            return Ok(Err(FunctionNotAccessible));
+        }
+
+        let Type::Function { abilities, .. } = view_type(expected_ty) else {
+            return Ok(Err(FunctionIncompatibleType));
+        };
+        // A resolved function is public and captures nothing, so the closure
+        // built from it has exactly the abilities of a public function value.
+        // Anything stronger has no inhabitant.
+        if !abilities.is_subset(AbilitySet::PUBLIC_FUNCTIONS) {
+            return Ok(Err(FunctionIncompatibleType));
+        }
+
+        let constraints = &prepared.function_handle_at(def.function).type_parameters;
+        let declared = prepared.function_signature_at(def.function);
+        let ty_args = match infer_function_type_args(declared, expected_ty, constraints.len()) {
+            Ok(ty_args) => ty_args,
+            Err(FunctionTypeMismatch::NotAFunction | FunctionTypeMismatch::Incompatible) => {
+                return Ok(Err(FunctionIncompatibleType))
+            },
+            Err(FunctionTypeMismatch::NotInstantiated) => return Ok(Err(FunctionNotInstantiated)),
+        };
+
+        if !self.ty_args_satisfy_constraints(read_set, gas_meter, constraints, &ty_args)? {
+            return Ok(Err(FunctionIncompatibleType));
+        }
+        let ty_args = self.guard.type_list_of(&ty_args);
+        Ok(Ok(self
+            .guard
+            .function_ref_of(module_id, func_name, ty_args)))
+    }
+
+    /// Whether every type argument satisfies the constraint declared for it.
+    ///
+    /// A [`Type::Nominal`] carries no abilities, so each module a constrained
+    /// argument names has to be loaded to reach the declaration that does.
+    fn ty_args_satisfy_constraints(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        constraints: &[AbilitySet],
+        ty_args: &[InternedType],
+    ) -> VMResult<bool> {
+        let constrained = constraints
+            .iter()
+            .zip(ty_args)
+            .filter(|(constraint, _)| **constraint != AbilitySet::EMPTY);
+
+        let mut nominal_modules = vec![];
+        for (_, &ty) in constrained.clone() {
+            collect_nominal_modules(ty, &mut nominal_modules);
+        }
+        let mut modules = UnorderedMap::with_capacity(nominal_modules.len());
+        for nominal_module in nominal_modules {
+            let module = self.get_or_load_module(read_set, gas_meter, nominal_module)?;
+            modules.insert(nominal_module, &module.ir().module);
+        }
+
+        // TODO(correctness): this uses the abilities of each nominal's
+        // definition. V1 uses the handle of the module that wrote the nominal
+        // in the expected type, and that handle travels with the type through
+        // generic calls. After an upgrade adds abilities, that handle can have
+        // fewer than the definition, so V1 rejects where this accepts. An
+        // interned type does not record which module wrote it.
+        let lookup = |module_id, name| {
+            modules
+                .get(&module_id)
+                .and_then(|module: &&PreparedModule| module.nominal_handle(module_id, name))
+                .ok_or(AbilityError::UnknownNominal)
+        };
+        let mut calculator = AbilityCalculator::new(lookup, &[]);
+        for (constraint, &ty) in constrained {
+            if !constraint.is_subset(calculator.abilities_of(ty)?) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     /// Loads a script from its bytes and returns its `main` instantiated with
@@ -353,6 +521,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let cost = script_code.len() as u64;
         let module_ir =
             specializer::destack(script_into_module(script, SCRIPT_MAIN.as_str()), self.guard)?;
+        self.check_natives_do_not_shadow(&module_ir)?;
         let module = LoadedModule::new(
             module_ir,
             cost,
@@ -411,7 +580,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }));
             },
         };
-        // TODO(metering): the lowering work needs to be charged deterministically.
+        // TODO(metering): the lowering work, including micro-op verification
+        // below, needs to be charged deterministically.
         let mut loading_ctx = LoweringContext::new(self, read_set);
         let descriptors = try_discover_types_for_lowering_in_function(
             &mut loading_ctx,
@@ -458,8 +628,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }))
             },
         };
-        // TODO(security, metering): run the micro-op verifier on `function`
-        // here, once per cached lowering.
+        // Verify once per lowering, before the function is leaked into a
+        // cache: a rejected function is dropped here and never executed.
+        let errors = verify_function(&function, self.guard);
+        if !errors.is_empty() {
+            invariant_violation!(MicroOpVerificationFailed { errors });
+        }
         Ok((function, function_ms))
     }
 }
@@ -740,7 +914,32 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         //   This can run verification twice because destack runs it and we verified before.
         //   Destack should take a hook so we can add more things to verify.
         let module_ir = specializer::destack(compiled_module, self.guard)?;
+        self.check_natives_do_not_shadow(&module_ir)?;
         Ok((module_ir, cost))
+    }
+
+    /// Rejects native registrations that shadow this module's Move bodies.
+    /// Lowering resolves natives by qualified name, so a matching registration
+    /// would replace the Move body and bypass its frame and reentrancy checks.
+    fn check_natives_do_not_shadow(&self, module_ir: &ModuleIR) -> VMResult<()> {
+        let module = &module_ir.module;
+        for fdef in module.function_defs() {
+            if fdef.is_native() {
+                continue;
+            }
+            let name = module.interned_identifier_at(module.function_handle_at(fdef.function).name);
+            if self.natives.is_registered(module.id(), name) {
+                let id = view_module_id(module.id());
+                return Err(VMInternalError::new(
+                    LoaderError::NativeShadowsMoveFunction {
+                        address: *id.address(),
+                        module: view_name(id.name()).to_string(),
+                        name: view_name(name).to_string(),
+                    },
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Called if module does not exist in the cache.
@@ -828,6 +1027,47 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     }
 }
 
+/// Records the defining module of every nominal type occurring in `ty`. The
+/// result may repeat a module; loading one twice is a read-set hit.
+///
+/// TODO(metering): unbounded recursion, same family as the `TODO(metering)` on
+/// `mono_move_core::types::is_closed_type`.
+fn collect_nominal_modules(ty: InternedType, out: &mut Vec<InternedModuleId>) {
+    match view_type(ty) {
+        Type::Nominal {
+            module_id, ty_args, ..
+        } => {
+            out.push(*module_id);
+            for &ty_arg in view_type_list(*ty_args) {
+                collect_nominal_modules(ty_arg, out);
+            }
+        },
+        Type::Vector { elem } => collect_nominal_modules(*elem, out),
+        Type::ImmutRef { inner } | Type::MutRef { inner } => collect_nominal_modules(*inner, out),
+        Type::Function { args, results, .. } => {
+            for &ty in view_type_list(*args).iter().chain(view_type_list(*results)) {
+                collect_nominal_modules(ty, out);
+            }
+        },
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::Signer
+        | Type::TypeParam { .. } => {},
+    }
+}
+
 /// Records modules visited during lowering requirements calculation in the
 /// read-set.
 struct LoweringContext<'a, 'guard, 'ctx> {
@@ -865,7 +1105,7 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         &mut self,
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
-    ) -> VMResult<Option<FieldTypes>> {
+    ) -> VMResult<Option<NominalFields>> {
         let id = self.loader.guard.arena_ref_for_module_id(*module_id);
 
         // Every module needs to be in the read-set.
@@ -893,11 +1133,7 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             self.discovered.push(slot);
         }
 
-        Ok(module
-            .ir()
-            .module
-            .interned_field_types(*nominal_name)
-            .cloned())
+        Ok(module.ir().module.interned_fields(*nominal_name).cloned())
     }
 
     fn publish_vec_descriptor(
@@ -936,8 +1172,12 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             .publish_captured_data_descriptor(values_size, pointer_offsets)
     }
 
-    fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
-        self.loader.guard.publish_layout(ty, layout)
+    fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {
+        self.loader.guard.publish_layout(layout)
+    }
+
+    fn framework_symbols(&self) -> &FrameworkSymbols {
+        self.loader.guard.framework_symbols()
     }
 
     fn publish_variant_layouts(

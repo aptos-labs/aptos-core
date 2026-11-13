@@ -28,6 +28,7 @@ pub mod ledger_info;
 pub mod mempool_status;
 pub mod move_any;
 pub mod move_fixed_point;
+pub mod move_stdlib;
 pub mod move_utils;
 pub mod network_address;
 pub mod nibble;
@@ -69,6 +70,7 @@ pub mod bytes;
 pub mod delayed_fields;
 pub mod keyless;
 pub mod lazy_bls;
+pub mod lazy_crypto;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;

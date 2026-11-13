@@ -30,7 +30,7 @@ use crate::{
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, valid_pragmas_for_block,
         CONDITION_DEACTIVATED_PROP, CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP,
-        INTRINSIC_PRAGMA,
+        INTRINSIC_PRAGMA, WEIGHT_PROP,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -1564,7 +1564,7 @@ impl ModuleBuilder<'_, '_> {
         // declaration analysis, before field definitions are known; check for
         // clashes with declared fields here, through the same field lookup
         // used everywhere else.
-        let qid = entry.module_id.qualified_inst(entry.struct_id, vec![]);
+        let qid = entry.module_id.qualified(entry.struct_id);
         let ghost_decls = entry
             .ghost_fields
             .iter()
@@ -1848,11 +1848,11 @@ impl ModuleBuilder<'_, '_> {
         let mut defined_post_labels: BTreeMap<Symbol, Loc> = BTreeMap::new();
         let mut used_pre_labels: BTreeSet<Symbol> = BTreeSet::new();
         for (pre_label, post_label, node_id, behavior_kind) in &labeled_exprs {
-            if let Some(post_name) = post_label.and_then(&get_label_name) {
+            if let Some(post_name) = post_label.and_then(get_label_name) {
                 let exp_loc = self.parent.env.get_node_loc(*node_id);
                 defined_post_labels.insert(post_name, exp_loc);
             }
-            if let Some(pre_name) = pre_label.and_then(&get_label_name) {
+            if let Some(pre_name) = pre_label.and_then(get_label_name) {
                 used_pre_labels.insert(pre_name);
             }
             // Reject post-state labels on predicates without an explicit
@@ -1916,8 +1916,8 @@ impl ModuleBuilder<'_, '_> {
         // This means: to get the state of `post_label_defined`, we need the state of `pre_label_used`
         let mut edges: BTreeMap<Symbol, BTreeSet<Symbol>> = BTreeMap::new();
         for (pre_label, post_label, _, _) in &labeled_exprs {
-            let pre_name = pre_label.and_then(&get_label_name);
-            let post_name = post_label.and_then(&get_label_name);
+            let pre_name = pre_label.and_then(get_label_name);
+            let post_name = post_label.and_then(get_label_name);
             if let (Some(pre), Some(post)) = (pre_name, post_name) {
                 // The predicate defines `post` and reads from `pre`
                 // So `post` depends on `pre`
@@ -3756,7 +3756,7 @@ impl ModuleBuilder<'_, '_> {
         // Stash `[weight = N]` in the spec fun's properties for the Boogie backend.
         if let Some(n) = weight {
             use num::BigInt;
-            let weight_sym = self.symbol_pool().make("weight");
+            let weight_sym = self.symbol_pool().make(WEIGHT_PROP);
             self.spec_funs[self.spec_fun_index]
                 .spec
                 .borrow_mut()

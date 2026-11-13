@@ -1,0 +1,114 @@
+name: "mono-move-lints"
+
+# Runs the custom lints in devtools/lints (via cargo dylint) over the mono-move
+# crates, through third_party/move/mono-move/scripts/dylint.sh so CI and local
+# runs share one definition. Which crates each lint applies to is configured
+# in /dylint.toml.
+#
+# The required check `mono-move-lints-required` always reports; `changes`
+# decides whether the lints run, so only mono-move PRs pay for the nightly
+# driver build.
+on:
+  # `pull_request`, never `pull_request_target`: this runs untrusted PR code on
+  # a self-hosted runner, and `pull_request_target` would hand that code a
+  # writable token in the base-repo context.
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: mono-move-lints-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  changes:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      mono_move: ${{ steps.filter.outputs.mono_move }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" != pull_request ]; then
+            echo "mono_move=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          if grep -qE \
+            -e '^third_party/move/mono-move/' \
+            -e '^devtools/lints/' \
+            -e '^dylint\.toml$' \
+            -e '^Cargo\.(toml|lock)$' \
+            -e '^\.github/workflows/mono-move-lints\.yaml$' \
+            <<< "$changed"; then
+            echo "mono_move=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "mono_move=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  lints:
+    needs: changes
+    if: |
+      needs.changes.outputs.mono_move == 'true' &&
+      (
+        github.event_name != 'pull_request' ||
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: runs-on,cpu=16,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Cache the lint library and driver
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
+        with:
+          key: mono-move-lints
+          workspaces: |
+            devtools/lints
+          cache-directories: |
+            ~/.dylint_drivers
+
+      - name: Install cargo-dylint
+        run: |
+          cargo install cargo-dylint --locked --version 6.3.2
+          cargo install dylint-link --locked --version 6.3.2
+
+      - name: Test the lint library
+        working-directory: devtools/lints
+        run: cargo test
+
+      - name: Run the lints over the mono-move crates
+        # The lints are deny-by-default: a hit is a review finding.
+        run: third_party/move/mono-move/scripts/dylint.sh
+
+  mono-move-lints-required:
+    needs: [changes, lints]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          LINTS_RESULT: ${{ needs.lints.result }}
+        run: |
+          echo "changes: $CHANGES_RESULT, lints: $LINTS_RESULT"
+          case "$CHANGES_RESULT/$LINTS_RESULT" in
+            success/success | success/skipped) ;;
+            *) exit 1 ;;
+          esac

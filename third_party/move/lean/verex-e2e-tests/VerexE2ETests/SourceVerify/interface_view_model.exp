@@ -1,0 +1,16 @@
+VerexE2ETests/SourceVerify/interface_view_model.move:30:9: error: the specification clause `ensures result == x` is not established
+VerexE2ETests/SourceVerify/interface_view_model.move:29:5: error: verex verification failed: the automatic verification of `concrete_unseen` failed; provide a proof in `VerexE2ETests/SourceVerify/interface_view_model.proof.lean`:
+  verify concrete_unseen by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/interface_view_model.move:35:9: error: the specification clause `ensures result == chosen(x + 1)` is not established
+VerexE2ETests/SourceVerify/interface_view_model.move:34:5: error: verex verification failed: the automatic verification of `other_unseen` failed; provide a proof in `VerexE2ETests/SourceVerify/interface_view_model.proof.lean`:
+  verify other_unseen by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

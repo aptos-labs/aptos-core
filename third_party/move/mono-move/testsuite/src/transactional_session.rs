@@ -5,8 +5,8 @@
 //! one transactional test.
 
 use crate::{
-    engine::build_natives, extensions::seed_extensions, module_provider::InMemoryModuleProvider,
-    resource_provider::InMemoryResourceProvider,
+    engine::build_natives, extensions::seed_extensions,
+    resource_provider::storage_resource_provider, InMemoryModuleProvider,
 };
 use bytes::Bytes;
 use mono_move_core::{
@@ -19,6 +19,7 @@ use mono_move_core::{
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_output::v1_return_bcs;
 use mono_move_runtime::{
     serialize, CompletedCall, InterpreterContext, RuntimeError, RuntimeStatus, SessionEffects,
     WriteClass,
@@ -44,8 +45,8 @@ use thiserror::Error;
 /// V1 stages, links, and checks compatibility against [`InMemoryStorage`],
 /// which also holds the committed resources as canonical BCS. MonoVM's
 /// [`InMemoryModuleProvider`] supplies the same module bytes to its loader,
-/// and each run reads resources from the storage through an
-/// [`InMemoryResourceProvider`]. [`commit`](Self::commit) updates both module
+/// and each run reads resources from the storage through
+/// [`storage_resource_provider`]. [`commit`](Self::commit) updates both module
 /// stores together; a successful [`run`](Self::run) or
 /// [`run_script`](Self::run_script) writes its effects back into the storage.
 ///
@@ -142,15 +143,17 @@ impl From<VMInternalError> for RunError {
             Some(LoaderError::LoweringSkipped { reason }) => {
                 RunError::VmUnsupported(reason.to_string())
             },
-            Some(native @ LoaderError::NativeFunctionNotLoadable { .. }) => {
-                RunError::VmUnsupported(native.to_string())
-            },
+            Some(
+                gap @ (LoaderError::NativeFunctionNotLoadable { .. }
+                | LoaderError::ResourceLayoutNotDerivable),
+            ) => RunError::VmUnsupported(gap.to_string()),
             Some(
                 LoaderError::ModuleNotFound { .. }
                 | LoaderError::FunctionNotFound { .. }
                 | LoaderError::ScriptDeserializationFailed { .. }
                 | LoaderError::ScriptVerificationFailed { .. }
                 | LoaderError::GlobalContext(_)
+                | LoaderError::NativeShadowsMoveFunction { .. }
                 | LoaderError::InvariantViolation(_),
             )
             | None => RunError::Vm(err),
@@ -243,7 +246,7 @@ impl TransactionalSession {
     ) -> Result<RunOutcome, RunError> {
         let (outcome, changes) = with_guard(&mut self.ctx, |guard| -> Result<_, RunError> {
             let natives = build_natives();
-            let resources = InMemoryResourceProvider::new(guard, &self.storage);
+            let resources = storage_resource_provider(guard, &self.storage);
             let loader = Loader::new_with_policy(
                 guard,
                 &self.module_provider,
@@ -496,18 +499,7 @@ fn to_v1_bcs(ty: InternedType, bytes: Vec<u8>) -> Result<(TypeTag, Vec<u8>), Run
     let tag = type_tag_of(ty).ok_or_else(|| {
         RunError::Unsupported("report a value whose type has no type tag".to_string())
     })?;
-    // Convert a top-level signer from MonoVM's bare address to V1's variant.
-    // TODO(completeness): a signer nested in a returned vector or struct keeps
-    // the bare encoding, so the adapter rejects the value as undecodable under
-    // V1's layout (or renders it wrongly if the bytes happen to decode).
-    // Re-encode through the value's layout instead of by top-level tag.
-    let bytes = if tag == TypeTag::Signer {
-        let address =
-            AccountAddress::from_bytes(&bytes).expect("MonoVM serializes a signer as its address");
-        encode_signer(address)
-    } else {
-        bytes
-    };
+    let bytes = v1_return_bcs(ty, bytes).map_err(VMInternalError::new)?;
     Ok((tag, bytes))
 }
 
@@ -517,7 +509,7 @@ fn to_v1_bcs(ty: InternedType, bytes: Vec<u8>) -> Result<(TypeTag, Vec<u8>), Run
 /// first, independent of write order.
 // TODO(cleanup): commit through the executor's write-set materialization,
 // draining the `WriteSet` into `InMemoryStorage`, instead of this conversion.
-fn resource_changes(
+pub(crate) fn resource_changes(
     guard: &ExecutionGuard<'_>,
     effects: &SessionEffects,
 ) -> Result<ChangeSet, RunError> {

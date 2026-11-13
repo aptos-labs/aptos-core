@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_keyless_validation::KeylessValidationError;
 use aptos_types::{
     error::{split_canonical, OUT_OF_RANGE},
     transaction::validation::ECANT_PAY_GAS_DEPOSIT,
@@ -38,6 +39,8 @@ impl MaterializationError {
 pub enum DiscardReason {
     /// The transaction's signature did not verify.
     InvalidSignature,
+    /// A keyless authenticator did not validate.
+    KeylessValidationFailure(KeylessValidationError),
     /// A transaction shape this executor does not support yet.
     Unsupported(&'static str),
     /// A payload or feature that no VM supports anymore.
@@ -91,6 +94,12 @@ pub enum PreExecutionCheckFailure {
     GasPriceBelowMinimum { price: u64, min: u64 },
     #[error("gas unit price {price} is below the encrypted-transaction minimum {min}")]
     EncryptedGasPriceBelowMinimum { price: u64, min: u64 },
+    #[error("gas unit price {price} is below the raised-limits minimum {min}")]
+    HighLimitGasPriceBelowMinimum { price: u64, min: u64 },
+    #[error("limits multiplier {percent}% must be above {min}% and at most {max}%")]
+    InvalidLimitsMultiplier { percent: u64, min: u64, max: u64 },
+    #[error("an approved governance script may not request raised limits")]
+    LimitsRequestOnGovernanceScript,
     #[error("gas unit price {price} is above the maximum {max}")]
     GasPriceAboveMaximum { price: u64, max: u64 },
 }
@@ -99,6 +108,9 @@ pub enum PreExecutionCheckFailure {
 #[derive(Clone, Copy, Debug)]
 pub enum ExecutionStage {
     Prologue,
+    /// The metered half of the prologue, which creates the sender's account on
+    /// its first transaction.
+    MeteredPrologue,
     Payload,
     /// The epilogue after a payload that succeeded.
     Epilogue,
@@ -141,6 +153,12 @@ pub enum InvalidArguments {
     SignerCountMismatch,
     /// An argument's bytes do not decode to its parameter's type.
     UndecodableArgument,
+    /// A `String` argument is not valid UTF-8.
+    MalformedString,
+    /// An `Object<T>` argument names an address holding no object.
+    ObjectDoesNotExist,
+    /// An `Object<T>` argument names an object holding no `T`.
+    ObjectLacksResource,
 }
 
 /// Why a script was refused before running.

@@ -1,0 +1,8 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function argument may modify resource `lambda_generic_memory_not_deferred::R`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/lambda_generic_memory_not_deferred.move:35:9
+   │
+35 │ ╭         apply<R>(a, || {
+36 │ │             let R { n: _ } = move_from<R>(a);
+37 │ │         })
+   │ ╰──────────^

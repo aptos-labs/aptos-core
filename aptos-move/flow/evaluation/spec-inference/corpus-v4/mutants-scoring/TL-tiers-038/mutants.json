@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 46,
+        "offset": 2085,
+        "sha256": "ffcf8d0d44b224ec7a669341cc6d91929201c09538fe59351ab27c4b45ad9964"
+      },
+      "edit": {
+        "at": 20,
+        "kind": "substitute",
+        "length": 2,
+        "to": "||"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-tiers-038-either-suffices",
+      "obligation_category": "abort",
+      "rationale": "A tier passes if either its stake or its multiplier is ordered.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 25,
+        "offset": 1955,
+        "sha256": "7acda38c0d00f533cee6e446f727b7075c451ecc5cf228e32a73b094d4a30f67"
+      },
+      "edit": {
+        "at": 18,
+        "kind": "substitute",
+        "length": 5,
+        "to": "i"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-tiers-038-compared-with-itself",
+      "obligation_category": "abort",
+      "rationale": "Each tier is compared with itself.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 38,
+        "offset": 1925,
+        "sha256": "3c3f4663c4c4ac7847b8938b4dfaa16edcb8ce79d37d74887aa7461a15d75bbd"
+      },
+      "edit": {
+        "at": 7,
+        "kind": "substitute",
+        "length": 7,
+        "to": "i + 1 < len"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-tiers-038-last-pair-skipped",
+      "obligation_category": "abort",
+      "rationale": "The last two tiers are never compared.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "task_id": "TL-tiers-038"
+}

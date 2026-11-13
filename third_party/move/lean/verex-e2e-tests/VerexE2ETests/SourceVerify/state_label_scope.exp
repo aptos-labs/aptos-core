@@ -1,0 +1,8 @@
+VerexE2ETests/SourceVerify/state_label_scope.move:32:9: error: the specification clause `ensures ∀ (j in 0 .. n), j < 2` is not established
+VerexE2ETests/SourceVerify/state_label_scope.move:30:5: error: verex verification failed: the automatic verification of `range_over_binding_wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/state_label_scope.proof.lean`:
+  verify range_over_binding_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

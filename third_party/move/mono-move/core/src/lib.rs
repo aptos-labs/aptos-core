@@ -4,6 +4,7 @@
 pub mod abilities;
 pub mod align;
 mod error;
+mod framework_symbols;
 mod function;
 mod gas;
 mod instruction;
@@ -15,7 +16,9 @@ mod prepared_module;
 pub mod root_pool;
 pub mod storage;
 pub mod types;
+pub mod value_format;
 pub mod value_layout;
+mod verifier;
 pub mod vm_error;
 
 pub use align::{
@@ -23,6 +26,7 @@ pub use align::{
     MAX_ALIGN,
 };
 pub use error::{ExecutionError, ExecutionErrorKind, ExecutionResult, IntoExecutionError};
+pub use framework_symbols::FrameworkSymbols;
 pub use function::{
     BytecodeOffset, Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry,
     SortedSafePointEntries,
@@ -51,17 +55,20 @@ pub use object_descriptor::{
     TRIVIAL_DESCRIPTOR_ID,
 };
 pub use prepared_module::{
-    intern_sig_token, intern_struct_tag, intern_type_tag, FieldTypes,
-    FunctionInstantiationSignature, FunctionSignature, PreparedModule, PreparedModuleError,
+    intern_sig_token, intern_struct_tag, intern_type_tag, FieldDecl,
+    FunctionInstantiationSignature, FunctionSignature, NominalFields, PreparedModule,
+    PreparedModuleError, VariantDecl,
 };
 pub use root_pool::{ObjectHandle, ReferenceHandle, RootPool};
 pub use storage::{
     nominal_tag, ModuleProvider, NoModuleProvider, NoResourceProvider, ReadPin, ResourceProvider,
     ResourceProviderError, StorageRead,
 };
-pub use types::{convert_mut_to_immut_ref, is_assignable, strip_ref};
+pub use types::{convert_mut_to_immut_ref, is_assignable, is_nominal, strip_ref};
+pub use value_format::FormatOptions;
 pub use value_layout::{
     reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
-    LayoutProvider, ValueLayout, ValueLayoutTable,
+    LayoutProvider, ValueLayout, ValueLayoutTable, VariantValueLayout,
 };
+pub use verifier::{assert_verified, verify_function, verify_program, VerificationError};
 pub use vm_error::{CallFrame, ErrorLocation, VMInternalError, VMResult};

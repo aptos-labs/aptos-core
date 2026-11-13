@@ -13,39 +13,47 @@ use crate::{
     metrics::{
         COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
     },
-    native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
-    position_buffered_state::{
-        PositionLedgerStateWithSummary, PositionProofReader, PositionSlot, PositionStateWithSummary,
-    },
+    native_state_store::decode_position_writes,
+    native_store::{CollateralStore, NativeStoreSpec, OrderStore, PositionStore},
     pruner::PrunerManager,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
+        version_data::VersionDataSchema,
     },
     state_store::StateStore,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, db_ensure as ensure, AptosDbError, DbReader, DbWriter, Result,
-    StateKind, StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit,
+    db_ensure as ensure,
+    state_store::{
+        collateral::{decode_collateral_writes, CollateralOverlay, ShardedCollateralLayers},
+        orders::{decode_order_writes, OrderOverlay, ShardedOrderLayers},
+        positions::{PositionOverlay, ShardedPositionLayers},
+    },
+    AptosDbError, DbReader, DbWriter, Result, StateKind, StateSnapshotReceiver,
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use aptos_types::transaction::TransactionAuxiliaryData;
 use aptos_types::{
     account_config::new_block_event_key,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{hot_state::HotStateValue, state_key::StateKey, state_value::StateValue},
+    state_store::{
+        hot_state::HotStateValue, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
+    },
     transaction::{
         Transaction, TransactionInfo, TransactionOutput, TransactionOutputListWithProofV2, Version,
     },
     write_set::WriteSet,
 };
 use rayon::prelude::*;
-use std::{collections::HashMap, iter::Iterator, sync::Arc, time::Instant};
+use std::{iter::Iterator, sync::Arc, time::Instant};
 
 impl DbWriter for AptosDB {
     fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {
@@ -62,7 +70,7 @@ impl DbWriter for AptosDB {
 
             chunk
                 .state_summary
-                .latest()
+                .last_checkpoint()
                 .global_state_summary
                 .log_generation("db_save");
 
@@ -72,7 +80,7 @@ impl DbWriter for AptosDB {
 
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__others"]);
 
-            self.state_store.buffered_state().lock().update(
+            self.state_store.live()?.buffered_state().lock().update(
                 chunk.result_ledger_state_with_summary(),
                 chunk.hot_state_updates.clone(),
                 chunk.estimated_total_state_updates(),
@@ -80,6 +88,60 @@ impl DbWriter for AptosDB {
             )?;
 
             Ok(())
+        })
+    }
+
+    fn advance_position_base(
+        &self,
+        target: Option<&PositionOverlay>,
+    ) -> Result<Option<ShardedPositionLayers>> {
+        gauged_api("advance_position_base", || {
+            let Some(bundle) = self.position.as_ref() else {
+                return Ok(None);
+            };
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["advance_position_base"]);
+            if let Some(target) = target {
+                // A declined fold isn't an error: this runs on every block
+                // execution, and the base can legitimately sit ahead of the
+                // target when state sync has folded further.
+                bundle.position_base.fold(target);
+            }
+            self.observe_position_overlay();
+            Ok(Some(bundle.position_base.layers()))
+        })
+    }
+
+    fn advance_order_base(
+        &self,
+        target: Option<&OrderOverlay>,
+    ) -> Result<Option<ShardedOrderLayers>> {
+        gauged_api("advance_order_base", || {
+            let Some(bundle) = self.order.as_ref() else {
+                return Ok(None);
+            };
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["advance_order_base"]);
+            if let Some(target) = target {
+                // Declined folds are expected, as for positions.
+                bundle.order_base.fold(target);
+            }
+            Ok(Some(bundle.order_base.layers()))
+        })
+    }
+
+    fn advance_collateral_base(
+        &self,
+        target: Option<&CollateralOverlay>,
+    ) -> Result<Option<ShardedCollateralLayers>> {
+        gauged_api("advance_collateral_base", || {
+            let Some(bundle) = self.collateral.as_ref() else {
+                return Ok(None);
+            };
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["advance_collateral_base"]);
+            if let Some(target) = target {
+                // Declined folds are expected, as for positions.
+                bundle.collateral_base.fold(target);
+            }
+            Ok(Some(bundle.collateral_base.layers()))
         })
     }
 
@@ -133,9 +195,20 @@ impl DbWriter for AptosDB {
                 let position = self.position.as_ref().ok_or_else(|| {
                     AptosDbError::Other("native-position subsystem is not enabled".into())
                 })?;
-                crate::position_state_sync::get_position_snapshot_receiver(
-                    &position.kv_db,
-                    &position.merkle_db,
+                crate::native_store::state_sync::get_native_snapshot_receiver(
+                    &position.store.kv_db,
+                    &position.store.merkle_db,
+                    version,
+                    expected_root_hash,
+                )
+            },
+            StateKind::Order => {
+                let order = self.order.as_ref().ok_or_else(|| {
+                    AptosDbError::Other("native-order store is not enabled".into())
+                })?;
+                crate::native_store::state_sync::get_native_snapshot_receiver(
+                    &order.store.kv_db,
+                    &order.store.merkle_db,
                     version,
                     expected_root_hash,
                 )
@@ -149,6 +222,12 @@ impl DbWriter for AptosDB {
         expected_root_hash: HashValue,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, HotStateValue>>> {
         gauged_api("get_hot_state_snapshot_receiver", || {
+            // `StateStore::reload()` at finalize discards a restored hot state when this is
+            // set, and a restart in the middle wipes the partially restored one.
+            ensure!(
+                !self.state_store.hot_state_config.delete_on_restart,
+                "Restoring a hot state snapshot requires hot_state_config.delete_on_restart = false."
+            );
             crate::hot_state_restore::get_hot_state_snapshot_receiver(
                 Arc::clone(&self.state_store.hot_state_kv_db),
                 Arc::clone(&self.state_store.hot_state_merkle_db),
@@ -179,6 +258,50 @@ impl DbWriter for AptosDB {
                 "Number of transaction infos should == 1, but got: {}",
                 num_transaction_infos
             );
+
+            // The position snapshot stage only runs when the target commits a
+            // position state root (`snapshot_kind_applies_to_target`). Without
+            // one there is nothing authenticated to restore, and the node
+            // would claim an empty index for a chain whose positions it cannot
+            // learn.
+            let position_root =
+                output_with_proof.proof.transaction_infos[0].position_state_checkpoint_hash();
+            if self.position.is_some() {
+                ensure!(
+                    position_root.is_some(),
+                    "Fast sync target at version {} commits no position state root, so the \
+                     native-position snapshot cannot be restored or verified. Enable \
+                     COMPUTE_TRADING_NATIVE_STATE_ROOTS on the source chain, or run without \
+                     native-position storage.",
+                    version,
+                );
+            }
+            let order_root =
+                output_with_proof.proof.transaction_infos[0].order_state_checkpoint_hash();
+            if self.order.is_some() {
+                ensure!(
+                    order_root.is_some(),
+                    "Fast sync target at version {} commits no order state root, so the \
+                     native-order snapshot cannot be restored or verified. Enable \
+                     COMPUTE_TRADING_NATIVE_STATE_ROOTS on the source chain, or run without \
+                     native-order storage.",
+                    version,
+                );
+            }
+
+            // An empty hot state snapshot streams no values, and a target without a hot root has no
+            // snapshot to sync, so nothing has written the root that later hot state commits build
+            // on, or the hot KV commit progress that a restart requires.
+            if output_with_proof.proof.transaction_infos[0]
+                .hot_state_checkpoint_hash()
+                .is_none_or(|root| root == *SPARSE_MERKLE_PLACEHOLDER_HASH)
+            {
+                StateStore::write_empty_hot_state(
+                    &self.state_store.hot_state_merkle_db,
+                    &self.state_store.hot_state_kv_db,
+                    version,
+                )?;
+            }
 
             // TODO(joshlind): include confirm_or_save_frozen_subtrees in the change set
             // bundle below.
@@ -240,6 +363,22 @@ impl DbWriter for AptosDB {
                 Some(&mut ledger_db_batch.ledger_metadata_db_batches),
             )?;
 
+            // The state snapshot restore only counted cold state. Start from its progress rather
+            // than `VersionData`, which a previous attempt may have overlaid already.
+            let cold_usage = self
+                .state_kv_db
+                .metadata_db()
+                .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotKvRestoreProgress(version))?
+                .map_or(StateStorageUsage::zero(), |v| {
+                    v.expect_state_snapshot_progress().usage
+                });
+            let usage = self
+                .state_store
+                .overlay_hot_state_usage(version, cold_usage)?;
+            ledger_db_batch
+                .ledger_metadata_db_batches
+                .put::<VersionDataSchema>(&version, &usage.into())?;
+
             ledger_db_batch
                 .ledger_metadata_db_batches
                 .put::<DbMetadataSchema>(
@@ -288,9 +427,17 @@ impl DbWriter for AptosDB {
             restore_utils::update_latest_ledger_info(self.ledger_db.metadata_db(), ledger_infos)?;
             info!(
                 version = version,
-                "Finalizing state snapshot restore: pruners seeded, resetting state store."
+                "Finalizing state snapshot restore: pruners seeded, reloading state store."
             );
-            self.state_store.reset();
+            self.state_store.reload();
+
+            // After the restored rows are durable.
+            if let Some(expected_root_hash) = position_root {
+                self.reset_position_after_fast_sync(version, expected_root_hash)?;
+            }
+            if let Some(expected_root_hash) = order_root {
+                self.reset_order_after_fast_sync(version, expected_root_hash)?;
+            }
 
             Ok(())
         })
@@ -303,7 +450,11 @@ impl AptosDB {
 
         ensure!(!chunk.is_empty(), "chunk is empty, nothing to save.");
 
-        let next_version = self.state_store.current_state_locked().next_version();
+        let next_version = self
+            .state_store
+            .live()?
+            .current_state_locked()
+            .next_version();
         // Ensure the incoming committing requests are always consecutive and the version in
         // buffered state is consistent with that in db.
         ensure!(
@@ -311,6 +462,12 @@ impl AptosDB {
             "The first version passed in ({}), and the next version expected by db ({}) are inconsistent.",
             chunk.first_version,
             next_version,
+        );
+        ensure!(
+            chunk.state.next_version() == chunk.next_version(),
+            "Chunk ends at version {}, while its state is at version {:?}.",
+            chunk.expect_last_version(),
+            chunk.state.version(),
         );
 
         Ok(())
@@ -368,6 +525,12 @@ impl AptosDB {
             if self.position.is_some() {
                 s.spawn(|_| self.commit_native_position(chunk, sync_commit).unwrap());
             }
+            if self.order.is_some() {
+                s.spawn(|_| self.commit_native_order(chunk, sync_commit).unwrap());
+            }
+            if self.collateral.is_some() {
+                s.spawn(|_| self.commit_native_collateral(chunk, sync_commit).unwrap());
+            }
         });
 
         Ok(new_root_hash)
@@ -378,135 +541,130 @@ impl AptosDB {
         let Some(bundle) = self.position.as_ref() else {
             return Ok(());
         };
-        if chunk.transaction_outputs.is_empty() {
+        let Some(chunk_last_inclusive) = bundle.store.commit_kv(chunk)? else {
             return Ok(());
-        }
-        let committer = NativeStateCommitter::new(bundle.kv_db.clone());
+        };
 
-        let chunk_first = chunk.first_version;
-        let chunk_last_inclusive = chunk_first + chunk.transaction_outputs.len() as Version - 1;
-
-        // Persist the position KV values + stale index.
-        let mut sharded_kv_batches = new_sharded_kv_batches();
-        let mut in_chunk_prior = InChunkPriorVersions::new();
-        for (i, output) in chunk.transaction_outputs.iter().enumerate() {
-            let version = chunk_first + i as Version;
-            let position_writes: Vec<_> = output
-                .write_set()
-                .native_position_iter()
-                .map(|(k, op)| (k.clone(), op.as_write_op().clone()))
-                .collect();
-            if !position_writes.is_empty() {
-                committer
-                    .apply(
-                        version,
-                        position_writes,
-                        &mut sharded_kv_batches,
-                        &mut in_chunk_prior,
-                    )
-                    .map_err(|e| AptosDbError::Other(format!("native commit: {e}")))?;
-            }
+        // Advance the tip the scanner reads through. `None` means either
+        // the feature is off or the chunk was built without the executor,
+        // as `aptosdb_testonly` does — extend from this chunk's writes
+        // rather than adopting an overlay.
+        match chunk.positions {
+            Some(executed) => {
+                // Pre-committed means ordered, and the base only folds to
+                // certified state, so the tip always descends from it.
+                assert!(
+                    bundle.position_base.is_ancestor_of(executed),
+                    "published position overlay does not descend from the base",
+                );
+                *bundle.positions.lock() = executed.clone();
+            },
+            None => {
+                let ops: Vec<_> = chunk
+                    .transaction_outputs
+                    .iter()
+                    .flat_map(|output| PositionStore::write_set_ops(output.write_set()))
+                    .map(|(key, op)| (key, op.as_state_value_opt()))
+                    .collect();
+                let chunk_position_writes = decode_position_writes(ops)?;
+                if !chunk_position_writes.is_empty() {
+                    let floor = bundle.position_base.layers();
+                    let mut positions = bundle.positions.lock();
+                    *positions =
+                        positions.extend(&floor, chunk_last_inclusive, chunk_position_writes);
+                }
+            },
         }
+        self.observe_position_overlay();
+
+        // Flag on: the summary comes from execution on the chunk; off: the
+        // store computes it so the tree still tracks forward (not
+        // consensus-committed).
         bundle
-            .kv_db
-            .commit(chunk_last_inclusive, None, sharded_kv_batches)
-            .map_err(|e| AptosDbError::Other(format!("position_db commit failed: {e}")))?;
-
-        // Advance the position pipeline (merklize + persist + advance the base).
-        // Flag on: the summary comes from execution on the chunk; off: compute
-        // it here so the tree still tracks forward (not consensus-committed).
-        if let Some(store) = bundle.state_store.as_ref() {
-            let new_state = match chunk.position_state_summary {
-                Some(summary) => summary.clone(),
-                None => self.position_summary_at_commit(chunk)?,
-            };
-            let estimated_items = chunk.transaction_outputs.len();
-            let mut bufstate = store.buffered_state_locked();
-            bufstate.update(
-                new_state,
-                (),
-                estimated_items,
-                sync_commit || chunk.is_reconfig,
-            )?;
-        }
-        Ok(())
+            .store
+            .advance_pipeline(chunk, chunk.position_state_summary, sync_commit)
     }
 
-    /// Computes the position summary at commit time by extending the in-memory
-    /// tip with this chunk's position writes, freezing on the persisted base.
-    /// Used only when `COMPUTE_TRADING_NATIVE_STATE_ROOTS` is off (otherwise the
-    /// summary comes from execution on the chunk).
-    fn position_summary_at_commit(
-        &self,
-        chunk: &ChunkToCommit,
-    ) -> Result<PositionLedgerStateWithSummary> {
-        let bundle = self
-            .position
-            .as_ref()
-            .expect("called only when position is present");
-        let store = bundle
-            .state_store
-            .as_ref()
-            .expect("called only when state_store is present");
-        let persisted_base = bundle
-            .persisted
-            .as_ref()
-            .expect("persisted present when state_store is")
-            .get();
-
-        let (mut latest, mut last_checkpoint) = {
-            let state = store.current_state();
-            let current = state.lock();
-            (current.latest().clone(), current.last_checkpoint().clone())
+    fn commit_native_order(&self, chunk: &ChunkToCommit, sync_commit: bool) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_order"]);
+        let Some(bundle) = self.order.as_ref() else {
+            return Ok(());
+        };
+        let Some(chunk_last_inclusive) = bundle.store.commit_kv(chunk)? else {
+            return Ok(());
         };
 
-        let chunk_first = chunk.first_version;
-        let chunk_last_inclusive = chunk_first + chunk.transaction_outputs.len() as Version - 1;
-        let checkpoint_within_chunk = chunk
-            .state
-            .last_checkpoint()
-            .version()
-            .filter(|v| (chunk_first..=chunk_last_inclusive).contains(v));
+        // Advance the published tip, as `commit_native_position` does.
+        match chunk.orders {
+            Some(executed) => {
+                assert!(
+                    bundle.order_base.is_ancestor_of(executed),
+                    "published order overlay does not descend from the base",
+                );
+                *bundle.orders.lock() = executed.clone();
+            },
+            None => {
+                let writes = decode_order_writes(
+                    chunk
+                        .transaction_outputs
+                        .iter()
+                        .flat_map(|output| OrderStore::write_set_ops(output.write_set()))
+                        .map(|(key, op)| (key, op.as_state_value_opt())),
+                )?;
+                if !writes.is_empty() {
+                    let floor = bundle.order_base.layers();
+                    let mut orders = bundle.orders.lock();
+                    *orders = orders.extend(&floor, chunk_last_inclusive, writes);
+                }
+            },
+        }
 
-        let mut pending: HashMap<HashValue, PositionSlot> = HashMap::new();
-        let extend_on_base = |latest: &PositionStateWithSummary,
-                              version: Version,
-                              updates: Vec<(HashValue, PositionSlot)>|
-         -> Result<PositionStateWithSummary> {
-            let proof_reader = PositionProofReader {
-                merkle_db: bundle.merkle_db.clone(),
-                version: persisted_base.version(),
-            };
-            latest.extend(version, updates, persisted_base.summary(), &proof_reader)
+        // With the roots on, the summary comes from execution on the chunk;
+        // off, the store computes it so the tree still tracks forward.
+        bundle
+            .store
+            .advance_pipeline(chunk, chunk.order_state_summary, sync_commit)
+    }
+
+    fn commit_native_collateral(&self, chunk: &ChunkToCommit, sync_commit: bool) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_collateral"]);
+        let Some(bundle) = self.collateral.as_ref() else {
+            return Ok(());
+        };
+        let Some(chunk_last_inclusive) = bundle.store.commit_kv(chunk)? else {
+            return Ok(());
         };
 
-        for (i, output) in chunk.transaction_outputs.iter().enumerate() {
-            let version = chunk_first + i as Version;
-            for (key, op) in output.write_set().native_position_iter() {
-                let value_hash = op.as_write_op().as_state_value_opt().map(CryptoHash::hash);
-                pending.insert(key.hash(), PositionSlot {
-                    state_key: key.clone(),
-                    value_hash,
-                    value: None,
-                });
-            }
-            if Some(version) == checkpoint_within_chunk && !pending.is_empty() {
-                let updates: Vec<_> = std::mem::take(&mut pending).into_iter().collect();
-                latest = extend_on_base(&latest, version, updates)?;
-                last_checkpoint = latest.clone();
-            }
-        }
-        if !pending.is_empty() {
-            let updates: Vec<_> = pending.into_iter().collect();
-            latest = extend_on_base(&latest, chunk_last_inclusive, updates)?;
+        // Advance the published tip, as `commit_native_position` does.
+        match chunk.collateral {
+            Some(executed) => {
+                assert!(
+                    bundle.collateral_base.is_ancestor_of(executed),
+                    "published collateral overlay does not descend from the base",
+                );
+                *bundle.collateral.lock() = executed.clone();
+            },
+            None => {
+                let writes = decode_collateral_writes(
+                    chunk
+                        .transaction_outputs
+                        .iter()
+                        .flat_map(|output| CollateralStore::write_set_ops(output.write_set()))
+                        .map(|(key, op)| (key, op.as_state_value_opt())),
+                )?;
+                if !writes.is_empty() {
+                    let floor = bundle.collateral_base.layers();
+                    let mut collateral = bundle.collateral.lock();
+                    *collateral = collateral.extend(&floor, chunk_last_inclusive, writes);
+                }
+            },
         }
 
-        Ok(
-            PositionLedgerStateWithSummary::from_latest_and_last_checkpoint(
-                latest,
-                last_checkpoint,
-            ),
-        )
+        // With the roots on, the summary comes from execution on the chunk;
+        // off, the store computes it so the tree still tracks forward.
+        bundle
+            .store
+            .advance_pipeline(chunk, chunk.collateral_state_summary, sync_commit)
     }
 
     fn commit_state_kv_and_ledger_metadata(&self, chunk: &ChunkToCommit) -> Result<()> {
@@ -717,7 +875,7 @@ impl AptosDB {
 
     fn get_and_check_commit_range(&self, version_to_commit: Version) -> Result<Option<Version>> {
         let old_committed_ver = self.ledger_db.metadata_db().get_synced_version()?;
-        let pre_committed_ver = self.state_store.current_state_locked().version();
+        let pre_committed_ver = self.state_store.live()?.current_state_locked().version();
         ensure!(
             old_committed_ver.is_none() || version_to_commit >= old_committed_ver.unwrap(),
             "Version too old to commit. Committed: {:?}; Trying to commit with LI: {}",
@@ -831,17 +989,16 @@ impl AptosDB {
                 .state_pruner
                 .hot_state_kv_pruner
                 .maybe_set_pruner_target_db_version(version);
-            // Activate the native-position value pruner here too, after
-            // the commit is durable — same point as `state_kv_pruner`.
-            // (The merkle pruners are driven when snapshots persist.)
-            if let Some(position_pruner) = self
-                .position
-                .as_ref()
-                .and_then(|bundle| bundle.position_pruner.as_ref())
-            {
-                position_pruner
-                    .value_pruner
-                    .maybe_set_pruner_target_db_version(version);
+            // The native stores' value pruners too, at the same point as
+            // `state_kv_pruner`.
+            if let Some(bundle) = self.position.as_ref() {
+                bundle.store.wake_value_pruner(version);
+            }
+            if let Some(order) = self.order.as_ref() {
+                order.store.wake_value_pruner(version);
+            }
+            if let Some(collateral) = self.collateral.as_ref() {
+                collateral.store.wake_value_pruner(version);
             }
         }
 

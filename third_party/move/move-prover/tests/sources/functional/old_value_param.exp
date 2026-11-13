@@ -1,0 +1,14 @@
+Move prover returns: exiting with verification errors
+error: base case of the loop invariant does not hold
+   ┌─ tests/sources/functional/old_value_param.move:30:13
+   │
+30 │             invariant start == old(start) + n + 1; // error: invariant does not hold on entry
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/old_value_param.move:24: count_up_wrong
+   =         start = <redacted>
+   =         end = <redacted>
+   =     at tests/sources/functional/old_value_param.move:25: count_up_wrong
+   =         n = <redacted>
+   =     at tests/sources/functional/old_value_param.move:29: count_up_wrong
+   =     at tests/sources/functional/old_value_param.move:30: count_up_wrong

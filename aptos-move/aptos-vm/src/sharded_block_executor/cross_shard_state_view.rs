@@ -9,7 +9,7 @@ use aptos_types::{
         errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
         state_value::StateValue, StateView, TStateView,
     },
-    transaction::analyzed_transaction::AnalyzedTransaction,
+    transaction::{analyzed_transaction::AnalyzedTransaction, Version},
 };
 use std::collections::{HashMap, HashSet};
 
@@ -84,14 +84,21 @@ impl<S: StateView + Sync + Send> TStateView for CrossShardStateView<'_, S> {
     fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         Ok(StateStorageUsage::new_untracked())
     }
+
+    fn next_version(&self) -> Version {
+        self.base_view.next_version()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::sharded_block_executor::cross_shard_state_view::CrossShardStateView;
-    use aptos_types::state_store::{
-        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, TStateView,
+    use aptos_types::{
+        state_store::{
+            errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+            state_value::StateValue, TStateView,
+        },
+        transaction::Version,
     };
     use std::{collections::HashSet, sync::Arc, thread, time::Duration};
 
@@ -108,6 +115,10 @@ mod tests {
         }
 
         fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
+            unreachable!()
+        }
+
+        fn next_version(&self) -> Version {
             unreachable!()
         }
     }

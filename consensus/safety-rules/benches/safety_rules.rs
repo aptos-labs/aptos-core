@@ -7,7 +7,8 @@ use aptos_consensus_types::block::block_test_utils;
 use aptos_safety_rules::{test_utils, PersistentSafetyStorage, SafetyRulesManager, TSafetyRules};
 use aptos_secure_storage::{InMemoryStorage, KVStorage, OnDiskStorage, Storage, VaultStorage};
 use aptos_types::validator_signer::ValidatorSigner;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 use tempfile::NamedTempFile;
 
 const VAULT_HOST: &str = "http://localhost:8200";

@@ -402,10 +402,20 @@ $1.vector.index_of{{S}}(v: Vec ({{T}}), e: {{T}}) returns (res1: bool, res2: int
 {%- set S = "'" ~ instance.suffix ~ "'" -%}
 
 function $EncodeKey{{S}}(k: {{K}}): int;
+{%- if instance.key_inverse_encoding %}
+// Injective via an inverse: linear in the number of keys, where the pairwise
+// form below is quadratic. Sound only because `$IsEqual` is `==` here.
+function $DecodeKey{{S}}(i: int): {{K}};
+axiom (
+  forall k: {{K}} :: {$EncodeKey{{S}}(k)}
+    $DecodeKey{{S}}($EncodeKey{{S}}(k)) == k
+);
+{%- else %}
 axiom (
   forall k1, k2: {{K}} :: {$EncodeKey{{S}}(k1), $EncodeKey{{S}}(k2)}
     $IsEqual{{S}}(k1, k2) <==> $EncodeKey{{S}}(k1) == $EncodeKey{{S}}(k2)
 );
+{%- endif %}
 {% endmacro table_key_encoding %}
 
 
@@ -484,7 +494,15 @@ datatype {{Self}} {
 {%- else -%}
 {%- set VEQ = "GetTable(" ~ c1 ~ ", k) == GetTable(" ~ c2 ~ ", k)" -%}
 {%- endif -%}
-{%- if options.native_equality and not impl.has_ghost_carrier and not instance.1.has_ghost -%}
+{#- An insertion-ordered map adds position agreement: its order is not a
+    function of its content, so two maps holding the same entries are only
+    equal if a program observing the order cannot tell them apart. For a
+    key-ordered enumeration the positions follow from the content, so the
+    conjunct is omitted and the output stays byte-identical. -#}
+{#- `HAS_ENUM` is also required: it additionally excludes bv instances, for
+    which no enumeration is emitted and the conjunct would not resolve. -#}
+{%- set ORDER_EQ = impl.insertion_ordered and HAS_ENUM -%}
+{%- if options.native_equality and not impl.has_ghost_carrier and not instance.1.has_ghost and not ORDER_EQ -%}
 function $IsEqual'{{Type}}{{S}}'(t1: {{Self}}, t2: {{Self}}): bool {
     t1 == t2
 }
@@ -493,7 +511,13 @@ function $IsEqual'{{Type}}{{S}}'(t1: {{Self}}, t2: {{Self}}): bool {
     LenTable({{c1}}) == LenTable({{c2}}) &&
     (forall k: int :: ContainsTable({{c1}}, k) <==> ContainsTable({{c2}}, k)) &&
     (forall k: int :: ContainsTable({{c1}}, k) ==> {{VEQ}}) &&
+{%- if ORDER_EQ %}
+    (forall k: int :: ContainsTable({{c2}}, k) ==> {{VEQ}}) &&
+    (forall i: int :: 0 <= i && i < LenTable({{c1}}) ==>
+        $IsEqual'{{instance.0.suffix}}'({{EKA}}({{c1}}, i), {{EKA}}({{c2}}, i)))
+{%- else %}
     (forall k: int :: ContainsTable({{c2}}, k) ==> {{VEQ}})
+{%- endif %}
 }
 {%- endif %}
 
@@ -533,8 +557,13 @@ procedure {:inline 2} {{impl.fun_new_with_config}}{{S}}(inner_max_degree: int, l
 {%- if impl.fun_destroy_empty != "" %}
 procedure {:inline 2} {{impl.fun_destroy_empty}}{{S}}(t: {{Self}}) {
     if (LenTable(t{{U}}) != 0) {
-        call $Abort($StdError(1/*INVALID_STATE*/, 102/*ENOT_EMPTY*/));
+        call $Abort($CanonicalError(3/*INVALID_STATE*/, 102/*ENOT_EMPTY*/));
     }
+}
+{%- endif %}
+
+{%- if impl.fun_destroy_unchecked != "" %}
+procedure {:inline 2} {{impl.fun_destroy_unchecked}}{{S}}(t: {{Self}}) {
 }
 {%- endif %}
 
@@ -565,7 +594,11 @@ procedure {:inline 2} {{impl.fun_has_key}}{{S}}(t: ({{Self}}), k: {{K}}) returns
      would fail Boogie name resolution (`is_bv` is a Boogie-level tag, not a Move
      type, so no registration path mints e.g. `Option'bv64'`); for the rest it
      would only bloat every shard's prelude. Bit-vector-classified maps are not
-     supported through these roles. #}
+     supported through these roles.
+   - `not instance.0.cmp_reaches_vector`: skips facts that only help proofs (the
+     end-position bounds and the insertion survival assumes) for keys whose comparison
+     walks a vector or an intrinsic map. Each instantiation of such a key's `compare`
+     is costly for the solver, and an intrinsic map has no comparison model. #}
 {%- if impl.fun_get != "" and not instance.1.is_bv %}
 // Read-only lookup. Returns `Some(value)` when `k` is in the map, `None` otherwise.
 // Never aborts.
@@ -797,8 +830,9 @@ procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec
     assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
         InRangeVec(result, i) ==> InRangeVec(result, j) ==> i != j ==>
         !$IsEqual'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)));
-{%- if instance.0.cmp_available %}
-    // Keys are returned in ascending `cmp::compare` order.
+{%- if instance.0.cmp_available and not impl.insertion_ordered %}
+    // Keys are returned in ascending `cmp::compare` order. Not stated for an
+    // insertion-ordered map, whose keys come back in insertion order.
     assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
         InRangeVec(result, i) ==> InRangeVec(result, j) ==> i < j ==>
         $1.cmp.$compare'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)) == $1.cmp.Ordering.Less());
@@ -849,8 +883,9 @@ procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: ({{Self}})) returns (resu
     assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
         InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i != j ==>
         !$IsEqual'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)));
-{%- if instance.0.cmp_available %}
-    // Keys are returned in ascending `cmp::compare` order.
+{%- if instance.0.cmp_available and not impl.insertion_ordered %}
+    // Keys are returned in ascending `cmp::compare` order. Not stated for an
+    // insertion-ordered map, whose keys come back in insertion order.
     assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
         InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i < j ==>
         $1.cmp.$compare'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)) == $1.cmp.Ordering.Less());
@@ -1098,6 +1133,13 @@ procedure {:inline 2} {{impl.fun_add_no_override}}{{S}}(m: $Mutation ({{Self}}),
         // `AddTable` cannot fire: the function is `{:inline}` and its
         // expansion is a constructor term with two array stores.
         assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, v));
+{%- if instance.0.cmp_available and not instance.0.cmp_reaches_vector and not impl.insertion_ordered %}
+        // The previous first and last keys survive the insertion; this names them in
+        // the new table so the end-position bound axioms can relate the two tables.
+        assume {{EWF}}(t{{U}}) && 0 < LenTable(t{{U}}) ==>
+            ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, 0)))
+            && ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, LenTable(t{{U}}) - 1)));
+{%- endif %}
 {%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
@@ -1121,6 +1163,13 @@ procedure {:inline 2} {{impl.fun_add_override_if_exists}}{{S}}(m: $Mutation ({{S
         // `AddTable` cannot fire: the function is `{:inline}` and its
         // expansion is a constructor term with two array stores.
         assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, v));
+{%- if instance.0.cmp_available and not instance.0.cmp_reaches_vector and not impl.insertion_ordered %}
+        // The previous first and last keys survive the insertion; this names them in
+        // the new table so the end-position bound axioms can relate the two tables.
+        assume {{EWF}}(t{{U}}) && 0 < LenTable(t{{U}}) ==>
+            ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, 0)))
+            && ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, LenTable(t{{U}}) - 1)));
+{%- endif %}
 {%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
@@ -1149,6 +1198,13 @@ returns (prev_v: $1.option.Option{{SV}}, m': $Mutation ({{Self}})) {
         // `AddTable` cannot fire: the function is `{:inline}` and its
         // expansion is a constructor term with two array stores.
         assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, v));
+{%- if instance.0.cmp_available and not instance.0.cmp_reaches_vector and not impl.insertion_ordered %}
+        // The previous first and last keys survive the insertion; this names them in
+        // the new table so the end-position bound axioms can relate the two tables.
+        assume {{EWF}}(t{{U}}) && 0 < LenTable(t{{U}}) ==>
+            ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, 0)))
+            && ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, LenTable(t{{U}}) - 1)));
+{%- endif %}
 {%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
@@ -1249,6 +1305,13 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
         // `AddTable` cannot fire, so well-formedness has to be carried by an
         // assume or the enumeration axioms stay gated off past this call.
         assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, default));
+{%- if instance.0.cmp_available and not instance.0.cmp_reaches_vector and not impl.insertion_ordered %}
+        // The previous first and last keys survive the insertion; this names them in
+        // the new table so the end-position bound axioms can relate the two tables.
+        assume {{EWF}}(t{{U}}) && 0 < LenTable(t{{U}}) ==>
+            ContainsTable(AddTable(t{{U}}, enc_k, default), {{ENC}}({{EKA}}(t{{U}}, 0)))
+            && ContainsTable(AddTable(t{{U}}, enc_k, default), {{ENC}}({{EKA}}(t{{U}}, LenTable(t{{U}}) - 1)));
+{%- endif %}
 {%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, default){{W2}});
         t' := $Dereference(m');
@@ -1423,24 +1486,49 @@ axiom (forall t: {{Table}}, i: int :: {{"{"}}{{EKA}}(t, i)}
     {{EWF}}(t) && 0 <= i && i < LenTable(t) ==>
         ContainsTable(t, {{ENC}}({{EKA}}(t, i)))
         && {{ERK}}(t, {{ENC}}({{EKA}}(t, i))) == i);
-{%- if instance.0.cmp_available %}
+{%- if instance.0.cmp_available and not impl.insertion_ordered %}
 // Strictly ascending under `cmp::compare`; emitted only when a cmp
-// instantiation for the key type exists in this run.
+// instantiation for the key type exists in this run. Suppressed for an
+// insertion-ordered enumeration, where it would be false.
 axiom (forall t: {{Table}}, i: int, j: int :: {{"{"}}{{EKA}}(t, i), {{EKA}}(t, j)}
     {{EWF}}(t) && 0 <= i && i < j && j < LenTable(t) ==>
         $1.cmp.$compare'{{instance.0.suffix}}'({{EKA}}(t, i), {{EKA}}(t, j)) == $1.cmp.Ordering.Less());
+{%- if not instance.0.cmp_reaches_vector %}
+// The first and last positions bound every contained key. Both follow from the
+// ascending axiom with the rank axioms, but only through a key's rank, which a
+// key known merely to be contained has no term for; the solver then misses the
+// chain depending on how the table term is written (measured). Stated directly,
+// they need only the containment and the end position.
+axiom (forall t: {{Table}}, k: {{K}} :: {{"{"}}ContainsTable(t, {{ENC}}(k)), {{EKA}}(t, 0)}
+    {{EWF}}(t) && 0 < LenTable(t) && ContainsTable(t, {{ENC}}(k)) ==>
+        $1.cmp.$compare'{{instance.0.suffix}}'({{EKA}}(t, 0), k) != $1.cmp.Ordering.Greater());
+axiom (forall t: {{Table}}, k: {{K}}, i: int :: {{"{"}}ContainsTable(t, {{ENC}}(k)), {{EKA}}(t, i)}
+    {{EWF}}(t) && i == LenTable(t) - 1 && 0 <= i && ContainsTable(t, {{ENC}}(k)) ==>
+        $1.cmp.$compare'{{instance.0.suffix}}'(k, {{EKA}}(t, i)) != $1.cmp.Ordering.Greater());
+{%- endif %}
 {%- endif %}
 // A contained key's rank is in range and key_at inverts it (up to $IsEqual).
 axiom (forall t: {{Table}}, k: {{K}} :: {{"{"}}{{ERK}}(t, {{ENC}}(k))}
     {{EWF}}(t) && ContainsTable(t, {{ENC}}(k)) ==>
         0 <= {{ERK}}(t, {{ENC}}(k)) && {{ERK}}(t, {{ENC}}(k)) < LenTable(t)
         && $IsEqual'{{instance.0.suffix}}'({{EKA}}(t, {{ERK}}(t, {{ENC}}(k))), k));
+{%- if not impl.insertion_ordered %}
 // Removal shift: a surviving key's rank drops by one exactly when it was
 // above the removed key.
+//
+// Order-preserving removal only, so this is emitted for key-ordered maps alone.
+// An insertion-ordered map is free to fill the hole instead of closing it --
+// `simple_map::remove` calls `swap_remove`, moving the last entry into the
+// vacated position -- under which surviving ranks do not shift. Stating the
+// shift for such a map would be a false axiom, which is worse than stating
+// nothing: it would license order conclusions that do not hold at runtime.
+// Saying nothing instead leaves a rank after removal unconstrained, so facts
+// that depend on it are unprovable rather than wrong.
 axiom (forall t: {{Table}}, ek: int, ek2: int :: {{"{"}}{{ERK}}(RemoveTable(t, ek), ek2)}
     {{EWF}}(t) && ContainsTable(t, ek) && ContainsTable(t, ek2) && ek2 != ek ==>
         {{ERK}}(RemoveTable(t, ek), ek2) ==
             (if {{ERK}}(t, ek2) < {{ERK}}(t, ek) then {{ERK}}(t, ek2) else {{ERK}}(t, ek2) - 1));
+{%- endif %}
 
 // A value write leaves the key set and the length alone, so it leaves ranks
 // alone. Without this, every position fact is lost across `iter_borrow_mut`,

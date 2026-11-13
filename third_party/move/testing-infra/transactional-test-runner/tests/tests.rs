@@ -20,4 +20,6 @@ fn run(path: &Path) -> anyhow::Result<(), Box<dyn Error>> {
     )
 }
 
-datatest_stable::harness!(run, TEST_DIR, r".*\.(move|masm|lean)$");
+datatest_stable::harness! {
+    { test = run, root = TEST_DIR, pattern = r".*\.(move|masm|lean)$" },
+}

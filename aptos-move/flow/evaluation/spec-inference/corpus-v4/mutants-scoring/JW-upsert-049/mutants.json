@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 73,
+        "offset": 1659,
+        "sha256": "d8f0a26b3e0f88d48a14a57da2d9431fe9e2de8215737cbf4851c7ddd5ef4275"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 73,
+        "to": "*entry = provider_jwks;\n            let old_entry = option::some(*entry);"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_jwks.move",
+      "mutant_id": "JW-upsert-049-returns-new-entry",
+      "obligation_category": "normal-result",
+      "rationale": "A replacement returns the new entry instead of the old one.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 42,
+        "offset": 1784,
+        "sha256": "3d78777b3f8b31b5857f827caa1759832917cfd4737a023be3db68c4c8d9f032"
+      },
+      "edit": {
+        "at": 13,
+        "kind": "substitute",
+        "length": 28,
+        "to": "push_back(provider_jwks)"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_jwks.move",
+      "mutant_id": "JW-upsert-049-appends",
+      "obligation_category": "normal-result",
+      "rationale": "A new issuer is appended instead of inserted in order.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 18,
+        "offset": 943,
+        "sha256": "19f633f41ed99597ef00a12b68e571be89fcd92d0f67ef9fed91e8440bd52671"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 5,
+        "to": "true"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_jwks.move",
+      "mutant_id": "JW-upsert-049-found-by-default",
+      "obligation_category": "abort",
+      "rationale": "An issuer larger than every entry is treated as present.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "27778ba39157783926c9892336f0134397464ba9299ced2a8e7f1692ec8330b0",
+  "task_id": "JW-upsert-049"
+}

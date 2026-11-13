@@ -25,13 +25,11 @@ use aptos_types::{
     transaction::{
         IndexedTransactionSummary, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
         TransactionInfo, TransactionListWithProofV2, TransactionOutputListWithProofV2,
-        TransactionToCommit, TransactionWithProof, Version,
+        TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use thiserror::Error;
 
 pub mod block_info;
 pub mod chunk_to_commit;
@@ -45,7 +43,12 @@ pub mod state_store;
 use crate::{
     chunk_to_commit::ChunkToCommit,
     state_store::{
-        sharded_jmt_state::PositionStateWithSummary, state::State, state_summary::StateSummary,
+        collateral::{CollateralOverlay, ShardedCollateralLayers},
+        orders::{OrderOverlay, ShardedOrderLayers},
+        positions::{PositionOverlay, ShardedPositionLayers},
+        sharded_jmt_state::NativeStateWithSummary,
+        state::State,
+        state_summary::StateSummary,
         state_with_summary::LedgerWithSummary,
     },
 };
@@ -64,37 +67,6 @@ pub trait StateSnapshotReceiver<K, V>: Send {
     fn finish(self) -> Result<()>;
 
     fn finish_box(self: Box<Self>) -> Result<()>;
-}
-
-#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
-pub enum Error {
-    #[error("Service error: {:?}", error)]
-    ServiceError { error: String },
-
-    #[error("Serialization error: {0}")]
-    SerializationError(String),
-}
-
-impl From<anyhow::Error> for Error {
-    fn from(error: anyhow::Error) -> Self {
-        Self::ServiceError {
-            error: format!("{}", error),
-        }
-    }
-}
-
-impl From<bcs::Error> for Error {
-    fn from(error: bcs::Error) -> Self {
-        Self::SerializationError(format!("{}", error))
-    }
-}
-
-impl From<aptos_secure_net::Error> for Error {
-    fn from(error: aptos_secure_net::Error) -> Self {
-        Self::ServiceError {
-            error: format!("{}", error),
-        }
-    }
 }
 
 macro_rules! delegate_read {
@@ -386,8 +358,8 @@ pub trait DbReader: Send + Sync {
         /// merklized position summary, used by execution as the freeze base and
         /// proof source for computing the position state root. Errors when the
         /// feature is on but native-position storage is absent (i.e.
-        /// `ENABLE_TRADING_NATIVE` is off).
-        fn get_persisted_position_state_summary(&self) -> Result<PositionStateWithSummary>;
+        /// `enable_trading_native` is off).
+        fn get_persisted_position_state_summary(&self) -> Result<NativeStateWithSummary>;
 
         /// The pre-committed position tip (latest + last_checkpoint), including
         /// committed writes the merklized snapshot in
@@ -396,7 +368,43 @@ pub trait DbReader: Send + Sync {
         /// block parent is available.
         fn get_pre_committed_position_state_summary(
             &self,
-        ) -> Result<LedgerWithSummary<PositionStateWithSummary>>;
+        ) -> Result<LedgerWithSummary<NativeStateWithSummary>>;
+
+        /// Pre-committed position overlay. Errors when the feature is on
+        /// but native-position storage is absent.
+        fn get_pre_committed_positions(&self) -> Result<PositionOverlay>;
+
+        /// Order analog of `get_persisted_position_state_summary`.
+        fn get_persisted_order_state_summary(&self) -> Result<NativeStateWithSummary>;
+
+        /// Order analog of `get_pre_committed_position_state_summary`.
+        fn get_pre_committed_order_state_summary(
+            &self,
+        ) -> Result<LedgerWithSummary<NativeStateWithSummary>>;
+
+        /// Order analog of `get_position_state_proof_by_version_ext`.
+        fn get_order_state_proof_by_version_ext(
+            &self,
+            key_hash: &HashValue,
+            version: Version,
+            root_depth: usize,
+        ) -> Result<SparseMerkleProofExt>;
+
+        /// Collateral analog of `get_persisted_position_state_summary`.
+        fn get_persisted_collateral_state_summary(&self) -> Result<NativeStateWithSummary>;
+
+        /// Collateral analog of `get_pre_committed_position_state_summary`.
+        fn get_pre_committed_collateral_state_summary(
+            &self,
+        ) -> Result<LedgerWithSummary<NativeStateWithSummary>>;
+
+        /// Collateral analog of `get_position_state_proof_by_version_ext`.
+        fn get_collateral_state_proof_by_version_ext(
+            &self,
+            key_hash: &HashValue,
+            version: Version,
+            root_depth: usize,
+        ) -> Result<SparseMerkleProofExt>;
 
         /// Native-position analog of `get_state_proof_by_version_ext`: a
         /// cold-key proof from the persisted position JMT at `version`.
@@ -556,6 +564,16 @@ pub trait DbReader: Send + Sync {
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
     }
 
+    /// Like `get_state_value_with_version_by_version`, but `version` must be a block end (state
+    /// checkpoint), which avoids looking up the block containing `version`.
+    fn get_state_value_with_version_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        self.get_state_value_with_version_by_version(state_key, version)
+    }
+
     fn get_state_value_with_proof_by_version(
         &self,
         state_key: &StateKey,
@@ -675,6 +693,41 @@ pub trait DbWriter: Send + Sync {
     ) -> Result<()> {
         unimplemented!()
     }
+
+    /// Fold `target` into the in-memory position base if given, and return
+    /// the base's layers: the floor every overlay built this stage extends
+    /// from. `None` when native position is off.
+    ///
+    /// Callers must ensure the base doesn't move while a block executes,
+    /// or that block's reads straddle two versions: the block executor
+    /// advances under its execution lock, state sync on a linear chain.
+    ///
+    /// Unimplemented rather than a silent no-op, so a delegating wrapper
+    /// that forgets to forward it fails loudly instead of never folding.
+    fn advance_position_base(
+        &self,
+        _target: Option<&PositionOverlay>,
+    ) -> Result<Option<ShardedPositionLayers>> {
+        unimplemented!()
+    }
+
+    /// The order analog of [`Self::advance_position_base`], under the same
+    /// lock discipline. `None` when trading-native storage is off.
+    fn advance_order_base(
+        &self,
+        _target: Option<&OrderOverlay>,
+    ) -> Result<Option<ShardedOrderLayers>> {
+        unimplemented!()
+    }
+
+    /// The collateral analog of [`Self::advance_position_base`], under the
+    /// same lock discipline. `None` when trading-native storage is off.
+    fn advance_collateral_base(
+        &self,
+        _target: Option<&CollateralOverlay>,
+    ) -> Result<Option<ShardedCollateralLayers>> {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone)]
@@ -704,52 +757,6 @@ impl DbReaderWriter {
     }
 }
 
-/// Network types for storage service
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum StorageRequest {
-    GetStateValueByVersionRequest(Box<GetStateValueByVersionRequest>),
-    GetStartupInfoRequest,
-    SaveTransactionsRequest(Box<SaveTransactionsRequest>),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
-pub struct GetStateValueByVersionRequest {
-    /// The access key for the resource
-    pub state_key: StateKey,
-
-    /// The version the query is based on.
-    pub version: Version,
-}
-
-impl GetStateValueByVersionRequest {
-    /// Constructor.
-    pub fn new(state_key: StateKey, version: Version) -> Self {
-        Self { state_key, version }
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-pub struct SaveTransactionsRequest {
-    pub txns_to_commit: Vec<TransactionToCommit>,
-    pub first_version: Version,
-    pub ledger_info_with_signatures: Option<LedgerInfoWithSignatures>,
-}
-
-impl SaveTransactionsRequest {
-    /// Constructor.
-    pub fn new(
-        txns_to_commit: Vec<TransactionToCommit>,
-        first_version: Version,
-        ledger_info_with_signatures: Option<LedgerInfoWithSignatures>,
-    ) -> Self {
-        SaveTransactionsRequest {
-            txns_to_commit,
-            first_version,
-            ledger_info_with_signatures,
-        }
-    }
-}
-
 pub fn jmt_update_refs<K>(
     jmt_updates: &[(HashValue, Option<(HashValue, K)>)],
 ) -> Vec<(HashValue, Option<&(HashValue, K)>)> {
@@ -759,21 +766,21 @@ pub fn jmt_update_refs<K>(
 #[macro_export]
 macro_rules! db_anyhow {
     ($($arg:tt)*) => {
-        AptosDbError::Other(format!($($arg)*))
+        $crate::AptosDbError::Other(format!($($arg)*))
     };
 }
 
 #[macro_export]
 macro_rules! db_not_found_bail {
     ($($arg:tt)*) => {
-        return Err(AptosDbError::NotFound(format!($($arg)*)))
+        return Err($crate::AptosDbError::NotFound(format!($($arg)*)))
     };
 }
 
 #[macro_export]
 macro_rules! db_other_bail {
     ($($arg:tt)*) => {
-        return Err(AptosDbError::Other(format!($($arg)*)))
+        return Err($crate::AptosDbError::Other(format!($($arg)*)))
     };
 }
 
@@ -781,7 +788,7 @@ macro_rules! db_other_bail {
 macro_rules! db_ensure {
     ($cond:expr, $($arg:tt)*) => {
         if !$cond {
-            return Err(AptosDbError::Other(format!($($arg)*)));
+            return Err($crate::AptosDbError::Other(format!($($arg)*)));
         }
     };
 }

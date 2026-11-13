@@ -1,0 +1,120 @@
+Move prover returns: exiting with verification errors
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:149:41
+    │
+149 │             invariant forall j in 0..i: ensures_of<f>(old(v)[j], v[j]);
+    │                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+240 │         for_each_mut(v, |e| *e = *e + Limit[a].max);
+    │         -------------------------------------------
+    │         │               │
+    │         │               lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:149:41
+    │
+149 │             invariant forall j in 0..i: ensures_of<f>(old(v)[j], v[j]);
+    │                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+261 │         for_each_mut(v, |e| *e = *e + limit_of(a));
+    │         ------------------------------------------
+    │         │               │
+    │         │               lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:150:42
+    │
+150 │             invariant forall j in 0..i: !aborts_of<f>(old(v)[j]);
+    │                                          ^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+240 │         for_each_mut(v, |e| *e = *e + Limit[a].max);
+    │         -------------------------------------------
+    │         │               │
+    │         │               lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:150:42
+    │
+150 │             invariant forall j in 0..i: !aborts_of<f>(old(v)[j]);
+    │                                          ^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+261 │         for_each_mut(v, |e| *e = *e + limit_of(a));
+    │         ------------------------------------------
+    │         │               │
+    │         │               lambda argument
+    │         from a call inlined at this callsite
+
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:26:13: error: the loop invariant `∀ (j in 0 .. i), result[j] == v[j] * 3` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:69:5: error: verex verification failed: the automatic verification of `map_double_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
+  verify map_double_wrong by lean =>
+    verex_obligations
+    verex_on
+    | invariant_4_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:103:9: error: the specification clause `ensures result ==> v.length > spec.result[1] && v[spec.result[1]] == x` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:102:5: error: verex verification failed: the automatic verification of `find_value` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
+  verify find_value by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:149:13: error: the loop invariant `∀ (j in 0 .. i), v[j] == with_state_anchor!(15, old(v))[j] + 1` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:150:13: error: the loop invariant `∀ (j in 0 .. i), !(with_state_anchor!(15, old(v))[j] == MAX_U64)` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:167:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:165:5: error: verex verification failed: the automatic verification of `increment_all` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
+  verify increment_all by lean =>
+    verex_obligations
+    verex_on
+    | invariant_4_step => verex_prepare; sorry
+    | invariant_5_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:149:13: error: the loop invariant `∀ (j in 0 .. i), v[j] == with_state_anchor!(19, old(v))[j] * k` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:183:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:181:5: error: verex verification failed: the automatic verification of `scale_all` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
+  verify scale_all by lean =>
+    verex_obligations
+    verex_on
+    | invariant_4_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:149:13: error: the loop invariant `∀ (j in 0 .. i), v[j] == with_state_anchor!(16, old(v))[j] + 1` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:150:13: error: the loop invariant `∀ (j in 0 .. i),
+        !(with_state_anchor!(16, old(v))[j] > 18446744073709551614)` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:196:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:194:5: error: verex verification failed: the automatic verification of `increment_all_inferred` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
+  verify increment_all_inferred by lean =>
+    verex_obligations
+    verex_on
+    | invariant_4_step => verex_prepare; sorry
+    | invariant_5_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:245:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:246:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), v[i] == old(v)[i] + global<Limit>(a).max` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: verex verification failed: the automatic verification of `bump_all` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
+  verify bump_all by lean =>
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:266:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:267:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), v[i] == old(v)[i] + global<Limit>(a).max` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:263:5: error: verex verification failed: the automatic verification of `bump_all_via_call` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
+  verify bump_all_via_call by lean =>
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

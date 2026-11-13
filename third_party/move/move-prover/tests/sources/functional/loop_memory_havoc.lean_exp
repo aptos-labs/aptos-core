@@ -1,0 +1,643 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/loop_memory_havoc.move:19:9: error: the specification clause `ensures global<R>(addr).x == old(global<R>(addr).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:17:5: error: verex verification failed: the automatic verification of `bump_loop_frame_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify bump_loop_frame_fails by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:29:9: error: the specification clause `ensures global<R>(addr).x == old(global<R>(addr).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:27:5: error: verex verification failed: the automatic verification of `bump_once_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify bump_once_fails by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:74:9: error: the specification clause `ensures global<«Ghost$gcount»>(@0x0).v
+        == old(global<«Ghost$gcount»>(@0x0).v)` is not established
+tests/sources/functional/loop_memory_havoc.move:73:5: error: verex verification failed: the automatic verification of `ghost_inline_update_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify ghost_inline_update_fails by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:96:9: error: the specification clause `ensures global<«Ghost$gcount»>(@0x0).v
+        == old(global<«Ghost$gcount»>(@0x0).v)` is not established
+tests/sources/functional/loop_memory_havoc.move:95:5: error: verex verification failed: the automatic verification of `ghost_callee_update_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify ghost_callee_update_fails by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:125:9: error: the specification clause `ensures global<«Ghost$gcount»>(@0x0).v
+        == old(global<«Ghost$gcount»>(@0x0).v)` is not established
+tests/sources/functional/loop_memory_havoc.move:124:5: error: verex verification failed: the automatic verification of `ghost_update_after_preamble_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify ghost_update_after_preamble_fails by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:169:9: error: the specification clause `ensures result.gf == 0` is not established
+tests/sources/functional/loop_memory_havoc.move:168:5: error: verex verification failed: the automatic verification of `ghost_field_loop_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify ghost_field_loop_fails by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:207:9: error: the specification clause `ensures global<«Ghost$gcount»>(@0x0).v == 7` is not established
+tests/sources/functional/loop_memory_havoc.move:205:5: error: verex verification failed: the automatic verification of `ghost_untouched_framed` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify ghost_untouched_framed by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:219:5: error: a loop invariant at an iteration is not established
+tests/sources/functional/loop_memory_havoc.move:222:9: error: the specification clause `ensures global<R>(addr).x == old(global<R>(addr).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:219:5: error: verex verification failed: the automatic verification of `fv_modifies_update_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify fv_modifies_update_fails by lean =>
+    verex_obligations
+    verex_on
+    | invariant_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:261:5: error: a loop invariant at an iteration is not established
+tests/sources/functional/loop_memory_havoc.move:264:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:261:5: error: verex verification failed: the automatic verification of `fv_field_modifies_update_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify fv_field_modifies_update_fails by lean =>
+    verex_obligations
+    verex_on
+    | invariant_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:277:5: error: a loop invariant at an iteration is not established
+tests/sources/functional/loop_memory_havoc.move:280:9: error: the specification clause `ensures global<Config>(s.address).active
+        == old(global<Config>(s.address).active)` is not established
+tests/sources/functional/loop_memory_havoc.move:277:5: error: verex verification failed: the automatic verification of `fv_field_untouched_framed` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify fv_field_untouched_framed by lean =>
+    verex_obligations
+    verex_on
+    | invariant_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:295:5: error: verification failed with a residual obligation:
+case step.some.left
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+self_bump_counter :
+  VerexIR.Proofs.Denote.HList bump_counter.params → VerexIR.Proofs.Denote.Comp unit bump_counter.shape.carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+s : VerexIR.Proofs.Denote.NTy.signer.carrier
+n : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+assumed : True
+this✝ :
+  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 15 } } (s, n, ())
+    initialState✝
+permitted :
+  (initialState✝
+        { type := 0x42.loop_memory_havoc.unit.nominal.namespace.0.declaration✝³⁻⁰,
+          arguments := VerexIR.Proofs.Denote.NRow.nil }
+        (VerexIR.StorageKey.address s)).isSome =
+    true
+verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_7 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s
+verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  verexContinuation✝²
+recursive✝ :
+  VerexIR.Proofs.Denote.HEnv
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.function
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+              { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              VerexIR.Proofs.Denote.NRow.nil)))) →
+    VerexIR.Proofs.Spec (VerexIR.Proofs.Denote.Memory unit) VerexIR.Proofs.Failure
+      (VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons
+              (VerexIR.Proofs.Denote.NTy.function
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+                { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                VerexIR.Proofs.Denote.NRow.nil))))
+        Unit)
+state✝ : VerexIR.Proofs.Denote.Memory unit
+frame✝ :
+  VerexIR.Proofs.Denote.DataInvariants
+      (storedInvariant unit { executable := executable✝, invoke := verexInvoke, coherent := verexInvokeCoherent })
+      initialState✝ →
+    VerexIR.Proofs.Denote.DataInvariants
+      (storedInvariant unit { executable := executable✝, invoke := verexInvoke, coherent := verexInvokeCoherent })
+      state✝
+verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_8 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s verexContinuation✝¹
+    recursive✝
+verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    (VerexIR.Proofs.Denote.NTy.int 64 false).carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_9 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s verexContinuation✝¹
+    recursive✝
+val✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+pathDecision✝ : val✝.val < n.val
+n_lower : 0 ≤ n.val
+n_upper : n.val ≤ 18446744073709551615
+left✝ : 0 ≤ val✝.val
+right✝ : val✝.val ≤ 18446744073709551615
+⊢ VerexIR.Proofs.wp
+    (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit)
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (s, ()))
+    (fun value state =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Flow.bind
+          (VerexIR.Proofs.Denote.Flow.bind
+            ((VerexIR.Proofs.Denote.opAt 171404
+                  (VerexIR.Proofs.Denote.CheckedOp.add.run
+                    (VerexIR.ThrowKind.profile { profile := VerexIR.Profile.move, tag := "runtime.arithmetic_error" })
+                    val✝ { val := 1, fits := ⋯ })).bind
+              fun value =>
+              VerexIR.Proofs.Spec.pure
+                (VerexIR.Proofs.Denote.Flow.value value (some s, some n, some (FunctionValue.site0 ()), some val✝, ())))
+            fun v env =>
+            VerexIR.Proofs.Spec.pure
+              (VerexIR.Proofs.Denote.Flow.value () (VerexIR.Proofs.Denote.Var.here.there.there.there.set v env)))
+          fun x env =>
+          VerexIR.Proofs.Denote.Term.denoteIn
+            {
+                call :=
+                  VerexIR.Proofs.Denote.routeMeaning { namespaceId := { index := 0 }, functionId := { index := 12 } }
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+                    VerexIR.Proofs.Denote.ResultShape.none self_bump_counter
+                    (VerexIR.Proofs.Denote.propheticMeaning executable✝ #[]),
+                generic := VerexIR.Proofs.Denote.closedGeneric executable✝ #[],
+                invoke := verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit), typeInstantiation := #[],
+                assumption := fun x => none,
+                atInstance := VerexIR.Proofs.Denote.closedInstance executable✝ #[] }.interpreterOps
+            (VerexIR.Proofs.Denote.Term.lit () _proof_2) env)
+        (attempt_1._verexContinuation_1_8 verexInvoke verexInvokeCoherent self_bump_counter initialState✝ s
+          verexContinuation✝¹ recursive✝)
+        (fun failure => True) state)
+    (fun failure => True) state✝
+tests/sources/functional/loop_memory_havoc.move:297:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:295:5: error: verex verification failed: the automatic verification of `fv_local_closure_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify fv_local_closure_fails by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:316:5: error: verification failed with a residual obligation:
+case step.some.left
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+self_make_bumper :
+  VerexIR.Proofs.Denote.HList make_bumper.params → VerexIR.Proofs.Denote.Comp unit make_bumper.shape.carrier
+self_bump_counter :
+  VerexIR.Proofs.Denote.HList bump_counter.params → VerexIR.Proofs.Denote.Comp unit bump_counter.shape.carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+s : VerexIR.Proofs.Denote.NTy.signer.carrier
+n : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+assumed : True
+this✝ :
+  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 17 } } (s, n, ())
+    initialState✝
+permitted :
+  (initialState✝
+        { type := 0x42.loop_memory_havoc.unit.nominal.namespace.0.declaration✝³⁻⁰,
+          arguments := VerexIR.Proofs.Denote.NRow.nil }
+        (VerexIR.StorageKey.address s)).isSome =
+    true
+verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_9 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter initialState✝ s
+verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  verexContinuation✝²
+recursive✝ :
+  VerexIR.Proofs.Denote.HEnv
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.function
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+              { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              VerexIR.Proofs.Denote.NRow.nil)))) →
+    VerexIR.Proofs.Spec (VerexIR.Proofs.Denote.Memory unit) VerexIR.Proofs.Failure
+      (VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons
+              (VerexIR.Proofs.Denote.NTy.function
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+                { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                VerexIR.Proofs.Denote.NRow.nil))))
+        Unit)
+state✝ : VerexIR.Proofs.Denote.Memory unit
+frame✝ :
+  VerexIR.Proofs.Denote.DataInvariants
+      (storedInvariant unit { executable := executable✝, invoke := verexInvoke, coherent := verexInvokeCoherent })
+      initialState✝ →
+    VerexIR.Proofs.Denote.DataInvariants
+      (storedInvariant unit { executable := executable✝, invoke := verexInvoke, coherent := verexInvokeCoherent })
+      state✝
+verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_10 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter initialState✝ s
+    verexContinuation✝¹ recursive✝
+verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    (VerexIR.Proofs.Denote.NTy.int 64 false).carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_11 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter initialState✝ s
+    verexContinuation✝¹ recursive✝
+val✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+pathDecision✝ : val✝.val < n.val
+n_lower : 0 ≤ n.val
+n_upper : n.val ≤ 18446744073709551615
+left✝ : 0 ≤ val✝.val
+right✝ : val✝.val ≤ 18446744073709551615
+⊢ VerexIR.Proofs.wp
+    (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit)
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (s, ()))
+    (fun value state =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Flow.bind
+          (VerexIR.Proofs.Denote.Flow.bind
+            ((VerexIR.Proofs.Denote.opAt 192509
+                  (VerexIR.Proofs.Denote.CheckedOp.add.run
+                    (VerexIR.ThrowKind.profile { profile := VerexIR.Profile.move, tag := "runtime.arithmetic_error" })
+                    val✝ { val := 1, fits := ⋯ })).bind
+              fun value =>
+              VerexIR.Proofs.Spec.pure
+                (VerexIR.Proofs.Denote.Flow.value value (some s, some n, some (FunctionValue.site0 ()), some val✝, ())))
+            fun v env =>
+            VerexIR.Proofs.Spec.pure
+              (VerexIR.Proofs.Denote.Flow.value () (VerexIR.Proofs.Denote.Var.here.there.there.there.set v env)))
+          fun x env =>
+          VerexIR.Proofs.Denote.Term.denoteIn
+            {
+                call :=
+                  VerexIR.Proofs.Denote.routeMeaning { namespaceId := { index := 0 }, functionId := { index := 16 } }
+                    VerexIR.Proofs.Denote.NRow.nil
+                    (VerexIR.Proofs.Denote.ResultShape.one
+                      (VerexIR.Proofs.Denote.NTy.function
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+                          VerexIR.Proofs.Denote.NRow.nil)
+                        { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil))
+                    self_make_bumper
+                    (VerexIR.Proofs.Denote.routeMeaning { namespaceId := { index := 0 }, functionId := { index := 12 } }
+                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+                      VerexIR.Proofs.Denote.ResultShape.none self_bump_counter
+                      (VerexIR.Proofs.Denote.propheticMeaning executable✝ #[])),
+                generic := VerexIR.Proofs.Denote.closedGeneric executable✝ #[],
+                invoke := verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit), typeInstantiation := #[],
+                assumption := fun x => none,
+                atInstance := VerexIR.Proofs.Denote.closedInstance executable✝ #[] }.interpreterOps
+            (VerexIR.Proofs.Denote.Term.lit () _proof_2) env)
+        (attempt_1._verexContinuation_1_10 verexInvoke verexInvokeCoherent self_make_bumper self_bump_counter
+          initialState✝ s verexContinuation✝¹ recursive✝)
+        (fun error => True) state)
+    (fun error => True) state✝
+tests/sources/functional/loop_memory_havoc.move:318:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:316:5: error: verex verification failed: the automatic verification of `fv_returned_closure_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify fv_returned_closure_fails by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:357:5: error: verification failed with a residual obligation:
+case step.some.left
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+nativesTyped : VerexIR.NativesTyped executable✝
+nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+self_tick_at : VerexIR.Proofs.Denote.HList tick_at.params → VerexIR.Proofs.Denote.Comp unit tick_at.shape.carrier
+self_make_curry :
+  VerexIR.Proofs.Denote.HList make_curry.params → VerexIR.Proofs.Denote.Comp unit make_curry.shape.carrier
+self_curry_wrap :
+  VerexIR.Proofs.Denote.HList curry_wrap.params → VerexIR.Proofs.Denote.Comp unit curry_wrap.shape.carrier
+self_curry_helper :
+  VerexIR.Proofs.Denote.HList curry_helper.params → VerexIR.Proofs.Denote.Comp unit curry_helper.shape.carrier
+verexAgree : VerexIR.Proofs.TypesAgree unit
+verexResources : VerexIR.Proofs.ResourcesTyped unit
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+a : VerexIR.Proofs.Denote.NTy.address.carrier
+n : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+assumed : True
+this✝ :
+  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 22 } } (a, n, ())
+    initialState✝
+permitted :
+  (initialState✝
+        { type := 0x42.loop_memory_havoc.unit.nominal.namespace.0.declaration✝³⁻⁰,
+          arguments := VerexIR.Proofs.Denote.NRow.nil }
+        (VerexIR.StorageKey.address a)).isSome =
+    true
+verexContinuation✝³ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_9 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
+    self_curry_helper initialState✝ a
+verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  verexContinuation✝³
+recursive✝ :
+  VerexIR.Proofs.Denote.HEnv
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.function
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              VerexIR.Proofs.Denote.NRow.nil)))) →
+    VerexIR.Proofs.Spec (VerexIR.Proofs.Denote.Memory unit) VerexIR.Proofs.Failure
+      (VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons
+              (VerexIR.Proofs.Denote.NTy.function
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                VerexIR.Proofs.Denote.NRow.nil))))
+        Unit)
+state✝ : VerexIR.Proofs.Denote.Memory unit
+frame✝ :
+  VerexIR.Proofs.Denote.DataInvariants
+      (storedInvariant unit { executable := executable✝, invoke := verexInvoke, coherent := verexInvokeCoherent })
+      initialState✝ →
+    VerexIR.Proofs.Denote.DataInvariants
+      (storedInvariant unit { executable := executable✝, invoke := verexInvoke, coherent := verexInvokeCoherent })
+      state✝
+verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_10 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
+    self_curry_helper initialState✝ a verexContinuation✝² recursive✝
+verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    (VerexIR.Proofs.Denote.NTy.int 64 false).carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_11 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
+    self_curry_helper initialState✝ a verexContinuation✝² recursive✝
+val✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+pathDecision✝ : val✝.val < n.val
+verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))))
+    (VerexIR.Proofs.Denote.NTy.int 64 false).carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  attempt_1._verexContinuation_1_12 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
+    self_curry_helper initialState✝ a verexContinuation✝² recursive✝
+n_lower : 0 ≤ n.val
+n_upper : n.val ≤ 18446744073709551615
+left✝ : 0 ≤ val✝.val
+right✝ : val✝.val ≤ 18446744073709551615
+⊢ VerexIR.Proofs.wp
+    (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit)
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none
+      (FunctionValue.site1 (FunctionValue.site2 (), a, ())) (val✝, ()))
+    (fun value state =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Flow.bind
+          (VerexIR.Proofs.Denote.Flow.bind
+            ((VerexIR.Proofs.Denote.opAt 244649
+                  (VerexIR.Proofs.Denote.CheckedOp.add.run
+                    (VerexIR.ThrowKind.profile { profile := VerexIR.Profile.move, tag := "runtime.arithmetic_error" })
+                    val✝ { val := 1, fits := ⋯ })).bind
+              fun value =>
+              VerexIR.Proofs.Spec.pure
+                (VerexIR.Proofs.Denote.Flow.value value
+                  (some a, some n, some (FunctionValue.site1 (FunctionValue.site2 (), a, ())), some val✝, ())))
+            fun v env =>
+            VerexIR.Proofs.Spec.pure
+              (VerexIR.Proofs.Denote.Flow.value () (VerexIR.Proofs.Denote.Var.here.there.there.there.set v env)))
+          fun x env =>
+          VerexIR.Proofs.Denote.Term.denoteIn
+            {
+                call :=
+                  VerexIR.Proofs.Denote.routeMeaning { namespaceId := { index := 0 }, functionId := { index := 18 } }
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address VerexIR.Proofs.Denote.NRow.nil)
+                    VerexIR.Proofs.Denote.ResultShape.none self_tick_at
+                    (VerexIR.Proofs.Denote.routeMeaning { namespaceId := { index := 0 }, functionId := { index := 21 } }
+                      (VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.NTy.function
+                          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+                            VerexIR.Proofs.Denote.NRow.nil)
+                          { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+                          VerexIR.Proofs.Denote.NRow.nil))
+                      (VerexIR.Proofs.Denote.ResultShape.one
+                        (VerexIR.Proofs.Denote.NTy.function
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                            VerexIR.Proofs.Denote.NRow.nil)
+                          { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil))
+                      self_make_curry
+                      (VerexIR.Proofs.Denote.routeMeaning
+                        { namespaceId := { index := 0 }, functionId := { index := 20 } }
+                        (VerexIR.Proofs.Denote.NRow.cons
+                          (VerexIR.Proofs.Denote.NTy.function
+                            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+                              VerexIR.Proofs.Denote.NRow.nil)
+                            { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+                          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                              VerexIR.Proofs.Denote.NRow.nil)))
+                        VerexIR.Proofs.Denote.ResultShape.none self_curry_wrap
+                        (VerexIR.Proofs.Denote.routeMeaning
+                          { namespaceId := { index := 0 }, functionId := { index := 19 } }
+                          (VerexIR.Proofs.Denote.NRow.cons
+                            (VerexIR.Proofs.Denote.NTy.function
+                              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+                                VerexIR.Proofs.Denote.NRow.nil)
+                              { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+                            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+                              VerexIR.Proofs.Denote.NRow.nil))
+                          VerexIR.Proofs.Denote.ResultShape.none self_curry_helper
+                          (VerexIR.Proofs.Denote.propheticMeaning executable✝ #[])))),
+                generic := VerexIR.Proofs.Denote.closedGeneric executable✝ #[],
+                invoke := verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit), typeInstantiation := #[],
+                assumption := fun x => none,
+                atInstance := VerexIR.Proofs.Denote.closedInstance executable✝ #[] }.interpreterOps
+            (VerexIR.Proofs.Denote.Term.lit () _proof_2) env)
+        (attempt_1._verexContinuation_1_10 verexInvoke verexInvokeCoherent self_tick_at self_make_curry self_curry_wrap
+          self_curry_helper initialState✝ a verexContinuation✝² recursive✝)
+        (fun error => True) state)
+    (fun error => True) state✝
+tests/sources/functional/loop_memory_havoc.move:359:9: error: the specification clause `ensures global<Counter>(a).x == old(global<Counter>(a).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:357:5: error: verex verification failed: the automatic verification of `fv_curry_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify fv_curry_fails by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:379:5: error: a loop invariant at an iteration is not established
+tests/sources/functional/loop_memory_havoc.move:383:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:379:5: error: verex verification failed: the automatic verification of `fv_wild_forward_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify fv_wild_forward_fails by lean =>
+    verex_obligations
+    verex_on
+    | invariant_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:404:5: error: a loop invariant at an iteration is not established
+tests/sources/functional/loop_memory_havoc.move:407:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:404:5: error: verex verification failed: the automatic verification of `fv_forward_depth2_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify fv_forward_depth2_fails by lean =>
+    verex_obligations
+    verex_on
+    | invariant_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:428:9: error: the precondition `requires exists<R>(a)` of `rec_bump` does not hold at call 1
+tests/sources/functional/loop_memory_havoc.move:429:9: error: the specification clause `ensures global<R>(a).x == old(global<R>(a).x)` is not established
+tests/sources/functional/loop_memory_havoc.move:426:5: error: verex verification failed: the automatic verification of `rec_bump` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify rec_bump by lean =>
+    verex_obligations
+    verex_on
+    | requires_1_of_rec_bump_at_call_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:444:5: error: the data invariant of a value written to memory is not established
+tests/sources/functional/loop_memory_havoc.move:446:9: error: the specification clause `ensures global<G<T> >(a).v == old(global<G<T> >(a).v)` is not established
+tests/sources/functional/loop_memory_havoc.move:444:5: error: verex verification failed: the automatic verification of `gen_bump` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify gen_bump by lean =>
+    verex_obligations
+    verex_on
+    | stored_invariant => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/loop_memory_havoc.move:483:9: error: the specification clause `ensures result == 7` is not established
+tests/sources/functional/loop_memory_havoc.move:480:5: error: verex verification failed: the automatic verification of `untouched_memory_framed` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
+  verify untouched_memory_framed by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 62,
+        "offset": 2038,
+        "sha256": "e906be6f5762c497bb532dc0a4e30b8ac5ebd5ef3c63ca8abc4988e16dea1fcf"
+      },
+      "edit": {
+        "at": 40,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-refill-037-full-exclusive",
+      "obligation_category": "normal-result",
+      "rationale": "Reaching capacity exactly keeps the fraction.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 35,
+        "offset": 2168,
+        "sha256": "953ebce45da2020ac7f2eb1814c8b72e9f9cfaed61657d816f4edfb43302fe42"
+      },
+      "edit": {
+        "at": 31,
+        "kind": "substitute",
+        "length": 4,
+        "to": "= limiter.fractional_accumulated;"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-refill-037-fraction-kept-when-full",
+      "obligation_category": "normal-result",
+      "rationale": "A full bucket keeps its old fraction.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 45,
+        "offset": 2463,
+        "sha256": "a43edcd04f58317ca1b7c421938471a957729d63a724304596acda5d56a55165"
+      },
+      "edit": {
+        "at": 32,
+        "kind": "substitute",
+        "length": 12,
+        "to": "limiter.last_refill_timestamp"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-refill-037-timestamp-not-advanced",
+      "obligation_category": "normal-result",
+      "rationale": "The refill time is never advanced.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "b6dcddbf64696687c8871357247833b914344d17356192d0b325b25800cd325c",
+  "task_id": "RL-refill-037"
+}
