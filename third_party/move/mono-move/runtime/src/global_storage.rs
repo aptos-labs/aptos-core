@@ -30,8 +30,9 @@
 //!
 //! Once no rollback can follow, [`ResourceReadWriteSet::drop_unchanged_writes`]
 //! demotes every copy that still equals its read, and
-//! [`ResourceReadWriteSet::compute_write_sizes`] records the serialized size of
-//! each value still written and of each resource group written.
+//! [`ResourceReadWriteSet::compute_write_sizes_and_metadata`] records the
+//! serialized size of each value still written and of each resource group
+//! written, and the metadata of each written slot.
 //!
 //! # Checkpoints and the checkpoint counter
 //!
@@ -64,12 +65,14 @@ use crate::{
     value_cmp::equals,
     value_conv::bcs::serialized_size,
 };
+use aptos_types::state_store::state_value::StateValueMetadata;
 use hashbrown::{hash_map::EntryRef, HashMap};
 use mono_move_core::{
     nominal_tag,
     storage::resource_provider::{InMemoryStorageKey, Version},
     types::InternedType,
-    GroupSize, LayoutProvider, ResourceProvider, StorageRead, VMResult,
+    GroupSize, GroupSlot, LayoutProvider, ResourceProvider, SlotMetadataContext, StorageRead,
+    VMResult,
 };
 use std::ptr::NonNull;
 
@@ -117,13 +120,19 @@ pub struct Entry {
     ///
     /// [`SessionEffects`]: crate::SessionEffects
     write_bcs_size: usize,
+    /// Metadata of the slot once `write` applies. Not set until the session
+    /// ends, so only [`SessionEffects`] expose it, and never set for a
+    /// resource group member, which has no slot of its own.
+    ///
+    /// [`SessionEffects`]: crate::SessionEffects
+    write_metadata: StateValueMetadata,
     /// Extra metadata for this entry: the resource-group container this entry
     /// belongs to. [`None`] means this is not a resource group member. Used to
     /// place the write and to fetch the read from the right storage slot.
     pub group: Option<InternedType>,
 }
 
-/// A resource group whose members the transaction touched. Its sizes are set
+/// A resource group whose members the transaction touched. Its slots are set
 /// when the session ends, so only [`SessionEffects`] expose them.
 ///
 /// [`SessionEffects`]: crate::SessionEffects
@@ -132,11 +141,11 @@ pub struct GroupEntry {
     /// The keys of the members touched. Narrowed to the members written when
     /// the session ends.
     members: Vec<InMemoryStorageKey>,
-    /// The group's size before the transaction.
-    size_before: GroupSize,
-    /// The group's size after the transaction's writes, or [`None`] if the
-    /// written members' sizes do not add up to `size_before`.
-    size: Option<GroupSize>,
+    /// The group's slot before the transaction.
+    slot_before: GroupSlot,
+    /// The group's slot after the transaction's writes, or [`None`] if the
+    /// written members' sizes do not add up to the size before.
+    slot: Option<GroupSlot>,
 }
 
 impl GroupEntry {
@@ -145,30 +154,38 @@ impl GroupEntry {
         &self.members
     }
 
-    /// The group's size before the transaction.
-    pub fn size_before(&self) -> GroupSize {
-        self.size_before
+    /// The group's slot before the transaction.
+    pub fn slot_before(&self) -> &GroupSlot {
+        &self.slot_before
     }
 
-    /// The group's size after the transaction's writes, or [`None`] if the
+    /// The group's slot after the transaction's writes, or [`None`] if the
     /// written members' sizes do not add up to the size before, which only
     /// reads inconsistent with each other cause.
-    pub fn size(&self) -> Option<GroupSize> {
-        self.size
+    pub fn slot(&self) -> Option<&GroupSlot> {
+        self.slot.as_ref()
     }
 }
 
 /// The write an [`Entry`] contributes to the write set, by its `(read, write)`
 /// pair.
 pub enum WriteClass {
-    /// Did not exist before, now does. Carries the value pointer to serialize
-    /// and the size of its BCS encoding.
-    Creation { ptr: NonNull<u8>, bcs_size: usize },
-    /// Existed before, now modified. Carries the value pointer to serialize
-    /// and the size of its BCS encoding.
-    Modification { ptr: NonNull<u8>, bcs_size: usize },
-    /// Existed before, now moved out.
-    Deletion,
+    /// Did not exist before, now does. Carries the value pointer to serialize,
+    /// the size of its BCS encoding, and the metadata of its slot.
+    Creation {
+        ptr: NonNull<u8>,
+        bcs_size: usize,
+        metadata: StateValueMetadata,
+    },
+    /// Existed before, now modified. Carries the value pointer to serialize,
+    /// the size of its BCS encoding, and the metadata of its slot.
+    Modification {
+        ptr: NonNull<u8>,
+        bcs_size: usize,
+        metadata: StateValueMetadata,
+    },
+    /// Existed before, now moved out. Carries the metadata the slot had.
+    Deletion { metadata: StateValueMetadata },
 }
 
 /// Represents the state of data pointer in the map: owned by local allocation
@@ -205,16 +222,27 @@ impl Entry {
             StorageWrite::NotModified => None,
             StorageWrite::LocalHeap { ptr, .. } => {
                 let bcs_size = self.write_bcs_size;
+                let metadata = self.write_metadata.clone();
                 Some(match self.read {
-                    StorageRead::DoesNotExist { .. } => WriteClass::Creation { ptr, bcs_size },
-                    StorageRead::ExternalHeap { .. } => WriteClass::Modification { ptr, bcs_size },
+                    StorageRead::DoesNotExist { .. } => WriteClass::Creation {
+                        ptr,
+                        bcs_size,
+                        metadata,
+                    },
+                    StorageRead::ExternalHeap { .. } => WriteClass::Modification {
+                        ptr,
+                        bcs_size,
+                        metadata,
+                    },
                 })
             },
             StorageWrite::Deleted { .. } => match self.read {
                 // Published and then removed in the same transaction: the
                 // on-chain slot never existed, so this is not a write.
                 StorageRead::DoesNotExist { .. } => None,
-                StorageRead::ExternalHeap { .. } => Some(WriteClass::Deletion),
+                StorageRead::ExternalHeap { .. } => Some(WriteClass::Deletion {
+                    metadata: self.write_metadata.clone(),
+                }),
             },
         }
     }
@@ -565,23 +593,25 @@ impl ResourceReadWriteSet {
     }
 
     /// Records the size of the BCS encoding of every written value, and the
-    /// size of every written resource group before and after its writes, as
-    /// `provider` serves the size before.
+    /// metadata of every written slot under `ctx`, with `creation_time_usecs`
+    /// for the slots it creates. For every written resource group, records its
+    /// slot before and after its writes, as `provider` serves the slot before.
     ///
-    /// Terminal: a later mutation would make the sizes stale.
+    /// Terminal: a later mutation would make the sizes and metadata stale.
     ///
-    /// TODO(metering): refactor this pass so it includes metadata calculation.
-    /// Charging for the write set needs these sizes before the epilogue, which
-    /// can still write, so they have to be computed before it and again after
-    /// it, ideally without serializing the same values twice.
+    /// TODO(metering): charging for the write set needs these sizes before the
+    /// epilogue, which can still write, so they have to be computed before it
+    /// and again after it, ideally without serializing the same values twice.
     ///
     /// # Safety
     ///
     /// Every entry's pointers hold initialized values of the type at its key.
-    pub(crate) unsafe fn compute_write_sizes<T: LayoutProvider + ?Sized>(
+    pub(crate) unsafe fn compute_write_sizes_and_metadata<T: LayoutProvider + ?Sized>(
         &mut self,
         layouts: &T,
         provider: &dyn ResourceProvider,
+        ctx: &SlotMetadataContext,
+        creation_time_usecs: u64,
     ) -> VMResult<()> {
         for (key, entry) in self.entries.iter_mut() {
             if let StorageWrite::LocalHeap { ptr, .. } = entry.write {
@@ -589,10 +619,59 @@ impl ResourceReadWriteSet {
                 entry.write_bcs_size =
                     unsafe { serialized_size(layouts, ptr.as_ptr(), key.value_ty()) }?;
             }
+            // A group member's write is part of the write to its group's slot.
+            if entry.group.is_some() {
+                continue;
+            }
+            let new_size = entry.write_bcs_size as u64;
+            entry.write_metadata = match (&entry.read, entry.write) {
+                (_, StorageWrite::NotModified)
+                | (StorageRead::DoesNotExist { .. }, StorageWrite::Deleted { .. }) => continue,
+                (StorageRead::DoesNotExist { .. }, StorageWrite::LocalHeap { .. }) => {
+                    ctx.written_metadata(None, new_size, state_key_size(key)?, creation_time_usecs)
+                },
+                (
+                    StorageRead::ExternalHeap {
+                        metadata, bcs_size, ..
+                    },
+                    StorageWrite::LocalHeap { .. },
+                ) => ctx.written_metadata(
+                    Some((metadata, *bcs_size as u64)),
+                    new_size,
+                    state_key_size(key)?,
+                    creation_time_usecs,
+                ),
+                (StorageRead::ExternalHeap { metadata, .. }, StorageWrite::Deleted { .. }) => {
+                    metadata.clone()
+                },
+            };
         }
         for (group_key, group) in self.groups.iter_mut() {
-            group.size_before = provider.get_resource_group_size(group_key)?;
-            group.size = group_size_after_writes(&self.entries, group.size_before, &group.members)?;
+            group.slot_before = provider.get_resource_group_slot(group_key)?;
+            let Some(size) =
+                group_size_after_writes(&self.entries, group.slot_before.size, &group.members)?
+            else {
+                group.slot = None;
+                continue;
+            };
+            // An empty group is not stored, so its slot has no metadata.
+            let metadata = match size.bcs_size() as u64 {
+                0 => None,
+                new_size => {
+                    let old = group
+                        .slot_before
+                        .metadata
+                        .as_ref()
+                        .map(|metadata| (metadata, group.slot_before.size.bcs_size() as u64));
+                    Some(ctx.written_metadata(
+                        old,
+                        new_size,
+                        state_key_size(group_key)?,
+                        creation_time_usecs,
+                    ))
+                },
+            };
+            group.slot = Some(GroupSlot { size, metadata });
         }
         Ok(())
     }
@@ -619,6 +698,12 @@ impl ResourceReadWriteSet {
         &self,
     ) -> impl Iterator<Item = (&InMemoryStorageKey, &GroupEntry)> {
         self.groups.iter()
+    }
+
+    /// The resource group at `group_key`, if the transaction wrote it. Exact
+    /// once the session ended, like [`Self::written_groups_unordered`].
+    pub(crate) fn written_group(&self, group_key: &InMemoryStorageKey) -> Option<&GroupEntry> {
+        self.groups.get(group_key)
     }
 
     /// Yields every key the transaction read, with the version it observed and
@@ -717,6 +802,18 @@ impl ResourceReadWriteSet {
     }
 }
 
+/// The size of the state key of the slot at `key`.
+//
+// TODO(perf): materialization builds the state key again.
+fn state_key_size(key: &InMemoryStorageKey) -> VMResult<u64> {
+    match key.as_state_key() {
+        Ok(state_key) => Ok(state_key.size() as u64),
+        Err(err) => invariant_violation!(Unreachable(format!(
+            "written slot has no state key: {err:#}"
+        ))),
+    }
+}
+
 /// The size of a group of size `size` once the writes to `members` apply:
 /// each member's size as read is counted out, and its size as written is
 /// counted in. [`None`] if the sizes do not add up.
@@ -747,7 +844,7 @@ fn group_size_after_writes(
             Some(
                 WriteClass::Creation { bcs_size, .. } | WriteClass::Modification { bcs_size, .. },
             ) => Some(bcs_size),
-            Some(WriteClass::Deletion) | None => None,
+            Some(WriteClass::Deletion { .. }) | None => None,
         };
         if size
             .replace_member(tag_len, entry.read.bcs_size(), written)
@@ -798,6 +895,7 @@ fn get_or_create_resource_entry<'a>(
                 read,
                 write: StorageWrite::NotModified,
                 write_bcs_size: 0,
+                write_metadata: StateValueMetadata::none(),
                 group,
             }))
         },
@@ -808,10 +906,11 @@ fn get_or_create_resource_entry<'a>(
 mod tests {
     use super::*;
     use crate::{heap::Heap, write_object_header};
+    use aptos_types::on_chain_config::CurrentTimeMicroseconds;
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        intern_type_tag, storage::resource_provider::ResourceProviderError, types::Type,
-        DescriptorId, ReadPin, ValueLayoutTable, OBJECT_HEADER_SIZE,
+        intern_type_tag, native::TableHandle, storage::resource_provider::ResourceProviderError,
+        types::Type, DescriptorId, ReadPin, ValueLayoutTable, OBJECT_HEADER_SIZE,
     };
     use mono_move_global_context::GlobalContext;
     use move_core_types::{
@@ -883,6 +982,7 @@ mod tests {
         StorageRead::ExternalHeap {
             ptr,
             bcs_size,
+            metadata: StateValueMetadata::none(),
             version: None,
             pin: Arc::new(TestPin),
         }
@@ -923,11 +1023,11 @@ mod tests {
             })
         }
 
-        fn get_resource_group_size(
+        fn get_resource_group_slot(
             &self,
             _group_key: &InMemoryStorageKey,
-        ) -> Result<GroupSize, ResourceProviderError> {
-            Ok(GroupSize::default())
+        ) -> Result<GroupSlot, ResourceProviderError> {
+            Ok(GroupSlot::default())
         }
     }
 
@@ -936,6 +1036,7 @@ mod tests {
             read,
             write,
             write_bcs_size: 0,
+            write_metadata: StateValueMetadata::none(),
             group: None,
         }
     }
@@ -1382,7 +1483,7 @@ mod tests {
         // Pre-existing + deleted -> Deletion.
         assert!(matches!(
             class_of(ext(), deleted()),
-            Some(WriteClass::Deletion)
+            Some(WriteClass::Deletion { .. })
         ));
         // Published then removed within the txn: net no-op, not a write.
         assert!(class_of(dne(), deleted()).is_none());
@@ -1434,38 +1535,74 @@ mod tests {
     }
 
     #[test]
-    fn write_sizes_cover_creations_and_modifications() {
+    fn write_sizes_and_metadata_cover_every_write_class() {
         let value = 7u64;
+        let stored_metadata =
+            StateValueMetadata::new(100, 50, &CurrentTimeMicroseconds { microseconds: 5 });
+        let stored = || StorageRead::ExternalHeap {
+            ptr: u64_ptr(&value),
+            bcs_size: 8,
+            metadata: stored_metadata.clone(),
+            version: None,
+            pin: Arc::new(TestPin),
+        };
+        let local = StorageWrite::LocalHeap {
+            ptr: u64_ptr(&value),
+            epoch: 0,
+        };
+        // Table items have a state key whatever their value type.
+        let item = |n: u8| {
+            InMemoryStorageKey::table_item(
+                TableHandle::new(addr(n)),
+                Box::new([n]),
+                GlobalArenaPtr::from_static(&TY_A),
+            )
+        };
+
         let mut rws = ResourceReadWriteSet::new();
-        for (key, read) in [(key_a(1), dne()), (key_a(2), ext_read(u64_ptr(&value)))] {
-            rws.entries.insert(
-                key,
-                entry(read, StorageWrite::LocalHeap {
-                    ptr: u64_ptr(&value),
-                    epoch: 0,
-                }),
-            );
-        }
-        rws.entries.insert(
-            key_a(3),
-            entry(ext_read(u64_ptr(&value)), StorageWrite::Deleted {
-                epoch: 0,
-            }),
-        );
+        rws.entries.insert(item(1), entry(dne(), local));
+        rws.entries.insert(item(2), entry(stored(), local));
+        rws.entries
+            .insert(item(3), entry(stored(), StorageWrite::Deleted { epoch: 0 }));
+        // A group member is sized, but has no slot of its own.
+        static GROUP_TY: Type = Type::U8;
+        let mut member = entry(dne(), local);
+        member.group = Some(GlobalArenaPtr::from_static(&GROUP_TY));
+        rws.entries.insert(key_a(4), member);
 
         let layouts = ValueLayoutTable::new();
+        let ctx = SlotMetadataContext {
+            slot_deposit_price: 1000,
+            byte_deposit_price: 3,
+        };
         // SAFETY: every pointer holds a live `u64`, which is `TY_A`.
-        unsafe { rws.compute_write_sizes(&layouts, &Provider::empty()) }.unwrap();
-        let mut sizes = rws
-            .writes_unordered()
-            .map(|(_, class, _)| match class {
-                WriteClass::Creation { bcs_size, .. }
-                | WriteClass::Modification { bcs_size, .. } => Some(bcs_size),
-                WriteClass::Deletion => None,
-            })
-            .collect::<Vec<_>>();
-        sizes.sort();
-        assert_eq!(sizes, vec![None, Some(8), Some(8)]);
+        unsafe { rws.compute_write_sizes_and_metadata(&layouts, &Provider::empty(), &ctx, 9) }
+            .unwrap();
+
+        let key_size = |key: &InMemoryStorageKey| key.as_state_key().unwrap().size() as u64;
+        for (key, class, _) in rws.writes_unordered() {
+            match class {
+                WriteClass::Creation {
+                    bcs_size, metadata, ..
+                } => {
+                    assert_eq!(bcs_size, 8);
+                    if *key == key_a(4) {
+                        assert!(metadata.is_none());
+                    } else {
+                        assert_eq!(metadata, ctx.written_metadata(None, 8, key_size(key), 9));
+                        assert_eq!(metadata.creation_time_usecs(), 9);
+                    }
+                },
+                WriteClass::Modification {
+                    bcs_size, metadata, ..
+                } => {
+                    assert_eq!(bcs_size, 8);
+                    assert_eq!(metadata, stored_metadata);
+                },
+                WriteClass::Deletion { metadata } => assert_eq!(metadata, stored_metadata),
+            }
+        }
+        assert_eq!(rws.writes_unordered().count(), 4);
     }
 
     #[test]
@@ -1566,6 +1703,7 @@ mod tests {
             read: ext_read(ext),
             write: StorageWrite::NotModified,
             write_bcs_size: 0,
+            write_metadata: StateValueMetadata::none(),
             group: None,
         });
         rws.entries.insert(k_local.clone(), Entry {
@@ -1575,6 +1713,7 @@ mod tests {
                 epoch: 0,
             },
             write_bcs_size: 0,
+            write_metadata: StateValueMetadata::none(),
             group: None,
         });
 

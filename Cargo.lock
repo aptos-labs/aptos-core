@@ -13351,6 +13351,7 @@ name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=b641d94fd00c7014eb28b48d5649d4db2edfe983)",
  "hashbrown 0.14.3",
  "mono-move-alloc",
