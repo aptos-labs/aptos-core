@@ -9,7 +9,9 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
-use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
+use move_core_types::{
+    account_address::AccountAddress, language_storage::StructTag, value::size_u32_as_uleb128,
+};
 use std::{ptr::NonNull, sync::Arc};
 use thiserror::Error;
 
@@ -207,6 +209,8 @@ pub enum StorageRead {
         /// the value allocation. Value's header is at negative offset.
         // TODO(cleanup): have a Value pointer unified API?
         ptr: NonNull<u8>,
+        /// Size of the value's BCS encoding.
+        bcs_size: usize,
         /// Version of this read from Block-STM. Used for read-set validation.
         version: Version,
         /// Keeps the arena `ptr` points into alive while this read is retained.
@@ -215,6 +219,14 @@ pub enum StorageRead {
 }
 
 impl StorageRead {
+    /// Size of the value's BCS encoding, or [`None`] if there is no value.
+    pub fn bcs_size(&self) -> Option<usize> {
+        match self {
+            StorageRead::DoesNotExist { .. } => None,
+            StorageRead::ExternalHeap { bcs_size, .. } => Some(*bcs_size),
+        }
+    }
+
     /// The Block-STM version this read observed.
     pub fn version(&self) -> Version {
         match self {
@@ -222,6 +234,76 @@ impl StorageRead {
             StorageRead::ExternalHeap { version, .. } => *version,
         }
     }
+}
+
+/// A resource group's size as BCS encodes it: the member count, then each
+/// member's tag and length-prefixed bytes.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GroupSize {
+    num_members: usize,
+    /// Sum over members of the encoded tag and the length-prefixed bytes.
+    members_size: usize,
+}
+
+impl GroupSize {
+    /// The size of a group whose members' tags and values encode to the given
+    /// numbers of bytes.
+    pub fn from_members(members: impl IntoIterator<Item = (usize, usize)>) -> Self {
+        let mut num_members = 0;
+        let mut members_size = 0;
+        for (tag_len, value_len) in members {
+            num_members += 1;
+            members_size += member_size(tag_len, value_len);
+        }
+        Self {
+            num_members,
+            members_size,
+        }
+    }
+
+    /// Counts in a member whose tag encodes to `tag_len` bytes and whose value
+    /// to `value_len` bytes. Returns [`None`] on overflow.
+    pub fn add_member(&mut self, tag_len: usize, value_len: usize) -> Option<()> {
+        let num_members = self.num_members.checked_add(1)?;
+        let members_size = self
+            .members_size
+            .checked_add(member_size(tag_len, value_len))?;
+        *self = Self {
+            num_members,
+            members_size,
+        };
+        Some(())
+    }
+
+    /// Counts out a member whose tag encodes to `tag_len` bytes and whose value
+    /// to `value_len` bytes. Returns [`None`] if the group is too small to
+    /// have held it.
+    pub fn remove_member(&mut self, tag_len: usize, value_len: usize) -> Option<()> {
+        let num_members = self.num_members.checked_sub(1)?;
+        let members_size = self
+            .members_size
+            .checked_sub(member_size(tag_len, value_len))?;
+        *self = Self {
+            num_members,
+            members_size,
+        };
+        Some(())
+    }
+
+    /// The length of the encoded group. Zero for a group with no members,
+    /// which is not stored.
+    pub fn bcs_size(&self) -> usize {
+        if self.num_members == 0 {
+            0
+        } else {
+            size_u32_as_uleb128(self.num_members) + self.members_size
+        }
+    }
+}
+
+/// What one member adds to its group's encoding.
+fn member_size(tag_len: usize, value_len: usize) -> usize {
+    tag_len + size_u32_as_uleb128(value_len) + value_len
 }
 
 /// Returns resource data from storage. Storage backend is not fixed and can be
@@ -241,6 +323,14 @@ pub trait ResourceProvider {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError>;
+
+    /// Returns the size of the resource group at `group_key`, an
+    /// [`InMemoryStorageKey::ResourceGroup`], as this transaction sees it.
+    /// A group that does not exist has size zero.
+    fn get_resource_group_size(
+        &self,
+        group_key: &InMemoryStorageKey,
+    ) -> Result<GroupSize, ResourceProviderError>;
 }
 
 /// Empty storage with no resources.
@@ -253,5 +343,12 @@ impl ResourceProvider for NoResourceProvider {
         _group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError> {
         Ok(StorageRead::DoesNotExist { version: None })
+    }
+
+    fn get_resource_group_size(
+        &self,
+        _group_key: &InMemoryStorageKey,
+    ) -> Result<GroupSize, ResourceProviderError> {
+        Ok(GroupSize::default())
     }
 }

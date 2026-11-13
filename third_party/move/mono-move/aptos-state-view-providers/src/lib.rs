@@ -27,7 +27,7 @@ use mono_move_core::{
         },
     },
     types::InternedType,
-    ExecutionErrorKind, IntoExecutionError, VMInternalError, VMResult,
+    ExecutionErrorKind, GroupSize, IntoExecutionError, VMInternalError, VMResult,
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::SegmentedArena;
@@ -233,11 +233,33 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
         let (ptr, pin) = inner.arena.deserialize(self.guard, key.value_ty(), &blob)?;
         let read = StorageRead::ExternalHeap {
             ptr,
+            bcs_size: blob.len(),
             version: None,
             pin,
         };
         inner.values.insert(cache_key, read.clone());
         Ok(read)
+    }
+
+    fn get_resource_group_size(
+        &self,
+        group_key: &InMemoryStorageKey,
+    ) -> Result<GroupSize, ResourceProviderError> {
+        let Some(members) = self.group_members(group_key)? else {
+            return Ok(GroupSize::default());
+        };
+        let members = members
+            .iter()
+            .map(|(tag, bytes)| {
+                let tag_len = bcs::serialized_size(tag).map_err(|e| {
+                    ResourceProviderError::InvariantViolation(format!(
+                        "failed to size a group member's tag: {e}"
+                    ))
+                })?;
+                Ok((tag_len, bytes.len()))
+            })
+            .collect::<Result<Vec<_>, ResourceProviderError>>()?;
+        Ok(GroupSize::from_members(members))
     }
 }
 

@@ -227,7 +227,19 @@ impl MonoMoveBackend {
                 }
             },
             Ok(_) => None,
-            Err(err) => return backend_error(format!("failed to finish the session: {err}")),
+            Err(err) => match classify(&err) {
+                // A write that cannot be serialized only matters when the
+                // effects are compared.
+                Classification::Unsupported if self.capture_effects && result.is_ok() => {
+                    return TestExecution::Unsupported {
+                        reason: err.to_string(),
+                    }
+                },
+                Classification::Unsupported => None,
+                Classification::BackendError | Classification::Ran => {
+                    return backend_error(format!("failed to finish the session: {err}"))
+                },
+            },
         };
 
         TestExecution::Ran(TestRun {
@@ -428,8 +440,8 @@ fn test_effects(guard: &ExecutionGuard<'_>, effects: &SessionEffects) -> Result<
             Ok(unsafe { serialize(guard, ptr.as_ptr(), key.value_ty()) }?.into())
         };
         let op = match class {
-            WriteClass::Creation(ptr) => Op::New(written(ptr)?),
-            WriteClass::Modification(ptr) => Op::Modify(written(ptr)?),
+            WriteClass::Creation { ptr, .. } => Op::New(written(ptr)?),
+            WriteClass::Modification { ptr, .. } => Op::Modify(written(ptr)?),
             WriteClass::Deletion => Op::Delete,
         };
         match key {
