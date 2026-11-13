@@ -17,7 +17,7 @@ use crate::{
     executor::AptosTransactionExecutor,
     natives::extensions_with,
     outcome::TxnOutcome,
-    providers::read_config,
+    providers::{read_config, read_creation_time_usecs},
 };
 use aptos_types::{
     fee_statement::FeeStatement,
@@ -87,8 +87,18 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         //
         // TODO(perf): an interrupted session still evacuates its heap; it
         // could be abandoned instead.
-        let result = self.run_session(&mut interp, txn, &txn_data);
-        match (result, interp.finish()) {
+        let (result, creation_time_usecs) =
+            match read_creation_time_usecs(&mut interp, guard, self.symbols) {
+                Ok(time) => (self.run_session(&mut interp, txn, &txn_data), time),
+                Err(ResourceProviderError::Interrupted) => (Err(DiscardReason::Interrupted), 0),
+                Err(e) => (
+                    Err(DiscardReason::InvariantViolation(format!(
+                        "the chain's time is unreadable: {e}"
+                    ))),
+                    0,
+                ),
+            };
+        match (result, interp.finish(creation_time_usecs)) {
             (_, Err(e)) => TxnOutcome::Panic(e),
             (Err(DiscardReason::Interrupted), Ok(_)) => TxnOutcome::Interrupted,
             (Ok((status, fee_statement)), Ok(effects)) => TxnOutcome::Executed {

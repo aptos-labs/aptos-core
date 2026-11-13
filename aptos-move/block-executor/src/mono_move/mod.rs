@@ -25,7 +25,11 @@ use aptos_types::{
     block_executor::value::SpeculativeValue,
     error::{code_invariant_error, PanicError, PanicOr},
     fee_statement::FeeStatement,
-    state_store::{state_key::StateKey, state_value::StateValue, TStateView},
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+        TStateView,
+    },
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
         BlockExecutableTransaction as Transaction, TransactionAuxiliaryData, TransactionOutput,
@@ -37,7 +41,7 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use group_chain::{
-    committed_value, finish_group_post_commit, unbuilt_metadata_before, validate_size_before,
+    committed_value, finish_group_post_commit, unbuilt_metadata_before, validate_slot_before,
     GroupMetadata, GroupView,
 };
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
@@ -78,6 +82,9 @@ pub enum MonoValue<K = InMemoryStorageKey> {
         ptr: NonNull<u8>,
         /// Size of the value's BCS encoding.
         bcs_size: usize,
+        /// Metadata of the slot holding the value. A resource group member
+        /// has no slot of its own and carries no metadata.
+        metadata: StateValueMetadata,
         kind: WriteOpKind,
         /// Pins the allocation backing the pointer. As long as we hold the pin,
         /// using the pointer is safe.
@@ -86,8 +93,6 @@ pub enum MonoValue<K = InMemoryStorageKey> {
     Deletion,
     /// Group write metadata and cache. Group members live as their own
     /// writes/deletions under their keys.
-    //
-    // TODO(completeness): add state value metadata here.
     GroupMetadata {
         group: Arc<GroupMetadata<K>>,
     },
@@ -105,10 +110,15 @@ impl<K> MonoValue<K> {
     fn as_storage_read(&self, version: Version) -> Result<StorageRead, ResourceProviderError> {
         Ok(match self {
             MonoValue::Write {
-                ptr, bcs_size, pin, ..
+                ptr,
+                bcs_size,
+                metadata,
+                pin,
+                ..
             } => StorageRead::ExternalHeap {
                 ptr: *ptr,
                 bcs_size: *bcs_size,
+                metadata: metadata.clone(),
                 version,
                 pin: pin.clone(),
             },
@@ -160,18 +170,7 @@ impl<K: Clone + Send + Sync> SpeculativeValue for MonoValue<K> {
     fn write_op_kind(&self) -> WriteOpKind {
         match self {
             MonoValue::Write { kind, .. } => kind.clone(),
-            // A group with no members is not stored, so an empty group after
-            // the changes is a deletion, and an empty group before them is a
-            // creation.
-            MonoValue::GroupMetadata { group } => {
-                if group.size().bcs_size() == 0 {
-                    WriteOpKind::Deletion
-                } else if group.size_before().bcs_size() == 0 {
-                    WriteOpKind::Creation
-                } else {
-                    WriteOpKind::Modification
-                }
-            },
+            MonoValue::GroupMetadata { group } => group.write_kind(),
             MonoValue::Deletion => WriteOpKind::Deletion,
         }
     }
@@ -185,7 +184,7 @@ pub struct MonoReads {
     /// nothing left to commit.
     outcome: Option<Arc<TxnOutcome>>,
     /// The metadata of the resource groups the transaction wrote. Each was
-    /// built on a read of its group's size.
+    /// built on a read of its group's slot.
     group_metadata: Vec<(InMemoryStorageKey, Arc<GroupMetadata<InMemoryStorageKey>>)>,
     /// The incarnation these reads were captured at, for BlockSTMv2. [`None`]
     /// only under sequential execution, which does not validate.
@@ -269,7 +268,7 @@ impl TxnInput for MonoReads {
                 Err(MVDataError::Dependency(_)) => false,
             }
         }) && self.group_metadata.iter().all(|(group_key, metadata)| {
-            validate_size_before(data_map, group_key, idx_to_validate, metadata)
+            validate_slot_before(data_map, group_key, idx_to_validate, metadata)
         })
     }
 
@@ -391,11 +390,11 @@ impl MonoTxnOutput {
             .into_iter()
             .flat_map(|effects| effects.written_groups_unordered())
             .map(|(group_key, group)| {
-                let size = group.size().ok_or_else(|| group_key.clone())?;
+                let slot = group.slot().ok_or_else(|| group_key.clone())?;
                 let metadata = GroupMetadata::from_changes(
                     group.members().to_vec(),
-                    group.size_before(),
-                    size,
+                    group.slot_before().clone(),
+                    slot.clone(),
                 );
                 Ok((group_key.clone(), Arc::new(metadata)))
             })
@@ -458,19 +457,29 @@ impl TxnOutput for MonoTxnOutput {
             .writes_unordered()
             .map(|(key, class, _group)| {
                 let value = match class {
-                    WriteClass::Creation { ptr, bcs_size } => MonoValue::Write {
+                    WriteClass::Creation {
                         ptr,
                         bcs_size,
+                        metadata,
+                    } => MonoValue::Write {
+                        ptr,
+                        bcs_size,
+                        metadata,
                         kind: WriteOpKind::Creation,
                         pin: pin.clone(),
                     },
-                    WriteClass::Modification { ptr, bcs_size } => MonoValue::Write {
+                    WriteClass::Modification {
                         ptr,
                         bcs_size,
+                        metadata,
+                    } => MonoValue::Write {
+                        ptr,
+                        bcs_size,
+                        metadata,
                         kind: WriteOpKind::Modification,
                         pin: pin.clone(),
                     },
-                    WriteClass::Deletion => MonoValue::Deletion,
+                    WriteClass::Deletion { .. } => MonoValue::Deletion,
                 };
                 (key.clone(), value)
             })
@@ -943,7 +952,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
 
         let mut group_writes = Vec::with_capacity(group_metadata.len());
         for (group_key, metadata) in &group_metadata {
-            let (prev, view) = match &mode {
+            let view = match &mode {
                 ViewMode::Sequential { unsync_map, .. } => {
                     let prev = metadata.before().cloned().ok_or_else(|| {
                         code_invariant_error("Sequential group metadata has no previous view")
@@ -962,15 +971,14 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                             member_change(&guard, key, &value)
                         })
                         .collect::<Result<Vec<_>, PanicError>>()?;
-                    let view = metadata.build_view(&prev, changes);
-                    (prev, view)
+                    metadata.build_view(&prev, changes)
                 },
                 ViewMode::Parallel { versioned_map, .. } => {
                     let data = versioned_map.data();
                     let prev = view_before(&guard, data, group_key, txn_idx)?;
                     let view = build_committed_view(&guard, data, metadata, &prev, txn_idx)?;
                     finish_group_post_commit(data, group_key, txn_idx, metadata)?;
-                    (prev, view)
+                    view
                 },
             };
             // A committed transaction validated the size it built on, so a
@@ -986,7 +994,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             let state_key = group_key
                 .as_state_key()
                 .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))?;
-            group_writes.push((state_key, view.write_op(!prev.is_empty())?));
+            group_writes.push((state_key, metadata.write_op(&view)?));
         }
         partial
             .with_group_writes(group_writes)

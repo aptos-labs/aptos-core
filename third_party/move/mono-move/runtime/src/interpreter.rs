@@ -294,6 +294,11 @@ impl SessionEffects {
         self.read_write_set.written_groups_unordered()
     }
 
+    /// The resource group at `group_key`, if the transaction wrote it.
+    pub fn written_group(&self, group_key: &InMemoryStorageKey) -> Option<&GroupEntry> {
+        self.read_write_set.written_group(group_key)
+    }
+
     /// Returns the frozen heap allocation backing the written values.
     pub fn frozen_heap(&self) -> std::sync::Arc<FrozenHeap> {
         self.heap.clone()
@@ -1065,7 +1070,8 @@ impl<'guard> InterpreterContext<'guard> {
     }
 
     /// Consumes the context, returning the transaction's side effects for
-    /// publication. The effects are copied out of the session heap into a
+    /// publication. Slots the session created are stamped with
+    /// `creation_time_usecs`. The effects are copied out of the session heap into a
     /// buffer sized to what the session allocated, which is then frozen into
     /// them, so every heap pointer they hold stays valid for as long as they
     /// live. Their interned types are not: the effects do not borrow the guard,
@@ -1073,11 +1079,11 @@ impl<'guard> InterpreterContext<'guard> {
     /// dropped.
     ///
     /// Fails on a VM bug, on a written value that cannot be serialized, or if
-    /// reading the size of a resource group the transaction wrote fails, which
+    /// reading the slot of a resource group the transaction wrote fails, which
     /// a speculative read can cause. A VM bug during the copy leaves the
     /// session heap half-forwarded, so nothing is recoverable afterwards and
     /// the block has to be aborted.
-    pub fn finish(self) -> VMResult<SessionEffects> {
+    pub fn finish(self, creation_time_usecs: u64) -> VMResult<SessionEffects> {
         let Self {
             loader,
             read_set: _,
@@ -1128,7 +1134,14 @@ impl<'guard> InterpreterContext<'guard> {
         // SAFETY: every read-write-set entry holds initialized values of the
         // type at its key, now in the evacuated heap, and nothing mutates a
         // written value from here on.
-        unsafe { read_write_set.compute_write_sizes(guard, resource_provider) }?;
+        unsafe {
+            read_write_set.compute_write_sizes_and_metadata(
+                guard,
+                resource_provider,
+                guard.slot_metadata_context(),
+                creation_time_usecs,
+            )
+        }?;
 
         Ok(SessionEffects {
             read_write_set,
