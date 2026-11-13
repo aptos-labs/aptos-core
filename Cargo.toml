@@ -636,7 +636,7 @@ enum_dispatch = "0.3.12"
 env_logger = "0.11.11"
 equivalent = "1.0"
 erased-serde = "0.4.11"
-ethers = { version = "2" }
+ethers = { version = "2", default-features = false }
 ethnum = "1.5.2"
 fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
@@ -824,6 +824,7 @@ rustc-hash = "2"
 rustversion = "1.0.14"
 rusty-fork = "0.3.0"
 scopeguard = "1.2.0"
+semver = "1.0.21"
 serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde-big-array = "0.5.1"
 serde-generate = { version = "0.34.1", default-features = false, features = ["golang", "rust"] }

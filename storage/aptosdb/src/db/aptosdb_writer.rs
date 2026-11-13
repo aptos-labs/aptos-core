@@ -528,33 +528,112 @@ impl AptosDB {
                     .commit_transaction_accumulator(chunk.first_version, chunk.transaction_infos)
                     .unwrap()
             });
-            if self.position.is_some() {
-                s.spawn(|_| self.commit_native_position(chunk, sync_commit).unwrap());
-            }
-            if self.order.is_some() {
-                s.spawn(|_| self.commit_native_order(chunk, sync_commit).unwrap());
-            }
-            if self.collateral.is_some() {
-                s.spawn(|_| self.commit_native_collateral(chunk, sync_commit).unwrap());
+            if self.position.is_some() || self.order.is_some() || self.collateral.is_some() {
+                s.spawn(|_| self.commit_trading_native(chunk, sync_commit).unwrap());
             }
         });
 
         Ok(new_root_hash)
     }
 
-    fn commit_native_position(&self, chunk: &ChunkToCommit, sync_commit: bool) -> Result<()> {
+    /// Commits the native stores' values, publishes their tips together,
+    /// then advances their trees. Publishing under all three tip locks at
+    /// once is what lets a reader taking them see every store at the same
+    /// chunk.
+    fn commit_trading_native(&self, chunk: &ChunkToCommit, sync_commit: bool) -> Result<()> {
+        if chunk.transaction_outputs.is_empty() {
+            return Ok(());
+        }
+        let (positions, (orders, collateral)) = rayon::join(
+            || self.commit_native_position_kv(chunk),
+            || {
+                rayon::join(
+                    || self.commit_native_order_kv(chunk),
+                    || self.commit_native_collateral_kv(chunk),
+                )
+            },
+        );
+        self.publish_trading_native_tips(positions?, orders?, collateral?);
+        self.observe_position_overlay();
+
+        // With the roots on, each summary comes from execution on the chunk;
+        // off, the store computes it so the tree still tracks forward (not
+        // consensus-committed).
+        let (positions, (orders, collateral)) = rayon::join(
+            || {
+                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_position"]);
+                self.position.as_ref().map_or(Ok(()), |bundle| {
+                    bundle
+                        .store
+                        .advance_pipeline(chunk, chunk.position_state_summary, sync_commit)
+                })
+            },
+            || {
+                rayon::join(
+                    || {
+                        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_order"]);
+                        self.order.as_ref().map_or(Ok(()), |bundle| {
+                            bundle.store.advance_pipeline(
+                                chunk,
+                                chunk.order_state_summary,
+                                sync_commit,
+                            )
+                        })
+                    },
+                    || {
+                        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_collateral"]);
+                        self.collateral.as_ref().map_or(Ok(()), |bundle| {
+                            bundle.store.advance_pipeline(
+                                chunk,
+                                chunk.collateral_state_summary,
+                                sync_commit,
+                            )
+                        })
+                    },
+                )
+            },
+        );
+        positions?;
+        orders?;
+        collateral?;
+        Ok(())
+    }
+
+    /// Swaps in the new tips under all three locks, taken in the order
+    /// `TradingNativeReader` takes them.
+    fn publish_trading_native_tips(
+        &self,
+        positions: Option<PositionOverlay>,
+        orders: Option<OrderOverlay>,
+        collateral: Option<CollateralOverlay>,
+    ) {
+        let mut position_tip = self.position.as_ref().map(|bundle| bundle.positions.lock());
+        let mut order_tip = self.order.as_ref().map(|bundle| bundle.orders.lock());
+        let mut collateral_tip = self
+            .collateral
+            .as_ref()
+            .map(|bundle| bundle.collateral.lock());
+        if let (Some(tip), Some(new_tip)) = (position_tip.as_mut(), positions) {
+            **tip = new_tip;
+        }
+        if let (Some(tip), Some(new_tip)) = (order_tip.as_mut(), orders) {
+            **tip = new_tip;
+        }
+        if let (Some(tip), Some(new_tip)) = (collateral_tip.as_mut(), collateral) {
+            **tip = new_tip;
+        }
+    }
+
+    /// Persists the chunk's position values and returns the tip to publish,
+    /// `None` to leave it as is.
+    fn commit_native_position_kv(&self, chunk: &ChunkToCommit) -> Result<Option<PositionOverlay>> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_position"]);
         let Some(bundle) = self.position.as_ref() else {
-            return Ok(());
+            return Ok(None);
         };
         let Some(chunk_last_inclusive) = bundle.store.commit_kv(chunk)? else {
-            return Ok(());
+            return Ok(None);
         };
-
-        // Advance the tip the scanner reads through. `None` means either
-        // the feature is off or the chunk was built without the executor,
-        // as `aptosdb_testonly` does — extend from this chunk's writes
-        // rather than adopting an overlay.
         match chunk.positions {
             Some(executed) => {
                 // Pre-committed means ordered, and the base only folds to
@@ -563,8 +642,10 @@ impl AptosDB {
                     bundle.position_base.is_ancestor_of(executed),
                     "published position overlay does not descend from the base",
                 );
-                *bundle.positions.lock() = executed.clone();
+                Ok(Some(executed.clone()))
             },
+            // The feature is off, or the chunk was built without the
+            // executor: extend from the chunk's own writes.
             None => {
                 let ops: Vec<_> = chunk
                     .transaction_outputs
@@ -572,42 +653,32 @@ impl AptosDB {
                     .flat_map(|output| PositionStore::write_set_ops(output.write_set()))
                     .map(|(key, op)| (key, op.as_state_value_opt()))
                     .collect();
-                let chunk_position_writes = decode_position_writes(ops)?;
-                if !chunk_position_writes.is_empty() {
-                    let floor = bundle.position_base.layers();
-                    let mut positions = bundle.positions.lock();
-                    *positions =
-                        positions.extend(&floor, chunk_last_inclusive, chunk_position_writes);
+                let writes = decode_position_writes(ops)?;
+                if writes.is_empty() {
+                    return Ok(None);
                 }
+                let floor = bundle.position_base.layers();
+                let tip = bundle.positions.lock().clone();
+                Ok(Some(tip.extend(&floor, chunk_last_inclusive, writes)))
             },
         }
-        self.observe_position_overlay();
-
-        // Flag on: the summary comes from execution on the chunk; off: the
-        // store computes it so the tree still tracks forward (not
-        // consensus-committed).
-        bundle
-            .store
-            .advance_pipeline(chunk, chunk.position_state_summary, sync_commit)
     }
 
-    fn commit_native_order(&self, chunk: &ChunkToCommit, sync_commit: bool) -> Result<()> {
+    fn commit_native_order_kv(&self, chunk: &ChunkToCommit) -> Result<Option<OrderOverlay>> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_order"]);
         let Some(bundle) = self.order.as_ref() else {
-            return Ok(());
+            return Ok(None);
         };
         let Some(chunk_last_inclusive) = bundle.store.commit_kv(chunk)? else {
-            return Ok(());
+            return Ok(None);
         };
-
-        // Advance the published tip, as `commit_native_position` does.
         match chunk.orders {
             Some(executed) => {
                 assert!(
                     bundle.order_base.is_ancestor_of(executed),
                     "published order overlay does not descend from the base",
                 );
-                *bundle.orders.lock() = executed.clone();
+                Ok(Some(executed.clone()))
             },
             None => {
                 let writes = decode_order_writes(
@@ -617,38 +688,34 @@ impl AptosDB {
                         .flat_map(|output| OrderStore::write_set_ops(output.write_set()))
                         .map(|(key, op)| (key, op.as_state_value_opt())),
                 )?;
-                if !writes.is_empty() {
-                    let floor = bundle.order_base.layers();
-                    let mut orders = bundle.orders.lock();
-                    *orders = orders.extend(&floor, chunk_last_inclusive, writes);
+                if writes.is_empty() {
+                    return Ok(None);
                 }
+                let floor = bundle.order_base.layers();
+                let tip = bundle.orders.lock().clone();
+                Ok(Some(tip.extend(&floor, chunk_last_inclusive, writes)))
             },
         }
-
-        // With the roots on, the summary comes from execution on the chunk;
-        // off, the store computes it so the tree still tracks forward.
-        bundle
-            .store
-            .advance_pipeline(chunk, chunk.order_state_summary, sync_commit)
     }
 
-    fn commit_native_collateral(&self, chunk: &ChunkToCommit, sync_commit: bool) -> Result<()> {
+    fn commit_native_collateral_kv(
+        &self,
+        chunk: &ChunkToCommit,
+    ) -> Result<Option<CollateralOverlay>> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_collateral"]);
         let Some(bundle) = self.collateral.as_ref() else {
-            return Ok(());
+            return Ok(None);
         };
         let Some(chunk_last_inclusive) = bundle.store.commit_kv(chunk)? else {
-            return Ok(());
+            return Ok(None);
         };
-
-        // Advance the published tip, as `commit_native_position` does.
         match chunk.collateral {
             Some(executed) => {
                 assert!(
                     bundle.collateral_base.is_ancestor_of(executed),
                     "published collateral overlay does not descend from the base",
                 );
-                *bundle.collateral.lock() = executed.clone();
+                Ok(Some(executed.clone()))
             },
             None => {
                 let writes = decode_collateral_writes(
@@ -658,19 +725,14 @@ impl AptosDB {
                         .flat_map(|output| CollateralStore::write_set_ops(output.write_set()))
                         .map(|(key, op)| (key, op.as_state_value_opt())),
                 )?;
-                if !writes.is_empty() {
-                    let floor = bundle.collateral_base.layers();
-                    let mut collateral = bundle.collateral.lock();
-                    *collateral = collateral.extend(&floor, chunk_last_inclusive, writes);
+                if writes.is_empty() {
+                    return Ok(None);
                 }
+                let floor = bundle.collateral_base.layers();
+                let tip = bundle.collateral.lock().clone();
+                Ok(Some(tip.extend(&floor, chunk_last_inclusive, writes)))
             },
         }
-
-        // With the roots on, the summary comes from execution on the chunk;
-        // off, the store computes it so the tree still tracks forward.
-        bundle
-            .store
-            .advance_pipeline(chunk, chunk.collateral_state_summary, sync_commit)
     }
 
     fn commit_state_kv_and_ledger_metadata(&self, chunk: &ChunkToCommit) -> Result<()> {
