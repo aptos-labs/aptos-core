@@ -25,13 +25,11 @@ use aptos_types::{
     transaction::{
         IndexedTransactionSummary, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
         TransactionInfo, TransactionListWithProofV2, TransactionOutputListWithProofV2,
-        TransactionToCommit, TransactionWithProof, Version,
+        TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use thiserror::Error;
 
 pub mod block_info;
 pub mod chunk_to_commit;
@@ -69,37 +67,6 @@ pub trait StateSnapshotReceiver<K, V>: Send {
     fn finish(self) -> Result<()>;
 
     fn finish_box(self: Box<Self>) -> Result<()>;
-}
-
-#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
-pub enum Error {
-    #[error("Service error: {:?}", error)]
-    ServiceError { error: String },
-
-    #[error("Serialization error: {0}")]
-    SerializationError(String),
-}
-
-impl From<anyhow::Error> for Error {
-    fn from(error: anyhow::Error) -> Self {
-        Self::ServiceError {
-            error: format!("{}", error),
-        }
-    }
-}
-
-impl From<bcs::Error> for Error {
-    fn from(error: bcs::Error) -> Self {
-        Self::SerializationError(format!("{}", error))
-    }
-}
-
-impl From<aptos_secure_net::Error> for Error {
-    fn from(error: aptos_secure_net::Error) -> Self {
-        Self::ServiceError {
-            error: format!("{}", error),
-        }
-    }
 }
 
 macro_rules! delegate_read {
@@ -597,6 +564,16 @@ pub trait DbReader: Send + Sync {
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
     }
 
+    /// Like `get_state_value_with_version_by_version`, but `version` must be a block end (state
+    /// checkpoint), which avoids looking up the block containing `version`.
+    fn get_state_value_with_version_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        self.get_state_value_with_version_by_version(state_key, version)
+    }
+
     fn get_state_value_with_proof_by_version(
         &self,
         state_key: &StateKey,
@@ -777,52 +754,6 @@ impl DbReaderWriter {
     pub fn wrap<D: 'static + DbReader + DbWriter>(db: D) -> (Arc<D>, Self) {
         let arc_db = Arc::new(db);
         (Arc::clone(&arc_db), Self::from_arc(arc_db))
-    }
-}
-
-/// Network types for storage service
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum StorageRequest {
-    GetStateValueByVersionRequest(Box<GetStateValueByVersionRequest>),
-    GetStartupInfoRequest,
-    SaveTransactionsRequest(Box<SaveTransactionsRequest>),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
-pub struct GetStateValueByVersionRequest {
-    /// The access key for the resource
-    pub state_key: StateKey,
-
-    /// The version the query is based on.
-    pub version: Version,
-}
-
-impl GetStateValueByVersionRequest {
-    /// Constructor.
-    pub fn new(state_key: StateKey, version: Version) -> Self {
-        Self { state_key, version }
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-pub struct SaveTransactionsRequest {
-    pub txns_to_commit: Vec<TransactionToCommit>,
-    pub first_version: Version,
-    pub ledger_info_with_signatures: Option<LedgerInfoWithSignatures>,
-}
-
-impl SaveTransactionsRequest {
-    /// Constructor.
-    pub fn new(
-        txns_to_commit: Vec<TransactionToCommit>,
-        first_version: Version,
-        ledger_info_with_signatures: Option<LedgerInfoWithSignatures>,
-    ) -> Self {
-        SaveTransactionsRequest {
-            txns_to_commit,
-            first_version,
-            ledger_info_with_signatures,
-        }
     }
 }
 
