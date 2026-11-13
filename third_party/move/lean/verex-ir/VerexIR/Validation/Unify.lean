@@ -30,6 +30,16 @@ def resolvedName? (ns : ValidatedNamespace) (nameId : NameId) :
   let namespaceRef ← ns.tables.namespaces[name.namespaceId.index]?
   some (namespaceRef, name.name)
 
+/-- Lifetimes agree by kind, and an inferred one with any: the borrow analysis, not
+typing, relates a body's inferred lifetimes to a signature's. -/
+def lifetimesAgree? (leftNs : ValidatedNamespace) (left : LifetimeId)
+    (rightNs : ValidatedNamespace) (right : LifetimeId) : Bool :=
+  match leftNs.tables.lifetimes[left.index]?, rightNs.tables.lifetimes[right.index]? with
+  | some leftLifetime, some rightLifetime =>
+      leftLifetime.kind == rightLifetime.kind || leftLifetime.kind == .inference ||
+        rightLifetime.kind == .inference
+  | _, _ => false
+
 /-- Fuel-bounded comparison protects semantic preparation even if an invalid
 unit somehow bypasses the structural type-cycle check. -/
 def typeIdsEquivalentFuel : Nat → ValidatedNamespace → TypeId →
@@ -52,6 +62,8 @@ def typeIdsEquivalentFuel : Nat → ValidatedNamespace → TypeId →
   | some (.vector leftElement leftLength), some (.vector rightElement rightLength) =>
       leftLength == rightLength &&
         typeIdsEquivalentFuel fuel leftNs leftElement rightNs rightElement
+  | some (.slice leftElement), some (.slice rightElement) =>
+      typeIdsEquivalentFuel fuel leftNs leftElement rightNs rightElement
   | some (.typeDomain leftType), some (.typeDomain rightType) =>
       typeIdsEquivalentFuel fuel leftNs leftType rightNs rightType
   | some (.resourceDomain leftName leftArguments),
@@ -71,12 +83,7 @@ def typeIdsEquivalentFuel : Nat → ValidatedNamespace → TypeId →
           | (.typeArg left, .typeArg right) =>
               typeIdsEquivalentFuel fuel leftNs left.typeId rightNs right.typeId
           | (.const left, .const right) => left == right
-          | (.lifetime left, .lifetime right) =>
-              match leftNs.tables.lifetimes[left.index]?,
-                  rightNs.tables.lifetimes[right.index]? with
-              | some leftLifetime, some rightLifetime =>
-                  leftLifetime.kind == rightLifetime.kind
-              | _, _ => false
+          | (.lifetime left, .lifetime right) => lifetimesAgree? leftNs left rightNs right
           | (.evidence left, .evidence right) => left == right
           | _ => false
   | some (.function leftArguments leftResult leftAbilities),
@@ -93,10 +100,7 @@ def typeIdsEquivalentFuel : Nat → ValidatedNamespace → TypeId →
         leftReference.kind == rightReference.kind &&
         typeIdsEquivalentFuel fuel leftNs leftReference.referent
           rightNs rightReference.referent &&
-        match leftNs.tables.lifetimes[leftReference.lifetime.index]?,
-            rightNs.tables.lifetimes[rightReference.lifetime.index]? with
-        | some leftLifetime, some rightLifetime => leftLifetime.kind == rightLifetime.kind
-        | _, _ => false
+        lifetimesAgree? leftNs leftReference.lifetime rightNs rightReference.lifetime
   | some (.profile leftValue), some (.profile rightValue) => leftValue == rightValue
   | _, _ => false
 
@@ -105,12 +109,6 @@ def typeIdsEquivalent? (leftNs : ValidatedNamespace) (left : TypeId)
     (rightNs : ValidatedNamespace) (right : TypeId) : Bool :=
   typeIdsEquivalentFuel (leftNs.tables.types.size + rightNs.tables.types.size + 1)
     leftNs left rightNs right
-
-def lifetimeKindsEquivalent? (leftNs : ValidatedNamespace) (left : LifetimeId)
-    (rightNs : ValidatedNamespace) (right : LifetimeId) : Bool :=
-  match leftNs.tables.lifetimes[left.index]?, rightNs.tables.lifetimes[right.index]? with
-  | some leftLifetime, some rightLifetime => leftLifetime.kind == rightLifetime.kind
-  | _, _ => false
 
 def isAnyIntegerType (ns : ValidatedNamespace) (id : TypeId) : Bool :=
   (ns.tables.types[id.index]?).any fun ty => ty matches .integer ..
@@ -132,6 +130,10 @@ def Solution.bound (arguments : Array GenericArgument) : Solution :=
 def Solution.unbound (count : Nat) : Solution :=
   { slots := .replicate count none }
 
+/-- No slots: comparing types of one frame, where a type parameter is itself. -/
+def Solution.rigid : Solution :=
+  { slots := #[] }
+
 /-- The solved instantiation, or `none` while any slot remains open. -/
 def Solution.arguments? (solution : Solution) : Option (Array GenericArgument) :=
   solution.slots.mapM id
@@ -148,13 +150,12 @@ private def bindTypeSlot (sourceNs : ValidatedNamespace) (source : TypeId)
       solution.slots.set! index (some (.typeArg { typeId := source, loc := bindLoc })) }
   | none => none
 
-/-- Bind or confirm a lifetime slot. Lifetimes compare by kind: frontends
-intern distinct inference lifetimes for equal reference spellings. -/
+/-- Bind or confirm a lifetime slot. -/
 private def bindLifetimeSlot (sourceNs : ValidatedNamespace) (source : LifetimeId)
     (index : Nat) (solution : Solution) : Option Solution :=
   match solution.slots[index]? with
   | some (some (.lifetime instantiated)) =>
-      if lifetimeKindsEquivalent? sourceNs source sourceNs instantiated then some solution
+      if lifetimesAgree? sourceNs source sourceNs instantiated then some solution
       else none
   | some (some _) => none
   | some none => some { slots := solution.slots.set! index (some (.lifetime source)) }
@@ -167,7 +168,7 @@ private def matchLifetime (sourceNs : ValidatedNamespace) (source : LifetimeId)
   | some { kind := .parameter index, .. } =>
       bindLifetimeSlot sourceNs source index solution
   | some _ =>
-      if lifetimeKindsEquivalent? sourceNs source targetNs target then some solution
+      if lifetimesAgree? sourceNs source targetNs target then some solution
       else none
   | none => none
 
@@ -181,7 +182,10 @@ def matchTypeFuel : Nat → (sourceNs : ValidatedNamespace) → TypeId →
   | fuel + 1, sourceNs, source, targetNs, target, bindLoc, solution =>
       match targetNs.tables.types[target.index]? with
       | some (.typeParameter index) =>
-          bindTypeSlot sourceNs source bindLoc index solution
+          if solution.slots.isEmpty then
+            if sourceNs.tables.types[source.index]? == some (.typeParameter index)
+              then some solution else none
+          else bindTypeSlot sourceNs source bindLoc index solution
       | targetType => match sourceNs.tables.types[source.index]?, targetType with
           | some .unit, some .unit | some .never, some .never |
               some .bool, some .bool | some .character, some .character |
@@ -201,6 +205,8 @@ def matchTypeFuel : Nat → (sourceNs : ValidatedNamespace) → TypeId →
           | some (.vector sourceElement sourceLength),
               some (.vector targetElement targetLength) =>
               if sourceLength != targetLength then none else
+              matchTypeFuel fuel sourceNs sourceElement targetNs targetElement bindLoc solution
+          | some (.slice sourceElement), some (.slice targetElement) =>
               matchTypeFuel fuel sourceNs sourceElement targetNs targetElement bindLoc solution
           | some (.typeDomain sourceType), some (.typeDomain targetType) =>
               matchTypeFuel fuel sourceNs sourceType targetNs targetType bindLoc solution
@@ -258,6 +264,13 @@ def matchType (sourceNs : ValidatedNamespace) (source : TypeId)
   matchTypeFuel (sourceNs.tables.types.size + targetNs.tables.types.size + 1)
     sourceNs source targetNs target bindLoc solution
 
+/-- The referent behind a type's references. -/
+private def strippedReferences (ns : ValidatedNamespace) : Nat → TypeId → TypeId
+  | 0, type => type
+  | fuel + 1, type => match ns.tables.types[type.index]? with
+      | some (.reference reference) => strippedReferences ns fuel reference.referent
+      | _ => type
+
 /-- Match through the specification projection: references erase on either
 side, and any source integer occupies the unbounded integer domain of any
 declared integer or integer-instantiated parameter. Relaxed arms confirm a
@@ -289,7 +302,10 @@ def specMatchFuel : Nat → (sourceNs : ValidatedNamespace) → (logical : Bool)
                   specMatchFuel fuel sourceNs logical pair.1 targetNs pair.2 bindLoc solution
               specMatchFuel fuel sourceNs logical sourceResult targetNs targetResult bindLoc solution
           -- So is a vector, at the projection of its elements.
-          | some (.vector sourceElement none), some (.vector targetElement none) =>
+          | some (.vector sourceElement none), some (.vector targetElement none)
+          | some (.slice sourceElement), some (.slice targetElement)
+          | some (.slice sourceElement), some (.vector targetElement none)
+          | some (.vector sourceElement none), some (.slice targetElement) =>
               specMatchFuel fuel sourceNs logical sourceElement targetNs targetElement bindLoc
                 solution
           | _, _ => none) <|>
@@ -308,8 +324,10 @@ def specMatchFuel : Nat → (sourceNs : ValidatedNamespace) → (logical : Bool)
           | some (.typeParameter index) =>
               match (solution.slots[index]?).bind id with
               | some (.typeArg use) =>
+                  -- The instantiation is of the source's frame, not the slots'.
                   if use.typeId == source then none else
-                  specMatchFuel fuel sourceNs logical source sourceNs use.typeId bindLoc solution
+                  (specMatchFuel fuel sourceNs logical source sourceNs use.typeId bindLoc
+                    Solution.rigid).map fun _ => solution
               | _ => none
           | _ => none))
 

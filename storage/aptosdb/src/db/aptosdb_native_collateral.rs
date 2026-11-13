@@ -182,7 +182,7 @@ fn ensure_collateral_root_matches_ledger(
     else {
         return Ok(());
     };
-    let latest = store.current_state().lock().latest().clone();
+    let latest = store.current_state().lock().last_checkpoint().clone();
     let local_root = latest.root_hash();
     ensure!(
         local_root == committed_root,

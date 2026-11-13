@@ -12,6 +12,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
@@ -39,7 +40,9 @@ sha2 = { workspace = true }
 # is on 0.9. Both are linked; using the wrong one silently changes the digest.
 sha2_0_10_6 = { workspace = true }
 sha3 = { workspace = true }
+shared-dsa = { workspace = true }
 siphasher = { workspace = true }
+smallvec = { workspace = true }
 tiny-keccak = { workspace = true }
 
 [features]

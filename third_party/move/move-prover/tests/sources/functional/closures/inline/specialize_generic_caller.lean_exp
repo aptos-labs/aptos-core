@@ -9,3 +9,5 @@ warning: cannot derive `folds_of` exactly for this lambda argument: the enclosin
    │         │           │
    │         │           lambda argument
    │         from a call inlined at this callsite
+
+../move-stdlib/sources/vector.move:11:1: info: `count_all` uses concrete verification: Given interpretation does not yet support authored assertion interpretation

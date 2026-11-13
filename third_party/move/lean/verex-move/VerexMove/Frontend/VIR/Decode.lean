@@ -26,9 +26,9 @@ private def requireSome (value : Option α) (message : String) : Except String �
 
 private partial def location (ns : VerexIR.Validation.ValidatedNamespace)
     (id : VerexIR.LocId) (fuel : Nat := 0) : Except String Loc := do
-  let fuel := if fuel == 0 then ns.tables.locations.size + 1 else fuel
+  let fuel := if fuel == 0 then ns.localTables.locations.size + 1 else fuel
   if fuel == 0 then fail s!"cyclic validated location parent chain at {id.index}"
-  let loc ← requireSome ns.tables.locations[id.index]? s!"invalid validated location {id.index}"
+  let loc ← requireSome (ns.location? id) s!"invalid validated location {id.index}"
   if let some range := loc.primary then
     return { file := range.file.index, start := range.startByte, stop := range.endByte }
   if let some parent := loc.parent then
@@ -63,6 +63,7 @@ private partial def ty (ns : VerexIR.Validation.ValidatedNamespace) (id : VerexI
   | .tuple elements => return .tuple (← elements.toList.mapM (ty ns))
   | .vector element none => return .vector (← ty ns element)
   | .vector _ (some _) => fail "fixed-length vector type cannot be projected as Move XAST"
+  | .slice _ => fail "slice type cannot be projected as Move XAST"
   | .range => return .range
   | .eventStore => return .eventStore
   | .typeDomain type => return .typeDomain (← ty ns type)
@@ -96,6 +97,7 @@ private def surfaceSyntax : Option VerexIR.SurfaceSyntax → Except String (Opti
   | none => pure none
   | some .receiverCall => pure (some .receiverCall)
   | some .indexNotation => pure (some .indexNotation)
+  | some .componentMove => fail "a mutable reference moved out of an aggregate has no Move XAST"
   | some (.extension value) =>
       fail s!"surface extension `{value.tag}` cannot be projected as Move XAST"
 
@@ -268,6 +270,8 @@ mutual
           (.call .index [] [base, index] (some .indexNotation)), resultType)
     | .subslice .. =>
         fail "subslice place borrows cannot be projected as Move XAST"
+    | .unsize _ =>
+        fail "unsize place borrows cannot be projected as Move XAST"
     | .downcast .. =>
         fail "enum-downcast place borrows cannot be projected as Move XAST"
 
@@ -406,8 +410,7 @@ mutual
               let operation ← match specification with
                 | .functionCall function range =>
                     let target ← MoveNames.qualifiedRef context.ns.tables function
-                    pure <| Xast.Operation.specFunction target
-                      { pre := range.pre, post := range.post }
+                    pure <| Xast.Operation.specFunction target (Codec.xastMemoryRange range)
                 | specification => Codec.specXastOperation specification
               pure <| Xast.ExpNode.call operation
                 (← genericTypeArguments context.ns instantiations) arguments
@@ -462,7 +465,7 @@ mutual
                 | tag => fail s!"unknown extension quantifier tag `{tag}`"
           let ranges ← binders.toList.mapM fun binder =>
             return .mk (← pattern context binder.pattern) (← expression context binder.domain)
-              binder.label
+              (binder.label.map (·.index))
           pure <| Xast.ExpNode.quant kind ranges (← triggers.toList.mapM fun trigger =>
             trigger.toList.mapM (expression context)) (← condition.mapM (expression context))
             (← expression context body)

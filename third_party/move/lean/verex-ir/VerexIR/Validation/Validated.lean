@@ -77,71 +77,58 @@ inductive Holding where
   | dropped
   deriving Repr, BEq, DecidableEq, Inhabited
 
-/-- Checked backend input namespace whose functions contain only structured
-bodies (or are explicitly absent). `tables` is an immutable cached view of the
-owning compilation-unit table. -/
-structure ValidatedNamespace extends Namespace FunctionBody where
-  tables : Tables
-  /-- The unit's value orders. A cached unit view, as `tables` is. -/
-  orders : ValueOrders := {}
-  /-- The patterns binding the locals validation added to hold mutable
-  references, with how each holds its reference. -/
-  holders : Array (PatternId × Holding) := #[]
+/-- The sizes of a unit's tables. -/
+structure TableSizes where
+  types : Nat := 0
+  names : Nat := 0
+  namespaces : Nat := 0
+  lifetimes : Nat := 0
+  deriving Repr, BEq, DecidableEq, Inhabited
+
+/-- Where a namespace's identifiers are in its unit's tables (θ): the unit
+index of each entry of the namespace's own tables, per semantic kind. An
+identifier θ does not cover is placed past the unit's tables (`beyond`), so
+it names no entry and no other identifier. -/
+structure Links where
+  types : Array Nat := #[]
+  names : Array Nat := #[]
+  namespaces : Array Nat := #[]
+  lifetimes : Array Nat := #[]
+  beyond : TableSizes := {}
   deriving Repr, BEq, Inhabited
 
-private def nameIn (tables : Tables) (id : NameId) : String :=
-  ((tables.names[id.index]?).map (·.name)).getD ""
+/-- The sizes of some tables. -/
+def TableSizes.of (tables : Tables) : TableSizes :=
+  { types := tables.types.size, names := tables.names.size
+    namespaces := tables.namespaces.size, lifetimes := tables.lifetimes.size }
 
-/-- Two qualified function names in the order Move compares function values:
-namespace path, addresses by the number they spell, then the function name. -/
-private def compareQualified (left right : Array String × String) : Ordering :=
-  (List.compareLex compareAddress left.1.toList right.1.toList).then (compare left.2 right.2)
+namespace Links
 
-/-- The value orders of a unit's namespaces. -/
-def valueOrdersOf (tables : Tables) (namespaces : Array (Namespace FunctionBody)) : ValueOrders :=
-  let variants := namespaces.map fun ns => ns.structs.map fun declaration =>
-    declaration.variants.map fun variant => nameIn tables variant.name
-  let keys := namespaces.toList.zipIdx.flatMap fun (ns, namespaceIndex) =>
-    let path := (tables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
-    ns.functions.toList.zipIdx.map fun (function, functionIndex) =>
-      ((path, nameIn tables function.name), namespaceIndex, functionIndex)
-  let sorted := keys.mergeSort fun left right => compareQualified left.1 right.1 != .gt
-  let functions := sorted.zipIdx.foldl (init := namespaces.map (Array.replicate ·.functions.size 0))
-    fun ranks ((_, namespaceIndex, functionIndex), rank) =>
-      ranks.modify namespaceIndex (·.set! functionIndex rank)
-  { variants, functions }
+variable (links : Links)
 
-/-- Checked dependency summary copied into `ValidatedUnit` after unit
-validation. It is intentionally distinct from the frontend-constructible raw
-form so its schema can grow checked indexes and resolved declarations. -/
-structure ValidatedNamespaceInterface where
-  namespaceId : NamespaceId
-  profile : Option Profile := none
-  exportedNames : Array NameId := #[]
-  /-- Checked nominal declarations this dependency exports; see
-  `RawNamespaceInterface.structs`. -/
-  structs : Array StructDecl := #[]
-  /-- Checked function signatures this dependency exports, without bodies. -/
-  functions : Array (FunctionDecl FunctionBody) := #[]
-  /-- Checked specification-function signatures, likewise without bodies. -/
-  specFunctions : Array SpecFunctionDecl := #[]
-  deriving Repr, BEq, Inhabited
+/-- The unit identifier of a type identifier. -/
+def typeId (id : TypeId) : TypeId :=
+  ⟨links.types.getD id.index (links.beyond.types + id.index)⟩
 
-/-- Checked copy of an upstream producer/check/assumption statement. This is
-retained for backend and theorem reporting; `trusted` remains an explicit
-assumption marker and is not upgraded into proof by VIR validation. -/
-structure ValidatedImportEvidence where
-  producer : String
-  description : String
-  trusted : Bool
-  deriving Repr, BEq, Inhabited
+/-- The unit identifier of a name identifier. -/
+def nameId (id : NameId) : NameId :=
+  ⟨links.names.getD id.index (links.beyond.names + id.index)⟩
 
-/-- Derived unit summary created by validation. These counts are the initial
-index surface and can be extended without making frontends construct them. -/
-structure UnitIndexes where
-  namespaceCount : Nat
-  functionCounts : Array Nat
-  deriving Repr, BEq, Inhabited
+/-- The unit identifier of a namespace identifier. -/
+def namespaceId (id : NamespaceId) : NamespaceId :=
+  ⟨links.namespaces.getD id.index (links.beyond.namespaces + id.index)⟩
+
+/-- The unit identifier of a lifetime identifier. -/
+def lifetimeId (id : LifetimeId) : LifetimeId :=
+  ⟨links.lifetimes.getD id.index (links.beyond.lifetimes + id.index)⟩
+
+end Links
+
+/-- The links of a namespace whose body is numbered in its unit's tables. -/
+def Links.identity (tables : Tables) : Links :=
+  { types := Array.range tables.types.size, names := Array.range tables.names.size
+    namespaces := Array.range tables.namespaces.size
+    lifetimes := Array.range tables.lifetimes.size, beyond := .of tables }
 
 /-- How one raw CFG block is represented by the recovered expression tree.
 A block may occur at multiple tree positions when structurization duplicates
@@ -211,16 +198,34 @@ structure ReferenceParameterFact where
   lifetime : LifetimeId
   deriving Repr, BEq, Inhabited
 
+/-- One step of a path into a loaned or holding place. -/
+inductive LoanProjection where
+  | dereference
+  | field (name : NameId)
+  | index (literal : Option Nat)
+  | subslice (start stop : Nat) (fromEnd : Bool)
+  | downcast (variant : NameId)
+  deriving Repr, BEq, Inhabited
+
 /-- One recorded death point of a loan: its write-back must run before
-(`before := true`) or after the anchor expression evaluates. Function-result
-boundaries explicitly record every mutable loan not carried by the returned
-value. A loan may carry several records when its death is branch-dependent;
-ending a loan is conditional and idempotent, so the over-approximation
-is sound. Only a loan carried by a returned reference remains live for frame
-finalization to transfer across the call boundary. -/
+(`before := true`) or after the anchor expression evaluates, and what holds it
+there. Function-result boundaries explicitly record every mutable loan not
+carried by the returned value. A loan may carry several records when its death is
+branch-dependent; ending a loan is conditional and idempotent, so the
+over-approximation is sound. Only a loan carried by a returned reference remains
+live for frame finalization to transfer across the call boundary. -/
 structure LoanDeath where
   anchor : ExprId
   before : Bool := false
+  /-- The locals holding the loan where it dies. A place holding it elsewhere may
+  hold another reference here, whose prophecy this death says nothing about. -/
+  holders : Array LocalId := #[]
+  /-- Where an aggregate holder holds the loan: a local and the path from it to
+  the reference. Empty where a holder is itself a reference. -/
+  holderPaths : Array (LocalId × Array LoanProjection) := #[]
+  /-- The loan goes on through another holder: only these places die, and they resolve
+  what they hold. The run ends no loan here. -/
+  alone : Bool := false
   deriving Repr, BEq, Inhabited
 
 /-- Stable identity and lifetime of a loan site accepted by the borrow
@@ -231,7 +236,6 @@ semantics ends them (`loanDeathsAt`). -/
 structure CheckedLoanFact where
   expression : ExprId
   lifetime : LifetimeId
-  holders : Array LocalId := #[]
   deaths : Array LoanDeath := #[]
   deriving Repr, BEq, Inhabited
 
@@ -253,16 +257,201 @@ structure BorrowCertificate where
   parameters : Array ReferenceParameterFact
   loans : Array CheckedLoanFact
   lifetimeRelations : Array LifetimeRelationFact
+  /-- Reference carriers retired before a write replaces them. Unlike a local
+  loan death, these can name references lent by the caller, without a lexical
+  loan id in this function. The paths identify the old carriers after the
+  right-hand side has run. -/
+  carrierDeaths : Array LoanDeath := #[]
+  /-- Reference parameters checked not to escape, conditional on scoped dictionary requirements. -/
+  receiverNoEscape : Array Nat := #[]
   /-- The body's places that dereference a shared reference, ascending. A
   shared reference is the observed value itself, so the semantics reads
   such a place as its base. -/
   sharedDereferences : Array PlaceId := #[]
+  /-- Whether the body writes, moves or mutably borrows a local that supplies
+  the element index of a place some mutable loan borrows, at a point where
+  the borrow analysis has that loan active.  The semantics reads such an index
+  again where the loan dies, while the reference denotes the element chosen
+  at the borrow, so a function with this fact has no carried denotation
+  (`compileFunctionIn`).  Kept per function rather than as a diagnostic, which
+  would refuse the whole unit. -/
+  writesIndexUnderLoan : Bool := false
   deriving Repr, BEq, Inhabited
 
 /-- A diagnostic of one namespace's function. -/
 structure OwnedDiagnostic where
   namespaceId : NamespaceId
   diagnostic : Diagnostic
+  deriving Repr, BEq, Inhabited
+
+/-- Checked backend input namespace whose functions contain only structured
+bodies (or are explicitly absent). Everything it holds is numbered in its own
+tables (`localTables`): the body, the holders, and the validation results.
+`tables` is an immutable cached view of the owning compilation-unit table,
+whose entries hold unit identifiers; the body's identifiers reach it through
+`links`. Provenance (files, locations, origins, alignments) is read in the
+namespace's own tables only. -/
+structure ValidatedNamespace extends Namespace FunctionBody where
+  tables : Tables
+  links : Links
+  /-- The namespace's own tables. Their semantic entries are what `links`
+  translates from; content is read in `tables` through `links`. -/
+  localTables : Tables
+  /-- The unit's value orders. A cached unit view, as `tables` is. -/
+  orders : ValueOrders := {}
+  /-- The patterns binding the locals validation added to hold mutable
+  references, with how each holds its reference. -/
+  holders : Array (PatternId × Holding) := #[]
+  /-- The structurization witnesses of its functions. -/
+  witnesses : Array StructurizationWitness := #[]
+  initializationCertificates : Array InitializationCertificate := #[]
+  borrowCertificates : Array BorrowCertificate := #[]
+  /-- Diagnostics of its functions the borrow analysis could not certify. The
+  analysis still lacks non-lexical loan death and region solving, so its
+  rejections stay preparation-stage errors instead of failing `validate`. -/
+  borrowRejections : Array OwnedDiagnostic := #[]
+  deriving Repr, BEq, Inhabited
+
+namespace ValidatedNamespace
+
+variable (ns : ValidatedNamespace)
+
+/-- The unit identifier of a type identifier of the body. -/
+def typeId (id : TypeId) : TypeId := ns.links.typeId id
+
+/-- The unit identifier of a name identifier of the body. -/
+def nameId (id : NameId) : NameId := ns.links.nameId id
+
+/-- The unit identifier of a namespace identifier of the body. -/
+def namespaceId (id : NamespaceId) : NamespaceId := ns.links.namespaceId id
+
+/-- The unit identifier of a lifetime identifier of the body. -/
+def lifetimeId (id : LifetimeId) : LifetimeId := ns.links.lifetimeId id
+
+/-- The type a type identifier of the body names, read in the unit's tables. -/
+abbrev typeOf (id : TypeId) : Option Ty := ns.tables.types[(ns.typeId id).index]?
+
+/-- The name a name identifier of the body names, read in the unit's tables. -/
+abbrev nameOf (id : NameId) : Option QualifiedName := ns.tables.names[(ns.nameId id).index]?
+
+/-- The namespace a namespace identifier of the body names. -/
+abbrev namespaceOf (id : NamespaceId) : Option NamespaceRef :=
+  ns.tables.namespaces[(ns.namespaceId id).index]?
+
+/-- A qualified reference of the body, as unit identifiers. -/
+def qualifiedRef (reference : QualifiedRef) : QualifiedRef :=
+  { namespaceId := ns.namespaceId reference.namespaceId, name := ns.nameId reference.name }
+
+/-- A generic argument of the body, its type or lifetime as a unit identifier. -/
+def genericArgument : GenericArgument → GenericArgument
+  | .typeArg value => .typeArg { value with typeId := ns.typeId value.typeId }
+  | .lifetime value => .lifetime (ns.lifetimeId value)
+  | argument => argument
+
+/-- Generic arguments of the body, their types and lifetimes as unit identifiers. -/
+def genericArguments (arguments : Array GenericArgument) : Array GenericArgument :=
+  arguments.map ns.genericArgument
+
+@[simp] theorem size_genericArguments (arguments : Array GenericArgument) :
+    (ns.genericArguments arguments).size = arguments.size := by
+  simp [genericArguments]
+
+theorem getElem?_genericArguments (arguments : Array GenericArgument) (index : Nat) :
+    (ns.genericArguments arguments)[index]? = arguments[index]?.map ns.genericArgument := by
+  simp [genericArguments]
+
+@[simp] theorem genericArguments_typeArg (value : TypeUse) :
+    ns.genericArguments #[.typeArg value] =
+      #[.typeArg { value with typeId := ns.typeId value.typeId }] := by
+  simp [genericArguments, genericArgument]
+
+/-- The namespace's own unit identifier. -/
+abbrev unitIdentity : NamespaceId := ns.namespaceId ns.identity
+
+/-- The loan facts of the borrow certificate of a function. -/
+def loanFacts (functionId : FunctionId) : Array CheckedLoanFact :=
+  -- A list search: the kernel searches an array by reading each element
+  -- through the array's list.
+  ((ns.borrowCertificates.toList.find? fun certificate =>
+    certificate.functionId == functionId).map (·.loans)).getD #[]
+
+/-- Checked receiver slots of a body, conditional on its scoped dictionaries. -/
+def receiverNoEscape (functionId : FunctionId) : Array Nat :=
+  ((ns.borrowCertificates.toList.find? fun certificate =>
+    certificate.functionId == functionId).map (·.receiverNoEscape)).getD #[]
+
+/-- Where a location of the namespace is, in its own tables. -/
+def location? (loc : LocId) : Option Location := ns.localTables.locations[loc.index]?
+
+theorem typeId_of_lt {id : TypeId} (lt : id.index < ns.links.types.size) :
+    ns.typeId id = ⟨ns.links.types[id.index]⟩ := by
+  simp [typeId, Links.typeId, Array.getD, lt]
+
+theorem nameId_of_lt {id : NameId} (lt : id.index < ns.links.names.size) :
+    ns.nameId id = ⟨ns.links.names[id.index]⟩ := by
+  simp [nameId, Links.nameId, Array.getD, lt]
+
+theorem namespaceId_of_lt {id : NamespaceId} (lt : id.index < ns.links.namespaces.size) :
+    ns.namespaceId id = ⟨ns.links.namespaces[id.index]⟩ := by
+  simp [namespaceId, Links.namespaceId, Array.getD, lt]
+
+end ValidatedNamespace
+
+private def nameIn (tables : Tables) (id : NameId) : String :=
+  ((tables.names[id.index]?).map (·.name)).getD ""
+
+/-- Two qualified function names in the order Move compares function values:
+namespace path, addresses by the number they spell, then the function name. -/
+private def compareQualified (left right : Array String × String) : Ordering :=
+  (List.compareLex compareAddress left.1.toList right.1.toList).then (compare left.2 right.2)
+
+/-- The value orders of a unit's namespaces, each in its own tables. -/
+def valueOrdersOf (namespaces : Array (Tables × Namespace FunctionBody)) : ValueOrders :=
+  let variants := namespaces.map fun (tables, ns) => ns.structs.map fun declaration =>
+    declaration.variants.map fun variant => nameIn tables variant.name
+  let keys := namespaces.toList.zipIdx.flatMap fun ((tables, ns), namespaceIndex) =>
+    let path := (tables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
+    ns.functions.toList.zipIdx.map fun (function, functionIndex) =>
+      ((path, nameIn tables function.name), namespaceIndex, functionIndex)
+  let sorted := keys.mergeSort fun left right => compareQualified left.1 right.1 != .gt
+  let functions := sorted.zipIdx.foldl
+      (init := namespaces.map fun (_, ns) => Array.replicate ns.functions.size 0)
+    fun ranks ((_, namespaceIndex, functionIndex), rank) =>
+      ranks.modify namespaceIndex (·.set! functionIndex rank)
+  { variants, functions }
+
+/-- Checked dependency summary copied into `ValidatedUnit` after unit
+validation. It is intentionally distinct from the frontend-constructible raw
+form so its schema can grow checked indexes and resolved declarations. -/
+structure ValidatedNamespaceInterface where
+  namespaceId : NamespaceId
+  profile : Option Profile := none
+  exportedNames : Array NameId := #[]
+  /-- Checked nominal declarations this dependency exports; see
+  `RawNamespaceInterface.structs`. -/
+  structs : Array StructDecl := #[]
+  /-- Checked function signatures this dependency exports, without bodies. -/
+  functions : Array (FunctionDecl FunctionBody) := #[]
+  /-- Checked specification-function signatures, likewise without bodies. -/
+  specFunctions : Array SpecFunctionDecl := #[]
+  /-- Its checked scopes; see `RawNamespaceInterface.scopes`. -/
+  scopes : Array ScopeDecl := #[]
+  deriving Repr, BEq, Inhabited
+
+/-- Checked copy of an upstream producer/check/assumption statement. This is
+retained for backend and theorem reporting; `trusted` remains an explicit
+assumption marker and is not upgraded into proof by VIR validation. -/
+structure ValidatedImportEvidence where
+  producer : String
+  description : String
+  trusted : Bool
+  deriving Repr, BEq, Inhabited
+
+/-- Derived unit summary created by validation. These counts are the initial
+index surface and can be extended without making frontends construct them. -/
+structure UnitIndexes where
+  namespaceCount : Nat
+  functionCounts : Array Nat
   deriving Repr, BEq, Inhabited
 
 /-- Only public backend input. Its constructor is private; the shared checker
@@ -277,44 +466,108 @@ structure ValidatedUnit where
   dependencies : Array ValidatedNamespaceInterface
   evidence : Array ValidatedImportEvidence
   indexes : UnitIndexes
-  structurizationWitnesses : Array StructurizationWitness
   resolution : ResolutionIndex
-  initializationCertificates : Array InitializationCertificate
-  borrowCertificates : Array BorrowCertificate
-  /-- Diagnostics of functions the borrow analysis could not certify, with
-  their namespaces. The analysis still lacks non-lexical loan death and
-  region solving, so its rejections stay preparation-stage errors instead of
-  failing `validate`. -/
-  borrowRejections : Array OwnedDiagnostic
   deriving Repr, BEq, Inhabited
 
+/-- The type at a unit identifier. -/
+def ValidatedUnit.tyAt (unit : ValidatedUnit) (id : TypeId) : Option Ty :=
+  unit.tables.types[id.index]?
+
+/-- The name at a unit identifier. -/
+def ValidatedUnit.nameAt (unit : ValidatedUnit) (id : NameId) : Option QualifiedName :=
+  unit.tables.names[id.index]?
+
+/-- The namespace reference at a unit identifier. -/
+def ValidatedUnit.namespaceAt (unit : ValidatedUnit) (id : NamespaceId) : Option NamespaceRef :=
+  unit.tables.namespaces[id.index]?
+
+namespace ValidatedUnit
+
+variable (unit : ValidatedUnit)
+
+/-- The namespaces' structurization witnesses, each in its namespace's tables. -/
+def structurizationWitnesses : Array StructurizationWitness :=
+  unit.namespaces.flatMap (·.witnesses)
+
+/-- The namespaces' initialization certificates, each in its namespace's tables. -/
+def initializationCertificates : Array InitializationCertificate :=
+  unit.namespaces.flatMap (·.initializationCertificates)
+
+/-- The namespaces' borrow certificates, each in its namespace's tables. -/
+def borrowCertificates : Array BorrowCertificate :=
+  unit.namespaces.flatMap (·.borrowCertificates)
+
+/-- The borrow analysis's rejections, each in its namespace's tables. -/
+def borrowRejections : Array OwnedDiagnostic :=
+  unit.namespaces.flatMap (·.borrowRejections)
+
+/-- The borrow analysis's rejections, with the namespace whose tables
+locate each. -/
+def ownedBorrowDiagnostics : Array (ValidatedNamespace × Diagnostic) :=
+  unit.namespaces.flatMap fun ns => ns.borrowRejections.map (ns, ·.diagnostic)
+
 /-- The borrow analysis's rejections. -/
-def ValidatedUnit.borrowDiagnostics (unit : ValidatedUnit) : Array Diagnostic :=
+def borrowDiagnostics : Array Diagnostic :=
   unit.borrowRejections.map (·.diagnostic)
+
+/-- Whether the links of every namespace are consistent with the unit: past
+its tables is `beyond`, each link table covers its namespace's own table, and
+every link is a unit identifier. -/
+def linksConsistent : Bool :=
+  let sizes := TableSizes.of unit.tables
+  unit.namespaces.all fun ns =>
+    ns.links.beyond == sizes &&
+      ns.links.types.size == ns.localTables.types.size &&
+      ns.links.names.size == ns.localTables.names.size &&
+      ns.links.namespaces.size == ns.localTables.namespaces.size &&
+      ns.links.lifetimes.size == ns.localTables.lifetimes.size &&
+      ns.links.types.all (· < sizes.types) && ns.links.names.all (· < sizes.names) &&
+      ns.links.namespaces.all (· < sizes.namespaces) &&
+      ns.links.lifetimes.all (· < sizes.lifetimes)
+
+end ValidatedUnit
 
 /-- Whether a place of a namespace dereferences a shared reference, as the
 borrow certificate of its function records. -/
 def sharedDereference (unit : ValidatedUnit) (namespaceId : NamespaceId) (place : PlaceId) :
     Bool :=
-  unit.borrowCertificates.any fun certificate =>
-    certificate.namespaceId == namespaceId && certificate.sharedDereferences.contains place
+  (unit.namespaces[namespaceId.index]?).any fun ns =>
+    ns.borrowCertificates.any (·.sharedDereferences.contains place)
+
+/-- Whether a place goes through a dereference the certificate records as shared:
+what it reads of a mutable reference is what that refers to. -/
+def placeThroughShared (unit : ValidatedUnit) (ns : ValidatedNamespace) : Nat → PlaceId → Bool
+  | 0, _ => false
+  | fuel + 1, place =>
+      match ns.places[place.index]? with
+      | some (.deref base) =>
+          sharedDereference unit ns.unitIdentity place || placeThroughShared unit ns fuel base
+      | some (.field base _ _) | some (.ghostField base _ _) | some (.index base _)
+      | some (.subslice base ..) | some (.unsize base) | some (.downcast base _) =>
+          placeThroughShared unit ns fuel base
+      | some (.localVar _) | none => false
 
 namespace Internal
 
 /-- Package-internal constructor used by the shared checker. Frontends and
-backends must not import or call this namespace. -/
+backends must not import or call this namespace. Every namespace views the
+unit's tables, and its links place what they do not cover past them. -/
 def mkValidatedUnit (tables : Tables) (profiles : Array ProfileConfig)
     (namespaces : Array ValidatedNamespace)
     (dependencies : Array ValidatedNamespaceInterface)
     (evidence : Array ValidatedImportEvidence)
     (indexes : UnitIndexes)
-    (structurizationWitnesses : Array StructurizationWitness)
-    (resolution : ResolutionIndex)
-    (initializationCertificates : Array InitializationCertificate := #[])
-    (borrowCertificates : Array BorrowCertificate := #[])
-    (borrowRejections : Array OwnedDiagnostic := #[]) : ValidatedUnit :=
-  .mk tables profiles namespaces dependencies evidence indexes structurizationWitnesses
-    resolution initializationCertificates borrowCertificates borrowRejections
+    (resolution : ResolutionIndex) : ValidatedUnit :=
+  .mk tables profiles
+    (namespaces.map fun ns => { ns with tables, links := { ns.links with beyond := .of tables } })
+    dependencies evidence indexes resolution
+
+/-- A view of a unit with its namespaces replaced as given, each keeping the
+tables it views (`ValidatedUnit.inUnitIds`). -/
+def withNamespaces (unit : ValidatedUnit) (namespaces : Array ValidatedNamespace) :
+    ValidatedUnit :=
+  .mk unit.tables unit.profiles namespaces unit.dependencies unit.evidence unit.indexes
+    unit.resolution
 
 end Internal
 

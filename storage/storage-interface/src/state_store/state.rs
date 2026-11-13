@@ -498,39 +498,25 @@ impl State {
     }
 }
 
-/// At a given version, the state and the last checkpoint state at or before the version.
+/// The state at the last checkpoint, which is where the ledger ends, as only whole blocks are
+/// committed.
 #[derive(Clone, Debug, Deref)]
 pub struct LedgerState {
-    last_checkpoint: State,
     #[deref]
-    latest: State,
+    last_checkpoint: State,
 }
 
 impl LedgerState {
-    pub fn new(latest: State, last_checkpoint: State) -> Self {
-        assert!(latest.is_descendant_of(&last_checkpoint));
-
-        Self {
-            latest,
-            last_checkpoint,
-        }
+    pub fn new(last_checkpoint: State) -> Self {
+        Self { last_checkpoint }
     }
 
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
-        let state = State::new_empty(hot_state_config);
-        Self::new(state.clone(), state)
-    }
-
-    pub fn latest(&self) -> &State {
-        &self.latest
+        Self::new(State::new_empty(hot_state_config))
     }
 
     pub fn last_checkpoint(&self) -> &State {
         &self.last_checkpoint
-    }
-
-    pub fn is_checkpoint(&self) -> bool {
-        self.latest.is_the_same(&self.last_checkpoint)
     }
 
     /// In the execution pipeline, at the time of state update, the reads during execution
@@ -546,14 +532,11 @@ impl LedgerState {
 
         let mut all_hot_state_updates = HotStateUpdates::new_empty();
         let last_checkpoint = if let Some(batched) = updates.for_last_checkpoint_batched() {
-            let per_version = updates
-                .for_last_checkpoint_per_version()
-                .expect("Both per-version and batched updates should exist.");
-            let (new_ckpt, hot_state_updates) = self.latest().update(
-                Arc::clone(&persisted_hot_view),
+            let (new_ckpt, hot_state_updates) = self.last_checkpoint.update(
+                persisted_hot_view,
                 persisted_snapshot,
                 batched,
-                per_version,
+                &updates.per_version,
                 updates.all_checkpoint_versions(),
                 reads,
             )?;
@@ -563,33 +546,7 @@ impl LedgerState {
             self.last_checkpoint.clone()
         };
 
-        let base_of_latest = if updates.for_last_checkpoint_batched().is_none() {
-            self.latest()
-        } else {
-            &last_checkpoint
-        };
-        let latest = if let Some(batched) = updates.for_latest_batched() {
-            let per_version = updates
-                .for_latest_per_version()
-                .expect("Both per-version and batched updates should exist.");
-            let (new_latest, hot_state_updates) = base_of_latest.update(
-                persisted_hot_view,
-                persisted_snapshot,
-                batched,
-                per_version,
-                &[],
-                reads,
-            )?;
-            all_hot_state_updates.for_latest = Some(hot_state_updates);
-            new_latest
-        } else {
-            base_of_latest.clone()
-        };
-
-        Ok((
-            LedgerState::new(latest, last_checkpoint),
-            all_hot_state_updates,
-        ))
+        Ok((LedgerState::new(last_checkpoint), all_hot_state_updates))
     }
 
     /// Old values of the updated keys are read from the DbReader at the version of the
@@ -606,7 +563,7 @@ impl LedgerState {
             reader,
             Arc::clone(&hot_state),
             persisted_snapshot.clone(),
-            self.latest().clone(),
+            self.last_checkpoint.clone(),
         );
         state_view.prime_cache(updates, PrimingPolicy::All)?;
 
@@ -621,8 +578,7 @@ impl LedgerState {
     }
 
     pub fn is_the_same(&self, other: &Self) -> bool {
-        self.latest.is_the_same(&other.latest)
-            && self.last_checkpoint.is_the_same(&other.last_checkpoint)
+        self.last_checkpoint.is_the_same(&other.last_checkpoint)
     }
 }
 
@@ -1156,22 +1112,9 @@ mod tests {
     }
 
     #[test]
-    fn test_ledger_state_empty_is_checkpoint() {
+    fn test_ledger_state_empty() {
         let ls = LedgerState::new_empty(TEST_CONFIG);
-        assert!(ls.is_checkpoint());
-        assert_eq!(ls.latest().next_version(), 0);
         assert_eq!(ls.last_checkpoint().next_version(), 0);
-    }
-
-    #[test]
-    fn test_ledger_state_non_checkpoint() {
-        let s0 = State::new_empty(TEST_CONFIG);
-        let s1 = empty_descendant(&s0, &s0, 0);
-        let ls = LedgerState::new(s1.clone(), s0.clone());
-
-        assert!(!ls.is_checkpoint());
-        assert!(ls.latest().is_the_same(&s1));
-        assert!(ls.last_checkpoint().is_the_same(&s0));
     }
 
     // ===== on-chain config changes =====
@@ -1186,6 +1129,7 @@ mod tests {
             max_bytes_per_shard: vec![max_bytes; NUM_STATE_SHARDS],
             refresh_interval_versions,
             max_promotion_bytes_per_block: 0,
+            defer_cold_writes_to_eviction: false,
         });
         let bytes = bcs::to_bytes(&bcs::to_bytes(&config).unwrap()).unwrap();
         BaseStateOp::Creation(StateValue::new_legacy(bytes.into()))
@@ -1311,16 +1255,19 @@ mod tests {
             creations(&keys[32..]),
         ];
 
-        // All in one batch, like replaying write sets on restart.
-        let (one_batch, _) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 2]);
-        // Split between the change and the next checkpoint.
-        let (first, _) = apply_write_sets(&empty, &empty, &write_sets[..2], vec![0]);
-        let (two_batches, _) = apply_write_sets(&empty, &first, &write_sets[2..], vec![0]);
+        // Blocks [v0], [v1, v2] and [v3]. All in one batch, like replaying write sets on restart.
+        let (one_batch, _) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 2, 3]);
+        let a = one_batch.last_checkpoint();
+        // Split right before the change, and right after it so it carries over to the next batch.
+        for (split_at, first_checkpoints, second_checkpoints) in
+            [(1, vec![0], vec![1, 2]), (3, vec![0, 2], vec![0])]
+        {
+            let (first, _) =
+                apply_write_sets(&empty, &empty, &write_sets[..split_at], first_checkpoints);
+            let (two_batches, _) =
+                apply_write_sets(&empty, &first, &write_sets[split_at..], second_checkpoints);
 
-        for (a, b) in [
-            (one_batch.last_checkpoint(), two_batches.last_checkpoint()),
-            (one_batch.latest(), two_batches.latest()),
-        ] {
+            let b = two_batches.last_checkpoint();
             assert_eq!(a.hot_state_config, b.hot_state_config);
             for shard_id in 0..NUM_STATE_SHARDS {
                 assert_eq!(a.num_hot_items(shard_id), b.num_hot_items(shard_id));

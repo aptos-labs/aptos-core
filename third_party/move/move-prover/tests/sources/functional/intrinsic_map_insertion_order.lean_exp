@@ -7,6 +7,14 @@ tests/sources/functional/intrinsic_map_insertion_order.move:56:5: error: verex v
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/intrinsic_map_insertion_order.move:67:9: error: the specification clause `ensures result` is not established
+tests/sources/functional/intrinsic_map_insertion_order.move:65:5: error: verex verification failed: the automatic verification of `self_equal` failed; provide a proof in `tests/sources/functional/intrinsic_map_insertion_order.proof.lean`:
+  verify self_equal by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/intrinsic_map_insertion_order.move:84:9: error: the specification clause `ensures false` is not established
 tests/sources/functional/intrinsic_map_insertion_order.move:83:5: error: verex verification failed: the automatic verification of `canary` failed; provide a proof in `tests/sources/functional/intrinsic_map_insertion_order.proof.lean`:
   verify canary by lean =>

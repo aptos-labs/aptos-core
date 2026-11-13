@@ -46,7 +46,7 @@ open Lean VerexIR VerexIR.Proofs VerexIR.Proofs.Denote in
 run_cmd do
   let some unit := VerexSL.registeredUnit? (← getEnv) `«0x99».generic_resources
     | throwError "missing generic resource fixture"
-  unless resourcesTypedCheck unit do throwError "runtime resource typing failed"
+  unless resourcesTypedCheck unit (typesAgreeCheck unit) do throwError "runtime resource typing failed"
   let mut openTemplates := 0
   let mut closedKeys := 0
   for n in [:unit.namespaces.size] do

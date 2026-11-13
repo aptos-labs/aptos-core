@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexSL.Registry
+import VerexSL.Reserved
 import VerexIR.Proofs.Typed
 import VerexIR.Proofs.Denote.Attr
 
@@ -43,7 +44,7 @@ inductive FieldRep where
   /-- A nested twin, by its generated Lean name. -/
   | nominal (twin : Name) (arguments : Array FieldRep)
   /-- The hidden contents field of a table owner: its entries, each a key and
-  a value (`doc/designs/intrinsic-maps.md`, "Owned Table values"). -/
+  a value (`doc/designs/intrinsic-maps.md`, "Tables in the runtime semantics"). -/
   | table (key value : FieldRep)
   /-- A ghost field's slot: a value of its type (`doc/designs/ghost-fields.md`). -/
   | ghost (slot : FieldRep)
@@ -92,8 +93,9 @@ private def structOf? (unit : ValidatedUnit) (qualified : QualifiedName) :
     Option (Nat × Nat × VerexIR.StructDecl) := do
   let ns ← unit.namespaces[qualified.namespaceId.index]?
   ns.structs.zipIdx.findSome? fun (declaration, index) =>
-    if nameOf? unit declaration.name == some qualified then
-      some (qualified.namespaceId.index, index, declaration)
+    if nameOf? unit (ns.nameId declaration.name) == some qualified then
+      -- The declaration in the unit's numbering.
+      some (qualified.namespaceId.index, index, ns.relocate declaration)
     else none
 
 /-- The representation of one field type, if supported.  Nominal fields name
@@ -112,7 +114,7 @@ private partial def fieldRep? (unit : ValidatedUnit) (twinName : QualifiedName �
   | .signer => some .signer
   | .bytes => some .bytes
   | .unit => some .unit
-  | .vector element _ =>
+  | .vector element _ | .slice element =>
       some (.vector (← fieldRep? unit twinName supported element profile) (profile == some .move))
   | .typeParameter index => some (.parameter index)
   | .nominal name arguments => do
@@ -141,14 +143,25 @@ private partial def structSupported (unit : ValidatedUnit)
             (structSupported unit · (qualified :: visiting))
             type.typeId (unit.namespaces[namespaceIndex]?.bind (·.profile))).isSome
 
+/-- A declaration's name within its namespace: after the scopes it is in. -/
+def scopedSpelling (qualified : QualifiedName) : String :=
+  "::".intercalate (qualified.scope.push qualified.name).toList
+
+/-- A declaration's path within its namespace as VerexSL source spells it, each
+segment escaped where it must be. -/
+def scopedSource (qualified : QualifiedName) : String :=
+  "::".intercalate ((qualified.scope.push qualified.name).map fun segment =>
+    (Lean.Name.mkSimple segment).toStringWithToken (isToken := isReservedWord)).toList
+
 /-- The generated Lean name of a struct's twin under the registered path:
 its simple name, or, when the unit declares several structs of that name in
-different modules, its module's path and name. -/
+different modules or scopes, their path and its name. -/
 def twinName (segments : Array String) (unit : ValidatedUnit) (ambiguous : String → Bool)
     (qualified : QualifiedName) : Name :=
   let base := segments.foldl (fun name segment => Name.str name segment) .anonymous
   let owner := if ambiguous qualified.name then
-      ((unit.tables.namespaces[qualified.namespaceId.index]?).map (·.segments)).getD #[]
+      ((unit.tables.namespaces[qualified.namespaceId.index]?).map (·.segments)).getD #[] ++
+        qualified.scope
     else #[]
   Name.str (owner.foldl (fun name segment => Name.str name segment) base) qualified.name
 
@@ -161,7 +174,7 @@ def twinInfos (segments : Array String) (unit : ValidatedUnit) :
   let mut pending : Array QualifiedName := #[]
   for ns in unit.namespaces do
     for declaration in ns.structs do
-      if let some qualified := nameOf? unit declaration.name then
+      if let some qualified := nameOf? unit (ns.nameId declaration.name) then
         if structSupported unit qualified then
           pending := pending.push qualified
   let ambiguous := fun (name : String) => (pending.filter (·.name == name)).size > 1
@@ -858,5 +871,28 @@ def ensureSpecTypes (segments : Array String) (unit : ValidatedUnit) :
   for info in twins do
     emitTwin info
   return twins
+
+/-- Whether an identifier may name a twin, or one of its declarations: some
+trailing part of the twin's name, its simple name at least, begins the
+identifier. A conservative syntactic test: it may hold of an identifier that
+resolves elsewhere, never fails for one that resolves to a twin. -/
+private def mayName (twin : Name) (identifier : Name) : Bool :=
+  let twinComponents := twin.components
+  let components := (identifier.replacePrefix rootNamespace .anonymous).components
+  (List.range twinComponents.length).any fun dropped =>
+    (twinComponents.drop dropped).isPrefixOf components
+
+/-- Ensure the twins of a registered unit exist where an authored proof
+names one. Twins are display artifacts: verification never reads them, so
+they are built only where asked for (`#verex_unit`, or an authored proof or
+theorem naming one). -/
+def ensureNamedTwins (segments : Array String) (unit : ValidatedUnit) (authored : Syntax) :
+    CommandElabM Unit := do
+  let twins := twinInfos segments unit
+  let named := (authored.find? fun node =>
+    node.isIdent && twins.any (mayName ·.twin node.getId)).isSome
+  if named then
+    for info in twins do
+      emitTwin info
 
 end VerexSL.SpecTypes

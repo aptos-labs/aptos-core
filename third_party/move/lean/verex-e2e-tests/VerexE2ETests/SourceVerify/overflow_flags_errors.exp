@@ -1,0 +1,25 @@
+VerexE2ETests/SourceVerify/overflow_flags_errors.spec.lean:7:3: error: the specification clause `ensures result == (a + b >= 255)` is not established
+VerexE2ETests/SourceVerify/overflow_flags_errors.spec.lean:6:6: error: verex verification failed: the automatic verification of `add_flag` failed; provide a proof in the module:
+  verify add_flag by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/overflow_flags_errors.spec.lean:10:3: error: the specification clause `ensures result == (a + b > 127)` is not established
+VerexE2ETests/SourceVerify/overflow_flags_errors.spec.lean:9:6: error: verex verification failed: the automatic verification of `signed_add_flag` failed; provide a proof in the module:
+  verify signed_add_flag by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/overflow_flags_errors.spec.lean:12:1: error: `no panic when aborts at abort 1` is not established: the panic `std::process::abort()` at VerexE2ETests/SourceVerify/overflow_flags_errors.rs:13:9 may panic
+  from: ¬(0 ≤ a.val + b.val ∧ a.val + b.val ≤ 255)
+VerexE2ETests/SourceVerify/overflow_flags_errors.spec.lean:12:6: error: verex verification failed: the automatic verification of `unguarded` failed; provide a proof in the module:
+  verify unguarded by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -1,0 +1,52 @@
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:6:3: error: the specification clause `ensures result == n` is not established
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `count_inclusive` failed; provide a proof in the module:
+  verify count_inclusive by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:15:15: error: the loop invariant `iter.end == 255 && n <= 255 && !iter.exhausted` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:16:15: error: the loop invariant `total == iter.start - n` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:17:15: error: the loop invariant `n <= iter.start` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:12:6: error: verex verification failed: the automatic verification of `count_to_max` failed; provide a proof in the module:
+  verify count_to_max by lean =>
+    verex_obligations
+    verex_on
+    | invariant_1_step => verex_prepare; sorry
+    | invariant_2_step => verex_prepare; sorry
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:21:3: error: the specification clause `ensures result == (n + 1) * 1000` is not established
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:19:6: error: verex verification failed: the automatic verification of `sum_inclusive` failed; provide a proof in the module:
+  verify sum_inclusive by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:28:3: error: the specification clause `ensures result + 1 == b` is not established
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:26:6: error: verex verification failed: the automatic verification of `last_inclusive` failed; provide a proof in the module:
+  verify last_inclusive by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:36:3: error: the specification clause `ensures result == (a >= b)` is not established
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:35:6: error: verex verification failed: the automatic verification of `empty_inclusive` failed; provide a proof in the module:
+  verify empty_inclusive by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:39:3: error: the specification clause `ensures result == a` is not established
+VerexE2ETests/SourceVerify/library_range_inclusive_errors.spec.lean:38:6: error: verex verification failed: the automatic verification of `first_inclusive` failed; provide a proof in the module:
+  verify first_inclusive by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

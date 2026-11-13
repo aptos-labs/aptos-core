@@ -2,6 +2,22 @@
 
 Recalibration history, newest first. Each entry lists the tests whose calibrated value drifted out of band, as a signed `inner tps % change` (negative means slower); new tests show `new`.
 
+## 2026-11-11
+
+| transaction_type | module_working_set | executor | runs | inner tps % change |
+| --- | --- | --- | --- | --- |
+| smart-table-picture30-k-with200-change | 1 | VM | 13 | +9.0% |
+| order-book-no-matches50-markets | 1 | VM | 13 | +59.5% |
+| order-book-balanced-matches25-pct50-markets | 1 | VM | 13 | +60.1% |
+| order-book-balanced-matches80-pct50-markets | 1 | VM | 13 | +54.9% |
+| order-book-balanced-size-skewed80-pct50-markets | 1 | VM | 13 | +52.4% |
+
+## 2026-11-10
+
+| transaction_type | module_working_set | executor | runs | inner tps % change |
+| --- | --- | --- | --- | --- |
+| smart-table-picture30-k-with200-change | 1 | VM | 5 | -8.6% |
+
 ## 2026-11-04
 
 | transaction_type | module_working_set | executor | runs | inner tps % change |

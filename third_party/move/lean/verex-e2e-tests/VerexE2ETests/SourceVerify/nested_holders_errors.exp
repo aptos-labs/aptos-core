@@ -1,0 +1,72 @@
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:11:3: error: the specification clause `ensures result.x == 2` is not established
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `ret_destruct_false` failed; provide a proof in the module:
+  verify ret_destruct_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:17:3: error: the specification clause `ensures result.x == 1` is not established
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `ret_swap_false` failed; provide a proof in the module:
+  verify ret_swap_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:24:3: error: the specification clause `ensures result.x == 1` is not established
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:23:6: error: verex verification failed: the automatic verification of `ret_cond_swap_false` failed; provide a proof in the module:
+  verify ret_cond_swap_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:30:3: error: the specification clause `ensures result.y == b` is not established
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:29:6: error: verex verification failed: the automatic verification of `ret_write_first_false` failed; provide a proof in the module:
+  verify ret_write_first_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:36:3: error: the specification clause `ensures result.x == a` is not established
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:35:6: error: verex verification failed: the automatic verification of `ret_mixed_false` failed; provide a proof in the module:
+  verify ret_mixed_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:42:3: error: the specification clause `ensures result == old(h).r + 1` is not established
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:41:6: error: verex verification failed: the automatic verification of `take_false` failed; provide a proof in the module:
+  verify take_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:48:3: error: the specification clause `ensures result == old(it).r + 1` is not established
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:47:6: error: verex verification failed: the automatic verification of `field_ref_false` failed; provide a proof in the module:
+  verify field_ref_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:54:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:53:6: error: verex verification failed: the automatic verification of `tup_take_false` failed; provide a proof in the module:
+  verify tup_take_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:63:3: error: the specification clause `ensures selected != old(replacement)` is not established
+VerexE2ETests/SourceVerify/nested_holders_errors.spec.lean:61:6: error: verex verification failed: the automatic verification of `replace_nested_false` failed; provide a proof in the module:
+  verify replace_nested_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

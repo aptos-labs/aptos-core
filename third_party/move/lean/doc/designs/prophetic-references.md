@@ -133,11 +133,40 @@ value, universally quantified in the rule:
   into a call's parameter or another local is a reborrow of that local, or
   a move where the copy is the local's last use
   (`normalizeReferenceCopies`), so one loan rests in one holder.
+- **References in aggregates**: an aggregate holds a borrow as a local does,
+  and a loan's holder is a local and a path, recorded per death
+  (`LoanDeath.holderPaths`): what the place holds at that death.
+  A mutable reference moved out of an aggregate is a reborrow through it
+  (`reborrowMovedComponents`): the component's current value is the new
+  reference's prophecy, and its death states what the lender is owed. A move an
+  overwrite follows on every path is a transfer instead: the run clears the
+  component and the term leaves `(π, π)` (`Term.takeAt`). A write of a place ends
+  the loans it destroys a carrier of, while the place still holds them, and a
+  write of a reference is shallow: a loan reborrowed through it no longer goes
+  through the place. A place dead while its loan goes on through another holder
+  dies alone (`LoanDeath.alone`): the term resolves it and the run reconciles what
+  it holds with its lender. A move of a value holding a reference out of an
+  aggregate and an overwrite through a reference or of a reference the caller
+  lends are rejected.
+- **Declared lifetimes**: a Rust signature keeps its regions, a body's stay
+  inferred. A caller reads from them which loans a result holds: a loan rests at
+  a result's position when a region of the parameter it is passed at outlives the
+  position's, by a bound the signature's types imply. An elided lifetime, a region
+  in a type argument, and an early-bound lifetime, which export erases, relate to all,
+  since the unit does not see what relates them.
+  This narrows what a result holds, which is the unsound direction, so the analysis
+  checks a body against the same rule (`resultRegionDiagnostics`): rustc does not
+  guard VerexSL, and a body whose result holds another parameter's loan is rejected.
+- **Shared views**: a shared borrow yields `value.observe`, each mutable reference as
+  its current value and no loan among it, so a callee's frame exports nothing. The
+  denotation reads `&T` as `NTy.erase T`. Nothing under a shared dereference is lent or
+  written, and every dereference under one is shared.
 - **Globals**: `borrow_global_mut` leaves the prophecy (relationally) or
-  the hole (executably) in the global slot. `RuntimeState.storageLoans`
-  records the storage key of a live global loan and rekeys it from an
-  outer loan to a returned reborrow. The key registry is write-back
-  metadata, not part of the reference value.
+  the hole (executably) in the global slot. `RuntimeState.globalLoans`
+  records the `GlobalKey` of a live global loan; when write-back
+  installs a value carrying a returned reborrow's hole, the entry moves
+  from the outer loan to that reborrow (`transferGlobalLoan`). The key
+  registry is write-back metadata, not part of the reference value.
 
 ### 2.3 Executable erasure
 
@@ -159,8 +188,13 @@ Validation runs the borrow analysis once and retains `BorrowCertificate`
 2. **Deaths.** Loan death is lexical; the analysis records, per accepted
    loan, its death points as it releases the loan: after an anchor
    expression completes, or before one begins (`CheckedLoanFact.deaths`),
-   at ordinary fallthrough and at explicit return and throw exits. The
-   semantics ends the recorded loans at their anchors (`loanDeathsAt`):
+   at ordinary fallthrough and at explicit return and throw exits. A loan
+   dies once no holder is read along the continuation, a loop's next
+   iteration included; an overwrite skipped by a `break` or `continue` does
+   not count, and an anchor runs on every path into it. A death over a place
+   still read assumes an equation the next write breaks, so
+   `VIR-SEMANTIC-LOAN-DEATH` checks each death against the merged state at
+   its anchor and refuses the unit. The semantics ends the recorded loans at their anchors (`loanDeathsAt`):
    `EvalExprWith` settles the loans dying before a node, evaluates the node
    (`EvalNodeWith`, which a loop repeats), and settles the loans dying
    after it once it produced a value; compilation wraps the node's term the
@@ -190,6 +224,18 @@ A contract names each dying loan's final value through the pending
 exports (`final.pending = initial.pending.push (loan, final_value)`), and
 a caller resolves its holes by `applyPending` at the call boundary.
 
+A loan's death certifies before it relates. Where the referent's type carries
+a data invariant, `Lender.resolve` (`VerexIR/Proofs/Denote/Term.lean`) first
+owes the invariants of the value the loan leaves — the current itself where no
+local lends it, the owner rebuilt with that current where a local does — and
+only then assumes the prophecy equation. The order is load-bearing: a run that
+breaks the invariant is undefined before an equation could prune it, so the
+obligation lands in the function that broke it, and a run that aborts first
+leaves an unobservable well-formed prophecy in the owner. A holder that several
+loans may have come from owes one obligation per distinct lender and states one
+equation beside them, since no single lender may constrain the owner
+([`data-invariants.md`](data-invariants.md), "A borrowed path").
+
 The hole-visibility scans (`holeWithin`, `holeInFrame`, `holeInGlobals`)
 are guarded by their predicates (`fillVisibleHole`), so a refuted
 predicate decides a branch without the scan computing on a symbolic
@@ -202,8 +248,8 @@ search.
 
 The reference-vocabulary typing lemmas: dereference inversion
 (`borrow_current_typed`), borrow introduction (`borrow_value_typed`),
-freeze (`freeze_typed`), and hole writes preserving frame and state
-typing (`typedFrame_set_loanHole`, `typedState_set_loanHole`); the shared
+freeze (`freeze_typed`), and hole writes preserving frame typing
+(`typedFrame_set_loanHole`); the shared
 transparency rule has introduction and inversion lemmas. Walker-level
 preservation of write-back and mutation through a live borrow is not
 stated: a hole types at every type, so only a loan-typing environment

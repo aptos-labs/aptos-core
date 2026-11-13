@@ -1,0 +1,41 @@
+VerexE2ETests/Check/Control/PartialAbortsErrors.lean:13:2: error: `no abort when aborts at op 1` is not established: the operation `value + 1` at VerexE2ETests/Check/Control/PartialAbortsErrors.lean:13:44 may abort
+  from: ¬(0 ≤ value.val + 1 ∧ value.val + 1 ≤ 18446744073709551615)
+VerexE2ETests/Check/Control/PartialAbortsErrors.lean:30:7: error: verex verification failed: the automatic verification of `strict` failed; provide a proof in the module:
+  verify strict by lean =>
+    verex_obligations
+    verex_on
+    | no_abort when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Control/PartialAbortsErrors.lean:18:4: error: the specification clause `ensures result == value + 1` is not established
+VerexE2ETests/Check/Control/PartialAbortsErrors.lean:31:7: error: verex verification failed: the automatic verification of `wrong_result` failed; provide a proof in the module:
+  verify wrong_result by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Control/PartialAbortsErrors.lean:32:7: error: verification failed with a residual obligation:
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+snd✝ : VerexIR.Proofs.Denote.HList VerexIR.Proofs.Denote.NRow.nil
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+⊢ ¬value.val = 0
+VerexE2ETests/Check/Control/PartialAbortsErrors.lean:32:7: error: verex verification failed: the automatic verification of `missing_abort` failed; provide a proof in the module:
+  verify missing_abort by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Control/PartialAbortsErrors.lean:28:4: error: the specification clause `aborts_with 7` is not established
+VerexE2ETests/Check/Control/PartialAbortsErrors.lean:33:7: error: verex verification failed: the automatic verification of `wrong_code` failed; provide a proof in the module:
+  verify wrong_code by lean =>
+    verex_obligations
+    verex_on
+    | aborts_with_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

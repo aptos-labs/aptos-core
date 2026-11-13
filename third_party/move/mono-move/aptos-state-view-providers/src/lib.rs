@@ -15,7 +15,6 @@ use anyhow::{anyhow, Result};
 use aptos_framework::natives::code::PackageRegistry;
 use aptos_types::state_store::{state_key::StateKey, StateView};
 use bytes::Bytes;
-use fxhash::FxHashMap;
 use mono_move_aptos_transaction_executor::{decode_group_members, AptosDataProvider, GroupMembers};
 use mono_move_core::{
     nominal_tag,
@@ -36,6 +35,7 @@ use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, move_resource::MoveStructType,
 };
+use shared_dsa::UnorderedMap;
 use std::{cell::RefCell, ptr::NonNull};
 use thiserror::Error;
 
@@ -161,12 +161,12 @@ struct ProviderState {
     /// to a different slot across executions that reuse this provider. Keying by
     /// the pair keeps a `#[resource_group_member]` add or remove between
     /// executions from serving the other placement's value.
-    values: FxHashMap<(InMemoryStorageKey, Option<InternedType>), StorageRead>,
+    values: UnorderedMap<(InMemoryStorageKey, Option<InternedType>), StorageRead>,
     /// Members of each resource group read so far, keyed by the group's state key.
     ///
     /// Here it is safe to use a non-cryptographic hasher because `StateKey` already
     /// gets hashed by its crypto digest.
-    groups: FxHashMap<StateKey, Option<GroupMembers>>,
+    groups: UnorderedMap<StateKey, Option<GroupMembers>>,
 }
 
 impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
@@ -186,8 +186,8 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
             inner: RefCell::new(ProviderState {
                 #[allow(clippy::arc_with_non_send_sync)]
                 arena: std::sync::Arc::new(SharedArena::new(arena_size)),
-                values: FxHashMap::default(),
-                groups: FxHashMap::default(),
+                values: UnorderedMap::new(),
+                groups: UnorderedMap::new(),
             }),
         }
     }

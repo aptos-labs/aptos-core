@@ -65,6 +65,7 @@ module aptos_framework::hot_state_config {
         max_bytes_per_shard: vector<u64>,
         refresh_interval_versions: u64,
         max_promotion_bytes_per_block: u64,
+        defer_cold_writes_to_eviction: bool,
     }
 
     #[test_only]
@@ -78,6 +79,7 @@ module aptos_framework::hot_state_config {
             max_bytes_per_shard: std::vector::range(0, num_shards).map(|_| 1000),
             refresh_interval_versions: 100,
             max_promotion_bytes_per_block: 10,
+            defer_cold_writes_to_eviction: false,
         }));
         config
     }

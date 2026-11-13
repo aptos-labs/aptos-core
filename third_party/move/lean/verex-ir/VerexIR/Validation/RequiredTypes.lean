@@ -57,6 +57,10 @@ private def internInstantiated (lifetimes : Array Lifetime)
           let (types, element) ← internInstantiated lifetimes instantiations fuel types element
           let node := Ty.vector element length
           pure (internType types node (· == node))
+      | .slice element => do
+          let (types, element) ← internInstantiated lifetimes instantiations fuel types element
+          let node := Ty.slice element
+          pure (internType types node (· == node))
       | .typeDomain nested => do
           let (types, nested) ← internInstantiated lifetimes instantiations fuel types nested
           let node := Ty.typeDomain nested
@@ -128,8 +132,9 @@ def ValidatedUnit.internRequiredTypes (unit : ValidatedUnit) : ValidatedUnit := 
       break
   if !closed || types.size == unit.tables.types.size then return unit
   let tables := { unit.tables with types }
-  Internal.mkValidatedUnit tables unit.profiles (unit.namespaces.map ({ · with tables }))
-    unit.dependencies unit.evidence unit.indexes unit.structurizationWitnesses unit.resolution
-    unit.initializationCertificates unit.borrowCertificates unit.borrowRejections
+  -- Appended types are reachable by unit identifiers alone: every link
+  -- stays, and the unit places past its grown tables what none covers.
+  Internal.mkValidatedUnit tables unit.profiles unit.namespaces
+    unit.dependencies unit.evidence unit.indexes unit.resolution
 
 end VerexIR.Validation

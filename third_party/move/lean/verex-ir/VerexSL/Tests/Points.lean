@@ -4,7 +4,7 @@
 import VerexSL
 
 /-! Hooks at program points (`verex_obligations at …`, `after …`;
-`doc/plan/proof-language.md`, "Points"): what a hook establishes there holds
+`doc/designs/proof-language.md`, "Points"): what a hook establishes there holds
 on every path through the point, and one run of the hook proves it for all
 of them, however the normal form distributes the paths after it. -/
 

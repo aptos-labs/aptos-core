@@ -9,7 +9,7 @@ verex proofs where
 verify caller by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals simp_all
+  all_goals simp_all [vir_denote_norm]
 
 verify wrong_final_value by lean =>
   verex_obligations

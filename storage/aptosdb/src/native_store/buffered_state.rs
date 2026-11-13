@@ -61,7 +61,7 @@ impl LedgerStateView for NativeLedgerStateWithSummary {
     type Snapshot = NativeStateWithSummary;
 
     fn next_version(&self) -> Version {
-        self.latest().next_version()
+        self.last_checkpoint().next_version()
     }
 
     fn last_checkpoint_snapshot(&self) -> Self::Snapshot {
@@ -69,10 +69,8 @@ impl LedgerStateView for NativeLedgerStateWithSummary {
     }
 
     fn is_descendant_of(&self, other: &Self) -> bool {
-        self.latest().is_descendant_of(other.latest())
-            && self
-                .last_checkpoint()
-                .is_descendant_of(other.last_checkpoint())
+        self.last_checkpoint()
+            .is_descendant_of(other.last_checkpoint())
     }
 }
 
@@ -146,7 +144,7 @@ pub struct NativeExtras;
 impl BufferedStateExtras<NativeSnapshotToCommit, NativeStateWithSummary> for NativeExtras {
     type ChunkInput = ();
 
-    fn absorb_chunk(&mut self, (): (), _checkpoint_advanced: bool) {}
+    fn absorb_chunk(&mut self, (): ()) {}
 
     fn build_payload(&mut self, snapshot: NativeStateWithSummary) -> NativeSnapshotToCommit {
         NativeSnapshotToCommit { snapshot }

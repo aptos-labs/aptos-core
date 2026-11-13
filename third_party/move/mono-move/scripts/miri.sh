@@ -81,6 +81,7 @@ SKIP_PACKAGES=(
   "mono-move-replay-benchmark:links rocksdb, jemalloc, and zstd"
   "mono-move-lean-link:unit tests reach no unsafe code; integration tests compile Move source and shell out to cargo and nm"
   "vm-comparison:contains no unsafe code"
+  "mono-move-unit-test-backend:unit tests reach no unsafe code; its unsafe sites run only on compiled Move packages"
 )
 
 # Fail if a package under mono-move/ is in neither list. Without this, a new

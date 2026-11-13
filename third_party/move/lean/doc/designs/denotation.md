@@ -35,7 +35,7 @@ denote : ExecutableUnit unit → FunctionHandle →
   Array RuntimeValue → Spec RuntimeState Failure (Array RuntimeValue)
 
 denote_agrees : ∀ unit function arguments,
-  Spec.Equiv (denote unit function arguments) (meaning unit function arguments)
+  Spec.Refines (meaning unit function arguments) (denote unit function arguments)
 ```
 
 - `denote` is a Lean function of the validated unit itself, recursing over
@@ -46,8 +46,15 @@ denote_agrees : ∀ unit function arguments,
   points; loops are fixed points under their invariant; storage and
   references use the typed memory and the prophecy encoding. `denote` is a
   relation, not an executable.
-- `denote_agrees` is proved once, by induction against
-  `BigStep.EvalFunction`, one case per construct. It is what makes a bare
+- `denote_agrees` is the statement an induction against
+  `BigStep.EvalFunction`, one case per construct, would prove: every
+  outcome of the meaning is one of the denotation wherever the denotation
+  is defined, which is not everywhere, since a data invariant is owed where
+  a value is made and nothing checks it at run time
+  ([`data-invariants.md`](data-invariants.md)). It is
+  assumed as the named axioms `compileFunction_agrees` and
+  `compileFunction_least_cycle` ([`assumptions.md`](../status/assumptions.md)).
+  It is what makes a bare
   `verify` meaningful: vacuity can arise only from preparation admitting a
   node without executable semantics.
 - Per target, `verify f` states the contract over `denote unit f`. The
@@ -131,8 +138,8 @@ discipline.
 
 ## What the denotation carries
 
-Scalars and checked arithmetic, comparisons, Boolean operations, unsigned
-`&`, checked shifts and casts, constants, `if`, `let`, blocks, `abort`,
+Scalars and checked arithmetic, comparisons, Boolean operations, bitwise
+operations, checked shifts and casts, constants, `if`, `let`, blocks, `abort`,
 `assert`, early `return`, assignment, `break`/`continue` (labeled too),
 loops with `invariant` clauses, direct calls, the Rust profile's modular
 arithmetic (`Term.modular`), tuples, structs, enums with variant tests and
@@ -146,6 +153,36 @@ places, literals, `index` with its abort, the bounds check the lowering
 emits, `push`, `insert`, `remove`, `swap`, `concat`, `slice`,
 `reverseSlice`, `contains`, `indexOf`, `destroyEmpty`; a construction
 exceeding the bound is undefined). A rejection names the construct.
+
+**Rust's primitives.** `usize` and `isize` are `NTy.int` at the unit's
+`target_pointer_width`; `.length` stays at width 64 and another width is
+rejected. `!` has no values, so its slot's carrier is the unit, and what
+follows a call returning it is `Term.unreachable`, no outcome. A lifetime or
+constant argument of a nominal keeps its binder's position at the unit type;
+no carrier reads it, and a shared reference in a field is its referent. A
+tuple's element is a place (`Proj.element`). `char` is `SpecChar`, a Unicode
+scalar value with its certificate, encoded as `.character`. An array is
+`NTy.array element length`, carried by `SpecArray`, a vector with the fact of
+its length: the certificate is what keeps the agreement over every native
+argument, and reading its vector (`Term.arrayVector`) states the fact as a
+hypothesis. A length past the vectors' bound has no native type, as
+validation lets it through and the runtime does not stop at it. The `as` cast is `Term.wrap`, the runtime's `modularInteger`.
+Bitwise operations on signed integers are the unsigned ones on the bit patterns
+(`signedBitwise`), bitwise not is `ones - value`, `<` on Booleans is `!a && b`,
+a discriminant read is a match with one arm per variant. The place operation
+`readDiscriminant` uses that same match without an intermediate whole-value IR
+read: initialization checks only the enum's storage, allowing moved payloads
+whose tag remains present. The denotation's retained payload is not exposed by
+this operation. An overflowing operation is the row of its value and flag (`Term.overflowing`). An unchecked
+operation is the partial operation it is: `Spec.stuck` outside its domain,
+where the runtime has no outcome (`Term.divideUnchecked`,
+`Term.shiftUnchecked`, `Term.charOf`), so the theorem owes the domain.
+A place or variant selection that resolves nothing, an element out of range or
+a variant not held, is `Spec.stuck` too where the profile has no mismatch throw
+(`mismatchOutcome`): the runtime has no outcome, the check before it rules the
+path out, and a lowering that misses the check fails verification. A borrow's
+prophecy of the wrong shape stays `Spec.bottom`: it is no execution, not an
+obligation.
 
 **Loops.** A loop carries a state invariant beside the local frame: the
 store and registry when the body has no global effect, the pending set when
@@ -165,7 +202,7 @@ substituted once.
 
 **Calls.** A callee is inlined, specified or not, and the caller reasons
 over its compiled body through the agreement theorem
-(`wp_calleeMeaning_of_compiled`). Only a native, an `opaque` callee and a
+(`wp_propheticMeaning_of_compiled`). Only a native, an `opaque` callee and a
 member of a cycle of calls are used through their contracts
 (`usedThroughContract`); such a callee with a body is used by its theorem,
 verified first. A callee without a theorem, whose verification failed or
@@ -265,7 +302,11 @@ Boolean atom, and `bv_decide` decides the result.
   arithmetic, comparisons, casts, string equality, decided `dite`) is the
   set `vir_denote_eval`, so the guards of an operation at literal
   arguments are decided before its result is built. Array literals are
-  updated at literal positions by simprocs.
+  updated at literal positions by simprocs. The UTF-8 encoding-witness relation
+  rewrites through a proved equivalence to Lean's byte validator. A simproc
+  decides vectors of at most 64 literal bytes with a kernel-checked reflexivity
+  proof; unknown bytes remain opaque, and symbolic string encodings use a
+  validity theorem without expanding the decoder.
 - Everything `compileFunction` computes is evaluated by the kernel when a
   target's `compiled_eq` certificate is checked, so it reads only what the
   target's body reaches (roles are collected from the function root, never
@@ -367,11 +408,18 @@ restated up to prophecy resolution (the RustHorn model of
 - The carrier of `NTy.ref τ` is `τ.carrier × τ.carrier`: the current value
   and the prophecy, the value the reference will hold when it dies. There
   is no loan id.
+- Mutable slices use `NTy.sliceRef τ`, carried by `SpecSliceRef τ.carrier`:
+  an extent `n`, current contents `SpecArray τ.carrier n`, and final contents
+  of that same type. A borrow chooses its prophecy at the backing extent;
+  reborrowing retains it. Length preservation therefore follows from the
+  carrier, including across calls whose contracts mention only element effects.
+  Shared slices use the distinct `NTy.slice τ` tag and a sequence carrier.
+  Content specifications project either slice representation to a sequence.
 - A borrow of a place `x.p` chooses a prophecy `π`; the reference is
   `(x.p, π)` and the lender holds `π` at `p` from then on. A mutable global
   borrow `&mut R[k]` is `(R[k], π)`, and the memory holds `π` at `k`.
 - Reads and writes through a reference act on its current value.
-- A loan's death (its `endLoan` marker) resolves the holder: execution
+- A loan's death (`deathEffect`, one `Term.resolve` per holder) resolves the holder: execution
   continues only where `current = prophecy`. A loan consumed by a call
   argument resolves inside the callee.
 - A `&mut` parameter arrives as `(c, φ)`. Every exit resolves each `&mut`
@@ -392,29 +440,59 @@ through `prophecyOf x p`, which is `Spec.choose` marked with the borrowed
 local and path: its rule (`wp_prophecyOf`) gives the value with an inert
 premise `Prophecy x p π`, which the walk consumes where it introduces `π`:
 a step proof binds a whole local's prophecy as the value written back,
-`x'` (`doc/plan/proof-language.md`, "Semantics and lowering"), any other
+`x'` ([`proof-language.md`](proof-language.md), "Semantics and lowering"), any other
 proof drops it. Both are generic in the value's type and carry no family,
 so the rule needs no instance. A loan's death
-resolves each of its holders that still holds a reference; a holder it
-moved from resolves nothing. A loop that only writes through a reference
+resolves the holders that death records, an aggregate at the path recorded
+with it (`Term.resolveAt`); a holder it moved from resolves nothing. Validation
+guarantees none of them is read from the anchor on (`VIR-SEMANTIC-LOAN-DEATH`). A loop that only writes through a reference
 local keeps its prophecy. Callees are collected through every inlined
-body, since a callee returning a reference is inlined. The rule-1 audit
-forbids the loan predicates (`FreshStorageLoanIds`, `LoanDiscipline`,
-`storageLoanTargetIn?`, `removeStorageLoan`) in verified artifacts.
+body, since a callee returning a reference is inlined. The rule-1 audit of
+`verify`'s artifacts (`requireNativeArtifacts`, `VerexSL/Verify/Members.lean`) forbids `RuntimeFrame`
+and the loan predicates (`SemanticOperations.FreshGlobalLoanIds`,
+`LoanDiscipline`, `globalLoanKeyIn?`, `removeGlobalLoan`); the native-only
+check (`runtimeNamespaces`, `runtimeConstants` in
+`VerexIR/Proofs/Denote/NativeOnly.lean`) rejects a contract or leaf that
+states a runtime value, the runtime state or failures, a codec or decoder,
+or a function value's runtime closure.
 
 ### Agreement
 
 `propheticMeaning unit handle f : HList f.params → Comp f.result.carrier`
-is defined from the big-step meaning by a loan assignment and prophecy
-resolution: `ok initial r final` holds when there are distinct loan ids for
-the argument references and a start state agreeing with `initial` on
-`globals` such that BigStep runs the arguments' current values with those
-loans to results `rs` and state `s₁`, `r` carries `rs` with each returned
-reference's prophecy, the export of every argument loan in `s₁.pending`
-(returned loans' holes replaced by their prophecies) encodes the
-argument's prophecy, and `final` is `s₁` with the loan fields of
-`initial`; `aborts` and `undefined` likewise. `compileFunction_agrees` is
-`Spec.Equiv (f.denote unit args) (propheticMeaning unit handle f args)`.
+is defined from the big-step meaning by a loan assignment and a shared
+correspondence between runtime loan identities and final referent values.
+`ok initial r final` runs the arguments' current values from storage encoding
+`initial`, relates the returned values to `r`, and checks every original loan's
+settlement separately. Replacing a nested reference changes the identity in its
+holder; it does not transfer the original loan's settlement obligation to the
+replacement. One correspondence spans arguments, exports, and results, including
+new loans that escape inside returned references. Unique ownership and map-domain
+checks exclude duplicate or invented loans. Only identities actually returned may
+resolve holes when reading the final global memory.
+
+Overwriting a mutable-reference holder retires its old loan after evaluation of
+the replacement and before the write. The checked borrow certificate names the
+holder's exact path; for `&mut &mut T`, retirement targets the inner reference,
+leaving the outer reference live. Existing settlement writes back locally minted
+loans and exports incoming loans for the caller to settle. Moving the old carrier
+out leaves nothing to retire. Whole aggregates and dynamic-index paths remain
+outside this replacement rule. Writing a borrow of frame-owned storage through
+a caller-owned reference is rejected even when the function returns no reference.
+An admissible reborrow stored through caller-owned storage escapes through that
+write: its lexical return does not retire it. The outer export retains the
+reborrow identity, and its original lender retains the corresponding hole until
+the shared boundary correspondence resolves it.
+
+An undefined boundary has no consistent resolution of its references and returned
+storage; aborts retain their runtime meaning. The existing compiler-agreement
+assumption `compileFunction_agrees` states
+`Spec.Refines (propheticMeaningAt σ handle args) (f.denote args)` for
+`compileFunctionAt unit handle σ = .ok f`: every outcome of the prophetic
+meaning is one of the denotation wherever the denotation is defined. Without a substitution `σ` this is
+`compileFunction` and `propheticMeaning`. At type arguments `θ` holding a mutable
+reference, the rows are substituted and the run lends at them, so lending follows the
+`.ref` type, and the frame agrees with the runtime at the family `θ` induces
+(`Coherent` at `Skolems.instantiate θ Θ`).
 
 Intrinsic maps ([`intrinsic-maps.md`](intrinsic-maps.md)): the runtime's
 values are read up to `normalize`, which replaces every well-formed value
@@ -435,12 +513,21 @@ assumed.
   the premise that every returned reference's prophecy equals its current
   value.
 - A contract may read a returned reference's final value,
-  `final(result)`; such a contract drops the value-view premise. A callee
+  `final(result)`, and of a reference the result carries a projection of it
+  (`final(result.0)`), which reads the result's prophecy view; such a
+  contract drops the value-view premise. A callee
   returning `&mut` whose contract does not read `final` keeps the value
   view, so a caller reasons over its denotation through the agreement.
-- References at the top level of a parameter or result, and components of
-  a result tuple, are carried; a reference inside an aggregate is rejected
-  by name.
+  The premise is dropped for the whole result, so a contract that reads
+  `final` of one reference the result carries and says nothing of another
+  loses the second's value view as well: a loss of precision, not of
+  soundness, and the contract states what it needs of each.
+- References in a parameter or result are carried behind references and in
+  tuples and structs. A clause reads a value holding references through them,
+  compositionally: in `ensures` bare `h.r` of a by-value `h` is the prophecy and
+  `old(h).r` the current value (`NTy.viewed`), and a returned one is read at its
+  current values under the same value-view premise. A vector holding one, and a
+  shared reference to a value holding a mutable one, are rejected by name.
 
 ## Recursion and cycles
 
@@ -449,9 +536,9 @@ proved by assuming it at the self-calls is sound because that meaning is
 the least fixed point of the body: big-step derivations are finite.
 
 - The denotation takes the meaning of calls as a parameter
-  (`CalleeMeaning`). The closed denotation passes `closedMeaning unit`; the
-  body of a member of a cycle at a slot passes `cycleMeanings unit members
-  typeInstantiation self slot`. A slot (`CycleSlot`) is a member at the
+  (`CalleeMeaning`). The closed denotation passes `closedMeanings executable
+  typeInstantiation`; the body of a member of a cycle at a slot passes
+  `cycleMeanings executable members typeInstantiation self slot`. A slot (`CycleSlot`) is a member at the
   runtime family, or at a skolem family and type instantiation. A call to
   a member without type arguments means `self` at the caller's slot, one
   with type arguments `self` at the family and frame instantiation the
@@ -525,9 +612,50 @@ use its contract and never prove an instance of their own.
 - **Agreement.** `compileFunction_agrees` and `compileFunction_least_cycle`
   are stated over every family and instantiation: a skolem value is only
   moved, compared by its encoding, stored, and lent as a `Plain` encoding.
-- **Not carried by design.** A type argument that is a reference (Rust) is
-  not `Plain`: such an instance is specialized. Type-dependent natives
-  (`type_info`) are not carried.
+- **Instances at a reference.** A type argument holding a mutable reference
+  (Rust) is not `Plain`, and no generic theorem transfers to it: dropping the
+  parameter resolves a prophecy the generic proof never saw. Such a call is
+  `Term.callInstance`, and the callee is compiled at the arguments
+  (`compileFunctionAt unit handle (some θ)`, one kernel-evaluated compilation
+  per distinct `θ`) and inlined, verified monomorphically. `compileFunction_agrees`
+  covers it, `compileFunction_least_cycle` and the `refFree` transfer theorems do
+  not: a callee dropping the parameter is rejected at the call (`dropsDestructor`),
+  and a native, opaque or recursive callee at such a type is rejected, its generic
+  contract not transferring. A move of a holder out of an aggregate has no carrier;
+  a reference moved out of one is read as a reborrow through it, as validation does
+  where the type shows it. A shared reference over the argument denotes the erased
+  argument at the instance, except inside a nominal, whose fields are declared once.
+  The sharing of such an argument is the argument's own. A substitution's entry at a
+  shared reference is the erased referent marked observed (`NTy.observed`); a type
+  reads it as the referent wherever a parameter stands for a type — a field, an
+  element, a nominal's argument, a parameter's type — and consults the mark only
+  where a function type decides whether a slot is a shared reference (`Sharing`): a
+  slot declared at a parameter is shared at an instance whose argument is marked. So
+  a dictionary `fn(F, T)` at `T := &u32` is the type of the closures that supply it,
+  `fn(F, u32)` with its slot shared, whether the function is read at the instance or
+  its declared reading is substituted (`readingAgrees`), and the generic theorem
+  transfers: the run of a function value does not read its slots' sharing
+  (`closureRun`), an observation is typed as its value (`HasType.observed`), and
+  only the carrier's index and a closure's admission mention it, so the reading at
+  the instance is the theorem's reading there. The mark is an entry of a
+  substitution, never the type of a value: substitution drops it where a parameter
+  stands for a type, no carrier, codec or view distinguishes `observed τ` from `τ`,
+  and a Move substitution holds none. A frame's reading of a parameter carries the
+  mark as well (`Skolems.argument`), since a frame resolves a function type by
+  substituting that reading (`resolve_eq`) and must consult the mark where
+  substituting does.
+- **Observations.** `compileFunction_agrees` holds at a shared view: a shared borrow
+  yields `value.observe`, typed at the referent by `HasType.observed`, and `&T` denotes
+  `erase T`. `erase` and `observe` are identities on reference-free types, so a Move
+  function's denotation does not change. An observation holds no loan: the prophecy
+  resolution does not see it, and a run reading through a live borrow is stuck, which
+  validation excludes.
+- **Transfers.** A mutable reference moved out of a component an overwrite follows is
+  `Term.takeAt`: the run clears the component and the term leaves `(π, π)`, unread and
+  trivially resolved. A death of a place alone resolves that place and the run reconciles
+  the reference it holds with its lender at the same anchor, the loan going on.
+- **Not carried by design.** Type-dependent natives (`type_info`) are not
+  carried.
 
 ## Discipline
 
@@ -536,7 +664,8 @@ use its contract and never prove an instance of their own.
   naming it, and a case of the induction that cannot be closed is such a
   construct.
 - No `sorry` in `denote_agrees`; the named axioms stating it are removed
-  by proving it, never extended.
+  by proving it. `compileFunction_agrees` is one family over substitutions, without
+  one exactly the agreement of `compileFunction`; it takes no other extension.
 - Cost is gated per target by `DenotePerformance.exp`; caps are not raised
   to count a port as done.
 - Every `denote` case ships with its induction case. A false `ensures` on
