@@ -9,7 +9,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_experimental_layered_map::MapLayer;
-use aptos_scratchpad::{ProofRead, SparseMerkleTree};
+use aptos_scratchpad::ProofRead;
 use aptos_types::{
     state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
@@ -189,29 +189,12 @@ impl<Slot: Clone + Send + Sync + LeafEntry + 'static> StateAndSummary<ShardedJmt
     }
 }
 
-/// A native-position leaf: the SMT/JMT only needs the key + value hash
+/// A native-store leaf: the SMT/JMT only needs the key + value hash
 /// (no value body), so the slot carries `()` as its value type.
-pub type PositionSlot = LeafSlot<()>;
+pub type NativeSlot = LeafSlot<()>;
 
-pub type PositionStateSummary = StateSummary;
-
-pub type PositionStateWithSummary = StateAndSummary<ShardedJmtState<PositionSlot>>;
-
-pub fn new_empty_position_state() -> PositionStateWithSummary {
-    PositionStateWithSummary::new_empty("position")
-}
-
-/// Restart-from-disk constructor: seeds the in-memory pipeline with
-/// the JMT root persisted at `version`.
-pub fn position_state_at_version(
-    version: Version,
-    root_hash: HashValue,
-) -> PositionStateWithSummary {
-    PositionStateWithSummary::new(
-        ShardedJmtState::new_at_version(Some(version), "position"),
-        StateSummary::new_global_only(version, SparseMerkleTree::new(root_hash)),
-    )
-}
+/// A native store's in-memory JMT + SMT state.
+pub type NativeStateWithSummary = StateAndSummary<ShardedJmtState<NativeSlot>>;
 
 pub fn pre_shard_jmt_updates<I>(
     flat: I,
@@ -235,15 +218,15 @@ mod tests {
         HashValue::new([i; 32])
     }
 
-    fn slot(i: u8) -> PositionSlot {
-        PositionSlot {
+    fn slot(i: u8) -> NativeSlot {
+        NativeSlot {
             state_key: StateKey::raw(&[i]),
             value_hash: Some(key(i)),
             value: None,
         }
     }
 
-    fn keys(delta: &[(HashValue, PositionSlot)]) -> Vec<HashValue> {
+    fn keys(delta: &[(HashValue, NativeSlot)]) -> Vec<HashValue> {
         let mut keys: Vec<_> = delta.iter().map(|(k, _)| *k).collect();
         keys.sort();
         keys
@@ -254,7 +237,7 @@ mod tests {
     /// is all a layer built over itself allowed.
     #[test]
     fn delta_from_a_snapshot_several_layers_back() {
-        let persisted = ShardedJmtState::<PositionSlot>::new_empty("test");
+        let persisted = ShardedJmtState::<NativeSlot>::new_empty("test");
         let s1 = persisted.extend(&persisted, 0, vec![(key(1), slot(1))]);
         let s2 = s1.extend(&persisted, 1, vec![(key(2), slot(2))]);
         let s3 = s2.extend(&persisted, 2, vec![(key(3), slot(3))]);

@@ -8,6 +8,10 @@ Move source -> compiler-v2 XAST -> validated Move VIR -> VerexSL or error
 Rust source -> rustc MIR exporter -> validated Rust VIR -> VerexSL or error
 ```
 
+A Rust baseline also lowers its rendering back and compiles each function
+to its denotation, as verification does; a function with none is listed after
+the source with the construct that stops it (`-- no denotation for …`).
+
 Inputs and expectations are side by side in feature directories:
 
 ```text
@@ -50,7 +54,8 @@ accepted aliases. Review the resulting source diff before committing it.
 at any depth, is a VerexSL source — modules with specifications, `verify`
 commands, proof scripts where real mathematics lives — that the driver
 elaborates in its own `lean` process under a heartbeat cap, several at once
-(`VEREX_E2E_JOBS`, by default half the hardware threads). What `lean`
+(`VEREX_E2E_JOBS`, by default half the hardware threads; the processes
+share those threads for the targets each proves at once, `verex.jobs`). What `lean`
 prints is the baseline, verbatim, beside the source as `<name>.exp`,
 following compiler-v2's baseline convention: a clean check has no
 expectation file, a check that prints anything has exactly that output as
@@ -60,12 +65,12 @@ feature (`Scalars/`, `Structs/`, `Enums/`, `Vectors/`, `Control/`,
 `References/`, `Storage/`, `Calls/`, `Generics/`, `Specifications/`,
 `Modules/`), with larger programs under `Examples/`; a file whose name ends
 in `Errors` holds negative cases. The ledger is the
-[roadmap's test section](../designs/roadmap.md#tests). Everything
+[roadmap](../doc/plan/roadmap.md). Everything
 under `Check/` is VerexSL; the frontend paths keep their own directories.
 
 `VerexE2ETests/SourceVerify/` verifies Move and Rust sources as
 `verex-move verify` and `verex-rust verify` do
-([`designs/source-verification.md`](../designs/source-verification.md)): every
+([`doc/designs/source-verification.md`](../doc/designs/source-verification.md)): every
 `.move` and `.rs` file there, a Rust file with the `.spec.lean` items beside
 it and a Move file with its proof file, is rendered as VerexSL and
 elaborated, and its messages, in the coordinates of the Move, Rust,
@@ -114,7 +119,7 @@ records nothing extra, but a divergence adds an explicit line naming it:
 Exhaustion never produces one — an `inconclusive` line means an engine ran out
 of its own budget, which proves nothing about the others. A recorded `ERROR:`
 line is an open finding, tracked in the findings register of
-`designs/monovm-link-design.md`, not an accepted expectation.
+`doc/designs/monovm-link-design.md`, not an accepted expectation.
 
 Only normalized content is recorded, so the file is deterministic: gas usage,
 collection counts, abort locations, and the adapter's build identity are

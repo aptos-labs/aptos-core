@@ -1,0 +1,36 @@
+processed 8 tasks
+task 0 lines 5-33:  publish --verbose [module 0x66::a]
+task 1 lines 36-54:  publish --verbose [module 0x66::b]
+task 2 lines 57-112:  publish --verbose [module 0x66::a]
+task 3 lines 115-115:  run 0x66::a::entry_ok --verbose
+task 4 lines 117-117:  run 0x66::a::locked_entry --verbose
+Error: Function execution failed with VMError: {
+    message: Reentrancy disallowed: reentering `0000000000000000000000000000000000000000000000000000000000000066::a` via function `noop` (module lock is active),
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 5 lines 119-119:  run 0x66::a::entry_restore --verbose
+task 6 lines 121-121:  run 0x66::a::entry_lie --verbose
+Error: Function execution failed with VMError: {
+    message: Reentrancy disallowed: reentering `0000000000000000000000000000000000000000000000000000000000000066::a` via function `locked_noop` (module lock is active),
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 7 lines 123-123:  run 0x66::a::entry_deep --verbose
+Error: Function execution failed with VMError: {
+    message: Resource `0x66::a::R` cannot be accessed because of active reentrancy of defining module.,
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 5)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(6), 11), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(6), 11), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(6), 11), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(6), 11), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(6), 11), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(6), 11), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(6), 11), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(6), 11), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("b") }), FunctionDefinitionIndex(3), 1), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(7), 1)] }),
+}

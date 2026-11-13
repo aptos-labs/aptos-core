@@ -42,12 +42,14 @@ itself is gated by the benchmark; the cap catches collapses. -/
 private def heartbeatCap : Nat := 180000
 
 /-- Elaborate one check in its own process, invoked on the package-relative
-path so the paths in its messages are stable across machines. -/
-private def elaborate (source : System.FilePath) : IO String := do
+path so the paths in its messages are stable across machines. A module's
+targets are proved `jobs` at a time in it: the processes share the threads. -/
+private def elaborate (source : System.FilePath) (jobs : Nat) : IO String := do
   let output ← IO.Process.output {
     cmd := "lake"
     args := #["env", "lean", s!"-DmaxHeartbeats={heartbeatCap}",
-      s!"-Dweak.verex.verifyHeartbeats={heartbeatCap}", source.toString] }
+      s!"-Dweak.verex.verifyHeartbeats={heartbeatCap}", s!"-Dverex.jobs={jobs}",
+      source.toString] }
   pure (output.stdout ++ output.stderr)
 
 /-- The number of checks elaborated at once: `VEREX_E2E_JOBS`, or half the
@@ -68,13 +70,16 @@ private def elaborateAll (sources : Array System.FilePath) (workers : Nat) :
   let sizes ← sources.mapM fun source => return (← source.metadata).byteSize
   let order := (Array.range sources.size).qsort fun a b => sizes[a]! > sizes[b]!
   let next ← IO.mkRef 0
-  let tasks ← (List.range (max 1 (min workers sources.size))).toArray.mapM fun _ =>
+  let workers := max 1 (min workers sources.size)
+  let threads := max 1 ((System.Platform.Internal.getHardwareConcurrency ()).toNat / 2)
+  let jobs := max 1 (threads / workers)
+  let tasks ← (List.range workers).toArray.mapM fun _ =>
     IO.asTask (prio := .dedicated) do
       let mut done : Array (Nat × String) := #[]
       repeat
         let position ← next.modifyGet fun position => (position, position + 1)
         let some index := order[position]? | break
-        done := done.push (index, ← elaborate sources[index]!)
+        done := done.push (index, ← elaborate sources[index]! jobs)
       return done
   let mut outputs := Array.replicate sources.size ""
   for task in tasks do

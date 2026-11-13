@@ -46,7 +46,9 @@ members = [
     "aptos-move/flow",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
+    "aptos-move/framework/collateral-natives",
     "aptos-move/framework/natives",
+    "aptos-move/framework/order-natives",
     "aptos-move/framework/position-natives",
     "aptos-move/framework/release-bundle",
     "aptos-move/framework/table-natives",
@@ -225,6 +227,8 @@ members = [
     "third_party/move/mono-move/runtime",
     "third_party/move/mono-move/specializer",
     "third_party/move/mono-move/testsuite",
+    "third_party/move/mono-move/unit-test-backend",
+    "third_party/move/mono-move/vm-comparison",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -312,7 +316,7 @@ license = "LicenseRef-Aptos"
 license-file = "LICENSE"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.93"
+rust-version = "1.95"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -517,8 +521,8 @@ fuzzer = { path = "testsuite/fuzzer" }
 aes-gcm = "0.10.3"
 again = "0.1.2"
 ahash = { version = "0.8.11", features = ["serde"] }
-ambassador = "0.4.1"
-annotate-snippets = "0.11.5"
+ambassador = "0.5.1"
+annotate-snippets = "0.12.17"
 anstyle = "1.0.1"
 anyhow = "1.0.98"
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.2.1", features = [
@@ -526,7 +530,7 @@ aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-index
 ] }
 aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.2.1" }
 arbitrary = { version = "1.4.1", features = ["derive"] }
-arc-swap = "1.6.0"
+arc-swap = "1.9.3"
 ark-bls12-381 = { version = "0.5.0", features = ["curve"] }
 ark-bn254 = { version = "0.5.0", features = ["curve"] }
 ark-ec = { version = "0.5.0", features = ["parallel", "rayon"] }
@@ -542,17 +546,17 @@ ark-std = { version = "0.5.0", features = ["getrandom"] }
 arr_macro = "0.2.1"
 assert_approx_eq = "1.1.0"
 async-mutex = "1.4.0"
-async-recursion = "1.0.5"
-async-trait = "0.1.53"
-axum = "0.7.5"
+async-recursion = "1.2.0"
+async-trait = "0.1.92"
+axum = "0.8.9"
 backoff = { version = "0.4.0", features = ["tokio"] }
-backtrace = "0.3.58"
-base64 = "0.13.0"
+backtrace = "0.3.77"
+base64 = "0.23.1"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
-better_any = "0.1.1"
+better_any = { version = "0.2.1", features = ["derive"] }
 bigdecimal = { version = "0.4.0", features = ["serde"] }
-bitflags = "2.11.0"
-bitvec = "1.0.1"
+bitflags = "2.13.2"
+bitvec = "1.1.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blake3 = { version = "1.5.4", features = ["mmap", "rayon"] }
@@ -560,56 +564,56 @@ bls12_381 = "0.8.0"
 blst = "0.3.15"
 # The __private_bench feature exposes the Fp12 type which we need to implement a multi-threaded multi-pairing.
 blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
-bollard = "0.15"
-bon = "3.9.3"
+bollard = "0.21.1"
+bon = "3.10.3"
 boxcar = "0.2.13"
 build_html = "2.5.0"
 bulletproofs = { version = "4.0.0" }
-bumpalo = { version = "3.14" }
+bumpalo = { version = "3.20.3" }
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
-bytesize = { version = "1.3.0" }
+bytesize = { version = "2.7.0" }
 camino = { version = "1.1.6" }
 cfg-if = "1.0.0"
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 chrono-tz = "0.10.1"
 ciborium = "0.2"
-claims = "0.7"
-clap = { version = "4.3.9", features = [
+claims = "0.8"
+clap = { version = "4.6.7", features = [
     "derive",
     "env",
     "unstable-styles",
     "wrap_help",
 ] }
-clap-verbosity-flag = "2.1.1"
-clap_complete = "4.4.1"
+clap-verbosity-flag = "3.0.4"
+clap_complete = "4.6.11"
 cloud-storage = { version = "0.11.1", features = [
     "global-client",
     "rustls-tls",
 ], default-features = false }
 codespan = "0.11.1"
 codespan-reporting = "0.11.1"
-colored = "2.0.0"
+colored = "3.1.1"
 concurrent-queue = "2.2.0"
-console-subscriber = "0.3.0"
+console-subscriber = "0.4.1"
 core_affinity = "0.8.1"
 coset = "0.3"
 criterion = "0.8.2"
-crossbeam = "0.8.1"
-crossbeam-channel = "0.5.4"
-crossbeam-utils = "0.8"
+crossbeam = "0.8.5"
+crossbeam-channel = "0.5.17"
+crossbeam-utils = "0.8.23"
 csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
 dashmap = { version = "7.0.0-rc2", features = ["inline-more"] }
-datatest-stable = "0.1.1"
+datatest-stable = "0.3.3"
 dearbitrary = { version = "1.0.4", features = ["derive"] }
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivation-path = "0.2.0"
 derivative = "2.2.0"
 derive_builder = "0.20.0"
-derive_more = { version = "1.0.0", features = ["add", "deref", "deref_mut"] }
-determinator = "0.12.0"
+derive_more = { version = "2.1.1", features = ["add", "deref", "deref_mut"] }
+determinator = "0.13.0"
 diesel = { version = "~2.3", features = ["uuid"] }
 diesel-async = { version = "0.7.4", features = [
     "async-connection-wrapper",
@@ -621,17 +625,17 @@ diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 difference = "2.0.0"
 digest = "0.9.0"
 dir-diff = "0.3.2"
-dirs = "5.0.1"
+dirs = "7.0.0"
 dirs-next = "2.0.0"
 dudect-bencher = "0.6"
 dunce = "1.0.4"
 ed25519-dalek = { version = "1.0.1", features = ["rand_core", "std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
-either = "1.6.1"
+either = "1.19.0"
 enum_dispatch = "0.3.12"
-env_logger = "0.10.0"
+env_logger = "0.11.11"
 equivalent = "1.0"
-erased-serde = "0.3.13"
+erased-serde = "0.4.11"
 ethers = { version = "2" }
 ethnum = "1.5.2"
 fail = "0.5.0"
@@ -641,10 +645,10 @@ figment = { version = "0.10.19", features = ["yaml", "env"] }
 file_diff = "1.0.0"
 firebase-token = { git = "https://github.com/aptos-labs/firebase-token", rev = "34ea512d3d1fad6c11df3e7d82ff72beccc05836" }
 firestore = "0.43.0"
-fixed = "1.25.1"
+fixed = "1.31.0"
 flate2 = "1.0.24"
-flexi_logger = "0.27.4"
-float-cmp = "0.9.0"
+flexi_logger = "0.31.10"
+float-cmp = "0.10.0"
 fs2 = "0.4.3"
 futures = "0.3.29"
 futures-channel = "0.3.29"
@@ -658,36 +662,54 @@ get_if_addrs = "0.5.3"
 getrandom = "0.2.2"
 git2 = { version = "0.21.0", features = ["https", "ssh"] }
 glob = "0.3.0"
-goldenfile = "1.5.2"
+goldenfile = "1.11.0"
 google-cloud-storage = "0.13.0"
 group = "0.13"
-guppy = "0.17.5"
-handlebars = "4.2.2"
+guppy = "0.19.1"
+handlebars = "6.4.4"
 hashbrown = { version = "0.14.3", features = ["equivalent"] }
-heck = "0.4.1"
+heck = "0.5.0"
 hex = { version = "0.4.3", features = ["serde"] }
-hex-literal = "0.3.4"
+hex-literal = "1.1.0"
 hkdf = "0.10.0"
 hmac = "0.12.0"
-hostname = "0.3.1"
+hostname = "0.4.2"
 http = "0.2.9"
 http-body-util = "0.1.1"
-httpmock = "0.6.8"
+httpmock = "0.9.0"
 hyper = { version = "0.14.18", features = ["full"] }
-hyper-util = { version = "0.1.3", features = ["client-legacy"] }
-im = "15.0.0"
-image = "0.24.5"
+hyper-util = { version = "0.1.17", features = ["client-legacy"] }
+# The default `avif` feature is an AV1 encoder (rav1e). AVIF images are passed
+# through, never re-encoded.
+image = { version = "0.25.10", default-features = false, features = [
+    "rayon",
+    "bmp",
+    "dds",
+    "exr",
+    "ff",
+    "gif",
+    "hdr",
+    "ico",
+    "jpeg",
+    "png",
+    "pnm",
+    "qoi",
+    "tga",
+    "tiff",
+    "webp",
+] }
+imbl = "7.0.2"
 indexmap = "2.7.0"
-indicatif = "0.17.7"
-indoc = "1.0.6"
-inferno = "0.11.14"
+indicatif = "0.18.6"
+indoc = "2.0.8"
+inferno = "0.12.8"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
-itertools = "0.13"
-jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.1" }
-jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.1" }
-jemalloc_pprof = { version = "0.8", features = ["symbolize"] }
-jemallocator = { package = "tikv-jemallocator", version = "0.6.1", features = [
+itertools = "0.15.0"
+jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.7.0" }
+jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.7.1" }
+jemalloc_pprof = { version = "0.9", features = ["symbolize"] }
+jemallocator = { package = "tikv-jemallocator", version = "0.7.0", features = [
     "profiling",
     "stats",
     "unprefixed_malloc_on_supported_platforms",
@@ -695,13 +717,13 @@ jemallocator = { package = "tikv-jemallocator", version = "0.6.1", features = [
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"
-lazy_static = "1.4.0"
-libc = "0.2.147"
+lazy_static = "1.5.1"
+libc = "0.2.191"
 libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
-libtest-mimic = "0.5.2"
-log = "0.4.17"
-lru = "0.18.0"
+libtest-mimic = "0.8.2"
+log = "0.4.35"
+lru = "0.19.0"
 lz4 = "1.28.0"
 maplit = "1.0.2"
 memchr = "2.7.4"
@@ -710,29 +732,29 @@ merlin = "3"
 mime = "0.3.16"
 mini-moka = { version = "0.10.3", features = ["sync"] }
 mirai-annotations = "1.12.0"
-mockall = "0.12.1"
+mockall = "0.15.0"
 more-asserts = "0.3.0"
-nalgebra = "0.32"
-named-lock = "0.2.0"
+nalgebra = "0.35.0"
+named-lock = "0.4.1"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default-features = false }
-nix = { version = "0.29", features = ["signal"] }
+nix = { version = "0.31", features = ["signal"] }
 notify = "8.2.0"
-ntest = "0.9.3"
+ntest = "0.10.0"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
-num-derive = "0.4.2"
-num-integer = "0.1.42"
+num-derive = "0.5.1"
+num-integer = "0.1.47"
 num-traits = "0.2.19"
-num_cpus = "1.13.1"
-once_cell = "1.10.0"
+num_cpus = "1.17.0"
+once_cell = "1.21.4"
 open = "5.3.1"
 opentelemetry = { version = "0.27.0", features = ["trace"] }
 opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "trace"] }
 opentelemetry_sdk = { version = "0.27.0", features = ["trace", "rt-tokio"] }
-ordered-float = "3.9.1"
+ordered-float = "5.5.1"
 ouroboros = "0.18.5"
-owo-colors = "3.5.0"
+owo-colors = "4.4.0"
 p256 = { version = "0.13.2" }
 pairing = "0.23"
 parking_lot = "0.12.0"
@@ -743,36 +765,36 @@ paste = "1.0.7"
 pathsearch = "0.2.0"
 pbjson = "0.5.1"
 percent-encoding = "2.1.0"
-petgraph = "0.6.5"
+petgraph = "0.8.3"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
-poem = { version = "3.1.3", features = ["anyhow", "compression", "rustls"] }
+poem = { version = "3.1.7", features = ["anyhow", "compression", "rustls"] }
 poem-openapi = { version = "5.1.2", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "5.1.1"
 pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
-pretty = "0.10.0"
+pretty = "0.12.5"
 pretty_assertions = "1.2.1"
-prettydiff = "0.6.2"
-primitive-types = { version = "0.12.2" }
-proc-macro2 = "1.0.38"
+prettydiff = "0.9.0"
+primitive-types = { version = "0.14.0" }
+proc-macro2 = "1.0.107"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.4.1", default-features = false }
-procfs = "0.14.1"
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.4.3", default-features = false }
+procfs = "0.18.0"
 project-root = "0.2.2"
 prometheus = { version = "0.14.0", default-features = false }
 prometheus-http-query = "0.5.2"
-proptest = "1.4.0"
-proptest-derive = "0.5.1"
+proptest = "1.12.0"
+proptest-derive = "0.9.0"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
 prost-types = "0.13.3"
-quick-junit = "0.5.0"
-quick_cache = "0.5.1"
+quick-junit = "0.8.0"
+quick_cache = "0.7.0"
 quote = "1.0.18"
 rand = "0.7.3"
-random_word = "0.3.0"
-rapidhash = "1.4.0"
-rayon = "1.5.2"
+random_word = { version = "1.0.0", features = ["en"] }
+rapidhash = "4.5.1"
+rayon = "1.12.0"
 redis = { version = "0.22.3", features = [
     "tokio-comp",
     "script",
@@ -780,8 +802,8 @@ redis = { version = "0.22.3", features = [
 ] }
 redis-test = { version = "0.1.1", features = ["aio"] }
 ref-cast = "1.0.6"
-regex = "1.9.3"
-reqwest = { version = "0.11.11", features = [
+regex = "1.13.1"
+reqwest = { version = "0.11.27", features = [
     "blocking",
     "cookies",
     "json",
@@ -792,28 +814,28 @@ reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 ring = { version = "0.17.14", features = ["std"] }
 ripemd = "0.1.1"
-rlimit = "0.10.2"
+rlimit = "0.11.0"
 rmcp = { version = "0.16", features = ["server", "transport-io"] }
 rocksdb = { version = "0.24.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
-rstest = "0.15.0"
+rstest = { version = "0.28.0", default-features = false }
 rustc-hash = "2"
 rustversion = "1.0.14"
 rusty-fork = "0.3.0"
 scopeguard = "1.2.0"
 serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde-big-array = "0.5.1"
-serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }
-serde-name = "0.2.1"
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }
+serde-generate = { version = "0.34.1", default-features = false, features = ["golang", "rust"] }
+serde-name = "0.3.0"
+serde-reflection = "0.6.0"
 serde_bytes = "0.11.6"
 serde_json = { version = "1.0.81", features = [
     "preserve_order",
     "arbitrary_precision",
 ] } # Note: arbitrary_precision is required to parse u256 in JSON
 serde_merge = "0.1.3"
-serde_with = "3.4.0"
+serde_with = "3.24.0"
 serde_yaml = "0.8.24"
 set_env = "1.3.4"
 sha2 = "0.9.3"
@@ -821,40 +843,40 @@ sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
 shadow-rs = { version = "0.36.1", default-features = false, features = ["tzdb"] }
-shell-words = "1.0.0"
+shell-words = "1.1.1"
 signature = "2.1.0"
-siphasher = "0.3.10"
+siphasher = "1.0.4"
 slh-dsa = "=0.2.0-rc.4"
-smallbitvec = "2.5.1"
-smallvec = "1.8.0"
+smallbitvec = "2.6.1"
+smallvec = "1.16.4"
 specializer = { path = "third_party/move/mono-move/specializer" }
 static_assertions = "1.1.0"
 status-line = "0.2.0"
-strum = "0.27.1"
-strum_macros = "0.27.1"
+strum = "0.28.0"
+strum_macros = "0.28.0"
 sugars = "3.0.1"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
-sysinfo = "0.28.4"
-tar = "0.4.40"
-tempfile = "3.3.0"
+sysinfo = { version = "0.40.1", features = ["multithread"] }
+tar = "0.4.46"
+tempfile = "3.27.0"
 tera = "1.16.0"
-termcolor = "1.1.2"
+termcolor = "1.4.1"
 test-case = "3.1.0"
-textwrap = "0.15.0"
+textwrap = "0.16.0"
 thiserror = "2.0.21"
 thousands = "0.2.0"
-thread_local = "1.1.7"
+thread_local = "1.1.10"
 threadpool = "1.8.1"
-tiny-bip39 = "0.8.2"
+tiny-bip39 = "2.0.0"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
-tokio = { version = "1.35.1", features = ["full"] }
+tokio = { version = "1.54.1", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-retry = "0.3.0"
 tokio-scoped = { version = "0.2.0" }
-tokio-stream = { version = "0.1.14", features = ["fs"] }
-tokio-test = "0.4.1"
-tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
-toml = "0.7.4"
+tokio-stream = { version = "0.1.19", features = ["fs"] }
+tokio-test = "0.4.6"
+tokio-util = { version = "0.7.20", features = ["compat", "codec"] }
+toml = "1.1.8"
 tonic = { version = "0.12.3", features = [
     "tls-roots",
     "transport",
@@ -864,7 +886,7 @@ tonic = { version = "0.12.3", features = [
     "zstd",
 ] }
 tonic-reflection = "0.12.3"
-topological-sort = "0.2.2"
+topological-sort = "0.3.1"
 tracing = "0.1.37"
 tracing-log = "0.2.0"
 tracing-opentelemetry = "0.28.0"
@@ -875,31 +897,33 @@ tracing-subscriber = { version = "0.3.17", features = [
 ] }
 triomphe = "0.1.14"
 try_match = "0.4.2"
-trybuild = "1.0.80"
+trybuild = "1.0.122"
 typed-arena = "2.0.2"
-typenum = "1.17.0"
+typenum = "1.20.1"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
 ], default-features = false }
-url = { version = "2.4.0", features = ["serde"] }
+url = { version = "2.5.8", features = ["serde"] }
 usdt = "0.6.0"
-uuid = { version = "1.0.0", features = ["v4", "serde"] }
-variant_count = "1.1.0"
-version-compare = "0.1.1"
-walkdir = "2.3.3"
+uuid = { version = "1.29.0", features = ["v4", "serde"] }
+variant_count = "1.2.1"
+version-compare = "0.2.1"
+vm-comparison = { path = "third_party/move/mono-move/vm-comparison" }
+walkdir = "2.5.0"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
-wasm-bindgen = "0.2.100"
-wasm-bindgen-futures = "0.4.50"
-which = "4.2.5"
-whoami = "1.5.0"
+wasm-bindgen = "0.2.106"
+wasm-bindgen-futures = "0.4.56"
+whoami = "2.1.0"
 # This allows for zeroize 1.6 to be used. Version 1.2.0 of x25519-dalek locks zeroize to 1.3.
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e" }
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
+aptos-collateral-natives = { path = "aptos-move/framework/collateral-natives" }
+aptos-order-natives = { path = "aptos-move/framework/order-natives" }
 aptos-position-natives = { path = "aptos-move/framework/position-natives" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }
@@ -915,6 +939,7 @@ mono-move-orchestrator = { path = "third_party/move/mono-move/orchestrator" }
 mono-move-output = { path = "third_party/move/mono-move/output" }
 mono-move-runtime = { path = "third_party/move/mono-move/runtime" }
 mono-move-testsuite = { path = "third_party/move/mono-move/testsuite" }
+mono-move-unit-test-backend = { path = "third_party/move/mono-move/unit-test-backend" }
 move-abigen = { path = "third_party/move/tools/move-abigen" }
 move-asm = { path = "third_party/move/tools/move-asm" }
 move-binary-format = { path = "third_party/move/move-binary-format" }
@@ -963,6 +988,9 @@ move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = 
 move-vm-types = { path = "third_party/move/move-vm/types" }
 shared-dsa = { path = "third_party/move/shared-dsa" }
 
+[workspace.metadata.dylint]
+libraries = [{ path = "devtools/lints" }]
+
 [profile.release]
 debug = true
 overflow-checks = true
@@ -1005,10 +1033,15 @@ debug-assertions = true
 [profile.bench]
 debug = true
 
+# The Move Prover's Lean tests digest the Verex verifier's build artifacts,
+# about 1 GB, twice per run (third_party/move/move-prover/src/verex.rs).
+# Unoptimized, `sha2` takes over a minute for it; optimized, about ten seconds.
+[profile.dev.package.sha2]
+opt-level = 3
+
 [patch.crates-io]
 # version 0.6 at commit 444eb13579c733089453806743b19f1ea2dce1c0 did not expose 'run_bench_with_bencher' as a public function, which we need
 dudect-bencher = { git = "https://github.com/aptos-labs/dudect-bencher", rev = "9515677c83c58884c1a8c764251753269d46fc0e" }
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-channel = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }

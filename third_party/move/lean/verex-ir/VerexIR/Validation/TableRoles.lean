@@ -10,7 +10,7 @@ An intrinsic map whose owner holds its entries in a hidden last field is a
 table: its value holds its identity (a handle, or the placeholder field of
 an owner declared without fields) and its entries, and the runtime provides
 the roles its module binds on that value, not running their bodies
-(`designs/intrinsic-maps.md`, "Tables in the runtime semantics"). This
+(`doc/designs/intrinsic-maps.md`, "Tables in the runtime semantics"). This
 module names the owners (`tableLayout?`) and the role functions
 (`tableRoleOf?`), which preparation, the runtime, and the denotation share.
 -/
@@ -22,7 +22,7 @@ end VerexIR.Validation
 namespace VerexIR
 
 /-- The executable roles of the Move `map` intrinsic
-(`designs/intrinsic-maps.md`, "Roles"): the functions a map owner binds. The
+(`doc/designs/intrinsic-maps.md`, "Roles"): the functions a map owner binds. The
 table runtime dispatches exhaustively over this type and the role contracts
 match on it, so a role added here is given a semantics and a contract. -/
 inductive MapOperation where
@@ -201,7 +201,7 @@ def nominalDeclarationId? (unit : ValidatedUnit) (ns : ValidatedNamespace)
 /-- The layout of a table owner: its declaration, whether it holds a handle,
 whether it caches its length, whether it holds the Boolean placeholder of a
 struct declared without fields, and whether it keeps its keys in order
-(`designs/intrinsic-maps.md`, "Views"). -/
+(`doc/designs/intrinsic-maps.md`, "Layouts"). -/
 structure TableLayout where
   namespaceId : NamespaceId
   structId : Nat
@@ -209,7 +209,7 @@ structure TableLayout where
   length : Bool
   dummy : Bool
   ordered : Bool
-  /-- The owner's ghost slots (`designs/ghost-fields.md`). -/
+  /-- The owner's ghost slots (`doc/designs/ghost-fields.md`). -/
   ghosts : Nat
   deriving Repr, Inhabited
 
@@ -224,7 +224,7 @@ def tableLayout? (unit : ValidatedUnit) (namespaceId : NamespaceId) (structId : 
     intrinsic.model == "map" && intrinsic.owner == declaration.name
   guard (declaration.variants.isEmpty && declaration.generics.size == 2)
   let fieldTypes : List Ty ← declaration.fields.toList.mapM fun field =>
-    unit.tables.types[field.type.typeId.index]?
+    unit.tyAt (ns.typeId field.type.typeId)
   let (handle, length, dummy) ← match fieldTypes with
     | [] => some (false, false, false)
     -- The Boolean placeholder Move's compilers give an empty struct.
@@ -241,7 +241,7 @@ map a conversion role (`map_to_ordered_map`) builds. -/
 def resultLayout? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : FunctionDecl FunctionBody) : Option TableLayout := do
   let result ← declaration.signature.results[0]?
-  let .nominal name _ ← ns.tables.types[result.typeId.index]? | none
+  let .nominal name _ ← ns.typeOf result.typeId | none
   let (namespaceId, structId) ← nominalDeclarationId? unit ns name
   tableLayout? unit namespaceId structId
 
@@ -251,7 +251,7 @@ def tableRoleOf? (unit : ValidatedUnit) (namespaceId : NamespaceId) (functionId 
     Option (String × TableLayout) := do
   let ns ← unit.namespaces[namespaceId.index]?
   let declaration ← ns.functions[functionId.index]?
-  let target : QualifiedRef := { namespaceId, name := declaration.name }
+  let target : QualifiedRef := { namespaceId := ns.identity, name := declaration.name }
   ns.intrinsics.findSome? fun intrinsic => do
     guard (intrinsic.model == "map")
     let binding ← intrinsic.executableBindings.find? (·.target == target)

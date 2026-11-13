@@ -9,7 +9,7 @@ tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:17:13: e
       3, global<R>(a).v == old(global<R>(a).v) + 3 && res == x
     )` does not hold
 tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:41:5: error: verex verification failed: the automatic verification of `wrong_attached_claim` failed; provide a proof in `tests/sources/functional/closures/inline/anchor_mutation_pre_state.proof.lean`:
-  verify wrong_attached_claim by
+  verify wrong_attached_claim by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

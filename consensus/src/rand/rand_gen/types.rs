@@ -1167,6 +1167,55 @@ mod tests {
         );
     }
 
+    /// A validator whose own share fails verification must still aggregate once the
+    /// valid shares from peers reach the threshold.
+    #[tokio::test]
+    async fn test_try_aggregate_after_evicting_bad_self_share() {
+        use crate::rand::rand_gen::rand_store::{AggregationResult, ShareAggregator};
+        use aptos_crypto::HashValue;
+        use aptos_types::randomness::FullRandMetadata;
+        use futures::StreamExt;
+        use futures_channel::mpsc::unbounded;
+
+        let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], true);
+        let rand_config = &ctx.rand_configs[0];
+        let threshold = rand_config.threshold() as usize;
+        let metadata = FullRandMetadata::new(1, 1, HashValue::zero(), 1700000000);
+        let (tx, mut rx) = unbounded();
+
+        // Self share signed with validator 1's key, so it fails verification.
+        let bad_self_share = Share::generate(&ctx.rand_configs[1], metadata.metadata.clone());
+        let mut aggr = ShareAggregator::new(ctx.authors[0]);
+        aggr.add_share(
+            1,
+            RandShare::new(
+                ctx.authors[0],
+                metadata.metadata.clone(),
+                bad_self_share.share().clone(),
+            ),
+        );
+        for config in &ctx.rand_configs[1..threshold] {
+            aggr.add_share(1, Share::generate(config, metadata.metadata.clone()));
+        }
+        // Threshold is met only by counting the bad self share, which gets evicted.
+        let mut aggr = aggr
+            .try_aggregate(rand_config, metadata.clone(), tx.clone(), None)
+            .left()
+            .expect("Should not aggregate after evicting the bad self share");
+
+        aggr.add_share(
+            1,
+            Share::generate(&ctx.rand_configs[threshold], metadata.metadata.clone()),
+        );
+        assert!(aggr
+            .try_aggregate(rand_config, metadata, tx, None)
+            .is_right());
+        assert!(matches!(
+            rx.next().await,
+            Some(AggregationResult::Success { .. })
+        ));
+    }
+
     /// Test that the key pair DB format change is backward compatible.
     /// Old format: (AugKeyPair, Option<AugKeyPair>) where AugKeyPair = (ASK, APK)
     /// New format: AugKeyPair = (ASK, APK)

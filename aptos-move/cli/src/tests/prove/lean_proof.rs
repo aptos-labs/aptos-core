@@ -36,7 +36,7 @@ fn prove_lean_proof() {
 verex proofs for \"lean_proof.move\"
 verex proofs where
 
-verify square_of_sum by
+verify square_of_sum by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   case aborts_if_1_3 =>

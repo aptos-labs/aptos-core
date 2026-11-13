@@ -92,6 +92,13 @@ def signer : Codec String RuntimeValue where
   decode? := decodeSigner?
   decode_encode := decodeSigner?_signer
 
+def character : Codec SpecChar RuntimeValue where
+  encode := fun value => .character value.val
+  decode?
+    | .character value => if valid : isUnicodeScalar value = true then some ⟨value, valid⟩ else none
+    | _ => none
+  decode_encode := fun value => by simp [value.valid]
+
 def bytes : Codec (Array UInt8) RuntimeValue where
   encode := .bytes
   decode? := decodeBytes?
@@ -185,6 +192,17 @@ def boundedVector (codec : Codec Native RuntimeValue) :
       | cons value values ih =>
           simp [Function.comp_apply, codec.decode_encode, ih]
     simp [List.mapM_map, decoded, bounded]
+
+/-- A fixed-length array is encoded as its vector; only a vector of its
+length decodes. -/
+def array (codec : Codec Native RuntimeValue) (length : Nat) :
+    Codec (SpecArray Native length) RuntimeValue where
+  encode := fun value => (boundedVector codec).encode value.vector
+  decode? := fun raw => ((boundedVector codec).decode? raw).bind fun vector =>
+    if size_eq : vector.values.size = length then some ⟨vector, size_eq⟩ else none
+  decode_encode := by
+    intro ⟨vector, size_eq⟩
+    simp [(boundedVector codec).decode_encode, size_eq]
 
 theorem boundedVector_encode (codec : Codec Native RuntimeValue)
     (value : SpecVector Native) :

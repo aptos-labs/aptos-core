@@ -149,6 +149,10 @@ theorem instantiatePlaceFieldTypeFuel?_mono (ns : ValidatedNamespace)
               simp only [Option.bind_eq_some_iff] at h ⊢
               obtain ⟨instantiated, mapped, found⟩ := h
               exact ⟨instantiated, lift _ _ mapped, found⟩
+          | slice element =>
+              simp only [Option.bind_eq_some_iff] at h ⊢
+              obtain ⟨instantiated, mapped, found⟩ := h
+              exact ⟨instantiated, lift _ _ mapped, found⟩
           | typeDomain nested =>
               simp only [Option.bind_eq_some_iff] at h ⊢
               obtain ⟨instantiated, mapped, found⟩ := h
@@ -375,6 +379,11 @@ theorem instantiate_repeat {ns callerNs : ValidatedNamespace}
               let index ← callerNs.tables.types.findIdx? fun candidate =>
                 candidate == .vector element length
               some ⟨index⟩
+          | .slice element => do
+              let element ← instantiatePlaceFieldTypeFuel? callerNs callerArguments fuel element
+              let index ← callerNs.tables.types.findIdx? fun candidate =>
+                candidate == .slice element
+              some ⟨index⟩
           | .typeDomain nested => do
               let nested ← instantiatePlaceFieldTypeFuel? callerNs callerArguments fuel nested
               let index ← callerNs.tables.types.findIdx? (fun candidate =>
@@ -433,7 +442,7 @@ theorem instantiate_repeat {ns callerNs : ValidatedNamespace}
       StaticTyping.mentionsLifetimeParameter callerNs (fuel + 1) ⟨index⟩ = false →
         (match found with
           | .tuple elements => elements.any (StaticTyping.mentionsLifetimeParameter callerNs fuel)
-          | .vector element _ | .typeDomain element =>
+          | .vector element _ | .slice element | .typeDomain element =>
               StaticTyping.mentionsLifetimeParameter callerNs fuel element
           | .resourceDomain _ arguments =>
               arguments.any (·.any (StaticTyping.mentionsLifetimeParameter callerNs fuel))
@@ -478,6 +487,22 @@ theorem instantiate_repeat {ns callerNs : ValidatedNamespace}
       rw [types_eq] at found''
       exact found''
   | vector element length =>
+      simp only [Option.bind_eq_some_iff] at first ⊢
+      obtain ⟨instantiated, mapped, index, found, instance_eq⟩ := first
+      simp only [Option.some.injEq] at instance_eq
+      subst instance_eq
+      obtain ⟨found', found'_eq, accepts⟩ := located found
+      cases beq_iff_eq.mp accepts
+      rw [instantiatePlaceFieldTypeFuel?] at second
+      simp only [found'_eq, Option.bind_eq_bind, Option.bind_some, Option.bind_eq_some_iff] at second
+      obtain ⟨instantiated', mapped', index', found'', result_eq⟩ := second
+      simp only [Option.some.injEq] at result_eq
+      subst result_eq
+      have fixed' := unmentioned found'_eq fixed
+      refine ⟨instantiated', ih' _ _ _ mapped mapped' fixed', index', ?_, rfl⟩
+      rw [types_eq] at found''
+      exact found''
+  | slice element =>
       simp only [Option.bind_eq_some_iff] at first ⊢
       obtain ⟨instantiated, mapped, index, found, instance_eq⟩ := first
       simp only [Option.some.injEq] at instance_eq
@@ -833,7 +858,7 @@ theorem FrameInstantiation.call {unit : ValidatedUnit} {callerNs targetNs : Vali
         instance_ ∈ callerRequired ∧
         StaticTyping.mentionsLifetimeParameter callerNs (callerNs.tables.types.size + 1)
           instance_ = false)
-    (resolved : StaticTyping.resolveArguments callerNs callerEnv instantiations = some arguments)
+    (resolved : StaticTyping.resolveArgumentsAt callerNs callerEnv instantiations = some arguments)
     (kinds : ∀ (index : Nat) (binder : GenericBinder) (argument : GenericArgument),
       generics[index]? = some binder → instantiations[index]? = some argument →
         (binder.kind = .typeArg ↔ ∃ value, argument = .typeArg value))
@@ -870,7 +895,7 @@ theorem FrameInstantiation.call {unit : ValidatedUnit} {callerNs targetNs : Vali
           obtain ⟨binder, binder_eq⟩ : ∃ binder, generics[index]? = some binder :=
             ⟨_, Array.getElem?_eq_getElem bound⟩
           have kind := (kinds index binder _ binder_eq argument_eq).mpr ⟨original, rfl⟩
-          simp only [StaticTyping.resolveArguments] at resolved
+          simp only [StaticTyping.resolveArgumentsAt] at resolved
           obtain ⟨semantic, semantic_eq, image⟩ := Array.mapM_getElem? resolved argument_eq
           simp only [Functor.map, Option.map_eq_some_iff] at image
           obtain ⟨type, type_eq, rfl⟩ := image

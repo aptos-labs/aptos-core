@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/bv_mul_overflow.move:57:9: error: the specification clause `aborts_if false` is not established
 tests/sources/regression/bv_mul_overflow.move:55:5: error: verex verification failed: the automatic verification of `multiply_incorrect` failed; provide a proof in `tests/sources/regression/bv_mul_overflow.proof.lean`:
-  verify multiply_incorrect by
+  verify multiply_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

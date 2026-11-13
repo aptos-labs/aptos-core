@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/generic_copy.rs:35:1: info: `upvar` uses concrete verification: Given interpretation does not yet support calls to callees without a contract

@@ -10,9 +10,9 @@ fun direct_arg_copy(r0): u64 {
     r4: &u64
   code:
   L0:
-    0: [r1] := call make, [r0] @1
+    0: [r1] := call_exempt make, [r0] @1
     1: x0 := copy r1 @3
-    2: [r0] := call mutate_first, [x0] @4
+    2: [r0] := call_exempt mutate_first, [x0] @4
     3: r2 := imm_borrow_loc r1 @6
     4: r3 := ld_u64 0 @7
     5: r4 := vec_imm_borrow u64, r2, r3 @8

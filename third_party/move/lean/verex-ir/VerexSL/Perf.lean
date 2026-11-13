@@ -69,6 +69,43 @@ benchmark turns it off: it compares time and heartbeats, and the count
 walks every proof term. -/
 initialize countingObjects : IO.Ref Bool ← IO.mkRef true
 
+/-- Record the artifacts of one stage measured elsewhere: a proof's
+heartbeats and wall time on the thread that elaborated it, with the
+objects of its artifacts counted here, the auxiliary declarations made for
+them (`f._proof_1`) included, as one term: a subproof moved into one stays
+counted, and a subterm they share counts once. -/
+def recordArtifacts [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [MonadEnv m]
+    (target : String) (names : Array Name) (heartbeats elapsedMs : Nat) : m Unit := do
+  unless ← (measuring.get : IO Bool) do return
+  /- A theorem hands out its proof only to a caller that asks for opaque
+  values; the proof term is exactly what this measures. -/
+  let mut objects := 0
+  if ← (countingObjects.get : IO Bool) then
+    let env ← getEnv
+    let mut pending := names
+    let mut counted : NameSet := {}
+    let mut values := #[]
+    while let some name := pending.back? do
+      pending := pending.pop
+      if counted.contains name then continue
+      counted := counted.insert name
+      let some value := env.find? name |>.bind (·.value? (allowOpaque := true)) | continue
+      values := values.push value
+      for used in value.getUsedConstants do
+        if names.any (fun artifact => artifact != used && artifact.isPrefixOf used) then
+          pending := pending.push used
+    -- One term, so that a subterm the proofs share counts once.
+    objects := ← ((mkAppN (mkConst `artifacts) values).numObjs : IO Nat)
+  let sample : Sample := { target, heartbeats, objects, elapsedMs }
+  (recorded.modify fun samples =>
+    match samples.findIdx? (·.target == target) with
+    | none => samples.push sample
+    | some index => samples.modify index fun previous => {
+        target
+        heartbeats := previous.heartbeats + sample.heartbeats
+        objects := previous.objects + sample.objects
+        elapsedMs := previous.elapsedMs + sample.elapsedMs } : IO Unit)
+
 /-- Measure all artifacts produced by one stage. Stages sharing a target
 are accumulated, so moving proof work into generated declarations cannot
 make it disappear from the existing verification-cost gate. -/
@@ -82,26 +119,8 @@ def measureArtifacts [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [MonadEnv
   elaborate
   let stopHeartbeats ← (IO.getNumHeartbeats : BaseIO Nat)
   let stopTime ← (IO.monoNanosNow : BaseIO Nat)
-  /- A theorem hands out its proof only to a caller that asks for opaque
-  values; the proof term is exactly what this measures. -/
-  let mut objects := 0
-  if ← (countingObjects.get : IO Bool) then
-    for name in names do
-      if let some value := (← getEnv).find? name |>.bind (·.value? (allowOpaque := true)) then
-        objects := objects + (← (value.numObjs : IO Nat))
-  let sample : Sample := {
-      target
-      heartbeats := stopHeartbeats - startHeartbeats
-      objects
-      elapsedMs := (stopTime - startTime) / 1000000 }
-  (recorded.modify fun samples =>
-    match samples.findIdx? (·.target == target) with
-    | none => samples.push sample
-    | some index => samples.modify index fun previous => {
-        target
-        heartbeats := previous.heartbeats + sample.heartbeats
-        objects := previous.objects + sample.objects
-        elapsedMs := previous.elapsedMs + sample.elapsedMs } : IO Unit)
+  recordArtifacts target names (stopHeartbeats - startHeartbeats)
+    ((stopTime - startTime) / 1000000)
 
 /-- Measure one verification target while it elaborates. -/
 def measure [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [MonadEnv m]
@@ -197,6 +216,12 @@ def withPhase [Monad m] [MonadLiftT BaseIO m] [MonadFinally m] (phase : Phase)
     (phaseClock.modify fun clock =>
       let clock := clock.charge left leftBeats leftThread
       { clock with running := clock.running.drop 1 } : BaseIO Unit)
+
+/-- Charge heartbeats spent on another thread to `phase`: a proof's task
+counts its own, which the clock of this thread does not see. -/
+def chargeHeartbeats (phase : Phase) (heartbeats : Nat) : BaseIO Unit :=
+  phaseClock.modify fun clock =>
+    { clock with heartbeats := clock.heartbeats.modify phase.index (· + heartbeats) }
 
 /-- The nanoseconds and heartbeats charged to each phase. -/
 def phaseTotals : BaseIO (Array (Phase × Nat × Nat)) := do

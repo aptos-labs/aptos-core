@@ -1,0 +1,16 @@
+// Phantom T0 is valid in `&S1<T0>` and `&mut S1<T0>` because S1's type parameter is phantom,
+// including in function parameter and return types.
+
+//# publish
+module 0x1::M1
+struct S1<phantom T0> has drop
+  a: bool
+
+struct S2<phantom T0> has drop
+  a: |&S1<T0>|u64 has drop
+
+struct S3<phantom T0> has drop
+  a: |&mut S1<T0>|u64 has drop
+
+struct S4<phantom T0> has drop
+  a: |u64|&S1<T0> has drop

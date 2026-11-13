@@ -24,6 +24,7 @@ use move_model::{
         ABORTS_IF_IS_PARTIAL_PRAGMA, BV_INTERNAL_PRAGMA, CONDITION_ABSTRACT_PROP,
         CONDITION_CONCRETE_PROP, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA,
     },
+    spec_derivation,
     spec_translator::{ProofAction, SpecTranslator, TranslatedSpec},
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext, BOOL_TYPE, NUM_TYPE},
@@ -759,7 +760,12 @@ impl<'a> Instrumenter<'a> {
                     .map(|mem| mem.instantiate_ref(targs)),
             );
         }
-        let closure_footprints = closure_footprints(usage, &data.code);
+        let closure_footprints = closure_footprints(
+            fun_env.module_env.env,
+            fun_env.get_qualified_id(),
+            usage,
+            &data.code,
+        );
 
         let mut builder = FunctionDataBuilder::new(fun_env, data);
 
@@ -1306,9 +1312,21 @@ impl<'a> Instrumenter<'a> {
                 .get_parameters()
                 .iter()
                 .any(|p| matches!(p.1.skip_reference(), Type::Fun(..)));
-            let entry_label = find_behavior_pre_label_for_callee(spec, mid, fid);
-            let emits_behavior_aggregate = entry_label.is_some() && !callee_is_higher_order;
-            if emits_behavior_aggregate {
+            let emits_behavior_aggregate = find_behavior_pre_label_for_callee(spec, mid, fid)
+                .is_some()
+                && !callee_is_higher_order;
+            // The aggregates describe THIS call, so they are stated over the
+            // memory at this call: a fresh label, saved here, for every
+            // resource the callee's evaluator takes. The enclosing
+            // specification's own occurrence of the predicate keeps its entry
+            // label; the two name the same state exactly when nothing the
+            // callee reads was written between entry and the call, which is
+            // what makes a caller's `aborts_if aborts_of<callee>(..)` true or
+            // false. (Binding the aggregates to the entry label instead let a
+            // write before the call be ignored: the success of a call on the
+            // written state was assumed over the entry state, and a later
+            // abort on the same state was pruned as contradictory.)
+            let entry_label = if emits_behavior_aggregate {
                 for src in &srcs {
                     if self.builder.data.local_types[*src].is_mutable_reference() {
                         let ty = self.builder.get_local_type(*src).skip_reference().clone();
@@ -1318,7 +1336,16 @@ impl<'a> Instrumenter<'a> {
                             .or_insert_with(|| self.builder.new_temp(ty));
                     }
                 }
-            }
+                let env = self.builder.global_env();
+                let label = MemoryLabel::new(env.new_global_id().as_usize());
+                let callee_qid = mid.qualified(fid);
+                for mem in spec_derivation::behavioral_target_memory(env, callee_qid, targs) {
+                    callee_spec.saved_memory.insert((mem, label));
+                }
+                Some(label)
+            } else {
+                None
+            };
 
             // Emit saves for parameters used in old(..) context. Those can be referred
             // to in aborts conditions, and must be initialized before evaluating those.
@@ -1368,15 +1395,11 @@ impl<'a> Instrumenter<'a> {
                     self.tag_contract_prop(callee_is_bv_internal);
                 }
                 // Aggregate `aborts_of<callee>` on the abort path so a
-                // caller's `aborts_of<callee>` assertion discharges directly.
-                // See the success-path comment below `OpaqueCall` end for
-                // soundness and the gating rationale.
-                let abort_callee_is_higher_order = callee_env
-                    .get_parameters()
-                    .iter()
-                    .any(|p| matches!(p.1.skip_reference(), Type::Fun(..)));
-                let abort_entry_label = find_behavior_pre_label_for_callee(spec, mid, fid);
-                if abort_entry_label.is_some() && !abort_callee_is_higher_order {
+                // caller's `aborts_of<callee>` assertion discharges directly,
+                // over the memory saved at this call. See the success-path
+                // comment below `OpaqueCall` end for soundness and the
+                // gating rationale.
+                if emits_behavior_aggregate {
                     let abort_arg_exps: Vec<Exp> =
                         srcs.iter().map(|s| self.builder.mk_temporary(*s)).collect();
                     let (abort_closure_exp, _) =
@@ -1385,7 +1408,7 @@ impl<'a> Instrumenter<'a> {
                     let abort_aborts_exp = self.builder.mk_aborts_of_with_state(
                         abort_closure_exp,
                         abort_arg_exps,
-                        abort_entry_label,
+                        entry_label,
                         None,
                     );
                     self.builder
@@ -2955,15 +2978,10 @@ impl<'a> Instrumenter<'a> {
 /// with the given module/function id; `None` otherwise.
 ///
 /// Used to gate the call-site `assume bp_*_of<callee>(...)` in the opaque
-/// instrumentation: emitting it only when the enclosing spec already has an
-/// assertion of that predicate ensures `spec.saved_memory` was populated
-/// with the right label for the callee's used memory.
-/// Returns the first pre-state label under which the enclosing spec references the
-/// given callee through behavioral predicates.
-/// TODO(#20069): with references anchored at different labels, sequential calls to
-/// the same callee have different entry snapshots, but the aggregated call-site
-/// assumes all bind to this single label; selecting the label per call site needs
-/// a correlation between calls and the abstract state labels they define.
+/// instrumentation: the aggregate is emitted only when the enclosing spec
+/// names the callee through a behavioral predicate, so that it has an
+/// assertion to discharge. The aggregate itself is stated over memory saved
+/// at the call, not under this label.
 /// Walk `stale_lhs` and `fresh_lhs` in parallel to build a stale→fresh
 /// Temporary index map, then rewrite `stale_rhs`'s Temporaries accordingly.
 /// Used at ghost-field update lowering, where the fun-spec keeps a lowered
@@ -3129,34 +3147,75 @@ fn find_behavior_pre_label_for_callee(
 /// invoked here from the initialize trait function of this processor.
 /// Memory a closure may write and access, from the usage of its target function.
 struct ClosureFootprint {
-    /// Memory the closure may write, including through the function values it invokes.
+    /// Memory havoced across a call the closure is passed to: what its target's usage summary
+    /// writes, and when the closure's effects are known, also what a call to the target
+    /// writes as the prover encodes it (`usage_analysis::call_effects`).
     writes: BTreeSet<QualifiedInstId<StructId>>,
+    /// Whether the closure's effects are known (`usage_analysis::closures_with_known_footprint`),
+    /// which is what a callee leaving the frame to the call site requires. A closure whose
+    /// effects are not known is rejected by the frame check in target modules; elsewhere,
+    /// `writes` still covers what its target's summary records.
+    known: bool,
     /// Memory written by the code of the target and its callees.
     code_writes: BTreeSet<QualifiedInstId<StructId>>,
     /// Memory read or written by the code of the target and its callees.
     code_accessed: BTreeSet<QualifiedInstId<StructId>>,
 }
 
-/// Footprints of the closures bound to temporaries that have no other definition.
+/// Whether `temp` is bound, in `code`, to a closure whose target's usage summary has
+/// `unbounded_invoke`: the target runs a function value whose writes nothing records.
+fn closure_target_has_unbounded_invoke(
+    usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
+    code: &[Bytecode],
+    temp: TempIndex,
+) -> bool {
+    code.iter().any(|bc| match bc {
+        Bytecode::Call(_, dests, Operation::Closure(mid, fid, _, _), _, _) => {
+            dests.contains(&temp)
+                && usage
+                    .get(&mid.qualified(*fid))
+                    .is_some_and(|target_usage| target_usage.unbounded_invoke)
+        },
+        _ => false,
+    })
+}
+
+/// Footprints of the closures in `code` bound to a temporary defined once, keyed by that
+/// temporary.
 fn closure_footprints(
+    env: &GlobalEnv,
+    enclosing: QualifiedId<FunId>,
     usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
     code: &[Bytecode],
 ) -> BTreeMap<TempIndex, ClosureFootprint> {
+    // A loop head havocs every temporary the body assigns, a closure among them, so a
+    // closure built inside a loop has two definitions and no footprint here. That is
+    // deliberate: the call-site havoc derived from a footprint covers the path through the
+    // loop body, but a claim made after the loop is checked against the loop-exit path,
+    // whose memory havoc comes from the callee's usage summary -- empty for a callee that
+    // declares no frame. Treating the footprint as known there would let a false post-loop
+    // claim through, so the loop case is left without one and rejected instead.
     let mut def_counts: BTreeMap<TempIndex, usize> = BTreeMap::new();
     for bc in code {
         for dest in bc.dests() {
             *def_counts.entry(dest).or_default() += 1;
         }
     }
+    let summary_of = |id: QualifiedId<FunId>| usage.get(&id).cloned();
+    let known = usage_analysis::closures_with_known_footprint(env, enclosing, code, &summary_of);
     code.iter()
         .filter_map(|bc| match bc {
             Bytecode::Call(_, dests, Operation::Closure(mid, fid, targs, _), _, _)
                 if dests.len() == 1 && def_counts[&dests[0]] == 1 =>
             {
-                let target_usage = &usage[&mid.qualified(*fid)];
+                let target_usage = usage.get(&mid.qualified(*fid))?;
                 let code_writes = target_usage.modified.get_all_inst(targs);
                 let mut writes = code_writes.clone();
                 writes.extend(target_usage.invoke_frame.get_all_inst(targs));
+                let effects = known.get(&dests[0]);
+                if let Some(effects) = effects {
+                    writes.extend(effects.writes.iter().cloned());
+                }
                 let code_accessed = target_usage
                     .code_accessed
                     .iter()
@@ -3164,6 +3223,7 @@ fn closure_footprints(
                     .collect();
                 Some((dests[0], ClosureFootprint {
                     writes,
+                    known: effects.is_some(),
                     code_writes,
                     code_accessed,
                 }))
@@ -3174,7 +3234,10 @@ fn closure_footprints(
 }
 
 /// The `modifies_of`/`reads_of` frame a function declares for a function-typed parameter,
-/// instantiated at a call site. Without a declaration the parameter may access no memory.
+/// instantiated at a call site.
+///
+/// Without a declaration the parameter may access no memory, except where the callee
+/// leaves the frame to its call sites (`FunctionEnv::leaves_fun_param_frame_to_call_site`).
 #[derive(Default)]
 struct DeclaredFrame {
     writes: BTreeSet<QualifiedInstId<StructId>>,
@@ -3207,6 +3270,11 @@ impl DeclaredFrame {
 /// declares for the parameter. The callee is verified under that frame, and its callers
 /// assume the result. The closure is judged by what its code accesses; frames of function
 /// values it invokes are not included.
+///
+/// A callee that leaves the frame to its call sites
+/// (`FunctionEnv::leaves_fun_param_frame_to_call_site`) is the exception: the call site
+/// supplies the frame instead, provided it has a closure footprint to supply, and the
+/// usage analysis carries that footprint into the summary of the function making the call.
 fn check_fun_arg_frames(
     env: &GlobalEnv,
     targets: &FunctionTargetsHolder,
@@ -3222,10 +3290,12 @@ fn check_fun_arg_frames(
                 continue;
             }
             let target = targets.get_target(&fun_env, &FunctionVariant::Baseline);
-            let footprints = closure_footprints(usage, target.get_bytecode());
-            if footprints.is_empty() {
-                continue;
-            }
+            let footprints = closure_footprints(
+                env,
+                fun_env.get_qualified_id(),
+                usage,
+                target.get_bytecode(),
+            );
             for bc in target.get_bytecode() {
                 let Bytecode::Call(id, _, Operation::Function(mid, fid, targs), srcs, _) = bc
                 else {
@@ -3236,15 +3306,72 @@ fn check_fun_arg_frames(
                     continue;
                 }
                 for (param, src) in callee_env.get_parameters().iter().zip(srcs) {
-                    let Some(footprint) = footprints.get(src) else {
-                        continue;
-                    };
                     let frame = DeclaredFrame::of_fun_param(&callee_env, param.0, targs);
                     if frame.modifies_all {
                         continue;
                     }
+                    let defers = callee_env.leaves_fun_param_frame_to_call_site(param.0);
                     let loc = target.get_bytecode_loc(*id);
                     let param_name = param.0.display(env.symbol_pool());
+                    // A closure built here whose target runs a function value nothing bounds
+                    // has writes no footprint records, so it can be checked against neither
+                    // a declared frame nor a deferred one.
+                    if param.1.skip_reference().is_function()
+                        && closure_target_has_unbounded_invoke(usage, target.get_bytecode(), *src)
+                    {
+                        env.error(
+                            &loc,
+                            &format!(
+                                "cannot establish what function argument `{}` may modify: \
+                                 the closure's target invokes a function value whose effects \
+                                 no `modifies_of` declaration bounds",
+                                param_name
+                            ),
+                        );
+                        continue;
+                    }
+                    let Some(footprint) = footprints.get(src).filter(|f| f.known) else {
+                        // Deferring only works when this call site can answer the question
+                        // the callee left open: for a closure whose writes are known
+                        // (`closures_with_known_footprint`), which are then havoced across
+                        // the call. Any other function value -- a forwarded parameter, a
+                        // stored callback, a closure over this very function, or one that
+                        // partially applies another deferring callee -- has no footprint to
+                        // havoc, so the callee's empty frame stands and the argument has to
+                        // be rejected rather than waved through.
+                        //
+                        // Against a declared frame, a closure built once here whose effects
+                        // are not known cannot be shown to stay within it either.
+                        if !defers
+                            && param.1.skip_reference().is_function()
+                            && footprints.contains_key(src)
+                        {
+                            env.error(
+                                &loc,
+                                &format!(
+                                    "cannot establish what function argument `{}` may \
+                                     modify: the closure's effects are not known",
+                                    param_name
+                                ),
+                            );
+                        } else if defers && param.1.skip_reference().is_function() {
+                            env.error(
+                                &loc,
+                                &format!(
+                                    "cannot establish what function argument `{}` may \
+                                     modify: `{}` declares no `modifies_of` for it, and the \
+                                     argument is not a closure with a known footprint built \
+                                     at this call site",
+                                    param_name,
+                                    callee_env.get_full_name_str()
+                                ),
+                            );
+                        }
+                        continue;
+                    };
+                    if defers {
+                        continue;
+                    }
                     for mem in footprint.code_writes.difference(&frame.writes) {
                         env.error(
                             &loc,

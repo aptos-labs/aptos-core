@@ -134,9 +134,14 @@ fn call_or_specialize_borrow_field_mut(
         // invalidate the original reference. By handling the borrow inline, we preserve
         // correct reference tracking.
         //
-        // This approach relies on assumptions enforced by struct_api_checker:
-        // 1. The function has only one struct-API attribute (BorrowFieldMutable)
-        // 2. The function implementation matches: it only borrows the specified field
+        // This approach relies on assumptions about the called function:
+        // 1. It has only one struct-API attribute (BorrowFieldMutable), checked by
+        //    struct_api_checker
+        // 2. Its signature takes one `&mut` struct and returns one `&mut` value, checked
+        //    up front by `struct_api_checker::check_function_handles` when enabled
+        // 3. Its implementation only borrows the specified field, checked by
+        //    `struct_api_checker::check_function` for local definitions and by linking for
+        //    imported handles
         //
         // Note: Immutable references don't need this special case since they can be copied.
         // The same special handling is done in call_generic below.

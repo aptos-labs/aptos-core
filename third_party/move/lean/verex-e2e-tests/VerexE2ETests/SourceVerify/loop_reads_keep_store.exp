@@ -1,0 +1,8 @@
+VerexE2ETests/SourceVerify/loop_reads_keep_store.move:43:9: error: the specification clause `ensures global<R>(a) == old(global<R>(a))` is not established
+VerexE2ETests/SourceVerify/loop_reads_keep_store.move:41:5: error: verex verification failed: the automatic verification of `writes` failed; provide a proof in `VerexE2ETests/SourceVerify/loop_reads_keep_store.proof.lean`:
+  verify writes by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

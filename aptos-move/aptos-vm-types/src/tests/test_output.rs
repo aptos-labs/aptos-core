@@ -53,7 +53,7 @@ fn test_ok_output_equality() {
     let txn_output_1 = assert_ok!(vm_output.clone().into_transaction_output());
     let txn_output_2 = assert_ok!(vm_output
         .clone()
-        .into_transaction_output_with_materialized_write_set(vec![], vec![]));
+        .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![]));
 
     assert_eq_outputs(&vm_output, txn_output_1);
     assert_eq_outputs(&vm_output, txn_output_2);

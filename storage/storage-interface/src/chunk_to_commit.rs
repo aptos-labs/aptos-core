@@ -2,8 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::{
+    collateral::CollateralOverlay,
+    orders::OrderOverlay,
     positions::PositionOverlay,
-    sharded_jmt_state::PositionStateWithSummary,
+    sharded_jmt_state::NativeStateWithSummary,
     state::LedgerState,
     state_summary::LedgerStateSummary,
     state_update_refs::StateUpdateRefs,
@@ -30,7 +32,14 @@ pub struct ChunkToCommit<'a> {
     /// Position summary computed at execution time (checkpoint stage), to
     /// be persisted/merklized at commit without recomputation. `None` when
     /// native position is disabled.
-    pub position_state_summary: Option<&'a LedgerWithSummary<PositionStateWithSummary>>,
+    pub position_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
+    /// Order summary computed at execution time, as `position_state_summary`
+    /// is. `None` unless the trading-native state roots are computed.
+    pub order_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
+    /// Collateral summary computed at execution time, as
+    /// `position_state_summary` is. `None` unless the trading-native state
+    /// roots are computed.
+    pub collateral_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
     /// Position writes since the base, computed in the execution phase
     /// — earlier than `position_state_summary`, which is a checkpoint-stage
     /// product. Commit publishes this as the bundle's tip so the
@@ -40,6 +49,13 @@ pub struct ChunkToCommit<'a> {
     /// The chunk's latest only. The executor tracks a last-checkpoint
     /// overlay alongside it, but nothing outside the executor reads one.
     pub positions: Option<&'a PositionOverlay>,
+    /// Order writes since the base, published by commit as the order tip
+    /// as `positions` is. `None` when trading-native storage is off.
+    pub orders: Option<&'a OrderOverlay>,
+    /// Collateral writes since the base, published by commit as the
+    /// collateral tip as `orders` is. `None` when trading-native storage is
+    /// off.
+    pub collateral: Option<&'a CollateralOverlay>,
     pub is_reconfig: bool,
 }
 
@@ -61,27 +77,15 @@ impl ChunkToCommit<'_> {
     }
 
     pub fn result_ledger_state_with_summary(&self) -> LedgerStateWithSummary {
-        let latest = StateWithSummary::new(
-            self.state.latest().clone(),
-            self.state_summary.latest().clone(),
-        );
-        let last_checkpoint = StateWithSummary::new(
+        LedgerStateWithSummary::new_at_checkpoint(StateWithSummary::new(
             self.state.last_checkpoint().clone(),
             self.state_summary.last_checkpoint().clone(),
-        );
-        LedgerStateWithSummary::from_latest_and_last_checkpoint(latest, last_checkpoint)
+        ))
     }
 
     pub fn estimated_total_state_updates(&self) -> usize {
-        let for_last_checkpoint = self
-            .state_update_refs
+        self.state_update_refs
             .for_last_checkpoint_batched()
-            .map_or(0, |x| x.len());
-        let for_latest = self
-            .state_update_refs
-            .for_latest_batched()
-            .map_or(0, |x| x.len());
-
-        for_latest + for_last_checkpoint
+            .map_or(0, |x| x.len())
     }
 }

@@ -4,7 +4,7 @@
 module 0x42::foo {
     use 0x1::vector;
     struct Foo<T0: store> has drop, key {
-        f: |T0|(vector<T0>) has drop + store,
+        f: |T0|vector<T0> has drop + store,
     }
     public fun make_foo<T0: store>(p0: &signer) {
         let _v0 = Foo<T0>{f: |x| vector::singleton<T0>(x)};

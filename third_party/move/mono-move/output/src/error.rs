@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Errors raised while building a transaction output.
+//! Errors raised while building a transaction output or return values.
 
 use mono_move_core::{ExecutionErrorKind, IntoExecutionError};
 use thiserror::Error;
@@ -16,6 +16,9 @@ pub enum OutputError {
 
     #[error("failed to build contract event: {0}")]
     InvalidEvent(String),
+
+    #[error("cannot re-encode a returned signer: {0}")]
+    InvalidSigner(String),
 }
 
 impl IntoExecutionError for OutputError {
@@ -24,6 +27,7 @@ impl IntoExecutionError for OutputError {
             OutputError::InvalidEventType => ExecutionErrorKind::InvariantViolation,
             OutputError::InvalidEventGuid(_) => ExecutionErrorKind::InvalidOperation,
             OutputError::InvalidEvent(_) => ExecutionErrorKind::RuntimeLimitExceeded,
+            OutputError::InvalidSigner(_) => ExecutionErrorKind::InvariantViolation,
         }
     }
 }

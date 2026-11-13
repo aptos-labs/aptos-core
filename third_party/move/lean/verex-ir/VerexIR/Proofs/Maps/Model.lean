@@ -147,7 +147,7 @@ theorem get_of_perm [Inhabited V] {left right : List (K × V)} (perm : left.Perm
           simp [get, h.1, ih h.2]
     rw [none left present, none right absent]
 
-/-! ## Laws of the sequence discipline -/
+/-! ## Lemmas of the sequence discipline -/
 
 theorem containsB_replaceFirst (entries : List (K × V)) (key : K) (value : V) (probe : K) :
     containsB (replaceFirst key value entries) probe = containsB entries probe := by
@@ -369,7 +369,7 @@ def ordDel (key : K) : List (K × V) → List (K × V)
   | [] => []
   | entry :: rest => if entry.1 = key then rest else entry :: ordDel key rest
 
-/-! ## Laws of the ordered discipline -/
+/-! ## Lemmas of the ordered discipline -/
 
 section OrderedLaws
 variable (rank : KeyOrder K)
@@ -605,6 +605,10 @@ def size (map : SpecMap K V) : Int := map.length
 
 def hasKey (map : SpecMap K V) (key : K) : Bool := containsB map key
 
+@[simp] theorem size_empty : size ([] : SpecMap K V) = 0 := rfl
+
+@[simp] theorem hasKey_empty (key : K) : hasKey ([] : SpecMap K V) key = false := rfl
+
 def valueAt [Inhabited V] (map : SpecMap K V) (key : K) : V := get map key
 
 def keyAt [Inhabited K] (map : SpecMap K V) (index : Int) : K :=
@@ -777,6 +781,31 @@ theorem keyAt_update_present [Inhabited K] {discipline : Discipline K}
   · rfl
   · rw [← List.getElem?_map, keys, List.getElem?_map]
 
+/-- A key's position depends on the keys alone. -/
+theorem indexOf_of_keys {entries others : List (K × V)}
+    (same : entries.map Prod.fst = others.map Prod.fst) (key : K) :
+    indexOf entries key = indexOf others key := by
+  induction entries generalizing others with
+  | nil => cases others with
+    | nil => rfl
+    | cons _ _ => simp at same
+  | cons head rest ih => cases others with
+    | nil => simp at same
+    | cons other tail =>
+      simp only [List.map_cons, List.cons.injEq] at same
+      simp only [indexOf, same.1, ih same.2]
+
+/-- Setting a key the map holds keeps every key's rank. -/
+theorem rank_update_present {discipline : Discipline K}
+    {map : SpecMap K V} {key : K} (valid : Valid discipline map) (present : hasKey map key = true)
+    (value : V) (probe : K) :
+    rank (update discipline map key value) probe = rank map probe := by
+  have keys : (discipline.set map key value).map Prod.fst = map.map Prod.fst := by
+    cases discipline with
+    | sequence => exact map_fst_seqSet_present value present
+    | ordered rank => exact map_fst_ordSet_present rank value present valid
+  simp only [rank, update, indexOf_of_keys keys]
+
 /-- After an ordered removal, the positions from the removed key's on hold
 the keys one position further. -/
 theorem keyAt_remove_ordered [Inhabited K] (order : KeyOrder K)
@@ -798,6 +827,8 @@ theorem keyAt_remove_ordered [Inhabited K] (order : KeyOrder K)
 
 /-- Mathematical order of integer keys. -/
 def intOrder : KeyOrder Int := ⟨compare, inferInstance, inferInstance⟩
+
+@[simp] theorem intOrder_compare (a b : Int) : intOrder.compare a b = compare a b := rfl
 
 omit [DecidableEq K] in
 theorem size_nonneg (map : SpecMap K V) : 0 ≤ size map := Int.natCast_nonneg _
@@ -833,6 +864,22 @@ theorem keyAt_lt {map : SpecMap Int V} (valid : Valid (.ordered intOrder) map)
     keyAt map first < keyAt map second :=
   Int.compare_eq_lt.mp (order_keyAt_lt valid low before high)
 
+omit [DecidableEq K] in
+/-- `keyAt_lt` as a fact of two positions, its conditions premises: what the
+solver states of the positions a leaf reads. -/
+theorem keyAt_lt_of_lt {map : SpecMap Int V} (valid : Valid (.ordered intOrder) map)
+    (first second : Int) :
+    0 ≤ first → first < second → second < size map → keyAt map first < keyAt map second :=
+  fun low before high => keyAt_lt valid low before high
+
+omit [DecidableEq K] in
+/-- Equal positions hold equal keys, as a fact over the positions' bounds. -/
+theorem keyAt_congr (map : SpecMap Int V) (first second : Int) :
+    first ≤ second → second ≤ first → keyAt map first ≤ keyAt map second := by
+  intro below above
+  rw [show first = second by omega]
+  exact Int.le_refl _
+
 theorem hasKey_remove {discipline : Discipline K} {map : SpecMap K V}
     (valid : Valid discipline map) (key probe : K) :
     hasKey (remove discipline map key) probe = (!decide (key = probe) && hasKey map probe) := by
@@ -857,6 +904,35 @@ theorem valid_remove {discipline : Discipline K} {map : SpecMap K V}
 def KeysSatisfy (property : K → Prop) (map : SpecMap K V) : Prop :=
   ∀ entry ∈ map, property entry.1
 
+/-- A property of every value, such as the source integer range. -/
+def ValuesSatisfy (property : V → Prop) (map : SpecMap K V) : Prop :=
+  ∀ entry ∈ map, property entry.2
+
+/-- The value at any key has a property every value and the default have. -/
+theorem valueAt_satisfies [Inhabited V] {map : SpecMap K V} {property : V → Prop}
+    (values : ValuesSatisfy property map) (fallback : property default) (key : K) :
+    property (valueAt map key) := by
+  unfold valueAt
+  induction map with
+  | nil => exact fallback
+  | cons entry rest ih =>
+      simp only [get]
+      split
+      · exact values entry (List.mem_cons_self ..)
+      · exact ih fun other member => values other (List.mem_cons_of_mem _ member)
+
+omit [DecidableEq K] in
+/-- The key at any position has a property every key and the default have. -/
+theorem keyAt_satisfies_all [Inhabited K] {map : SpecMap K V} {property : K → Prop}
+    (keys : KeysSatisfy property map) (fallback : property default) (index : Int) :
+    property (keyAt map index) := by
+  unfold keyAt
+  split
+  · exact fallback
+  · cases found : map[index.toNat]? with
+    | none => exact fallback
+    | some entry => exact keys entry (List.mem_of_getElem? found)
+
 omit [DecidableEq K] in
 theorem keyAt_satisfies [Inhabited K] {map : SpecMap K V} {property : K → Prop}
     (keys : KeysSatisfy property map) {index : Int} (low : 0 ≤ index) (high : index < size map) :
@@ -864,6 +940,13 @@ theorem keyAt_satisfies [Inhabited K] {map : SpecMap K V} {property : K → Prop
   have bound : index.toNat < map.length := by simp only [size] at high; omega
   simpa only [keyAt, Int.not_lt.mpr low, if_false, List.getElem?_eq_getElem bound,
     Option.map_some, Option.getD_some] using keys _ (List.getElem_mem bound)
+
+omit [DecidableEq K] in
+/-- A present key has a property every key has. -/
+theorem hasKey_satisfies [DecidableEq K] [Inhabited K] {map : SpecMap K V} {property : K → Prop}
+    (keys : KeysSatisfy property map) {key : K} (present : hasKey map key = true) :
+    property key :=
+  keyAt_rank present ▸ keyAt_satisfies keys (rank_nonneg map key) (rank_lt_size present)
 
 /-- Present integer keys have the same strict order as their positions. -/
 theorem rank_lt_rank {map : SpecMap Int V}
@@ -942,6 +1025,39 @@ def prevKey? (order : KeyOrder K) (map : SpecMap K V) (key : K) : Option K :=
   ((map.filter fun entry => order.compare entry.1 key == .lt).getLast?).map Prod.fst
 
 omit [DecidableEq K] in
+/-- The next key of a map literal, entry by entry. -/
+theorem nextKey?_nil (order : KeyOrder K) (key : K) : nextKey? order ([] : SpecMap K V) key = none :=
+  rfl
+
+omit [DecidableEq K] in
+theorem nextKey?_cons (order : KeyOrder K) (k : K) (v : V) (rest : SpecMap K V) (key : K) :
+    nextKey? order ((k, v) :: rest) key =
+      if order.compare k key = .gt then some k else nextKey? order rest key := by
+  unfold nextKey?
+  by_cases above : order.compare k key = .gt
+  · simp [List.find?_cons, above]
+  · simp [List.find?_cons, above]
+
+omit [DecidableEq K] in
+/-- The previous key of a map literal, entry by entry: the last below the
+key among the later entries, else this one where it is below. -/
+theorem prevKey?_nil (order : KeyOrder K) (key : K) : prevKey? order ([] : SpecMap K V) key = none :=
+  rfl
+
+omit [DecidableEq K] in
+theorem prevKey?_cons (order : KeyOrder K) (k : K) (v : V) (rest : SpecMap K V) (key : K) :
+    prevKey? order ((k, v) :: rest) key =
+      (prevKey? order rest key).or (if order.compare k key = .lt then some k else none) := by
+  unfold prevKey?
+  by_cases below : order.compare k key = .lt
+  · simp only [List.filter_cons, below, beq_self_eq_true, if_true, List.getLast?_cons]
+    cases h : (List.filter (fun entry => order.compare entry.1 key == .lt) rest).getLast? <;>
+      simp [h]
+  · have : (order.compare k key == .lt) = false := by simpa using below
+    simp only [List.filter_cons, this, Bool.false_eq_true, if_false, below]
+    cases (List.filter (fun entry => order.compare entry.1 key == .lt) rest).getLast? <;> rfl
+
+omit [DecidableEq K] in
 theorem nextKey_at [Inhabited K] {order : KeyOrder K} {m : SpecMap K V}
     (valid : Valid (.ordered order) m) {i : Int} (low : 0 ≤ i) (high : i < size m) :
     nextKey? order m (keyAt m i) =
@@ -1007,6 +1123,87 @@ theorem nextKey_some [Inhabited K] {order : KeyOrder K} {map : SpecMap K V} {key
   · simp at found
 
 omit [DecidableEq K] in
+theorem prevKey_at [Inhabited K] {order : KeyOrder K} {m : SpecMap K V}
+    (valid : Valid (.ordered order) m) {i : Int} (low : 0 ≤ i) (high : i < size m) :
+    prevKey? order m (keyAt m i) = if 0 < i then some (keyAt m (i - 1)) else none := by
+  have read (j : Nat) (hj : j < m.length) :
+      m[j].1 = keyAt m j := by
+    simp only [keyAt, Int.natCast_nonneg, Int.not_lt.mpr, if_false,
+      Int.toNat_natCast, List.getElem?_eq_getElem hj, Option.map_some, Option.getD_some]
+  have below (j : Nat) (hj : j < m.length) :
+      (order.compare m[j].1 (keyAt m i) == .lt) = decide ((j : Int) < i) := by
+    rw [read j hj]
+    by_cases before : (j : Int) < i
+    · rw [order_keyAt_lt valid (by omega) before high]; simp [before]
+    · by_cases same : (j : Int) = i
+      · rw [same, Std.ReflCmp.compare_self (cmp := order.compare)]; simp
+      · rw [Std.OrientedCmp.eq_swap (cmp := order.compare),
+          order_keyAt_lt valid low (by omega) (by simp only [size]; omega)]
+        simp [before]
+  have belowPrefix : m.filter (fun entry => order.compare entry.1 (keyAt m i) == .lt) =
+      m.take i.toNat := by
+    conv => lhs; arg 2; rw [← List.take_append_drop i.toNat m]
+    rw [List.filter_append, List.filter_eq_self.mpr, List.filter_eq_nil_iff.mpr, List.append_nil]
+    · intro entry mem
+      obtain ⟨j, hj, rfl⟩ := List.getElem_of_mem mem
+      rw [List.getElem_drop, below _ (by simp at hj; omega)]; simp; omega
+    · intro entry mem
+      obtain ⟨j, hj, rfl⟩ := List.getElem_of_mem mem
+      rw [List.getElem_take, below _ (by simp at hj; omega)]; simp at hj ⊢; omega
+  unfold prevKey?
+  have bound : i.toNat < m.length := by simp only [size] at high; omega
+  rw [belowPrefix, List.getLast?_eq_getElem?, List.length_take, List.getElem?_take,
+    show min i.toNat m.length = i.toNat by omega]
+  split
+  next positive =>
+    have previous : i.toNat - 1 < m.length := by omega
+    rw [if_pos (by omega), List.getElem?_eq_getElem previous, Option.map_some, read _ previous,
+      show ((i.toNat - 1 : Nat) : Int) = i - 1 by omega]
+  next first =>
+    rw [if_neg (by omega), Option.map_none]
+
+/-- No predecessor of a present key means that key is first. -/
+theorem prevKey_none [Inhabited K] {order : KeyOrder K} {map : SpecMap K V} {key : K}
+    (valid : Valid (.ordered order) map) (present : hasKey map key = true)
+    (absent : prevKey? order map key = none) : rank map key = 0 := by
+  have low := rank_nonneg map key
+  have high := rank_lt_size present
+  rw [← keyAt_rank present, prevKey_at valid low high] at absent
+  split at absent
+  · simp at absent
+  · omega
+
+/-- A predecessor is present at the previous position. -/
+theorem prevKey_some [Inhabited K] {order : KeyOrder K} {map : SpecMap K V} {key prev : K}
+    (valid : Valid (.ordered order) map) (present : hasKey map key = true)
+    (found : prevKey? order map key = some prev) :
+    hasKey map prev = true ∧ rank map prev + 1 = rank map key := by
+  have low := rank_nonneg map key
+  have high := rank_lt_size present
+  rw [← keyAt_rank present, prevKey_at valid low high] at found
+  split at found
+  · have equal := Option.some.inj found
+    rw [← equal]
+    exact ⟨hasKey_keyAt (by omega) (by omega), by rw [rank_keyAt valid (by omega) (by omega)]; omega⟩
+  · simp at found
+
+omit [DecidableEq K] in
+/-- A key's successor is a key of the map: it has what every key has. -/
+theorem nextKey_satisfies {order : KeyOrder K} {map : SpecMap K V} {property : K → Prop}
+    (keys : KeysSatisfy property map) {key next : K}
+    (found : nextKey? order map key = some next) : property next := by
+  obtain ⟨entry, hit, rfl⟩ := Option.map_eq_some_iff.mp found
+  exact keys entry (List.mem_of_find?_eq_some hit)
+
+omit [DecidableEq K] in
+/-- A key's predecessor is a key of the map. -/
+theorem prevKey_satisfies {order : KeyOrder K} {map : SpecMap K V} {property : K → Prop}
+    (keys : KeysSatisfy property map) {key prev : K}
+    (found : prevKey? order map key = some prev) : property prev := by
+  obtain ⟨entry, hit, rfl⟩ := Option.map_eq_some_iff.mp found
+  exact keys entry (List.mem_filter.mp (List.mem_of_getLast? hit)).1
+
+omit [DecidableEq K] in
 /-- The returned key sequence has the map's cardinality. -/
 theorem size_of_keys {map : SpecMap K V} {keys : List K} (same : keys = map.map Prod.fst) :
     (keys.length : Int) = size map := by simp [same, size]
@@ -1042,5 +1239,464 @@ theorem valid_slice {W : Type} {map : SpecMap Int V} {slice : SpecMap Int W} {of
   intro i j ilo before jhi
   rw [same i ilo (by omega), same j (by omega) jhi]
   exact keyAt_lt valid (by omega) (by omega) (by omega)
+
+/-- An update keeps a map valid under its discipline. -/
+theorem valid_update {discipline : Discipline K} {map : SpecMap K V}
+    (valid : Valid discipline map) (key : K) (value : V) :
+    Valid discipline (update discipline map key value) := by
+  cases discipline with
+  | sequence => exact distinct_seqSet valid key value
+  | ordered order => exact ascending_ordSet order valid key value
+
+/-! ## Bulk operations
+
+Several entries set in order, the entries of a prefix or a suffix, and a
+key replaced at its position: the typed forms of the runtime bulk
+operations (`Maps.updateAll`, `takeEntries`, `dropEntries`, `replaceKey`),
+with the conditions under which the intrinsic roles abort. -/
+
+/-- The keys of a map, in order. -/
+def keys (map : SpecMap K V) : List K := map.map Prod.fst
+
+/-- The values of a map, in order. -/
+def values (map : SpecMap K V) : List V := map.map Prod.snd
+
+omit [DecidableEq K] in
+theorem keys_nil : keys ([] : SpecMap K V) = [] := rfl
+omit [DecidableEq K] in
+theorem keys_cons (entry : K × V) (rest : SpecMap K V) :
+    keys (entry :: rest) = entry.1 :: keys rest := rfl
+omit [DecidableEq K] in
+theorem values_nil : values ([] : SpecMap K V) = [] := rfl
+omit [DecidableEq K] in
+theorem values_cons (entry : K × V) (rest : SpecMap K V) :
+    values (entry :: rest) = entry.2 :: values rest := rfl
+
+/-- The map with the keys of one list set to the values of another, in
+order: a later equal key wins. -/
+def updateAll (discipline : Discipline K) (map : SpecMap K V) (keys : List K) (values : List V) :
+    SpecMap K V :=
+  (keys.zip values).foldl (fun map entry => update discipline map entry.1 entry.2) map
+
+/-- The entries of the first `count` positions. -/
+def takeEntries (map : SpecMap K V) (count : Int) : SpecMap K V := map.take count.toNat
+
+/-- The entries from position `count` on. -/
+def dropEntries (map : SpecMap K V) (count : Int) : SpecMap K V := map.drop count.toNat
+
+/-- The map with a key replaced by another at its position. -/
+def replaceKey (map : SpecMap K V) (old new : K) : SpecMap K V :=
+  map.map fun entry => if entry.1 = old then (new, entry.2) else entry
+
+/-- Building a map aborts on lists of different lengths or a key twice. -/
+def AbortsNewFrom (keys : List K) (values : List V) : Prop :=
+  keys.length ≠ values.length ∨ ¬keys.Nodup
+
+/-- Adding several entries aborts on lists of different lengths, a key the
+map holds, or a key twice. -/
+def AbortsAddAll (map : SpecMap K V) (keys : List K) (values : List V) : Prop :=
+  keys.length ≠ values.length ∨ (∃ key ∈ keys, hasKey map key = true) ∨ ¬keys.Nodup
+
+/-- Updating several entries aborts on lists of different lengths. -/
+def AbortsUpsertAll (keys : List K) (values : List V) : Prop := keys.length ≠ values.length
+
+/-- Appending a map aborts on a key both hold. -/
+def AbortsAppendDisjoint (map other : SpecMap K V) : Prop :=
+  ∃ key, hasKey map key = true ∧ hasKey other key = true
+
+/-- Replacing a key aborts when the map lacks it, or when the new key breaks
+the discipline at its position. -/
+def AbortsReplaceKey (discipline : Discipline K) (map : SpecMap K V) (old new : K) : Prop :=
+  hasKey map old = false ∨ ¬Valid discipline (replaceKey map old new)
+
+theorem mem_keys_iff (map : SpecMap K V) (key : K) : key ∈ keys map ↔ hasKey map key = true := by
+  simp only [keys, hasKey, containsB_iff, List.mem_map]
+  constructor
+  · rintro ⟨⟨_, value⟩, mem, rfl⟩
+    exact ⟨value, mem⟩
+  · rintro ⟨value, mem⟩
+    exact ⟨(key, value), mem, rfl⟩
+
+private theorem valid_foldl_update {discipline : Discipline K} (pairs : List (K × V))
+    {map : SpecMap K V} (valid : Valid discipline map) :
+    Valid discipline (pairs.foldl (fun map entry => update discipline map entry.1 entry.2) map) := by
+  induction pairs generalizing map with
+  | nil => exact valid
+  | cons pair rest ih => exact ih (valid_update valid pair.1 pair.2)
+
+private theorem hasKey_foldl_update (discipline : Discipline K) (pairs : List (K × V))
+    (map : SpecMap K V) (probe : K) :
+    hasKey (pairs.foldl (fun map entry => update discipline map entry.1 entry.2) map) probe =
+      (decide (probe ∈ pairs.map Prod.fst) || hasKey map probe) := by
+  induction pairs generalizing map with
+  | nil => simp
+  | cons pair rest ih =>
+      rw [List.foldl_cons, ih, hasKey_update]
+      apply Bool.eq_iff_iff.mpr
+      simp only [Bool.or_eq_true, decide_eq_true_eq, List.map_cons, List.mem_cons]
+      constructor
+      · rintro (h | h | h)
+        · exact .inl (.inr h)
+        · exact .inl (.inl h.symm)
+        · exact .inr h
+      · rintro ((h | h) | h)
+        · exact .inr (.inl h.symm)
+        · exact .inl h
+        · exact .inr (.inr h)
+
+theorem length_ordSet_bounds (rank : KeyOrder K) (entries : List (K × V)) (key : K) (value : V) :
+    entries.length ≤ (ordSet rank key value entries).length ∧
+      (ordSet rank key value entries).length ≤ entries.length + 1 := by
+  induction entries with
+  | nil => simp [ordSet]
+  | cons head rest ih =>
+      simp only [ordSet]
+      split <;> simp only [List.length_cons] <;> omega
+
+/-- An update keeps every entry and adds at most one. -/
+theorem size_update_bounds (discipline : Discipline K) (map : SpecMap K V) (key : K) (value : V) :
+    size map ≤ size (update discipline map key value) ∧
+      size (update discipline map key value) ≤ size map + 1 := by
+  cases discipline with
+  | sequence =>
+      simp only [size, update, Discipline.set, length_seqSet]
+      split <;> omega
+  | ordered order =>
+      have := length_ordSet_bounds order map key value
+      simp only [size, update, Discipline.set]
+      omega
+
+private theorem size_foldl_update_bounds (discipline : Discipline K) (pairs : List (K × V))
+    (map : SpecMap K V) :
+    size map ≤ size (pairs.foldl (fun map entry => update discipline map entry.1 entry.2) map) ∧
+      size (pairs.foldl (fun map entry => update discipline map entry.1 entry.2) map) ≤
+        size map + (pairs.length : Int) := by
+  induction pairs generalizing map with
+  | nil => simp
+  | cons pair rest ih =>
+      rw [List.foldl_cons]
+      have step := size_update_bounds discipline map pair.1 pair.2
+      have := ih (update discipline map pair.1 pair.2)
+      simp only [List.length_cons]
+      omega
+
+private theorem size_foldl_update_fresh {discipline : Discipline K} (pairs : List (K × V))
+    {map : SpecMap K V} (valid : Valid discipline map) (nodup : (pairs.map Prod.fst).Nodup)
+    (fresh : ∀ pair ∈ pairs, hasKey map pair.1 = false) :
+    size (pairs.foldl (fun map entry => update discipline map entry.1 entry.2) map) =
+      size map + (pairs.length : Int) := by
+  induction pairs generalizing map with
+  | nil => simp
+  | cons pair rest ih =>
+      rw [List.foldl_cons]
+      simp only [List.map_cons, List.nodup_cons] at nodup
+      have step := size_update valid pair.1 pair.2
+      simp only [fresh pair (List.mem_cons_self ..), Bool.false_eq_true, if_false] at step
+      rw [ih (valid_update valid pair.1 pair.2) nodup.2 ?_, step, List.length_cons]
+      · omega
+      intro other mem
+      rw [hasKey_update]
+      simp only [Bool.or_eq_false_iff, decide_eq_false_iff_not]
+      exact ⟨fun eq => nodup.1 (by rw [eq]; exact List.mem_map_of_mem mem),
+        fresh other (List.mem_cons_of_mem _ mem)⟩
+
+theorem valid_updateAll {discipline : Discipline K} {map : SpecMap K V}
+    (valid : Valid discipline map) (keys : List K) (values : List V) :
+    Valid discipline (updateAll discipline map keys values) :=
+  valid_foldl_update _ valid
+
+/-- Setting entries keeps every entry and adds at most one per key set. -/
+theorem size_updateAll_bounds (discipline : Discipline K) (map : SpecMap K V) (keys : List K)
+    (values : List V) :
+    size map ≤ size (updateAll discipline map keys values) ∧
+      size (updateAll discipline map keys values) ≤ size map + (keys.length : Int) := by
+  have := size_foldl_update_bounds discipline (keys.zip values) map
+  rw [List.length_zip] at this
+  unfold updateAll
+  omega
+
+theorem hasKey_updateAll (discipline : Discipline K) (map : SpecMap K V) {keys : List K}
+    {values : List V} (fits : keys.length ≤ values.length) (probe : K) :
+    hasKey (updateAll discipline map keys values) probe = (decide (probe ∈ keys) || hasKey map probe) := by
+  rw [updateAll, hasKey_foldl_update, List.map_fst_zip fits]
+
+theorem hasKey_updateAll_add_all (discipline : Discipline K) (map : SpecMap K V) (keys : List K)
+    (values : List V) (ok : ¬AbortsAddAll map keys values) (probe : K) :
+    hasKey (updateAll discipline map keys values) probe = (decide (probe ∈ keys) || hasKey map probe) :=
+  hasKey_updateAll discipline map (Nat.le_of_eq (Decidable.of_not_not fun h => ok (Or.inl h))) probe
+
+theorem hasKey_updateAll_upsert_all (discipline : Discipline K) (map : SpecMap K V) (keys : List K)
+    (values : List V) (ok : ¬AbortsUpsertAll keys values) (probe : K) :
+    hasKey (updateAll discipline map keys values) probe = (decide (probe ∈ keys) || hasKey map probe) :=
+  hasKey_updateAll discipline map (Nat.le_of_eq (Decidable.of_not_not ok)) probe
+
+theorem hasKey_updateAll_new_from (discipline : Discipline K) (map : SpecMap K V) (keys : List K)
+    (values : List V) (ok : ¬AbortsNewFrom keys values) (probe : K) :
+    hasKey (updateAll discipline map keys values) probe = (decide (probe ∈ keys) || hasKey map probe) :=
+  hasKey_updateAll discipline map (Nat.le_of_eq (Decidable.of_not_not fun h => ok (Or.inl h))) probe
+
+theorem hasKey_updateAll_append (discipline : Discipline K) (map other : SpecMap K V) (probe : K) :
+    hasKey (updateAll discipline map (keys other) (values other)) probe =
+      (hasKey other probe || hasKey map probe) := by
+  rw [hasKey_updateAll discipline map (by simp [keys, values])]
+  apply Bool.eq_iff_iff.mpr
+  simp only [Bool.or_eq_true, decide_eq_true_eq, mem_keys_iff]
+
+/-- Adding entries at fresh keys adds one each. -/
+theorem size_updateAll_add_all {discipline : Discipline K} {map : SpecMap K V}
+    (valid : Valid discipline map) (keys : List K) (values : List V)
+    (ok : ¬AbortsAddAll map keys values) :
+    size (updateAll discipline map keys values) = size map + (keys.length : Int) := by
+  have lengths : keys.length = values.length := Decidable.of_not_not fun h => ok (Or.inl h)
+  have fresh : ∀ pair ∈ keys.zip values, hasKey map pair.1 = false := by
+    intro pair mem
+    have absent := fun h => ok (Or.inr (Or.inl ⟨pair.1, (List.of_mem_zip mem).1, h⟩))
+    cases h : hasKey map pair.1 with
+    | false => rfl
+    | true => exact absurd h absent
+  have nodup : ((keys.zip values).map Prod.fst).Nodup := by
+    rw [List.map_fst_zip (Nat.le_of_eq lengths)]
+    exact Classical.byContradiction fun h => ok (Or.inr (Or.inr h))
+  rw [updateAll, size_foldl_update_fresh _ valid nodup fresh, List.length_zip, ← lengths, Nat.min_self]
+
+/-- A map built from fresh lists holds one entry per key. -/
+theorem size_updateAll_new_from (discipline : Discipline K) (keys : List K) (values : List V)
+    (ok : ¬AbortsNewFrom keys values) :
+    size (updateAll discipline ([] : SpecMap K V) keys values) = (keys.length : Int) := by
+  have valid : Valid discipline ([] : SpecMap K V) := by
+    cases discipline <;> simp [Valid, Distinct, Ascending]
+  have ok' : ¬AbortsAddAll ([] : SpecMap K V) keys values := fun
+    | .inl h => ok (.inl h)
+    | .inr (.inl ⟨_, _, h⟩) => by simp [hasKey, containsB] at h
+    | .inr (.inr h) => ok (.inr h)
+  rw [size_updateAll_add_all valid keys values ok']
+  simp [size]
+
+/-- Appending a disjoint map adds its entries. -/
+theorem size_updateAll_append_disjoint {discipline : Discipline K} {map other : SpecMap K V}
+    (valid : Valid discipline map) (validOther : Valid discipline other)
+    (ok : ¬AbortsAppendDisjoint map other) :
+    size (updateAll discipline map (keys other) (values other)) = size map + size other := by
+  have ok' : ¬AbortsAddAll map (keys other) (values other) := fun
+    | .inl h => h (by simp [keys, values])
+    | .inr (.inl ⟨key, mem, held⟩) => ok ⟨key, held, (mem_keys_iff other key).mp mem⟩
+    | .inr (.inr h) => h (distinct_of_valid validOther)
+  rw [size_updateAll_add_all valid _ _ ok']
+  simp [keys, size]
+
+omit [DecidableEq K] in
+theorem valid_takeEntries {discipline : Discipline K} {map : SpecMap K V}
+    (valid : Valid discipline map) (count : Int) : Valid discipline (takeEntries map count) := by
+  cases discipline with
+  | sequence =>
+      simp only [Valid, Distinct, takeEntries, List.map_take] at valid ⊢
+      exact valid.sublist (List.take_sublist _ _)
+  | ordered order => exact List.Pairwise.sublist (List.take_sublist _ _) valid
+
+omit [DecidableEq K] in
+theorem valid_dropEntries {discipline : Discipline K} {map : SpecMap K V}
+    (valid : Valid discipline map) (count : Int) : Valid discipline (dropEntries map count) := by
+  cases discipline with
+  | sequence =>
+      simp only [Valid, Distinct, dropEntries, List.map_drop] at valid ⊢
+      exact valid.sublist (List.drop_sublist _ _)
+  | ordered order => exact List.Pairwise.sublist (List.drop_sublist _ _) valid
+
+omit [DecidableEq K] in
+theorem size_takeEntries (map : SpecMap K V) (count : Int) :
+    size (takeEntries map count) = min (max count 0) (size map) := by
+  simp only [size, takeEntries, List.length_take]
+  omega
+
+omit [DecidableEq K] in
+theorem size_dropEntries (map : SpecMap K V) (count : Int) :
+    size (dropEntries map count) = size map - min (max count 0) (size map) := by
+  simp only [size, dropEntries, List.length_drop]
+  omega
+
+theorem size_replaceKey (map : SpecMap K V) (old new : K) :
+    size (replaceKey map old new) = size map := by
+  simp [size, replaceKey]
+
+instance (keys : List K) (values : List V) : Decidable (AbortsNewFrom keys values) := by
+  unfold AbortsNewFrom; infer_instance
+
+omit [DecidableEq K] in
+instance (keys : List K) (values : List V) : Decidable (AbortsUpsertAll keys values) := by
+  unfold AbortsUpsertAll; infer_instance
+
+omit [DecidableEq K] in
+theorem length_keys (map : SpecMap K V) : (keys map).length = map.length := List.length_map ..
+
+omit [DecidableEq K] in
+/-- A read of the key list at a position is the key at the position. -/
+theorem getElem_keys [Inhabited K] (map : SpecMap K V) (n : Nat) (h : n < (keys map).length) :
+    (keys map)[n] = keyAt map n := by
+  have bound : n < map.length := by simpa only [keys, List.length_map] using h
+  simp only [keys, keyAt, List.getElem_map, Int.not_lt.mpr (Int.natCast_nonneg n), if_false,
+    Int.toNat_natCast, List.getElem?_eq_getElem bound, Option.map_some, Option.getD_some]
+
+omit [DecidableEq K] in
+/-- The key vector read at a nonnegative integer position, as Move reads it. -/
+theorem getElem_keys_toNat [Inhabited K] (map : SpecMap K V) {index : Int} (low : 0 ≤ index)
+    (h : index.toNat < (keys map).length) : (keys map)[index.toNat] = keyAt map index := by
+  rw [getElem_keys, Int.toNat_of_nonneg low]
+
+omit [DecidableEq K] in
+theorem length_values (map : SpecMap K V) : (values map).length = map.length := List.length_map ..
+
+/-- Appending a map keeps every entry and adds at most the other's. -/
+theorem size_updateAll_append_bounds (discipline : Discipline K) (map other : SpecMap K V) :
+    size map ≤ size (updateAll discipline map (keys other) (values other)) ∧
+      size (updateAll discipline map (keys other) (values other)) ≤ size map + size other := by
+  have := size_updateAll_bounds discipline map (keys other) (values other)
+  simp only [length_keys, size] at this ⊢
+  omega
+
+private theorem length_le_of_nodup_subset {l₁ l₂ : List K} (nodup : l₁.Nodup) (subset : l₁ ⊆ l₂) :
+    l₁.length ≤ l₂.length := by
+  induction l₁ generalizing l₂ with
+  | nil => simp
+  | cons head rest ih =>
+      rw [List.nodup_cons] at nodup
+      have mem : head ∈ l₂ := subset (List.mem_cons_self ..)
+      have restSubset : rest ⊆ l₂.erase head := by
+        intro x hx
+        have ne : x ≠ head := fun eq => nodup.1 (eq ▸ hx)
+        exact (List.mem_erase_of_ne ne).mpr (subset (List.mem_cons_of_mem _ hx))
+      have := ih nodup.2 restSubset
+      rw [List.length_erase_of_mem mem] at this
+      have pos : 0 < l₂.length := List.length_pos_of_mem mem
+      simp only [List.length_cons]
+      omega
+
+/-- Appending a valid map holds at least its entries. -/
+theorem size_other_le_updateAll_append {discipline : Discipline K} (map : SpecMap K V)
+    {other : SpecMap K V} (validOther : Valid discipline other) :
+    size other ≤ size (updateAll discipline map (keys other) (values other)) := by
+  have subset : keys other ⊆ keys (updateAll discipline map (keys other) (values other)) := by
+    intro key mem
+    rw [mem_keys_iff] at mem ⊢
+    rw [hasKey_updateAll_append, mem, Bool.true_or]
+  have nodup : (keys other).Nodup := distinct_of_valid validOther
+  have := length_le_of_nodup_subset nodup subset
+  simp only [length_keys, size] at this ⊢
+  omega
+
+theorem keys_replaceKey (map : SpecMap K V) (old new : K) :
+    keys (replaceKey map old new) = (keys map).map fun key => if key = old then new else key := by
+  simp only [keys, replaceKey, List.map_map]
+  congr 1
+  funext entry
+  by_cases same : entry.1 = old <;> simp [same]
+
+/-- After a key is replaced, the new key is held where either was, and
+every other key but the old one as before. -/
+theorem hasKey_replaceKey (map : SpecMap K V) (old new probe : K) :
+    hasKey (replaceKey map old new) probe =
+      if probe = new then (hasKey map old || hasKey map new)
+      else (!decide (probe = old) && hasKey map probe) := by
+  rw [Bool.eq_iff_iff, ← mem_keys_iff, keys_replaceKey, List.mem_map]
+  split
+  · subst probe
+    simp only [Bool.or_eq_true, ← mem_keys_iff]
+    constructor
+    · rintro ⟨key, mem, eq⟩
+      by_cases same : key = old
+      · exact .inl (same ▸ mem)
+      · simp only [same, if_false] at eq
+        exact .inr (eq ▸ mem)
+    · rintro (mem | mem)
+      · exact ⟨old, mem, by simp⟩
+      · exact ⟨new, mem, by by_cases h : new = old <;> simp [h]⟩
+  · rename_i differs
+    simp only [Bool.and_eq_true, Bool.not_eq_true', decide_eq_false_iff_not, ← mem_keys_iff]
+    constructor
+    · rintro ⟨key, mem, eq⟩
+      by_cases same : key = old
+      · simp only [same, if_true] at eq
+        exact absurd eq.symm differs
+      · simp only [same, if_false] at eq
+        exact ⟨eq ▸ same, eq ▸ mem⟩
+    · rintro ⟨ne, mem⟩
+      exact ⟨probe, mem, by simp [ne]⟩
+
+/-! ## Entries after an update or a removal
+
+An update's entries are the entry it writes and entries of the map before;
+a removal's entries are entries of the map before. -/
+
+theorem mem_replaceFirst {key : K} {value : V} : ∀ {entries : List (K × V)} {entry : K × V},
+    entry ∈ replaceFirst key value entries → entry = (key, value) ∨ entry ∈ entries
+  | [], _, member => by simp [replaceFirst] at member
+  | head :: rest, entry, member => by
+      unfold replaceFirst at member
+      split at member
+      · rcases List.mem_cons.mp member with same | inner
+        · exact .inl same
+        · exact .inr (List.mem_cons_of_mem _ inner)
+      · rcases List.mem_cons.mp member with same | inner
+        · exact .inr (same ▸ List.mem_cons_self ..)
+        · rcases mem_replaceFirst inner with same | inner
+          · exact .inl same
+          · exact .inr (List.mem_cons_of_mem _ inner)
+
+omit [DecidableEq K] in
+theorem mem_swapRemove {entries : List (K × V)} {index : Nat} {entry : K × V}
+    (member : entry ∈ swapRemove entries index) : entry ∈ entries :=
+  List.mem_of_mem_eraseIdx ((swapRemove_perm entries index).mem_iff.mp member)
+
+theorem mem_ordDel {key : K} : ∀ {entries : List (K × V)} {entry : K × V},
+    entry ∈ ordDel key entries → entry ∈ entries
+  | [], _, member => by simp [ordDel] at member
+  | head :: rest, entry, member => by
+      unfold ordDel at member
+      split at member
+      · exact List.mem_cons_of_mem _ member
+      · rcases List.mem_cons.mp member with same | inner
+        · exact same ▸ List.mem_cons_self ..
+        · exact List.mem_cons_of_mem _ (mem_ordDel inner)
+
+theorem mem_update {discipline : Discipline K} {map : SpecMap K V} {key : K} {value : V}
+    {entry : K × V} (member : entry ∈ update discipline map key value) :
+    entry = (key, value) ∨ entry ∈ map := by
+  cases discipline with
+  | sequence =>
+      simp only [update, Discipline.set, seqSet] at member
+      split at member
+      · exact mem_replaceFirst member
+      · rcases List.mem_append.mp member with inner | added
+        · exact .inr inner
+        · exact .inl (List.mem_singleton.mp added)
+  | ordered order => exact mem_ordSet order member
+
+theorem mem_remove {discipline : Discipline K} {map : SpecMap K V} {key : K} {entry : K × V}
+    (member : entry ∈ remove discipline map key) : entry ∈ map := by
+  cases discipline with
+  | sequence =>
+      simp only [remove, Discipline.del, seqDel] at member
+      split at member
+      · exact mem_swapRemove member
+      · exact member
+  | ordered _ => exact mem_ordDel member
+
+/-- Whether every entry of a map satisfies a property. -/
+def EntriesSatisfy (property : K × V → Prop) (map : SpecMap K V) : Prop :=
+  ∀ entry ∈ map, property entry
+
+omit [DecidableEq K] in
+theorem entriesSatisfy_nil (property : K × V → Prop) :
+    EntriesSatisfy property ([] : SpecMap K V) := fun _ member => nomatch member
+
+theorem entriesSatisfy_update {property : K × V → Prop} {discipline : Discipline K}
+    {map : SpecMap K V} {key : K} {value : V} (before : EntriesSatisfy property map)
+    (written : property (key, value)) :
+    EntriesSatisfy property (update discipline map key value) := fun _ member =>
+  (mem_update member).elim (fun same => same ▸ written) (before _)
+
+theorem entriesSatisfy_remove {property : K × V → Prop} {discipline : Discipline K}
+    {map : SpecMap K V} {key : K} (before : EntriesSatisfy property map) :
+    EntriesSatisfy property (remove discipline map key) := fun _ member =>
+  before _ (mem_remove member)
 
 end VerexIR.SpecMap

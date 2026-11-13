@@ -6,4 +6,4 @@ error: cannot select field `1` since it has different types in variants of enum 
 8 │         x.1
   │         ^
   │
-  = field `1` has type `u8` in variant `B` and type `bool` in variant `A`
+  = in `enum Foo`, field `1` has type `u8` in variant `B` and type `bool` in variant `A`

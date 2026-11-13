@@ -1,0 +1,1 @@
+tests/sources/regression/generic_aliasing_exact_types.move:7:1: info: `generic` uses concrete verification: Given interpretation does not yet support storage interpretation

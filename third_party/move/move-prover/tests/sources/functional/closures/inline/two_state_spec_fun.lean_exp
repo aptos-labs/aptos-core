@@ -25,7 +25,7 @@ warning: cannot derive `ensures_of` exactly for this lambda argument: per-applic
 
 tests/sources/functional/closures/inline/two_state_spec_fun.move:30:13: error: the assertion `with_state_anchor!(0, spec_delta(a) == 3 && res == x)` does not hold
 tests/sources/functional/closures/inline/two_state_spec_fun.move:54:5: error: verex verification failed: the automatic verification of `delta_false` failed; provide a proof in `tests/sources/functional/closures/inline/two_state_spec_fun.proof.lean`:
-  verify delta_false by
+  verify delta_false by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

@@ -31,7 +31,25 @@ def selfReferential (type : Expr) : MetaM Bool := do
   forallTelescope type fun _ body => do
     let some (_, left, right) := body.eq? | return false
     -- An instance as rewriting finds one, up to reducible unfolding.
-    return (← kabstract right left).hasLooseBVars
+    return (← withReducible (kabstract right left)).hasLooseBVars
+
+/-- Whether a quantified fact can rewrite: its pattern, the side of its
+conclusion a rule matches, fixes every data binder and is no bare binder.
+Otherwise it matches any subterm of the binder's type, and its other binders
+are left to the discharge of its premises. It stays a fact, for the deciders
+that instantiate it. -/
+def rewritesByPattern (type : Expr) : MetaM Bool := do
+  unless type.isForall do return true
+  forallTelescope type fun binders conclusion => do
+    let pattern := match conclusion.eq?, conclusion.iff? with
+      | some (_, left, _), _ => left
+      | _, some (left, _) => left
+      | _, _ => conclusion
+    if pattern.isFVar && binders.contains pattern then return false
+    let fixed := (collectFVars {} pattern).fvarSet
+    binders.allM fun binder => do
+      if fixed.contains binder.fvarId! then return true
+      isProp (← inferType binder)
 
 /-- Whether rewriting `left` to `right` closes a cycle with the admitted
 equations (origin, left side, right side): `left` is reached from `right`
@@ -42,7 +60,7 @@ partial def closesCycle (rules : Array (Origin × Expr × Expr)) (left right : E
   -- What a rule's right side reaches does not depend on the path to it, so
   -- each rule is explored once.
   let explored ← IO.mkRef (∅ : Std.HashSet Nat)
-  let rec reaches (term : Expr) : MetaM Bool := do
+  let rec reaches (term : Expr) : MetaM Bool := withReducible do
     if (← kabstract term left).hasLooseBVars then return true
     for h : index in [0:rules.size] do
       if (← explored.get).contains index then continue
@@ -80,6 +98,8 @@ structure State where
   diag         : Simp.Diagnostics := {}
   /-- The admitted equations, by origin, left and right side. -/
   rules        : Array (Origin × Expr × Expr) := #[]
+  /-- The hypotheses rewritten, if not all; the goal is then left as it is. -/
+  targets?     : Option FVarIdSet := none
 
 abbrev M := StateRefT State MetaM
 
@@ -88,6 +108,7 @@ equation whose left side its right side mentions, nor one closing a cycle
 with the admitted equations; an admitted equation is recorded. -/
 private def admit (id : Origin) (type : Expr) : M Bool := do
   if ← selfReferential type then return false
+  unless ← rewritesByPattern type do return false
   let some (_, left, right) := type.eq? | return true
   if ← closesCycle (← get).rules left right then return false
   modify fun s => { s with rules := s.rules.push (id, left, right) }
@@ -109,7 +130,7 @@ private def initEntries : M Unit := do
       if ← admit (.fvar h) (← instantiateMVars localDecl.type) then
         simpThms ← simpThms.addTheorem (.fvar h) proof (config := ctx.indexConfig)
         modify fun s => { s with ctx := s.ctx.setSimpTheorems simpThms }
-      if hsNonDeps.contains h then
+      if hsNonDeps.contains h && (← get).targets?.all (·.contains h) then
         -- We only simplify nondependent hypotheses
         let type ← instantiateMVars localDecl.type
         let entry : Entry := { fvarId := h, userName := localDecl.userName, id := .fvar h, origType := type, type, proof }
@@ -174,17 +195,18 @@ private partial def loop : M Bool := do
           entries[i]       := { entry with type := typeNew, proof := proofNew, id := .other idNew }
         }
   -- simplify target
-  let mvarId := (← get).mvarId
-  let (r, stats) ← simpTarget mvarId (← get).ctx simprocs (stats := { (← get) with })
-  modify fun s => { s with usedTheorems := stats.usedTheorems, diag := stats.diag }
-  match r with
-  | none => return true
-  | some mvarIdNew =>
-    unless mvarId == mvarIdNew do
-      modify fun s => { s with
-        modified := true
-        mvarId   := mvarIdNew
-      }
+  if (← get).targets?.isNone then
+    let mvarId := (← get).mvarId
+    let (r, stats) ← simpTarget mvarId (← get).ctx simprocs (stats := { (← get) with })
+    modify fun s => { s with usedTheorems := stats.usedTheorems, diag := stats.diag }
+    match r with
+    | none => return true
+    | some mvarIdNew =>
+      unless mvarId == mvarIdNew do
+        modify fun s => { s with
+          modified := true
+          mvarId   := mvarIdNew
+        }
   if (← get).modified then
     loop
   else
@@ -216,9 +238,10 @@ def main : M (Option MVarId) := do
 
 end SimpAll
 
-def simpAllFixed (mvarId : MVarId) (ctx : Simp.Context) (simprocs : SimprocsArray := #[]) (stats : Stats := {}) : MetaM (Option MVarId × Stats) := do
+def simpAllFixed (mvarId : MVarId) (ctx : Simp.Context) (simprocs : SimprocsArray := #[]) (stats : Stats := {})
+    (targets? : Option FVarIdSet := none) : MetaM (Option MVarId × Stats) := do
   mvarId.withContext do
-    let (r, s) ← SimpAll.main.run { stats with mvarId, ctx, simprocs }
+    let (r, s) ← SimpAll.main.run { stats with mvarId, ctx, simprocs, targets? }
     if let .some mvarIdNew := r then
       if ctx.config.failIfUnchanged && mvarId == mvarIdNew then
         throwError "simp_all made no progress"
@@ -230,11 +253,17 @@ syntax (name := verexSimpAll) "verex_simp_all" optConfig (Lean.Parser.Tactic.dis
   (" [" withoutPosition((Lean.Parser.Tactic.simpErase <|> Lean.Parser.Tactic.simpLemma),*,?) "]")? : tactic
 
 open Lean.Elab Lean.Elab.Tactic in
-@[tactic verexSimpAll] def evalVerexSimpAll : Tactic := fun stx => withMainContext do
+/-- A `verex_simp_all` call on a goal; with `targets?`, it rewrites only
+those hypotheses, by the whole context, and leaves the goal as it is. -/
+def simpAllAt (goal : MVarId) (stx : Syntax) (targets? : Option FVarIdSet := none) :
+    TacticM (Option MVarId) := goal.withContext do
   let { ctx, simprocs, .. } ← mkSimpContext stx (eraseLocal := true) (kind := .simpAll) (ignoreStarArg := true)
   let ctx ← Simp.mkContext ctx.config ctx.simpTheorems (withoutBranchConditions ctx.congrTheorems)
-  let (result?, _) ← simpAllFixed (← getMainGoal) ctx (simprocs := simprocs)
-  match result? with
+  return (← simpAllFixed goal ctx (simprocs := simprocs) (targets? := targets?)).1
+
+open Lean.Elab Lean.Elab.Tactic in
+@[tactic verexSimpAll] def evalVerexSimpAll : Tactic := fun stx => withMainContext do
+  match ← simpAllAt (← getMainGoal) stx with
   | none => replaceMainGoal []
   | some mvarId => replaceMainGoal [mvarId]
 

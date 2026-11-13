@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/modifies_receiver_call.move:17:9: error: the specification clause `aborts_if !exists<State>(handle.addr_of())` is not established
 tests/sources/functional/modifies_receiver_call.move:16:5: error: verex verification failed: the automatic verification of `increment` failed; provide a proof in `tests/sources/functional/modifies_receiver_call.proof.lean`:
-  verify increment by
+  verify increment by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

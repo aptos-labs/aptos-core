@@ -88,11 +88,11 @@ fun deep_copy_bypass(): u64 {
   code:
   L0:
     0: x0 := ld_u64 1 @0
-    1: [r0] := call make, [x0] @1
+    1: [r0] := call_exempt make, [x0] @1
     2: r1 := copy r0 @3
     3: r4 := imm_borrow_loc r1 @5
     4: r2 := vec_len u64, r4 @6
-    5: [r3] := call mutate_first, [r1] @9
+    5: [r3] := call_exempt mutate_first, [r1] @9
     6: r4 := imm_borrow_loc r0 @11
     7: r5 := ld_u64 0 @12
     8: r6 := vec_imm_borrow u64, r4, r5 @13

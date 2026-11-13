@@ -76,6 +76,9 @@ pub trait NativeResolver {
         function: InternedIdentifier,
         ty_args: InternedTypeList,
     ) -> Option<NativeIdx>;
+
+    /// Whether `module::function` has a registered native for any dispatch.
+    fn is_registered(&self, module: InternedModuleId, function: InternedIdentifier) -> bool;
 }
 
 /// A [`NativeResolver`] that resolves nothing -- useful for tests and simulations that
@@ -90,5 +93,9 @@ impl NativeResolver for NoNatives {
         _ty_args: InternedTypeList,
     ) -> Option<NativeIdx> {
         None
+    }
+
+    fn is_registered(&self, _module: InternedModuleId, _function: InternedIdentifier) -> bool {
+        false
     }
 }

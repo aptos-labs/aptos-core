@@ -6,11 +6,12 @@ use anyhow::{Context, Result};
 pub use aptos_localnet::docker::get_docker;
 use async_trait::async_trait;
 use bollard::{
-    container::{RemoveContainerOptions, StopContainerOptions},
     errors::Error as BollardError,
-    image::CreateImageOptions,
-    network::CreateNetworkOptions,
-    volume::{CreateVolumeOptions, RemoveVolumeOptions},
+    models::{NetworkCreateRequest, VolumeCreateRequest},
+    query_parameters::{
+        CreateImageOptionsBuilder, RemoveContainerOptionsBuilder, RemoveVolumeOptionsBuilder,
+        StopContainerOptionsBuilder,
+    },
 };
 use futures::TryStreamExt;
 use std::{fs::create_dir_all, path::Path};
@@ -27,10 +28,7 @@ pub async fn delete_container(container_name: &str) -> Result<()> {
 
     let docker = get_docker().await?;
 
-    let options = Some(RemoveContainerOptions {
-        force: true,
-        ..Default::default()
-    });
+    let options = Some(RemoveContainerOptionsBuilder::new().force(true).build());
 
     // Ignore any error, it'll be because the container doesn't exist.
     let result = docker.remove_container(container_name, options).await;
@@ -55,10 +53,12 @@ pub async fn stop_container(container_name: &str) -> Result<()> {
 
     let docker = get_docker().await?;
 
-    let options = Some(StopContainerOptions {
-        // Timeout in seconds before we kill the container.
-        t: 1,
-    });
+    let options = Some(
+        StopContainerOptionsBuilder::new()
+            // Timeout in seconds before we kill the container.
+            .t(1)
+            .build(),
+    );
 
     // Ignore any error, it'll be because the container doesn't exist.
     let result = docker.stop_container(container_name, options).await;
@@ -79,10 +79,11 @@ pub async fn pull_docker_image(image_name: &str) -> Result<()> {
 
     let docker = get_docker().await?;
 
-    let options = Some(CreateImageOptions {
-        from_image: image_name,
-        ..Default::default()
-    });
+    let options = Some(
+        CreateImageOptionsBuilder::new()
+            .from_image(image_name)
+            .build(),
+    );
 
     // Check if the image is there. If it is, exit early, the user can update any
     // images we've already pulled manually if they want.
@@ -116,7 +117,7 @@ pub async fn network_exists(network_name: &str) -> Result<bool> {
     let docker = get_docker().await?;
 
     // Try to inspect the network. If it exists, this will succeed.
-    match docker.inspect_network::<&str>(network_name, None).await {
+    match docker.inspect_network(network_name, None).await {
         Ok(_) => Ok(true),
         Err(BollardError::DockerResponseServerError {
             status_code: 404, ..
@@ -130,10 +131,9 @@ pub async fn create_network(network_name: &str) -> Result<()> {
 
     info!("Creating network {}", network_name);
 
-    let config = CreateNetworkOptions {
-        name: network_name,
-        internal: false,
-        check_duplicate: true,
+    let config = NetworkCreateRequest {
+        name: network_name.to_string(),
+        internal: Some(false),
         ..Default::default()
     };
     let response = docker.create_network(config).await;
@@ -162,8 +162,8 @@ pub async fn create_volume(volume_name: &str) -> Result<()> {
 
     info!("Creating volume {}", volume_name);
 
-    let config = CreateVolumeOptions {
-        name: volume_name,
+    let config = VolumeCreateRequest {
+        name: Some(volume_name.to_string()),
         ..Default::default()
     };
     docker.create_volume(config).await?;
@@ -178,7 +178,7 @@ pub async fn delete_volume(volume_name: &str) -> Result<()> {
 
     info!("Removing volume {}", volume_name);
 
-    let config = RemoveVolumeOptions { force: true };
+    let config = RemoveVolumeOptionsBuilder::new().force(true).build();
 
     // Delete the volume. This returns Ok even if the volume didn't exist, unlike the
     // other "remove_x" endpoints, so we just use ? here.

@@ -49,6 +49,11 @@ impl<'a> CodeUnitVerifier<'a> {
         verifier_config: &VerifierConfig,
         module: &'a CompiledModule,
     ) -> PartialVMResult<()> {
+        // Must run before any function is type checked: with the flag on, `borrow_field` takes a
+        // variant field handle's type from its first listed variant.
+        if verifier_config.uniform_variant_field_handles {
+            type_safety::verify_variant_field_handles(module)?;
+        }
         let mut meter = BoundMeter::new(verifier_config);
         let mut name_def_map = HashMap::new();
         for (idx, func_def) in module.function_defs().iter().enumerate() {
@@ -61,6 +66,9 @@ impl<'a> CodeUnitVerifier<'a> {
         // whose names happen to contain '$' (the struct API delimiter), since those names are
         // structurally valid but carry no struct API attribute.
         let struct_api_ctx = if module.version() >= VERSION_10 {
+            if verifier_config.check_borrow_field_handle_shape {
+                struct_api_checker::check_function_handles(&BinaryIndexedView::Module(module))?;
+            }
             Some(struct_api_checker::StructApiContext::new(module)?)
         } else {
             None
@@ -70,18 +78,17 @@ impl<'a> CodeUnitVerifier<'a> {
         for (idx, function_definition) in module.function_defs().iter().enumerate() {
             let index = FunctionDefinitionIndex(idx as TableIndex);
 
-            // SECURITY: Check struct API attributes BEFORE verify_function runs.
-            // This ensures that reference_safety (which runs inside verify_function) can
-            // safely trust BorrowFieldMutable attributes, since they've been validated
-            // to accurately match the bytecode before reference_safety sees them.
-            // Only runs for VERSION_10+ modules (see guard above).
+            // SECURITY: Validate this definition's struct API attributes against its bytecode.
+            // reference_safety (inside verify_function) trusts BorrowFieldMutable on call
+            // targets, which may be imported or defined later in the module. Their signature
+            // shape is checked up front by `check_function_handles` (when enabled), and their
+            // field offset by `check_function` for local definitions or by linking for imported
+            // handles. Only runs for VERSION_10+ modules (see guard above).
             if let Some(ctx) = &struct_api_ctx {
                 struct_api_checker::check_function(module, function_definition, ctx)
                     .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
             }
 
-            // Now reference_safety can safely trust that BorrowFieldMutable attributes
-            // accurately describe which field is being borrowed
             let num_back_edges = Self::verify_function(
                 verifier_config,
                 index,
@@ -130,13 +137,13 @@ impl<'a> CodeUnitVerifier<'a> {
             }
         }
 
-        // INVARIANT: `struct_api_checker` is NOT called here for scripts, unlike for modules
-        // (see `verify_module_impl`). This is safe because `CompiledScript` has no mechanism
-        // to attach `FunctionAttribute`s to its main function: there is no `attributes` field
-        // on the main function's representation (it is stored as a bare `CodeUnit`, not as a
-        // `FunctionDefinition` with attributes). Therefore a script can never carry struct API
-        // attributes such as `BorrowFieldMutable`, and `reference_safety` (called inside
-        // `verify_common`) has no attributes to trust or mistrust.
+        // A script has no function definitions for `check_function`, but its imported
+        // handles can carry struct API attributes that `reference_safety` (inside
+        // `verify_common`) trusts, so check them first.
+        if verifier_config.check_borrow_field_handle_shape {
+            struct_api_checker::check_function_handles(&resolver)?;
+        }
+
         meter.enter_scope("script", Scope::Function);
         let code_unit_verifier = CodeUnitVerifier {
             resolver,
@@ -214,7 +221,7 @@ impl<'a> CodeUnitVerifier<'a> {
         meter: &mut impl Meter,
     ) -> PartialVMResult<()> {
         StackUsageVerifier::verify(verifier_config, &self.resolver, &self.function_view, meter)?;
-        type_safety::verify(&self.resolver, &self.function_view, meter)?;
+        type_safety::verify(verifier_config, &self.resolver, &self.function_view, meter)?;
         locals_safety::verify(&self.resolver, &self.function_view, meter)?;
         reference_safety::verify(
             &self.resolver,

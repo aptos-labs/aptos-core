@@ -21,6 +21,7 @@ use std::ops::Deref;
 
 pub mod errors;
 pub mod hot_state;
+pub mod native_collateral;
 pub mod native_order;
 pub mod native_position;
 pub mod state_key;
@@ -37,6 +38,7 @@ pub const NUM_STATE_SHARDS: usize = 16;
 pub enum StateKind {
     MainState,
     Position,
+    Order,
 }
 
 pub type StateViewResult<T, E = StateViewError> = std::result::Result<T, E>;
@@ -55,11 +57,7 @@ pub trait TStateView {
     fn get_usage(&self) -> StateViewResult<StateStorageUsage>;
 
     /// Returns the version after this view.
-    fn next_version(&self) -> Version {
-        // TODO(HotState): Revisit
-        // This is currently only used by the HotStateOpAccumulator to decide if to refresh an already hot item.
-        unimplemented!()
-    }
+    fn next_version(&self) -> Version;
 
     /// Returns the version of the view.
     ///
@@ -193,6 +191,10 @@ impl<K: Clone + Eq + Hash> TStateView for MockStateView<K> {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
+        unimplemented!("Irrelevant for tests");
+    }
+
+    fn next_version(&self) -> Version {
         unimplemented!("Irrelevant for tests");
     }
 }

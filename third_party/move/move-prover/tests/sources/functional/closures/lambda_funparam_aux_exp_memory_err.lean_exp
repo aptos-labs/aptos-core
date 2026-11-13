@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/lambda_funparam_aux_exp_memory_err.move:20:31: error: the specification clause `aborts_if false with result_of<g>(x)` is not established
 tests/sources/functional/closures/lambda_funparam_aux_exp_memory_err.move:20:24: error: verex verification failed: the automatic verification of `__lambda__1__outer` failed; provide a proof in `tests/sources/functional/closures/lambda_funparam_aux_exp_memory_err.proof.lean`:
-  verify __lambda__1__outer by
+  verify __lambda__1__outer by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

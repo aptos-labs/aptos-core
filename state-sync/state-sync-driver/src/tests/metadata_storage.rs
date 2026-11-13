@@ -99,6 +99,48 @@ fn test_create_then_open() {
 }
 
 #[test]
+fn test_snapshot_kinds_keep_independent_progress() {
+    let kinds = [
+        SnapshotKind::MAIN_STATE,
+        SnapshotKind::HOT_STATE,
+        SnapshotKind::POSITION,
+        SnapshotKind::ORDER,
+    ];
+    let tmp_dir = TempPath::new();
+    let metadata_storage = PersistentMetadataStorage::new(tmp_dir.path());
+    let target_ledger_info = create_ledger_info_at_version(12345);
+    for (i, kind) in kinds.into_iter().enumerate() {
+        metadata_storage
+            .update_last_persisted_index(&target_ledger_info, i as u64 * 100, i % 2 == 1, kind)
+            .unwrap();
+    }
+
+    // Reopen and verify each kind reads back its own row
+    drop(metadata_storage);
+    let metadata_storage = PersistentMetadataStorage::new(tmp_dir.path());
+    for (i, kind) in kinds.into_iter().enumerate() {
+        assert_eq!(
+            Some(target_ledger_info.clone()),
+            metadata_storage
+                .previous_snapshot_sync_target(kind)
+                .unwrap()
+        );
+        assert_eq!(
+            i as u64 * 100,
+            metadata_storage
+                .get_last_persisted_index(&target_ledger_info, kind)
+                .unwrap()
+        );
+        assert_eq!(
+            i % 2 == 1,
+            metadata_storage
+                .is_snapshot_sync_complete(&target_ledger_info, kind)
+                .unwrap()
+        );
+    }
+}
+
+#[test]
 fn test_metadata_schema_encode_decode() {
     assert_encode_decode::<MetadataSchema>(
         &MetadataKey::StateSnapshotSync,

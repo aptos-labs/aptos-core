@@ -44,9 +44,11 @@ private structure RefPatContext where
   unit : RawUnit
   profile : Option Profile
 
-private def pushExpr (loc : LocId) (typeId : TypeId) (kind : ExprKind) : RefPatM ExprId :=
+private def pushExpr (loc : LocId) (typeId : TypeId) (kind : ExprKind)
+    (origin : Option ExprOrigin := none) : RefPatM ExprId :=
   modifyGet fun state =>
-    (⟨state.expressions.size⟩, { state with expressions := state.expressions.push { loc, typeId, kind } })
+    (⟨state.expressions.size⟩,
+      { state with expressions := state.expressions.push { loc, typeId, kind, origin } })
 
 private def pushPlace (place : Place) : RefPatM PlaceId :=
   modifyGet fun state => (⟨state.places.size⟩, { state with places := state.places.push place })
@@ -68,9 +70,10 @@ private def patternAt (id : PatternId) : RefPatM Pattern := do
   let some pattern := (← get).patterns[id.index]? | throw "a pattern is out of range"
   pure pattern
 
-private def setKind (id : ExprId) (kind : ExprKind) : RefPatM Unit :=
+private def setKind (id : ExprId) (kind : ExprKind) (origin : Option ExprOrigin := none) :
+    RefPatM Unit :=
   modify fun state =>
-    { state with expressions := state.expressions.modify id.index ({ · with kind }) }
+    { state with expressions := state.expressions.modify id.index ({ · with kind, origin }) }
 
 /-- The kind and referent of a reference type. -/
 private def referenceOf? (id : TypeId) : RefPatM (Option ReferenceType) := do
@@ -295,12 +298,13 @@ private def withBinds (steps : Array MatchStep) (body : ExprId) : RefPatM ExprId
   pure result
 
 /-- The throw of a pattern mismatch: the profile's (`patternMismatch?`). -/
-private def mismatchThrow (context : RefPatContext) (loc : LocId) : RefPatM ExprId := do
+private def mismatchThrow (context : RefPatContext) (loc : LocId)
+    (origin : Option ExprOrigin := none) : RefPatM ExprId := do
   let some (kind, codes) := patternMismatch? context.profile
     | throw "a pattern through a reference that may not match, in a profile without a mismatch throw"
   let codeType ← internType (.integer (.bits 64) false)
   let arguments ← codes.mapM fun code => pushExpr loc codeType (.value (.integer code))
-  pushExpr loc (← internType .never) (.throw_ kind arguments)
+  pushExpr loc (← internType .never) (.throw_ kind arguments) origin
 
 /-- The statement making the mismatch throw unless the tests hold; `none`
 without tests. -/
@@ -314,12 +318,12 @@ private def mismatchCheck (context : RefPatContext) (loc : LocId) (steps : Array
 
 /-- Bind a scrutinee to its local around a rewritten node, when it needs one. -/
 private def bindScrutinee (id : ExprId) (binding : Option (PatternId × ExprId))
-    (kind : ExprKind) : RefPatM Unit := do
+    (kind : ExprKind) (origin : Option ExprOrigin := none) : RefPatM Unit := do
   match binding with
-  | none => setKind id kind
+  | none => setKind id kind origin
   | some (pattern, scrutinee) =>
       let node ← exprAt id
-      let inner ← pushExpr node.loc node.typeId kind
+      let inner ← pushExpr node.loc node.typeId kind origin
       setKind id (.letDecl pattern (some scrutinee) inner)
 
 /-- The borrow statements of an assignment through a reference. -/
@@ -358,29 +362,43 @@ private def rewriteNode (context : RefPatContext) (id : ExprId) : RefPatM Unit :
       let (root, binding) ← scrutineeRoot scrutinee
       let boolType ← internType .bool
       -- From the last arm: an arm is tried where the later ones are its
-      -- fallback; the last unguarded arm is taken untested.
+      -- fallback; the last unguarded arm is taken untested. Each arm's
+      -- conditional records the match and the arm's variant, so that a path
+      -- through it is addressed as the match's (`ExprOrigin.matchArm`).
+      let variantOf (pattern : PatternId) : RefPatM String := do
+        let some pattern := (← get).patterns[pattern.index]? | pure "_"
+        pure <| match pattern.kind with
+          | .constructor _ _ (some variant) _ => variant
+          | _ => "_"
       let mut next : Option ExprId := none
+      -- The variant of the arm `next` is taken untested, if it is one.
+      let mut untested : Option String := none
       for arm in arms.reverse do
         let steps ← planPattern context arm.pattern { root, loc := node.loc }
         let body ← withBinds steps arm.body
         let tests ← conjunction boolType node.loc steps
         let guard ← arm.guard.mapM (withBinds steps ·)
+        let variant ← variantOf arm.pattern
         let condition ← match tests, guard with
           | some tests, some guard => do
               let false_ ← pushExpr node.loc boolType (.value (.bool false))
               some <$> pushExpr node.loc boolType (.ifElse tests guard (some false_))
           | some tests, none => pure (some tests)
           | none, guard => pure guard
-        next := some <| ← match next, condition, arm.guard with
-          | none, _, none => pure body
+        let (fallback, last) := (next, untested)
+        (next, untested) ← match fallback, condition, arm.guard with
+          | none, _, none => pure (some body, some variant)
           | none, some condition, some _ => do
-              let thrown ← mismatchThrow context node.loc
-              pushExpr node.loc node.typeId (.ifElse condition body (some thrown))
-          | _, none, _ => pure body
+              let thrown ← mismatchThrow context node.loc (some (.matchMismatch node.loc))
+              pure (some (← pushExpr node.loc node.typeId (.ifElse condition body (some thrown))
+                (some (.matchArm node.loc variant none))), none)
+          | _, none, _ => pure (some body, some variant)
           | some fallback, some condition, _ =>
-              pushExpr node.loc node.typeId (.ifElse condition body (some fallback))
+              pure (some (← pushExpr node.loc node.typeId (.ifElse condition body (some fallback))
+                (some (.matchArm node.loc variant last))), none)
       let some result := next | throw "a match has no arms"
-      bindScrutinee id binding (← exprAt result).kind
+      let resultNode ← exprAt result
+      bindScrutinee id binding resultNode.kind resultNode.origin
   | _ => pure ()
 
 /-- The expressions of a body, in an order that visits every node once. -/

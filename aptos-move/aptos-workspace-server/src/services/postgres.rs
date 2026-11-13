@@ -9,8 +9,10 @@ use crate::{
 use anyhow::{anyhow, Context, Result};
 use aptos_localnet::health_checker::HealthChecker;
 use bollard::{
-    container::{CreateContainerOptions, WaitContainerOptions},
-    secret::{ContainerInspectResponse, HostConfig, PortBinding},
+    models::{ContainerCreateBody, ContainerInspectResponse, HostConfig, PortBinding},
+    query_parameters::{
+        CreateContainerOptions, CreateContainerOptionsBuilder, WaitContainerOptionsBuilder,
+    },
     Docker,
 };
 use futures::TryStreamExt;
@@ -81,10 +83,7 @@ fn create_container_options_and_config(
     instance_id: Uuid,
     network_name: String,
     volume_name: String,
-) -> (
-    CreateContainerOptions<String>,
-    bollard::container::Config<String>,
-) {
+) -> (CreateContainerOptions, ContainerCreateBody) {
     let host_config = Some(HostConfig {
         // Bind the container to the network we created in the pre_run. This does
         // not prevent the binary in the container from exposing itself to the host
@@ -102,13 +101,13 @@ fn create_container_options_and_config(
         ..Default::default()
     });
 
-    let config = bollard::container::Config {
+    let config = ContainerCreateBody {
         image: Some(POSTGRES_IMAGE.to_string()),
         // We set this to false so the container keeps running after the CLI
         // shuts down by default. We manually kill the container if applicable,
         // for example if the user set --force-restart.
         tty: Some(false),
-        exposed_ports: Some(hashmap! {POSTGRES_DEFAULT_PORT.to_string() => hashmap!{}}),
+        exposed_ports: Some(vec![POSTGRES_DEFAULT_PORT.to_string()]),
         host_config,
         env: Some(vec![
             // We run postgres without any auth + no password.
@@ -139,10 +138,9 @@ fn create_container_options_and_config(
         ..Default::default()
     };
 
-    let options = CreateContainerOptions {
-        name: format!("aptos-workspace-{}-postgres", instance_id),
-        ..Default::default()
-    };
+    let options = CreateContainerOptionsBuilder::new()
+        .name(&format!("aptos-workspace-{}-postgres", instance_id))
+        .build();
 
     (options, config)
 }
@@ -231,9 +229,11 @@ pub fn start_postgres(
         let _wait = docker
             .wait_container(
                 &format!("aptos-workspace-{}-postgres", instance_id),
-                Some(WaitContainerOptions {
-                    condition: "not-running",
-                }),
+                Some(
+                    WaitContainerOptionsBuilder::new()
+                        .condition("not-running")
+                        .build(),
+                ),
             )
             .try_collect::<Vec<_>>()
             .await

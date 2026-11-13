@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/result_of_attached_fallback.move:32:13: error: the assertion `x + 1 == expected` does not hold
 tests/sources/functional/closures/inline/result_of_attached_fallback.move:40:5: error: verex verification failed: the automatic verification of `wrong_expectation` failed; provide a proof in `tests/sources/functional/closures/inline/result_of_attached_fallback.proof.lean`:
-  verify wrong_expectation by
+  verify wrong_expectation by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

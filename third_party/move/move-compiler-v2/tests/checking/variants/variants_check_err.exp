@@ -42,4 +42,4 @@ error: cannot select field `f1` since it has different types in variants of enum
 49 │         self.f1 + (self.f2 as u64)
    │         ^^^^
    │
-   = field `f1` has type `u8` in variant `V3` and type `u64` in variant `V1` and type `u64` in variant `V2`
+   = in `enum Fields`, field `f1` has type `u8` in variant `V3` and type `u64` in variant `V1` and type `u64` in variant `V2`

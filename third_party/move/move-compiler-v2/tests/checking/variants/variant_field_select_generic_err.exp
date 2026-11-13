@@ -1,0 +1,89 @@
+
+Diagnostics:
+error: cannot select field `x` since it has different types in variants of enum `E<u8, u8>`
+   ┌─ tests/checking/variants/variant_field_select_generic_err.move:51:9
+   │
+51 │         e.x
+   │         ^
+   │
+   = in `enum E<T1, T2>`, field `x` has type `T2` in variant `B` and type `T1` in variant `A`
+
+error: cannot select field `x` since it has different types in variants of enum `E<T, T>`
+   ┌─ tests/checking/variants/variant_field_select_generic_err.move:55:9
+   │
+55 │         e.x
+   │         ^
+   │
+   = in `enum E<T1, T2>`, field `x` has type `T2` in variant `B` and type `T1` in variant `A`
+
+error: cannot select field `x` since it has different types in variants of enum `E<T2, T1>`
+   ┌─ tests/checking/variants/variant_field_select_generic_err.move:60:9
+   │
+60 │         e.x
+   │         ^
+   │
+   = in `enum E<T1, T2>`, field `x` has type `T2` in variant `B` and type `T1` in variant `A`
+
+error: cannot select field `x` since it has different types in variants of enum `E<u8, u64>`
+   ┌─ tests/checking/variants/variant_field_select_generic_err.move:64:9
+   │
+64 │         e.x
+   │         ^
+   │
+   = in `enum E<T1, T2>`, field `x` has type `T2` in variant `B` and type `T1` in variant `A`
+
+error: cannot select field `x` since it has different types in variants of enum `E<u8, u8>`
+   ┌─ tests/checking/variants/variant_field_select_generic_err.move:73:9
+   │
+73 │         e.x
+   │         ^
+   │
+   = in `enum E<T1, T2>`, field `x` has type `T2` in variant `B` and type `T1` in variant `A`
+
+error: cannot select field `x` since it has different types in variants of enum `E<u8, drop>`
+   ┌─ tests/checking/variants/variant_field_select_generic_err.move:78:17
+   │
+78 │         let y = e.x;
+   │                 ^
+   │
+   = in `enum E<T1, T2>`, field `x` has type `T2` in variant `B` and type `T1` in variant `A`
+
+error: cannot select field `x` since it has different types in variants of enum `Partial<u8, u8>`
+   ┌─ tests/checking/variants/variant_field_select_generic_err.move:88:9
+   │
+88 │         e.x
+   │         ^
+   │
+   = in `enum Partial<T1, T2>`, field `x` has type `T2` in variant `D` and type `T1` in variant `A` and type `T1` in variant `C`
+
+error: cannot select field `x` since it has different types in variants of enum `Phantom<u8, u8>`
+   ┌─ tests/checking/variants/variant_field_select_generic_err.move:92:9
+   │
+92 │         e.x
+   │         ^
+   │
+   = in `enum Phantom<T1, T2>`, field `x` has type `S<T2>` in variant `B` and type `S<T1>` in variant `A`
+
+error: cannot select field `x` since it has different types in variants of enum `Concrete`
+   ┌─ tests/checking/variants/variant_field_select_generic_err.move:96:9
+   │
+96 │         e.x
+   │         ^
+   │
+   = in `enum Concrete`, field `x` has type `u8` in variant `B` and type `u64` in variant `A`
+
+error: cannot select field `0` since it has different types in variants of enum `Result<u64, u64>`
+    ┌─ tests/checking/variants/variant_field_select_generic_err.move:100:9
+    │
+100 │         r.0
+    │         ^
+    │
+    = in `enum Result<T, E>`, field `0` has type `E` in variant `Err` and type `T` in variant `Ok`
+
+error: cannot select field `x` since it has different types in variants of enum `E<u8, u8>`
+    ┌─ tests/checking/variants/variant_field_select_generic_err.move:110:27
+    │
+110 │         ensures result == e.x;
+    │                           ^
+    │
+    = in `enum E<T1, T2>`, field `x` has type `T2` in variant `B` and type `T1` in variant `A`
