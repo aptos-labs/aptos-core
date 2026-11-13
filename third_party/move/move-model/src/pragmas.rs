@@ -42,6 +42,11 @@ pub const VERIFY_DURATION_ESTIMATE_PRAGMA: &str = "verify_duration_estimate";
 /// the Move Prover.
 pub const HEARTBEATS_PRAGMA: &str = "heartbeats";
 
+/// Pragma whose `false` resolves `verify` to false for the Verex verifier
+/// alone: a function the Move Prover verifies is not verified by Verex.
+/// Ignored by the Move Prover.
+pub const VEREX_VERIFY_PRAGMA: &str = "verex_verify";
+
 /// Pragma indicating whether implementation of function should be ignored and
 /// instead treated to be like a native function.
 pub const INTRINSIC_PRAGMA: &str = "intrinsic";
@@ -711,6 +716,7 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
 /// Pragmas accepted in a module specification block.
 const MODULE_PRAGMAS: &[&str] = &[
     VERIFY_PRAGMA,
+    VEREX_VERIFY_PRAGMA,
     HEARTBEATS_PRAGMA,
     EMITS_IS_STRICT_PRAGMA,
     EMITS_IS_PARTIAL_PRAGMA,
@@ -724,6 +730,7 @@ const MODULE_PRAGMAS: &[&str] = &[
 /// Pragmas accepted in a function specification block.
 const FUNCTION_PRAGMAS: &[&str] = &[
     VERIFY_PRAGMA,
+    VEREX_VERIFY_PRAGMA,
     HEARTBEATS_PRAGMA,
     TIMEOUT_PRAGMA,
     SEED_PRAGMA,

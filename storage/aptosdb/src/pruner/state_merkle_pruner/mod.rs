@@ -55,7 +55,7 @@ where
     }
 
     fn prune(&self, batch_size: usize) -> Result<Version> {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_merkle_pruner__prune"]);
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&format!("{}__prune", M::name())]);
         let mut progress = self.progress();
         let target_version = self.target_version();
 

@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:18:4: error: the specification clause `ensures successor(300) == 301` is not established
 VerexE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:17:7: error: verex verification failed: the automatic verification of `outside` failed; provide a proof in the module:
-  verify outside by
+  verify outside by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -8,7 +8,7 @@ VerexE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:17:7: error: ve
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:24:4: error: the specification clause `ensures triangle(-1) == 0` is not established
 VerexE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:23:7: error: verex verification failed: the automatic verification of `negative` failed; provide a proof in the module:
-  verify negative by
+  verify negative by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

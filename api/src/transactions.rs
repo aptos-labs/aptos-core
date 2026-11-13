@@ -672,9 +672,10 @@ impl TransactionsApi {
             let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
                 // Retrieve max possible gas units
                 let (_, gas_params) = context.get_gas_schedule(&ledger_info)?;
-                let min_number_of_gas_units =
-                    u64::from(gas_params.vm.txn.min_transaction_gas_units)
-                        / u64::from(gas_params.vm.txn.gas_unit_scaling_factor);
+                let min_number_of_gas_units = minimum_external_gas_units(
+                    u64::from(gas_params.vm.txn.min_transaction_gas_units),
+                    u64::from(gas_params.vm.txn.gas_unit_scaling_factor),
+                );
                 let max_number_of_gas_units =
                     u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
 
@@ -1947,8 +1948,30 @@ fn override_gas_parameters(
     SignedTransaction::new_signed_transaction(raw_txn, signed_txn.authenticator())
 }
 
+/// Converts an internal gas amount to external gas units, rounding up to ensure the returned
+/// value is accepted by VM gas validation.
+fn minimum_external_gas_units(internal_gas_units: u64, gas_unit_scaling_factor: u64) -> u64 {
+    debug_assert_ne!(gas_unit_scaling_factor, 0);
+    internal_gas_units.div_ceil(gas_unit_scaling_factor)
+}
+
 enum GetByVersionResponse {
     VersionTooNew,
     VersionTooOld,
     Found(TransactionData),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::minimum_external_gas_units;
+
+    #[test]
+    fn minimum_external_gas_units_rounds_up() {
+        assert_eq!(minimum_external_gas_units(27_600_000, 1_000_000), 28);
+    }
+
+    #[test]
+    fn minimum_external_gas_units_preserves_exact_values() {
+        assert_eq!(minimum_external_gas_units(28_000_000, 1_000_000), 28);
+    }
 }

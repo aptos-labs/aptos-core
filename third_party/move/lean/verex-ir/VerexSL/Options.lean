@@ -53,6 +53,19 @@ register_option verex.relocateMessages : Bool := {
     position in the text"
 }
 
+/-- A module's command holds `lemma` items as a proof file does: a single file
+of a module with its proofs (`scripts/isolate-target.py --proofs`). -/
+register_option verex.lemmaItemsInModule : Bool := {
+  defValue := false
+  descr := "accept `lemma` items in a module's command, as in its proof file"
+}
+
+register_option verex.jobs : Nat := {
+  defValue := 0
+  descr := "how many targets of a module are proved at once, each in a task of its own; \
+    0 for half the hardware threads"
+}
+
 register_option verex.stageLog : String := {
   defValue := ""
   descr := "path of a file the verifier appends a timestamped line to at every stage of a \

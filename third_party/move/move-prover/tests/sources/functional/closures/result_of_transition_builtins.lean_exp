@@ -1,0 +1,25 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/result_of_transition_builtins.move:35:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_builtins.move:31:5: error: verex verification failed: the automatic verification of `caller_take_false` failed; provide a proof in `tests/sources/functional/closures/result_of_transition_builtins.proof.lean`:
+  verify caller_take_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_builtins.move:57:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_builtins.move:53:5: error: verex verification failed: the automatic verification of `caller_put_false` failed; provide a proof in `tests/sources/functional/closures/result_of_transition_builtins.proof.lean`:
+  verify caller_put_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_builtins.move:80:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_builtins.move:75:5: error: verex verification failed: the automatic verification of `caller_set_false` failed; provide a proof in `tests/sources/functional/closures/result_of_transition_builtins.proof.lean`:
+  verify caller_set_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

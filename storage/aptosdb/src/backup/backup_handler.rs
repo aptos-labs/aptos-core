@@ -217,8 +217,8 @@ impl BackupHandler {
     fn position_store_reader(&self) -> Result<NativeStoreReader<'_, PositionStore>> {
         let position = self.position()?;
         Ok(NativeStoreReader {
-            kv_db: &position.kv_db,
-            merkle_db: &position.merkle_db,
+            kv_db: &position.store.kv_db,
+            merkle_db: &position.store.merkle_db,
             pruner: None,
             ledger_metadata_db: self.ledger_db.metadata_db(),
         })

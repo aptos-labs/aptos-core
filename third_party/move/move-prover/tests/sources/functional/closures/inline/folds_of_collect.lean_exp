@@ -3,7 +3,7 @@ tests/sources/functional/closures/inline/folds_of_collect.move:50:9: error: the 
 tests/sources/functional/closures/inline/folds_of_collect.move:48:10: error: verex verification failed: the lemma `fold_is_prefix` is not established
 tests/sources/functional/closures/inline/folds_of_collect.move:41:9: error: the specification clause `ensures result == v` is not established
 tests/sources/functional/closures/inline/folds_of_collect.move:39:5: error: verex verification failed: the automatic verification of `collect` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_collect.proof.lean`:
-  verify collect by
+  verify collect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -11,7 +11,7 @@ tests/sources/functional/closures/inline/folds_of_collect.move:39:5: error: vere
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of_collect.move:66:9: error: the specification clause `ensures result.length == v.length + 1` is not established
 tests/sources/functional/closures/inline/folds_of_collect.move:64:5: error: verex verification failed: the automatic verification of `collect_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_collect.proof.lean`:
-  verify collect_wrong by
+  verify collect_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

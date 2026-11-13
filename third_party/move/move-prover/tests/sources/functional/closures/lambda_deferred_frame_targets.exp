@@ -1,0 +1,124 @@
+Move prover returns: exiting with verification errors
+warning: opaque call to `lambda_deferred_frame_targets::native_in_helper` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_targets.move:79:5
+   │
+79 │ ╭     spec native_in_helper {
+80 │ │         pragma opaque;
+81 │ │         pragma aborts_if_is_partial;
+82 │ │     }
+   │ ╰─────^
+
+error: verification failed: this assertion could not be proved; this is usually a recursive call, direct or through function values, to a function that is not opaque (mark it `pragma opaque` and give it a specification)
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_targets.move:49:22
+   │
+49 │             pong(n - 1, y)
+   │                      ^
+   │
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:44: ping
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:45: ping
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:49: ping
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:52: pong
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:53: pong
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:44: ping
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:45: ping
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:49: ping
+
+error: verification failed: this assertion could not be proved; this is usually a recursive call, direct or through function values, to a function that is not opaque (mark it `pragma opaque` and give it a specification)
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_targets.move:53:9
+   │
+53 │         ping(n, y)
+   │         ^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:52: pong
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:53: pong
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:44: ping
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:45: ping
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:49: ping
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:52: pong
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:53: pong
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_targets.move:63:9
+   │
+63 │         ensures result == old(global<R>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:56: native_direct
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:57: native_direct
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:58: native_direct
+   =         <redacted> = <redacted>
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:59: native_direct
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:56: native_direct
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:63: native_direct (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_targets.move:73:9
+   │
+73 │         ensures result == old(global<R>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:66: unverified_direct
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:67: unverified_direct
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:68: unverified_direct
+   =         <redacted> = <redacted>
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:69: unverified_direct
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:66: unverified_direct
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:73: unverified_direct (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_targets.move:91:9
+   │
+91 │         ensures result == old(global<R>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:84: native_through_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:85: native_through_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:86: native_through_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:87: native_through_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:84: native_through_helper
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:91: native_through_helper (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/lambda_deferred_frame_targets.move:107:9
+    │
+107 │         ensures result == old(global<R>(@0x42).v);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:94: unverified_in_loop
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:106: unverified_in_loop (spec)
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:94: unverified_in_loop
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:95: unverified_in_loop
+    =         before = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:96: unverified_in_loop
+    =         f = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:97: unverified_in_loop
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:98: unverified_in_loop
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:102: unverified_in_loop
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:94: unverified_in_loop
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:107: unverified_in_loop (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/lambda_deferred_frame_targets.move:117:9
+    │
+117 │         ensures result == old(global<R>(@0x42).v);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:110: recursive_direct
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:111: recursive_direct
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:112: recursive_direct
+    =         <redacted> = <redacted>
+    =         before = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:113: recursive_direct
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:110: recursive_direct
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_targets.move:117: recursive_direct (spec)

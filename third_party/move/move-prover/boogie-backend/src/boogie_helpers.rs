@@ -12,7 +12,7 @@ use itertools::Itertools;
 use move_binary_format::file_format::TypeParameterIndex;
 use move_core_types::{ability::AbilitySet, function::ClosureMask};
 use move_model::{
-    ast::{Address, BehaviorKind, ConditionKind, MemoryLabel, TempIndex, Value},
+    ast::{Address, BehaviorKind, MemoryLabel, TempIndex, Value},
     model::{
         FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedId,
         QualifiedInstId, SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
@@ -33,11 +33,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// instantiation, with nested function types normalized. Abilities are not part of Boogie
 /// names, so instantiations differing only in them are one entity.
 pub fn normalized_inst_id<Id: Clone>(id: QualifiedId<Id>, inst: &[Type]) -> QualifiedInstId<Id> {
-    id.instantiate(
-        inst.iter()
-            .map(|t| t.clone().normalize_nested_funs())
-            .collect(),
-    )
+    id.instantiate(Type::normalize_inst(inst))
 }
 
 /// Tracks which entities an emission loop has already translated. Keyed on the entity,
@@ -91,41 +87,13 @@ impl<K: Ord + Clone> EmittedEntities<K> {
 }
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
-pub const MAX_TUPLE_SIZE: usize = 11;
+pub const MAX_TUPLE_SIZE: usize = 20;
 pub const TABLE_NATIVE_SPEC_ERROR: &str =
     "Native functions defined in Table cannot be used as specification functions";
 const NUM_TYPE_BASE_ERROR: &str = "cannot infer concrete integer type from `num`, consider using a concrete integer type or explicit type cast";
 const BV_TYPE_NOT_ENABLED_ERROR: &str = "signed integer cannot be turned into bit vector";
 
-/// Returns memory whose pre-state is needed by a function behavioral predicate
-/// at a concrete type instantiation. In addition to ordinary parameterized
-/// resources, this resolves resource memory selected by a bare function type
-/// parameter (for example the `T` in `object::spec_exists_at<T>`).
-pub fn behavioral_old_memory_instantiated(
-    fun_env: &FunctionEnv<'_>,
-    inst: &[Type],
-) -> BTreeSet<QualifiedInstId<StructId>> {
-    let mut result = fun_env.get_spec_old_memory_instantiated(inst);
-    let spec = fun_env.get_spec();
-    for cond in &spec.conditions {
-        if matches!(cond.kind, ConditionKind::LetPre(..)) {
-            result.extend(
-                cond.exp
-                    .directly_used_memory(fun_env.env())
-                    .into_iter()
-                    .map(|memory| memory.instantiate(inst)),
-            );
-            for type_param in cond.exp.directly_generic_used_memory(fun_env.env()) {
-                if let Some(Type::Struct(module_id, struct_id, type_args)) =
-                    inst.get(type_param as usize).map(Type::skip_reference)
-                {
-                    result.insert(module_id.qualified_inst(*struct_id, type_args.clone()));
-                }
-            }
-        }
-    }
-    result
-}
+pub use move_model::spec_derivation::behavioral_old_memory_instantiated;
 
 /// Return boogie name of given module.
 pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {

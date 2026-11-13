@@ -3,7 +3,7 @@
   "evidence": [
     {
       "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
-      "producer": "verex-rust-export via rustc Public",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
       "trusted": true
     }
   ],
@@ -83,9 +83,10 @@
               "arguments": [],
               "instantiations": [],
               "operation": {
-                "move": {
+                "borrow": {
+                  "kind": "mutable",
                   "place": {
-                    "index": 3
+                    "index": 4
                   }
                 }
               },
@@ -103,7 +104,7 @@
           "kind": {
             "assign": {
               "place": {
-                "index": 4
+                "index": 5
               },
               "value": {
                 "index": 3
@@ -125,7 +126,7 @@
               "operation": {
                 "move": {
                   "place": {
-                    "index": 5
+                    "index": 6
                   }
                 }
               },
@@ -444,6 +445,13 @@
           }
         },
         {
+          "deref": {
+            "base": {
+              "index": 3
+            }
+          }
+        },
+        {
           "localVar": {
             "localId": {
               "index": 1
@@ -461,6 +469,7 @@
       "pragmas": [],
       "profile": "rust",
       "profileMetadata": [],
+      "scopes": [],
       "specFunctions": [],
       "specVars": [],
       "structs": [],
@@ -485,7 +494,7 @@
         ]
       ],
       "profile": "rust",
-      "version": 2
+      "version": 5
     }
   ],
   "tables": {
@@ -726,6 +735,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 6
+    "minor": 9
   }
 }

@@ -12,21 +12,20 @@ open VerexIR.Import
 open VerexIR.SemanticOperations
 open VerexIR.Validation
 
-private def testNamespace : ValidatedNamespace := {
-  loc := ⟨0⟩
-  identity := ⟨0⟩
-  tables := { types := #[.integer (.bits 8) false] } }
+-- A namespace over `types`, numbered in its own tables.
+private def primitiveNamespace (types : Array Ty) : ValidatedNamespace :=
+  let tables : Tables := { types }
+  { loc := ⟨0⟩, identity := ⟨0⟩, tables, links := .identity tables, localTables := tables }
 
-private def signedTestNamespace : ValidatedNamespace := {
-  loc := ⟨0⟩
-  identity := ⟨0⟩
-  tables := { types := #[.integer (.bits 8) true] } }
+private def testNamespace : ValidatedNamespace :=
+  primitiveNamespace #[.integer (.bits 8) false]
 
-private def pointerTestNamespace : ValidatedNamespace := {
-  loc := ⟨0⟩
-  identity := ⟨0⟩
-  tables := { types := #[.integer .pointer false, .integer .pointer true, .bool,
-    .tuple #[⟨0⟩, ⟨2⟩]] } }
+private def signedTestNamespace : ValidatedNamespace :=
+  primitiveNamespace #[.integer (.bits 8) true]
+
+private def pointerTestNamespace : ValidatedNamespace :=
+  primitiveNamespace #[.integer .pointer false, .integer .pointer true, .bool,
+    .tuple #[⟨0⟩, ⟨2⟩]]
 
 -- Insertion permits the end index; removal returns the removed value and
 -- rejects the end index. Both reject negative indexes and preserve siblings.
@@ -106,10 +105,8 @@ example : ValueHasType default textTypingTables (.string "Verex") ⟨0⟩ := by
 example : ValueHasType default textTypingTables (.bytes #[0, 127, 255]) ⟨1⟩ := by
   exact .bytes ⟨1⟩ #[0, 127, 255] rfl
 
-private def textTestNamespace : ValidatedNamespace := {
-  loc := ⟨0⟩
-  identity := ⟨0⟩
-  tables := { types := #[.string, .bytes, .integer (.bits 64) false] } }
+private def textTestNamespace : ValidatedNamespace :=
+  primitiveNamespace #[.string, .bytes, .integer (.bits 64) false]
 
 #guard match evaluatePrimitiveOperation? textTestNamespace ⟨2⟩ .length
     #[.string "Lean🦀"] with
@@ -121,11 +118,9 @@ private def textTestNamespace : ValidatedNamespace := {
   | some (.ok (.integer 3)) => true
   | _ => false
 
-private def characterTestNamespace : ValidatedNamespace := {
-  loc := ⟨0⟩
-  identity := ⟨0⟩
-  tables := { types := #[.character, .bool,
-    .integer (.bits 8) false, .integer (.bits 32) false] } }
+private def characterTestNamespace : ValidatedNamespace :=
+  primitiveNamespace #[.character, .bool,
+    .integer (.bits 8) false, .integer (.bits 32) false]
 
 #guard match evaluatePrimitiveOperation? characterTestNamespace ⟨1⟩ .less
     #[.character 0x61, .character 0x1f980] with
@@ -233,11 +228,8 @@ private def characterTestNamespace : ValidatedNamespace := {
   | some (.ok (.integer (-1))) => true
   | _ => false
 
-private def overflowingTestNamespace : ValidatedNamespace := {
-  testNamespace with
-  tables := { testNamespace.tables with
-    types := #[.integer (.bits 8) false, .bool, .tuple #[⟨0⟩, ⟨1⟩]] }
-}
+private def overflowingTestNamespace : ValidatedNamespace :=
+  primitiveNamespace #[.integer (.bits 8) false, .bool, .tuple #[⟨0⟩, ⟨1⟩]]
 
 #guard match evaluatePrimitiveOperation? overflowingTestNamespace ⟨2⟩ .overflowingAdd
     #[.integer 250, .integer 10] with
@@ -249,21 +241,16 @@ private def overflowingTestNamespace : ValidatedNamespace := {
   | some (.ok (.tuple #[.integer 120, .bool false])) => true
   | _ => false
 
-private def signedOverflowingTestNamespace : ValidatedNamespace := {
-  signedTestNamespace with
-  tables := { signedTestNamespace.tables with
-    types := #[.integer (.bits 8) true, .bool, .tuple #[⟨0⟩, ⟨1⟩]] }
-}
+private def signedOverflowingTestNamespace : ValidatedNamespace :=
+  primitiveNamespace #[.integer (.bits 8) true, .bool, .tuple #[⟨0⟩, ⟨1⟩]]
 
 #guard match evaluatePrimitiveOperation? signedOverflowingTestNamespace ⟨2⟩
     .overflowingSubtract #[.integer (-120), .integer 20] with
   | some (.ok (.tuple #[.integer 116, .bool true])) => true
   | _ => false
 
-private def boolTestNamespace : ValidatedNamespace := {
-  loc := ⟨0⟩
-  identity := ⟨0⟩
-  tables := { types := #[.bool] } }
+private def boolTestNamespace : ValidatedNamespace :=
+  primitiveNamespace #[.bool]
 
 #guard match evaluatePrimitiveOperation? boolTestNamespace ⟨0⟩ .bitwiseAnd
     #[.bool true, .bool false] with
@@ -494,10 +481,7 @@ private def characterRangeNamespace : ValidatedNamespace :=
   let rangePattern : Pattern :=
     { loc := ⟨0⟩, typeId := ⟨0⟩,
       kind := .range (some (.character 0x61)) (some (.character 0x7a)) true }
-  { loc := ⟨0⟩
-    identity := ⟨0⟩
-    tables := { types := #[.character] }
-    patterns := #[rangePattern] }
+  { primitiveNamespace #[.character] with patterns := #[rangePattern] }
 
 #guard (bindPattern default characterRangeNamespace {} ⟨0⟩ (.character 0x6d)).isSome
 #guard (bindPattern default characterRangeNamespace {} ⟨0⟩ (.character 0x1f980)).isNone

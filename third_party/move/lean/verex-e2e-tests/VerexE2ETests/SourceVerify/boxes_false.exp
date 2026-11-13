@@ -1,0 +1,144 @@
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:5:3: error: the specification clause `ensures result == value + 1` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:4:6: error: verex verification failed: the automatic verification of `make` failed; provide a proof in the module:
+  verify make by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:8:3: error: the specification clause `ensures result == 0` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:7:6: error: verex verification failed: the automatic verification of `read` failed; provide a proof in the module:
+  verify read by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:11:3: error: the specification clause `ensures result == value + 1` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:10:6: error: verex verification failed: the automatic verification of `read_nested` failed; provide a proof in the module:
+  verify read_nested by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:14:3: error: the specification clause `ensures result == value[0u32]` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:13:6: error: verex verification failed: the automatic verification of `read_field` failed; provide a proof in the module:
+  verify read_field by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:17:3: error: the specification clause `ensures result.length == 0` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:16:6: error: verex verification failed: the automatic verification of `move_out` failed; provide a proof in the module:
+  verify move_out by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:20:3: error: the specification clause `ensures result.0 == value.0 + 1` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:19:6: error: verex verification failed: the automatic verification of `move_guard` failed; provide a proof in the module:
+  verify move_guard by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:23:3: error: the specification clause `ensures result.length == 0` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:22:6: error: verex verification failed: the automatic verification of `move_part` failed; provide a proof in the module:
+  verify move_part by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:26:3: error: the specification clause `ensures result == value.length` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:25:6: error: verex verification failed: the automatic verification of `move_behind_flag` failed; provide a proof in the module:
+  verify move_behind_flag by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:29:3: error: the specification clause `ensures value == old(value)` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:28:6: error: verex verification failed: the automatic verification of `write` failed; provide a proof in the module:
+  verify write by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:32:3: error: the specification clause `ensures value[1u32][1u32] == old(value[1u32][1u32])` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:31:6: error: verex verification failed: the automatic verification of `write_field` failed; provide a proof in the module:
+  verify write_field by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:35:3: error: the specification clause `ensures value == old(value)` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:34:6: error: verex verification failed: the automatic verification of `write_through` failed; provide a proof in the module:
+  verify write_through by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:38:3: error: the specification clause `ensures result == value` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:37:6: error: verex verification failed: the automatic verification of `write_owned` failed; provide a proof in the module:
+  verify write_owned by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:41:3: error: the specification clause `ensures result == old(value) + 1` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:40:6: error: verex verification failed: the automatic verification of `borrow_mut` failed; provide a proof in the module:
+  verify borrow_mut by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:44:3: error: the specification clause `ensures result == value + 1` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:43:6: error: verex verification failed: the automatic verification of `view` failed; provide a proof in the module:
+  verify «view» by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:47:3: error: the specification clause `ensures result == value + 1` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:46:6: error: verex verification failed: the automatic verification of `as_ref` failed; provide a proof in the module:
+  verify as_ref by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:50:3: error: the specification clause `ensures value == old(value)` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:49:6: error: verex verification failed: the automatic verification of `as_mut` failed; provide a proof in the module:
+  verify as_mut by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:53:3: error: the specification clause `ensures result == 2` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:52:6: error: verex verification failed: the automatic verification of `dropped` failed; provide a proof in the module:
+  verify dropped by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:56:3: error: the specification clause `ensures result == 2` is not established
+VerexE2ETests/SourceVerify/boxes_false.spec.lean:55:6: error: verex verification failed: the automatic verification of `dropped_holder` failed; provide a proof in the module:
+  verify dropped_holder by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

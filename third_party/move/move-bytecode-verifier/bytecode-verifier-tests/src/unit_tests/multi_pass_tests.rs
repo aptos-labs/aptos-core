@@ -6,14 +6,14 @@
 use move_binary_format::CompiledModule;
 use move_bytecode_verifier::{
     constants, instantiation_loops::InstantiationLoopChecker, DuplicationChecker,
-    InstructionConsistency, RecursiveStructDefChecker,
+    InstructionConsistency, RecursiveStructDefChecker, VerifierConfig,
 };
 use proptest::prelude::*;
 
 proptest! {
     #[test]
     fn check_verifier_passes(module in CompiledModule::valid_strategy(20)) {
-        DuplicationChecker::verify_module(&module).expect("DuplicationChecker failure");
+        DuplicationChecker::verify_module(&VerifierConfig::default(), &module).expect("DuplicationChecker failure");
         InstructionConsistency::verify_module(&module).expect("InstructionConsistency failure");
         constants::verify_module(&module).expect("constants failure");
         RecursiveStructDefChecker::verify_module(&module).expect("RecursiveStructDefChecker failure");

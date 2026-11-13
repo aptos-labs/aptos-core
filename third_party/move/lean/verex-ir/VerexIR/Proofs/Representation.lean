@@ -37,6 +37,11 @@ theorem SpecInt.ext {width : IntWidth} {signed : Bool} :
     ∀ {a b : SpecInt width signed}, a.val = b.val → a = b
   | ⟨_, _⟩, ⟨_, _⟩, rfl => rfl
 
+/-- Certified integers are equal exactly when their values are. -/
+theorem SpecInt.eq_iff_val {width : IntWidth} {signed : Bool} (left right : SpecInt width signed) :
+    left = right ↔ left.val = right.val :=
+  ⟨fun same => same ▸ rfl, SpecInt.ext⟩
+
 /-- The bounds an unsigned certificate carries, in the form `omega` reads.
 The zero-width case is vacuous: no certificate exists there. -/
 theorem IntegerValueFits.unsigned_bounds {width : Nat} {value : Int}
@@ -45,6 +50,24 @@ theorem IntegerValueFits.unsigned_bounds {width : Nat} {value : Int}
   by_cases zero : width = 0
   · simp [IntegerValueFits, Ty.integerValueFits?, Ty.integerBounds?, zero] at fits
   · simpa [IntegerValueFits, Ty.integerValueFits?, Ty.integerBounds?, zero] using fits
+
+/-- An integer in a range whose least and greatest values fit fits. -/
+theorem IntegerValueFits.of_range {width : IntWidth} {signed : Bool} {lower upper value : Int}
+    (range : lower ≤ value ∧ value < upper) (lowerFits : IntegerValueFits width signed lower)
+    (lastFits : IntegerValueFits width signed (upper - 1)) :
+    IntegerValueFits width signed value := by
+  cases width with
+  | unbounded => simp [IntegerValueFits, Ty.integerValueFits?]
+  | pointer => simp [IntegerValueFits, Ty.integerValueFits?] at lowerFits
+  | bits n =>
+      simp only [IntegerValueFits, Ty.integerValueFits?] at lowerFits lastFits ⊢
+      cases bounds : (Ty.integer (.bits n) signed).integerBounds? with
+      | none => simp [bounds] at lowerFits
+      | some b =>
+          obtain ⟨least, greatest⟩ := b
+          simp only [bounds, Option.bind_eq_bind, Option.bind_some, Option.some.injEq,
+            Bool.and_eq_true, decide_eq_true_eq] at lowerFits lastFits ⊢
+          omega
 
 /-- The bounds a signed certificate carries, in the form `omega` reads. -/
 theorem IntegerValueFits.signed_bounds {width : Nat} {value : Int}
@@ -64,6 +87,63 @@ theorem SpecInt.signed_bounds {width : Nat} (n : SpecInt (.bits width) true) :
     -(2 ^ (width - 1)) ≤ n.val ∧ n.val ≤ 2 ^ (width - 1) - 1 :=
   n.fits.signed_bounds
 
+/-- The certified integer of a value within the width, and `default`
+outside it: the total form a specification reads an integer into a position
+of a fixed-width type at. -/
+def SpecInt.ofInt {width : IntWidth} {signed : Bool} (default : SpecInt width signed)
+    (value : Int) : SpecInt width signed :=
+  if fits : IntegerValueFits width signed value then ⟨value, fits⟩ else default
+
+/-- A map's size as the cached length of an owner a specification builds:
+`ofInt`, for a field the representation keeps and no specification states,
+cut only at a size no table holds. -/
+@[reducible] def SpecInt.ofSize {width : IntWidth} {signed : Bool} (default : SpecInt width signed)
+    (size : Int) : SpecInt width signed :=
+  SpecInt.ofInt default size
+
+@[simp] theorem SpecInt.ofInt_val {width : IntWidth} {signed : Bool}
+    (default n : SpecInt width signed) : SpecInt.ofInt default n.val = n := by
+  unfold SpecInt.ofInt
+  rw [dif_pos n.fits]
+
+theorem SpecInt.val_ofInt {width : IntWidth} {signed : Bool} (default : SpecInt width signed)
+    {value : Int} (fits : IntegerValueFits width signed value) :
+    (SpecInt.ofInt default value).val = value := by
+  simp [SpecInt.ofInt, fits]
+
+/-- A cut compared with a certified integer compares their values, where
+the cut's value reads back when it fits (`SpecInt.val_ofInt`). -/
+theorem SpecInt.ofInt_eq_iff {width : IntWidth} {signed : Bool} (default other : SpecInt width signed)
+    (value : Int) :
+    SpecInt.ofInt default value = other ↔ (SpecInt.ofInt default value).val = other.val :=
+  ⟨congrArg SpecInt.val, SpecInt.ext⟩
+
+theorem SpecInt.eq_ofInt_iff {width : IntWidth} {signed : Bool} (default other : SpecInt width signed)
+    (value : Int) :
+    other = SpecInt.ofInt default value ↔ other.val = (SpecInt.ofInt default value).val :=
+  ⟨congrArg SpecInt.val, SpecInt.ext⟩
+
+/-- An integer cut to a width is a certified integer of that value. -/
+theorem SpecInt.ofInt_eq_of_val {width : IntWidth} {signed : Bool} (default x : SpecInt width signed)
+    {value : Int} (named : x.val = value) : SpecInt.ofInt default value = x := by
+  rw [← named, SpecInt.ofInt_val]
+
+/-- A Unicode scalar value: the carrier of `char`, the value its code point. -/
+structure SpecChar where
+  val : Nat
+  valid : isUnicodeScalar val = true
+
+theorem SpecChar.ext : ∀ {a b : SpecChar}, a.val = b.val → a = b
+  | ⟨_, _⟩, ⟨_, _⟩, rfl => rfl
+
+theorem SpecChar.eq_iff_val (left right : SpecChar) : left = right ↔ left.val = right.val :=
+  ⟨fun same => same ▸ rfl, SpecChar.ext⟩
+
+instance : DecidableEq SpecChar := fun left right =>
+  decidable_of_iff (left.val = right.val) (SpecChar.eq_iff_val left right).symm
+
+instance : Inhabited SpecChar := ⟨⟨0, by decide⟩⟩
+
 /-! ## Certified Move vectors
 
 Move's native vector carries an unsigned-64 length bound.
@@ -73,6 +153,22 @@ structure SpecVector (α : Type) where
   values : Array α
   bounded : values.size < 2 ^ 64
 
+/-- A string's UTF-8 bytes. A string too long for a vector has none here: no value of
+a running program is. -/
+def stringBytes (text : String) : SpecVector (SpecInt (.bits 8) false) :=
+  let values := text.toUTF8.data.map fun byte =>
+    SpecInt.ofInt (width := .bits 8) (signed := false) (default := ⟨0, by decide⟩)
+      (Int.ofNat byte.toNat)
+  if bounded : values.size < 2 ^ 64 then ⟨values, bounded⟩ else ⟨#[], by decide⟩
+
+/-- A character's UTF-8 encoding. -/
+def charEncode (value : SpecChar) : SpecVector (SpecInt (.bits 8) false) :=
+  stringBytes (String.singleton (Char.ofNat value.val))
+
+/-- Rebuilding a vector's certificate preserves the vector itself. -/
+theorem SpecVector.eta (vector : SpecVector α) (bounded : vector.values.size < 2 ^ 64) :
+    (⟨vector.values, bounded⟩ : SpecVector α) = vector := rfl
+
 @[ext, grind ext] theorem SpecVector.ext {a b : SpecVector α} (h : a.values = b.values) : a = b := by
   cases a
   cases b
@@ -80,6 +176,17 @@ structure SpecVector (α : Type) where
   rfl
 
 instance : Inhabited (SpecVector α) := ⟨⟨#[], by change 0 < 2 ^ 64; decide⟩⟩
+
+/-- A fixed-length array: a vector with the fact of its length. -/
+structure SpecArray (α : Type) (length : Nat) where
+  vector : SpecVector α
+  size_eq : vector.values.size = length
+
+theorem SpecArray.ext {length : Nat} {a b : SpecArray α length} (h : a.vector = b.vector) : a = b := by
+  cases a
+  cases b
+  cases h
+  rfl
 
 /-- Vectors are equal exactly when their values are: the form a goal about
 vectors is decided in. -/
@@ -94,6 +201,41 @@ def SpecVector.map (f : α → β) (vector : SpecVector α) : SpecVector β :=
 
 @[simp] theorem SpecVector.map_values (f : α → β) (vector : SpecVector α) :
     (vector.map f).values = vector.values.map f := rfl
+
+/-- The concatenation of two vectors, as a specification states it: the
+left vector where the elements would exceed a vector's length, which no
+Move vector reaches. -/
+def SpecVector.append (left right : SpecVector α) : SpecVector α :=
+  if bounded : left.values.size + right.values.size < 2 ^ 64 then
+    ⟨left.values ++ right.values, by simpa only [Array.size_append] using bounded⟩
+  else left
+
+theorem SpecVector.values_append {left right : SpecVector α}
+    (bounded : left.values.size + right.values.size < 2 ^ 64) :
+    (left.append right).values = left.values ++ right.values := by
+  simp only [SpecVector.append, dif_pos bounded]
+
+/-- A vector with one more element, as a specification states it: the vector
+itself where it is full, which no Move vector is. -/
+def SpecVector.push (vector : SpecVector α) (element : α) : SpecVector α :=
+  if bounded : vector.values.size + 1 < 2 ^ 64 then
+    ⟨vector.values.push element, by simpa only [Array.size_push] using bounded⟩
+  else vector
+
+theorem SpecVector.values_push {vector : SpecVector α} (element : α)
+    (bounded : vector.values.size + 1 < 2 ^ 64) :
+    (vector.push element).values = vector.values.push element := by
+  simp only [SpecVector.push, dif_pos bounded]
+
+/-- The elements from `lower` up to `upper`, cut at the vector's end. -/
+def SpecVector.extract (vector : SpecVector α) (lower upper : Nat) : SpecVector α :=
+  ⟨vector.values.extract lower upper, by
+    have := vector.bounded
+    simp only [Array.size_extract]
+    omega⟩
+
+@[simp] theorem SpecVector.values_extract (vector : SpecVector α) (lower upper : Nat) :
+    (vector.extract lower upper).values = vector.values.extract lower upper := rfl
 
 /-- The entries of an intrinsic map, as many as a Move vector holds: the
 map's representation keeps them in vectors, whose unsigned-64 length bound
@@ -121,6 +263,17 @@ def SpecEntries.map (f : α → β) (entries : SpecEntries α) : SpecEntries β 
 theorem SpecEntries.eq_iff_entries (left right : SpecEntries α) :
     left = right ↔ left.entries = right.entries :=
   ⟨fun h => h ▸ rfl, SpecEntries.ext⟩
+
+/-- Entries a specification states, as a map holds them: the entries
+themselves where they fit a Move vector's length, `default` where they do
+not, which no Move map reaches. -/
+def SpecEntries.ofList (entries : List α) (default : SpecEntries α) : SpecEntries α :=
+  if bounded : entries.length < 2 ^ 64 then ⟨entries, bounded⟩ else default
+
+theorem SpecEntries.entries_ofList {entries : List α} (default : SpecEntries α)
+    (bounded : entries.length < 2 ^ 64) :
+    (SpecEntries.ofList entries default).entries = entries := by
+  simp only [SpecEntries.ofList, dif_pos bounded]
 
 /-! ## Field codecs
 
@@ -190,7 +343,7 @@ def decodeUnit? : RuntimeValue → Option Unit
 
 @[simp] theorem decodeUnit?_unit : decodeUnit? .unit = some () := rfl
 
-/-- A ghost slot's decoder: its contents' (`designs/ghost-fields.md`). -/
+/-- A ghost slot's decoder: its contents' (`doc/designs/ghost-fields.md`). -/
 def decodeGhost? {α : Type} (decode : RuntimeValue → Option α) : RuntimeValue → Option α
   | .ghost contents => decode contents
   | _ => none

@@ -107,7 +107,7 @@ warning: cannot derive `aborts_of` exactly for this lambda argument: per-applica
 
 tests/sources/functional/closures/inline/state_hofs.move:51:5: error: a loop invariant at entry is not established
 tests/sources/functional/closures/inline/state_hofs.move:51:5: error: verex verification failed: the automatic verification of `bump_all` failed; provide a proof in `tests/sources/functional/closures/inline/state_hofs.proof.lean`:
-  verify bump_all by
+  verify bump_all by lean =>
     verex_obligations
     verex_on
     | invariant_entry => verex_prepare; sorry
@@ -115,7 +115,7 @@ tests/sources/functional/closures/inline/state_hofs.move:51:5: error: verex veri
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/state_hofs.move:67:5: error: a loop invariant at entry is not established
 tests/sources/functional/closures/inline/state_hofs.move:67:5: error: verex verification failed: the automatic verification of `remove_all` failed; provide a proof in `tests/sources/functional/closures/inline/state_hofs.proof.lean`:
-  verify remove_all by
+  verify remove_all by lean =>
     verex_obligations
     verex_on
     | invariant_entry => verex_prepare; sorry
@@ -123,7 +123,7 @@ tests/sources/functional/closures/inline/state_hofs.move:67:5: error: verex veri
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/state_hofs.move:84:5: error: a loop invariant at entry is not established
 tests/sources/functional/closures/inline/state_hofs.move:84:5: error: verex verification failed: the automatic verification of `bump_all_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/state_hofs.proof.lean`:
-  verify bump_all_wrong by
+  verify bump_all_wrong by lean =>
     verex_obligations
     verex_on
     | invariant_entry => verex_prepare; sorry
@@ -131,7 +131,7 @@ tests/sources/functional/closures/inline/state_hofs.move:84:5: error: verex veri
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/state_hofs.move:137:5: error: a loop invariant at entry is not established
 tests/sources/functional/closures/inline/state_hofs.move:137:5: error: verex verification failed: the automatic verification of `bump_all_via_call` failed; provide a proof in `tests/sources/functional/closures/inline/state_hofs.proof.lean`:
-  verify bump_all_via_call by
+  verify bump_all_via_call by lean =>
     verex_obligations
     verex_on
     | invariant_entry => verex_prepare; sorry

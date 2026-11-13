@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Specifications/Assumptions.lean:24:16: error: the assertion `x > y` does not hold
 VerexE2ETests/Check/Specifications/Assumptions.lean:22:6: error: verex verification failed: the automatic verification of `ordered_incorrect` failed; provide a proof in the module:
-  verify ordered_incorrect by
+  verify ordered_incorrect by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

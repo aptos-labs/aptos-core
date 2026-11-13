@@ -64,7 +64,7 @@ verify 0x42::state_label_decoding::caller
 error: the specification clause `ensures ..S |~ update<Counter>(addr, new Counter { value := 1 })` is not established
 ---
 error: verex verification failed: the automatic verification of `missing_label` failed; provide a proof in the module:
-  verify missing_label by
+  verify missing_label by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -77,7 +77,7 @@ verify 0x42::state_label_decoding::missing_label
 error: the specification clause `ensures ..S |~ update<Counter>(addr, core.data.updateField(old(global<Counter>(addr)), value, old(global<Counter>(addr).value) + 1))` is not established
 ---
 error: verex verification failed: the automatic verification of `overflow_label` failed; provide a proof in the module:
-  verify overflow_label by
+  verify overflow_label by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

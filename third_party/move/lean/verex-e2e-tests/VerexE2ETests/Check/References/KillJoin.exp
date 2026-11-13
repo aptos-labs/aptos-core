@@ -1,0 +1,6 @@
+VerexE2ETests/Check/References/KillJoin.lean:13:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active mutable loan at VerexE2ETests/Check/References/KillJoin.lean:23:5
+  active loan originates here: VerexE2ETests/Check/References/KillJoin.lean:22:14
+VerexE2ETests/Check/References/KillJoin.lean:30:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active mutable loan at VerexE2ETests/Check/References/KillJoin.lean:40:5
+  active loan originates here: VerexE2ETests/Check/References/KillJoin.lean:39:14

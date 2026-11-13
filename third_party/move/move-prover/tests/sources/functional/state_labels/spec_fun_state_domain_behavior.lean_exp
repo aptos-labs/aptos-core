@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/state_labels/spec_fun_state_domain_behavior.move:24:9: error: the specification clause `ensures readable_in_every_state(_addr)` is not established
 tests/sources/functional/state_labels/spec_fun_state_domain_behavior.move:22:5: error: verex verification failed: the automatic verification of `expose_false_claim` failed; provide a proof in `tests/sources/functional/state_labels/spec_fun_state_domain_behavior.proof.lean`:
-  verify expose_false_claim by
+  verify expose_false_claim by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

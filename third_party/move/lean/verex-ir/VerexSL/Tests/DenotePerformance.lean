@@ -6,7 +6,7 @@ import VerexSL
 /-!
 # Verification-cost benchmark of the denotation
 
-The D0 targets of `designs/denotation.md`, one per operation class, the
+The D0 targets of `doc/designs/denotation.md`, one per operation class, the
 D1 loop forms, and the D1 aggregates (tuples, structs, enums), each proved
 by a bare `verify` through the denotation.  `#verex_perf` compares
 their cost with [`DenotePerformance.exp`](DenotePerformance.exp) and fails

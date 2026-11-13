@@ -443,6 +443,21 @@ impl DbWriter for FakeAptosDB {
         self.inner.advance_position_base(target)
     }
 
+    fn advance_order_base(
+        &self,
+        target: Option<&aptos_storage_interface::state_store::orders::OrderOverlay>,
+    ) -> Result<Option<aptos_storage_interface::state_store::orders::ShardedOrderLayers>> {
+        self.inner.advance_order_base(target)
+    }
+
+    fn advance_collateral_base(
+        &self,
+        target: Option<&aptos_storage_interface::state_store::collateral::CollateralOverlay>,
+    ) -> Result<Option<aptos_storage_interface::state_store::collateral::ShardedCollateralLayers>>
+    {
+        self.inner.advance_collateral_base(target)
+    }
+
     fn get_state_snapshot_receiver(
         &self,
         version: Version,

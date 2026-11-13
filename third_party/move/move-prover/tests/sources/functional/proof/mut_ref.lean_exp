@@ -7,7 +7,7 @@ warning: proof uses trusted assumption
 
 tests/sources/functional/proof/mut_ref.move:152:14: error: the assertion `c.value == old(c.value)` does not hold
 tests/sources/functional/proof/mut_ref.move:149:5: error: verex verification failed: the automatic verification of `set_to_zero` failed; provide a proof in `tests/sources/functional/proof/mut_ref.proof.lean`:
-  verify set_to_zero by
+  verify set_to_zero by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

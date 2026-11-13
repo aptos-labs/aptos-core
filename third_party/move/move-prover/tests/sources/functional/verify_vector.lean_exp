@@ -1,87 +1,187 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/verify_vector.move:118:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), v[i] == old(v)[v.length - 1 - i]` is not established
-tests/sources/functional/verify_vector.move:106:17: error: the loop invariant `∀ (j in front_index .. back_index + 1), v[j] == old(v)[j]` is not preserved by an iteration
-tests/sources/functional/verify_vector.move:105:17: error: the loop invariant `∀ (i in 0 .. front_index), v[vlen - 1 - i] == old(v)[i]` is not preserved by an iteration
-tests/sources/functional/verify_vector.move:104:17: error: the loop invariant `∀ (i in 0 .. front_index), v[i] == old(v)[vlen - 1 - i]` is not preserved by an iteration
-tests/sources/functional/verify_vector.move:116:5: error: verex verification failed: the automatic verification of `verify_reverse` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_reverse by
+tests/sources/functional/verify_vector.move:39:9: error: the specification clause `ensures v[v.length - 1] == e` is not established
+tests/sources/functional/verify_vector.move:40:9: error: the specification clause `ensures old(v) == v[0 .. v.length - 1]` is not established
+tests/sources/functional/verify_vector.move:37:5: error: verex verification failed: the automatic verification of `verify_model_push_back` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_model_push_back by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | ensures_3 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/verify_vector.move:49:9: error: the specification clause `ensures result == v[i]` is not established
+tests/sources/functional/verify_vector.move:47:5: error: verex verification failed: the automatic verification of `verify_model_borrow_mut` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_model_borrow_mut by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
-    | invariant_4_step => verex_prepare; sorry
-    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/verify_vector.move:59:9: error: the specification clause `ensures result == old(v[v.length - 1])` is not established
+tests/sources/functional/verify_vector.move:60:9: error: the specification clause `ensures v == old(v[0 .. v.length - 1])` is not established
+tests/sources/functional/verify_vector.move:56:5: error: verex verification failed: the automatic verification of `verify_model_pop_back` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_model_pop_back by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | ensures_3 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/verify_vector.move:79:9: error: the specification clause `ensures v == old(update(update(v, i, v[j]), j, v[i]))` is not established
+tests/sources/functional/verify_vector.move:76:5: error: verex verification failed: the automatic verification of `verify_model_swap` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_model_swap by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/verify_vector.move:104:17: error: the loop invariant `∀ (i in 0 .. front_index), v[i] == old(v)[vlen - 1 - i]` is not preserved by an iteration
+tests/sources/functional/verify_vector.move:105:17: error: the loop invariant `∀ (i in 0 .. front_index), v[vlen - 1 - i] == old(v)[i]` is not preserved by an iteration
+tests/sources/functional/verify_vector.move:106:17: error: the loop invariant `∀ (j in front_index .. back_index + 1), v[j] == old(v)[j]` is not preserved by an iteration
+tests/sources/functional/verify_vector.move:118:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), v[i] == old(v)[v.length - 1 - i]` is not established
+tests/sources/functional/verify_vector.move:116:5: error: verex verification failed: the automatic verification of `verify_reverse` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_reverse by lean =>
+    verex_obligations
+    verex_on
     | invariant_2_step => verex_prepare; sorry
+    | invariant_3_step => verex_prepare; sorry
+    | invariant_4_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_vector.move:133:5: error: the bound `pragma unroll = 3` of a loop is not established
 tests/sources/functional/verify_vector.move:133:5: error: verex verification failed: the automatic verification of `verify_reverse_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_reverse_with_unroll by
+  verify verify_reverse_with_unroll by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_vector.move:157:17: error: the loop invariant `∀ (k in 0 .. other.length),
-        other[k] == old(other)[old(other).length - 1 - k]` is not established at entry
-tests/sources/functional/verify_vector.move:168:9: error: the specification clause `ensures v[old(v).length .. v.length] == old(other)` is not established
-tests/sources/functional/verify_vector.move:167:9: error: the specification clause `ensures v[0 .. old(v).length] == old(v)` is not established
-tests/sources/functional/verify_vector.move:158:17: error: the loop invariant `∀ (k in old(v).length .. v.length),
-        v[k] == old(other)[k - old(v).length]` is not preserved by an iteration
-tests/sources/functional/verify_vector.move:165:5: error: verex verification failed: the automatic verification of `verify_append` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_append by
+tests/sources/functional/verify_vector.move:145:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), old(v[i]) == v[v.length - 1 - i]` is not established
+tests/sources/functional/verify_vector.move:143:5: error: verex verification failed: the automatic verification of `verify_model_reverse` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_model_reverse by lean =>
     verex_obligations
     verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/verify_vector.move:156:17: error: the loop invariant `∀ (k in 0 .. old(v).length), v[k] == old(v)[k]` is not preserved by an iteration
+tests/sources/functional/verify_vector.move:157:17: error: the loop invariant `∀ (k in 0 .. other.length),
+        other[k] == old(other)[old(other).length - 1 - k]` is not established at entry
+tests/sources/functional/verify_vector.move:157:17: error: the loop invariant `∀ (k in 0 .. other.length),
+        other[k] == old(other)[old(other).length - 1 - k]` is not preserved by an iteration
+tests/sources/functional/verify_vector.move:158:17: error: the loop invariant `∀ (k in old(v).length .. v.length),
+        v[k] == old(other)[k - old(v).length]` is not preserved by an iteration
+tests/sources/functional/verify_vector.move:167:9: error: the specification clause `ensures v[0 .. old(v).length] == old(v)` is not established
+tests/sources/functional/verify_vector.move:168:9: error: the specification clause `ensures v[old(v).length .. v.length] == old(other)` is not established
+tests/sources/functional/verify_vector.move:165:5: error: verex verification failed: the automatic verification of `verify_append` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_append by lean =>
+    verex_obligations
+    verex_on
+    | invariant_4_step => verex_prepare; sorry
     | invariant_5_entry => verex_prepare; sorry
-    | ensures_3 => verex_prepare; sorry
-    | ensures_2 => verex_prepare; sorry
+    | invariant_5_step => verex_prepare; sorry
     | invariant_6_step => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | ensures_3 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_vector.move:179:5: error: the bound `pragma unroll = 3` of a loop is not established
 tests/sources/functional/verify_vector.move:179:5: error: verex verification failed: the automatic verification of `verify_append_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_append_with_unroll by
+  verify verify_append_with_unroll by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/verify_vector.move:192:9: error: the specification clause `ensures lhs[0 .. old(lhs).length] == old(lhs)` is not established
+tests/sources/functional/verify_vector.move:190:5: error: verex verification failed: the automatic verification of `verify_model_append` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_model_append by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_vector.move:245:5: error: the bound `pragma unroll = 3` of a loop is not established
 tests/sources/functional/verify_vector.move:245:5: error: verex verification failed: the automatic verification of `verify_index_of_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_index_of_with_unroll by
+  verify verify_index_of_with_unroll by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_vector.move:300:5: error: the bound `pragma unroll = 3` of a loop is not established
-tests/sources/functional/verify_vector.move:300:5: error: verex verification failed: the automatic verification of `verify_contains_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_contains_with_unroll by
-    verex_obligations
-    verex_on
-    | unroll => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_vector.move:344:9: error: the specification clause `ensures v[j .. v.length] == old(v[j + 1 .. v.length])` is not established
-tests/sources/functional/verify_vector.move:343:9: error: the specification clause `ensures v[0 .. j] == old(v[0 .. j])` is not established
-tests/sources/functional/verify_vector.move:317:74: error: the loop invariant `∀ (k in i + 1 .. v.length), v[k] == old(v)[k]` is not preserved by an iteration
-tests/sources/functional/verify_vector.move:317:74: error: the loop invariant `∀ (k in j .. i), v[k] == old(v)[k + 1]` is not preserved by an iteration
-tests/sources/functional/verify_vector.move:317:74: error: the loop invariant `v[0 .. j] == old(v)[0 .. j]` is not preserved by an iteration
-tests/sources/functional/verify_vector.move:340:5: error: verex verification failed: the automatic verification of `verify_remove` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_remove by
+tests/sources/functional/verify_vector.move:261:9: error: the specification clause `ensures result ==> (∀ (i in 0 .. spec.result[1]), v[i] != e)` is not established
+tests/sources/functional/verify_vector.move:257:5: error: verex verification failed: the automatic verification of `verify_model_index_of` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_model_index_of by lean =>
     verex_obligations
     verex_on
     | ensures_3 => verex_prepare; sorry
-    | ensures_2 => verex_prepare; sorry
-    | invariant_5_step => verex_prepare; sorry
-    | invariant_4_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+../move-stdlib/sources/vector.move:11:1: info: `verify_contains` uses concrete verification: Given interpretation does not yet support authored assertion interpretation
+../move-stdlib/sources/vector.move:11:1: info: `verify_contains_with_unroll` uses concrete verification: Given interpretation does not yet support authored assertion interpretation
+tests/sources/functional/verify_vector.move:300:5: error: the bound `pragma unroll = 3` of a loop is not established
+tests/sources/functional/verify_vector.move:300:5: error: verex verification failed: the automatic verification of `verify_contains_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_contains_with_unroll by lean =>
+    verex_obligations
+    verex_on
+    | unroll => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/verify_vector.move:317:74: error: the loop invariant `v[0 .. j] == old(v)[0 .. j]` is not preserved by an iteration
+tests/sources/functional/verify_vector.move:317:74: error: the loop invariant `∀ (k in j .. i), v[k] == old(v)[k + 1]` is not preserved by an iteration
+tests/sources/functional/verify_vector.move:317:74: error: the loop invariant `∀ (k in i + 1 .. v.length), v[k] == old(v)[k]` is not preserved by an iteration
+tests/sources/functional/verify_vector.move:317:74: error: the loop invariant `v[i] == old(v)[j]` is not preserved by an iteration
+tests/sources/functional/verify_vector.move:343:9: error: the specification clause `ensures v[0 .. j] == old(v[0 .. j])` is not established
+tests/sources/functional/verify_vector.move:344:9: error: the specification clause `ensures v[j .. v.length] == old(v[j + 1 .. v.length])` is not established
+tests/sources/functional/verify_vector.move:345:9: error: the specification clause `ensures old(v[j]) == result` is not established
+tests/sources/functional/verify_vector.move:340:5: error: verex verification failed: the automatic verification of `verify_remove` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_remove by lean =>
+    verex_obligations
+    verex_on
     | invariant_3_step => verex_prepare; sorry
+    | invariant_4_step => verex_prepare; sorry
+    | invariant_5_step => verex_prepare; sorry
+    | invariant_6_step => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | ensures_3 => verex_prepare; sorry
+    | ensures_4 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_vector.move:361:5: error: the bound `pragma unroll = 3` of a loop is not established
 tests/sources/functional/verify_vector.move:361:5: error: verex verification failed: the automatic verification of `verify_remove_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_remove_with_unroll by
+  verify verify_remove_with_unroll by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/verify_vector.move:378:9: error: the specification clause `ensures v[0 .. i] == old(v[0 .. i])` is not established
+tests/sources/functional/verify_vector.move:379:9: error: the specification clause `ensures v[i .. v.length] == old(v[i + 1 .. v.length])` is not established
+tests/sources/functional/verify_vector.move:380:9: error: the specification clause `ensures old(v[i]) == result` is not established
+tests/sources/functional/verify_vector.move:375:5: error: verex verification failed: the automatic verification of `verify_model_remove` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+  verify verify_model_remove by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | ensures_3 => verex_prepare; sorry
+    | ensures_4 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+../move-stdlib/sources/vector.move:11:1: info: `spec_with_vector_operator` uses concrete verification: Given interpretation does not yet support authored assertion interpretation
+tests/sources/functional/verify_vector.proof.lean:33:27: error: Unknown identifier `i.val.toNat`
+tests/sources/functional/verify_vector.proof.lean:33:41: error: Unknown identifier `v.values.size`
+tests/sources/functional/verify_vector.proof.lean:33:27: error: Unknown identifier `i.val.toNat`
+tests/sources/functional/verify_vector.proof.lean:33:41: error: Unknown identifier `v.values.size`
+tests/sources/functional/verify_vector.proof.lean:30:8: error: verex verification failed: the proof of `verify_swap_remove` does not establish its specification
+tests/sources/functional/verify_vector.proof.lean:55:27: error: Unknown identifier `i.val.toNat`
+tests/sources/functional/verify_vector.proof.lean:55:41: error: Unknown identifier `v.values.size`
+tests/sources/functional/verify_vector.proof.lean:55:27: error: Unknown identifier `i.val.toNat`
+tests/sources/functional/verify_vector.proof.lean:55:41: error: Unknown identifier `v.values.size`
+tests/sources/functional/verify_vector.proof.lean:55:27: error: Unknown identifier `i.val.toNat`
+tests/sources/functional/verify_vector.proof.lean:55:41: error: Unknown identifier `v.values.size`
+tests/sources/functional/verify_vector.proof.lean:55:27: error: Unknown identifier `i.val.toNat`
+tests/sources/functional/verify_vector.proof.lean:55:41: error: Unknown identifier `v.values.size`
+tests/sources/functional/verify_vector.proof.lean:55:27: error: Unknown identifier `i.val.toNat`
+tests/sources/functional/verify_vector.proof.lean:55:41: error: Unknown identifier `v.values.size`
+tests/sources/functional/verify_vector.proof.lean:52:8: error: verex verification failed: the proof of `verify_model_swap_remove` does not establish its specification

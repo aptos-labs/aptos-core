@@ -103,7 +103,7 @@ verex module 0x42::table_stored_invariants where
 error: the specification clause `ensures result < 10` is not established
 ---
 error: verex verification failed: the automatic verification of `too_strong` failed; provide a proof in the module:
-  verify too_strong by
+  verify too_strong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -116,8 +116,8 @@ verify 0x42::table_stored_invariants::too_strong
 /--
 error: the specification clause `ensures permitted::<Bool>(result)` is not established
 ---
-error: verex verification failed: the automatic verification of `wrong_type` failed; provide a proof in the module:
-  verify wrong_type by
+error: verex verification failed: the automatic verification of `wrong_type` exceeded its budget of 25000 maxHeartbeats; provide a proof in the module:
+  verify wrong_type by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

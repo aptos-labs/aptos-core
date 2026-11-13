@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/library_slice_get_mut_errors.rs:5:22: error: no denotation for `preserved`: a dereference of a place that is not a mutable reference is not carried by the denotation
+VerexE2ETests/SourceVerify/library_slice_get_mut_errors.rs:11:22: error: no denotation for `increment`: a dereference of a place that is not a mutable reference is not carried by the denotation

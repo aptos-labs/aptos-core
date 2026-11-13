@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/behavior_axiom_quantifier_domain.move:22:9: error: the specification clause `ensures result == 0` is not established
 tests/sources/regression/behavior_axiom_quantifier_domain.move:21:5: error: verex verification failed: the automatic verification of `out_of_range` failed; provide a proof in `tests/sources/regression/behavior_axiom_quantifier_domain.proof.lean`:
-  verify out_of_range by
+  verify out_of_range by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/regression/behavior_axiom_quantifier_domain.move:21:5: error: vere
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/behavior_axiom_quantifier_domain.move:60:9: error: the specification clause `ensures result == 0` is not established
 tests/sources/regression/behavior_axiom_quantifier_domain.move:59:5: error: verex verification failed: the automatic verification of `out_of_where` failed; provide a proof in `tests/sources/regression/behavior_axiom_quantifier_domain.proof.lean`:
-  verify out_of_where by
+  verify out_of_where by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

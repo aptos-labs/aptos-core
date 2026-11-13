@@ -315,6 +315,19 @@ class E2eSelectionTest(unittest.TestCase):
         selection = (root / ".github/workflows/e2e-test-selection.yaml").read_text()
         self.assertIn("CICD:run-forge-e2e-perf", selection)
 
+    def test_release_branch_prs_use_legacy_e2e_selection(self):
+        root = Path(__file__).resolve().parents[3]
+        selection = (root / ".github/workflows/e2e-test-selection.yaml").read_text()
+        mode = next(line for line in selection.splitlines() if "E2E_MODE:" in line)
+        legacy_gate = mode.split("&& 'legacy'", 1)[0]
+        # Match the release branches of the Lint+Test classifier.
+        for gate in (
+            "startsWith(github.base_ref, 'aptos-release-v')",
+            "startsWith(github.base_ref, 'aptos-node-v')",
+            """contains(fromJSON('["devnet","testnet","mainnet"]'), github.base_ref)""",
+        ):
+            self.assertIn(gate, legacy_gate)
+
     def test_selected_reusable_jobs_reach_their_work(self):
         root = Path(__file__).resolve().parents[3]
         faucet = (

@@ -7,7 +7,7 @@ import VerexIR.Semantics.ValueTyping
 # Typed frames and states
 
 The invariants preservation threads through evaluation
-(`designs/static-typing.md`, Phase 3), and the operations' lemmas over them.
+(`doc/historical/static-typing.md`, Phase 3), and the operations' lemmas over them.
 A frame types its initialized locals at their declared types under the
 frame's semantic arguments; a state types global memory at its keys' types
 and pending write-backs at their loans' referents, every loan below the
@@ -25,7 +25,7 @@ def TypedFrame (unit : ValidatedUnit) (loans : LoanTypes) (ns : ValidatedNamespa
   frame.locals.size = locals.size ∧
     ∀ (index : Nat) (declaration : LocalDecl) (value : RuntimeValue),
       locals[index]? = some declaration → frame.locals[index]? = some (some value) →
-        ∃ type, Resolves ns.tables env declaration.type.typeId type ∧
+        ∃ type, Resolves ns.tables env (ns.typeId declaration.type.typeId) type ∧
           HasType unit loans value type
 
 /-- A state typed under loans: every global slot at its key's type, every
@@ -205,6 +205,7 @@ theorem constValue?_typed {unit : ValidatedUnit} {loans : LoanTypes} :
           simp only [StaticTyping.constTyped, beq_iff_eq] at typed
           subst typed; exact .bytes bs
       | profile _ => simp [constValue?] at value_eq
+      | «opaque» _ => simp [constValue?] at value_eq
       | vector elements =>
           simp only [constValue?] at value_eq
           cases out_eq : Array.mapM (fun x => constValue? x.val) elements.attach with
@@ -551,6 +552,20 @@ private theorem integer_result {unit : ValidatedUnit} {loans : LoanTypes} {table
       obtain ⟨_, _, _, shape, -⟩ := at_
       cases shape
 
+/-- A successful checked integer result is typed at the result node read by
+both the static checker and runtime, including the target pointer width. -/
+theorem checkedInteger_result_typed {unit : ValidatedUnit} {loans : LoanTypes}
+    {ns : ValidatedNamespace} {env : Array SemArg} {resultType : TypeId}
+    {type : SemTy} {node integerType : Ty} {tag : Int} {value : RuntimeValue}
+    {failure : ThrowKind}
+    (resolves : Resolves ns.tables env resultType type)
+    (entry : ns.tables.types[resultType.index]? = some node)
+    (integer_eq : resolveTargetIntegerType? (targetPointerWidth? unit) node = some integerType)
+    (checked : checkedInteger failure integerType tag = .ok value) :
+    HasType unit loans value type :=
+  integer_result ((Resolves.node entry type).mp resolves) integer_eq
+    (checkedInteger_integerAt checked)
+
 /-! ## Rows and elements -/
 
 theorem HasTypeEach.mem {unit : ValidatedUnit} {loans : LoanTypes} {type : SemTy} :
@@ -660,6 +675,13 @@ theorem HasType.vector_elements {unit : ValidatedUnit} {loans : LoanTypes}
     HasTypeEach unit loans elements.toList element := by
   cases typed with
   | vector _ _ _ _ elements => exact elements
+
+theorem HasType.slice_elements {unit : ValidatedUnit} {loans : LoanTypes}
+    {elements : Array RuntimeValue} {element : SemTy}
+    (typed : HasType unit loans (.vector elements) (.slice element)) :
+    HasTypeEach unit loans elements.toList element := by
+  cases typed with
+  | slice _ _ elements => exact elements
 
 /-! ## Array moves
 
@@ -840,8 +862,8 @@ theorem evaluatePrimitive_typed {unit : ValidatedUnit} {loans : LoanTypes}
           subst eval; exact .address _
         · cases eval
       case copyValue | moveValue =>
-        simp only [StaticTyping.primitiveTyped, beq_iff_eq] at typed
-        subst typed
+        simp only [StaticTyping.primitiveTyped, Bool.and_eq_true, beq_iff_eq] at typed
+        obtain ⟨-, rfl⟩ := typed
         split at eval
         · rename_i only shape
           simp only [Option.some.injEq, Except.ok.injEq] at eval
@@ -1042,6 +1064,11 @@ theorem evaluatePrimitive_typed {unit : ValidatedUnit} {loans : LoanTypes}
                   simp only [StaticTyping.primitiveTyped, Bool.and_eq_true, beq_iff_eq] at typed
                   obtain ⟨-, rfl⟩ := typed
                   exact vectorTyped.vector_elements.mem _
+                    (by simpa using Array.mem_of_getElem? found_eq)
+              | slice element =>
+                  simp only [StaticTyping.primitiveTyped, Bool.and_eq_true, beq_iff_eq] at typed
+                  obtain ⟨-, rfl⟩ := typed
+                  exact vectorTyped.slice_elements.mem _
                     (by simpa using Array.mem_of_getElem? found_eq)
               | _ => simp [StaticTyping.primitiveTyped] at typed
             · simp at eval
@@ -1285,8 +1312,8 @@ theorem fieldTypes_resolve {targetNs : ValidatedNamespace} {declaration : Struct
     (fieldTypes_eq : StaticTyping.fieldTypes? targetNs declaration variant arguments =
       some fieldTypes) :
     ∃ fields, StaticTyping.fieldsOf targetNs declaration variant = some fields ∧
-      ResolvesAll targetNs.tables arguments.toArray (fields.toList.map (·.type.typeId))
-        fieldTypes := by
+      ResolvesAll targetNs.tables arguments.toArray
+        (fields.toList.map (targetNs.typeId ·.type.typeId)) fieldTypes := by
   simp only [StaticTyping.fieldTypes?, Option.bind_eq_bind, Option.bind_eq_some_iff]
     at fieldTypes_eq
   obtain ⟨fields, fields_eq, resolved⟩ := fieldTypes_eq
@@ -1311,6 +1338,7 @@ theorem ghostTypes_resolve {unit : ValidatedUnit} {handle : StructHandle}
   have ghosts_eq : nominalGhosts unit handle = declaration.ghosts := by
     simp [nominalGhosts, namespace_eq, declaration_eq]
   unfold ghostTypeIds
+  simp only [namespace_eq]
   rw [ghosts_eq]
   simp only [StaticTyping.ghostTypes?] at ghostTypes_eq
   refine ResolvesAll.of_mapM (fuel := targetNs.tables.types.size + 1) ?_
@@ -1360,7 +1388,7 @@ theorem constructNominal_typed {unit : ValidatedUnit} {loans : LoanTypes}
     obtain ⟨declared, declared_eq, resolved⟩ := fieldTypes_resolve fieldTypes_eq
     have ghostsResolved := ghostTypes_resolve namespace_eq declaration_eq ghostTypes_eq
     have ghostLength := ResolvesAll.length_eq ghostsResolved
-    simp only [ghostTypeIds, List.length_map, Array.length_toList] at ghostLength
+    rw [ghostTypeIds_length] at ghostLength
     refine .nominal handle variant _ spelled arguments targetNs declared fieldTypes ghostTypes name_eq
       (fieldsOf_handleFields namespace_eq declaration_eq declared_eq) resolved ghostsResolved ?_
     rw [contentsTypes_of_constructorFields arguments expected, List.append_nil,
@@ -1384,7 +1412,7 @@ theorem HasType.nominal_fields {unit : ValidatedUnit} {loans : LoanTypes}
     ∃ declaringNamespace declared fieldTypes ghostTypes, structName? unit source = some name ∧
       handleFields? unit source variant = some (declaringNamespace, declared) ∧
       ResolvesAll declaringNamespace.tables arguments.toArray
-        (declared.toList.map (·.type.typeId)) fieldTypes ∧
+        (declared.toList.map (declaringNamespace.typeId ·.type.typeId)) fieldTypes ∧
       ResolvesAll declaringNamespace.tables arguments.toArray
         (ghostTypeIds unit source) ghostTypes ∧
       HasTypes unit loans fields.toList
@@ -1404,6 +1432,19 @@ theorem HasType.shared_referent {unit : ValidatedUnit} {loans : LoanTypes}
   | hole loan loanReferent _ loan_eq same inhabited =>
       exact .hole loan loanReferent referent loan_eq (by simpa [SemTy.unshared] using same)
         inhabited
+
+/-- What a shared view holds at a mutable reference type, not being live, is a value
+of the referent. -/
+theorem HasType.viewed_referent {unit : ValidatedUnit} {loans : LoanTypes}
+    {value : RuntimeValue} {referent : SemTy}
+    (typed : HasType unit loans value (.reference .mutable referent))
+    (settled : value.live = false) :
+    HasType unit loans value referent := by
+  cases typed with
+  | observed _ _ _ typed => exact typed
+  | dead => simp [RuntimeValue.live] at settled
+  | borrow => simp [RuntimeValue.live] at settled
+  | hole => simp [RuntimeValue.live] at settled
 
 /-- A destructured nominal value's fields are typed at the field types the
 checker resolved. -/
@@ -1441,7 +1482,7 @@ theorem destructNominal_typed {unit : ValidatedUnit} {loans : LoanTypes}
       rw [contentsTypes_of_constructorFields arguments constructible, List.append_nil] at typed
       have lengths := HasTypes.length_eq typed
       have ghostLength := ResolvesAll.length_eq ghostsResolved
-      simp only [ghostTypeIds, List.length_map, Array.length_toList] at ghostLength
+      rw [ghostTypeIds_length] at ghostLength
       simp only [Array.length_toList, List.length_append, List.length_map] at lengths
       have taken : expected.size = fieldTypes'.length := by omega
       simp only [Array.toList_extract, List.extract_eq_drop_take, List.drop_zero, Nat.sub_zero]
@@ -1526,7 +1567,7 @@ private theorem fieldType_of_find {targetNs : ValidatedNamespace} {declaration :
     {fieldName : String} {arguments : List SemArg}
     (fields_eq : StaticTyping.fieldsOf targetNs declaration variant = some fields)
     (find_eq : fields.toList.find? (fun field =>
-      (targetNs.tables.names[field.name.index]?).any (·.name == fieldName)) = some field) :
+      (targetNs.nameOf field.name).any (·.name == fieldName)) = some field) :
     StaticTyping.fieldType? targetNs declaration variant arguments fieldName =
       StaticTyping.resolveIn targetNs arguments.toArray field.type.typeId := by
   rw [Array.find?_toList] at find_eq
@@ -1563,7 +1604,7 @@ private theorem handleFields_variant {unit : ValidatedUnit} {handle : StructHand
     (declaration_eq : targetNs.structs[handle.structId]? = some declaration)
     (handle_eq : handleFields? unit handle (some variantName) = some (targetNs', fields)) :
     targetNs' = targetNs ∧ ∃ chosen spelled, chosen ∈ declaration.variants.toList ∧
-      targetNs.tables.names[chosen.name.index]? = some spelled ∧
+      (targetNs.nameOf chosen.name) = some spelled ∧
       StaticTyping.fieldsOf targetNs declaration (some spelled.name) = some fields ∧
       fields = chosen.fields := by
   simp only [handleFields?, namespace_eq, declaration_eq, Option.bind_eq_bind, Option.bind_some,
@@ -1587,7 +1628,7 @@ theorem fieldTypesAcross_mem {unit : ValidatedUnit} {handle : StructHandle}
     (declaration_eq : targetNs.structs[handle.structId]? = some declaration)
     (handle_eq : handleFields? unit handle variant = some (targetNs', fields))
     (find_eq : fields.toList.find? (fun field =>
-      (targetNs'.tables.names[field.name.index]?).any (·.name == fieldName)) = some field)
+      (targetNs'.nameOf field.name).any (·.name == fieldName)) = some field)
     (types_eq : StaticTyping.fieldTypesAcross? targetNs declaration arguments fieldName = some types) :
     ∃ type, StaticTyping.resolveIn targetNs arguments.toArray field.type.typeId = some type ∧
       type ∈ types := by
@@ -1621,15 +1662,15 @@ theorem fieldTypesAcross_mem {unit : ValidatedUnit} {handle : StructHandle}
       simp only [StaticTyping.fieldTypesAcross?, nonempty, Bool.false_eq_true, if_false]
         at types_eq
       have has_field : chosen.fields.any (fun field =>
-          (targetNs'.tables.names[field.name.index]?).any (·.name == fieldName)) = true := by
+          (targetNs'.nameOf field.name).any (·.name == fieldName)) = true := by
         rw [← Array.any_toList]
         have matched := List.find?_some find_eq
         exact List.any_eq_true.mpr ⟨field, List.mem_of_find?_eq_some find_eq, matched⟩
       have image_eq : ∀ image, (do
-          let variantName ← targetNs'.tables.names[chosen.name.index]?
+          let variantName ← (targetNs'.nameOf chosen.name)
           let fields ← StaticTyping.fieldsOf targetNs' declaration (some variantName.name)
           if fields.any fun field =>
-              (targetNs'.tables.names[field.name.index]?).any (·.name == fieldName) then
+              (targetNs'.nameOf field.name).any (·.name == fieldName) then
             some <$> StaticTyping.fieldType? targetNs' declaration (some variantName.name)
               arguments fieldName
           else some none) = some image →
@@ -1657,19 +1698,19 @@ theorem ResolvesAll.getId {tables : Tables} {env : Array SemArg} :
       | succ index => simpa using ResolvesAll.getId rest (by simpa using found)
 
 /-- The resolved type at a declared field's position is its field's type. -/
-private theorem declared_field_resolves {tables : Tables} {env : Array SemArg}
+private theorem declared_field_resolves {tables : Tables} {env : Array SemArg} {ns : ValidatedNamespace}
     {declared : Array FieldDecl} {fieldTypes : List SemTy} {index : Nat} {field : FieldDecl}
-    (resolved : ResolvesAll tables env (declared.toList.map (·.type.typeId)) fieldTypes)
+    (resolved : ResolvesAll tables env (declared.toList.map (ns.typeId ·.type.typeId)) fieldTypes)
     (field_eq : declared[index]? = some field) :
     ∃ fieldType, fieldTypes[index]? = some fieldType ∧
-      Resolves tables env field.type.typeId fieldType :=
+      Resolves tables env (ns.typeId field.type.typeId) fieldType :=
   resolved.getId (by simp [field_eq])
 
 /-- A declared field's position reads the declared field types, ahead of a
 table owner's contents. -/
-private theorem declared_field_type {tables : Tables} {env : Array SemArg}
+private theorem declared_field_type {tables : Tables} {env : Array SemArg} {ns : ValidatedNamespace}
     {declared : Array FieldDecl} {fieldTypes extra : List SemTy} {index : Nat} {field : FieldDecl}
-    (resolved : ResolvesAll tables env (declared.toList.map (·.type.typeId)) fieldTypes)
+    (resolved : ResolvesAll tables env (declared.toList.map (ns.typeId ·.type.typeId)) fieldTypes)
     (field_eq : declared[index]? = some field) :
     (fieldTypes ++ extra)[index]? = fieldTypes[index]? := by
   obtain ⟨fieldType, found, -⟩ := declared_field_resolves resolved field_eq
@@ -1687,10 +1728,10 @@ private theorem field_type_mem {unit : ValidatedUnit} {targetNs : ValidatedNames
     (types_eq : StaticTyping.fieldTypesAcross? targetNs declaration arguments fieldName = some types)
     (handle_eq : handleFields? unit handle variant = some (declaringNamespace, declared))
     (resolved : ResolvesAll declaringNamespace.tables arguments.toArray
-      (declared.toList.map (·.type.typeId)) fieldTypes)
+      (declared.toList.map (declaringNamespace.typeId ·.type.typeId)) fieldTypes)
     (field_eq : declared[index]? = some field)
     (find_eq : declared.toList.find? (fun field =>
-      (declaringNamespace.tables.names[field.name.index]?).any (·.name == fieldName)) = some field)
+      (declaringNamespace.nameOf field.name).any (·.name == fieldName)) = some field)
     (fieldType_eq : fieldTypes[index]? = some fieldType) :
     fieldType ∈ types := by
   have same := handleFields_namespace namespace_eq handle_eq
@@ -1721,7 +1762,7 @@ private theorem nominal_field_typed {unit : ValidatedUnit} {loans : LoanTypes}
     (handle_eq' : handleFields? unit handle variant = some (targetNs', fields))
     (field_eq : fields[index]? = some field)
     (find_eq : fields.toList.find? (fun field =>
-      (targetNs'.tables.names[field.name.index]?).any (·.name == fieldName)) = some field)
+      (targetNs'.nameOf field.name).any (·.name == fieldName)) = some field)
     (value_eq : values[index]? = some value) :
     ∃ type, type ∈ types ∧ HasType unit loans value type := by
   obtain ⟨declaringNamespace, declared, fieldTypes, ghostTypes, -, handle_eq, resolved, ghostsResolved, typed⟩ :=
@@ -1743,7 +1784,7 @@ private theorem selected_some {operandType result : SemTy} {field : SemTy → Bo
   rcases selected with direct | through
   · exact ⟨_, direct⟩
   · split at through
-    · exact ⟨_, (Bool.and_eq_true _ _ ▸ through).2⟩
+    · exact ⟨_, through⟩
     · cases through
 
 private theorem selected_typed {unit : ValidatedUnit} {loans : LoanTypes}
@@ -1757,41 +1798,33 @@ private theorem selected_typed {unit : ValidatedUnit} {loans : LoanTypes}
         (.nominal spelled arguments) →
       ∃ type, HasType unit loans value type ∧ ∀ expected, field expected = true → type = expected) :
     HasType unit loans value result := by
-  have nominal : HasType unit loans (.nominal source variant values) (.nominal spelled arguments) ∧
-      ∀ kind referent, operandType = .reference kind referent → kind = .shared := by
+  have nominal : HasType unit loans (.nominal source variant values) (.nominal spelled arguments) := by
     cases operandType with
     | nominal name arguments' =>
         simp only [StaticTyping.Context.nominalOperand, Option.some.injEq, Prod.mk.injEq]
           at operand_eq
         obtain ⟨rfl, rfl⟩ := operand_eq
-        exact ⟨typed, fun _ _ same => by cases same⟩
+        exact typed
     | reference kind referent =>
         cases referent <;> simp only [StaticTyping.Context.nominalOperand, reduceCtorEq]
           at operand_eq
         simp only [Option.some.injEq, Prod.mk.injEq] at operand_eq
         obtain ⟨rfl, rfl⟩ := operand_eq
         cases kind with
-        | mutable => cases typed
-        | shared =>
-            refine ⟨typed.shared_referent, fun kind _ same => ?_⟩
-            cases same
-            rfl
+        | mutable =>
+            cases typed with
+            | observed _ _ _ typed => exact typed
+        | shared => exact typed.shared_referent
     | _ => simp [StaticTyping.Context.nominalOperand] at operand_eq
-  obtain ⟨type, typed', agrees⟩ := field_typed nominal.1
+  obtain ⟨type, typed', agrees⟩ := field_typed nominal
   unfold StaticTyping.Context.selected at selected
   simp only [Bool.or_eq_true] at selected
   rcases selected with direct | through
   · rw [← agrees _ direct]
     exact typed'
   · split at through
-    · rename_i kind _ resultKind referent
-      simp only [Bool.and_eq_true] at through
-      have shared := nominal.2 kind _ rfl
-      subst shared
-      cases resultKind
-      · rw [← agrees _ through.2]
-        exact .shared _ _ typed'
-      · exact absurd through.1 (by decide)
+    · rw [← agrees _ through]
+      exact .shared _ _ typed'
     · cases through
 
 /-- A selected field has the node's type: the field's, or a shared
@@ -1851,11 +1884,11 @@ theorem handleFields_of_distinct {unit : ValidatedUnit} {handle : StructHandle}
     (declaration_eq : targetNs.structs[handle.structId]? = some declaration)
     (distinct : StaticTyping.variantsDistinct targetNs declaration = true)
     (member : variant ∈ declaration.variants)
-    (name_eq : targetNs.tables.names[variant.name.index]? = some name) :
+    (name_eq : (targetNs.nameOf variant.name) = some name) :
     handleFields? unit handle (some name.name) = some (targetNs, variant.fields) := by
   have member := Array.mem_toList_iff.mpr member
   have found : (declaration.variants.toList.find? fun candidate =>
-      (targetNs.tables.names[candidate.name.index]?).any (·.name == name.name)).isSome := by
+      (targetNs.nameOf candidate.name).any (·.name == name.name)).isSome := by
     exact List.find?_isSome.mpr ⟨variant, member, by simp [name_eq]⟩
   obtain ⟨chosen, chosen_eq⟩ := Option.isSome_iff_exists.mp found
   have chosen_mem := List.mem_of_find?_eq_some chosen_eq
@@ -1884,7 +1917,7 @@ private theorem nominal_variant_field_typed {unit : ValidatedUnit} {loans : Loan
     (handle_eq' : handleFields? unit handle (some variantName) = some (targetNs, fields))
     (field_eq : fields[index]? = some field)
     (find_eq : fields.toList.find? (fun field =>
-      (targetNs.tables.names[field.name.index]?).any (·.name == fieldName)) = some field)
+      (targetNs.nameOf field.name).any (·.name == fieldName)) = some field)
     (value_eq : values[index]? = some value) :
     HasType unit loans value fieldType := by
   obtain ⟨declaringNamespace, declared, fieldTypes, ghostTypes, -, handle_eq, resolved, ghostsResolved, typed⟩ :=
@@ -2208,7 +2241,7 @@ theorem PathTyped.slot {unit : ValidatedUnit} {loans : LoanTypes} {source : Stru
     (name_eq : structName? unit source = some name)
     (handle_eq : handleFields? unit source variant = some (declaringNamespace, declared))
     (resolved : ResolvesAll declaringNamespace.tables arguments.toArray
-      (declared.toList.map (·.type.typeId)) fieldTypes)
+      (declared.toList.map (declaringNamespace.typeId ·.type.typeId)) fieldTypes)
     (ghostsResolved : ResolvesAll declaringNamespace.tables arguments.toArray
       (ghostTypeIds unit source) ghostTypes)
     (typed : HasTypes unit loans fields.toList
@@ -2249,7 +2282,7 @@ theorem PathTyped.field {unit : ValidatedUnit} {loans : LoanTypes} {source : Str
     (name_eq : structName? unit source = some name)
     (handle_eq : handleFields? unit source variant = some (declaringNamespace, declared))
     (resolved : ResolvesAll declaringNamespace.tables arguments.toArray
-      (declared.toList.map (·.type.typeId)) fieldTypes)
+      (declared.toList.map (declaringNamespace.typeId ·.type.typeId)) fieldTypes)
     (ghostsResolved : ResolvesAll declaringNamespace.tables arguments.toArray
       (ghostTypeIds unit source) ghostTypes)
     (typed : HasTypes unit loans fields.toList
@@ -2279,6 +2312,30 @@ theorem PathTyped.vectorIndex {unit : ValidatedUnit} {loans : LoanTypes}
     cases typed with
     | vector _ _ _ length_matches elements =>
         refine .vector _ _ _ (by simpa using length_matches) (HasTypeEach.of_forall ?_)
+        intro value member
+        simp only [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] at member
+        rcases List.mem_or_eq_of_mem_set member with member | rfl
+        · exact elements.mem value member
+        · exact replacement
+
+theorem PathTyped.sliceIndex {unit : ValidatedUnit} {loans : LoanTypes}
+    {elements : Array RuntimeValue} {element : SemTy} {index : Nat}
+    (typed : HasType unit loans (.vector elements) (.slice element)) :
+    PathTyped unit loans (.vector elements) (.slice element) [.index index] element where
+  read read := by
+    simp only [readProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
+    obtain ⟨part, part_eq, read⟩ := read
+    simp only [Option.some.injEq] at read
+    subst read
+    exact typed.slice_elements.mem part (by simpa using Array.mem_of_getElem? part_eq)
+  write replacement write := by
+    simp only [writeProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff, pure,
+      Option.some.injEq] at write
+    obtain ⟨_, -, _, written_eq, rfl⟩ := write
+    subst written_eq
+    cases typed with
+    | slice _ _ elements =>
+        refine .slice _ _ (HasTypeEach.of_forall ?_)
         intro value member
         simp only [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] at member
         rcases List.mem_or_eq_of_mem_set member with member | rfl
@@ -2332,20 +2389,19 @@ theorem PathTyped.downcast {unit : ValidatedUnit} {loans : LoanTypes} {value : R
     · cases write
 
 theorem PathTyped.deref {unit : ValidatedUnit} {loans : LoanTypes} {loan : Nat}
-    {current : RuntimeValue} {type : SemTy}
-    (typed : HasType unit loans (.borrow loan current) (.reference .mutable type)) :
-    PathTyped unit loans (.borrow loan current) (.reference .mutable type) [.deref] type where
+    {current : RuntimeValue} {type storage : SemTy}
+    (loan_eq : loans loan = some storage)
+    (current_typed : HasType unit loans current storage)
+    (view : BorrowView storage type) :
+    PathTyped unit loans (.borrow loan current) (.reference .mutable type) [.deref] storage where
   read read := by
     simp only [readProjections?, Option.some.injEq] at read
-    subst read
-    cases typed with
-    | borrow _ _ _ _ current_typed => exact current_typed
+    exact read ▸ current_typed
   write replacement write := by
     simp only [writeProjections?, Option.bind_eq_bind, Option.bind_some, pure,
       Option.some.injEq] at write
     subst write
-    cases typed with
-    | borrow _ _ _ loan_eq _ => exact .borrow _ _ _ loan_eq replacement
+    exact .borrow _ _ _ loan_eq replacement view
 
 theorem mem_of_mem_extract {α : Type} {xs : Array α} {a : α} {start stop : Nat}
     (member : a ∈ xs.extract start stop) : a ∈ xs := by
@@ -2390,13 +2446,16 @@ private theorem subsliceLength_matches {length : Option ConstValue} {size start 
         simp only [StaticTyping.subsliceLength, VectorLengthMatches, Int.toNat_natCast]
         cases fromEnd <;> simp_all
 
-theorem PathTyped.subslice {unit : ValidatedUnit} {loans : LoanTypes}
-    {elements : Array RuntimeValue} {element : SemTy} {length : Option ConstValue}
+/-- A subslice step typed at any result length the selected range matches. -/
+private theorem PathTyped.subsliceAt {unit : ValidatedUnit} {loans : LoanTypes}
+    {elements : Array RuntimeValue} {element : SemTy} {length result : Option ConstValue}
     {start stop : Nat} {fromEnd : Bool}
-    (typed : HasType unit loans (.vector elements) (.vector element length)) :
+    (typed : HasType unit loans (.vector elements) (.vector element length))
+    (matching : ∀ {first last : Nat}, VectorLengthMatches length elements.size →
+      subsliceBounds? elements.size start stop fromEnd = some (first, last) →
+      VectorLengthMatches result (last - first)) :
     PathTyped unit loans (.vector elements) (.vector element length)
-      [.subslice start stop fromEnd]
-      (.vector element (StaticTyping.subsliceLength length start stop fromEnd)) where
+      [.subslice start stop fromEnd] (.vector element result) where
   read read := by
     simp only [readProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
     obtain ⟨⟨first, last⟩, bounds, read⟩ := read
@@ -2412,7 +2471,7 @@ theorem PathTyped.subslice {unit : ValidatedUnit} {loans : LoanTypes}
           simp only [Array.size_extract]
           omega
         rw [size_eq]
-        exact subsliceLength_matches length_matches bounds
+        exact matching length_matches bounds
   write replacement write := by
     simp only [writeProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff, pure] at write
     obtain ⟨⟨first, last⟩, bounds, written, written_eq, write⟩ := write
@@ -2446,13 +2505,126 @@ theorem PathTyped.subslice {unit : ValidatedUnit} {loans : LoanTypes}
                   (by simpa using mem_of_mem_extract (Array.mem_toList_iff.mp member))
     · cases write
 
+private theorem PathTyped.sliceView {unit : ValidatedUnit} {loans : LoanTypes}
+    {elements : Array RuntimeValue} {element : SemTy} {length : Option ConstValue}
+    {start stop : Nat} {fromEnd : Bool}
+    (typed : HasType unit loans (.vector elements) (.vector element length))
+    :
+    PathTyped unit loans (.vector elements) (.vector element length)
+      [.subslice start stop fromEnd] (.slice element) where
+  read read := by
+    simp only [readProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
+    obtain ⟨⟨first, last⟩, bounds, read⟩ := read
+    simp only [Option.some.injEq] at read
+    subst read
+    cases typed with
+    | vector _ _ _ length_matches elements_typed =>
+        obtain ⟨-, ordered, bounded, -⟩ := subsliceBounds?_some bounds
+        exact .slice _ _ (HasTypeEach.of_forall fun value member =>
+          elements_typed.mem value (by
+            simpa using mem_of_mem_extract (Array.mem_toList_iff.mp member)))
+  write replacement write := by
+    simp only [writeProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff, pure] at write
+    obtain ⟨⟨first, last⟩, bounds, written, written_eq, write⟩ := write
+    simp only [Option.some.injEq] at written_eq
+    subst written_eq
+    split at write
+    · rename_i inner
+      split at write
+      · cases write
+      · rename_i same
+        simp only [Option.some.injEq] at write
+        subst write
+        cases typed with
+        | vector _ _ _ length_matches elements_typed =>
+            obtain ⟨-, ordered, bounded, -⟩ := subsliceBounds?_some bounds
+            have inner_typed := replacement.slice_elements
+            refine .vector _ _ _ ?_ (HasTypeEach.of_forall fun value member => ?_)
+            · have size_eq : (elements.extract 0 first ++ inner ++
+                  elements.extract last elements.size).size = elements.size := by
+                simp only [bne_iff_ne, ne_eq, Decidable.not_not] at same
+                simp only [Array.size_append, Array.size_extract, same]
+                omega
+              rw [size_eq]
+              exact length_matches
+            · simp only [Array.toList_append, List.mem_append] at member
+              rcases member with (member | member) | member
+              · exact elements_typed.mem value
+                  (by simpa using mem_of_mem_extract (Array.mem_toList_iff.mp member))
+              · exact inner_typed.mem value member
+              · exact elements_typed.mem value
+                  (by simpa using mem_of_mem_extract (Array.mem_toList_iff.mp member))
+    · cases write
+
+private theorem PathTyped.sliceSubslice {unit : ValidatedUnit} {loans : LoanTypes}
+    {elements : Array RuntimeValue} {element : SemTy}
+    {start stop : Nat} {fromEnd : Bool}
+    (typed : HasType unit loans (.vector elements) (.slice element))
+    :
+    PathTyped unit loans (.vector elements) (.slice element)
+      [.subslice start stop fromEnd] (.slice element) where
+  read read := by
+    simp only [readProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
+    obtain ⟨⟨first, last⟩, bounds, read⟩ := read
+    simp only [Option.some.injEq] at read
+    subst read
+    cases typed with
+    | slice _ _ elements_typed =>
+        obtain ⟨-, ordered, bounded, -⟩ := subsliceBounds?_some bounds
+        exact .slice _ _ (HasTypeEach.of_forall fun value member =>
+          elements_typed.mem value (by
+            simpa using mem_of_mem_extract (Array.mem_toList_iff.mp member)))
+  write replacement write := by
+    simp only [writeProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff, pure] at write
+    obtain ⟨⟨first, last⟩, bounds, written, written_eq, write⟩ := write
+    simp only [Option.some.injEq] at written_eq
+    subst written_eq
+    split at write
+    · rename_i inner
+      split at write
+      · cases write
+      · rename_i same
+        simp only [Option.some.injEq] at write
+        subst write
+        cases typed with
+        | slice _ _ elements_typed =>
+            obtain ⟨-, ordered, bounded, -⟩ := subsliceBounds?_some bounds
+            have inner_typed := replacement.slice_elements
+            refine .slice _ _ (HasTypeEach.of_forall fun value member => ?_)
+            simp only [Array.toList_append, List.mem_append] at member
+            rcases member with (member | member) | member
+            · exact elements_typed.mem value
+                (by simpa using mem_of_mem_extract (Array.mem_toList_iff.mp member))
+            · exact inner_typed.mem value member
+            · exact elements_typed.mem value
+                (by simpa using mem_of_mem_extract (Array.mem_toList_iff.mp member))
+    · cases write
+
+
+theorem PathTyped.subslice {unit : ValidatedUnit} {loans : LoanTypes}
+    {elements : Array RuntimeValue} {element : SemTy} {length : Option ConstValue}
+    {start stop : Nat} {fromEnd : Bool}
+    (typed : HasType unit loans (.vector elements) (.vector element length)) :
+    PathTyped unit loans (.vector elements) (.vector element length)
+      [.subslice start stop fromEnd]
+      (.vector element (StaticTyping.subsliceLength length start stop fromEnd)) :=
+  PathTyped.subsliceAt typed subsliceLength_matches
+
+/-- The whole of a vector as a dynamic one. -/
+theorem PathTyped.unsize {unit : ValidatedUnit} {loans : LoanTypes}
+    {elements : Array RuntimeValue} {element : SemTy} {length : Option ConstValue}
+    (typed : HasType unit loans (.vector elements) (.vector element length)) :
+    PathTyped unit loans (.vector elements) (.vector element length)
+      [.subslice 0 0 true] (.slice element) :=
+  PathTyped.sliceView typed
+
 /-- A nominal type a field place names is the declaration the runtime's
 handle names, under the name the runtime spells it by. -/
 theorem nominalTarget_handle {unit : ValidatedUnit} {sourceNamespace : NamespaceId}
     {ns targetNs : ValidatedNamespace} {reference : QualifiedRef} {declaration : StructDecl}
     {spelled : QualifiedName} {handle : StructHandle}
     (ns_eq : unit.namespaces[sourceNamespace.index]? = some ns)
-    (target : StaticTyping.nominalTarget? unit ns reference.name =
+    (target : StaticTyping.nominalTarget? unit ns (ns.nameId reference.name) =
       some (targetNs, declaration, spelled))
     (resolve : resolveStruct? unit sourceNamespace reference = some handle) :
     unit.namespaces[handle.namespaceId.index]? = some targetNs ∧
@@ -2561,6 +2733,77 @@ private theorem readRuntimePlace_local_some {frame : RuntimeFrame} {state : Runt
     Option.bind_eq_some_iff] at read
   exact read
 
+/-- The static view of a place may hide the extent of its sequence storage.
+Only the storage type is used by the strong path write theorem. -/
+inductive PlaceView : SemTy → SemTy → Prop where
+  | same (type : SemTy) : PlaceView type type
+  | slice (element : SemTy) (length : Option ConstValue) :
+      PlaceView (.vector element length) (.slice element)
+
+theorem PlaceView.sized {storage view : SemTy} (relation : PlaceView storage view)
+    (sized : view.sized = true) : storage = view := by
+  cases relation with
+  | same => rfl
+  | slice => cases sized
+
+theorem BorrowView.placeView {storage view : SemTy} (relation : BorrowView storage view) :
+    PlaceView storage view := by
+  cases relation with
+  | same => exact .same _
+  | slice => exact .slice _ _
+
+/-- A nonempty projection into a sequence preserves its outer extent. -/
+private theorem vectorProjection_size {elements : Array RuntimeValue}
+    {projection : RuntimeProjection} {replacement updated : RuntimeValue}
+    (written : writeProjections? (.vector elements) [projection] replacement = some updated) :
+    ∃ values, updated = .vector values ∧ values.size = elements.size := by
+  cases projection with
+  | index index =>
+      simp only [writeProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff,
+        Option.bind_some, pure, Option.some.injEq] at written
+      obtain ⟨part, found, rfl⟩ := written
+      exact ⟨_, rfl, by simp⟩
+  | subslice start stop fromEnd =>
+      simp only [writeProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff,
+        Option.bind_some, pure] at written
+      obtain ⟨⟨first, last⟩, bounds, written⟩ := written
+      split at written
+      · rename_i inner
+        split at written
+        · cases written
+        · rename_i same
+          simp only [Option.some.injEq] at written
+          subst written
+          obtain ⟨-, ordered, bounded, -⟩ := subsliceBounds?_some bounds
+          refine ⟨_, rfl, ?_⟩
+          simp only [bne_iff_ne, ne_eq, Decidable.not_not] at same
+          simp only [Array.size_append, Array.size_extract, same]
+          omega
+      · cases written
+  | _ => simp [writeProjections?] at written
+
+/-- A step through an unsized view still preserves the hidden storage extent. -/
+private theorem PathTyped.liftView {unit : ValidatedUnit} {loans : LoanTypes}
+    {value : RuntimeValue} {storage view next : SemTy} {projection : RuntimeProjection}
+    (typed : HasType unit loans value storage) (relation : PlaceView storage view)
+    (step : PathTyped unit loans value view [projection] next) :
+    PathTyped unit loans value storage [projection] next := by
+  cases relation with
+  | same => exact step
+  | slice element length =>
+      refine ⟨step.read, fun replacement written => ?_⟩
+      cases typed with
+      | vector values element length length_matches elements =>
+          obtain ⟨updated, rfl, size_eq⟩ := vectorProjection_size written
+          exact .vector _ _ _ (size_eq ▸ length_matches)
+            (step.write replacement written).slice_elements
+      | hole => cases projection <;> simp [writeProjections?] at written
+
+/-- A path carries its storage type separately from its exposed place type. -/
+abbrev ViewedPathTyped (unit : ValidatedUnit) (loans : LoanTypes) (value : RuntimeValue)
+    (root : SemTy) (projections : List RuntimeProjection) (type : SemTy) : Prop :=
+  ∃ storage, PlaceView storage type ∧ PathTyped unit loans value root projections storage
+
 /-- What a resolved place guarantees (`resolvePlace_typed`): it is a path
 from a local that reads and writes at the place's type; a downcast place
 reads its variant; a path without projections writes the local itself, at a
@@ -2569,13 +2812,33 @@ abbrev PlaceTyped (unit : ValidatedUnit) (loans : LoanTypes) (context : StaticTy
     (frame : RuntimeFrame) (place : RuntimePlace) (type : SemTy) (variant : Option String) :
     Prop :=
   ∃ localId rootType, place.root = .local localId ∧ context.localType localId = some rootType ∧
-    (place.projections = #[] →
+    (place.writable = true → place.projections = #[] → type.sized = true →
       ∀ value, HasType unit loans value type → HasType unit loans value rootType) ∧
     ∀ rootValue, readLocal? frame localId = some rootValue →
-      PathTyped unit loans rootValue rootType place.projections.toList type ∧
+      (∀ part, readProjections? rootValue place.projections.toList = some part →
+        HasType unit loans part type) ∧
+      (place.writable = true → ViewedPathTyped unit loans rootValue rootType place.projections.toList type) ∧
       ∀ name, variant = some name → ∀ part,
         readProjections? rootValue place.projections.toList = some part →
         ∃ source fields, part = .nominal source (some name) fields
+
+/-- A place's reads and path, one projection on. -/
+theorem PlaceTyped.pushed {unit : ValidatedUnit} {loans : LoanTypes} {rootValue : RuntimeValue}
+    {rootType type next : SemTy} {projections : List RuntimeProjection}
+    {projection : RuntimeProjection} {writes : Prop}
+    (path : writes → ViewedPathTyped unit loans rootValue rootType projections type)
+    (stepped : ∀ part, readProjections? rootValue projections = some part →
+      PathTyped unit loans part type [projection] next) :
+    (∀ last, readProjections? rootValue (projections ++ [projection]) = some last →
+      HasType unit loans last next) ∧
+    (writes → ViewedPathTyped unit loans rootValue rootType (projections ++ [projection]) next) := by
+  refine ⟨fun last last_eq => ?_, fun writable => ?_⟩
+  · rw [readProjections?_append] at last_eq
+    obtain ⟨part, part_eq, last_eq⟩ := Option.bind_eq_some_iff.mp last_eq
+    exact (stepped part part_eq).read last_eq
+  · obtain ⟨storage, view, path⟩ := path writable
+    exact ⟨next, .same _, path.snoc fun part found =>
+      PathTyped.liftView (path.read found) view (stepped part found)⟩
 
 /-- A typed place extended by a projection step from its value. -/
 theorem PlaceTyped.extend {unit : ValidatedUnit} {loans : LoanTypes}
@@ -2590,15 +2853,31 @@ theorem PlaceTyped.extend {unit : ValidatedUnit} {loans : LoanTypes}
     PlaceTyped unit loans context frame
       { place with projections := place.projections.push projection } next none := by
   obtain ⟨localId, rootType, root_eq, local_eq, -, paths⟩ := typed
-  refine ⟨localId, rootType, root_eq, local_eq, by simp, fun rootValue read => ⟨?_, by simp⟩⟩
+  have stepped : ∀ rootValue, readLocal? frame localId = some rootValue → ∀ part,
+      readProjections? rootValue place.projections.toList = some part →
+      PathTyped unit loans part type [projection] next := fun rootValue read part part_eq =>
+    step part ((paths rootValue read).1 part part_eq)
+      (fun name variant_eq => (paths rootValue read).2.2 name variant_eq part part_eq) (by
+        intro rootValue' read'
+        simp only [root_eq] at read'
+        rw [read, Option.some.injEq] at read'
+        exact read' ▸ part_eq)
+  refine ⟨localId, rootType, root_eq, local_eq, by simp, fun rootValue read => ?_⟩
   simp only [Array.toList_push]
-  refine (paths rootValue read).1.snoc fun part part_eq => step part
-    ((paths rootValue read).1.read part_eq)
-    (fun name variant_eq => (paths rootValue read).2 name variant_eq part part_eq) ?_
-  intro rootValue' read'
-  simp only [root_eq] at read'
-  rw [read, Option.some.injEq] at read'
-  exact read' ▸ part_eq
+  have pushed := PlaceTyped.pushed (paths rootValue read).2.1 (stepped rootValue read)
+  exact ⟨pushed.1, pushed.2, by simp⟩
+
+/-- An unsize step from any value of a vector type. -/
+theorem PathTyped.unsizeOf {unit : ValidatedUnit} {loans : LoanTypes} {value : RuntimeValue}
+    {element : SemTy} {length : Option ConstValue}
+    (typed : HasType unit loans value (.vector element length)) :
+    PathTyped unit loans value (.vector element length) [.subslice 0 0 true]
+      (.slice element) := by
+  cases value with
+  | vector elements => exact PathTyped.unsize typed
+  | _ => exact {
+      read := fun read => by simp [readProjections?] at read
+      write := fun _ write => by simp [writeProjections?] at write }
 
 /-- A subslice step from any value of a vector type: only a vector has
 one. -/
@@ -2613,11 +2892,21 @@ theorem PathTyped.subsliceOf {unit : ValidatedUnit} {loans : LoanTypes} {value :
       read := fun read => by simp [readProjections?] at read
       write := fun _ write => by simp [writeProjections?] at write }
 
+theorem PathTyped.sliceSubsliceOf {unit : ValidatedUnit} {loans : LoanTypes}
+    {value : RuntimeValue} {element : SemTy} {start stop : Nat} {fromEnd : Bool}
+    (typed : HasType unit loans value (.slice element)) :
+    PathTyped unit loans value (.slice element) [.subslice start stop fromEnd] (.slice element) := by
+  cases value with
+  | vector elements => exact PathTyped.sliceSubslice typed
+  | _ => exact {
+      read := fun read => by simp [readProjections?] at read
+      write := fun _ write => by simp [writeProjections?] at write }
+
 /-- A place the checker types resolves to a typed place (`PlaceTyped`). -/
 theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
     {context : StaticTyping.Context} {frame : RuntimeFrame} {state : RuntimeState}
     (unit_eq : context.unit = unit)
-    (ns_eq : unit.namespaces[context.ns.identity.index]? = some context.ns)
+    (ns_eq : unit.namespaces[context.ns.unitIdentity.index]? = some context.ns)
     (frameTyped : TypedFrame unit loans context.ns context.locals context.env frame) :
     ∀ (fuel fuel' : Nat) {placeId : PlaceId} {type : SemTy} {variant : Option String}
       {place : RuntimePlace},
@@ -2645,8 +2934,11 @@ theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
       split at resolve
       · simp only [Option.some.injEq] at resolve
         subst resolve
-        exact ⟨localId, rootType, rfl, local_eq, fun _ _ typed => typed, fun rootValue read =>
-          ⟨PathTyped.nil (frameTyped.read local_eq read), by simp⟩⟩
+        have path := fun rootValue read =>
+          PathTyped.nil (frameTyped.read local_eq (value := rootValue) read)
+        exact ⟨localId, rootType, rfl, local_eq, fun _ _ _ _ typed => typed, fun rootValue read =>
+          ⟨fun _ part_eq => (path rootValue read).read part_eq, fun _ => ⟨_, .same _, path rootValue read⟩,
+            by simp⟩⟩
       · cases resolve
   | deref base =>
       dsimp only at static resolve
@@ -2663,19 +2955,34 @@ theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
             split at resolve
             · rename_i shared
               rw [shared] at agrees
+              obtain ⟨basePlace, base_resolved, resolve⟩ := Option.bind_eq_some_iff.mp resolve
+              obtain ⟨baseValue, baseValue_eq, resolve⟩ := Option.bind_eq_some_iff.mp resolve
+              split at resolve
+              · cases resolve
+              rename_i settled
+              simp only [Bool.not_eq_true] at settled
+              simp only [Option.some.injEq] at resolve
+              subst resolve
+              obtain ⟨localId, rootType, root_eq, local_eq, -, paths⟩ :=
+                ih fuel' base_eq base_resolved
+              refine ⟨localId, rootType, root_eq, local_eq, by simp, fun rootValue read =>
+                ⟨?_, by simp, by simp⟩⟩
+              intro part part_eq
+              have typed := (paths rootValue read).1 part part_eq
               cases kind with
-              | mutable => exact absurd agrees (by decide)
-              | shared =>
-              obtain ⟨localId, rootType, root_eq, local_eq, embeds, paths⟩ :=
-                ih fuel' base_eq resolve
-              refine ⟨localId, rootType, root_eq, local_eq,
-                fun empty value typed => embeds empty value (.shared _ _ typed),
-                fun rootValue read => ⟨(paths rootValue read).1.unshare, by simp⟩⟩
+              | shared => exact typed.shared_referent
+              | mutable =>
+                  simp only [readRuntimePlace?, root_eq, readRoot?, read, Option.bind_eq_bind,
+                    Option.bind_some, part_eq, Option.some.injEq] at baseValue_eq
+                  subst baseValue_eq
+                  exact typed.viewed_referent settled
             · rename_i unshared
               simp only [Bool.not_eq_true] at unshared
               rw [unshared] at agrees
               cases kind with
-              | shared => exact absurd agrees (by decide)
+              | shared =>
+                  simp at agrees
+                  exact absurd agrees.1 (by decide)
               | mutable =>
               obtain ⟨basePlace, base_resolved, resolve⟩ := Option.bind_eq_some_iff.mp resolve
               obtain ⟨localId, rootType, root_eq, local_eq, -, paths⟩ :=
@@ -2686,13 +2993,39 @@ theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
                   simp only [Option.some.injEq] at resolve
                   subst resolve
                   refine ⟨localId, rootType, root_eq, local_eq, by simp, fun rootValue read => ?_⟩
-                  refine ⟨?_, by simp⟩
-                  simp only [Array.toList_push]
-                  refine (paths rootValue read).1.snoc fun part part_eq => ?_
-                  simp only [readRuntimePlace?, root_eq, readRoot?, read, Option.bind_eq_bind,
-                    Option.bind_some, part_eq, Option.some.injEq] at borrowed_eq
-                  subst borrowed_eq
-                  exact PathTyped.deref ((paths rootValue read).1.read part_eq)
+                  have borrowTyped : HasType unit loans (.borrow loan current)
+                      (.reference .mutable referent) := by
+                    have found : readProjections? rootValue basePlace.projections.toList =
+                        some (.borrow loan current) := by
+                      simpa only [readRuntimePlace?, root_eq, readRoot?, read,
+                        Option.bind_eq_bind, Option.bind_some] using borrowed_eq
+                    exact (paths rootValue read).1 _ found
+                  cases borrowTyped with
+                  | borrow _ _ _ loan_eq currentTyped view =>
+                      simp only [Array.toList_push]
+                      refine ⟨?_, ?_, by simp⟩
+                      · intro part found
+                        rw [readProjections?_append] at found
+                        obtain ⟨borrowedValue, foundBorrow, found⟩ := Option.bind_eq_some_iff.mp found
+                        have same : borrowedValue = .borrow loan current := by
+                          simpa only [readRuntimePlace?, root_eq, readRoot?, read,
+                            Option.bind_eq_bind, Option.bind_some, foundBorrow,
+                            Option.some.injEq] using borrowed_eq
+                        subst same
+                        simp only [readProjections?, Option.some.injEq] at found
+                        exact found ▸ currentTyped.storageView view.storageView
+                      · intro writable
+                        obtain ⟨storage, parentView, path⟩ := (paths rootValue read).2.1 writable
+                        cases parentView
+                        refine ⟨_, view.placeView, path.snoc ?_⟩
+                        intro part found
+                        have same : part = .borrow loan current := by
+                          simpa only [readRuntimePlace?, root_eq, readRoot?, read,
+                            Option.bind_eq_bind, Option.bind_some, found,
+                            Option.some.injEq] using borrowed_eq
+                        subst same
+                        exact PathTyped.deref loan_eq currentTyped view
+                  | observed _ _ settled _ => simp [RuntimeValue.live] at settled
               | _ => simp at resolve
           · cases static
       | _ => simp at static
@@ -2738,18 +3071,19 @@ theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
                   Option.some.injEq] at fname_eq
                 exact fname_eq.symm
               subst fname_def
-              refine ⟨localId, rootType, root_eq, local_eq, by simp, fun rootValue read =>
-                ⟨?_, by simp⟩⟩
+              refine ⟨localId, rootType, root_eq, local_eq, by simp, fun rootValue read => ?_⟩
               simp only [Array.toList_push]
-              refine (paths rootValue read).1.snoc fun part part_eq => ?_
-              rw [readRuntimePlace_local root_eq read, part_eq, Option.some.injEq] at baseValue_eq
-              subst baseValue_eq
-              refine PathTyped.fieldAt namespace_eq declaration_eq fieldType_eq ?_
-                ((paths rootValue read).1.read part_eq) index_eq
-              intro name variant_eq
-              obtain ⟨_, _, same⟩ := (paths rootValue read).2 name variant_eq _ part_eq
-              simp only [RuntimeValue.nominal.injEq] at same
-              exact same.2.1
+              have pushed := PlaceTyped.pushed (projection := .field index)
+                (paths rootValue read).2.1 (next := fieldType) fun part part_eq => by
+                  rw [readRuntimePlace_local root_eq read, part_eq, Option.some.injEq] at baseValue_eq
+                  subst baseValue_eq
+                  refine PathTyped.fieldAt namespace_eq declaration_eq fieldType_eq ?_
+                    ((paths rootValue read).1 _ part_eq) index_eq
+                  intro name variant_eq
+                  obtain ⟨_, _, same⟩ := (paths rootValue read).2.2 name variant_eq _ part_eq
+                  simp only [RuntimeValue.nominal.injEq] at same
+                  exact same.2.1
+              exact ⟨pushed.1, pushed.2, by simp⟩
           | _ => simp at resolve
       | _ => simp at static
   | ghostField base owner field =>
@@ -2769,7 +3103,7 @@ theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
         obtain ⟨localId', rootType, root_eq', -, -, paths⟩ := id typed
         rw [root_eq] at root_eq'
         cases root_eq'
-        exact (paths rootValue read).1.read part_eq
+        exact (paths rootValue read).1 _ part_eq
       have extend := fun next (step : ∀ part, HasType unit loans part baseType →
           readProjections? rootValue basePlace.projections.toList = some part →
           PathTyped unit loans part baseType [.index index] next) =>
@@ -2797,10 +3131,31 @@ theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
               | _ => simp at resolve
             · cases static
           · cases static
+      | slice element =>
+          simp only at static
+          split at static
+          · split at static
+            · simp only [Option.some.injEq, Prod.mk.injEq] at static
+              obtain ⟨rfl, rfl⟩ := static
+              cases baseValue with
+              | vector elements =>
+                  simp only at resolve
+                  split at resolve
+                  · simp only [Option.some.injEq] at resolve
+                    subst resolve
+                    exact extend element fun part partTyped part_eq' => by
+                      rw [part_eq, Option.some.injEq] at part_eq'
+                      subst part_eq'
+                      exact PathTyped.sliceIndex partTyped
+                  · cases resolve
+              | tuple elements => cases baseTyped
+              | _ => simp at resolve
+            · cases static
+          · cases static
       | tuple elementTypes =>
           simp only at static
           split at static
-          · rename_i expression position _ expression_eq
+          · rename_i expression position _ _ expression_eq
             split at static
             · cases static
             rename_i nonnegative
@@ -2843,6 +3198,42 @@ theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
           simp only [Option.some.injEq, Prod.mk.injEq] at static
           obtain ⟨rfl, rfl⟩ := static
           exact typed.extend fun _ partTyped _ _ => PathTyped.subsliceOf partTyped
+      | slice element =>
+          simp only [Option.some.injEq, Prod.mk.injEq] at static
+          obtain ⟨rfl, rfl⟩ := static
+          exact typed.extend fun _ partTyped _ _ => PathTyped.sliceSubsliceOf partTyped
+      | _ => simp at static
+  | unsize base =>
+      dsimp only at static resolve
+      simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at static
+      obtain ⟨⟨baseType, baseVariant⟩, base_eq, static⟩ := static
+      obtain ⟨basePlace, base_resolved, resolve⟩ := Option.bind_eq_some_iff.mp resolve
+      obtain ⟨value, valueRead, resolve⟩ := Option.bind_eq_some_iff.mp resolve
+      have typed := ih fuel' base_eq base_resolved
+      cases baseType with
+      | vector element length =>
+          simp only [Option.some.injEq, Prod.mk.injEq] at static
+          obtain ⟨rfl, rfl⟩ := static
+          cases value with
+          | vector elements =>
+            simp only [Option.some.injEq] at resolve
+            subst resolve
+            obtain ⟨localId, rootType, root_eq, local_eq, _, paths⟩ := typed
+            refine ⟨localId, rootType, root_eq, local_eq, ?_, fun rootValue read => ?_⟩
+            · intro _ _ sized
+              cases sized
+            · refine ⟨?_, ?_, by simp⟩
+              · intro part found
+                have same : part = .vector elements := by
+                  simpa only [readRuntimePlace?, root_eq, readRoot?, read,
+                    Option.bind_eq_bind, Option.bind_some, found, Option.some.injEq] using valueRead
+                subst same
+                exact .slice _ _ ((paths rootValue read).1 _ found).vector_elements
+              · intro writable
+                obtain ⟨storage, view, path⟩ := (paths rootValue read).2.1 writable
+                cases view
+                exact ⟨_, .slice element length, path⟩
+          | _ => cases resolve
       | _ => simp at static
   | downcast base variantId =>
       dsimp only at static resolve
@@ -2871,11 +3262,12 @@ theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
                   split at resolve
                   · simp only [Option.some.injEq] at resolve
                     subst resolve
-                    refine ⟨localId, rootType, root_eq, local_eq, by simp, fun rootValue read =>
-                      ⟨?_, ?_⟩⟩
-                    · simp only [Array.toList_push]
-                      exact (paths rootValue read).1.snoc fun part part_eq =>
-                        PathTyped.downcast ((paths rootValue read).1.read part_eq)
+                    refine ⟨localId, rootType, root_eq, local_eq, by simp, fun rootValue read => ?_⟩
+                    have pushed := PlaceTyped.pushed (projection := .downcast variantName.name)
+                      (paths rootValue read).2.1 fun part part_eq =>
+                        PathTyped.downcast ((paths rootValue read).1 part part_eq)
+                    simp only [Array.toList_push]
+                    refine ⟨pushed.1, pushed.2, ?_⟩
                     · intro name name_eq part' read'
                       simp only [Option.some.injEq] at name_eq
                       subst name_eq
@@ -2908,7 +3300,7 @@ theorem PlaceTyped.read {unit : ValidatedUnit} {loans : LoanTypes}
     HasType unit loans value type := by
   obtain ⟨localId, rootType, root_eq, -, -, paths⟩ := typed
   obtain ⟨rootValue, rootRead, value_eq⟩ := readRuntimePlace_local_some root_eq read
-  exact (paths rootValue rootRead).1.read value_eq
+  exact (paths rootValue rootRead).1 value value_eq
 
 /-- Storing a value of a local's type keeps the frame typed. -/
 theorem TypedFrame.set {unit : ValidatedUnit} {loans : LoanTypes}
@@ -2944,6 +3336,7 @@ theorem PlaceTyped.write {unit : ValidatedUnit} {loans : LoanTypes}
     {place : RuntimePlace} {type : SemTy} {variant : Option String} {value : RuntimeValue}
     (typed : PlaceTyped unit loans context frame place type variant)
     (frameTyped : TypedFrame unit loans context.ns context.locals context.env frame)
+    (sized : type.sized = true)
     (value_typed : HasType unit loans value type)
     (write : writeRuntimePlace? frame state place value = some (frame', state')) :
     TypedFrame unit loans context.ns context.locals context.env frame' ∧ state' = state := by
@@ -2961,12 +3354,58 @@ theorem PlaceTyped.write {unit : ValidatedUnit} {loans : LoanTypes}
   simp only [writeRuntimePlace?] at write
   split at write
   · cases write
+  rename_i writable
+  simp only [Bool.not_eq_true', Bool.not_eq_false] at writable
   split at write
   · rename_i empty
-    exact store value (embeds (Array.isEmpty_iff.mp empty) value value_typed) write
+    exact store value (embeds writable (Array.isEmpty_iff.mp empty) sized value value_typed) write
   · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at write
     obtain ⟨rootValue, rootRead, updated, updated_eq, write⟩ := write
     simp only [root_eq, readRoot?] at rootRead
-    exact store updated ((paths rootValue rootRead).1.write value_typed updated_eq) write
+    obtain ⟨storage, view, path⟩ := (paths rootValue rootRead).2.1 writable
+    cases view.sized sized
+    exact store updated (path.write value_typed updated_eq) write
+
+/-- A resolved initialized place exposes its hidden storage type and permits
+writing another value of that storage type. Unsized views never weaken this
+write-back obligation. -/
+theorem PlaceTyped.storage {unit : ValidatedUnit} {loans : LoanTypes}
+    {context : StaticTyping.Context} {frame : RuntimeFrame} {state : RuntimeState}
+    {place : RuntimePlace} {type : SemTy} {variant : Option String} {current : RuntimeValue}
+    (typed : PlaceTyped unit loans context frame place type variant)
+    (frameTyped : TypedFrame unit loans context.ns context.locals context.env frame)
+    (writable : place.writable = true)
+    (read : readRuntimePlace? frame state place = some current) :
+    ∃ storage, PlaceView storage type ∧ HasType unit loans current storage ∧
+      ∀ {value frame' state'}, HasType unit loans value storage →
+        writeRuntimePlace? frame state place value = some (frame', state') →
+        TypedFrame unit loans context.ns context.locals context.env frame' ∧ state' = state := by
+  obtain ⟨localId, rootType, root_eq, local_eq, _, paths⟩ := typed
+  obtain ⟨rootValue, rootRead, currentRead⟩ := readRuntimePlace_local_some root_eq read
+  obtain ⟨storage, view, path⟩ := (paths rootValue rootRead).2.1 writable
+  refine ⟨storage, view, path.read currentRead, ?_⟩
+  intro value frame' state' valueTyped written
+  simp only [writeRuntimePlace?, writable, Bool.not_true, Bool.false_eq_true, if_false] at written
+  have store : ∀ stored, HasType unit loans stored rootType →
+      writeRoot? frame state place.root stored = some (frame', state') →
+      TypedFrame unit loans context.ns context.locals context.env frame' ∧ state' = state := by
+    intro stored storedTyped storedEq
+    simp only [writeRoot?, root_eq] at storedEq
+    split at storedEq
+    · cases storedEq
+    · simp only [Option.some.injEq, Prod.mk.injEq] at storedEq
+      obtain ⟨rfl, rfl⟩ := storedEq
+      exact ⟨frameTyped.set local_eq storedTyped, rfl⟩
+  split at written
+  · rename_i empty
+    have empty := Array.isEmpty_iff.mp empty
+    have updated := path.write (updated := value) valueTyped (by simp [empty, writeProjections?])
+    exact store _ updated written
+  · simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at written
+    obtain ⟨rootValue', read', updated, updatedEq, written⟩ := written
+    simp only [readRoot?, root_eq] at read'
+    rw [rootRead, Option.some.injEq] at read'
+    subst read'
+    exact store _ (path.write valueTyped updatedEq) written
 
 end VerexIR

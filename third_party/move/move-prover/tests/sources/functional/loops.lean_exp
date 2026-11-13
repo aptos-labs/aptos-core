@@ -10,27 +10,14 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value) (fun result final => False)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+      (fun result final => False)
       (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True) state
 verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
-  fun flow state =>
-    match flow with
-    | VerexIR.Proofs.Denote.Flow.value value env =>
-      VerexIR.Proofs.wp
-        (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
-          (VerexIR.Proofs.Denote.Term.lit ()) env)
-        verexContinuation✝²
-        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True)
-        state
-    | VerexIR.Proofs.Denote.Flow.return_ result env =>
-      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.return_ result env) state
-    | VerexIR.Proofs.Denote.Flow.break_ nest env =>
-      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.break_ nest env) state
-    | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
-      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
+  attempt_1._verexContinuation_1_4
 verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
     VerexIR.Proofs.Denote.NTy.unit.carrier →
@@ -39,7 +26,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
 recursive✝ :
   VerexIR.Proofs.Denote.HEnv
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) →
-    VerexIR.Proofs.Denote.Comp unit
+    VerexIR.Proofs.Spec (VerexIR.Proofs.Denote.Memory unit) VerexIR.Proofs.Failure
       (VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
         (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) Unit)
 state✝ : VerexIR.Proofs.Denote.Memory unit
@@ -64,10 +51,10 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
   fun value state =>
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.Flow.iterate recursive✝ value) verexContinuation✝
       (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True) state
-a✝ : 10 < i.val
+pathDecision✝ : 10 < i.val
 ⊢ False
 tests/sources/functional/loops.move:57:5: error: verex verification failed: the automatic verification of `iter10_no_abort_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
-  verify iter10_no_abort_incorrect by
+  verify iter10_no_abort_incorrect by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry
@@ -75,7 +62,7 @@ tests/sources/functional/loops.move:57:5: error: verex verification failed: the 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:88:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/loops.move:86:5: error: verex verification failed: the automatic verification of `iter10_abort_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
-  verify iter10_abort_incorrect by
+  verify iter10_abort_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -83,25 +70,25 @@ tests/sources/functional/loops.move:86:5: error: verex verification failed: the 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:119:17: error: the loop invariant `x != y` is not preserved by an iteration
 tests/sources/functional/loops.move:134:5: error: verex verification failed: the automatic verification of `nested_loop_outer_invariant_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
-  verify nested_loop_outer_invariant_incorrect by
+  verify nested_loop_outer_invariant_incorrect by lean =>
     verex_obligations
     verex_on
-    | invariant_1_step => verex_prepare; sorry
+    | invariant_1_of_loop_1_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:145:21: error: the loop invariant `x != y` is not established at entry
 tests/sources/functional/loops.move:145:21: error: the loop invariant `x != y` is not preserved by an iteration
 tests/sources/functional/loops.move:159:5: error: verex verification failed: the automatic verification of `nested_loop_inner_invariant_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
-  verify nested_loop_inner_invariant_incorrect by
+  verify nested_loop_inner_invariant_incorrect by lean =>
     verex_obligations
     verex_on
-    | invariant_1_entry => verex_prepare; sorry
-    | invariant_1_step => verex_prepare; sorry
+    | invariant_1_of_loop_2_entry => verex_prepare; sorry
+    | invariant_1_of_loop_2_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:189:17: error: the loop invariant `x < y` is not preserved by an iteration
 tests/sources/functional/loops.move:202:5: error: verex verification failed: the automatic verification of `loop_with_two_back_edges_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
-  verify loop_with_two_back_edges_incorrect by
+  verify loop_with_two_back_edges_incorrect by lean =>
     verex_obligations
     verex_on
     | invariant_1_step => verex_prepare; sorry
@@ -109,7 +96,7 @@ tests/sources/functional/loops.move:202:5: error: verex verification failed: the
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:234:9: error: the assertion `i <= 11` does not hold
 tests/sources/functional/loops.move:242:5: error: verex verification failed: the automatic verification of `iter10_assert_instead_of_invariant` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
-  verify iter10_assert_instead_of_invariant by
+  verify iter10_assert_instead_of_invariant by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry
@@ -117,7 +104,7 @@ tests/sources/functional/loops.move:242:5: error: verex verification failed: the
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:210:17: error: the loop invariant `x != 0` is not established at entry
 tests/sources/functional/loops.move:206:5: error: verex verification failed: the automatic verification of `loop_invariant_base_invalid` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
-  verify loop_invariant_base_invalid by
+  verify loop_invariant_base_invalid by lean =>
     verex_obligations
     verex_on
     | invariant_1_entry => verex_prepare; sorry
@@ -125,7 +112,7 @@ tests/sources/functional/loops.move:206:5: error: verex verification failed: the
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:223:17: error: the loop invariant `x == 0` is not preserved by an iteration
 tests/sources/functional/loops.move:219:5: error: verex verification failed: the automatic verification of `loop_invariant_induction_invalid` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
-  verify loop_invariant_induction_invalid by
+  verify loop_invariant_induction_invalid by lean =>
     verex_obligations
     verex_on
     | invariant_1_step => verex_prepare; sorry

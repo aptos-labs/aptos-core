@@ -50,21 +50,51 @@ instance : FromJson NamespaceRef where
       | .error _ => pure none
     pure { segments, alias }
 
+/-- A name at its namespace's root keeps its encoding without a scope. -/
+instance : ToJson QualifiedName where
+  toJson name := Json.mkObj <|
+    [("namespaceId", toJson name.namespaceId), ("name", toJson name.name)] ++
+    (if name.scope.isEmpty then [] else [("scope", toJson name.scope)])
+
+instance : FromJson QualifiedName where
+  fromJson? json := do
+    let namespaceId ← json.getObjValAs? NamespaceId "namespaceId"
+    let name ← json.getObjValAs? String "name"
+    let scope ← match json.getObjVal? "scope" with
+      | .ok value => fromJson? value
+      | .error _ => pure #[]
+    pure { namespaceId, name, scope }
+
 deriving instance ToJson, FromJson for
   SourceFile, SourceRange, Location, OriginKind, Origin, Trust, Alignment,
-  QualifiedName, QualifiedRef, Profile, ProfileValue,
+  QualifiedRef, Profile, ProfileValue,
   ProfileConfig, IntWidth, ReferenceKind, LifetimeKind, Lifetime, ReferenceType,
   ConstValue, TypeUse, GenericArgument, Ability, TraitRef, GenericPredicate, Ty,
   AttributeValue, Attribute, Comment, Tables, BorrowKind, ThrowKind, CallKind,
   SurfaceSyntax, GlobalKind, PrimitiveOperation, ReferenceOperation,
   DataOperation, MemoryRange, TraceKind, BehaviorKind, SpecOperation, Operation, Place,
   QuantifierKind, MatchArm, QuantifierBinder, ConditionKind, Condition, Frame,
-  SpecBlock, ExprKind, Expr, PatternKind, Pattern, BinderKind, GenericBinder,
+  SpecBlock, ExprKind, ExprOrigin
+
+/-- An expression's origin is present only where an import pass records one,
+so expressions without one keep their canonical encoding. -/
+instance : ToJson Expr where
+  toJson expression := Json.mkObj <|
+    [("loc", toJson expression.loc), ("typeId", toJson expression.typeId),
+      ("kind", toJson expression.kind)] ++
+    (match expression.origin with
+      | some origin => [("origin", toJson origin)]
+      | none => [])
+
+deriving instance FromJson for Expr
+
+deriving instance ToJson, FromJson for
+  PatternKind, Pattern, BinderKind, GenericBinder,
   Parameter, LocalDecl, Signature, ParameterFrame, FunctionContract, ConstantDecl, FieldDecl,
-  VariantDecl, GhostFieldDecl, StructDecl, FunctionDecl, AssociatedItemKind, AssociatedItemDecl,
+  VariantDecl, GhostFieldDecl, StructDecl, ShapeContract, FunctionDecl, AssociatedItemKind, AssociatedItemDecl,
   TraitDecl, AssociatedItemValue, AssociatedItemBinding, ImplDecl,
   SpecFunctionDecl, LemmaDecl, SpecVarDecl, NamespaceInvariant, IntrinsicBinding,
-  IntrinsicDecl, Namespace
+  IntrinsicDecl, ScopeKind, ScopeDecl, Namespace
 
 namespace Import
 

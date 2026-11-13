@@ -11,7 +11,7 @@
 
 use anyhow::Result;
 use aptos_rest_client::AptosBaseUrl;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
 use mono_move_replay_benchmark::{
     capture, data, report::TransactionReport, timing::TimingConfig, v1, v2, BenchmarkRun,
 };
@@ -131,6 +131,7 @@ struct BenchArgs {
 }
 
 #[derive(Parser)]
+#[command(group(ArgGroup::new("selection").required(true).args(["begin_version", "versions"])))]
 struct CaptureArgs {
     #[clap(
         long,
@@ -140,30 +141,60 @@ struct CaptureArgs {
     network: Network,
     #[clap(long, help = "Optional API key to raise the request-rate quota")]
     api_key: Option<String>,
-    #[clap(long, help = "First transaction version to capture (inclusive)")]
-    begin_version: u64,
+    #[clap(
+        long,
+        requires = "end_version",
+        help = "First transaction version to capture (inclusive); requires --end-version"
+    )]
+    begin_version: Option<u64>,
     #[clap(long, help = "Last transaction version to capture (inclusive)")]
-    end_version: u64,
+    end_version: Option<u64>,
+    #[clap(
+        long,
+        num_args = 1..,
+        value_delimiter = ',',
+        help = "Comma-separated transaction versions to capture, which need not be contiguous \
+                (alternative to --begin-version/--end-version)"
+    )]
+    versions: Vec<u64>,
     #[clap(long, help = "Output directory for the captured dump")]
     out_dir: PathBuf,
+}
+
+impl CaptureArgs {
+    /// The versions to capture, sorted and deduplicated.
+    fn selected_versions(&self) -> Result<Vec<u64>> {
+        if let Some(begin) = self.begin_version {
+            let end = self
+                .end_version
+                .expect("--end-version is required by --begin-version");
+            if end < begin {
+                anyhow::bail!("--end-version must be >= --begin-version");
+            }
+            return Ok((begin..=end).collect());
+        }
+
+        let mut versions = self.versions.clone();
+        versions.sort_unstable();
+        versions.dedup();
+        Ok(versions)
+    }
 }
 
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Bench(args) => bench(args),
         Command::Capture(args) => {
-            if args.end_version < args.begin_version {
-                anyhow::bail!("--end-version must be >= --begin-version");
-            }
-            let versions = (args.begin_version..=args.end_version).collect();
+            let versions = args.selected_versions()?;
             capture::run(args.network.into(), args.api_key, versions, args.out_dir)
         },
     }
 }
 
 fn bench(args: BenchArgs) -> Result<()> {
-    // Set once, before V1 builds its VM environment (it's a write-once global).
+    // Set once, before V1 builds its VM environment (they're write-once globals).
     aptos_vm_environment::prod_configs::set_paranoid_type_checks(args.v1_paranoid);
+    vm_comparison::features::install_timed_feature_override()?;
 
     let timing = TimingConfig {
         warmup: args.warmup,

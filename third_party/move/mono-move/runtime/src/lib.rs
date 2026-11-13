@@ -9,9 +9,11 @@ pub(crate) mod heap;
 mod interpreter;
 pub(crate) mod memory;
 mod native_context;
+mod reentrancy;
 mod types;
 mod value_cmp;
 mod value_conv;
+mod value_display;
 
 pub use error::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError, RuntimeStatus, VecOp};
 pub use global_storage::{ResourceReadWriteSet, WriteClass};
@@ -28,7 +30,7 @@ pub use mono_move_core::{
     VerificationError,
 };
 pub use native_context::{
-    ProductionContextFamily, ProductionNativeContext, ProductionNativeFunction,
+    LoaderAccess, ProductionContextFamily, ProductionNativeContext, ProductionNativeFunction,
     ProductionNativeRegistry,
 };
 pub use types::{DEFAULT_HEAP_SIZE, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};

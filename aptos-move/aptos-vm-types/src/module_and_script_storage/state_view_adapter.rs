@@ -112,11 +112,11 @@ where
         self,
     ) -> Result<
         impl Iterator<
-            Item = (
-                ModuleId,
-                Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
-            ),
-        >,
+                Item = (
+                    ModuleId,
+                    Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
+                ),
+            > + use<S, E>,
         PanicError,
     > {
         let (state_view, verified_modules_iter) = self

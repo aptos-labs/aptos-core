@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/state_labels/aborting_result_definition.move:18:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/state_labels/aborting_result_definition.move:16:5: error: verex verification failed: the automatic verification of `caller` failed; provide a proof in `tests/sources/functional/state_labels/aborting_result_definition.proof.lean`:
-  verify caller by
+  verify caller by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/state_labels/aborting_result_definition.move:16:5: erro
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/state_labels/aborting_result_definition.move:32:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/state_labels/aborting_result_definition.move:29:5: error: verex verification failed: the automatic verification of `missing` failed; provide a proof in `tests/sources/functional/state_labels/aborting_result_definition.proof.lean`:
-  verify missing by
+  verify missing by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

@@ -1,0 +1,35 @@
+processed 7 tasks
+task 0 lines 5-17:  publish [// Source: a private `entry` function, stored in a resource.]
+Error: compilation errors:
+ error: function `private_entry::target` is missing the `store` ability
+   ┌─ TEMPFILE:13:25
+   │
+13 │         move_to(s, Work(target))
+   │                         ^^^^^^
+   │
+   = only public functions or functions with the `#[persistent]` attribute can be stored
+   = expected function type: `|u64|u64 has store`
+
+
+task 1 lines 19-36:  publish [// Source: a `public entry` function, stored, loaded and called.]
+task 2 lines 38-38:  run 0x66::public_entry::store --signers 0x66
+Error: unsupported by MonoVM: function values are not yet supported
+task 3 lines 40-40:  run 0x66::public_entry::exec --args @0x66
+Error: Function execution failed with VMError: {
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x66::public_entry,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}
+task 4 lines 42-60:  publish [// Source: a private `entry` function marked `#[persistent]`.]
+task 5 lines 62-62:  run 0x66::persistent_entry::store --signers 0x66
+Error: unsupported by MonoVM: function values are not yet supported
+task 6 lines 64-64:  run 0x66::persistent_entry::exec --args @0x66
+Error: Function execution failed with VMError: {
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x66::persistent_entry,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}

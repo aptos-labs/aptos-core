@@ -77,7 +77,7 @@ verex module 0x42::loop_unroll_bound where
 error: the bound `pragma unroll = 1` of a loop is not established
 ---
 error: verex verification failed: the automatic verification of `outrun` failed; provide a proof in the module:
-  verify outrun by
+  verify outrun by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
@@ -90,7 +90,7 @@ verify 0x42::loop_unroll_bound::outrun
 -- Exhausting the proof allowance must preserve normal executions, failures,
 -- and undefinedness; replacing the continuation with bottom loses all three.
 open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote in
-example {unit : Validation.ValidatedUnit} [Skolems unit]
+example {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
     (entry : HEnv .nil) (initial : Memory unit) :
     ¬wp (loopUnroll (ρ := .none) 0 0 1
       (fun _ env => Spec.pure (.value () env)) entry)
@@ -100,7 +100,7 @@ example {unit : Validation.ValidatedUnit} [Skolems unit]
     simp [loopUnroll, Spec.fixApprox, Spec.pure])
 
 open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote in
-example {unit : Validation.ValidatedUnit} [Skolems unit]
+example {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
     (entry : HEnv .nil) (initial : Memory unit) (error : Failure) :
     ¬wp (loopUnroll (ρ := .none) 0 0 1
       (fun _ _ => Spec.abort error) entry)
@@ -109,7 +109,7 @@ example {unit : Validation.ValidatedUnit} [Skolems unit]
   exact verified.2.1 error (by simp [loopUnroll, Spec.fixApprox, Spec.abort])
 
 open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote in
-example {unit : Validation.ValidatedUnit} [Skolems unit]
+example {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
     (entry : HEnv .nil) (initial : Memory unit) :
     ¬wp (loopUnroll (ρ := .none) 0 0 1
       (fun _ _ => ⟨fun _ _ _ => False, fun _ _ => False, fun _ => True⟩) entry)

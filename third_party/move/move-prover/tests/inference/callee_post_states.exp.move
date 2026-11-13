@@ -72,7 +72,7 @@ module 0x42::callee_post_states {
     }
     spec two_calls(s: &mut S) {
         pragma opaque = true;
-        ensures [inferred = sathard] exists x: S: (..S1 |~ ensures_of<inc_b>(old(s), x)) && (S1.. |~ ensures_of<set_a>(x, 3, s));
+        ensures [inferred = sathard] exists x: S: ensures_of<inc_b>(old(s), x) && ensures_of<set_a>(x, 3, s);
         aborts_if [inferred] aborts_of<inc_b>(s);
     }
 

@@ -1,6 +1,6 @@
 VerexE2ETests/SourceVerify/generic_enum_invariants.move:61:9: error: the specification clause `ensures result == 0` is not established
 VerexE2ETests/SourceVerify/generic_enum_invariants.move:60:5: error: verex verification failed: the automatic verification of `wrong_read` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_enum_invariants.proof.lean`:
-  verify wrong_read by
+  verify wrong_read by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -10,9 +10,9 @@ VerexE2ETests/SourceVerify/generic_enum_invariants.move:10:9: error: the data in
         | Tagged<T>::Empty {} => true
         | Tagged<T>::Filled { value := _, tag := tag } => tag > 0` does not hold where a value is constructed
 VerexE2ETests/SourceVerify/generic_enum_invariants.move:50:5: error: verex verification failed: the automatic verification of `invalid` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_enum_invariants.proof.lean`:
-  verify invalid by
+  verify invalid by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

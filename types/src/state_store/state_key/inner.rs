@@ -39,6 +39,7 @@ pub enum TradingNativeKeyTag {
     Position = 0,
     Order = 1,
     BulkOrder = 2,
+    Collateral = 3,
 }
 
 /// Error thrown when a [`StateKey`] fails to be deserialized out of a byte sequence stored in physical
@@ -111,6 +112,21 @@ pub enum TradingNativeKey {
         market: AccountAddress,
         account: AccountAddress,
     },
+    /// Native collateral entry: per-(exchange, account, scope) collateral.
+    Collateral {
+        exchange: AccountAddress,
+        account: AccountAddress,
+        scope: CollateralScope,
+    },
+}
+
+/// Which balance domain a collateral entry belongs to. `Cross` is the
+/// account's shared cross-margin pool; `Isolated` is dedicated to one market.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+pub enum CollateralScope {
+    Cross,
+    Isolated { market: AccountAddress },
 }
 
 impl StateKeyInner {
@@ -165,6 +181,22 @@ impl StateKeyInner {
                         writer.write_all(market.as_ref())?;
                         writer.write_all(account.as_ref())?;
                     },
+                    TradingNativeKey::Collateral {
+                        exchange,
+                        account,
+                        scope,
+                    } => {
+                        writer.write_all(&[TradingNativeKeyTag::Collateral as u8])?;
+                        writer.write_all(exchange.as_ref())?;
+                        writer.write_all(account.as_ref())?;
+                        match scope {
+                            CollateralScope::Cross => writer.write_all(&[0])?,
+                            CollateralScope::Isolated { market } => {
+                                writer.write_all(&[1])?;
+                                writer.write_all(market.as_ref())?;
+                            },
+                        }
+                    },
                 }
             },
         };
@@ -217,6 +249,15 @@ impl Debug for StateKeyInner {
                     f,
                     "StateKey::TradingNative::BulkOrder {{ exchange: {}, market: {}, account: {} }}",
                     exchange, market, account,
+                ),
+                TradingNativeKey::Collateral {
+                    exchange,
+                    account,
+                    scope,
+                } => write!(
+                    f,
+                    "StateKey::TradingNative::Collateral {{ exchange: {}, account: {}, scope: {:?} }}",
+                    exchange, account, scope,
                 ),
             },
         }

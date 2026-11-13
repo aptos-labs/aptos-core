@@ -1,0 +1,25 @@
+VerexE2ETests/SourceVerify/derive_eq_errors.spec.lean:7:3: error: the specification clause `ensures result == (p.a == q.a)` is not established
+VerexE2ETests/SourceVerify/derive_eq_errors.spec.lean:6:6: error: verex verification failed: the automatic verification of `same_point` failed; provide a proof in the module:
+  verify same_point by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/derive_eq_errors.spec.lean:10:3: error: the specification clause `ensures result == (x is Red)` is not established
+VerexE2ETests/SourceVerify/derive_eq_errors.spec.lean:9:6: error: verex verification failed: the automatic verification of `same_color` failed; provide a proof in the module:
+  verify same_color by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/derive_eq_errors.spec.lean:13:3: error: the specification clause `ensures result == (s.length != t.length)` is not established
+VerexE2ETests/SourceVerify/derive_eq_errors.spec.lean:12:6: error: verex verification failed: the automatic verification of `same_string` failed; provide a proof in the module:
+  verify same_string by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/derive_eq_errors.rs:29:5: error: `same_text` calls the native `core::cmp::impls::std::cmp::impls::<impl std::cmp::PartialEq<&B> for &A>::eq`, which has neither a specification nor a prelude model; specify it

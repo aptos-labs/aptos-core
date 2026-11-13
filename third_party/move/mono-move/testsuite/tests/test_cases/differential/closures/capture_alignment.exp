@@ -67,7 +67,7 @@ fun combine(r0, r1, r2): u64 {
 }
 
 fun run(r0): u64 {
-  slots: params(1), locals(2), temps(2)
+  slots: params(1), locals(2), temps(2), transfer(1)
     r0: bool
     r1: vector<u64>
     r2: |u64|(u64) has drop
@@ -84,8 +84,8 @@ fun run(r0): u64 {
     6: vec_push_back u64, r3, r4 @7
     7: r2 := pack_closure combine, 11, [r0, r1] @10
     8: r4 := ld_u64 100 @12
-    9: [r4] := call_closure [|u64|(u64) has drop], [r4, r2] @14
-    10: ret [r4] @15
+    9: [x0] := call_closure [|u64|(u64) has drop], [r4, r2] @14
+    10: ret [x0] @15
 }
 === micro-ops ===
 // module 0x99::capture_alignment
@@ -107,7 +107,7 @@ fun combine() {
 
 fun run() {
   frame_data_size: 48
-  entry_gas: 258
+  entry_gas: 232
   code:
     0: VecNew [8] @0
     1: SlotBorrow [24] <- &[8] @2
@@ -119,9 +119,8 @@ fun run() {
     7: PackClosure [16] <- func_ref=Unresolved(combine), mask=11, captured_desc=3, captured=[[0](1), [8](8)] @10
     8: StoreImm8 [40] <- #100 @12
     9: CallClosure closure=[16], provided_args=[[40](8)] @14
-    10: Move8 [40] <- [72] @14
-    11: Move8 [0] <- [40] @15
-    12: Return @15
+    10: Move8 [0] <- [72] @15
+    11: Return @15
   safe_point_layouts:
     3: []
     6: []

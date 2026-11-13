@@ -806,7 +806,7 @@ let g: |u64|bool has copy+drop = is_odd;
 
 A _persistent_ function is required to build a storable function value because it needs to be guaranteed that the underlying function exists and can be safely restored from storage at any point in the future. However, a code upgrade may change the underlying implementation of the function, while its signature is persistent.
 
-While `public` and `entry` functions are persistent by default, a non-public function needs to be marked with the attribute `#[persistent]` to become storable:
+While `public` functions are persistent by default, a non-public function, including an `entry` function, needs to be marked with the attribute `#[persistent]` to become storable:
 
 ```move
 #[persistent] fun is_odd(x: u64): bool { x % 2 == 1 }
@@ -814,7 +814,7 @@ While `public` and `entry` functions are persistent by default, a non-public fun
 let g: |u64|bool has copy+drop+store = is_odd;
 ```
 
-Using the `#[persistent]` attribute is preferred if the only objective is to make a function storable, avoiding security implications with public or entry visibility.
+Using the `#[persistent]` attribute is preferred if the only objective is to make a function storable, avoiding the security implications of `public` visibility.
 
 ### Lambda Expressions and Closures
 

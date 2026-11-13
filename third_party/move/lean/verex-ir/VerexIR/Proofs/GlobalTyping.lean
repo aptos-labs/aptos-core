@@ -7,7 +7,7 @@ import VerexIR.Proofs.Invocation
 # Typed memory is typed at run time
 
 An invocation of a function value a proof does not see runs from global
-memory whose every slot is typed at its key's type (`designs/static-typing.md`,
+memory whose every slot is typed at its key's type (`doc/historical/static-typing.md`,
 Phase 5). Typed memory (`Denote.Memory`) holds a native value per resource
 type, so every runtime encoding of every memory is typed once the unit's
 resource types correspond to their keys' types (`ResourcesTyped`), which is
@@ -40,6 +40,13 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
       Denote.NTy.TypedAs unit (.tuple elements) (.tuple types)
   | vector {element : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit element type) :
       Denote.NTy.TypedAs unit (.vector element) (.vector type none)
+  | slice {element : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit element type) :
+      Denote.NTy.TypedAs unit (.slice element) (.slice type)
+  | sliceRef {element : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit element type) :
+      Denote.NTy.TypedAs unit (.sliceRef element) (.reference .mutable (.slice type))
+  /-- An array: a vector of its length. -/
+  | array {element : NTy} {type : SemTy} {length : Nat} (typed : Denote.NTy.TypedAs unit element type) :
+      Denote.NTy.TypedAs unit (.array element length) (.vector type (some (.integer length)))
   /-- A table owner's hidden contents: its entries, pairs of a key and a value. -/
   | table {key value : NTy} {keyType valueType : SemTy}
       (typedKey : Denote.NTy.TypedAs unit key keyType)
@@ -57,7 +64,7 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
       (declaration_eq : SemanticOperations.handleFields? unit source none =
         some (declaringNs, declared))
       (resolve : ResolvesAll declaringNs.tables arguments.toArray
-        (declared.toList.map (·.type.typeId)) fieldTypes)
+        (declared.toList.map (declaringNs.typeId ·.type.typeId)) fieldTypes)
       (ghostsResolve : ResolvesAll declaringNs.tables arguments.toArray
         (ghostTypeIds unit source) ghostTypes)
       (typed : Denote.NRow.TypedAs unit fields
@@ -65,7 +72,7 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
       Denote.NTy.TypedAs unit (.struct source nativeArguments fields) (.nominal name arguments)
   /-- An intrinsic map owner at its key and value arguments: the fields of
   its abstract value, its leading fields, its ghost slots, and its entries
-  (`OwnerLayout.canonicalTypes`; `designs/intrinsic-maps.md`, "Abstract
+  (`OwnerLayout.canonicalTypes`; `doc/designs/intrinsic-maps.md`, "Abstract
   representation"). -/
   | abstract {source : StructHandle} {nativeArguments fields : NRow} {name : QualifiedName}
       {key value : SemTy} {layout : OwnerLayout} {declaringNs : ValidatedNamespace}
@@ -94,16 +101,18 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
         (.nominal name arguments)
   | ref {referent : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit referent type) :
       Denote.NTy.TypedAs unit (.ref referent) (.reference .mutable type)
-  /-- A ghost field's slot reads as a slot of its type (`designs/ghost-fields.md`). -/
+  /-- A ghost field's slot reads as a slot of its type (`doc/designs/ghost-fields.md`). -/
   | ghost {slot : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit slot type) :
       Denote.NTy.TypedAs unit (.ghost slot) (.ghost type)
   | param (index : Nat) : Denote.NTy.TypedAs unit (.param index) (.param index)
-  /-- A function type at its rows, each parameter a shared reference where it
-  is marked so, the results packed as the checker packs them. -/
-  | function {parameters returned : NRow} {shared : List Bool} {parameterTypes results : List SemTy}
-      {result : SemTy}
-      (typedParameters : Denote.NRow.ParametersTypedAs unit parameters shared parameterTypes)
-      (typedResults : Denote.NRow.TypedAs unit returned results)
+  /-- A function type at its rows, each parameter and each result a shared
+  reference where it is marked so, the results packed as the checker packs
+  them. -/
+  | function {parameters returned : NRow} {shared : Denote.Sharing}
+      {parameterTypes results : List SemTy} {result : SemTy}
+      (typedParameters : Denote.NRow.ParametersTypedAs unit parameters shared.parameters
+        parameterTypes)
+      (typedResults : Denote.NRow.ParametersTypedAs unit returned shared.results results)
       (packed : result = SemTy.pack results) :
       Denote.NTy.TypedAs unit (.function parameters shared returned)
         (.function parameterTypes result)
@@ -151,7 +160,7 @@ inductive Denote.NRows.VariantsTypedAs (unit : ValidatedUnit) :
       (declaration_eq : SemanticOperations.handleFields? unit source (some name) =
         some (declaringNs, declared))
       (resolve : ResolvesAll declaringNs.tables arguments.toArray
-        (declared.toList.map (·.type.typeId)) fieldTypes)
+        (declared.toList.map (declaringNs.typeId ·.type.typeId)) fieldTypes)
       (ghostsResolve : ResolvesAll declaringNs.tables arguments.toArray
         (ghostTypeIds unit source) ghostTypes)
       (typed : Denote.NRow.TypedAs unit fields (fieldTypes ++ ghostTypes.map .ghost))
@@ -170,7 +179,8 @@ theorem HasTypeEach.of_forall {unit : ValidatedUnit} {loans : LoanTypes} {type :
 theorem declaredTypes?_resolves {ns : ValidatedNamespace} {arguments : List SemArg}
     {declared : Array FieldDecl} {fieldTypes : List SemTy}
     (resolved : declaredTypes? ns arguments declared = some fieldTypes) :
-    ResolvesAll ns.tables arguments.toArray (declared.toList.map (·.type.typeId)) fieldTypes :=
+    ResolvesAll ns.tables arguments.toArray (declared.toList.map (ns.typeId ·.type.typeId))
+      fieldTypes :=
   ResolvesAll.of_mapM resolved
 
 mutual
@@ -200,12 +210,27 @@ theorem Denote.NTy.typedAs_of_core {unit : ValidatedUnit} :
   | .bytes, type, checked => by
       simp only [NTy.typedAsCore, beq_iff_eq] at checked
       subst checked; exact .scalar rfl
+  | .char, type, checked => by
+      simp only [NTy.typedAsCore, beq_iff_eq] at checked
+      subst checked; exact .scalar rfl
   | .tuple elements, type, checked => by
       cases type <;> simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
       exact .tuple (NRow.typedAs_of_check elements _ checked)
   | .ghost slot, type, checked => by
       cases type <;> simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
       exact .ghost (NTy.typedAs_of_core slot _ checked)
+  | .slice element, type, checked => by
+      cases type <;> simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+      exact .slice (NTy.typedAs_of_core element _ checked)
+  | .sliceRef element, type, checked => by
+      cases type with
+      | reference kind referent =>
+          cases kind with
+          | mutable =>
+              cases referent <;> simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+              exact .sliceRef (NTy.typedAs_of_core element _ checked)
+          | shared => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+      | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
   | .vector element, type, checked => by
       cases type with
       | vector type length =>
@@ -214,6 +239,20 @@ theorem Denote.NTy.typedAs_of_core {unit : ValidatedUnit} :
               simp only [NTy.typedAsCore] at checked
               exact .vector (NTy.typedAs_of_core element _ checked)
           | some _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+      | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+  | .array element length, type, checked => by
+      cases type with
+      | vector type bound =>
+          cases bound with
+          | none => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+          | some bound =>
+              cases bound with
+              | integer actual =>
+                  simp only [NTy.typedAsCore, Bool.and_eq_true, beq_iff_eq] at checked
+                  obtain ⟨same, typed⟩ := checked
+                  subst same
+                  exact .array (NTy.typedAs_of_core element _ typed)
+              | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
       | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
   | .table key value, type, checked => by
       cases type with
@@ -294,9 +333,10 @@ theorem Denote.NTy.typedAs_of_core {unit : ValidatedUnit} :
       | function parameterTypes result =>
           simp only [NTy.typedAsCore, Bool.and_eq_true, beq_iff_eq] at checked
           obtain ⟨⟨typedParameters, packed⟩, typedResults⟩ := checked
-          exact .function (NRow.parametersTypedAs_of_check parameters shared parameterTypes
-              typedParameters)
-            (NRow.typedAs_of_check returned result.resultRow typedResults) packed.symm
+          exact .function (NRow.parametersTypedAs_of_check parameters shared.parameters
+              parameterTypes typedParameters)
+            (NRow.parametersTypedAs_of_check returned shared.results result.resultRow typedResults)
+            packed.symm
       | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
 
 theorem Denote.NRow.typedAs_of_check {unit : ValidatedUnit} :
@@ -338,7 +378,7 @@ theorem Denote.NRow.parametersTypedAs_of_check {unit : ValidatedUnit} :
             (NRow.parametersTypedAs_of_check rest shared types checked.2)
       | .reference .mutable _, checked | .unit, checked | .never, checked | .bool, checked
       | .character, checked | .string, checked | .bytes, checked | .address, checked
-      | .signer, checked | .integer _ _, checked | .tuple _, checked | .vector _ _, checked
+      | .signer, checked | .integer _ _, checked | .tuple _, checked | .slice _, checked | .vector _ _, checked
       | .nominal _ _, checked | .function _ _, checked | .profile _, checked
       | .param _, checked => simp only [NRow.parametersCheck, Bool.false_eq_true] at checked
   | .nil, _ :: _, _, checked | .nil, [], _ :: _, checked | .cons _ _, [], _, checked
@@ -380,7 +420,7 @@ theorem _root_.VerexIR.SemTy.sizeOf_unshared_le : (type : SemTy) →
       simp only [SemTy.unshared, SemTy.reference.sizeOf_spec]
       omega
   | .reference .mutable _ | .unit | .never | .bool | .character | .string | .bytes | .address
-  | .signer | .integer _ _ | .tuple _ | .vector _ _ | .nominal _ _ | .function _ _ | .profile _
+  | .signer | .integer _ _ | .tuple _ | .slice _ | .vector _ _ | .nominal _ _ | .function _ _ | .profile _
   | .param _ | .ghost _ => Nat.le_refl _
 
 /-- Ghost slot types substitute through their slots. -/
@@ -429,7 +469,7 @@ theorem _root_.VerexIR.SemTy.unshared_subst {arguments : Array SemArg} :
   | .param index, _, notParam => absurd rfl (notParam index)
   | .reference .mutable _, _, _ | .unit, _, _ | .never, _, _ | .bool, _, _ | .character, _, _
   | .string, _, _ | .bytes, _, _ | .address, _, _ | .signer, _, _ | .integer _ _, _, _
-  | .tuple _, _, _ | .vector _ _, _, _ | .nominal _ _, _, _ | .function _ _, _, _
+  | .tuple _, _, _ | .slice _, _, _ | .vector _ _, _, _ | .nominal _ _, _, _ | .function _ _, _, _
   | .profile _, _, _ | .ghost _, _, _ => rfl
 
 /-- A type parameter is read only as itself. -/
@@ -471,6 +511,17 @@ theorem _root_.VerexIR.Validation.OwnerLayout.canonicalTypes_subst (layout : Own
     by_cases dummy : layout.canonical.dummy = true <;>
     by_cases length : layout.canonical.length = true <;> simp [handle, dummy, length, SemTy.subst]
 
+/-- Dropping a mark keeps a typing: no typed type is marked, so the entry a
+substitution reads is the type it stands for
+(`doc/designs/denotation.md`, "Instances at a reference"). -/
+theorem Denote.NTy.TypedAs.unmark {unit : ValidatedUnit} {τ : NTy} {type : SemTy}
+    (typed : Denote.NTy.TypedAs unit τ type) : Denote.NTy.TypedAs unit τ.unmark type := by
+  cases τ <;>
+    first
+      | (cases typed with | scalar scalar => simp [Denote.NTy.scalarType?] at scalar)
+      | exact typed
+      | cases typed
+
 mutual
 /-- A native type reads, under a substitution, as its reading under the
 arguments it agrees with. -/
@@ -481,16 +532,19 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
       (τ.substWith types).TypedAs unit (type.subst arguments)
   | .bool, _, .scalar scalar, _ | .int _ _, _, .scalar scalar, _ | .num, _, .scalar scalar, _ | .address, _, .scalar scalar, _
   | .signer, _, .scalar scalar, _ | .string, _, .scalar scalar, _
-  | .bytes, _, .scalar scalar, _ => by
+  | .bytes, _, .scalar scalar, _ | .char, _, .scalar scalar, _ => by
       simp only [NTy.scalarType?, Option.some.injEq] at scalar
       subst scalar
       exact .scalar rfl
   | .unit, _, .scalar scalar, _ | .tuple _, _, .scalar scalar, _
   | .struct _ _ _, _, .scalar scalar, _
   | .enum _ _ _ _ _, _, .scalar scalar, _ | .vector _, _, .scalar scalar, _
+  | .slice _, _, .scalar scalar, _ | .sliceRef _, _, .scalar scalar, _
+  | .array _ _, _, .scalar scalar, _
   | .table _ _, _, .scalar scalar, _ | .ghost _, _, .scalar scalar, _
   | .ref _, _, .scalar scalar, _ | .param _, _, .scalar scalar, _
-  | .function _ _ _, _, .scalar scalar, _ => by simp [NTy.scalarType?] at scalar
+  | .function _ _ _, _, .scalar scalar, _ | .nominal _ _ _, _, .scalar scalar, _ => by
+      simp [NTy.scalarType?] at scalar
   | _, _, .unit, _ => .unit
   | _, _, .tuple typed, mentioned => by
       simp only [NTy.paramsAll] at mentioned
@@ -499,6 +553,15 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
   | _, _, .vector typed, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       exact .vector (NTy.TypedAs.subst agree typed mentioned)
+  | _, _, .slice typed, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      exact .slice (NTy.TypedAs.subst agree typed mentioned)
+  | _, _, .sliceRef typed, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      exact .sliceRef (NTy.TypedAs.subst agree typed mentioned)
+  | _, _, .array typed, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      exact .array (NTy.TypedAs.subst agree typed mentioned)
   | _, _, .table typedKey typedValue, mentioned => by
       simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
       simp only [NTy.substWith, SemTy.subst, SemTy.substList]
@@ -543,13 +606,13 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
       simp only [NTy.paramsAll] at mentioned
       obtain ⟨type, argument, typed, _⟩ := agree index mentioned
       simp only [NTy.substWith, SemTy.subst, argument]
-      exact typed
+      exact typed.unmark
   | _, _, .function typedParameters typedResults packed, mentioned => by
       simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
       subst packed
       simp only [NTy.substWith, SemTy.subst, SemTy.substList_eq_map]
       exact .function (NRow.ParametersTypedAs.subst agree typedParameters mentioned.1)
-        (NRow.TypedAs.subst agree typedResults mentioned.2) (SemTy.subst_pack arguments _)
+        (NRow.ParametersTypedAs.subst agree typedResults mentioned.2) (SemTy.subst_pack arguments _)
 
 theorem Denote.NRow.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
     {types : Nat → NTy} {arguments : Array SemArg}
@@ -630,7 +693,8 @@ theorem Denote.NTy.readsUnique {unit : ValidatedUnit} :
   | .address, _, _, .scalar leftScalar, .scalar rightScalar
   | .signer, _, _, .scalar leftScalar, .scalar rightScalar
   | .string, _, _, .scalar leftScalar, .scalar rightScalar
-  | .bytes, _, _, .scalar leftScalar, .scalar rightScalar => by
+  | .bytes, _, _, .scalar leftScalar, .scalar rightScalar
+  | .char, _, _, .scalar leftScalar, .scalar rightScalar => by
       rw [leftScalar] at rightScalar; exact Option.some.inj rightScalar
   | .tuple elements, _, _, leftTyped, rightTyped => by
       cases leftTyped with
@@ -638,12 +702,30 @@ theorem Denote.NTy.readsUnique {unit : ValidatedUnit} :
       | tuple leftRow => cases rightTyped with
         | scalar scalar => simp [NTy.scalarType?] at scalar
         | tuple rightRow => rw [NRow.readsUnique elements leftRow rightRow]
+  | .slice element, _, _, leftTyped, rightTyped => by
+      cases leftTyped with
+      | scalar scalar => simp [NTy.scalarType?] at scalar
+      | slice leftElement => cases rightTyped with
+        | scalar scalar => simp [NTy.scalarType?] at scalar
+        | slice rightElement => rw [NTy.readsUnique element leftElement rightElement]
+  | .sliceRef element, _, _, leftTyped, rightTyped => by
+      cases leftTyped with
+      | scalar scalar => simp [NTy.scalarType?] at scalar
+      | sliceRef leftElement => cases rightTyped with
+        | scalar scalar => simp [NTy.scalarType?] at scalar
+        | sliceRef rightElement => rw [NTy.readsUnique element leftElement rightElement]
   | .vector element, _, _, leftTyped, rightTyped => by
       cases leftTyped with
       | scalar scalar => simp [NTy.scalarType?] at scalar
       | vector leftElement => cases rightTyped with
         | scalar scalar => simp [NTy.scalarType?] at scalar
         | vector rightElement => rw [NTy.readsUnique element leftElement rightElement]
+  | .array element _, _, _, leftTyped, rightTyped => by
+      cases leftTyped with
+      | scalar scalar => simp [NTy.scalarType?] at scalar
+      | array leftElement => cases rightTyped with
+        | scalar scalar => simp [NTy.scalarType?] at scalar
+        | array rightElement => rw [NTy.readsUnique element leftElement rightElement]
   | .table key value, _, _, leftTyped, rightTyped => by
       cases leftTyped with
       | scalar scalar => simp [NTy.scalarType?] at scalar
@@ -676,7 +758,7 @@ theorem Denote.NTy.readsUnique {unit : ValidatedUnit} :
         | scalar scalar => simp [NTy.scalarType?] at scalar
         | function rightParameters rightResults rightPacked =>
             rw [NRow.parametersUnique parameters leftParameters rightParameters, leftPacked,
-              rightPacked, NRow.readsUnique returned leftResults rightResults]
+              rightPacked, NRow.parametersUnique returned leftResults rightResults]
   | .struct _ nativeArguments _, _, _, leftTyped, rightTyped => by
       cases leftTyped with
       | scalar scalar => simp [NTy.scalarType?] at scalar
@@ -739,12 +821,22 @@ end
 /-- The sharing a function's declared parameters have, as a function type
 marks it. -/
 def parameterSharing (unit : ValidatedUnit) (function : FunctionHandle)
-    (declaration : FunctionDecl Validation.FunctionBody) : List Bool :=
+    (targetNs : ValidatedNamespace) (declaration : FunctionDecl Validation.FunctionBody) :
+    List Bool :=
   declaration.signature.parameters.toList.map fun parameter =>
-    sharedReference (unitTypes unit) function.namespaceId parameter.typeUse.typeId
+    sharedReference (unitTypes unit) function.namespaceId (targetNs.typeId parameter.typeUse.typeId)
+
+/-- The sharing a function's declared results have, as a function type marks
+it. -/
+def resultSharing (unit : ValidatedUnit) (function : FunctionHandle)
+    (targetNs : ValidatedNamespace) (declaration : FunctionDecl Validation.FunctionBody) :
+    List Bool :=
+  declaration.signature.results.toList.map fun result =>
+    sharedReference (unitTypes unit) function.namespaceId (targetNs.typeId result.typeId)
 
 /-- Whether a closure target's signature reads alike natively and
-semantically, over its own environment. -/
+semantically, over its own environment; true of a function that is not a
+closure target (`closureSignature?` is `none`), which no function value holds. -/
 def signatureAgrees (unit : ValidatedUnit) (function : FunctionHandle) : Bool :=
   match unit.namespaces[function.namespaceId.index]? with
   | none => true
@@ -757,56 +849,194 @@ def signatureAgrees (unit : ValidatedUnit) (function : FunctionHandle) : Bool :=
               (StaticTyping.staticEnv declaration.signature.generics) with
           | some (parameterTypes, resultTypes) =>
               NRow.parametersCheck unit (NRow.ofList parameters)
-                  (parameterSharing unit function declaration) parameterTypes &&
-                NRow.typedAsCheck unit (NRow.ofList results) resultTypes
+                  (parameterSharing unit function targetNs declaration) parameterTypes &&
+                NRow.parametersCheck unit (NRow.ofList results)
+                  (resultSharing unit function targetNs declaration) resultTypes
           | none => false
+
+/-! A type identifier means what its namespace's tables say, and a unit's
+namespaces hold one view of its tables: the checks below read each table once,
+so that their cost does not grow with the namespaces times the types. -/
+
+theorem resolveNominal?_sameNames {unit : ValidatedUnit} {a b : ValidatedNamespace}
+    (names : a.tables.names = b.tables.names) :
+    SemanticOperations.resolveNominal? unit a = SemanticOperations.resolveNominal? unit b := by
+  funext name; simp only [SemanticOperations.resolveNominal?, names]
+
+theorem ntyOfFuel_sameTables {unit : ValidatedUnit} {i j : NamespaceId} {a b : ValidatedNamespace}
+    (ha : unit.namespaces[i.index]? = some a) (hb : unit.namespaces[j.index]? = some b)
+    (types : a.tables.types = b.tables.types) (names : a.tables.names = b.tables.names) (fuel : Nat) :
+    ∀ env, ntyOfFuel (unitTypes unit) unit env fuel i = ntyOfFuel (unitTypes unit) unit env fuel j := by
+  have lookup : unitTypes unit i = unitTypes unit j := by
+    funext t; simp only [unitTypes, ha, hb, Option.bind_some, types]
+  have shared : sharedReference (unitTypes unit) i = sharedReference (unitTypes unit) j := by
+    funext t; simp only [sharedReference, lookup]
+  have resolve := resolveNominal?_sameNames (unit := unit) names
+  induction fuel with
+  | zero => intro env; funext t; simp only [ntyOfFuel]
+  | succ fuel ih =>
+    intro env; funext t
+    simp only [ntyOfFuel, ha, hb, Option.bind_eq_bind, Option.bind_some, ih, shared, resolve, lookup]
+
+theorem resolveFuel_sameTables {left right : Tables}
+    (types : left.types = right.types) (names : left.names = right.names) (env : Array SemArg) (fuel : Nat) :
+    SemTy.resolveFuel left env fuel = SemTy.resolveFuel right env fuel := by
+  induction fuel with
+  | zero => funext t; simp only [SemTy.resolveFuel]
+  | succ fuel ih =>
+    funext t
+    simp only [SemTy.resolveFuel, types, names, ih]
+
+theorem resolveAt_sameTables {a b : ValidatedNamespace}
+    (types : a.tables.types = b.tables.types) (names : a.tables.names = b.tables.names) :
+    StaticTyping.resolveAt a #[] = StaticTyping.resolveAt b #[] := by
+  funext t
+  simp only [StaticTyping.resolveAt, types, resolveFuel_sameTables types names]
+
+theorem resourceOf_sameTables {unit : ValidatedUnit} {i j : NamespaceId} {a b : ValidatedNamespace}
+    (ha : unit.namespaces[i.index]? = some a) (hb : unit.namespaces[j.index]? = some b)
+    (types : a.tables.types = b.tables.types) (names : a.tables.names = b.tables.names) (t : TypeId) :
+    resourceOf unit i t = resourceOf unit j t := by
+  have lookup : unitTypes unit i = unitTypes unit j := by
+    funext t; simp only [unitTypes, ha, hb, Option.bind_some, types]
+  have nty : ntyOf unit i = ntyOf unit j := by
+    funext t; simp only [ntyOf, ntyOfFuel_sameTables ha hb types names]
+  simp only [resourceOf, lookup, nty, ha, hb, Option.bind_eq_bind, Option.bind_some, resolveNominal?_sameNames (unit := unit) names]
+
+def sameTypes : List Ty → List Ty → Bool
+  | [], [] => true
+  | left :: lefts, right :: rights => Ty.beq left right && sameTypes lefts rights
+  | _, _ => false
+
+theorem sameTypes_eq : (lefts rights : List Ty) → sameTypes lefts rights = true → lefts = rights
+  | [], [], _ => rfl
+  | [], _ :: _, same => by simp [sameTypes] at same
+  | _ :: _, [], same => by simp [sameTypes] at same
+  | left :: lefts, right :: rights, same => by
+      simp only [sameTypes, Bool.and_eq_true] at same
+      rw [(Ty.beq_iff left right).mp same.1, sameTypes_eq lefts rights same.2]
+
+def sameNames : List QualifiedName → List QualifiedName → Bool
+  | [], [] => true
+  | left :: lefts, right :: rights => decide (left = right) && sameNames lefts rights
+  | _, _ => false
+
+theorem sameNames_eq : (lefts rights : List QualifiedName) →
+    sameNames lefts rights = true → lefts = rights
+  | [], [], _ => rfl
+  | [], _ :: _, same => by simp [sameNames] at same
+  | _ :: _, [], same => by simp [sameNames] at same
+  | left :: lefts, right :: rights, same => by
+      simp only [sameNames, Bool.and_eq_true, decide_eq_true_eq] at same
+      rw [same.1, sameNames_eq lefts rights same.2]
+
+/-- Whether two namespaces hold the same types and names. -/
+def sameTables (left right : ValidatedNamespace) : Bool :=
+  sameTypes left.tables.types.toList right.tables.types.toList &&
+    sameNames left.tables.names.toList right.tables.names.toList
+
+/-- A check of every type identifier of every namespace, of a namespace
+holding the first namespace's tables by the first's. -/
+def everyNamespaceType (unit : ValidatedUnit) (check : Nat → ValidatedNamespace → Nat → Bool) :
+    Bool :=
+  (List.range unit.namespaces.size).all fun index =>
+    match unit.namespaces[index]? with
+    | none => true
+    | some ns =>
+        (index != 0 && (unit.namespaces[0]?).any (sameTables ns)) ||
+          (List.range ns.tables.types.size).all (check index ns)
+
+theorem everyNamespaceType_sound {unit : ValidatedUnit}
+    {check : Nat → ValidatedNamespace → Nat → Bool}
+    (transport : ∀ {index other : Nat} {left right : ValidatedNamespace},
+      unit.namespaces[index]? = some left → unit.namespaces[other]? = some right →
+      left.tables.types = right.tables.types → left.tables.names = right.tables.names →
+      ∀ type, check index left type = check other right type)
+    (checked : everyNamespaceType unit check = true) {index : Nat} {ns : ValidatedNamespace}
+    (namespace_eq : unit.namespaces[index]? = some ns) {type : Nat}
+    (inTable : type < ns.tables.types.size) : check index ns type = true := by
+  simp only [everyNamespaceType, List.all_eq_true, List.mem_range] at checked
+  have direct : ∀ {index : Nat} {ns : ValidatedNamespace}, unit.namespaces[index]? = some ns →
+      index = 0 → ∀ type, type < ns.tables.types.size → check index ns type = true := by
+    intro index ns namespace_eq isFirst type inTable
+    have inNamespaces : index < unit.namespaces.size := by
+      rcases Nat.lt_or_ge index unit.namespaces.size with inside | beyond
+      · exact inside
+      · simp [Array.getElem?_eq_none beyond] at namespace_eq
+    have atNamespace := checked index inNamespaces
+    rw [namespace_eq] at atNamespace
+    simp only [isFirst, bne_self_eq_false, Bool.false_and, Bool.false_or, List.all_eq_true,
+      List.mem_range] at atNamespace
+    subst isFirst
+    exact atNamespace type inTable
+  have inNamespaces : index < unit.namespaces.size := by
+    rcases Nat.lt_or_ge index unit.namespaces.size with inside | beyond
+    · exact inside
+    · simp [Array.getElem?_eq_none beyond] at namespace_eq
+  have atNamespace := checked index inNamespaces
+  rw [namespace_eq] at atNamespace
+  rcases (Bool.or_eq_true _ _).mp atNamespace with shared | own
+  · obtain ⟨_, shared⟩ := (Bool.and_eq_true _ _).mp shared
+    cases first_eq : unit.namespaces[0]? with
+    | none => simp [first_eq] at shared
+    | some first =>
+        simp only [first_eq, Option.any_some, sameTables, Bool.and_eq_true] at shared
+        have types := Array.toList_inj.mp (sameTypes_eq _ _ shared.1)
+        have names := Array.toList_inj.mp (sameNames_eq _ _ shared.2)
+        rw [transport namespace_eq first_eq types names type]
+        exact direct first_eq rfl type (types ▸ inTable)
+  · simp only [List.all_eq_true, List.mem_range] at own
+    exact own type inTable
+
+/-- Whether a type identifier stating no reference reads natively as its
+semantic type. -/
+def typeAgrees (unit : ValidatedUnit) (index : Nat) (ns : ValidatedNamespace) (type : Nat) : Bool :=
+  match ntyOf unit ⟨index⟩ ⟨type⟩, StaticTyping.resolveAt ns #[] ⟨type⟩ with
+  | some τ, some type => !type.referenceFree || τ.typedAsCheck unit type
+  | _, _ => true
 
 /-- Whether a unit's native and semantic readings agree: every closed type
 identifier stating no reference reads natively as its semantic type, and
 every closure target's signature reads alike. Decided by evaluation over the
 unit. -/
 def typesAgreeCheck (unit : ValidatedUnit) : Bool :=
-  (List.range unit.namespaces.size).all fun index =>
+  everyNamespaceType unit (typeAgrees unit) &&
+    (List.range unit.namespaces.size).all fun index =>
       match unit.namespaces[index]? with
       | none => true
-      | some ns =>
-          (List.range ns.tables.types.size).all (fun typeIndex =>
-            match ntyOf unit ⟨index⟩ ⟨typeIndex⟩,
-                StaticTyping.resolveIn ns #[] ⟨typeIndex⟩ with
-            | some τ, some type => !type.referenceFree || τ.typedAsCheck unit type
-            | _, _ => true) &&
-          (List.range ns.functions.size).all fun functionIndex =>
-            signatureAgrees unit ⟨⟨index⟩, ⟨functionIndex⟩⟩
+      | some ns => (List.range ns.functions.size).all fun functionIndex =>
+          signatureAgrees unit ⟨⟨index⟩, ⟨functionIndex⟩⟩
 
 /-- A unit's native and semantic readings agree (`typesAgreeCheck`). -/
 structure TypesAgree (unit : ValidatedUnit) : Prop where
   types : ∀ namespaceId typeId ns τ type, unit.namespaces[namespaceId.index]? = some ns →
-    ntyOf unit namespaceId typeId = some τ → StaticTyping.resolveIn ns #[] typeId = some type →
+    ntyOf unit namespaceId typeId = some τ → StaticTyping.resolveAt ns #[] typeId = some type →
     type.referenceFree = true → τ.TypedAs unit type
   signatures : ∀ function, signatureAgrees unit function = true
 
 theorem TypesAgree.ofCheck {unit : ValidatedUnit} (check : typesAgreeCheck unit = true) :
     TypesAgree unit := by
-  simp only [typesAgreeCheck, List.all_eq_true, List.mem_range] at check
-  have namespaces := check
+  obtain ⟨types, functions⟩ := (Bool.and_eq_true _ _).mp check
+  simp only [List.all_eq_true, List.mem_range] at functions
   refine ⟨fun namespaceId typeId ns τ type namespace_eq native resolved free => ?_,
     fun function => ?_⟩
-  · have inNamespaces : namespaceId.index < unit.namespaces.size := by
-      rcases Nat.lt_or_ge namespaceId.index unit.namespaces.size with inside | beyond
-      · exact inside
-      · simp [Array.getElem?_eq_none beyond] at namespace_eq
-    have atNamespace := namespaces namespaceId.index inNamespaces
-    rw [namespace_eq] at atNamespace
-    simp only [Bool.and_eq_true, List.all_eq_true, List.mem_range] at atNamespace
-    have inTable : typeId.index < ns.tables.types.size := by
+  · have inTable : typeId.index < ns.tables.types.size := by
       rcases Nat.lt_or_ge typeId.index ns.tables.types.size with inside | beyond
       · exact inside
-      · simp [StaticTyping.resolveIn, SemTy.resolveFuel, Array.getElem?_eq_none beyond] at resolved
-    have atType := atNamespace.1 typeId.index inTable
+      · simp [StaticTyping.resolveAt, SemTy.resolveFuel, Array.getElem?_eq_none beyond] at resolved
+    have transport : ∀ {index other : Nat} {left right : ValidatedNamespace},
+        unit.namespaces[index]? = some left → unit.namespaces[other]? = some right →
+        left.tables.types = right.tables.types → left.tables.names = right.tables.names →
+        ∀ type, typeAgrees unit index left type = typeAgrees unit other right type := by
+      intro index other left right left_eq right_eq types names type
+      simp only [typeAgrees, ntyOf]
+      rw [ntyOfFuel_sameTables (i := ⟨index⟩) (j := ⟨other⟩) left_eq right_eq types names,
+        resolveAt_sameTables types names]
+    have atType := everyNamespaceType_sound transport types namespace_eq inTable
     have identifier : (⟨namespaceId.index⟩ : NamespaceId) = namespaceId := rfl
     have typeIdentifier : (⟨typeId.index⟩ : TypeId) = typeId := rfl
-    rw [identifier, typeIdentifier, native, resolved] at atType
-    simp only [free, Bool.not_true, Bool.false_or] at atType
+    simp only [typeAgrees, identifier, typeIdentifier, native, resolved, free, Bool.not_true,
+      Bool.false_or] at atType
     exact NTy.typedAs_of_check atType
   · cases namespace_eq : unit.namespaces[function.namespaceId.index]? with
     | none => simp [signatureAgrees, namespace_eq]
@@ -815,9 +1045,9 @@ theorem TypesAgree.ofCheck {unit : ValidatedUnit} (check : typesAgreeCheck unit 
           rcases Nat.lt_or_ge function.namespaceId.index unit.namespaces.size with inside | beyond
           · exact inside
           · simp [Array.getElem?_eq_none beyond] at namespace_eq
-        have atNamespace := namespaces function.namespaceId.index inNamespaces
+        have atNamespace := functions function.namespaceId.index inNamespaces
         rw [namespace_eq] at atNamespace
-        simp only [Bool.and_eq_true, List.all_eq_true, List.mem_range] at atNamespace
+        simp only [List.all_eq_true, List.mem_range] at atNamespace
         cases function_eq : ns.functions[function.functionId.index]? with
         | none => simp [signatureAgrees, namespace_eq, function_eq]
         | some declaration =>
@@ -825,20 +1055,25 @@ theorem TypesAgree.ofCheck {unit : ValidatedUnit} (check : typesAgreeCheck unit 
               rcases Nat.lt_or_ge function.functionId.index ns.functions.size with inside | beyond
               · exact inside
               · simp [Array.getElem?_eq_none beyond] at function_eq
-            exact atNamespace.2 function.functionId.index inFunctions
+            exact atNamespace function.functionId.index inFunctions
 
 mutual
 /-- Whether a type mentions no function type. -/
 def Denote.NTy.closureFree : NTy → Bool
   | .function _ _ _ => false
+  -- Its rows, which its type does not show, may hold one.
+  | .nominal _ _ _ => false
   | .tuple elements => Denote.NRow.closureFree elements
   | .struct _ _ fields => Denote.NRow.closureFree fields
   | .enum _ _ _ rows _ => Denote.NRows.closureFree rows
+  | .slice element | .sliceRef element => Denote.NTy.closureFree element
   | .vector element => Denote.NTy.closureFree element
+  | .array element _ => Denote.NTy.closureFree element
   | .table key value => Denote.NTy.closureFree key && Denote.NTy.closureFree value
   | .ref referent => Denote.NTy.closureFree referent
   | .ghost slot => Denote.NTy.closureFree slot
-  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .param _ => true
+  | .observed referent => Denote.NTy.closureFree referent
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char | .param _ => true
 
 def Denote.NRow.closureFree : NRow → Bool
   | .nil => true
@@ -868,19 +1103,16 @@ def resourceTypedCheck (unit : ValidatedUnit) (agree : Bool) (namespaceId : Name
   | none => true
   | some resource =>
       resource.type.paramFree && resource.type.refFree && (resource.type.closureFree || agree) &&
-        match StaticTyping.resolveIn ns #[] typeId with
+        match StaticTyping.resolveAt ns #[] typeId with
         | some type => resource.type.typedAsCheck unit type
         | none => false
 
 /-- Whether every resource type of a unit corresponds to its type, decided
-by evaluation over its type tables; the readings' agreement is evaluated
-only for a resource type stating a function type. -/
-def resourcesTypedCheck (unit : ValidatedUnit) : Bool :=
-  (List.range unit.namespaces.size).all fun index =>
-    match unit.namespaces[index]? with
-    | none => true
-    | some ns => (List.range ns.tables.types.size).all fun typeIndex =>
-        resourceTypedCheck unit (typesAgreeCheck unit) ⟨index⟩ ns ⟨typeIndex⟩
+by evaluation over its type tables, given the verdict on the readings' agreement,
+which a resource type stating a function type needs. -/
+def resourcesTypedCheck (unit : ValidatedUnit) (agree : Bool) : Bool :=
+  everyNamespaceType unit fun index ns typeIndex =>
+    resourceTypedCheck unit agree ⟨index⟩ ns ⟨typeIndex⟩
 
 /-- A type identifier outside its namespace's table denotes no resource. -/
 theorem runtimeResourceOf_beyond {unit : ValidatedUnit} {namespaceId : NamespaceId} {ns : ValidatedNamespace}
@@ -888,7 +1120,10 @@ theorem runtimeResourceOf_beyond {unit : ValidatedUnit} {namespaceId : Namespace
     (beyond : ns.tables.types.size ≤ typeId.index) : runtimeResourceOf unit namespaceId typeId = none := by
   simp [runtimeResourceOf, resourceOf, unitTypes, namespace_eq, Array.getElem?_eq_none beyond]
 
-theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} (check : resourcesTypedCheck unit = true) :
+/-- Resource typing from the check, its verdict on the readings' agreement proved apart
+(`TypesAgree.ofCheck`), so that the agreement is evaluated once. -/
+theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} {agree : Bool}
+    (agreed : agree = true → TypesAgree unit) (check : resourcesTypedCheck unit agree = true) :
     ResourcesTyped unit := by
   intro ⟨namespaceIndex⟩ ⟨typeIndex⟩ resource named
   have namespaceAt : ∃ ns, unit.namespaces[namespaceIndex]? = some ns := by
@@ -896,19 +1131,22 @@ theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} (check : resourcesTypedChe
     | some ns => exact ⟨ns, rfl⟩
     | none => simp [runtimeResourceOf, resourceOf, unitTypes, namespace_eq] at named
   obtain ⟨ns, namespace_eq⟩ := namespaceAt
-  have inNamespaces : namespaceIndex < unit.namespaces.size := by
-    rcases Nat.lt_or_ge namespaceIndex unit.namespaces.size with inside | beyond
-    · exact inside
-    · simp [Array.getElem?_eq_none beyond] at namespace_eq
   have inTable : typeIndex < ns.tables.types.size := by
     rcases Nat.lt_or_ge typeIndex ns.tables.types.size with inside | beyond
     · exact inside
     · rw [runtimeResourceOf_beyond (namespaceId := ⟨namespaceIndex⟩) namespace_eq
         (typeId := ⟨typeIndex⟩) beyond] at named
       cases named
-  have checked := List.all_eq_true.mp check namespaceIndex (List.mem_range.mpr inNamespaces)
-  simp only [namespace_eq] at checked
-  have typed := List.all_eq_true.mp checked typeIndex (List.mem_range.mpr inTable)
+  have transport : ∀ {index other : Nat} {left right : ValidatedNamespace},
+      unit.namespaces[index]? = some left → unit.namespaces[other]? = some right →
+      left.tables.types = right.tables.types → left.tables.names = right.tables.names →
+      ∀ type, resourceTypedCheck unit agree ⟨index⟩ left ⟨type⟩ =
+        resourceTypedCheck unit agree ⟨other⟩ right ⟨type⟩ := by
+    intro index other left right left_eq right_eq types names type
+    simp only [resourceTypedCheck, runtimeResourceOf]
+    rw [resourceOf_sameTables (i := ⟨index⟩) (j := ⟨other⟩) left_eq right_eq types names,
+      resolveAt_sameTables types names]
+  have typed := everyNamespaceType_sound transport check namespace_eq inTable
   unfold resourceTypedCheck at typed
   rw [named] at typed
   simp only [Bool.and_eq_true] at typed
@@ -916,7 +1154,7 @@ theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} (check : resourcesTypedChe
   have closures : resource.type.closureFree = true ∨ TypesAgree unit := by
     rcases (Bool.or_eq_true _ _).mp closures with closureFree | agree
     · exact .inl closureFree
-    · exact .inr (TypesAgree.ofCheck agree)
+    · exact .inr (agreed agree)
   split at typed
   · next type resolved =>
       exact ⟨ns, type, namespace_eq, ⟨_, resolved⟩, NTy.typedAs_of_check typed, closed, plain,
@@ -924,9 +1162,9 @@ theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} (check : resourcesTypedChe
   · cases typed
 
 /-- Declared types that resolve by evaluation. -/
-theorem ResolvesAll.ofResolveIn {ns : ValidatedNamespace} {typeIds : List TypeId}
+theorem ResolvesAll.ofResolveAt {ns : ValidatedNamespace} {typeIds : List TypeId}
     {types : List SemTy}
-    (resolved : typeIds.mapM (StaticTyping.resolveIn ns #[]) = some types) :
+    (resolved : typeIds.mapM (StaticTyping.resolveAt ns #[]) = some types) :
     ResolvesAll ns.tables #[] typeIds types :=
   ResolvesAll.of_mapM resolved
 
@@ -939,7 +1177,7 @@ theorem holdsAt_val (pointerWidth : Option Nat) {width : Nat} {signed : Bool}
   simp [StaticTyping.holdsAt, StaticTyping.targetWidth, fits]
 
 section
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- Every runtime value a closed native type holding no reference admits
 (`NTy.admits`) has a typed runtime representation: a runtime value
@@ -948,7 +1186,7 @@ type the native type reads as, a function type only in a unit whose readings
 agree. A value of an intrinsic map owner is abstract, and its representation
 is a value of the owner's Move type holding its entries, slots, and handle;
 this is assumed of a unit as its natives' contracts are
-(`designs/intrinsic-maps.md`, "Abstract representation"). -/
+(`doc/designs/intrinsic-maps.md`, "Abstract representation"). -/
 def OwnersRepresentable (unit : ValidatedUnit) : Prop :=
   ∀ (τ : NTy) (type : SemTy) (value : RuntimeValue), τ.TypedAs unit type → τ.paramFree = true →
     τ.refFree = true → (τ.closureFree = true ∨ TypesAgree unit) → NTy.admits unit τ value = true →

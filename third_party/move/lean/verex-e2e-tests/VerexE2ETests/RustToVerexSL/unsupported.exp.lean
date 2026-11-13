@@ -1,4 +1,13 @@
--- error: VerexE2ETests/RustToVerexSL/unsupported.rs:1:1: Rust exporter failed:
--- verex-rust-export: M0 probe bodies=1 generic_bodies=0 blocks=2 statements=0 generic_parameters=0 traits=0 trait_methods=0 trait_predicates=0 trait_impls=0 direct_calls=0 switches=0 drops=0 cleanup_edges=0 borrows=0 raw_pointer_types=0 raw_pointer_operations=0 inline_asm=1 sources={"unsupported.rs"} callees={}
--- verex-rust-export: stopping before codegen
--- verex-rust-export: cannot emit RawUnit: unsupported MIR terminator: InlineAsm { template: "[]", operands: [], options: "", line_spans: "[unsupported.rs:10:27: 10:27 (#0)]", destination: Some(1), unwind: Unreachable }
+-- Copyright © Aptos Foundation
+-- SPDX-License-Identifier: Apache-2.0
+
+import VerexSL
+
+verex namespace unsupported where
+  @[refused = "unsupported MIR terminator: InlineAsm"]
+  native fun inline_assembly() -> Unit
+
+  -- This fixture is intentionally outside the accepted subset. M0 must
+  -- observe the MIR tag so the mapper can reject it without erasing it.
+
+-- no denotation for `inline_assembly`: a function without a body is not carried by the denotation

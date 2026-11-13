@@ -9,13 +9,11 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    native_store::{kv_db::NativeKvDb, merkle_db::NativeMerkleDb, NativeStoreSpec, PositionStore},
+    native_store::{kv_db::NativeKvDb, merkle_db::NativeMerkleDb, NativeStoreSpec},
     pruner::{StateKvPrunerManager, StateMerklePrunerManager},
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use std::sync::Arc;
-
-pub(crate) type PositionPruner = NativeStorePruner<PositionStore>;
 
 pub(crate) struct NativeStorePruner<T: NativeStoreSpec> {
     pub(crate) value_pruner: StateKvPrunerManager<T::ValuePruner, NativeKvDb<T>>,
@@ -51,7 +49,7 @@ impl<T: NativeStoreSpec> NativeStorePruner<T> {
 mod tests {
     use super::*;
     use crate::{
-        native_store::{kv_db::PositionDb, merkle_db::PositionMerkleDb},
+        native_store::{kv_db::PositionDb, merkle_db::PositionMerkleDb, PositionStore},
         pruner::PrunerManager,
         schema::stale_node_index::StaleNodeIndexSchema,
     };
@@ -114,7 +112,7 @@ mod tests {
             "overwrite leaves stale nodes"
         );
 
-        let pruner = PositionPruner::new(
+        let pruner = NativeStorePruner::<PositionStore>::new(
             kv_db,
             Arc::clone(&merkle_db),
             LedgerPrunerConfig {

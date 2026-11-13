@@ -36,7 +36,7 @@ error: cannot select field `inner` since it has different types in variants of e
 21 │         first.inner is One<G>|One<u8>;
    │         ^^^^^
    │
-   = field `inner` has type `S1<u8>` in variant `Four` and type `S1<G>` in variant `Three`
+   = in `enum S3<T>`, field `inner` has type `S1<u8>` in variant `Four` and type `S1<T>` in variant `Three`
 
 error: undeclared struct `m::One`
    ┌─ tests/checking/variants/variants_test_infer_err.move:21:24
