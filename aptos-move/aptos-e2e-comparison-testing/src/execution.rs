@@ -317,7 +317,7 @@ impl Execution {
             }
         }
         // read the state data
-        let state = data_manager.get_state(cur_version);
+        let state = InMemoryStateStore::new_with_state_values(data_manager.get_state(cur_version));
         self.execute_and_compare(
             cur_version,
             state,

@@ -1,23 +1,17 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub use aptos_comparison_testing_dump_format::APTOS_COMMONS;
+use aptos_comparison_testing_dump_format::{
+    DataManager, IndexReader, IndexWriter, PackageInfo, TxnIndex,
+};
 use aptos_framework::{
     natives::code::PackageMetadata, unzip_metadata_str, BuiltPackage, APTOS_PACKAGES,
 };
-use aptos_transaction_simulation::InMemoryStateStore;
-use aptos_types::{
-    account_address::AccountAddress,
-    state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::Transaction,
-    write_set::WriteSet,
-};
-use rocksdb::{DBWithThreadMode, SingleThreaded, DB};
-use serde::{Deserialize, Serialize};
+use aptos_types::account_address::AccountAddress;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    fmt,
-    fs::{File, OpenOptions},
-    io::{BufRead, BufReader, BufWriter, Read, Write},
+    fs::File,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -52,232 +46,7 @@ const APTOS_PACKAGES_DIR_NAMES: [&str; 7] = [
     "aptos-experimental",
 ];
 
-const STATE_DATA: &str = "state_data";
-const WRITE_SET_DATA: &str = "write_set_data";
-const INDEX_FILE: &str = "version_index.txt";
-const ERR_LOG: &str = "err_log.txt";
-const ROCKS_INDEX_DB: &str = "rocks_txn_idx_db";
-pub const APTOS_COMMONS: &str = "aptos-commons";
-const MAX_TO_FLUSH: usize = 50000;
 pub const DISABLE_SPEC_CHECK: &str = "spec-check=off";
-
-struct IndexWriter {
-    index_writer: BufWriter<File>,
-    err_logger: BufWriter<File>,
-    version_vec: Vec<u64>,
-    counter: usize,
-}
-
-impl IndexWriter {
-    pub fn new(root: &Path) -> Self {
-        let create_file = |file_name: &str| -> File {
-            let path = root.to_path_buf().join(file_name);
-            if !path.exists() {
-                File::create(path).expect("Error encountered while creating file!")
-            } else {
-                OpenOptions::new().append(true).open(path).unwrap()
-            }
-        };
-        let index_file = create_file(INDEX_FILE);
-        let err_log = create_file(ERR_LOG);
-        Self {
-            index_writer: BufWriter::with_capacity(4096 * 1024 /* 4096KB */, index_file),
-            err_logger: BufWriter::with_capacity(4096 * 1024 /* 4096KB */, err_log),
-            version_vec: vec![],
-            counter: 0,
-        }
-    }
-
-    pub fn reset_vec(&mut self) {
-        self.version_vec = vec![];
-    }
-
-    pub fn add_version(&mut self, version: u64) {
-        self.version_vec.push(version);
-    }
-
-    pub fn dump_version(&mut self) {
-        self.version_vec.sort();
-        self.version_vec.iter().for_each(|&version| {
-            self.index_writer
-                .write_fmt(format_args!("{}\n", version))
-                .unwrap()
-        });
-        self.counter += self.version_vec.len();
-        self.reset_vec();
-        if self.counter > MAX_TO_FLUSH {
-            self.flush_writer();
-        }
-    }
-
-    pub fn write_err(&mut self, err_msg: &str) {
-        self.err_logger
-            .write_fmt(format_args!("{}\n", err_msg))
-            .unwrap();
-        self.err_logger.flush().unwrap();
-    }
-
-    pub fn flush_writer(&mut self) {
-        self.index_writer.flush().unwrap();
-        self.counter = 0;
-    }
-}
-
-struct IndexReader {
-    index_reader: BufReader<File>,
-    _version_cache: Vec<u64>,
-}
-
-impl IndexReader {
-    pub fn check_availability(root: &Path) -> bool {
-        root.to_path_buf().join(INDEX_FILE).exists()
-    }
-
-    pub fn new(root: &Path) -> Self {
-        let index_path = root.to_path_buf().join(INDEX_FILE);
-        let index_file = File::open(index_path).unwrap();
-        let index_reader = BufReader::new(index_file);
-        Self {
-            index_reader,
-            _version_cache: vec![],
-        }
-    }
-
-    pub fn _load_all_versions(&mut self) {
-        loop {
-            let next_val = self.get_next_version();
-            if next_val.is_err() {
-                continue;
-            }
-            if let Some(val) = next_val.unwrap() {
-                self._version_cache.push(val);
-            } else {
-                break;
-            }
-        }
-    }
-
-    pub fn get_next_version(&mut self) -> Result<Option<u64>, ()> {
-        let mut cur_idx = String::new();
-        let num_bytes = self.index_reader.read_line(&mut cur_idx).unwrap();
-        if num_bytes == 0 {
-            return Ok(None);
-        }
-        let indx = cur_idx.trim().parse();
-        if indx.is_ok() {
-            Ok(indx.ok())
-        } else {
-            Err(())
-        }
-    }
-
-    pub fn get_next_version_ge(&mut self, version: u64) -> Option<u64> {
-        loop {
-            let next_val = self.get_next_version();
-            if next_val.is_err() {
-                continue;
-            }
-            if let Some(val) = next_val.unwrap() {
-                if val >= version {
-                    return Some(val);
-                }
-            } else {
-                break;
-            }
-        }
-        None
-    }
-}
-
-struct DataManager {
-    state_data_dir_path: PathBuf,
-    write_set_dir_path: PathBuf,
-    db: DBWithThreadMode<SingleThreaded>,
-}
-
-impl DataManager {
-    pub fn new_with_dir_creation(root: &Path) -> Self {
-        let dm = Self::new(root);
-        if !dm.state_data_dir_path.exists() {
-            std::fs::create_dir_all(dm.state_data_dir_path.as_path()).unwrap();
-        }
-        if !dm.write_set_dir_path.exists() {
-            std::fs::create_dir_all(dm.write_set_dir_path.as_path()).unwrap();
-        }
-        dm
-    }
-
-    pub fn new(root: &Path) -> Self {
-        let db = DB::open_default(root.to_path_buf().join(ROCKS_INDEX_DB)).unwrap();
-        let state_data_dir_path = root.join(STATE_DATA);
-        let write_set_dir_path = root.join(WRITE_SET_DATA);
-        Self {
-            state_data_dir_path,
-            write_set_dir_path,
-            db,
-        }
-    }
-
-    pub fn check_dir_availability(&self) -> bool {
-        if !(self.state_data_dir_path.exists() && self.write_set_dir_path.exists()) {
-            return false;
-        }
-        true
-    }
-
-    pub fn dump_state_data(&self, version: u64, state: &HashMap<StateKey, StateValue>) {
-        let state_path = self.state_data_dir_path.join(format!("{}_state", version));
-        if !state_path.exists() {
-            let mut data_state_file = File::create(state_path).unwrap();
-            let state_store = InMemoryStateStore::new_with_state_values(state.to_owned());
-            data_state_file
-                .write_all(&bcs::to_bytes(&state_store.to_btree_map()).unwrap())
-                .unwrap();
-        }
-    }
-
-    pub fn dump_write_set(&self, version: u64, write_set: &WriteSet) {
-        let write_set_path = self
-            .write_set_dir_path
-            .join(format!("{}_write_set", version));
-        if !write_set_path.exists() {
-            let mut write_set_file = File::create(write_set_path).unwrap();
-            write_set_file
-                .write_all(&bcs::to_bytes(&write_set).unwrap())
-                .unwrap();
-        }
-    }
-
-    pub fn dump_txn_index(&self, version: u64, version_idx: &TxnIndex) {
-        self.db
-            .put(
-                bcs::to_bytes(&version).unwrap(),
-                bcs::to_bytes(&version_idx).unwrap(),
-            )
-            .unwrap();
-    }
-
-    pub fn get_txn_index(&self, version: u64) -> Option<TxnIndex> {
-        let db_val = self.db.get(bcs::to_bytes(&version).unwrap());
-        if let Ok(Some(val)) = db_val {
-            let txn_idx = bcs::from_bytes::<TxnIndex>(&val).unwrap();
-            Some(txn_idx)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_state(&self, version: u64) -> InMemoryStateStore {
-        let state_path = self.state_data_dir_path.join(format!("{}_state", version));
-        let mut data_state_file = File::open(state_path).unwrap();
-        let mut buffer = Vec::<u8>::new();
-        data_state_file.read_to_end(&mut buffer).unwrap();
-        InMemoryStateStore::new_with_state_values(
-            bcs::from_bytes::<BTreeMap<StateKey, StateValue>>(&buffer).unwrap(),
-        )
-    }
-}
-
 fn is_aptos_package(package_name: &str) -> bool {
     APTOS_PACKAGES.contains(&package_name)
 }
@@ -378,45 +147,6 @@ struct CompilationCache {
     compared_compiled_package_cache: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
     /// Packages already dumped to disk; consulted when compilation is skipped.
     dumped_packages: HashSet<PackageInfo>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub(crate) struct PackageInfo {
-    address: AccountAddress,
-    package_name: String,
-    upgrade_number: Option<u64>,
-}
-
-impl fmt::Display for PackageInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut name = format!("{}.{}", self.package_name, self.address);
-        if let Some(upgrade_number) = self.upgrade_number {
-            name = format!("{}.{}", name, upgrade_number);
-        }
-        write!(f, "{}", name)?;
-        Ok(())
-    }
-}
-
-impl PackageInfo {
-    pub fn is_compilable(&self) -> bool {
-        self.address != AccountAddress::ZERO
-    }
-
-    pub fn non_compilable_info() -> Self {
-        Self {
-            address: AccountAddress::ZERO,
-            package_name: "".to_string(),
-            upgrade_number: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct TxnIndex {
-    version: u64,
-    package_info: PackageInfo,
-    txn: Transaction,
 }
 
 fn generate_compiled_blob(
