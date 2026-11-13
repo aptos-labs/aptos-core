@@ -11,11 +11,11 @@ use move_core_types::{
     identifier::Identifier,
     int256::{I256, U256},
     metadata::Metadata,
-    state::VMState,
+    state::{self, VMState},
     vm_status::StatusCode,
 };
 use serde::Serialize;
-use std::{collections::HashSet, convert::TryInto, io::Read};
+use std::{collections::HashSet, convert::TryInto, io::Read, panic::UnwindSafe};
 
 impl CompiledScript {
     /// Deserializes a &[u8] slice into a `CompiledScript` instance.
@@ -29,9 +29,11 @@ impl CompiledScript {
         binary: &[u8],
         config: &DeserializerConfig,
     ) -> BinaryLoaderResult<Self> {
-        let script = deserialize_compiled_script(binary, config)?;
-        BoundsChecker::verify_script(&script)?;
-        Ok(script)
+        catch_deserializer_panic(|| {
+            let script = deserialize_compiled_script(binary, config)?;
+            BoundsChecker::verify_script(&script)?;
+            Ok(script)
+        })
     }
 
     // exposed as a public function to enable testing the deserializer
@@ -54,21 +56,11 @@ impl CompiledModule {
         binary: &[u8],
         config: &DeserializerConfig,
     ) -> BinaryLoaderResult<Self> {
-        let prev_state = move_core_types::state::set_state(VMState::DESERIALIZER);
-        let result = std::panic::catch_unwind(|| {
+        catch_deserializer_panic(|| {
             let module = deserialize_compiled_module(binary, config)?;
             BoundsChecker::verify_module(&module)?;
-
             Ok(module)
         })
-        .unwrap_or_else(|_| {
-            Err(PartialVMError::new(
-                StatusCode::VERIFIER_INVARIANT_VIOLATION,
-            ))
-        });
-        move_core_types::state::set_state(prev_state);
-
-        result
     }
 
     // exposed as a public function to enable testing the deserializer
@@ -77,6 +69,18 @@ impl CompiledModule {
         let config = DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
         deserialize_compiled_module(binary, &config)
     }
+}
+
+/// Runs `body`, turning a panic into an invariant-violation error instead of exiting the node.
+fn catch_deserializer_panic<T>(
+    body: impl FnOnce() -> BinaryLoaderResult<T> + UnwindSafe,
+) -> BinaryLoaderResult<T> {
+    state::catch_unwind_in(VMState::DESERIALIZER, body).unwrap_or_else(|_| {
+        Err(
+            PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                .with_message("[VM] deserializer panicked".to_string()),
+        )
+    })
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]

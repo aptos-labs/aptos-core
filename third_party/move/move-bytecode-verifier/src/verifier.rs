@@ -24,7 +24,10 @@ use move_binary_format::{
     errors::{Location, PartialVMError, VMResult},
     file_format::{CompiledModule, CompiledScript},
 };
-use move_core_types::{state::VMState, vm_status::StatusCode};
+use move_core_types::{
+    state::{self, VMState},
+    vm_status::StatusCode,
+};
 use serde::Serialize;
 use std::time::Instant;
 
@@ -148,8 +151,7 @@ pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModul
     if config.verify_nothing() {
         return Ok(());
     }
-    let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
-    let result = std::panic::catch_unwind(|| {
+    state::catch_unwind_in(VMState::VERIFIER, || {
         // Always needs to run bound checker first as subsequent passes depend on it
         BoundsChecker::verify_module(module).map_err(|e| {
             // We can't point the error at the module, because if bounds-checking
@@ -180,9 +182,7 @@ pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModul
             PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
                 .finish(Location::Undefined),
         )
-    });
-    move_core_types::state::set_state(prev_state);
-    result
+    })
 }
 
 /// Helper for a "canonical" verification of a script.
@@ -203,8 +203,7 @@ pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScrip
     if config.verify_nothing() {
         return Ok(());
     }
-    let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
-    let result = std::panic::catch_unwind(|| {
+    state::catch_unwind_in(VMState::VERIFIER, || {
         // Always needs to run bound checker first as subsequent passes depend on it
         BoundsChecker::verify_script(script).map_err(|e| {
             // We can't point the error at the script, because if bounds-checking
@@ -228,10 +227,7 @@ pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScrip
                 .with_message("[VM] bytecode verifier panicked for script".to_string())
                 .finish(Location::Undefined),
         )
-    });
-    move_core_types::state::set_state(prev_state);
-
-    result
+    })
 }
 
 impl Default for VerifierConfig {
