@@ -11,6 +11,7 @@ pub mod aptos_debug_natives;
 mod bytecode;
 mod commands;
 pub mod coverage;
+mod delegated_publish;
 pub mod exchange;
 
 mod fmt;

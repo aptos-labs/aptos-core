@@ -48,7 +48,7 @@ impl Display for ReplayProtectionType {
 // ProfileOptions
 // ────────────────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Default, Parser)]
+#[derive(Clone, Debug, Default, Parser)]
 pub struct ProfileOptions {
     /// Profile to use from the CLI config
     ///
@@ -374,7 +374,7 @@ impl HardwareWalletOptions {
 // PrivateKeyInputOptions
 // ────────────────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Default, Parser)]
+#[derive(Clone, Debug, Default, Parser)]
 pub struct PrivateKeyInputOptions {
     /// Signing Ed25519 private key file path
     ///
@@ -694,7 +694,7 @@ impl SaveFile {
 // ────────────────────────────────────────────────────────────────────────────
 
 /// Options specific to using the Rest endpoint
-#[derive(Debug, Parser)]
+#[derive(Clone, Debug, Parser)]
 pub struct RestOptions {
     /// URL to the REST API for the network
     ///
@@ -986,7 +986,7 @@ pub enum AccountType {
 // ────────────────────────────────────────────────────────────────────────────
 
 /// Common options for interacting with an account for a validator
-#[derive(Debug, Default, Parser)]
+#[derive(Clone, Debug, Default, Parser)]
 pub struct TransactionOptions {
     /// Sender account address
     ///
