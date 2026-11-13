@@ -45,7 +45,8 @@ module 0x42::sourcifier_roundtrip {
     }
 
 
-    fun opaque_address(counter: &mut u64): address {
+    fun opaque_address(counter: &mut u64): address acquires R {
+        let _ = borrow_global<R>(@0x42).value;
         *counter = 0;
         @0x42
     }
@@ -53,7 +54,7 @@ module 0x42::sourcifier_roundtrip {
     spec opaque_address(counter: &mut u64): address {
         pragma opaque = true;
         pragma inference = none;
-        aborts_if false;
+        aborts_if !exists<R>(@0x42);
         ensures counter == 0;
         ensures result == @0x42;
     }
@@ -89,6 +90,7 @@ module 0x42::sourcifier_roundtrip {
             let a = ..S1 |~ result_of<opaque_address>(old(counter));
             ..S1 |~ ensures_of<opaque_address>(old(counter), a, counter)
         });
+        aborts_if [inferred] aborts_of<opaque_address>(counter);
         aborts_if [inferred] ({
             let a = ..S1 |~ result_of<opaque_address>(counter);
             S1 |~ aborts_of<pair_at>(a)
@@ -98,7 +100,8 @@ module 0x42::sourcifier_roundtrip {
 
     struct Handle has copy, drop { value: u64 }
 
-    fun make(counter: &mut u64): Handle {
+    fun make(counter: &mut u64): Handle acquires R {
+        let _ = borrow_global<R>(@0x42).value;
         *counter = *counter + 1;
         Handle { value: *counter }
     }
@@ -106,6 +109,7 @@ module 0x42::sourcifier_roundtrip {
     spec make {
         pragma opaque = true;
         pragma inference = none;
+        aborts_if !exists<R>(@0x42);
         aborts_if counter == MAX_U64;
         ensures counter == old(counter) + 1;
         ensures result.value == counter;
@@ -123,7 +127,7 @@ module 0x42::sourcifier_roundtrip {
         h9: Handle,
     }
 
-    fun nine_hoisted_calls(counter: &mut u64): Nine {
+    fun nine_hoisted_calls(counter: &mut u64): Nine acquires R {
         let h1 = make(counter);
         let h2 = make(counter);
         let h3 = make(counter);

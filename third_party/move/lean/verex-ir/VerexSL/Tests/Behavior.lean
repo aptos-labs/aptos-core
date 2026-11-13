@@ -45,7 +45,10 @@ run_cmd do
   unless takesUnit contract.type do
     throwError "a contract stating behavioral predicates does not take the unit"
   let constants := contract.value!.getUsedConstants
-  for predicate in [``VerexIR.Proofs.AbortsOf, ``VerexIR.Proofs.EnsuresOf,
+  -- `aborts_of` and `ensures_of` of a clause are stated over the arguments'
+  -- entry values (`AbortsOfEntries`, `EnsuresOfEntries`), which name no
+  -- prophecy but the finals the clause reads.
+  for predicate in [``VerexIR.Proofs.AbortsOfEntries, ``VerexIR.Proofs.EnsuresOfEntries,
       ``VerexIR.Proofs.ResultOf] do
     unless constants.contains predicate do
       throwError s!"the contract does not state {predicate}"
@@ -73,21 +76,21 @@ verex module 0x42::dispatch where
 
 run_cmd do
   let env ← getEnv
-  unless env.contains `«0x42».dispatch.requiresTable.eq_0 do
-    throwError "the closure's target has no entry in the table of declared preconditions"
+  unless env.contains `«0x42».dispatch.FunctionValue.requires0 do
+    throwError "the closure site has no equation of its declared precondition"
   unless env.contains (`VerexSL.Tests.Behavior ++ `«0x42».dispatch.use_apply.verified) do
     throwError "the caller did not verify through the target's precondition and theorem"
 
 -- A caller that does not establish the target's precondition does not
 -- establish `requires_of`.
 /--
-error: the precondition of `apply` is not established
+error: the precondition `requires requires_of<f>(x)` of `apply` does not hold at call 1
 ---
 error: verex verification failed: the automatic verification of `use_apply` failed; provide a proof in the module:
-  verify use_apply by
+  verify use_apply by lean =>
     verex_obligations
     verex_on
-    | requires_of_apply => verex_prepare; sorry
+    | requires_1_of_apply_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
@@ -343,7 +346,7 @@ verex module 0x42::nested_results where
 error: the specification clause `aborts_if x + 1 > MAX_U64` is not established
 ---
 error: verex verification failed: the automatic verification of `add_two` failed; provide a proof in the module:
-  verify add_two by
+  verify add_two by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

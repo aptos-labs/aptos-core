@@ -184,9 +184,6 @@ impl CachedStateView {
             if let Some(updates) = updates.for_last_checkpoint_batched() {
                 self.prime_cache_for_batched_updates(updates, policy)?;
             }
-            if let Some(updates) = updates.for_latest_batched() {
-                self.prime_cache_for_batched_updates(updates, policy)?;
-            }
             Ok(())
         })
     }
@@ -246,7 +243,7 @@ impl CachedStateView {
             StateSlot::from_db_get(
                 state_key.clone(),
                 self.cold
-                    .get_state_value_with_version_by_version(state_key, base_version)?,
+                    .get_state_value_with_version_at_checkpoint(state_key, base_version)?,
             )
         } else {
             StateSlot::new(state_key.clone(), StateSlotKind::ColdVacant)

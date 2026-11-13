@@ -8,8 +8,8 @@ import VerexIR.Proofs.Maps.Table
 # Table allocation and identity
 
 A table is a value of its owner's type: its handle among the declared fields
-and its contents in a hidden last field (`designs/intrinsic-maps.md`, "Owned
-Table values"). The handles allocated so far are a slot of the memory
+and its contents in a hidden last field (`doc/designs/intrinsic-maps.md`, "Tables
+in the runtime semantics"). The handles allocated so far are a slot of the memory
 (`allocationResource`), as the runtime keeps them (`RuntimeState.tableHandles`);
 the model operations keep a table's identity.
 -/
@@ -18,12 +18,22 @@ namespace VerexIR.Proofs.Denote.TableMemory
 
 open VerexIR.Validation
 
-variable {unit : ValidatedUnit}
+variable {unit : ValidatedUnit} [FunctionCarriers unit]
 
 /-- The fixed logical slot of allocation history. Its address elements and
 empty scope are independent of a callee's type parameters, and the collection
 carrier imposes no Move vector length bound. -/
 def allocationResource : ResourceType := ⟨.address, .nil, .collection⟩
+
+/-- A stored value's resource is never the allocation history. -/
+@[vir_denote_norm] theorem value_ne_allocationResource (type : NTy) (arguments : NRow) :
+    ({ type, arguments } : ResourceType) ≠ allocationResource := by
+  simp only [allocationResource, ne_eq, ResourceType.mk.injEq, reduceCtorEq, and_false,
+    not_false_eq_true]
+
+@[vir_denote_norm] theorem allocationResource_ne_value (type : NTy) (arguments : NRow) :
+    allocationResource ≠ ({ type, arguments } : ResourceType) :=
+  (value_ne_allocationResource type arguments).symm
 
 def encodeAllocated (handles : Array String) : allocationResource.carrier unit := handles
 
@@ -51,7 +61,7 @@ theorem NTy.identityRuntime_build (source : StructHandle) (arguments rest : NRow
   unfold Maps.Layout.build at field ⊢
   rw [NTy.identityRuntime_handle _ _ _ hidden, field]
 
-@[simp, vir_denote_norm] theorem NTy.identityRuntime_update (source : StructHandle)
+@[simp] theorem NTy.identityRuntime_update (source : StructHandle)
     (arguments rest : NRow) (hidden : rest.holdsContents = true) (layout : Maps.Layout)
     (h : layout.handle = true) (discipline : Maps.Discipline) (map key value : RuntimeValue) :
     NTy.identityRuntime (.struct source arguments (.cons .address rest))
@@ -61,7 +71,7 @@ theorem NTy.identityRuntime_build (source : StructHandle) (arguments rest : NRow
   rw [NTy.identityRuntime_build _ _ _ hidden _ h]
   simp [Maps.Layout.handleOf, h]
 
-@[simp, vir_denote_norm] theorem NTy.identityRuntime_remove (source : StructHandle)
+@[simp] theorem NTy.identityRuntime_remove (source : StructHandle)
     (arguments rest : NRow) (hidden : rest.holdsContents = true) (layout : Maps.Layout)
     (h : layout.handle = true) (discipline : Maps.Discipline) (map key : RuntimeValue) :
     NTy.identityRuntime (.struct source arguments (.cons .address rest))
@@ -71,7 +81,7 @@ theorem NTy.identityRuntime_build (source : StructHandle) (arguments rest : NRow
   rw [NTy.identityRuntime_build _ _ _ hidden _ h]
   simp [Maps.Layout.handleOf, h]
 
-@[simp, vir_denote_norm] theorem NTy.identityRuntime_updateAll (source : StructHandle)
+@[simp] theorem NTy.identityRuntime_updateAll (source : StructHandle)
     (arguments rest : NRow) (hidden : rest.holdsContents = true) (layout : Maps.Layout)
     (h : layout.handle = true) (discipline : Maps.Discipline) (map keys values : RuntimeValue) :
     NTy.identityRuntime (.struct source arguments (.cons .address rest))
@@ -81,7 +91,7 @@ theorem NTy.identityRuntime_build (source : StructHandle) (arguments rest : NRow
   rw [NTy.identityRuntime_build _ _ _ hidden _ h]
   simp [Maps.Layout.handleOf, h]
 
-@[simp, vir_denote_norm] theorem NTy.identityRuntime_takeEntries (source : StructHandle)
+@[simp] theorem NTy.identityRuntime_takeEntries (source : StructHandle)
     (arguments rest : NRow) (hidden : rest.holdsContents = true) (layout : Maps.Layout)
     (h : layout.handle = true) (map : RuntimeValue) (count : Int) :
     NTy.identityRuntime (.struct source arguments (.cons .address rest))
@@ -91,7 +101,7 @@ theorem NTy.identityRuntime_build (source : StructHandle) (arguments rest : NRow
   rw [NTy.identityRuntime_build _ _ _ hidden _ h]
   simp [Maps.Layout.handleOf, h]
 
-@[simp, vir_denote_norm] theorem NTy.identityRuntime_replaceKey (source : StructHandle)
+@[simp] theorem NTy.identityRuntime_replaceKey (source : StructHandle)
     (arguments rest : NRow) (hidden : rest.holdsContents = true) (layout : Maps.Layout)
     (h : layout.handle = true) (map old new : RuntimeValue) :
     NTy.identityRuntime (.struct source arguments (.cons .address rest))

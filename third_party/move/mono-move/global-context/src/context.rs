@@ -59,9 +59,9 @@ use mono_move_core::{
     TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
+use shared_dsa::UnorderedMap;
 use std::{
     any::{Any, TypeId},
-    collections::HashMap,
     hash::{Hash, Hasher},
     marker::PhantomData,
 };
@@ -142,7 +142,12 @@ struct Context {
     layouts: Layouts,
     /// Values a client preinstalls before execution for execution guards to
     /// read, keyed by their type. See [`GlobalContext::preinstall`].
-    preinstalled: HashMap<TypeId, Box<dyn Any + Send + Sync>, ahash::RandomState>,
+    ///
+    /// This map never needs to be iterated, only looked up by type, so an
+    /// unordered map is the right choice. A `BTreeMap` would be weaker: it
+    /// would expose an ordering based on `TypeId`, which depends on the
+    /// compiler.
+    preinstalled: UnorderedMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 /// Storage for the published object-descriptor set.
@@ -356,7 +361,7 @@ impl GlobalContext {
                 script_cache: ScriptCache::new(),
                 descriptors: Descriptors::default(),
                 layouts: Layouts::default(),
-                preinstalled: HashMap::default(),
+                preinstalled: UnorderedMap::new(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
@@ -686,6 +691,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
                     .unwrap_or_else(|e| panic!("publish_struct_descriptor: {e}"));
                 self.append_descriptor(desc)
             })
+    }
+
+    /// The enum-object descriptor already published for `enum_ty`, if any.
+    pub fn enum_descriptor(&self, enum_ty: InternedType) -> Option<DescriptorId> {
+        self.ctx
+            .descriptors
+            .enum_by_type
+            .get(&enum_ty)
+            .map(|id| *id)
     }
 
     /// Materializes an enum-object descriptor for `enum_ty` into the shared

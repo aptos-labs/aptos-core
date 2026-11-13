@@ -30,7 +30,8 @@ jobs:
   select:
     runs-on: 2cpu-gh-ubuntu24-x64
     env:
-      E2E_MODE: ${{ (inputs.FORCE_FULL || (github.event_name != 'pull_request' && github.event_name != 'pull_request_target') || contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') || contains(github.event.pull_request.labels.*.name, 'CICD:run-forge-e2e-perf')) && 'legacy' || vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
+      # Release branches predate the planner, so their PRs use legacy selection.
+      E2E_MODE: ${{ (inputs.FORCE_FULL || (github.event_name != 'pull_request' && github.event_name != 'pull_request_target') || startsWith(github.base_ref, 'aptos-release-v') || startsWith(github.base_ref, 'aptos-node-v') || contains(fromJSON('["devnet","testnet","mainnet"]'), github.base_ref) || contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') || contains(github.event.pull_request.labels.*.name, 'CICD:run-forge-e2e-perf')) && 'legacy' || vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
     outputs:
       known_e2e_tests: ${{ steps.registry.outputs.known_e2e_tests }}
       selected_e2e_tests: ${{ steps.selection.outputs.selected_e2e_tests }}

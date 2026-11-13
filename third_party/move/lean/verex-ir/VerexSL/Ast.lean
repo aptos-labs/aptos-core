@@ -77,6 +77,7 @@ inductive Ty where
   | stateDomain
   | tuple (elements : Array (Located Ty))
   | vector (element : Located Ty) (length : Option Int := none)
+  | slice (element : Located Ty)
   | function (arguments : Array (Located Ty)) (result : Located Ty)
       (abilities : Array Ability := #[])
   | reference (mutable : Bool) (referent : Located Ty)
@@ -107,6 +108,8 @@ structure GenericBinder where
   /-- A type parameter no field of the declaration stores. Move spells this
   `phantom`; the marker is recorded as a profile predicate on the binder. -/
   phantom : Bool := false
+  /-- Regions this lifetime parameter is declared to outlive. -/
+  outlives : Array SourceLifetime := #[]
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
@@ -173,6 +176,9 @@ inductive SpecificationOperation where
   | lengthVector
   | indexVector
   | sliceVector
+  | stringConcat
+  | stringBytes
+  | charEncode
   | bitVectorToInt
   | intToBitVector
   | inRange
@@ -191,7 +197,7 @@ inductive SpecificationConditionKind where
   /-- Splits cases on a Boolean or an enum's variant. -/
   | split
   /-- Updates a ghost field: the condition's expression assigns the field
-  (`designs/ghost-fields.md`). -/
+  (`doc/designs/ghost-fields.md`). -/
   | update
   deriving Repr, BEq, DecidableEq, Inhabited
 
@@ -318,6 +324,35 @@ def BindingPattern.span : BindingPattern → Span
   | .wildcard span | .variable _ span _ | .literal _ span | .tuple _ span |
       .constructor _ _ _ span => span
 
+structure Parameter where
+  name : String
+  type : Located Ty
+  mutable : Bool := false
+  span : Span := {}
+  deriving Repr, BEq, Inhabited
+
+/-- Literal or unresolved name assigned in declaration metadata. -/
+inductive SourceAttributeValue where
+  | number (value : Nat)
+  | string (value : String)
+  | name (value : String)
+  /-- A name in another namespace, as written. -/
+  | qualifiedName (value : String)
+  deriving Repr, BEq, Inhabited
+
+/-- Structured declaration metadata. Intrinsic owner/role annotations use
+the same call syntax, but are consumed into the intrinsic graph by lowering. -/
+inductive SourceAttribute where
+  | call (name : String) (arguments : Array SourceAttribute) (span : Span)
+  | assign (name : String) (value : SourceAttributeValue) (span : Span)
+  deriving Repr, BEq, Inhabited
+
+def SourceAttribute.name : SourceAttribute → String
+  | .call name .. | .assign name .. => name
+
+def SourceAttribute.span : SourceAttribute → Span
+  | .call _ _ span | .assign _ _ span => span
+
 mutual
 inductive Expr where
   | unit (span : Span := {})
@@ -337,6 +372,13 @@ inductive Expr where
   last captured one, `none` for one supplied at invocation. -/
   | closure (name : Array String) (types : Array (Located Ty)) (result : Located Ty)
       (captures : Array (Option Expr)) (span : Span := {})
+  /-- A Rust closure expression: the struct `name` of its captures and the body
+  `function` in the struct's scope. `lower` makes them items of the enclosing
+  module and leaves the construction here. -/
+  | closureItem (name : String) (generics : Array GenericBinder) (abilities : Array Ability)
+      (captures : Array (String × Located Ty × Expr)) (attributes : Array SourceAttribute) (function : String)
+      (functionGenerics : Array GenericBinder) (parameters : Array Parameter)
+      (result : Located Ty) (body : Expr) (span : Span := {})
   | invoke (callable : Expr) (arguments : Array Expr) (span : Span := {})
   | genericCall (name : Array String) (types : Array (Located Ty))
       (arguments : Array Expr) (span : Span := {})
@@ -373,7 +415,14 @@ inductive Expr where
       (value : Expr) (span : Span := {})
   | updateField (value : Expr) (field : String) (replacement : Expr) (span : Span := {})
   | discriminant (owner result : Located Ty) (value : Expr) (span : Span := {})
+  | readDiscriminant (result : Located Ty) (place : Expr) (span : Span := {})
   | placeOperation (operation : PlaceOperation) (place : Expr) (span : Span := {})
+  /-- A place as the variant it names, which a field selection reads. -/
+  | downcast (place : Place) (span : Span := {})
+  /-- A sequence subrange place, read through a borrow. -/
+  | subslice (place : Expr) (start stop : Nat) (fromEnd : Bool) (span : Span := {})
+  /-- The whole fixed-array place viewed as a slice, read through a borrow. -/
+  | unsize (place : Expr) (span : Span := {})
   | borrowPlace (mutable : Bool) (place : Place) (span : Span := {})
   | dropPlace (place : Place) (span : Span := {})
   | borrowValue (mutable : Bool) (value : Expr) (span : Span := {})
@@ -444,8 +493,9 @@ def Expr.span : Expr → Span
       .select _ _ _ span | .field _ _ span | .storageIndex _ _ span |
       .index _ _ span |
       .membership _ _ span | .variantTest _ _ span | .selectVariants _ _ _ span |
-      .testVariants _ _ _ span | .discriminant _ _ _ span | .updateField _ _ _ span |
-      .placeOperation _ _ span | .block _ _ span |
+      .testVariants _ _ _ span | .discriminant _ _ _ span | .readDiscriminant _ _ span |
+      .updateField _ _ _ span |
+      .placeOperation _ _ span | .downcast _ span | .unsize _ span | .subslice _ _ _ _ span | .block _ _ span |
       .borrowPlace _ _ span | .dropPlace _ span | .borrowValue _ _ span |
       .rawBorrowValue _ _ span |
       .freezeReference _ _ span |
@@ -457,16 +507,10 @@ def Expr.span : Expr → Span
       .ifElse _ _ _ span | .match_ _ _ span |
       .forRange _ _ _ _ span |
       .loop _ span _ | .break_ _ span _ | .continue_ span _ |
+      .closureItem _ _ _ _ _ _ _ _ _ _ span |
       .assign _ _ span | .assignExpression _ _ span | .rawAssignExpression _ _ span |
       .assignPattern _ _ _ span |
       .return_ _ span | .throw_ _ _ span => span
-
-structure Parameter where
-  name : String
-  type : Located Ty
-  mutable : Bool := false
-  span : Span := {}
-  deriving Repr, BEq, Inhabited
 
 inductive Visibility where
   | private_
@@ -503,6 +547,10 @@ inductive ContractClause where
       (properties : Array Pragma := #[]) (span : Span := {})
   | abortsWith (expression : Expr) (additional : Array Expr := #[])
       (properties : Array Pragma := #[]) (span : Span := {})
+  /-- The Rust profile's failure clause: a panic is permitted where the
+  condition holds. It takes no code, since no code matches a panic
+  (`doc/designs/rust-verification.md`, "Failure contract"). -/
+  | panicsIf (expression : Expr) (properties : Array Pragma := #[]) (span : Span := {})
   | invariant (expression : Expr) (properties : Array Pragma := #[]) (span : Span := {})
   | modifies (expression : Expr) (span : Span := {}) (loose : Bool := false)
   | modifiesAll (span : Span := {})
@@ -516,36 +564,33 @@ inductive ContractClause where
   /-- `modifies_of<f> *`: an invocation of `f` may change any global memory. -/
   | modifiesOfAll (parameter : String) (span : Span := {})
   /-- A ghost field of every value of a struct or enum, with the value a pack
-  gives it over the fields (`designs/ghost-fields.md`). -/
+  gives it over the fields (`doc/designs/ghost-fields.md`). -/
   | ghost (name : String) (type : Located Ty) (initializer : Option Expr) (span : Span := {})
   deriving Repr, BEq, Inhabited
 
 def ContractClause.span : ContractClause → Span
   | .letPre _ _ _ span | .letPost _ _ _ span |
       .requires _ _ span | .ensures _ _ span | .abortsIf _ _ _ span | .abortsWith _ _ _ span |
-      .invariant _ _ span | .modifies _ span _ | .modifiesAll span |
+      .panicsIf _ _ span | .invariant _ _ span | .modifies _ span _ | .modifiesAll span |
       .reads _ span | .readsAll span | .modifiesOf _ _ _ span | .modifiesOfAll _ span |
       .ghost _ _ _ span => span
 
-/-- Literal or unresolved name assigned in declaration metadata. -/
-inductive SourceAttributeValue where
-  | number (value : Nat)
-  | string (value : String)
-  | name (value : String)
+/-- The conditions a `spec` item states of one of its function's loops. -/
+structure LoopSpecification where
+  /-- The loop's number among the function's loops in source order, from 1. -/
+  number : Nat
+  conditions : Array (SpecificationConditionKind × Expr)
+  span : Span := {}
   deriving Repr, BEq, Inhabited
 
-/-- Structured declaration metadata. Intrinsic owner/role annotations use
-the same call syntax, but are consumed into the intrinsic graph by lowering. -/
-inductive SourceAttribute where
-  | call (name : String) (arguments : Array SourceAttribute) (span : Span)
-  | assign (name : String) (value : SourceAttributeValue) (span : Span)
+/-- A contract at a shape of a function's generics: its types mention the
+shape's variables, which its clauses read at the function's signature there. -/
+structure ShapeContractDecl where
+  arguments : Array (Located Ty)
+  contract : Array ContractClause := #[]
+  pragmas : Array Pragma := #[]
+  span : Span := {}
   deriving Repr, BEq, Inhabited
-
-def SourceAttribute.name : SourceAttribute → String
-  | .call name .. | .assign name .. => name
-
-def SourceAttribute.span : SourceAttribute → Span
-  | .call _ _ span | .assign _ _ span => span
 
 structure FunctionDecl where
   name : String
@@ -557,8 +602,16 @@ structure FunctionDecl where
   contract : Array ContractClause := #[]
   /-- The `spec` item the contract was declared in. -/
   contractSpan : Option Span := none
+  /-- The conditions the `spec` item states of the body's loops, which
+  lowering places in them. -/
+  loopSpecifications : Array LoopSpecification := #[]
   pragmas : Array Pragma := #[]
   attributes : Array SourceAttribute := #[]
+  /-- Its contracts at shapes of its generics, in source order. -/
+  shapes : Array ShapeContractDecl := #[]
+  /-- Only the contract of a closure's body, which a closure expression
+  declares; `lower` joins the two. -/
+  contractOnly : Bool := false
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
@@ -569,7 +622,9 @@ structure SpecFunctionDecl where
   isOpaque : Bool := false
   generics : Array GenericBinder := #[]
   parameters : Array Parameter := #[]
-  result : Located Ty := { value := .unit }
+  /-- The declared result type; without one the body's type is the result
+  and the function cannot be called. -/
+  result : Option (Located Ty) := none
   /-- The measure a recursive definition decreases. -/
   decreases : Option Expr := none
   body : Option Expr := none
@@ -605,6 +660,12 @@ structure FieldDecl where
 
 structure StructDecl where
   name : String
+  /-- A dependency's type whose shape the crate does not see (`opaque struct`):
+  it is named, and neither constructed nor destructured. -/
+  isOpaque : Bool := false
+  /-- The struct of a closure expression's captures, with the path of the function
+  the expression stands in. -/
+  closureParent : Option (Array String) := none
   generics : Array GenericBinder := #[]
   fields : Array FieldDecl := #[]
   abilities : Array Ability := #[]
@@ -647,6 +708,15 @@ structure NamespaceInvariantDecl where
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
+/-- What a naming scope names: `mod`, a module; `impl`, the type of an inherent
+impl; `trait`, a trait; `trait impl`, a trait impl. -/
+inductive ScopeKind where
+  | module
+  | inherent
+  | implementation
+  | trait
+  deriving Repr, BEq, Inhabited
+
 inductive Item where
   | constant (declaration : ConstantDecl)
   | struct (declaration : StructDecl)
@@ -655,7 +725,26 @@ inductive Item where
   | specFunction (declaration : SpecFunctionDecl)
   | lemma (declaration : LemmaDecl)
   | namespaceInvariants (declarations : Array NamespaceInvariantDecl)
+  /-- One block of a naming scope; further blocks reopen it. -/
+  | scope (name : String) (kind : ScopeKind) (items : Array Item) (span : Span)
   deriving Repr, BEq, Inhabited
+
+/-- The first result of `find` on an item directly in `scope`, a path relative
+to `items`, across every block that opens it. -/
+partial def findInScope (items : Array Item) (scope : List String)
+    (find : Item → Option α) : Option α :=
+  items.findSome? fun
+    | .scope name _ nested _ => match scope with
+        | head :: rest => if name == head then findInScope nested rest find else none
+        | [] => none
+    | item => if scope.isEmpty then find item else none
+
+/-- Every declaration of `items` with the scope it is in, in source order. -/
+partial def scopedItems (items : Array Item) (scope : Array String := #[]) :
+    Array (Array String × Item) :=
+  items.flatMap fun
+    | .scope name _ nested _ => scopedItems nested (scope.push name)
+    | item => #[(scope, item)]
 
 /-- Another namespace granted privileged (`friend`) access to this one. Move
 spells this as a module-level `friend` declaration; other profiles map it onto
@@ -687,10 +776,19 @@ structure Namespace where
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
-/-- A source file may own multiple namespaces but uses one provenance file. -/
+/-- The width of a source's band of positions: the positions of the unit's
+own file lie in the first band, those of its further sources each in the
+next (`CompilationUnit.sources`). -/
+def sourceBand : Nat := 1000000000
+
+/-- A source file may own multiple namespaces. Its syntax may hold items of
+further sources, spliced in at positions shifted to their bands
+(`sourceBand`): the proof file whose step expressions a copy of the unit
+lowers. -/
 structure CompilationUnit where
   sourceName : String
   namespaces : Array Namespace
+  sources : Array String := #[]
   deriving Repr, BEq, Inhabited
 
 end VerexSL

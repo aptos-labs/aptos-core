@@ -20,7 +20,7 @@ fun read_x_a() {
     3: HeapMoveTo [0]+8 <- [8] (size=1) @2
     4: HeapMoveTo [0]+9 <- [9] (size=1) @2
     5: SlotBorrow [48] <- &[0] @4
-    6: CallIndirect 0x42::enum_by_ref_param::read_x @5
+    6: CallByNameExempt 0x42::enum_by_ref_param::read_x @5
     7: Move(1) [0] <- [48] @6
     8: Return @6
   safe_point_layouts:
@@ -37,7 +37,7 @@ fun read_x_b() {
     3: HeapMoveTo8 [0]+8 <- [8] @2
     4: HeapMoveTo [0]+16 <- [16] (size=1) @2
     5: SlotBorrow [56] <- &[0] @4
-    6: CallIndirect 0x42::enum_by_ref_param::read_x @5
+    6: CallByNameExempt 0x42::enum_by_ref_param::read_x @5
     7: Move(1) [0] <- [56] @6
     8: Return @6
   safe_point_layouts:

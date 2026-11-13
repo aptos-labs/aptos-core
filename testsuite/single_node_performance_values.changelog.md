@@ -2,6 +2,17 @@
 
 Recalibration history, newest first. Each entry lists the tests whose calibrated value drifted out of band, as a signed `tps % change` (negative means slower); new tests show `new`.
 
+## 2026-11-04
+
+| transaction_type | module_working_set | executor | runs | tps % change |
+| --- | --- | --- | --- | --- |
+| vector-trim-append-len3000-size1 | 1 | VM | 11 | -25.0% |
+| vector-remove-insert-len3000-size1 | 1 | VM | 11 | -30.3% |
+| order-book-no-matches50-markets | 1 | VM | 11 | +44.5% |
+| order-book-balanced-matches25-pct50-markets | 1 | VM | 11 | +45.0% |
+| order-book-balanced-matches80-pct50-markets | 1 | VM | 11 | +47.3% |
+| order-book-balanced-size-skewed80-pct50-markets | 1 | VM | 11 | +42.5% |
+
 ## 2026-06-24
 
 | transaction_type | module_working_set | executor | runs | tps % change |

@@ -10,14 +10,14 @@ module 0x66::protected {
         let _v0 = Entry<T0>{_0: p1};
         move_to<Entry<T0>>(p0, _v0);
     }
-    public fun modify<T0: store, T1>(p0: &signer, p1: |&mut T0|(T1)): T1
+    public fun modify<T0: store, T1>(p0: &signer, p1: |&mut T0|T1): T1
         acquires Entry
     {
         let _v0 = signer::address_of(p0);
         let _v1 = &mut borrow_global_mut<Entry<T0>>(_v0)._0;
         p1(_v1)
     }
-    public fun read<T0: store, T1>(p0: &signer, p1: |&T0|(T1)): T1
+    public fun read<T0: store, T1>(p0: &signer, p1: |&T0|T1): T1
         acquires Entry
     {
         let _v0 = signer::address_of(p0);

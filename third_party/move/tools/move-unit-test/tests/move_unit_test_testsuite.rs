@@ -159,17 +159,13 @@ fn no_fail_fast(path: &Path) -> datatest_stable::Result<()> {
     Ok(())
 }
 
-datatest_stable::harness!(
-    run_test,
-    "tests/test_sources",
-    r".*\.move$",
-    fail_fast,
-    "tests/fail_fast",
-    r"unittest-fast\.move$",
-    no_fail_fast,
-    "tests/fail_fast",
-    r"unittest\.move$",
-    fail_fast_unexpected,
-    "tests/fail_fast",
-    r"unittest-fast-unexpected-success\.move$",
-);
+datatest_stable::harness! {
+    { test = run_test, root = "tests/test_sources", pattern = r".*\.move$" },
+    { test = fail_fast, root = "tests/fail_fast", pattern = r"unittest-fast\.move$" },
+    { test = no_fail_fast, root = "tests/fail_fast", pattern = r"unittest\.move$" },
+    {
+        test = fail_fast_unexpected,
+        root = "tests/fail_fast",
+        pattern = r"unittest-fast-unexpected-success\.move$",
+    },
+}

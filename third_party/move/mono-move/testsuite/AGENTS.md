@@ -11,7 +11,7 @@ Tests use `datatest-stable` (a data-driven harness) over the cases under `tests/
 Each input drives the pipeline with `// RUN:` lines:
 
 - `// RUN: publish [--print(<sections>)]` — destack plus per-function micro-op lowering. `--print` renders specializer golden output into the `.exp`; sections are any of `bytecode`, `stackless`, `micro-ops`. A function that cannot be lowered at publish time renders `skipped (<reason>)`.
-- `// RUN: execute <addr>::<mod>::<fn> --args ... [--heap-size <n>]` paired with `// CHECK:` / `// CHECK-SUBSTR:` — runs the function on both the V1 VM and mono-move (v2) and checks they agree (and match the expected output). `--heap-size <n>` sizes the v2 heap in bytes to force garbage collection under allocation pressure (v1 has no such knob and ignores it).
+- `// RUN: execute <addr>::<mod>::<fn> --args ... [--heap-size <n>] [--commit]` paired with `// CHECK:` / `// CHECK-SUBSTR:` — runs the function on both the V1 VM and mono-move (v2) and checks they agree (and match the expected output). `--heap-size <n>` sizes the v2 heap in bytes to force garbage collection under allocation pressure (v1 has no such knob and ignores it). `--commit` adds a `writes:` segment (each resource write as `create`/`modify`/`delete`, or `none`) to the output and commits the writes to the storage later steps read (V1's when it ran), so a step can act on resources an earlier step left behind. Without it, the step's writes are discarded.
 - `// CHECK-GC-COUNT: <n>` — asserts mono-move (v2) ran exactly `n` garbage collections during the preceding `execute`. v2-only (the V1 VM has no GC); pair with `--heap-size` to drive collections deterministically.
 - `// CHECK-ERROR-PARITY` — asserts both VMs failed with a VM error and that v2's failure, mapped into v1 terms, matches the status code, sub-status, message, and error location v1 reported. Takes no argument: the expected value is v1's actual output. Move aborts are not covered (they carry no VM error to map, and `CHECK:` already compares them).
 - `// CHECK-V1: <literal>` / `// CHECK-V2: <literal>` (and the `-SUBSTR:` variants) — like `CHECK` / `CHECK-SUBSTR:`, but apply to only one VM. Use to pin a deliberate, documented divergence between V1 and v2; a step runs only the VMs its checks need.
@@ -36,4 +36,12 @@ A source whose MonoMove output legitimately differs is listed in the matrix crat
 ```bash
 cargo test -p mono-move-testsuite --test transactional          # verify
 UB=1 cargo test -p mono-move-testsuite --test transactional     # create or refresh overrides
+```
+
+## Move Unit Tests
+
+`tests/unit_tests.rs` (framework packages) and `tests/benches_e2e_unit_tests.rs` (`benches-e2e` packages) run each package's `#[test]`s on V1 and MonoMove through `move-unit-test`'s runner with the `mono-move-unit-test-backend` backend. A test fails if the two VMs disagree or MonoMove fails on its own; tests MonoMove cannot run yet are reported as unsupported, and tests whose runs cannot be compared (e.g. V1 writes different values on every run) as incomparable, each with a per-reason histogram (`--nocapture`). `tests/unit_test_fixtures.rs` covers the backend over the `tests/unit-test-fixtures` package.
+
+```bash
+cargo test -p mono-move-testsuite --test unit_tests -- --nocapture
 ```

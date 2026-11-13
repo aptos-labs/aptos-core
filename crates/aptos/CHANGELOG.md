@@ -5,6 +5,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 # Unreleased
 
 - Deprecate macOS x86_64 (Intel) CLI builds. This release still publishes an Intel binary and prints a deprecation warning on startup. The next macOS CLI release will be Apple Silicon (arm64) only.
+- Compiler now rejects selecting an enum field `e.f` when the variants that declare `f` declare it with different types. Previously this was accepted when the types coincided after instantiation.
+- Interactive runs now check every 3 days for a newer CLI release and print a notice on stderr when one is available. Set `APTOS_DISABLE_UPDATE_CHECK=1` to disable it.
 
 ## [9.6.0]
 - Add `aptos governance propose-bundle` and `aptos governance execute-bundle`, which submit and execute a governance bundle's proposal using the bundle's compiled scripts. `execute-bundle` resumes from the step the chain expects next.

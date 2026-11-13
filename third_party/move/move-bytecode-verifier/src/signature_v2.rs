@@ -261,20 +261,27 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
 
 /// Helper function to check if a type contains phantom type parameters in non-phantom positions.
 ///
+/// - `check_references`: if false, types behind references are not checked.
+/// - `is_phantom_pos`: whether `ty` is an argument to a phantom type parameter.
+///
 /// Time complexity: `O(size_of_type)`
 fn check_phantom_params(
     struct_handles: &[StructHandle],
     context: &[StructTypeParameter],
+    check_references: bool,
     is_phantom_pos: bool,
     ty: &SignatureToken,
 ) -> PartialVMResult<()> {
     use SignatureToken::*;
 
     match ty {
-        Vector(ty) => check_phantom_params(struct_handles, context, false, ty)?,
+        Vector(ty) => check_phantom_params(struct_handles, context, check_references, false, ty)?,
+        Reference(ty) | MutableReference(ty) if check_references => {
+            check_phantom_params(struct_handles, context, check_references, false, ty)?
+        },
         Function(args, result, _) => {
             for ty in args.iter().chain(result) {
-                check_phantom_params(struct_handles, context, false, ty)?
+                check_phantom_params(struct_handles, context, check_references, false, ty)?
             }
         },
         StructInstantiation(idx, type_arguments) => {
@@ -283,6 +290,7 @@ fn check_phantom_params(
                 check_phantom_params(
                     struct_handles,
                     context,
+                    check_references,
                     sh.type_parameters[i].is_phantom,
                     ty,
                 )?;
@@ -1135,6 +1143,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             check_phantom_params(
                 self.resolver.struct_handles(),
                 &struct_handle.type_parameters,
+                self.config.check_phantom_params_behind_references,
                 false,
                 field_ty,
             )?;

@@ -12,9 +12,28 @@ use mono_move_core::{
 use mono_move_runtime::{CallBuilder, InterpreterContext, RuntimeStatus};
 use move_core_types::account_address::AccountAddress;
 
-/// Calls `module::function<ty_args>` as system code: nothing consumes the
-/// transaction's gas budget, `signers` fill the leading signer parameters,
-/// and `place` fills the rest.
+/// Calls `module::function<ty_args>` as system code: `signers` fill the
+/// leading signer parameters and `place` fills the rest. Metered against the
+/// transaction's gas budget.
+pub(crate) fn call_system_function<'a>(
+    interp: &mut InterpreterContext<'a>,
+    module: InternedModuleId,
+    function: InternedIdentifier,
+    ty_args: InternedTypeList,
+    signers: &[AccountAddress],
+    place: impl FnOnce(&mut CallBuilder<'_, '_>) -> Result<(), VMInternalError>,
+) -> Result<RuntimeStatus, VMInternalError> {
+    let func = interp.load_function(module, function, ty_args)?;
+    let mut call = interp.build_call(func)?;
+    for signer in signers {
+        call.signer(signer)?;
+    }
+    place(&mut call)?;
+    Ok(call.run()?.into_status())
+}
+
+/// Like [`call_system_function`], but nothing consumes the transaction's gas
+/// budget.
 pub(crate) fn call_system_function_unmetered<'a>(
     interp: &mut InterpreterContext<'a>,
     module: InternedModuleId,
@@ -23,13 +42,6 @@ pub(crate) fn call_system_function_unmetered<'a>(
     signers: &[AccountAddress],
     place: impl FnOnce(&mut CallBuilder<'_, '_>) -> Result<(), VMInternalError>,
 ) -> Result<RuntimeStatus, VMInternalError> {
-    interp.unmetered(|interp| {
-        let func = interp.load_function(module, function, ty_args)?;
-        let mut call = interp.build_call(func)?;
-        for signer in signers {
-            call.signer(signer)?;
-        }
-        place(&mut call)?;
-        Ok(call.run()?.into_status())
-    })
+    interp
+        .unmetered(|interp| call_system_function(interp, module, function, ty_args, signers, place))
 }

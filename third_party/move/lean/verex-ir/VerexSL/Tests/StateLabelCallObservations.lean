@@ -40,6 +40,7 @@ verex module 0x42::state_label_call_observations where
 
   spec caller where
     pragma opaque
+    pragma verify = false
     ensures do
         let a :=
           do
@@ -80,7 +81,7 @@ verex module 0x42::state_label_call_observations where
 error: the specification clause `ensures result == 1` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_result` failed; provide a proof in the module:
-  verify wrong_result by
+  verify wrong_result by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -89,3 +90,20 @@ error: verex verification failed: the automatic verification of `wrong_result` f
 -/
 #guard_msgs in
 verify 0x42::state_label_call_observations::wrong_result
+
+/--
+error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+---
+error: verex verification failed: the automatic verification of `caller` exceeded its budget of 25000 maxHeartbeats after deciding 9 leaves (stage interrupted); provide a proof in the module:
+  verify caller by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+-/
+#guard_msgs in
+verify 0x42::state_label_call_observations::caller

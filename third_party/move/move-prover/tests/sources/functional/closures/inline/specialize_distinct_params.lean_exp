@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/specialize_distinct_params.move:46:9: error: the specification clause `ensures result == 2 * x + 4` is not established
 tests/sources/functional/closures/inline/specialize_distinct_params.move:44:5: error: verex verification failed: the automatic verification of `call_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/specialize_distinct_params.proof.lean`:
-  verify call_wrong by
+  verify call_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

@@ -8,7 +8,7 @@ import VerexIR.Validation.TableRoles
 
 Every structure marked an intrinsic map has one abstract layout: its
 entries, its ghost slots, and its allocation handle where its Move type
-holds table storage (`designs/intrinsic-maps.md`, "Abstract
+holds table storage (`doc/designs/intrinsic-maps.md`, "Abstract
 representation"). Its concrete value holds them in one of a few shapes,
 which this module names (`ownerLayout?`); the runtime semantics reads the
 abstract value off the concrete one by the shape (`normalize`).
@@ -23,7 +23,7 @@ def nominalDeclaration? (unit : ValidatedUnit) (ty : Ty) :
   let .nominal name _ := ty | none
   let qualified ← unit.tables.names[name.index]?
   let ns ← unit.namespaces[qualified.namespaceId.index]?
-  let structId ← ns.structs.findIdx? (·.name == name)
+  let structId ← ns.structs.findIdx? (ns.nameId ·.name == name)
   let declaration ← ns.structs[structId]?
   some (qualified.namespaceId, structId, ns, declaration)
 
@@ -84,10 +84,10 @@ private def treeNode? (unit : ValidatedUnit) (ty : Ty) :
     Option (NamespaceId × Nat × Nat × String) := do
   let .nominal _ arguments := ty | none
   guard (arguments.size == 2 && ownTypeParameters unit arguments)
-  let (nodeNamespace, nodeStruct, _, declaration) ← nominalDeclaration? unit ty
+  let (nodeNamespace, nodeStruct, nodeNs, declaration) ← nominalDeclaration? unit ty
   let fields ← soleFields? declaration
   let leafOf (field : FieldDecl) : Option String := do
-    let childrenType ← unit.tables.types[field.type.typeId.index]?
+    let childrenType ← nodeNs.typeOf field.type.typeId
     let (_, _, childrenNs, childrenDeclaration) ← nominalDeclaration? unit childrenType
     guard (isMapOwner childrenNs childrenDeclaration)
     let .nominal _ #[.typeArg key, .typeArg child] := childrenType | none
@@ -95,12 +95,12 @@ private def treeNode? (unit : ValidatedUnit) (ty : Ty) :
     let childType ← unit.tables.types[child.typeId.index]?
     let .nominal _ #[.typeArg value] := childType | none
     guard (unit.tables.types[value.typeId.index]? == some (Ty.typeParameter 1))
-    let (_, _, _, childDeclaration) ← nominalDeclaration? unit childType
+    let (_, _, childNs, childDeclaration) ← nominalDeclaration? unit childType
     let variant ← childDeclaration.variants.find? fun variant =>
       match variant.fields.toList with
-      | [field] => unit.tables.types[field.type.typeId.index]? == some (Ty.typeParameter 0)
+      | [field] => childNs.typeOf field.type.typeId == some (Ty.typeParameter 0)
       | _ => false
-    (unit.tables.names[variant.name.index]?).map (·.name)
+    (childNs.nameOf variant.name).map (·.name)
   let children ← fields.findIdx? fun field => (leafOf field).isSome
   let leaf ← leafOf (← fields[children]?)
   some (nodeNamespace, nodeStruct, children, leaf)
@@ -108,10 +108,10 @@ private def treeNode? (unit : ValidatedUnit) (ty : Ty) :
 /-- The path, from a value of a type, to the handle of the first table it
 holds in a field: the field's index, then the table's handle field. -/
 private def handlePath? (unit : ValidatedUnit) (ty : Ty) : Option (List Nat) := do
-  let (_, _, _, declaration) ← nominalDeclaration? unit ty
+  let (_, _, ns, declaration) ← nominalDeclaration? unit ty
   let fields ← soleFields? declaration
   fields.toList.zipIdx.findSome? fun (field, index) => do
-    let fieldType ← unit.tables.types[field.type.typeId.index]?
+    let fieldType ← ns.typeOf field.type.typeId
     let (namespaceId, structId, _, _) ← nominalDeclaration? unit fieldType
     let layout ← tableLayout? unit namespaceId structId
     guard layout.handle
@@ -131,9 +131,9 @@ def ownerLayout? (unit : ValidatedUnit) (namespaceId : NamespaceId) (structId : 
     (MapRole.ofName? binding.role).any (·.readsInOrder)
   let (variant, fields) ← match declaration.variants.toList with
     | [] => some (none, declaration.fields)
-    | [variant] => some ((unit.tables.names[variant.name.index]?).map (·.name), variant.fields)
+    | [variant] => some ((ns.nameOf variant.name).map (·.name), variant.fields)
     | _ => none
-  let typeOf (field : FieldDecl) : Option Ty := unit.tables.types[field.type.typeId.index]?
+  let typeOf (field : FieldDecl) : Option Ty := ns.typeOf field.type.typeId
   let table : Option OwnerShape := .table <$> tableLayout? unit namespaceId structId
   let entries : Option OwnerShape := do
     let [field] := fields.toList | none
@@ -169,7 +169,7 @@ def ownerLayout? (unit : ValidatedUnit) (namespaceId : NamespaceId) (structId : 
 
 /-- The layout of an intrinsic map owner whose values the denotation holds
 abstractly, which the runtime's values are read through
-(`SemanticOperations.normalize`): every owner (`designs/intrinsic-maps.md`,
+(`SemanticOperations.normalize`): every owner (`doc/designs/intrinsic-maps.md`,
 "Abstract representation"). -/
 def abstractLayout? (unit : ValidatedUnit) (namespaceId : NamespaceId) (structId : Nat) :
     Option OwnerLayout :=

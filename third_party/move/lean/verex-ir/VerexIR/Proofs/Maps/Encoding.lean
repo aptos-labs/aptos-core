@@ -140,6 +140,90 @@ theorem ascending (keys : View K) (values : View V) (map : SpecMap K V) (ranks :
   simp only [Maps.Ascending, entries, List.pairwise_map, SpecMap.Ascending, View.order]
 
 omit [DecidableEq K] in
+/-- Entries keyed by written keys are distinct exactly when the typed map is. -/
+theorem valid_sequence (keys : View K) (values : View V) (map : SpecMap K V) :
+    Discipline.sequence.Valid (entries keys values map) ↔ SpecMap.Valid .sequence map := by
+  simp only [Discipline.Valid, SpecMap.Valid, Distinct, SpecMap.Distinct, entries, List.Nodup,
+    List.map_map, List.pairwise_map, Function.comp_def, ne_eq, keys.injective.eq_iff]
+
+/-- A key held by the entries is a written key the typed map holds. -/
+theorem exists_of_containsB_entries (keys : View K) (values : View V) (map : SpecMap K V)
+    (key : RuntimeValue) (held : containsB (entries keys values map) key = true) :
+    ∃ k, SpecMap.hasKey map k = true ∧ key = keys.write k := by
+  induction map with
+  | nil => simp [entries] at held
+  | cons entry rest ih =>
+    simp only [entries, List.map_cons, containsB, Bool.or_eq_true, decide_eq_true_eq] at held
+    rcases held with same | later
+    · exact ⟨entry.1, by simp [SpecMap.hasKey, SpecMap.containsB], same.symm⟩
+    · obtain ⟨k, has, eq⟩ := ih later
+      exact ⟨k, by simp [SpecMap.hasKey, SpecMap.containsB] at has ⊢; exact Or.inr has, eq⟩
+
+/-- A statement over every key the entries hold is one over every key the
+typed map holds, written. -/
+theorem forall_entries_key (keys : View K) (values : View V) (map : SpecMap K V)
+    (P : RuntimeValue → Prop) :
+    (∀ key, containsB (entries keys values map) key = true → P key) ↔
+      ∀ k, SpecMap.hasKey map k = true → P (keys.write k) := by
+  constructor
+  · intro h k has
+    exact h _ (by rw [contains]; exact has)
+  · intro h key held
+    obtain ⟨k, has, rfl⟩ := exists_of_containsB_entries keys values map key held
+    exact h k has
+
+theorem replaceFirst_entries (keys : View K) (values : View V) (map : SpecMap K V) (key : K)
+    (value : V) :
+    Maps.replaceFirst (keys.write key) (values.write value) (entries keys values map) =
+      entries keys values (SpecMap.replaceFirst key value map) := by
+  induction map with
+  | nil => rfl
+  | cons entry rest ih =>
+    by_cases same : entry.1 = key
+    · simp [entries, Maps.replaceFirst, SpecMap.replaceFirst, same]
+    · simp only [entries, List.map_cons, Maps.replaceFirst, SpecMap.replaceFirst,
+        keys.injective.eq_iff, same, if_false]
+      exact congrArg _ ih
+
+/-- A sequence update of the entries is the typed map's. -/
+theorem sequenceSet (keys : View K) (values : View V) (map : SpecMap K V) (key : K) (value : V) :
+    Maps.seqSet (entries keys values map) (keys.write key) (values.write value) =
+      entries keys values (SpecMap.update .sequence map key value) := by
+  simp only [Maps.seqSet, SpecMap.update, SpecMap.Discipline.set, SpecMap.seqSet, contains,
+    SpecMap.hasKey]
+  split
+  · exact replaceFirst_entries keys values map key value
+  · simp [entries, List.map_append]
+
+omit [DecidableEq K] in
+theorem swapRemove_entries (keys : View K) (values : View V) (map : SpecMap K V) (index : Nat) :
+    Maps.swapRemove (entries keys values map) index =
+      entries keys values (SpecMap.swapRemove map index) := by
+  unfold Maps.swapRemove SpecMap.swapRemove
+  simp only [entries]
+  rw [← List.map_drop, ← List.map_reverse]
+  cases (map.drop (index + 1)).reverse with
+  | nil => simp [List.map_take]
+  | cons last middle => simp [List.map_take, List.map_append, List.map_reverse]
+
+/-- A sequence removal from the entries is the typed map's. -/
+theorem sequenceDel (keys : View K) (values : View V) (map : SpecMap K V) (key : K) :
+    Maps.seqDel (entries keys values map) (keys.write key) =
+      entries keys values (SpecMap.remove .sequence map key) := by
+  simp only [Maps.seqDel, SpecMap.remove, SpecMap.Discipline.del, SpecMap.seqDel, contains, position,
+    SpecMap.hasKey]
+  split
+  · exact swapRemove_entries keys values map _
+  · rfl
+
+omit [DecidableEq K] in
+/-- Entries of one view are equal exactly when the typed maps are. -/
+theorem entries_inj (keys : View K) (values : View V) (a b : SpecMap K V) :
+    entries keys values a = entries keys values b ↔ a = b :=
+  List.map_inj_right fun _ _ h =>
+    Prod.ext (keys.injective (congrArg Prod.fst h)) (values.injective (congrArg Prod.snd h))
+
+omit [DecidableEq K] in
 theorem valid (keys : View K) (values : View V) (map : SpecMap K V) (raw : RuntimeValue)
     (equal : Maps.entriesOf raw = entries keys values map) (ranks : ValueRanks) :
     Maps.Valid (.ordered ranks) raw ↔ SpecMap.Valid (.ordered (keys.order ranks)) map := by
@@ -155,6 +239,13 @@ theorem orderedSet (keys : View K) (values : View V) (map : SpecMap K V)
   | cons entry rest ih =>
     simp only [entries, List.map_cons, Maps.ordSet, SpecMap.ordSet, View.order] at *
     split <;> simp_all only [List.map_cons]
+
+/-- An ordered update of the entries is the typed map's. -/
+theorem orderedUpdate (keys : View K) (values : View V) (map : SpecMap K V)
+    (ranks : ValueRanks) (key : K) (value : V) :
+    Maps.ordSet ranks (keys.write key) (values.write value) (entries keys values map) =
+      entries keys values (SpecMap.update (.ordered (keys.order ranks)) map key value) :=
+  orderedSet keys values map ranks key value
 
 theorem orderedDel (keys : View K) (values : View V) (map : SpecMap K V) (key : K) :
     Maps.ordDel (keys.write key) (entries keys values map) =

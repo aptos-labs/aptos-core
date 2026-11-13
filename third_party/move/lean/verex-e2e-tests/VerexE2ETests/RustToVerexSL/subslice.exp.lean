@@ -4,7 +4,7 @@
 import VerexSL
 
 verex namespace subslice where
-  fun tail_len(values : &Vector<u32>) -> usize :=
+  fun tail_len(values : &Slice<u32>) -> usize :=
     if values.length >= 1usize then
-      slice(*values, 1usize, values.length).length
+      (&core.subsliceFromEnd[1, 0](*values)).length
     else 0usize

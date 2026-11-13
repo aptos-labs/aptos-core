@@ -5,7 +5,6 @@ use crate::{
     metrics::OTHER_TIMERS_SECONDS,
     state_store::hot_state::{HotState, LoadedHotState},
 };
-use aptos_config::config::HotStateConfig;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::SUBTREE_DROPPER;
@@ -24,10 +23,10 @@ pub struct PersistedState {
 impl PersistedState {
     const MAX_PENDING_DROPS: usize = 8;
 
-    pub fn new_empty(config: HotStateConfig) -> Self {
-        let state = State::new_empty(config);
-        let hot_state = Arc::new(HotState::new_empty(state));
-        let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
+    pub(crate) fn new(hot_state: LoadedHotState, summary: StateSummary) -> Self {
+        assert_eq!(hot_state.state().version(), summary.version());
+        let hot_state = Arc::new(HotState::new(hot_state));
+        let summary = Arc::new(Mutex::new(summary));
         Self { hot_state, summary }
     }
 
@@ -62,20 +61,5 @@ impl PersistedState {
         *self.summary.lock() = summary;
 
         self.hot_state.enqueue_commit(state);
-    }
-
-    /// Installs a snapshot synchronously and returns it for seeding subsequent commits.
-    /// Requires no queued or concurrent hot-state commits.
-    pub(crate) fn install_snapshot(
-        &self,
-        hot_state: LoadedHotState,
-        summary: StateSummary,
-    ) -> StateWithSummary {
-        assert_eq!(hot_state.state().version(), summary.version());
-        let snapshot = StateWithSummary::new(hot_state.state().clone(), summary.clone());
-        // As in `set`, publish the summary before readers can observe the matching hot state.
-        *self.summary.lock() = summary;
-        self.hot_state.install_snapshot(hot_state);
-        snapshot
     }
 }

@@ -46,7 +46,8 @@ verex module 0x42::loose_frame where
 
 -- The mixed wildcard must not silently turn the listed family fully open.
 open VerexIR.Proofs.Denote in
-example {unit : VerexIR.Validation.ValidatedUnit} [Skolems unit] (initial final : Memory unit)
+example {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
+    (initial final : Memory unit)
     (addr other : String) (different : other ≠ addr)
     (frame : «0x42».loose_frame.bump.typedContract.frame (addr, ()) initial () final) :
     final (Skolems.resource (.struct ⟨⟨0⟩, 0⟩ .nil (.cons (.int 64 false) .nil)) .nil)

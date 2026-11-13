@@ -1,8 +1,6 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import VerexIR.Proofs.SimpAttrs
-
 /-!
 # Relational verification semantics
 
@@ -66,10 +64,16 @@ theorem trans {first second third : Spec σ ε α}
 
 end Equiv
 
-/-- Every outcome of `left` is an outcome of `right`. -/
+/-- Every outcome of `left` is an outcome of `right` from every start at
+which `right` is defined.  At a start where `right` is undefined it owes a
+proof the language never checks at run time, and `wp` excludes that start, so
+nothing is asserted there of `left`'s outcomes: a run of `left` may go on
+past the point `right` leaves undefined. -/
 structure Refines (left right : Spec σ ε α) : Prop where
-  ok : ∀ initial result final, left.ok initial result final → right.ok initial result final
-  aborts : ∀ initial error, left.aborts initial error → right.aborts initial error
+  ok : ∀ initial result final, left.ok initial result final →
+    right.ok initial result final ∨ right.undefined initial
+  aborts : ∀ initial error, left.aborts initial error →
+    right.aborts initial error ∨ right.undefined initial
   undefined : ∀ initial, left.undefined initial → right.undefined initial
 
 /-- The computation with no terminating execution.  This is the zeroth
@@ -508,6 +512,9 @@ def certifyUpdate (relation : σ → σ → Prop) (op : Spec σ ε α) :
 
 @[simp] theorem certified_aborts {Invariant : Prop} (build : Invariant → α) :
     ¬(certified build : Spec σ ε α).aborts initial error := fun h => h
+
+@[simp] theorem certified_undefined {Invariant : Prop} (build : Invariant → α) :
+    (certified build : Spec σ ε α).undefined initial ↔ ¬Invariant := Iff.rfl
 
 /-! Projections distribute over conditionals, so symbolic execution never has
 to unfold a branch it has not yet decided. -/

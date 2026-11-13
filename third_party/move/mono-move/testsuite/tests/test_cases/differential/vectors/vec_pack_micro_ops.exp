@@ -16,7 +16,7 @@ fun literal_args() {
   code:
     0: VecPack [40] <- [[0]] (size=1, desc=0) @1
     1: VecPack [48] <- [[8], [8]] (size=8, desc=0) @4
-    2: CallIndirect 0x66::vec_pack_micro_ops::take_two @5
+    2: CallByNameExempt 0x66::vec_pack_micro_ops::take_two @5
     3: Move8 [0] <- [40] @6
     4: Return @6
   safe_point_layouts:

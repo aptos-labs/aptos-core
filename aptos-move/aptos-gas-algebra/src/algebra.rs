@@ -27,6 +27,8 @@ pub type NumTypeTagPseudoGasUnits = GasQuantity<TypeTagPseudoGasUnit>;
 pub type AbstractValueSizePerTypeTagPseudoGasUnit =
     GasQuantity<UnitDiv<AbstractValueUnit, TypeTagPseudoGasUnit>>;
 
+pub type AbstractValueSizePerByte = GasQuantity<UnitDiv<AbstractValueUnit, Byte>>;
+
 /// Unit of (external) gas.
 pub enum GasUnit {}
 
@@ -43,6 +45,9 @@ pub type GasScalingFactor = GasQuantity<UnitDiv<InternalGasUnit, GasUnit>>;
 pub type Fee = GasQuantity<Octa>;
 
 pub type FeePerGasUnit = GasQuantity<UnitDiv<Octa, GasUnit>>;
+
+/// A unitless multiplier on gas.
+pub type GasMultiplier = GasQuantity<UnitDiv<GasUnit, GasUnit>>;
 
 /// Unit of storage slot
 pub enum Slot {}

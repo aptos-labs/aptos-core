@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/dependency_call.rs:5:5: error: `powered` calls the native `core::primitive::u32::rotate_left`, which has neither a specification nor a prelude model; specify it

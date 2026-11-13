@@ -34,6 +34,7 @@ use aptos_types::{
     transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
     write_set::WriteSet,
 };
+use itertools::Itertools;
 use std::sync::Arc;
 
 /// Saves the given ledger infos to the ledger store. If a change set is provided,
@@ -265,8 +266,23 @@ pub(crate) fn save_transactions_impl(
     }
 
     if kv_replay {
+        let all_checkpoint_indices: Vec<_> = txn_infos
+            .iter()
+            .positions(|txn_info| txn_info.has_state_checkpoint_hash())
+            .collect();
+        ensure!(
+            all_checkpoint_indices.last().map(|idx| idx + 1) == Some(txn_infos.len()),
+            "KV replay of {} txns from version {} doesn't end at a block end.",
+            txn_infos.len(),
+            first_version,
+        );
         state_store.replay_kv(
-            &StateUpdateRefs::index_write_sets(first_version, write_sets, write_sets.len(), vec![]),
+            &StateUpdateRefs::index_write_sets(
+                first_version,
+                write_sets,
+                write_sets.len(),
+                all_checkpoint_indices,
+            ),
             &mut ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
             state_kv_batches,
         )?;

@@ -23,8 +23,7 @@ pub(crate) trait MerklePrunerSchema: 'static + Send + Sync {
     fn pruner_progress_key() -> DbMetadataKey;
 }
 
-/// Main-state regular merkle pruner (cold and hot share this identity,
-/// distinguished by their DB).
+/// Main-state cold regular merkle pruner.
 pub(crate) enum StateMerkle {}
 impl MerklePrunerSchema for StateMerkle {
     type StaleIndexSchema = StaleNodeIndexSchema;
@@ -46,7 +45,7 @@ impl MerklePrunerSchema for StateMerkle {
     }
 }
 
-/// Main-state epoch-snapshot merkle pruner.
+/// Main-state cold epoch-snapshot merkle pruner.
 pub(crate) enum EpochSnapshot {}
 impl MerklePrunerSchema for EpochSnapshot {
     type StaleIndexSchema = StaleNodeIndexCrossEpochSchema;
@@ -57,6 +56,52 @@ impl MerklePrunerSchema for EpochSnapshot {
 
     fn worker_name() -> &'static str {
         "state_merkle"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::EpochEndingStateMerkleShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::EpochEndingStateMerklePrunerProgress
+    }
+}
+
+/// Main-state hot regular merkle pruner. Reuses the cold progress keys, as
+/// they live in the hot DB.
+pub(crate) enum HotStateMerkle {}
+impl MerklePrunerSchema for HotStateMerkle {
+    type StaleIndexSchema = StaleNodeIndexSchema;
+
+    fn name() -> &'static str {
+        "hot_state_merkle_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "hot_jmt"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::StateMerkleShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::StateMerklePrunerProgress
+    }
+}
+
+/// Main-state hot epoch-snapshot merkle pruner. Reuses the cold progress keys,
+/// as they live in the hot DB.
+pub(crate) enum HotEpochSnapshot {}
+impl MerklePrunerSchema for HotEpochSnapshot {
+    type StaleIndexSchema = StaleNodeIndexCrossEpochSchema;
+
+    fn name() -> &'static str {
+        "hot_epoch_snapshot_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "hot_ep"
     }
 
     fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
@@ -109,5 +154,97 @@ impl MerklePrunerSchema for PositionEpochSnapshot {
 
     fn pruner_progress_key() -> DbMetadataKey {
         DbMetadataKey::PositionEpochSnapshotPrunerProgress
+    }
+}
+
+/// Native-order regular merkle pruner.
+// Used once the order store is opened by the write path (PR 6).
+#[allow(dead_code)]
+pub(crate) enum OrderStateMerkle {}
+impl MerklePrunerSchema for OrderStateMerkle {
+    type StaleIndexSchema = StaleNodeIndexSchema;
+
+    fn name() -> &'static str {
+        "order_state_merkle_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "order_state_merkle"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::OrderStateMerkleShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::OrderStateMerklePrunerProgress
+    }
+}
+
+/// Native-order epoch-snapshot merkle pruner.
+// Used once the order store is opened by the write path (PR 6).
+#[allow(dead_code)]
+pub(crate) enum OrderEpochSnapshot {}
+impl MerklePrunerSchema for OrderEpochSnapshot {
+    type StaleIndexSchema = StaleNodeIndexCrossEpochSchema;
+
+    fn name() -> &'static str {
+        "order_epoch_snapshot_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "order_epoch_snapshot"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::OrderEpochSnapshotShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::OrderEpochSnapshotPrunerProgress
+    }
+}
+
+/// Native-collateral regular merkle pruner.
+pub(crate) enum CollateralStateMerkle {}
+impl MerklePrunerSchema for CollateralStateMerkle {
+    type StaleIndexSchema = StaleNodeIndexSchema;
+
+    fn name() -> &'static str {
+        "collateral_state_merkle_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "collateral_state_merkle"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::CollateralStateMerkleShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::CollateralStateMerklePrunerProgress
+    }
+}
+
+/// Native-collateral epoch-snapshot merkle pruner.
+pub(crate) enum CollateralEpochSnapshot {}
+impl MerklePrunerSchema for CollateralEpochSnapshot {
+    type StaleIndexSchema = StaleNodeIndexCrossEpochSchema;
+
+    fn name() -> &'static str {
+        "collateral_epoch_snapshot_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "collateral_epoch_snapshot"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::CollateralEpochSnapshotShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::CollateralEpochSnapshotPrunerProgress
     }
 }

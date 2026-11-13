@@ -8,6 +8,7 @@ use crate::{
     },
 };
 use aptos_aggregator::aggregator_v1_extension::{AGGREGATOR_V1_LAYOUT, AGGREGATOR_V1_SIZE};
+use aptos_collateral_natives::NativeCollateralContext;
 use aptos_framework_natives::{
     aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
@@ -18,6 +19,7 @@ use aptos_framework_natives::{
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
+use aptos_order_natives::NativeOrderContext;
 use aptos_position_natives::NativePositionContext;
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
@@ -245,6 +247,10 @@ where
         // Drain staged position writes into the VMChangeSet bucket.
         let position_context: NativePositionContext = extensions.remove();
         let position_writes_map = position_context.into_change_maps();
+        let order_context: NativeOrderContext = extensions.remove();
+        let order_writes_map = order_context.into_change_maps();
+        let collateral_context: NativeCollateralContext = extensions.remove();
+        let collateral_writes_map = collateral_context.into_change_maps();
 
         let woc = WriteOpConverter::new(resolver, is_storage_slot_metadata_enabled);
 
@@ -263,6 +269,12 @@ where
             .map_err(|e| e.finish(Location::Undefined))?;
         change_set
             .set_position_bucket(position_bucket)
+            .map_err(|e| e.finish(Location::Undefined))?;
+        change_set
+            .set_order_bucket(build_trading_native_writeset(order_writes_map))
+            .map_err(|e| e.finish(Location::Undefined))?;
+        change_set
+            .set_collateral_bucket(build_trading_native_writeset(collateral_writes_map))
             .map_err(|e| e.finish(Location::Undefined))?;
 
         Ok(change_set)
@@ -629,8 +641,27 @@ where
     extensions.add(NativeObjectContext::default());
 
     extensions.add(NativePositionContext::new());
+    extensions.add(NativeOrderContext::new());
+    extensions.add(NativeCollateralContext::new());
 
     extensions
+}
+
+/// Convert staged trading-native writes (`None` = deletion) into a
+/// `StateKey -> WriteOp` map, with legacy creation/deletion as for positions.
+fn build_trading_native_writeset(
+    writes: BTreeMap<TradingNativeKey, Option<Bytes>>,
+) -> BTreeMap<StateKey, WriteOp> {
+    writes
+        .into_iter()
+        .map(|(key, value)| {
+            let op = match value {
+                Some(bytes) => WriteOp::legacy_creation(bytes),
+                None => WriteOp::legacy_deletion(),
+            };
+            (StateKey::trading_native(key), op)
+        })
+        .collect()
 }
 
 /// Convert staged position writes (`None` = deletion) into a

@@ -216,6 +216,11 @@ impl ProverOptions {
             // specifications and is asked for explicitly. The Boogie
             // backend's options have no effect on it.
             experiments_vec.push(format!("{}=on", Experiment::SPEC_REWRITE));
+        } else {
+            // The Boogie pipeline carries a deferred closure's effects into usage summaries
+            // and loop havoc; the Verex verifier does not, so it keeps every undeclared
+            // closure frame empty.
+            experiments_vec.push(format!("{}=on", Experiment::DEFERRED_CLOSURE_FRAMES));
         }
         // The Verex verifier inlines dependency code, which only the full
         // pipeline of a compilation target provides: every module is a
@@ -463,5 +468,6 @@ pub fn configure_aptos_custom_natives(options: &mut Options) {
         Some(move_prover_boogie_backend::options::CustomNativeOptions {
             template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
             module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
+            provides_cmp_model: true,
         });
 }

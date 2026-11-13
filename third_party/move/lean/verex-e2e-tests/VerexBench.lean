@@ -9,7 +9,7 @@ import VerexE2ETests.CheckSupport
 # `verex-bench`
 
 Runs one problem of the verification benchmark natively and writes what it
-cost as JSON (`designs/verification-benchmarks.md`): wall time and
+cost as JSON (`doc/designs/benchmark.md`): wall time and
 heartbeats per phase, the verified targets with their wall time and
 heartbeats, and the errors reported.
 
@@ -71,8 +71,10 @@ private unsafe def elaborateFile (path : System.FilePath) : IO (Array Message) :
       (mainModule := `VerexBenchProblem)
   -- Verified as on the command line: unset, `verex.skip_verify` means the
   -- language server.
+  let options ← VerexSL.SourceVerify.environmentOptions
+    (({} : Options).setBool `verex.skip_verify false)
   let state ← Elab.IO.processCommands inputCtx parserState
-    (Elab.Command.mkState environment messages (({} : Options).setBool `verex.skip_verify false))
+    (Elab.Command.mkState environment messages options)
   state.commandState.messages.toList.toArray.filterMapM fun message => do
     if message.isSilent then return none
     let position := s!"{path}:{message.pos.line}:{message.pos.column + 1}"

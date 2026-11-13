@@ -24,7 +24,7 @@ use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree, SUBTREE_DROPPER};
 pub use aptos_storage_interface::state_store::sharded_jmt_state::{
-    PositionSlot, PositionStateWithSummary,
+    NativeSlot, NativeStateWithSummary,
 };
 use aptos_storage_interface::state_store::{
     sharded_jmt_state::ShardedJmtState, state_summary::StateSummary,
@@ -33,11 +33,7 @@ use aptos_storage_interface::state_store::{
 use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
 use std::sync::Arc;
 
-/// A native store's in-memory JMT + SMT state. Leaves carry only the key and
-/// value hash, so every store shares the position slot shape.
-pub type NativeStateWithSummary = PositionStateWithSummary;
 pub type NativeLedgerStateWithSummary = LedgerWithSummary<NativeStateWithSummary>;
-pub type PositionLedgerStateWithSummary = NativeLedgerStateWithSummary;
 
 pub fn new_empty_native_state<T: NativeStoreSpec>() -> NativeStateWithSummary {
     NativeStateWithSummary::new_empty(T::NAME)
@@ -65,7 +61,7 @@ impl LedgerStateView for NativeLedgerStateWithSummary {
     type Snapshot = NativeStateWithSummary;
 
     fn next_version(&self) -> Version {
-        self.latest().next_version()
+        self.last_checkpoint().next_version()
     }
 
     fn last_checkpoint_snapshot(&self) -> Self::Snapshot {
@@ -73,10 +69,8 @@ impl LedgerStateView for NativeLedgerStateWithSummary {
     }
 
     fn is_descendant_of(&self, other: &Self) -> bool {
-        self.latest().is_descendant_of(other.latest())
-            && self
-                .last_checkpoint()
-                .is_descendant_of(other.last_checkpoint())
+        self.last_checkpoint()
+            .is_descendant_of(other.last_checkpoint())
     }
 }
 
@@ -150,7 +144,7 @@ pub struct NativeExtras;
 impl BufferedStateExtras<NativeSnapshotToCommit, NativeStateWithSummary> for NativeExtras {
     type ChunkInput = ();
 
-    fn absorb_chunk(&mut self, (): (), _checkpoint_advanced: bool) {}
+    fn absorb_chunk(&mut self, (): ()) {}
 
     fn build_payload(&mut self, snapshot: NativeStateWithSummary) -> NativeSnapshotToCommit {
         NativeSnapshotToCommit { snapshot }

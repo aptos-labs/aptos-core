@@ -2,7 +2,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
-"""The verification benchmark (`designs/verification-benchmarks.md`).
+"""The verification benchmark (`doc/designs/benchmark.md`).
 
     run      measure the problems of `bench/problems.toml`
     history  fetch the results of recent CI runs
@@ -19,9 +19,12 @@ reports the latest run against main. `compare` only reads recorded runs:
 """
 
 import argparse
+import concurrent.futures
+import contextlib
 import datetime
 import hashlib
 import html
+import importlib.util
 import json
 import math
 import os
@@ -31,6 +34,7 @@ import signal
 import statistics
 import subprocess
 import sys
+import threading
 import time
 import tomllib
 import zoneinfo
@@ -47,6 +51,7 @@ LOCAL_RESULT = LEAN_DIR / "local_benchmark.json"
 LOCAL_HISTORY = LEAN_DIR / "local_benchmark_history.jsonl"
 LOCAL_LOGS = LEAN_DIR / "local_benchmark_logs"
 LOCAL_KEEP = 100
+FX_PREFIX = LEAN_DIR / "local_fx_benchmark"
 SCHEMA = "verex-bench"
 STATUSES = ("verified", "expected rejection", "unexpected acceptance", "failed", "timeout",
             "crashed")
@@ -57,7 +62,7 @@ KINDS = ("move", "lean", "rust")
 # The page's group of a problem that is not a Move problem, by kind; a Move
 # problem is grouped by its package's name.
 KIND_GROUPS = {"move": "Move", "lean": "VerexSL", "rust": "Rust"}
-DEFAULT_TIMEOUT = 20 * 60
+DEFAULT_TIMEOUT = 5 * 60
 DEFAULT_THREADS = 8
 SPARKS = "▁▂▃▄▅▆▇█"
 # The report's groups of phases, in chart order.
@@ -135,11 +140,18 @@ def group_of(problem):
         return tomllib.load(file)["package"]["name"]
 
 
+def head_object(path):
+    """The git object of a path at `HEAD`; a path not yet committed has none."""
+    found = subprocess.run(["git", "rev-parse", "--verify", "--quiet", f"HEAD:{path}"],
+                           cwd=REPO, capture_output=True, text=True)
+    return found.stdout.strip() if found.returncode == 0 else "uncommitted"
+
+
 def input_id(problem):
     """The git objects of a problem's inputs at `HEAD`, marked when the
     working tree changes them."""
     paths = input_paths(problem)
-    objects = [git("rev-parse", f"HEAD:{path}") for path in paths]
+    objects = [head_object(path) for path in paths]
     digest = hashlib.sha1("\n".join(objects).encode()).hexdigest()[:12]
     dirty = git("status", "--porcelain", "--", *paths)
     return digest + ("-dirty" if dirty else "")
@@ -149,18 +161,113 @@ def input_id(problem):
 # Running
 
 
+def default_jobs():
+    """Keep CI wall times sequential; use a small local process pool."""
+    ci = in_ci() or os.environ.get("CI", "").lower() in ("1", "true", "yes")
+    return 1 if ci else min(4, os.cpu_count() or 1)
+
+
+def positive_int(value):
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return number
+
+
+def positive_seconds(value):
+    number = float(value)
+    if not math.isfinite(number) or number <= 0:
+        raise argparse.ArgumentTypeError("must be a finite number greater than zero")
+    return number
+
+
+@contextlib.contextmanager
+def termination_as_exception():
+    """Let SIGTERM run the same process cleanup as Ctrl-C."""
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    previous = signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+
+
+def kill_process_group(pid):
+    try:
+        os.killpg(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+
+
+def run_process_group(command, **kwargs):
+    """Untimed setup processes also take their children with them on cancellation."""
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          start_new_session=True, **kwargs) as process:
+        try:
+            stdout, stderr = process.communicate()
+        except BaseException:
+            kill_process_group(process.pid)
+            process.wait()
+            raise
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+class BenchmarkCancelled(Exception):
+    """The run stopped before this problem completed."""
+
+
+class BenchmarkProgress:
+    def __init__(self, total, jobs):
+        self.total = total
+        self.jobs = jobs
+        self.active = {}
+        self.completed = 0
+        self.lock = threading.Lock()
+
+    def workers(self):
+        pids = ", ".join(f"{name}={pid}" for name, pid in self.active.items())
+        return f"active {len(self.active)}/{self.jobs}" + (f" [{pids}]" if pids else "")
+
+    def started(self, name, pid):
+        with self.lock:
+            self.active[name] = pid
+            print(f"[start] {name}: PID {pid}; {self.workers()}", file=sys.stderr, flush=True)
+
+    def stopped(self, name):
+        with self.lock:
+            self.active.pop(name, None)
+
+    def finished(self, problem, result):
+        wall = result["wall_ms"]["total"] / 1000
+        beats = result.get("heartbeats", {}).get("total")
+        with self.lock:
+            self.completed += 1
+            print(f"[{self.completed}/{self.total}] {problem['name']}: {result['status']}, "
+                  f"{wall:.1f} s"
+                  + (f", {beat_count(beats)} heartbeats" if beats is not None else "")
+                  + f"; {self.workers()}", file=sys.stderr, flush=True)
+
+
 def bench_environment(package, threads):
     """The environment `lake env` gives the benchmark executable, so it runs
     without `lake` around it (whose time would count as the problem's)."""
     probe = "import json, os; print(json.dumps(dict(os.environ)))"
-    output = subprocess.run(
+    output = run_process_group(
         ["lake", "--dir", str(package), "env", sys.executable, "-c", probe],
-        cwd=LEAN_DIR, capture_output=True, text=True,
+        cwd=LEAN_DIR, text=True,
     )
     if output.returncode != 0:
         fail(f"`lake env` failed in {package}:\n{output.stderr}")
     env = json.loads(output.stdout.strip().splitlines()[-1])
     env["LEAN_NUM_THREADS"] = str(threads)
+    if threads == 1:
+        # A single Lean worker must execute proofs directly, without waiting
+        # on asynchronous proof tasks queued behind its current command.
+        options = env.get("VEREX_OPTIONS", "").strip(",")
+        env["VEREX_OPTIONS"] = ",".join(filter(None,
+            (options, "verex.jobs=1", "Elab.async=false")))
     move_cli = os.environ.get("APTOS_MOVE_CLI") or str(REPO / "target" / "ci" / "move")
     if not Path(move_cli).is_file():
         fail(f"no Move CLI at {move_cli}; build it with `cargo build --locked --profile ci "
@@ -189,9 +296,11 @@ def repository_relative(text):
     return text.replace(f"{REPO}/", "")
 
 
-def attempt(problem, executable, env, workdir):
+def attempt(problem, executable, env, workdir, cancel=None, progress=None):
     """One run of a problem in its own process group, under its timeout;
     the result with the CPU time of the process tree added."""
+    if cancel is not None and cancel.is_set():
+        raise BenchmarkCancelled()
     out = workdir / f"{problem['name']}.json"
     log = workdir / f"{problem['name']}.log"
     out.unlink(missing_ok=True)
@@ -205,21 +314,39 @@ def attempt(problem, executable, env, workdir):
         )
         timed_out = False
         try:
+            if progress is not None:
+                progress.started(problem["name"], process.pid)
             while True:
+                if cancel is not None and cancel.is_set():
+                    raise BenchmarkCancelled()
                 pid, status, usage = os.wait4(process.pid, os.WNOHANG)
                 if pid:
+                    process.returncode = os.waitstatus_to_exitcode(status)
                     break
                 if time.monotonic() - started > timeout:
-                    os.killpg(process.pid, signal.SIGKILL)
+                    kill_process_group(process.pid)
                     _, status, usage = os.wait4(process.pid, 0)
+                    process.returncode = os.waitstatus_to_exitcode(status)
                     timed_out = True
                     break
-                time.sleep(0.2)
+                if cancel is None:
+                    time.sleep(0.1)
+                else:
+                    cancel.wait(0.1)
         except BaseException:
-            # The driver is stopped: the problem's process group goes with it.
-            os.killpg(process.pid, signal.SIGKILL)
+            # Every worker handles its own group and reaps its leader. The
+            # coordinator signals all workers before waiting for any of them.
+            kill_process_group(process.pid)
+            if process.returncode is None:
+                _, status, _ = os.wait4(process.pid, 0)
+                process.returncode = os.waitstatus_to_exitcode(status)
             raise
-        process.returncode = os.waitstatus_to_exitcode(status)
+        finally:
+            # Descendants belong to the attempt even if their leader exits
+            # before them (including a leader that writes malformed output).
+            kill_process_group(process.pid)
+            if progress is not None:
+                progress.stopped(problem["name"])
     wall_ms = round((time.monotonic() - started) * 1000)
     cpu_ms = round((usage.ru_utime + usage.ru_stime) * 1000)
     if timed_out:
@@ -235,18 +362,36 @@ def attempt(problem, executable, env, workdir):
     return result
 
 
-def measure(problem, executable, env, workdir):
-    """A problem's result: the median of its repeats by wall time, with the
-    spread of the repeats."""
+def measure(problem, executable, env, workdir, cancel=None, progress=None):
+    """A complete case shares one wall-time cap across sequential repeats.
+    Successful groups select the median by wall time, with their spread."""
     results = []
+    timeout = problem.get("timeout", DEFAULT_TIMEOUT)
+    started = time.monotonic()
+    deadline = started + timeout
+    options = {}
+    if cancel is not None:
+        options["cancel"] = cancel
+    if progress is not None:
+        options["progress"] = progress
     for _ in range(problem.get("repeat", 1)):
-        result = attempt(problem, executable, env, workdir)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            result = {"status": "timeout", "wall_ms": {"total": 0}, "cpu_ms": 0}
+        else:
+            result = attempt({**problem, "timeout": remaining}, executable, env, workdir, **options)
         results.append(result)
         if "heartbeats" not in result:
             break
     finished = [result for result in results if "heartbeats" in result]
-    if not finished:
-        chosen = results[-1]
+    if len(finished) != len(results):
+        # A completed repeat cannot hide a later timeout or crash. Failed
+        # repeat groups report the complete work spent on the case.
+        chosen = dict(results[-1])
+        chosen["wall_ms"] = {"total": round((time.monotonic() - started) * 1000)}
+        chosen["cpu_ms"] = sum(result.get("cpu_ms", 0) for result in results)
+        if chosen["status"] == "timeout":
+            chosen["error_messages"] = [f"benchmark case exceeded its {timeout:g} s wall-time limit"]
     else:
         ordered = sorted(finished, key=lambda result: result["wall_ms"]["total"])
         chosen = dict(ordered[(len(ordered) - 1) // 2])
@@ -258,7 +403,58 @@ def measure(problem, executable, env, workdir):
             }
     chosen = expected_outcome(problem, chosen)
     return {"name": problem["name"], "kind": problem["kind"], "group": group_of(problem),
-            "input": input_id(problem), **chosen}
+            "input": input_id(problem), "timeout_seconds": timeout, **chosen}
+
+
+def measure_problems(problems, executable, env, workdir, jobs, cancel=None, timeout=None):
+    """Run independent process groups, keeping repeats together and output ordered."""
+    if jobs < 1:
+        raise ValueError("jobs must be at least 1")
+    if timeout is not None:
+        problems = [{**problem, "timeout": timeout} for problem in problems]
+    cancel = cancel if cancel is not None else threading.Event()
+    progress = BenchmarkProgress(len(problems), jobs)
+    measured = [None] * len(problems)
+    failures = []
+    failure_lock = threading.Lock()
+
+    def worker(problem):
+        try:
+            return measure(problem, executable, env, workdir, cancel=cancel, progress=progress)
+        except BaseException as error:
+            with failure_lock:
+                if not isinstance(error, BenchmarkCancelled) and not failures:
+                    failures.append(error)
+            cancel.set()
+            raise
+
+    print(f"verex-bench: {len(problems)} problems; up to {jobs} problem processes, "
+          f"{env.get('LEAN_NUM_THREADS', 'default')} Lean threads per process",
+          file=sys.stderr, flush=True)
+    with termination_as_exception():
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=jobs)
+        pending = {}
+        try:
+            pending = {executor.submit(worker, problem): index
+                       for index, problem in enumerate(problems)}
+            for future in concurrent.futures.as_completed(pending):
+                index = pending[future]
+                measured[index] = future.result()
+                progress.finished(problems[index], measured[index])
+        except BaseException as error:
+            cancel.set()
+            for future in pending:
+                future.cancel()
+            print("verex-bench: stopping all active problem process groups",
+                  file=sys.stderr, flush=True)
+            if isinstance(error, BenchmarkCancelled) and failures:
+                raise failures[0]
+            raise
+        finally:
+            # Do not use the executor's context manager: it would wait for
+            # running children before the outer exception could cancel them.
+            executor.shutdown(wait=True, cancel_futures=True)
+    return measured
 
 
 def expected_outcome(problem, result):
@@ -287,6 +483,14 @@ def expected_outcome(problem, result):
     return {**result, "status": "failed"}
 
 
+def concurrency_description(run):
+    if run.get("flavor") == "framework":
+        # Older framework records called their module-process count threads.
+        return f"{run.get('jobs', run.get('threads'))} module processes"
+    return (f"{run.get('jobs', run.get('processes', 1))} problem processes, "
+            f"{run.get('threads')} Lean threads per process")
+
+
 def cpu_model():
     try:
         for line in Path("/proc/cpuinfo").read_text().splitlines():
@@ -299,8 +503,11 @@ def cpu_model():
 
 
 def run(args):
-    # A cancelled CI job terminates the driver; stop the running problem too.
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    with termination_as_exception():
+        return run_benchmark(args)
+
+
+def run_benchmark(args):
     problems = load_manifest(args.manifest)
     if args.only:
         wanted = args.only.split(",")
@@ -311,8 +518,8 @@ def run(args):
     package = Path(args.package).resolve()
     # A run measures the executable, so it is built from the current sources
     # first; up to date, the build is a no-op.
-    build = subprocess.run(["lake", "--dir", str(package), "build", "verex-bench"],
-                           cwd=LEAN_DIR, capture_output=True, text=True)
+    build = run_process_group(["lake", "--dir", str(package), "build", "verex-bench"],
+                              cwd=LEAN_DIR, text=True)
     if build.returncode != 0:
         fail(f"building verex-bench in {package} failed:\n{build.stdout[-3000:]}"
              f"{build.stderr[-3000:]}")
@@ -328,19 +535,11 @@ def run(args):
     workdir.mkdir(parents=True, exist_ok=True)
     # Load the environment once untimed, so the first problem does not pay
     # for a cold file cache.
-    warmup = subprocess.run([str(executable), "warmup"], cwd=LEAN_DIR, env=env,
-                            capture_output=True, text=True)
+    warmup = run_process_group([str(executable), "warmup"], cwd=LEAN_DIR, env=env,
+                               text=True)
     if warmup.returncode != 0:
         fail(f"the warm-up failed:\n{warmup.stderr}")
-    measured = []
-    for index, problem in enumerate(problems, 1):
-        result = measure(problem, executable, env, workdir)
-        measured.append(result)
-        wall = result["wall_ms"]["total"] / 1000
-        beats = result.get("heartbeats", {}).get("total")
-        print(f"[{index}/{len(problems)}] {problem['name']}: {result['status']}, {wall:.1f} s"
-              + (f", {beat_count(beats)} heartbeats" if beats is not None else ""),
-              file=sys.stderr, flush=True)
+    measured = measure_problems(problems, executable, env, workdir, args.jobs, timeout=args.timeout)
     results = {
         "schema": SCHEMA,
         "version": VERSION,
@@ -351,6 +550,8 @@ def run(args):
         "runner": os.environ.get("RUNNER_NAME") or platform.node(),
         "cpu": cpu_model(),
         "threads": args.threads,
+        "jobs": args.jobs,
+        "default_timeout_seconds": args.timeout if args.timeout is not None else DEFAULT_TIMEOUT,
         "branch": current_branch(),
         "subset": bool(args.only),
         "problems": measured,
@@ -358,12 +559,12 @@ def run(args):
     if args.out:
         Path(args.out).write_text(json.dumps(results, indent=2) + "\n")
         print(f"verex-bench: wrote {args.out}", file=sys.stderr)
-    # Keep intermediate runs for explicit comparisons, but show only the
-    # latest local measurement against main in the default page.
+    # The default page appends every local run of the branch, so a series of
+    # local measurements shows its progression against the CI history.
     if not in_ci():
         record_local(results)
         LOCAL_RESULT.write_text(json.dumps(results, indent=2) + "\n")
-        report(parser().parse_args(["report", "--local", str(LOCAL_RESULT)]))
+        report(parser().parse_args(["report", "--local-runs"]))
 
 
 # --------------------------------------------------------------------------
@@ -518,7 +719,7 @@ def result_of(point, name):
 def suite_value(point, measure):
     """The total measured work, including verification rejections; none for
     a run of a subset, whose total compares with no other."""
-    if point.get("subset"):
+    if point.get("subset") and point.get("flavor") != "framework":
         return None
     return sum(problem.get(measure, {}).get("total", 0) for problem in point["problems"])
 
@@ -660,7 +861,7 @@ def markdown(points, threshold, page_url=None):
         f"vs previous, {percent(change(suite[-1], median(suite[:-1])))} "
         f"vs median of {len(suite) - 1} runs); "
         + ", ".join(f"{count} {status}" for status, count in counts.items() if count)
-        + f". Runner `{latest.get('runner')}`, {latest.get('threads')} threads.")
+        + f". Runner `{latest.get('runner')}`, {concurrency_description(latest)}.")
     header = ("| Problem | Status | Elaboration s | Verification s | Overall s | "
               "Δ previous | Δ median | Δ heartbeats | Overall, window |")
     lines += ["", header, "|---|---|---:|---:|---:|---:|---:|---:|---|"]
@@ -991,7 +1192,7 @@ def problem_section(points, name):
     targets = sorted((latest or {}).get("targets", []), key=lambda t: -t["heartbeats"])[:8]
     target_rows = "".join(
         f"<tr><td>{html.escape(target['target'])}</td><td>{beat_count(target['heartbeats'])}</td>"
-        f"<td>{target['wall_ms'] / 1000:.1f}</td>"
+        f"<td>{seconds(target.get('wall_ms'))}</td>"
         f"<td>{html.escape(target_status(latest, target['target']))}</td></tr>" for target in targets)
     errors = "".join(f"<li>{html.escape(message)}</li>"
                      for message in (latest or {}).get("error_messages", []))
@@ -1030,9 +1231,10 @@ def suite_section(points):
     if all(value is None for value in totals + wall_totals):
         return ('<section id="suite"><h2>Suite</h2><p class="meta">No full run in this '
                 "window: the suite total compares full runs only.</p></section>")
+    scope = ("fixed framework sample" if points[-1].get("flavor") == "framework" else "full runs")
     return (
         '<section id="suite"><h2>Suite<span class="status">all measured work, including rejections, '
-        'full runs</span></h2>'
+        f'{scope}</span></h2>'
         '<div class="charts">'
         f'{chart("Suite", f"Heartbeats ({suffix} = {BEAT_POWERS[suffix]})", suffix, labels, [("Overall", beats)], {})}'
         "</div>" + value_table(labels, rows)
@@ -1078,7 +1280,8 @@ def page(points, local_table):
         f"<title>Verex benchmark</title><style>{STYLE}</style></head><body>"
         '<div class="viz-root"><h1>Verex verification benchmark</h1>'
         f'<div class="meta">{len(points)} runs, latest {html.escape(page_label_of(latest))}, '
-        f'runner {html.escape(str(latest.get("runner")))}, {latest.get("threads")} threads, '
+        f'runner {html.escape(str(latest.get("runner")))}, '
+        f'{html.escape(concurrency_description(latest))}, '
         f'{html.escape(latest.get("toolchain", ""))}</div>'
         f'<div class="layout">{index(points, groups, local_table)}<main>'
         + expensive_targets_section(latest) + local_table + sections
@@ -1172,6 +1375,8 @@ def report(args):
     locals_ = [json.loads(Path(args.local).read_text())] if args.local else []
     if args.local_runs:
         locals_ += local_runs(current_branch())
+    if args.full_runs_only:
+        locals_ = [point for point in locals_ if not point.get("subset", False)]
     base, rows = None, []
     if locals_:
         base = comparison_base(points, args.base_ref) if points else None
@@ -1222,10 +1427,151 @@ def compare(args):
           f"{percent(change(beats[1], beats[0])):>9}")
 
 
+def framework_selection(corpus, durations, fraction):
+    """Rank measured modules first, resolving address aliases by module name."""
+    def duration(name):
+        if name in durations:
+            return durations[name]
+        return max((value for key, value in durations.items()
+                    if key.rsplit("::", 1)[-1] == name.rsplit("::", 1)[-1]), default=-1)
+    ranked = sorted(corpus, key=lambda name: (-duration(name), name))
+    if not ranked or duration(ranked[0]) < 0:
+        fail("no measured framework modules to rank; run verify-modules.py first")
+    selected = ranked[:max(1, math.ceil(len(ranked) * fraction))]
+    return {"fraction": fraction, "corpus_modules": len(corpus),
+            "ranking": "prior module wall seconds", "modules": selected,
+            "ranking_seconds": {name: duration(name) for name in selected}}
+
+
+def framework_problems(sweep):
+    problems = []
+    for module in sweep["modules"]:
+        targets = module["targets"]
+        measured = [target for target in targets if "heartbeats" in target]
+        problems.append({
+            "name": module["module"], "kind": "move", "group": "Aptos Framework",
+            "status": module["outcome"],
+            "heartbeats": {"total": sum(target["heartbeats"] for target in measured)},
+            "wall_ms": {"total": round(module["wall"] * 1000)},
+            "cpu_ms": round(module["cpu"] * 1000),
+            "targets": measured, "outcomes": targets,
+        })
+    return problems
+
+
+def framework_overview(point):
+    selection, sweep = point["selection"], point["sweep"]
+    counts = {}
+    rows = []
+    targets = sorted(
+        ((module["module"], target) for module in sweep["modules"] for target in module["targets"]),
+        key=lambda item: (item[1].get("heartbeats") is None,
+                          -item[1].get("heartbeats", 0), item[0], item[1]["target"]))
+    for rank, (module, target) in enumerate(targets, 1):
+        status = target["status"]
+        counts[status] = counts.get(status, 0) + 1
+        beats = target.get("heartbeats")
+        measured_rank = str(rank) if beats is not None else "–"
+        rows.append(f'<tr><td>{measured_rank}</td><td>{html.escape(module)}</td>'
+                    f'<td>{html.escape(target["target"])}</td><td>{html.escape(status)}</td>'
+                    f'<td>{f"{beats:,}" if beats is not None else "–"}</td></tr>')
+    summary = ", ".join(f"{counts.get(status, 0)} {status}"
+                        for status in ("verified", "budget", "failed", "interrupted"))
+    modules = ", ".join(html.escape(name) for name in selection["modules"])
+    return (f'<section id="local"><h2>Framework sample</h2><p>'
+            f'{len(selection["modules"])} of {selection["corpus_modules"]} modules with specifications, '
+            f'selected by {html.escape(selection["ranking"])}. Selection is frozen between runs.</p>'
+            f'<p>{summary}. Counts cover observed targets only; crashed or timed-out modules '
+            'may leave additional targets unstarted.</p>'
+            f'<p>Namespace compilation failures: {len(sweep.get("namespace_failures", []))}. '
+            f'Modules timed out or crashed: {sum(module["outcome"] in ("timeout", "crashed") for module in sweep["modules"])}.</p>'
+            f'<p>Whole-run wall: {sweep["wall"]:.1f}s; namespace preparation: '
+            f'{sweep["namespace_wall"]:.1f}s; module CPU total: '
+            f'{sum(module["cpu"] for module in sweep["modules"]):.1f}s; '
+            f'{sweep["jobs"]} module workers; 300M raw heartbeats per target.</p>'
+            '<p>Charts show theorem heartbeats, including failed and budget-stopped attempts. '
+            'Module wall times include export and elaboration; their sum is not elapsed wall time. '
+            'Namespace preparation has no heartbeat measurement here.</p>'
+            f'<details><summary>Selected modules</summary><p>{modules}</p></details>'
+            f'<details id="ranked-targets"><summary>All targets ranked by heartbeats (highest first)</summary>'
+            '<p>Targets without a completed heartbeat measurement appear last, unranked.</p>'
+            '<table><tr><th>Rank</th><th>Module</th>'
+            f'<th>Target</th><th>Status</th><th>Heartbeats</th></tr>{"".join(rows)}</table></details>'
+            '</section>')
+
+
+def framework(args):
+    """A local, fixed expensive-module sample, separate from nightly problems."""
+    if not 0 < args.fraction <= 1 or args.jobs < 1 or args.timeout <= 0:
+        fail("framework requires 0 < fraction <= 1, jobs >= 1, and timeout > 0")
+    spec = importlib.util.spec_from_file_location("verify_modules", LEAN_DIR / "scripts/verify-modules.py")
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    package = REPO / "aptos-move/framework/aptos-framework"
+    corpus = runner.modules_of(package, None)
+    selection_path = FX_PREFIX.with_name("local_fx_selection.json")
+    if selection_path.exists() and not args.refresh_selection:
+        selection = json.loads(selection_path.read_text())
+        missing = set(selection["modules"]) - set(corpus)
+        if missing:
+            fail(f"selected modules disappeared: {sorted(missing)}; use --refresh-selection")
+    else:
+        durations = (json.loads(runner.DURATIONS.read_text()).get(str(package), {})
+                     if runner.DURATIONS.exists() else {})
+        selection = framework_selection(corpus, durations, args.fraction)
+        selection_path.write_text(json.dumps(selection, indent=2) + "\n")
+    logs = FX_PREFIX.with_name("local_fx_benchmark_logs") / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    logs.mkdir(parents=True, exist_ok=True)
+    raw = logs / "sweep.json"
+    command = [sys.executable, str(LEAN_DIR / "scripts/verify-modules.py"), str(package),
+               "--modules", ",".join(selection["modules"]), "--heartbeats", "300",
+               "--jobs", str(args.jobs), "--timeout", str(args.timeout),
+               "--logs", str(logs), "--json", str(raw)]
+    if args.no_build:
+        command.append("--no-build")
+    started = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+    print(f"verex-bench: framework sample: {len(selection['modules'])}/{len(corpus)} modules; "
+          f"logs {logs}", file=sys.stderr, flush=True)
+    with (logs / "driver.out").open("w") as output:
+        completed = subprocess.run(command, cwd=LEAN_DIR, stdout=output,
+                                   env=runner.with_option(os.environ.copy(), "verex.jobs=1"))
+    if completed.returncode not in (0, 1) or not raw.exists():
+        fail(f"framework runner failed ({completed.returncode}); see {logs}")
+    sweep = json.loads(raw.read_text())
+    point = {"schema": SCHEMA, "version": VERSION, "flavor": "framework",
+             "commit": git("rev-parse", "HEAD"), "dirty": bool(git("status", "--porcelain")),
+             "date": started, "branch": current_branch(), "runner": platform.node(),
+             "toolchain": (LEAN_DIR / "lean-toolchain").read_text().strip(),
+             "threads": args.jobs, "subset": True, "selection": selection, "sweep": sweep,
+             "problems": framework_problems(sweep)}
+    history_path = FX_PREFIX.with_name("local_fx_benchmark_history.jsonl")
+    history = [json.loads(line) for line in history_path.read_text().splitlines()] if history_path.exists() else []
+    history = (history + [point])[-LOCAL_KEEP:]
+    history_path.write_text("".join(json.dumps(item) + "\n" for item in history))
+    FX_PREFIX.with_suffix(".json").write_text(json.dumps(point, indent=2) + "\n")
+    # Never mix changing samples or branches in a chart's comparison window.
+    comparable = [item for item in history if item["branch"] == point["branch"]
+                  and item["selection"]["modules"] == selection["modules"]]
+    rendered = page(comparable, framework_overview(point))
+    rendered = rendered.replace("Verex verification benchmark", "Verex Aptos Framework sample")
+    Path(args.html).write_text(rendered)
+    print(f"verex-bench: wrote {args.html}", file=sys.stderr)
+
+
 def parser():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
+
+    fx = commands.add_parser("framework", help="benchmark a frozen expensive-module framework sample")
+    fx.add_argument("--fraction", type=float, default=0.3, help="fraction selected when refreshing (default: 0.3)")
+    fx.add_argument("--refresh-selection", action="store_true", help="rank modules again using prior measured runtimes")
+    fx.add_argument("--jobs", type=int, default=8)
+    fx.add_argument("--timeout", type=positive_seconds, default=DEFAULT_TIMEOUT,
+                    help="seconds per module (default: 300)")
+    fx.add_argument("--no-build", action="store_true")
+    fx.add_argument("--html", default=LEAN_DIR / "local_fx_bechmark.html")
+    fx.set_defaults(action=framework)
 
     run_parser = commands.add_parser("run", help="measure the problems")
     run_parser.add_argument("--out", help="a results file to write; a local run is also "
@@ -1234,8 +1580,14 @@ def parser():
     run_parser.add_argument("--manifest", default=MANIFEST)
     run_parser.add_argument("--package", default=PACKAGE,
                             help="the Lake package that built verex-bench")
-    run_parser.add_argument("--threads", type=int,
-                            default=int(os.environ.get("LEAN_NUM_THREADS", DEFAULT_THREADS)))
+    run_parser.add_argument("--timeout", type=positive_seconds,
+                            help="wall-time cap per complete problem, including repeats; overrides "
+                                 "manifest timeout (otherwise 300 seconds)")
+    run_parser.add_argument("--jobs", type=positive_int, default=default_jobs(),
+                            help="independent problem processes (default: up to 4 locally, 1 in CI)")
+    run_parser.add_argument("--threads", type=positive_int,
+                            default=os.environ.get("LEAN_NUM_THREADS", str(DEFAULT_THREADS)),
+                            help="Lean worker threads per problem (default: LEAN_NUM_THREADS or 8)")
     run_parser.set_defaults(action=run)
 
     def history_options(sub):
@@ -1256,6 +1608,8 @@ def parser():
     report_parser.add_argument("--local", help="a local results file to append")
     report_parser.add_argument("--local-runs", action="store_true",
                                help="append the recorded local runs of the current branch")
+    report_parser.add_argument("--full-runs-only", action="store_true",
+                               help="omit local subset runs from the report; retain full failed runs")
     report_parser.add_argument("--no-history", action="store_true",
                                help="report the local run alone")
     report_parser.add_argument("--base-ref", default="upstream/main",

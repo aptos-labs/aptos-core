@@ -39,7 +39,7 @@ use aptos_vm_environment::prod_configs::{
 use clap::Parser;
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
 use std::{
-    ops::Range,
+    ops::{Range, RangeInclusive},
     panic,
     path::{Path, PathBuf},
     process,
@@ -52,13 +52,13 @@ use std::{
 pub struct Opt {
     #[clap(
         long,
-        help = "The first transaction version required to be replayed and verified, extended to the start of its block"
+        help = "The first transaction version to verify. Replay starts at the start of its block"
     )]
     start_version: Version,
 
     #[clap(
         long,
-        help = "The last transaction version required to be replayed and verified, extended to the end of its block"
+        help = "The last transaction version to verify. Replay ends at the end of its block"
     )]
     end_version: Version,
 
@@ -194,6 +194,7 @@ impl ReplayTps {
 struct Verifier {
     backup_handler: BackupHandler,
     arc_db: Arc<dyn DbReader>,
+    requested_versions: RangeInclusive<Version>,
     start: Version,
     limit: u64,
     replay_concurrency_level: usize,
@@ -263,6 +264,7 @@ impl Verifier {
         Ok(Self {
             backup_handler,
             arc_db,
+            requested_versions: config.start_version..=config.end_version,
             start,
             limit,
             replay_concurrency_level: config.replay_concurrency_level.get(),
@@ -502,6 +504,16 @@ impl Verifier {
                 expected_events.drain(..=block_end_idx);
                 expected_writesets.drain(..=block_end_idx);
 
+                // Txns outside the requested range only complete blocks. Neighboring ranges verify
+                // them, unless they are skipped on purpose.
+                if !self.requested_versions.contains(&version) {
+                    warn!(
+                        version = version,
+                        error = %err,
+                        "Ignoring mismatch outside the requested range."
+                    );
+                    return Ok(None);
+                }
                 return Ok(Some(err));
             }
 
@@ -664,6 +676,7 @@ mod tests {
         block_metadata::BlockMetadata,
         transaction::{ChangeSet, ExecutionStatus, WriteSetPayload},
     };
+    use itertools::Itertools;
     use move_core_types::account_address::AccountAddress;
 
     /// Txns from `first_version` on, ending a block wherever `block_ends` says so.
@@ -898,6 +911,58 @@ mod tests {
             );
             let errors = verifier.run().unwrap();
             assert!(errors.is_empty(), "{errors:?}");
+        }
+    }
+
+    #[test]
+    fn mismatches_reported_only_in_requested_range() {
+        let db_dir = aptos_temppath::TempPath::new();
+        // Blocks: [0, 0], [1, 11], [12, 13], [14, 29].
+        drop(test_execution_with_storage_impl_inner(false, db_dir.path()));
+        let opt = Opt::try_parse_from([
+            "replay-on-archive",
+            "--start-version",
+            "16",
+            "--end-version",
+            "25",
+            "--target-db-dir",
+            db_dir.path().to_str().unwrap(),
+        ])
+        .unwrap();
+        let verifier = Verifier::new(&opt, None).unwrap();
+        assert_eq!((verifier.start, verifier.limit), (14, 16));
+        let executor = AptosVMBlockExecutor::new();
+
+        for (mismatch_version, reported) in [(15, false), (20, true), (26, false)] {
+            let (mut txns, mut aux_infos, mut txn_infos, mut events, mut write_sets) = verifier
+                .backup_handler
+                .get_transaction_iter(verifier.start, verifier.limit as usize)
+                .unwrap()
+                .map(|item| item.unwrap())
+                .multiunzip::<(Vec<_>, Vec<_>, Vec<_>, Vec<_>, Vec<_>)>();
+            let txn_info = &mut txn_infos[(mismatch_version - verifier.start) as usize];
+            *txn_info = TransactionInfo::new_placeholder(
+                0,
+                txn_info.state_checkpoint_hash(),
+                ExecutionStatus::Success,
+            );
+
+            let mut version = verifier.start;
+            let error = verifier
+                .execute_and_verify(
+                    &executor,
+                    &mut version,
+                    &mut txns,
+                    &mut aux_infos,
+                    &mut txn_infos,
+                    &mut events,
+                    &mut write_sets,
+                )
+                .unwrap();
+            assert_eq!(error.is_some(), reported, "{error:?}");
+            // The rest of the block is skipped either way.
+            assert_eq!(version, 30);
+            assert!(txns.is_empty());
         }
     }
 

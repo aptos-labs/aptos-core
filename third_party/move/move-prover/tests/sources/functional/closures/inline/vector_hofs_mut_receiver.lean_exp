@@ -1,9 +1,49 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:106:9: error: the specification clause `ensures ∀ (i in 0 .. s.v.length), s.v[i] == old(s.v)[i] + 2` is not established
-tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:103:5: error: verex verification failed: the automatic verification of `bump_field_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_mut_receiver.proof.lean`:
-  verify bump_field_wrong by
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:21:13: error: the loop invariant `∀ (j in 0 .. i), v[j] == with_state_anchor!(1, old(v))[j] + 1` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:22:13: error: the loop invariant `∀ (j in 0 .. i), !(with_state_anchor!(1, old(v))[j] == MAX_U64)` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:57:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:55:5: error: verex verification failed: the automatic verification of `bump_field` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_mut_receiver.proof.lean`:
+  verify bump_field by lean =>
     verex_obligations
     verex_on
+    | invariant_4_step => verex_prepare; sorry
+    | invariant_5_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:21:13: error: the loop invariant `∀ (j in 0 .. i), v[j] == with_state_anchor!(3, old(v))[j] + 1` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:22:13: error: the loop invariant `∀ (j in 0 .. i), !(with_state_anchor!(3, old(v))[j] == MAX_U64)` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:73:9: error: the specification clause `aborts_if !exists<R>(a)` is not established
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:71:5: error: verex verification failed: the automatic verification of `bump_resource` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_mut_receiver.proof.lean`:
+  verify bump_resource by lean =>
+    verex_obligations
+    verex_on
+    | invariant_4_step => verex_prepare; sorry
+    | invariant_5_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:37:13: error: the loop invariant `∀ (j in 0 .. i), v[j] == with_state_anchor!(0, old(v))[j] + j` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:90:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:87:5: error: verex verification failed: the automatic verification of `add_index` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_mut_receiver.proof.lean`:
+  verify add_index by lean =>
+    verex_obligations
+    verex_on
+    | invariant_4_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:21:13: error: the loop invariant `∀ (j in 0 .. i), v[j] == with_state_anchor!(2, old(v))[j] + 1` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:22:13: error: the loop invariant `∀ (j in 0 .. i), !(with_state_anchor!(2, old(v))[j] == MAX_U64)` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:105:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:106:9: error: the specification clause `ensures ∀ (i in 0 .. s.v.length), s.v[i] == old(s.v)[i] + 2` is not established
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:103:5: error: verex verification failed: the automatic verification of `bump_field_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_mut_receiver.proof.lean`:
+  verify bump_field_wrong by lean =>
+    verex_obligations
+    verex_on
+    | invariant_4_step => verex_prepare; sorry
+    | invariant_5_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -15,7 +15,10 @@ use crate::{
     on_chain_config::OnChainConfig,
     state_store::{
         state_key::{
-            inner::{StateKeyDecodeErr, StateKeyTag, TradingNativeKey, TradingNativeKeyTag},
+            inner::{
+                CollateralScope, StateKeyDecodeErr, StateKeyTag, TradingNativeKey,
+                TradingNativeKeyTag,
+            },
             registry::{Entry, REGISTRY},
         },
         table::TableHandle,
@@ -162,6 +165,36 @@ impl StateKey {
                             .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
                         Self::bulk_order(exchange, market, account)
                     },
+                    TradingNativeKeyTag::Collateral => {
+                        // [tag:1][sub_tag:1][exchange:32][account:32][scope:1][market:32 if Isolated]
+                        const ADDR: usize = AccountAddress::LENGTH;
+                        const FIXED_LEN: usize = 2 + ADDR * 2 + 1;
+                        if val.len() < FIXED_LEN {
+                            return Err(StateKeyDecodeErr::NotEnoughBytes {
+                                tag,
+                                num_bytes: val.len(),
+                            });
+                        }
+                        let exchange = AccountAddress::from_bytes(&val[2..2 + ADDR])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        let account = AccountAddress::from_bytes(&val[2 + ADDR..2 + ADDR * 2])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        let scope = match val[FIXED_LEN - 1] {
+                            0 if val.len() == FIXED_LEN => CollateralScope::Cross,
+                            1 if val.len() == FIXED_LEN + ADDR => {
+                                let market = AccountAddress::from_bytes(&val[FIXED_LEN..])
+                                    .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                                CollateralScope::Isolated { market }
+                            },
+                            _ => {
+                                return Err(StateKeyDecodeErr::NotEnoughBytes {
+                                    tag,
+                                    num_bytes: val.len(),
+                                })
+                            },
+                        };
+                        Self::collateral(exchange, account, scope)
+                    },
                 }
             },
         };
@@ -190,6 +223,11 @@ impl StateKey {
                 TradingNativeKey::Order { .. } => 1 + AccountAddress::LENGTH * 2 + 16,
                 // sub_tag (1) + exchange (32) + market (32) + account (32).
                 TradingNativeKey::BulkOrder { .. } => 1 + AccountAddress::LENGTH * 3,
+                // sub_tag (1) + exchange (32) + account (32) + scope tag (1) [+ market (32)].
+                TradingNativeKey::Collateral { scope, .. } => match scope {
+                    CollateralScope::Cross => 1 + AccountAddress::LENGTH * 2 + 1,
+                    CollateralScope::Isolated { .. } => 1 + AccountAddress::LENGTH * 3 + 1,
+                },
             },
         }
     }
@@ -243,6 +281,11 @@ impl StateKey {
                 market,
                 account,
             } => Self::bulk_order(exchange, market, account),
+            TradingNativeKey::Collateral {
+                exchange,
+                account,
+                scope,
+            } => Self::collateral(exchange, account, scope),
         }
     }
 
@@ -299,6 +342,26 @@ impl StateKey {
                     }))
                 })
                 .expect("BulkOrder StateKey encode is infallible"),
+        )
+    }
+
+    /// Construct a persisted native collateral state key.
+    pub fn collateral(
+        exchange: AccountAddress,
+        account: AccountAddress,
+        scope: CollateralScope,
+    ) -> Self {
+        Self(
+            REGISTRY
+                .collateral((exchange, account), &scope)
+                .get_or_add(&(exchange, account), &scope, || {
+                    Ok(StateKeyInner::TradingNative(TradingNativeKey::Collateral {
+                        exchange,
+                        account,
+                        scope,
+                    }))
+                })
+                .expect("Collateral StateKey encode is infallible"),
         )
     }
 

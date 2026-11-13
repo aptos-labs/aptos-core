@@ -1,6 +1,6 @@
 VerexE2ETests/SourceVerify/returned_reference_freeze.move:62:35: error: the specification clause `ensures result == 9` is not established
 VerexE2ETests/SourceVerify/returned_reference_freeze.move:62:5: error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/returned_reference_freeze.proof.lean`:
-  verify wrong by
+  verify wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

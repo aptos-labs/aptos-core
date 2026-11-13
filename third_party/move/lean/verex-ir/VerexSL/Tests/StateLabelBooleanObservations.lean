@@ -54,7 +54,7 @@ verify 0x42::state_label_boolean_observations::twice
 error: the specification clause `ensures result == spec.result[1]` is not established
 ---
 error: verex verification failed: the automatic verification of `different_readers` failed; provide a proof in the module:
-  verify different_readers by
+  verify different_readers by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
