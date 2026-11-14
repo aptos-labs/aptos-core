@@ -121,22 +121,36 @@ spec aptos_framework::transaction_context {
         pragma opaque;
     }
 
+    /// Whether the current transaction is an orderless transaction.
+    spec fun spec_is_orderless_txn(): bool;
+
+    /// Whether the current execution runs the inner payload of a multisig transaction.
+    spec fun spec_is_multisig_payload_txn(): bool;
+
     spec is_orderless_txn_internal(): bool {
         pragma opaque;
+        // Assumes a user transaction context is available.
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_is_orderless_txn();
     }
 
     spec is_orderless_txn_internal_for_test_only(): bool {
         pragma opaque;
         aborts_if [abstract] false;
+        ensures [abstract] result == spec_is_orderless_txn();
     }
 
     spec is_multisig_payload_txn_internal(): bool {
         pragma opaque;
+        // Assumes a user transaction context is available.
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_is_multisig_payload_txn();
     }
 
     spec is_multisig_payload_txn_internal_for_test_only(): bool {
         pragma opaque;
         aborts_if [abstract] false;
+        ensures [abstract] result == spec_is_multisig_payload_txn();
     }
 
     spec monotonically_increasing_counter_internal(timestamp_us: u64): u128 {

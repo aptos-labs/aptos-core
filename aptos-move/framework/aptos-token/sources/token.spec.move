@@ -52,8 +52,6 @@ spec aptos_token::token {
         aborts_if !exists<Collections>(creator_addr);
         aborts_if balance <= 0;
         include CreateTokenMutabilityConfigAbortsIf;
-
-        include CreateTokenMutabilityConfigAbortsIf;
     }
 
     spec fun spec_create_tokendata(
@@ -406,7 +404,6 @@ spec aptos_token::token {
     spec deposit_token(account: &signer, token: Token) {
         // TODO: boogie error: invalid type for argument 1 in application of $ResourceExists: $1_account_Account (expected: int)
         pragma verify = false;
-        pragma aborts_if_is_partial;
         let account_addr = signer::address_of(account);
         include !exists<TokenStore>(account_addr) ==> InitializeTokenStore;
         let token_id = token.id;
@@ -589,7 +586,6 @@ spec aptos_token::token {
     ): TokenDataId {
         // TODO: Complex abort condition in "roperty_map::new".
         pragma verify = false;
-        pragma aborts_if_is_partial;
         let account_addr = signer::address_of(account);
         let collections = global<Collections>(account_addr);
         let token_data_id = spec_create_token_data_id(account_addr, collection, name);

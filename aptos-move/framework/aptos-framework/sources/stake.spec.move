@@ -614,26 +614,47 @@ spec aptos_framework::stake {
         let post post_active_value = post_stake_pool.active.value;
         let post post_pending_inactive_value = post_stake_pool.pending_inactive.value;
         let post post_inactive_value = post_stake_pool.inactive.value;
+        include DistributeRewardsAbortsIf {
+            stake: stake_pool.active,
+            num_successful_proposals,
+            num_total_proposals,
+            rewards_rate,
+            rewards_rate_denominator
+        };
+        include DistributeRewardsAbortsIf {
+            stake: stake_pool.pending_inactive,
+            num_successful_proposals,
+            num_total_proposals,
+            rewards_rate,
+            rewards_rate_denominator
+        };
         ensures post_stake_pool.pending_active.value == 0;
-        // the amount stored in the stake pool should not changed after the update
+        // Besides rewards, active and pending_inactive stake can only grow by the
+        // distributed transaction fees.
+        let no_fee = !exists<PendingTransactionFee>(@aptos_framework);
+        let expired = spec_get_reconfig_start_time_secs() >= stake_pool.locked_until_secs;
         ensures post_active_value
+            >= stake_pool.active.value + rewards_amount_1
+                + stake_pool.pending_active.value;
+        ensures no_fee ==> post_active_value
             == stake_pool.active.value + rewards_amount_1
                 + stake_pool.pending_active.value;
         // when current lockup cycle has expired, pending inactive should be fully unlocked and moved into inactive
-        ensures if (spec_get_reconfig_start_time_secs() >= stake_pool.locked_until_secs) {
-            post_pending_inactive_value == 0
-                && post_inactive_value
-                    == stake_pool.inactive.value + stake_pool.pending_inactive.value
-                        + rewards_amount_2
-        } else {
-            post_pending_inactive_value
-                == stake_pool.pending_inactive.value + rewards_amount_2
-        };
+        ensures expired ==> post_pending_inactive_value == 0
+            && post_inactive_value
+                >= stake_pool.inactive.value + stake_pool.pending_inactive.value
+                    + rewards_amount_2;
+        ensures expired && no_fee ==> post_inactive_value
+            == stake_pool.inactive.value + stake_pool.pending_inactive.value
+                + rewards_amount_2;
+        ensures !expired ==> post_inactive_value == stake_pool.inactive.value
+            && post_pending_inactive_value
+                >= stake_pool.pending_inactive.value + rewards_amount_2;
+        ensures !expired && no_fee ==> post_pending_inactive_value
+            == stake_pool.pending_inactive.value + rewards_amount_2;
     }
 
     spec schema UpdateStakePoolAbortsIf {
-        use aptos_std::type_info;
-
         pool_address: address;
         validator_perf: ValidatorPerformance;
 
@@ -641,18 +662,12 @@ spec aptos_framework::stake {
         aborts_if !exists<ValidatorConfig>(pool_address);
         aborts_if global<ValidatorConfig>(pool_address).validator_index
             >= len(validator_perf.validators);
-
-        let aptos_addr = type_info::type_of<AptosCoin>().account_address;
-
-        let stake_pool = global<StakePool>(pool_address);
-
-        include DistributeRewardsAbortsIf { stake: stake_pool.active };
-        include DistributeRewardsAbortsIf { stake: stake_pool.pending_inactive };
     }
 
     spec distribute_rewards {
         pragma opaque;
-        pragma aborts_if_is_partial;
+        // Callers can only rely on the abort conditions of a non-partial opaque spec.
+        pragma aborts_if_is_partial = false;
         include ResourceRequirement;
         requires rewards_rate <= MAX_REWARDS_RATE;
         requires rewards_rate_denominator > 0;
@@ -681,6 +696,9 @@ spec aptos_framework::stake {
                         rewards_rate_denominator
                     );
         ensures old(stake.value) == 0 ==> result == 0;
+        let coin_addr = aptos_std::type_info::type_of<AptosCoin>().account_address;
+        ensures exists<coin::CoinInfo<AptosCoin>>(coin_addr)
+            == old(exists<coin::CoinInfo<AptosCoin>>(coin_addr));
         ensures old(stake.value) == 0 ==>
             stake.value == old(stake.value);
     }
@@ -739,6 +757,8 @@ spec aptos_framework::stake {
         // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 300;
         pragma verify = false;
+        // Override module-level `aborts_if_is_partial` so the declared `aborts_if false` is honored.
+        pragma aborts_if_is_partial = false;
         requires rewards_rate <= MAX_REWARDS_RATE;
         requires rewards_rate_denominator > 0;
         requires rewards_rate <= rewards_rate_denominator;
@@ -856,7 +876,6 @@ spec aptos_framework::stake {
         // TODO: These function failed in github CI
         pragma verify_duration_estimate = 120;
         pragma verify = false;
-        pragma aborts_if_is_partial;
         include ResourceRequirement;
         let addr = signer::address_of(owner);
         ensures global<ValidatorConfig>(addr)

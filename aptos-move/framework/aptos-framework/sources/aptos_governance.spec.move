@@ -59,7 +59,6 @@ spec aptos_framework::aptos_governance {
         voting_duration_secs: u64,
     ) {
         use aptos_std::type_info::Self;
-        pragma aborts_if_is_partial;
 
         let addr = signer::address_of(aptos_framework);
         let register_account = global<account::Account>(addr);
@@ -561,7 +560,6 @@ spec aptos_framework::aptos_governance {
         aborts_if !exists<ApprovedExecutionHashes>(@aptos_framework);
         let voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         aborts_if !table::spec_contains(voting_forum.proposals, proposal_id);
-        aborts_if !exists<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
         aborts_if !proposal.is_resolved;
         let post approved_hashes = global<ApprovedExecutionHashes>(@aptos_framework).hashes;

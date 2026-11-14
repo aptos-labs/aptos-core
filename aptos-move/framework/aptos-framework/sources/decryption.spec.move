@@ -7,6 +7,17 @@ spec aptos_framework::decryption {
         invariant option::is_some(decryption_key) == option::is_some(decryption_round);
     }
 
+    spec initialize(framework: &signer) {
+        use std::signer;
+        aborts_if signer::address_of(framework) != @aptos_framework;
+        ensures exists<PerBlockDecryptionKey>(@aptos_framework);
+        ensures exists<PerEpochEncryptionKey>(@aptos_framework);
+        ensures exists<PerBlockDecryptionKeyV2>(@aptos_framework);
+        // Already published resources are left untouched.
+        ensures old(exists<PerBlockDecryptionKeyV2>(@aptos_framework)) ==>
+            global<PerBlockDecryptionKeyV2>(@aptos_framework) == old(global<PerBlockDecryptionKeyV2>(@aptos_framework));
+    }
+
     spec on_new_block(
         vm: &signer,
         epoch: u64,
