@@ -434,7 +434,9 @@ pub async fn simulate_compiled_scripts(
         AptosDebugger::rest_client(client.clone()).context("failed to create AptosDebugger")?;
     let state = client.get_ledger_information().await?.into_inner();
 
-    let state_view = DeltaStateStore::new_with_base(debugger.state_view_at_version(state.version));
+    // The debugger reads the state right before the given version.
+    let state_view =
+        DeltaStateStore::new_with_base(debugger.state_view_at_version(state.version + 1));
 
     // Create and fund a sender account that is used to send the governance scripts.
     print!("Creating and funding sender account.. ");
