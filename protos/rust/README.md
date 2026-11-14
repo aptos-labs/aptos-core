@@ -16,4 +16,4 @@ fn parse(transaction: Transaction) {
 ```
 
 ## Contributing
-See [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for more information.

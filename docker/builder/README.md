@@ -11,7 +11,7 @@ docker/builder/docker-bake-rust-all.sh
 
 The above command will by default build all the images. To build specific images, refer to `group` and `target` definitions in [docker-bake-rust-all.hcl](docker-bake-rust-all.hcl).
 
-For using the images, look in the [docker/compose](../docker/compose/) directory.
+For using the images, look in the [docker/compose](../compose/) directory.
 
 ## List of Images
 
