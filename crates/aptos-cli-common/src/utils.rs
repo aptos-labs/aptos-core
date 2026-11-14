@@ -199,7 +199,25 @@ pub fn write_to_user_only_file(path: &Path, name: &str, bytes: &[u8]) -> CliType
     let mut opts = OpenOptions::new();
     #[cfg(unix)]
     opts.mode(0o600);
-    write_to_file_with_opts(path, name, bytes, &mut opts)
+    let mut file = opts
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)
+        .map_err(|e| CliError::IO(name.to_string(), e))?;
+    // `OpenOptions::mode` only governs the permissions of a newly created file;
+    // when `path` already exists the open reuses its current bits. Re-apply the
+    // restrictive mode on the open handle before writing so the contents (e.g. a
+    // private key) are never stored in a file readable by other users, even when
+    // overwriting a pre-existing or attacker-pre-created file.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| CliError::IO(name.to_string(), e))?;
+    }
+    file.write_all(bytes)
+        .map_err(|e| CliError::IO(name.to_string(), e))
 }
 
 pub fn read_from_file(path: &Path) -> CliTypedResult<Vec<u8>> {
@@ -557,4 +575,68 @@ pub fn cli_build_information() -> BTreeMap<String, String> {
         env!("CARGO_PKG_VERSION").to_string(),
     );
     info
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::write_to_user_only_file;
+    use std::{
+        fs::{self, OpenOptions, Permissions},
+        io::Write,
+        os::unix::fs::{OpenOptionsExt, PermissionsExt},
+        path::PathBuf,
+    };
+
+    fn unique_temp_path(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "aptos-cli-perm-{}-{}-{}",
+            tag,
+            std::process::id(),
+            nanos
+        ))
+    }
+
+    #[test]
+    fn write_to_user_only_file_sets_0600_on_new_file() {
+        let path = unique_temp_path("new");
+        write_to_user_only_file(&path, "test", b"secret").unwrap();
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        assert_eq!(fs::read(&path).unwrap(), b"secret");
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn write_to_user_only_file_tightens_existing_permissions() {
+        let path = unique_temp_path("existing");
+        // Pre-create the file world-readable/writable, mimicking a file left over
+        // from a loosened save or planted by another local user.
+        {
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o666)
+                .open(&path)
+                .unwrap();
+            file.write_all(b"old").unwrap();
+        }
+        fs::set_permissions(&path, Permissions::from_mode(0o666)).unwrap();
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o666
+        );
+
+        // Overwriting through the user-only helper must restore 0600 rather than
+        // inherit the existing file's permissions.
+        write_to_user_only_file(&path, "test", b"secret").unwrap();
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "existing file permissions were not tightened");
+        assert_eq!(fs::read(&path).unwrap(), b"secret");
+        let _ = fs::remove_file(&path);
+    }
 }
