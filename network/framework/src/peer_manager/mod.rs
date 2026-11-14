@@ -771,8 +771,6 @@ where
             return Ok(());
         }
 
-        let mut send_new_peer_notification = true;
-
         // Check for and handle simultaneous dialing
         if let Entry::Occupied(active_entry) = self.active_peers.entry(peer_id) {
             let (curr_conn_metadata, _) = active_entry.get();
@@ -791,7 +789,6 @@ where
                     self.network_context,
                     peer_id.short_str()
                 );
-                send_new_peer_notification = false;
             } else {
                 info!(
                     NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
@@ -847,13 +844,11 @@ where
             conn_meta.clone(),
         )?;
         // Send NewPeer notification to connection event handlers before consuming conn_meta.
-        if send_new_peer_notification {
-            let notif = ConnectionNotification::NewPeer(
-                conn_meta.clone(),
-                self.network_context.network_id(),
-            );
-            self.send_conn_notification(peer_id, notif);
-        }
+        let notif = ConnectionNotification::NewPeer(
+            conn_meta.clone(),
+            self.network_context.network_id(),
+        );
+        self.send_conn_notification(peer_id, notif);
         self.active_peers.insert(peer_id, (conn_meta, peer_reqs_tx));
 
         Ok(())
