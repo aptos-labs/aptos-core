@@ -45,7 +45,7 @@ pub(super) fn recover_dkg_state<T: OnChainConfig + Default>(
 
     let version = ledger_info.version();
     let value = db
-        .get_state_value_by_version(&StateKey::on_chain_config::<T>()?, version)
+        .get_state_value_at_checkpoint(&StateKey::on_chain_config::<T>()?, version)
         .with_context(|| {
             format!(
                 "Failed to read {} at epoch-start version {version}",
