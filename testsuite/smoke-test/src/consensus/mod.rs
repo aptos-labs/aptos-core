@@ -8,4 +8,5 @@ mod consensusdb_recovery;
 mod dag;
 mod helpers;
 mod optqs_fault_tolerance;
+mod pipeline_reset;
 mod quorum_store_fault_tolerance;

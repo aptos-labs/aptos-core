@@ -247,6 +247,7 @@ mod tests {
         for block in &ordered_blocks.ordered_blocks {
             let (rand_tx, rand_rx) = oneshot::channel();
             block.set_pipeline_tx(PipelineInputTx {
+                commit_messages_tx: None,
                 qc_tx: None,
                 rand_tx: Some(rand_tx),
                 order_vote_tx: None,
