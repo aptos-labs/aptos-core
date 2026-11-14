@@ -29,24 +29,25 @@ impl IntoExecutionError for InterruptedError {
     }
 }
 
-/// Chunk size for meters that poll for interrupts.
+/// Size of a gas chunk, in MonoMove gas units. A meter with interrupt polling
+/// polls once per chunk.
 //
-// TODO(metering): derive the interval from the gas schedule.
-pub const POLL_INTERVAL: u64 = 10_000;
+// TODO(metering): derive the chunk size from the gas schedule.
+pub const GAS_CHUNK_SIZE: u64 = 10_000;
 
 /// A flat-budget gas meter, called by the interpreter at charge points.
 ///
 /// Charges draw from the current chunk, and a reserve refills it. Without
 /// interrupt polling, the whole budget is one chunk. With polling, a chunk
-/// holds at most `chunk_size` units, and the interpreter polls for interrupts
-/// each time one runs out. Either way, a charge fails at the same point as
-/// with a single counter.
+/// holds at most `chunk_size` gas units, and the interpreter polls for
+/// interrupts each time one runs out. Either way, a charge fails at the same
+/// point as with a single counter.
 pub struct GasMeter {
     /// Gas left in the current chunk.
     chunk: u64,
     /// Gas left beyond the current chunk.
     reserve: u64,
-    /// Maximum size of a chunk, or 0 if the meter does not poll.
+    /// Maximum size of a chunk in gas units, or 0 if the meter does not poll.
     chunk_size: u64,
 }
 
@@ -61,9 +62,9 @@ impl GasMeter {
         Self::new(u64::MAX)
     }
 
-    /// Splits the balance into chunks of at most `chunk_size` units, so the
-    /// interpreter polls for interrupts once per chunk. A `chunk_size` of 0
-    /// turns polling off.
+    /// Splits the balance into chunks of at most `chunk_size` gas units, so
+    /// the interpreter polls for interrupts once per chunk. A `chunk_size` of
+    /// 0 turns polling off.
     pub fn with_interrupt_polling(self, chunk_size: u64) -> Self {
         Self::split(self.balance(), chunk_size)
     }
@@ -81,7 +82,7 @@ impl GasMeter {
         }
     }
 
-    /// Maximum size of a chunk, or 0 if the meter does not poll.
+    /// Maximum size of a chunk in gas units, or 0 if the meter does not poll.
     pub fn chunk_size(&self) -> u64 {
         self.chunk_size
     }
@@ -147,9 +148,9 @@ mod tests {
         prop_oneof![
             Just(0),
             Just(1),
-            Just(POLL_INTERVAL - 1),
-            Just(POLL_INTERVAL),
-            Just(POLL_INTERVAL + 1),
+            Just(GAS_CHUNK_SIZE - 1),
+            Just(GAS_CHUNK_SIZE),
+            Just(GAS_CHUNK_SIZE + 1),
             Just(u64::MAX),
             0..1_000u64,
             any::<u64>(),
@@ -160,7 +161,7 @@ mod tests {
         prop_oneof![
             Just(0),
             Just(1),
-            Just(POLL_INTERVAL),
+            Just(GAS_CHUNK_SIZE),
             1..64u64,
             any::<u64>()
         ]
@@ -170,10 +171,10 @@ mod tests {
         prop_oneof![
             Just(0),
             Just(1),
-            Just(POLL_INTERVAL - 1),
-            Just(POLL_INTERVAL),
-            Just(POLL_INTERVAL + 1),
-            Just(2 * POLL_INTERVAL),
+            Just(GAS_CHUNK_SIZE - 1),
+            Just(GAS_CHUNK_SIZE),
+            Just(GAS_CHUNK_SIZE + 1),
+            Just(2 * GAS_CHUNK_SIZE),
             Just(u64::MAX),
             0..100u64,
             any::<u64>(),

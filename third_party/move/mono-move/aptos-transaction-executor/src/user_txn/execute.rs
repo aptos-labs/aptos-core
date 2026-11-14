@@ -29,7 +29,7 @@ use aptos_types::{
 };
 use mono_move_core::{
     intern_type_tag, native::NativeExtensions, types::InternedTypeList, GasMeter, Interner,
-    POLL_INTERVAL,
+    GAS_CHUNK_SIZE,
 };
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;
@@ -69,7 +69,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             loader,
             // TODO(metering): MonoMove gas units are uncalibrated; budgeting
             // 1:1 against the transaction's gas units is a placeholder.
-            GasMeter::new(txn_data.max_gas_amount).with_interrupt_polling(POLL_INTERVAL),
+            GasMeter::new(txn_data.max_gas_amount).with_interrupt_polling(GAS_CHUNK_SIZE),
             self.data_provider,
             self.natives,
         )
@@ -90,7 +90,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let interrupted = interp.is_interrupted();
         match (result, interp.finish()) {
             (_, Err(e)) => TxnOutcome::Panic(e),
-            (_, Ok(effects)) if interrupted => TxnOutcome::Interrupted { effects },
+            (_, Ok(_)) if interrupted => TxnOutcome::Interrupted,
             (Ok((status, fee_statement)), Ok(effects)) => TxnOutcome::Executed {
                 status,
                 fee_statement,

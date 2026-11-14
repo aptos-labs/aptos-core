@@ -214,6 +214,11 @@ impl<S: TStateView<Key = StateKey>> ResourceProvider for BlockSTMSequentialProvi
             },
         }
     }
+
+    /// A sequential run has no concurrent incarnations to abort.
+    fn interrupt_requested(&self) -> bool {
+        false
+    }
 }
 
 impl<S: TStateView<Key = StateKey>> AptosDataProvider for BlockSTMSequentialProvider<'_, '_, S> {

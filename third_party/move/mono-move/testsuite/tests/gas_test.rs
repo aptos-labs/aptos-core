@@ -7,7 +7,7 @@ use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey,
     types::{InternedType, EMPTY_TYPE_LIST},
     Function, GasExhaustedError, GasMeter, InterruptedError, ResourceProvider,
-    ResourceProviderError, StorageRead, VMInternalError, POLL_INTERVAL,
+    ResourceProviderError, StorageRead, VMInternalError, GAS_CHUNK_SIZE,
 };
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
@@ -178,7 +178,7 @@ module 0x1::test {
             .into_global_arena_ptr();
         let mut interpreter = InterpreterContext::new(
             loader,
-            GasMeter::with_max_budget().with_interrupt_polling(POLL_INTERVAL),
+            GasMeter::with_max_budget().with_interrupt_polling(GAS_CHUNK_SIZE),
             &AlwaysInterrupt,
             &natives,
         );
