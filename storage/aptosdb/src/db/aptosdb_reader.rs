@@ -712,6 +712,21 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn is_known_state_checkpoint(&self, version: Version) -> bool {
+        // The latest ledger info is cached and always at a block end.
+        let latest_version = self
+            .ledger_db
+            .metadata_db()
+            .get_latest_ledger_info_option()
+            .map(|li| li.ledger_info().version());
+        latest_version == Some(version)
+            || self
+                .ledger_db
+                .transaction_info_db()
+                .get_transaction_info(version)
+                .is_ok_and(|txn_info| txn_info.has_state_checkpoint_hash())
+    }
+
     fn get_state_value_at_checkpoint(
         &self,
         state_key: &StateKey,
