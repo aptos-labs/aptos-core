@@ -485,11 +485,8 @@ impl PrioritizedPeersState {
     fn update_prioritized_peer_metrics(&mut self, new_prioritized_peers: &Vec<PeerNetworkId>) {
         // Calculate the number of peers that changed priorities
         let current_prioritized_peers = self.prioritized_peers.read();
-        let num_peers_changed = new_prioritized_peers
-            .iter()
-            .zip(current_prioritized_peers.iter())
-            .filter(|(new_peer, old_peer)| new_peer != old_peer)
-            .count();
+        let num_peers_changed =
+            num_peers_with_changed_priority(&current_prioritized_peers, new_prioritized_peers);
 
         // Log the number of peers that changed priorities
         info!(
@@ -500,6 +497,23 @@ impl PrioritizedPeersState {
         // Update the metrics for the number of peers that changed priorities
         counters::shared_mempool_priority_change_count(num_peers_changed as i64);
     }
+}
+
+/// Returns the number of positions whose peer differs between the old and
+/// new prioritized peer lists, including peers added or removed at the tail.
+fn num_peers_with_changed_priority(
+    old_prioritized_peers: &[PeerNetworkId],
+    new_prioritized_peers: &[PeerNetworkId],
+) -> usize {
+    let num_changed_in_common_prefix = new_prioritized_peers
+        .iter()
+        .zip(old_prioritized_peers.iter())
+        .filter(|(new_peer, old_peer)| new_peer != old_peer)
+        .count();
+    num_changed_in_common_prefix
+        + new_prioritized_peers
+            .len()
+            .abs_diff(old_prioritized_peers.len())
 }
 
 /// Returns the distance from the validators for the
@@ -1391,6 +1405,31 @@ mod test {
 
         // Verify that the observed ping latencies flag was set
         assert!(prioritized_peers_state.observed_all_ping_latencies);
+    }
+
+    #[test]
+    fn test_num_peers_with_changed_priority() {
+        let (a, b, c) = (
+            create_validator_peer(),
+            create_vfn_peer(),
+            create_public_peer(),
+        );
+
+        // No change
+        assert_eq!(num_peers_with_changed_priority(&[a, b], &[a, b]), 0);
+        assert_eq!(num_peers_with_changed_priority(&[], &[]), 0);
+
+        // Reordering changes both positions
+        assert_eq!(num_peers_with_changed_priority(&[a, b], &[b, a]), 2);
+
+        // Peers added or removed at the tail are counted
+        assert_eq!(num_peers_with_changed_priority(&[a], &[a, b]), 1);
+        assert_eq!(num_peers_with_changed_priority(&[a, b], &[a]), 1);
+        assert_eq!(num_peers_with_changed_priority(&[], &[a, b, c]), 3);
+        assert_eq!(num_peers_with_changed_priority(&[a, b, c], &[]), 3);
+
+        // Changes in the common prefix and at the tail are both counted
+        assert_eq!(num_peers_with_changed_priority(&[a, b], &[c, b, a]), 2);
     }
 
     #[test]
