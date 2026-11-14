@@ -29,6 +29,87 @@ use proptest::prelude::*;
 use std::{cmp::min, collections::HashSet};
 
 #[tokio::test]
+async fn test_insert_block_registers_transaction_trace() {
+    use aptos_consensus_types::{
+        payload::{InlineBatch, OptQuorumStorePayload, PayloadExecutionLimit},
+        proof_of_store::BatchInfo,
+    };
+    use aptos_transaction_tracing::{
+        filter::TransactionFilter, store::TransactionTraceStore, types::TransactionStage,
+    };
+    use aptos_types::quorum_store::BatchId;
+
+    let inserter = TreeInserter::default();
+    let block_store = inserter.block_store();
+    let sender = inserter.signer().author();
+    let hash = HashValue::random();
+    let digest = HashValue::random();
+    let store = TransactionTraceStore::global();
+    let _restore = scopeguard::guard(store.get_filter(), |filter| {
+        store.finalize_trace(&hash);
+        store.update_filter((*filter).clone());
+    });
+    store.update_filter(TransactionFilter::new(
+        true,
+        HashSet::from([sender]),
+        1.0,
+        1.0,
+    ));
+    assert!(store.maybe_start_trace(hash, sender, 0));
+    store.register_batch(digest, &[hash]);
+
+    let batch = BatchInfo::new(
+        sender,
+        BatchId::new_for_test(1),
+        1,
+        u64::MAX,
+        digest,
+        1,
+        1,
+        0,
+    );
+    let block = inserter.create_block_with_qc(
+        certificate_for_genesis(),
+        1,
+        1,
+        Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            Vec::<InlineBatch<BatchInfo>>::new().into(),
+            vec![batch].into(),
+            vec![].into(),
+            PayloadExecutionLimit::None,
+        )),
+        vec![],
+    );
+
+    // QC retrieval inserts blocks directly, bypassing RoundManager's proposal handler.
+    block_store.insert_block(block.clone()).await.unwrap();
+    assert_eq!(store.get_block_traced_txns(&block.id()), Some(vec![hash]));
+    // A later proposal for the same block must not record its stages again.
+    block_store.insert_block(block.clone()).await.unwrap();
+    store.record_execution_result(&block.id(), &[], &[]);
+    store.record_block_stage(&block.id(), TransactionStage::Committed);
+
+    let trace = store.get_trace(&hash).unwrap();
+    for stage in [
+        TransactionStage::ParentBlockProposed,
+        TransactionStage::BlockProposed,
+        TransactionStage::BlockReceived,
+        TransactionStage::Executed,
+        TransactionStage::Committed,
+    ] {
+        assert_eq!(
+            trace
+                .stages
+                .iter()
+                .filter(|record| record.stage == stage)
+                .count(),
+            1,
+            "expected exactly one {stage:?} stage"
+        );
+    }
+}
+
+#[tokio::test]
 async fn test_highest_block_and_quorum_cert() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
