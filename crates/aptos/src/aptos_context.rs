@@ -204,9 +204,10 @@ where
     let hash = transaction.committed_hash();
 
     let debugger = AptosDebugger::rest_client(client)?;
+    // The debugger reads the state right before the given version.
     let (vm_status, vm_output) = execute(
         &debugger,
-        version,
+        version + 1,
         transaction,
         hash,
         PersistedAuxiliaryInfo::V1 {
