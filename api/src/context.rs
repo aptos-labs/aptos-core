@@ -41,7 +41,7 @@ use aptos_types::{
     },
     state_store::{
         state_key::{inner::StateKeyInner, prefix::StateKeyPrefix, StateKey},
-        TStateView,
+        MoveResourceExt, TStateView,
     },
     transaction::{
         block_epilogue::BlockEndInfo,
@@ -385,7 +385,7 @@ impl Context {
                         self.get_oldest_version_and_block_height()?;
 
                     let encryption_key_hex = self
-                        .get_encryption_key(latest_version)
+                        .get_encryption_key(block_end_version)
                         .unwrap_or(None)
                         .map(hex::encode);
 
@@ -419,13 +419,16 @@ impl Context {
         Ok(self.db.get_latest_ledger_info()?)
     }
 
+    /// `version` must be the latest ledger version.
     pub fn get_encryption_key(&self, version: Version) -> Result<Option<Vec<u8>>> {
         if !self.node_config.api.allow_encrypted_txns_submission {
             return Ok(None);
         }
         use aptos_types::decryption::PerEpochEncryptionKeyResource;
-        let resource: Option<PerEpochEncryptionKeyResource> =
-            self.get_resource(AccountAddress::ONE, version)?;
+        let resource = PerEpochEncryptionKeyResource::fetch_move_resource(
+            &self.db.state_view_at_checkpoint(Some(version))?,
+            &AccountAddress::ONE,
+        )?;
         Ok(resource.and_then(|r| r.encryption_key))
     }
 
@@ -1479,7 +1482,7 @@ impl Context {
             // Retrieve the gas schedule from storage and parse it accordingly
             let state_view = self
                 .db
-                .state_view_at_version(Some(ledger_info.version()))
+                .state_view_at_checkpoint(Some(ledger_info.version()))
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
@@ -1553,7 +1556,7 @@ impl Context {
             // Retrieve the execution config from storage and parse it accordingly
             let state_view = self
                 .db
-                .state_view_at_version(Some(ledger_info.version()))
+                .state_view_at_checkpoint(Some(ledger_info.version()))
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
