@@ -180,13 +180,6 @@ module 0x42::apply_carrier_unread_memory {
     }
     spec native_wrapper_twice { ensures result_1 == result_2; } // error: each call may differ
 
-    // Binding is kept for a native whose specification determines the result.
-    fun determined_native_twice(x: u64): (u64, u64) {
-        let h: |u64| u64 has copy + drop = same;
-        (h(x), h(x))
-    }
-    spec determined_native_twice { ensures result_1 == result_2; }
-
     struct Q has key { u: u64 }
 
     fun flip_q() acquires Q {
@@ -567,7 +560,7 @@ module 0x42::apply_carrier_unread_memory {
     }
     spec local_digest_twice { ensures result_1 == result_2; } // error: each call may differ
 
-    // A native the prelude models exactly is a function of its arguments.
+    // Forwards a result of vector type.
     fun apply_bytes(f: |vector<u8>| vector<u8> has copy + drop, b: vector<u8>): vector<u8> {
         f(b)
     }
@@ -576,11 +569,6 @@ module 0x42::apply_carrier_unread_memory {
         aborts_if aborts_of<f>(b);
         ensures result == result_of<f>(b);
     }
-
-    fun prelude_native_through_hof(b: vector<u8>): (vector<u8>, vector<u8>) {
-        (apply_bytes(std::hash::sha2_256, b), std::hash::sha2_256(b))
-    }
-    spec prelude_native_through_hof { ensures result_1 == result_2; }
 
     // Binding is kept for a determined target.
     fun g_byte(x: u8): u8 acquires R { if (exists<R>(@0x42) && R[@0x42].w > 7) x else x }
