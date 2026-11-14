@@ -81,11 +81,11 @@ use aptos_types::{
         },
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
-        AuxiliaryInfo, BlockExecutionResult, EntryFunction, ExecutionError, ExecutionStatus,
-        ModuleBundle, MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction,
-        Transaction, TransactionArgument, TransactionExecutableRef, TransactionExtraConfig,
-        TransactionOutput, TransactionPayload, TransactionStatus, TxnLimitsRequest,
-        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+        AuxiliaryInfo, BlockExecutionResult, CacheInvalidationInfo, EntryFunction, ExecutionError,
+        ExecutionStatus, ModuleBundle, MultisigTransactionPayload, ReplayProtector, Script,
+        SignedTransaction, Transaction, TransactionArgument, TransactionExecutableRef,
+        TransactionExtraConfig, TransactionOutput, TransactionPayload, TransactionStatus,
+        TxnLimitsRequest, VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
@@ -3553,6 +3553,14 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
             onchain_config,
             transaction_slice_metadata,
         )
+    }
+
+    fn invalidate(&self, info: &CacheInvalidationInfo) {
+        // TODO: Invalidate the module cache once publishing emits invalidation
+        // info.
+        match info {
+            CacheInvalidationInfo::V0 { published: _ } => {},
+        }
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(

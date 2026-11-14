@@ -67,10 +67,12 @@ pub fn prepare_phases_and_buffer_manager(
         create_channel::<CountedRequest<ExecutionWaitRequest>>();
     let (execution_wait_phase_response_tx, execution_wait_phase_response_rx) =
         create_channel::<ExecutionResponse>();
-    let execution_wait_phase_processor = ExecutionWaitPhase;
+    // The wait phase sends its own responses, possibly several per request.
+    let execution_wait_phase_processor =
+        ExecutionWaitPhase::new(execution_wait_phase_response_tx, order_vote_enabled);
     let execution_wait_phase = PipelinePhase::new(
         execution_wait_phase_request_rx,
-        Some(execution_wait_phase_response_tx),
+        None,
         Box::new(execution_wait_phase_processor),
         reset_flag.clone(),
     );

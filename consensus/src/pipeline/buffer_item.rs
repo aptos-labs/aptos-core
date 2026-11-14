@@ -9,7 +9,6 @@ use aptos_consensus_types::{
     pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::{bls12381, HashValue};
-use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
@@ -17,7 +16,6 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures, SignatureAggregator},
     validator_verifier::ValidatorVerifier,
 };
-use futures::future::BoxFuture;
 use itertools::zip_eq;
 use std::{collections::HashMap, sync::Arc};
 use tokio::time::Instant;
@@ -150,8 +148,6 @@ impl Hashable for BufferItem {
     }
 }
 
-pub type ExecutionFut = BoxFuture<'static, ExecutorResult<Vec<Arc<PipelinedBlock>>>>;
-
 impl BufferItem {
     pub fn new_ordered(
         ordered_blocks: Vec<Arc<PipelinedBlock>>,
@@ -164,6 +160,28 @@ impl BufferItem {
             ordered_blocks,
             ordered_proof,
         }))
+    }
+
+    /// Splits an ordered item after its first `prefix_len` blocks. Returns the
+    /// prefix blocks, the ordered proof, and the remaining item. The remaining
+    /// item keeps the tip, so it keeps the votes and the commit proof.
+    pub fn split_ordered(
+        self,
+        prefix_len: usize,
+    ) -> (Vec<Arc<PipelinedBlock>>, LedgerInfoWithSignatures, Self) {
+        match self {
+            Self::Ordered(ordered_item) => {
+                let mut ordered_item = *ordered_item;
+                assert!(prefix_len > 0 && prefix_len < ordered_item.ordered_blocks.len());
+                let suffix = ordered_item.ordered_blocks.split_off(prefix_len);
+                let prefix = std::mem::replace(&mut ordered_item.ordered_blocks, suffix);
+                let ordered_proof = ordered_item.ordered_proof.clone();
+                (prefix, ordered_proof, Self::Ordered(Box::new(ordered_item)))
+            },
+            Self::Executed(_) | Self::Signed(_) | Self::Aggregated(_) => {
+                panic!("Only ordered blocks can be split.")
+            },
+        }
     }
 
     // pipeline functions

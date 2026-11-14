@@ -403,18 +403,30 @@ impl BufferManager {
             .await
             .expect("Failed to send execution schedule request");
 
+        let unverified_votes = ordered_blocks
+            .last()
+            .map(|block| self.take_pending_commit_votes(block.round(), block.id()))
+            .unwrap_or_default();
+        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, unverified_votes);
+        self.buffer.push_back(item);
+    }
+
+    /// Removes the pending commit votes for the round, and returns those that
+    /// vote for the given block.
+    fn take_pending_commit_votes(
+        &mut self,
+        round: Round,
+        block_id: HashValue,
+    ) -> HashMap<Author, CommitVote> {
         let mut unverified_votes = HashMap::new();
-        if let Some(block) = ordered_blocks.last() {
-            if let Some(votes) = self.pending_commit_votes.remove(&block.round()) {
-                for (_, vote) in votes {
-                    if vote.commit_info().id() == block.id() {
-                        unverified_votes.insert(vote.author(), vote);
-                    }
+        if let Some(votes) = self.pending_commit_votes.remove(&round) {
+            for (_, vote) in votes {
+                if vote.commit_info().id() == block_id {
+                    unverified_votes.insert(vote.author(), vote);
                 }
             }
         }
-        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, unverified_votes);
-        self.buffer.push_back(item);
+        unverified_votes
     }
 
     /// Set the execution root to the first not executed item (Ordered) and send execution request
@@ -660,7 +672,46 @@ impl BufferManager {
         }
 
         let item = self.buffer.take(&current_cursor);
+        if executed_blocks.len() < item.get_blocks().len() {
+            // Execution was cut after a block that requires cache invalidation.
+            // Its descendants wait for its commit, so the executed prefix
+            // becomes its own item, and the rest stays ordered.
+            let (prefix, ordered_proof, remaining_item) = item.split_ordered(executed_blocks.len());
+            self.buffer.set(&current_cursor, remaining_item);
+
+            let prefix_tip = prefix.last().expect("Prefix must not be empty");
+            let (prefix_id, prefix_round) = (prefix_tip.id(), prefix_tip.round());
+            let unverified_votes = self.take_pending_commit_votes(prefix_round, prefix_id);
+            // The ordered proof is for the remaining item's tip. Only the
+            // signing fallback reads it, which runs after a reset.
+            let prefix_item = BufferItem::new_ordered(prefix, ordered_proof, unverified_votes);
+            let prefix_item = self.advance_to_executed(prefix_item, executed_blocks);
+
+            let aggregated = prefix_item.is_aggregated();
+            self.buffer.insert_before(&current_cursor, prefix_item);
+            if aggregated {
+                self.advance_head(prefix_id).await;
+            }
+            return;
+        }
+
+        let new_item = self.advance_to_executed(item, executed_blocks);
+        let aggregated = new_item.is_aggregated();
+        self.buffer.set(&current_cursor, new_item);
+        if aggregated {
+            self.advance_head(block_id).await;
+        }
+    }
+
+    /// Advances an ordered item with its executed blocks, and aggregates it if
+    /// a pending commit proof matches.
+    fn advance_to_executed(
+        &mut self,
+        item: BufferItem,
+        executed_blocks: Vec<Arc<PipelinedBlock>>,
+    ) -> BufferItem {
         let round = item.round();
+        let block_id = item.block_id();
         let mut new_item = item.advance_to_executed_or_aggregated(
             executed_blocks,
             &self.epoch_state.verifier,
@@ -674,12 +725,7 @@ impl BufferManager {
                 new_item = new_item.try_advance_to_aggregated_with_ledger_info(commit_proof)
             }
         }
-
-        let aggregated = new_item.is_aggregated();
-        self.buffer.set(&current_cursor, new_item);
-        if aggregated {
-            self.advance_head(block_id).await;
-        }
+        new_item
     }
 
     fn generate_commit_message(commit_vote: CommitVote) -> CommitMessage {
@@ -1070,7 +1116,7 @@ mod tests {
             signers,
             _result_rx,
             _verifier,
-        ) = prepare_buffer_manager(BoundedExecutor::new(1, runtime.handle().clone()));
+        ) = prepare_buffer_manager(BoundedExecutor::new(1, runtime.handle().clone()), false);
 
         let (blocks, commit_proof, _) = prepare_executed_blocks_with_ledger_info(
             &signers[0],
