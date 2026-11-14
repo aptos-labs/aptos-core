@@ -406,11 +406,32 @@ def errors_cell(entry):
     return f"{'-' if before is None else before} → {'-' if after is None else after}"
 
 
+def recorded_reasons(ledger_path):
+    """The reasons a recorded ledger states, keyed by package and fixture."""
+    recorded = json.loads(Path(ledger_path).read_text())
+    return {(entry["package"], entry["fixture"]): entry.get("reason", "")
+            for entry in recorded["entries"]}
+
+
+def merge_reasons(entries, ledger_path):
+    """Carry a recorded ledger's reasons over to freshly built entries.
+
+    A reason is kept only for an entry that still differs from the reference;
+    a recorded reason wins over the mechanical one.
+    """
+    reasons = recorded_reasons(ledger_path)
+    for entry in entries:
+        if entry["class"] == "same":
+            continue
+        recorded = reasons.get((entry["package"], entry["fixture"]), "").strip()
+        if recorded:
+            entry["reason"] = recorded
+    return entries
+
+
 def check(entries, ledger_path):
     """Fail when an entry differs from the reference without a stated reason."""
-    recorded = json.loads(Path(ledger_path).read_text())
-    reasons = {(entry["package"], entry["fixture"]): entry.get("reason", "")
-               for entry in recorded["entries"]}
+    reasons = recorded_reasons(ledger_path)
     unexplained = []
     for entry in entries:
         if entry["class"] == "same":
@@ -432,12 +453,16 @@ def main():
     parser.add_argument("--format", choices=["md", "json"], default="md")
     parser.add_argument("--check", metavar="LEDGER",
                         help="fail when an entry differs without a reason")
+    parser.add_argument("--reasons", metavar="LEDGER",
+                        help="carry the reasons of this recorded ledger into the output")
     parser.add_argument("--output", metavar="FILE", help="write there, not to stdout")
     args = parser.parse_args()
 
     entries = build_entries()
     if args.check:
         return check(entries, args.check)
+    if args.reasons:
+        entries = merge_reasons(entries, args.reasons)
 
     if args.format == "json":
         text = json.dumps({"reference": REFERENCE,

@@ -79,6 +79,56 @@ value never enters an environment that is stated valid; or given an explicit
 obligation before it enters one. This audit is a gate before the switch. An
 observable default left unresolved cannot be waived by citing the bijection.
 
+The audit was made twice, independently, and the two agree. No default reaches
+a check, memory, a slot of an environment, a premise of a join or a loop, or a
+contract's receipt: none launders an invalid value into a place stated valid.
+What changes is what a **specification** may conclude from a total read. These
+reads are total by a default, and today the default is a valid value, so its
+invariant is free; after the change it is a raw value with no fact:
+
+| Total read in a specification | Where | A fact needs |
+|---|---|---|
+| A resource that is absent | `nativeSlot` | the resource's existence, that is, a successful read |
+| A field of a variant the value is not in | `typedVariantField?` | the variant test or the selection's equation |
+| A missing key of a map, a position outside it | `SpecMap.get`, `valueAt`, `keyAt` | membership or the bound |
+| An index outside a vector | the clause translator's `indexVector` | the bound; with it the read is the element and has the vector's fact |
+| `result_of` where no run returns | `ResultOf` | a returning run |
+| An unspecified result of an aborting or out-of-domain branch | `nativeArbitrary`, `outsideValue` | nothing gives one; it is raw |
+| A ghost slot a specification leaves unspecified | `unspecifiedGhost` | an explicit statement of the slot |
+
+The rule is one: **a total read's value has a fact only under the premise that
+makes the read successful.** No assumption that a default is valid is added;
+it would be the satisfiability hypothesis under another name. This is the
+behavior of the tree before the carriers, whose defaults were structural, and
+it departs from the Move Prover, where a read of an absent resource is an
+arbitrary well-formed value. A specification that relied on the free fact
+states the premise instead.
+
+Other findings of the audit:
+
+- `NTy.readBack`'s fallback is unreachable for a value the view wrote
+  (`NTy.readBack_readWrite`) and at a certificate-free type. The change
+  narrows it: today the checked decoder also takes it for a well-shaped value
+  that fails its invariant; a plain decoder takes it for a shape mismatch
+  only. No theorem may then claim that an arbitrary plain read recovers a
+  valid value.
+- No place relies on an empty certified type. `Spec.choose` over an empty
+  carrier has no outcome, and the choice over plain values under `Holds`
+  reproduces that exactly, so nothing becomes newly provable. The global
+  vacuity of a unit with an unsatisfiable invariant, which the satisfiability
+  hypothesis caused, disappears.
+- `NTy.inhabitant` and `readBack` return to the form they had before the
+  carriers, which today's plain inhabitants already have. The constants stay
+  irreducible: simprocs match them by name. The array, slice, character and
+  nominal arms are newer and keep their own rules.
+- `VerexSL/Tests/PlainDefaults.lean` asserts in its second half that the
+  certified spelling of a default survives. It is re-aimed with the switch and
+  is the tripwire of this gate.
+
+Before the switch, each row of the table is traced to the facts it feeds, and
+a control per row shows that the fact is refused without its premise and
+granted with it.
+
 `NTy.deepHolds : (τ : NTy) → τ.carrier → Prop` keeps today's arms: a struct's
 or an enum's own clauses (`Carriers.own`) and its fields'; through tuples,
 vectors, tables and ghost slots; `True` at a scalar and a function value; at a
