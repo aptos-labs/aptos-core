@@ -1,0 +1,33 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:27:20
+   │
+27 │     spec keeps_d { ensures d == old(d); }
+   │                    ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:26: keeps_d
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:26: keeps_d
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:27: keeps_d (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:34:27
+   │
+34 │     spec keeps_g_static { ensures g == old(g); }
+   │                           ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:33: keeps_g_static
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:33: keeps_g_static
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:34: keeps_g_static (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:41:27
+   │
+41 │     spec keeps_d_static { ensures d == old(d); }
+   │                           ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:40: keeps_d_static
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:40: keeps_d_static
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_static_update.move:41: keeps_d_static (spec)

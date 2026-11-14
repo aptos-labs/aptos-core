@@ -14,7 +14,8 @@ use log::{debug, info, warn};
 use log::{log_enabled, Level};
 use move_compiler_v2::Experiment;
 use move_model::{
-    code_writer::CodeWriter, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE, model::GlobalEnv,
+    code_writer::CodeWriter, emitln, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE,
+    model::GlobalEnv,
 };
 use move_prover_boogie_backend::{
     add_prelude,
@@ -244,6 +245,9 @@ fn run_move_prover_with_model_v2_internal<W: WriteColor>(
     // Add the prover options as an extension to the environment, so they can be accessed
     // from there.
     env.set_extension(options.prover.clone());
+
+    // Function values may touch state no verification root translates.
+    env.add_world_memory_if_needed();
 
     // Populate initial number operation state for each function and struct based on the pragma
     create_init_num_operation_state(env);
@@ -479,6 +483,11 @@ pub fn generate_boogie(
     let mut translator =
         BoogieTranslator::new(env, &options.backend, verification_root, targets, &writer);
     translator.translate();
+    // Declared only where a call site under a re-entrancy lock or an `$apply` uses it, to leave
+    // every other verification condition as it was.
+    if writer.process_result(|result| result.contains("$known_closure_ran")) {
+        emitln!(writer, "var $known_closure_ran: bool;");
+    }
     Ok(writer)
 }
 

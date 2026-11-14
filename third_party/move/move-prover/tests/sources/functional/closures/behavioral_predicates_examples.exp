@@ -25,6 +25,7 @@ error: post-condition does not hold
 226 │         ensures result == true;  // TODO(#18560)
     │         ^^^^^^^^^^^^^^^^^^^^^^^
     │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:221: contains_test_found
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:223: contains_test_found
     =         <redacted> = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:192: contains (spec)
@@ -58,6 +59,7 @@ error: post-condition does not hold
 234 │         ensures result == true;  // TODO(#18560)
     │         ^^^^^^^^^^^^^^^^^^^^^^^
     │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:229: contains_opaque_test_found
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:231: contains_opaque_test_found
     =         <redacted> = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:216: contains_opaque (spec)
@@ -71,6 +73,7 @@ error: post-condition does not hold
 395 │         ensures result == 7; // expected failure: result == 8
     │         ^^^^^^^^^^^^^^^^^^^^
     │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:390: reduce_test_fail
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:392: reduce_test_fail
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:326: reduce
     =         vec = <redacted>
@@ -102,6 +105,7 @@ error: post-condition does not hold
 403 │         ensures result == 7; // expected failure: result == 8
     │         ^^^^^^^^^^^^^^^^^^^^
     │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:398: reduce_opaque_test_fail
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:400: reduce_opaque_test_fail
     =         result = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:403: reduce_opaque_test_fail (spec)

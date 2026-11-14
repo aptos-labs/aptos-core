@@ -1,0 +1,131 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:21:9
+   │
+21 │         ensures global<other::C>(@0x42) == old(global<other::C>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:14: run
+   =         r = <redacted>
+   =         c = <redacted>
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:15: run
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:16: run
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:17: run
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:17: run
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:14: run
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:21: run (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:32:50
+   │
+32 │     spec run_bool { pragma aborts_if_is_partial; ensures result; }
+   │                                                  ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:25: run_bool
+   =         r = <redacted>
+   =         c = <redacted>
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:26: run_bool
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:6: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:6: get
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:27: run_bool
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:28: run_bool
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:29: run_bool
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:29: run_bool
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:30: run_bool
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:6: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:6: get
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:25: run_bool
+   =         result = <redacted>
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:32: run_bool (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:41:9
+   │
+41 │         ensures global<other::C>(@0x42) == old(global<other::C>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:35: run_store_in_loop
+   =         r = <redacted>
+   =         c = <redacted>
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:36: run_store_in_loop
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:37: run_store_in_loop
+   =     enter loop, variable(s) r, i havocked and reassigned
+   =         r = <redacted>
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:37: run_store_in_loop
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:41: run_store_in_loop (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:53:9
+   │
+53 │         ensures global<other::C>(@0x42) == old(global<other::C>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:45: run_copied
+   =         r = <redacted>
+   =         c = <redacted>
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:46: run_copied
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:47: run_copied
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:48: run_copied
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:49: run_copied
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:45: run_copied
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:53: run_copied (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:65:9
+   │
+65 │         ensures global<other::C>(@0x42) == old(global<other::C>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:57: run_opaque
+   =         r = <redacted>
+   =         c = <redacted>
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:58: run_opaque
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:59: run_opaque
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:60: run_opaque
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:60: run_opaque
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:57: run_opaque
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:65: run_opaque (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:75:9
+   │
+75 │         ensures global<other::C>(@0x42) == old(global<other::C>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:69: run_imm
+   =         r = <redacted>
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:70: run_imm
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:71: run_imm
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_ref_param.move:75: run_imm (spec)

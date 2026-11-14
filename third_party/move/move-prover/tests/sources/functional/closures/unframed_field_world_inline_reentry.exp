@@ -1,0 +1,55 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_reentry.move:27:18
+   │
+27 │     spec run_t { ensures global<Own>(@0x42) == old(global<Own>(@0x42)); }
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:26: run_t
+   =         c = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:10: get
+   =         c = <redacted>
+   =         result = <redacted>
+   =         g = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:27: run_t (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_reentry.move:31:33
+   │
+31 │     spec run_o { pragma opaque; ensures global<Own>(@0x42) == old(global<Own>(@0x42)); }
+   │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:30: run_o
+   =         c = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:10: get
+   =         c = <redacted>
+   =         result = <redacted>
+   =         g = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:31: run_o (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_reentry.move:52:9
+   │
+52 │         ensures global<L::Own>(@0x42) == old(global<L::Own>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:46: witness_t
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:51: witness_t (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:46: witness_t
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:47: witness_t
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:8: make
+   =         f = <redacted>
+   =         result = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:48: witness_t
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:26: run_t
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:10: get
+   =         c = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_reentry.move:52: witness_t (spec)

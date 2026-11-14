@@ -1,0 +1,24 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `f` may modify: it is read from field `f` of `ff::Cb`, which declares no `modifies_of`/`reads_of`
+   ┌─ tests/sources/functional/closures/unframed_field_world_frames.move:20:49
+   │
+20 │     public fun fwd_field(c: &Cb, x: u64): u64 { apply_p(c.f, x) }
+   │                                                 ^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is read from field `f` of `ff::CbE`, which declares no `modifies_of`/`reads_of`
+   ┌─ tests/sources/functional/closures/unframed_field_world_frames.move:23:52
+   │
+23 │     public fun fwd_variant(c: &CbE, x: u64): u64 { apply_p(c.f, x) }
+   │                                                    ^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is read from field `f` of `ff::Cb`, which declares no `modifies_of`/`reads_of`
+   ┌─ tests/sources/functional/closures/unframed_field_world_frames.move:28:9
+   │
+28 │         apply_p(f, x)
+   │         ^^^^^^^^^^^^^
+
+error: function argument read from field `f` of `ff::CbW` may modify any resource, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/unframed_field_world_frames.move:32:55
+   │
+32 │     public fun fwd_wild_field(c: &CbW, x: u64): u64 { apply_p(c.f, x) }
+   │                                                       ^^^^^^^^^^^^^^^

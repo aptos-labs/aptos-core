@@ -34,7 +34,7 @@ module 0x42::behavior_axiom_shared_result {
             x <= y && ensures_of<f>(x, r) && ensures_of<f>(y, s) ==> r <= s;
     }
 
-    /// Must verify: monotonicity at 5 and 9.
+    /// Must fail: the second call runs after the first, which may write what `f` reads.
     public fun distinct_results(m: &M): bool {
         (m.f)(5) <= (m.f)(9)
     }

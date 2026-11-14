@@ -1,0 +1,91 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_existence.move:75:9
+   │
+75 │         ensures global<keep::R>(@0x50) == old(global<keep::R>(@0x50));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:72: keep_value
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:74: keep_value (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:72: keep_value
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:75: keep_value (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_existence.move:82:9
+   │
+82 │         ensures !exists<keep::R>(@0x50);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:79: keep_absent
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:81: keep_absent (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:79: keep_absent
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:82: keep_absent (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_existence.move:89:9
+   │
+89 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:86: keep_false
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:88: keep_false (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:86: keep_false
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:89: keep_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_existence.move:96:9
+   │
+96 │         ensures exists<rem::R>(@0x51);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:93: rem_invoke
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:95: rem_invoke (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:93: rem_invoke
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_existence.move:96: rem_invoke (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_existence.move:103:9
+    │
+103 │         ensures exists<rem::R>(@0x51);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_existence.move:100: rem_dispatch
+    =     at tests/sources/functional/closures/unframed_field_world_existence.move:102: rem_dispatch (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_existence.move:100: rem_dispatch
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_existence.move:30: dispatched
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_existence.move:30: dispatched
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_existence.move:103: rem_dispatch (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_existence.move:110:9
+    │
+110 │         ensures exists<nat::R>(@0x52);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_existence.move:107: nat_invoke
+    =     at tests/sources/functional/closures/unframed_field_world_existence.move:109: nat_invoke (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_existence.move:107: nat_invoke
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_existence.move:110: nat_invoke (spec)

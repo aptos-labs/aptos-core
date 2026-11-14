@@ -1,0 +1,33 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:16:23
+   │
+16 │     spec keeps_body { ensures inl == old(inl); }
+   │                       ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:15: keeps_body
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:15: keeps_body
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:16: keeps_body (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:19:24
+   │
+19 │     spec keeps_fspec { ensures inl2 == old(inl2); }
+   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:18: keeps_fspec
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:18: keeps_fspec
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:19: keeps_fspec (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:23:24
+   │
+23 │     spec keeps_false { ensures false; }
+   │                        ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:22: keeps_false
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:22: keeps_false
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater_nocaller.move:23: keeps_false (spec)

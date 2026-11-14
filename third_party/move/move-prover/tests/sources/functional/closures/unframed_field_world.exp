@@ -1,0 +1,594 @@
+Move prover returns: exiting with verification errors
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:31:45
+   │
+31 │     spec two { aborts_if aborts_of<c.f>(x); aborts_if aborts_of<c.g>(x); }
+   │                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:30: two
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:31: two (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:31:5
+   │
+30 │     public fun two(c: &Two, x: u64): u64 { let r = (c.f)(x); let _s = (c.g)(x); r }
+   │                                                                       -------- abort happened here with code 0x0
+31 │     spec two { aborts_if aborts_of<c.f>(x); aborts_if aborts_of<c.g>(x); }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:30: two
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:30: two
+   =         ABORTED
+
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:35:70
+   │
+35 │     spec two_opaque { pragma opaque; aborts_if aborts_of<self.f>(x); aborts_if aborts_of<self.g>(x); }
+   │                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:34: two_opaque
+   =         self = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:35: two_opaque (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:35:5
+   │
+34 │     public fun two_opaque(self: &Two, x: u64): u64 { let r = (self.f)(x); let _s = (self.g)(x); r }
+   │                                                                                    ----------- abort happened here with code 0x0
+35 │     spec two_opaque { pragma opaque; aborts_if aborts_of<self.f>(x); aborts_if aborts_of<self.g>(x); }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:34: two_opaque
+   =         self = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:34: two_opaque
+   =         ABORTED
+
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:39:47
+   │
+39 │     spec two_e { aborts_if aborts_of<c.f>(x); aborts_if aborts_of<c.g>(x); }
+   │                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:38: two_e
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:39: two_e (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:39:5
+   │
+38 │     public fun two_e(c: &CbE, x: u64): u64 { let r = (c.f)(x); let _s = (c.g)(x); r }
+   │                                                                         -------- abort happened here with code 0x4
+39 │     spec two_e { aborts_if aborts_of<c.f>(x); aborts_if aborts_of<c.g>(x); }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:38: two_e
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:38: two_e
+   =         ABORTED
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:47:18
+   │
+47 │     spec twice { ensures result_1 == result_2; }
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:46: twice
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result_1 = <redacted>
+   =         result_2 = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:47: twice (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:51:5
+   │
+50 │     public fun twice_abort(c: &Cb, x: u64): u64 { let _a = (c.f)(x); (c.f)(x) }
+   │                                                                      -------- abort happened here with code 0x0
+51 │     spec twice_abort { aborts_if aborts_of<c.f>(x); }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:50: twice_abort
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:50: twice_abort
+   =         ABORTED
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:55:24
+   │
+55 │     spec twice_false { ensures false; }
+   │                        ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:54: twice_false
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result_1 = <redacted>
+   =         result_2 = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:55: twice_false (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:84:5
+   │
+83 │     public fun outer(c: &Cb, x: u64): u64 { let _a = inner(c, x); inner(c, x) }
+   │                                                                   ----------- abort happened here with code 0x0
+84 │     spec outer { aborts_if aborts_of<c.f>(x); }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:83: outer
+   =         c = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:83: outer
+   =         ABORTED
+
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:93:28
+   │
+93 │     spec write_then_call { aborts_if aborts_of<c.f>(x); }
+   │                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:89: write_then_call
+   =         c = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:90: write_then_call
+   =     at tests/sources/functional/closures/unframed_field_world.move:91: write_then_call
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:89: write_then_call
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:93: write_then_call (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/unframed_field_world.move:93:5
+   │
+91 │         (c.f)(x)
+   │         -------- abort happened here with code 0x1D
+92 │     }
+93 │     spec write_then_call { aborts_if aborts_of<c.f>(x); }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world.move:89: write_then_call
+   =         c = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:90: write_then_call
+   =     at tests/sources/functional/closures/unframed_field_world.move:91: write_then_call
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world.move:91: write_then_call
+   =         ABORTED
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:167:9
+    │
+167 │         ensures global<wl::Own>(@0x42) == old(global<wl::Own>(@0x42));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:164: use_w
+    =     at tests/sources/functional/closures/unframed_field_world.move:166: use_w (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:164: use_w
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:164: use_w
+    =     at tests/sources/functional/closures/unframed_field_world.move:143: make_w
+    =         f = <redacted>
+    =         result = <redacted>
+    =         c = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:164: use_w
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:167: use_w (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:173:9
+    │
+173 │         ensures global<wl::Own>(@0x42) == old(global<wl::Own>(@0x42));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:170: use_u
+    =     at tests/sources/functional/closures/unframed_field_world.move:172: use_u (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:170: use_u
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:170: use_u
+    =     at tests/sources/functional/closures/unframed_field_world.move:144: make_u
+    =         f = <redacted>
+    =         result = <redacted>
+    =         c = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:170: use_u
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:173: use_u (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:197:37
+    │
+197 │     spec loop_call { pragma opaque; ensures global<Own>(@0x42) == old(global<Own>(@0x42)); }
+    │                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:193: loop_call
+    =         c = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:194: loop_call
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:195: loop_call
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:197: loop_call (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:206:9
+    │
+206 │         ensures global<gl::Own>(@0x42) == old(global<gl::Own>(@0x42));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:203: use_apply_w
+    =     at tests/sources/functional/closures/unframed_field_world.move:205: use_apply_w (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:203: use_apply_w
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:203: use_apply_w
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:206: use_apply_w (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:217:5
+    │
+216 │     public fun twice_sf(c: &Cb, x: u64): u64 { let _a = (c.f)(x); (c.f)(x) }
+    │                                                                   -------- abort happened here with code 0x0
+217 │     spec twice_sf { aborts_if fails_at(c, x); }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:216: twice_sf
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:216: twice_sf
+    =         ABORTED
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:225:27
+    │
+225 │     spec twice_sf_false { ensures false; }
+    │                           ^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:224: twice_sf_false
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:225: twice_sf_false (spec)
+
+error: function does not abort under this condition
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:241:9
+    │
+241 │         aborts_if n == 2 && (aborts_of<c.f>(2) || aborts_of<c.f>(1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:233: rec
+    =     at tests/sources/functional/closures/unframed_field_world.move:240: rec (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:233: rec
+    =         c = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:234: rec
+    =     at tests/sources/functional/closures/unframed_field_world.move:235: rec
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:236: rec
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:240: rec (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:237: rec
+    =     at tests/sources/functional/closures/unframed_field_world.move:241: rec (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:238:5
+    │
+238 │ ╭     spec rec {
+239 │ │         pragma opaque;
+240 │ │         requires n <= 2;
+    │ │         ---------------- abort happened here with code 0x0
+241 │ │         aborts_if n == 2 && (aborts_of<c.f>(2) || aborts_of<c.f>(1));
+242 │ │         aborts_if n == 1 && aborts_of<c.f>(1);
+243 │ │     }
+    │ ╰─────^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:233: rec
+    =     at tests/sources/functional/closures/unframed_field_world.move:240: rec (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:233: rec
+    =         c = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:234: rec
+    =     at tests/sources/functional/closures/unframed_field_world.move:235: rec
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:236: rec
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:240: rec (spec)
+    =         ABORTED
+
+error: induction case of the loop invariant does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:253:13
+    │
+253 │             invariant i > 0 ==> !aborts_of<c.f>(0);
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:246: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:257: loop_abort (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:246: loop_abort
+    =         c = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:247: loop_abort
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:251: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:252: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:253: loop_abort
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/unframed_field_world.move:252: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:253: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:248: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:249: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:250: loop_abort
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:248: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:252: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:253: loop_abort
+
+error: function does not abort under this condition
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:258:9
+    │
+258 │         aborts_if aborts_of<c.f>(0);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:246: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:257: loop_abort (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:246: loop_abort
+    =         c = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:247: loop_abort
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:251: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:252: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:253: loop_abort
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/unframed_field_world.move:252: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:253: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:248: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:258: loop_abort (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:256:5
+    │
+249 │               (c.f)(0);
+    │               -------- abort happened here with code 0x0
+    ·
+256 │ ╭     spec loop_abort {
+257 │ │         requires n > 0;
+258 │ │         aborts_if aborts_of<c.f>(0);
+259 │ │     }
+    │ ╰─────^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:246: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:257: loop_abort (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:246: loop_abort
+    =         c = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:247: loop_abort
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:251: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:252: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:253: loop_abort
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/unframed_field_world.move:252: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:253: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:248: loop_abort
+    =     at tests/sources/functional/closures/unframed_field_world.move:249: loop_abort
+    =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:263:5
+    │
+262 │     public fun twice_let(c: &Cb, x: u64): u64 { let _a = (c.f)(x); (c.f)(x) }
+    │                                                                    -------- abort happened here with code 0x0
+263 │     spec twice_let { let h = c.f; aborts_if aborts_of<h>(x); }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:262: twice_let
+    =     at tests/sources/functional/closures/unframed_field_world.move:263: twice_let (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:262: twice_let
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:262: twice_let
+    =         ABORTED
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:267:28
+    │
+267 │     spec twice_let_false { ensures false; }
+    │                            ^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:266: twice_let_false
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:267: twice_let_false (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:276:5
+    │
+274 │         (c.f)(t)
+    │         -------- abort happened here with code 0x7
+275 │     }
+276 │     spec gen_two { aborts_if aborts_of<c.f>(t); }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:271: gen_two
+    =         c = <redacted>
+    =         t = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:272: gen_two
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:273: gen_two
+    =     at tests/sources/functional/closures/unframed_field_world.move:274: gen_two
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:274: gen_two
+    =         ABORTED
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:286:22
+    │
+286 │     spec via_local { ensures result_1 == result_2; }
+    │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:285: via_local
+    =         c = <redacted>
+    =         x = <redacted>
+    =         g = <redacted>
+    =         result_1 = <redacted>
+    =         result_2 = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:286: via_local (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:290:28
+    │
+290 │     spec via_local_false { ensures false; }
+    │                            ^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:289: via_local_false
+    =         c = <redacted>
+    =         x = <redacted>
+    =         g = <redacted>
+    =         result_1 = <redacted>
+    =         result_2 = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:290: via_local_false (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:297:44
+    │
+297 │     spec via_vector { requires len(v) > 0; ensures result_1 == result_2; }
+    │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:293: via_vector
+    =     at tests/sources/functional/closures/unframed_field_world.move:297: via_vector (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:293: via_vector
+    =         v = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:294: via_vector
+    =         g = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:295: via_vector
+    =         result_1 = <redacted>
+    =         result_2 = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:297: via_vector (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:307:22
+    │
+307 │     spec mut_twice { ensures result_1 == result_2; }
+    │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:300: mut_twice
+    =         c = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:301: mut_twice
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:302: mut_twice
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:303: mut_twice
+    =         b = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:304: mut_twice
+    =         b = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:305: mut_twice
+    =     at tests/sources/functional/closures/unframed_field_world.move:300: mut_twice
+    =         result_1 = <redacted>
+    =         result_2 = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:307: mut_twice (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:318:5
+    │
+317 │     public fun two_w(f: |u64| u64 has copy + drop, x: u64): u64 { let _a = f(x); f(x) }
+    │                                                                                  ---- abort happened here with code 0x0
+318 │     spec two_w { pragma opaque; modifies_of<f> *; aborts_if aborts_of<f>(x); }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:317: two_w
+    =         f = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:317: two_w
+    =         ABORTED
+
+error: function does not abort under this condition
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:342:9
+    │
+342 │         aborts_if aborts_of<self.g>(m);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:334: two
+    =         self = <redacted>
+    =         x = <redacted>
+    =         m = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:335: two
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:336: two
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:337: two
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:341: two (spec)
+    =     at tests/sources/functional/closures/unframed_field_world.move:342: two (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:339:5
+    │
+336 │           let _s = (self.g)(m);
+    │                    ----------- abort happened here with code 0x6
+    ·
+339 │ ╭     spec two {
+340 │ │         pragma opaque;
+341 │ │         aborts_if aborts_of<self.f>(x, m);
+342 │ │         aborts_if aborts_of<self.g>(m);
+343 │ │     }
+    │ ╰─────^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:334: two
+    =         self = <redacted>
+    =         x = <redacted>
+    =         m = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:335: two
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:336: two
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:336: two
+    =         ABORTED
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world.move:392:25
+    │
+392 │     spec loop_closure { ensures global<wl::Own>(@0x42) == old(global<wl::Own>(@0x42)); }
+    │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world.move:387: loop_closure
+    =         c = <redacted>
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:388: loop_closure
+    =         g = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:389: loop_closure
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:390: loop_closure
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world.move:392: loop_closure (spec)

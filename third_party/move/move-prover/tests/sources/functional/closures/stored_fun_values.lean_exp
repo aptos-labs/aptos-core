@@ -161,7 +161,7 @@ tests/sources/functional/closures/stored_fun_values.move:504:5: error: verex ver
     | stored_invariant => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/stored_fun_values.move:514:5: error: verification failed with a residual obligation:
+tests/sources/functional/closures/stored_fun_values.move:515:5: error: verification failed with a residual obligation:
 case returns.right.left
 executable✝ : VerexIR.Validation.ExecutableUnit unit
 nativesTyped : VerexIR.NativesTyped executable✝
@@ -215,8 +215,8 @@ a✝ :
         (VerexIR.StorageKey.address modifier_addr)).isSome =
     true
 ⊢ VerexIR.Proofs.Denote.DataInvariants (storedInvariant unit executable✝) verexFinal
-tests/sources/functional/closures/stored_fun_values.move:517:9: error: the specification clause `ensures global<Counter>(s.address) == old(global<Counter>(s.address))` is not established
-tests/sources/functional/closures/stored_fun_values.move:514:5: error: verex verification failed: the automatic verification of `use_any_modifier_wrong` failed; provide a proof in `tests/sources/functional/closures/stored_fun_values.proof.lean`:
+tests/sources/functional/closures/stored_fun_values.move:518:9: error: the specification clause `ensures global<Counter>(s.address) == old(global<Counter>(s.address))` is not established
+tests/sources/functional/closures/stored_fun_values.move:515:5: error: verex verification failed: the automatic verification of `use_any_modifier_wrong` failed; provide a proof in `tests/sources/functional/closures/stored_fun_values.proof.lean`:
   verify use_any_modifier_wrong by lean =>
     verex_obligations
     verex_on

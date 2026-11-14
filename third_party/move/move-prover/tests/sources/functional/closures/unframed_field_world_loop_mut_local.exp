@@ -1,0 +1,34 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:20:45
+   │
+20 │     spec bad { pragma aborts_if_is_partial; ensures result; }
+   │                                             ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:11: bad
+   =         c = <redacted>
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:12: bad
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:5: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:5: get
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:13: bad
+   =         g = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:14: bad
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:15: bad
+   =         <redacted> = <redacted>
+   =         r = <redacted>
+   =         g = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:16: bad
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:17: bad
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:18: bad
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:5: get
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:5: get
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:11: bad
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_loop_mut_local.move:20: bad (spec)

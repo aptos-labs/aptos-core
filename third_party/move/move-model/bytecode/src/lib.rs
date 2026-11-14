@@ -20,6 +20,7 @@ pub mod fat_loop;
 pub mod function_data_builder;
 pub mod function_target;
 pub mod function_target_pipeline;
+pub mod ghost_keep_analysis;
 pub mod graph;
 pub mod livevar_analysis;
 pub mod reaching_def_analysis;

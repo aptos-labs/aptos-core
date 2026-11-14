@@ -1,0 +1,26 @@
+Move prover returns: exiting with verification errors
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/unframed_field_world_lock_known_write.move:19:5
+   │
+17 │           (c.f)();
+   │           ------- abort happened here with code 0x9
+18 │       }
+19 │ ╭     spec g {
+20 │ │         aborts_if !exists<R>(@0x42);
+21 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_lock_known_write.move:15: g
+   =     at tests/sources/functional/closures/unframed_field_world_lock_known_write.move:16: g
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_lock_known_write.move:17: g
+   =     at tests/sources/functional/closures/unframed_field_world_lock_known_write.move:10: write_r
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_lock_known_write.move:11: write_r
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_lock_known_write.move:11: write_r
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_lock_known_write.move:9: write_r
+   =     at tests/sources/functional/closures/unframed_field_world_lock_known_write.move:12: write_r
+   =     at tests/sources/functional/closures/unframed_field_world_lock_known_write.move:17: g
+   =         ABORTED
