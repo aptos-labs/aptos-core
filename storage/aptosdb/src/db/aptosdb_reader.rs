@@ -712,6 +712,35 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn is_known_state_checkpoint(&self, version: Version) -> bool {
+        // The latest ledger info is cached and always at a block end.
+        let latest_version = self
+            .ledger_db
+            .metadata_db()
+            .get_latest_ledger_info_option()
+            .map(|li| li.ledger_info().version());
+        latest_version == Some(version)
+            || self
+                .ledger_db
+                .transaction_info_db()
+                .get_transaction_info(version)
+                .is_ok_and(|txn_info| txn_info.has_state_checkpoint_hash())
+    }
+
+    fn get_state_value_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        gauged_api("get_state_value_at_checkpoint", || {
+            self.error_if_state_kv_pruned("StateValue", version)?;
+            self.debug_assert_block_end(version);
+
+            self.state_store
+                .get_state_value_by_version(state_key, version)
+        })
+    }
+
     fn get_state_value_with_version_at_checkpoint(
         &self,
         state_key: &StateKey,
@@ -719,14 +748,7 @@ impl DbReader for AptosDB {
     ) -> Result<Option<(Version, StateValue)>> {
         gauged_api("get_state_value_with_version_at_checkpoint", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
-            // Skipped if the txn info is unavailable (e.g. pruned).
-            debug_assert!(
-                self.ledger_db
-                    .transaction_info_db()
-                    .get_transaction_info(version)
-                    .map_or(true, |txn_info| txn_info.has_state_checkpoint_hash()),
-                "Version {version} is not a block end.",
-            );
+            self.debug_assert_block_end(version);
 
             self.state_store
                 .get_state_value_with_version_by_version(state_key, version)
@@ -996,6 +1018,7 @@ impl DbReader for AptosDB {
             },
             StateKind::Position => self.position_store_reader()?.item_count(version),
             StateKind::Order => self.order_store_reader()?.item_count(version),
+            StateKind::Collateral => self.collateral_store_reader()?.item_count(version),
         })
     }
 
@@ -1021,6 +1044,11 @@ impl DbReader for AptosDB {
                 self.order_store_reader()?
                     .value_chunk_with_proof(version, first_index, chunk_size)
             },
+            StateKind::Collateral => self.collateral_store_reader()?.value_chunk_with_proof(
+                version,
+                first_index,
+                chunk_size,
+            ),
         })
     }
 
@@ -1058,6 +1086,14 @@ impl DbReader for AptosDB {
                 )?;
                 Ok(iter as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>)
             },
+            StateKind::Collateral => {
+                let iter = self.collateral_store_reader()?.value_chunk_iter(
+                    version,
+                    first_index,
+                    chunk_size,
+                )?;
+                Ok(iter as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>)
+            },
         })
     }
 
@@ -1083,6 +1119,11 @@ impl DbReader for AptosDB {
                 self.order_store_reader()?
                     .value_chunk_proof(version, first_index, state_key_values)
             },
+            StateKind::Collateral => self.collateral_store_reader()?.value_chunk_proof(
+                version,
+                first_index,
+                state_key_values,
+            ),
         })
     }
 
@@ -1293,5 +1334,16 @@ impl AptosDB {
             events,
             proof,
         })
+    }
+
+    fn debug_assert_block_end(&self, version: Version) {
+        // Skipped if the txn info is unavailable (e.g. pruned).
+        debug_assert!(
+            self.ledger_db
+                .transaction_info_db()
+                .get_transaction_info(version)
+                .map_or(true, |txn_info| txn_info.has_state_checkpoint_hash()),
+            "Version {version} is not a block end.",
+        );
     }
 }

@@ -564,6 +564,22 @@ pub trait DbReader: Send + Sync {
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
     }
 
+    /// Whether `version` is known to be a block end (state checkpoint). `false` may also mean
+    /// unknown (e.g. pruned), which only makes the caller take the slower exact reads.
+    fn is_known_state_checkpoint(&self, version: Version) -> bool {
+        false
+    }
+
+    /// Like `get_state_value_by_version`, but `version` must be a block end (state checkpoint),
+    /// which avoids looking up the block containing `version`.
+    fn get_state_value_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        self.get_state_value_by_version(state_key, version)
+    }
+
     /// Like `get_state_value_with_version_by_version`, but `version` must be a block end (state
     /// checkpoint), which avoids looking up the block containing `version`.
     fn get_state_value_with_version_at_checkpoint(

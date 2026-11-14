@@ -175,6 +175,7 @@ pub enum SnapshotKind {
 }
 
 impl SnapshotKind {
+    pub const COLLATERAL: Self = Self::State(StateKind::Collateral);
     pub const HOT_STATE: Self = Self::HotState;
     pub const MAIN_STATE: Self = Self::State(StateKind::MainState);
     pub const ORDER: Self = Self::State(StateKind::Order);
@@ -186,6 +187,7 @@ impl SnapshotKind {
             Self::MAIN_STATE => "state",
             Self::POSITION => "position state",
             Self::ORDER => "order state",
+            Self::COLLATERAL => "collateral state",
             Self::HOT_STATE => "hot state",
         }
     }
@@ -194,7 +196,7 @@ impl SnapshotKind {
         match self {
             // Main state at a real snapshot is never empty
             Self::MAIN_STATE => false,
-            Self::POSITION | Self::ORDER | Self::HOT_STATE => true,
+            Self::POSITION | Self::ORDER | Self::COLLATERAL | Self::HOT_STATE => true,
         }
     }
 
