@@ -20,7 +20,7 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use fail::fail_point;
 use rand::{thread_rng, Rng};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
@@ -153,7 +153,9 @@ impl TransactionValidation for PooledVMValidator {
         });
 
         let result = std::panic::catch_unwind(move || {
-            let vm_validator_locked = vm_validator.lock().unwrap();
+            // A previously caught VM panic poisons the lock; recover from it so the
+            // pool slot keeps validating transactions.
+            let vm_validator_locked = vm_validator.lock().unwrap_or_else(PoisonError::into_inner);
 
             use aptos_vm::VMValidator;
             let vm = AptosVM::new(&vm_validator_locked.state.environment);
@@ -171,14 +173,20 @@ impl TransactionValidation for PooledVMValidator {
 
     fn restart(&mut self) -> Result<()> {
         for vm_validator in &self.vm_validators {
-            vm_validator.lock().unwrap().restart()?;
+            vm_validator
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .restart()?;
         }
         Ok(())
     }
 
     fn notify_commit(&mut self) {
         for vm_validator in &self.vm_validators {
-            vm_validator.lock().unwrap().notify_commit();
+            vm_validator
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .notify_commit();
         }
     }
 }
