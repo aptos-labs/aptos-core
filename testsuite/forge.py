@@ -322,6 +322,14 @@ class ForgeFormatter:
         return self.filename
 
 
+# Log lines that can be interleaved into the JSON report, because the runner logs
+# to stderr while printing the report to stdout. The report is pretty-printed, so
+# none of its own lines start with either prefix.
+INTERLEAVED_LOG_LINE = re.compile(
+    r'^(\[\d{4}-\d{2}-\d{2}T\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s|\{"level":)'
+)
+
+
 def format_report(context: ForgeContext, result: ForgeResult) -> str:
     report_lines = []
     recording = False
@@ -331,7 +339,8 @@ def format_report(context: ForgeContext, result: ForgeResult) -> str:
         if line in ("====json-report-begin===", "====json-report-end==="):
             recording = not recording
         elif recording:
-            report_lines.append(line)
+            if not INTERLEAVED_LOG_LINE.match(line):
+                report_lines.append(line)
         else:
             if len(error_buffer) == error_length and not report_lines:
                 error_buffer.pop(0)
