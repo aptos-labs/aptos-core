@@ -2943,13 +2943,11 @@ impl Transfer {
 
         // We converted to u128 to ensure no loss of precision in comparison,
         // but now we actually have to check it's a u64
-        if deposit_value > u64::MAX as i128 {
-            return Err(ApiError::InvalidTransferOperations(Some(
-                "Transfer amount must not be greater than u64 max",
-            )));
-        }
-
-        let transfer_amount = deposit_value as u64;
+        let transfer_amount = u64::try_from(deposit_value).map_err(|_| {
+            ApiError::InvalidTransferOperations(Some(
+                "Transfer amount must not be negative or greater than u64 max",
+            ))
+        })?;
 
         Ok(Transfer {
             sender,
