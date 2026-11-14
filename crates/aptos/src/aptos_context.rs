@@ -204,9 +204,10 @@ where
     let hash = transaction.committed_hash();
 
     let debugger = AptosDebugger::rest_client(client)?;
+    let next_version = version + 1;
     let (vm_status, vm_output) = execute(
         &debugger,
-        version,
+        next_version,
         transaction,
         hash,
         PersistedAuxiliaryInfo::V1 {
