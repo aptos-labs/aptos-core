@@ -119,7 +119,7 @@ pub struct Amount {
 impl Amount {
     pub fn suggested_gas_fee(gas_unit_price: u64, max_gas_amount: u64) -> Amount {
         Amount {
-            value: (gas_unit_price * max_gas_amount).to_string(),
+            value: gas_unit_price.saturating_mul(max_gas_amount).to_string(),
             currency: native_coin(),
         }
     }
