@@ -11,8 +11,8 @@ use crate::{
     utils::{
         backup_service_client::BackupServiceClient,
         test_utils::{
-            open_with_positions, start_local_backup_service, tmp_db_with_random_content,
-            tmp_db_with_random_positions,
+            open_with_native_stores, start_local_backup_service, tmp_db_with_random_collateral,
+            tmp_db_with_random_content, tmp_db_with_random_positions,
         },
         ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt,
         RocksdbOpt, TrustedWaypointOpt,
@@ -272,7 +272,7 @@ fn end_to_end_with_positions() {
     drop(src_db);
 
     // Reopening as a node runs the open-time root check against the ledger.
-    let tgt_db = open_with_positions(tgt_db_dir.path());
+    let tgt_db = open_with_native_stores(tgt_db_dir.path());
     assert_eq!(positions_at(&tgt_db, version), expected);
     assert_eq!(
         tgt_db
@@ -372,6 +372,58 @@ fn position_restore_resumes() {
     )
     .unwrap();
 
-    let tgt_db = open_with_positions(tgt_db_dir.path());
+    let tgt_db = open_with_native_stores(tgt_db_dir.path());
     assert_eq!(positions_at(&tgt_db, version), expected);
+}
+
+fn collateral_at(db: &AptosDB, version: Version) -> Vec<(StateKey, StateValue)> {
+    db.get_state_value_chunk_iter(version, 0, usize::MAX, StateKind::Collateral)
+        .unwrap()
+        .collect::<aptos_storage_interface::Result<_>>()
+        .unwrap()
+}
+
+#[test]
+fn end_to_end_with_collateral() {
+    let (_src_db_dir, src_db, _blocks) = tmp_db_with_random_collateral();
+    let tgt_db_dir = TempPath::new();
+    tgt_db_dir.create_as_dir().unwrap();
+
+    let version = backup_and_restore(
+        Arc::clone(&src_db),
+        Some(&tgt_db_dir),
+        RocksdbOpt::default_with_trading_native(),
+    );
+
+    let expected = collateral_at(&src_db, version);
+    assert!(!expected.is_empty(), "generated blocks write collateral");
+    let committed_root = src_db
+        .get_transactions(version, 1, version, false)
+        .unwrap()
+        .consume_transaction_list_with_proof()
+        .proof
+        .transaction_infos
+        .pop()
+        .unwrap()
+        .collateral_state_checkpoint_hash()
+        .expect("checkpoint commits a collateral root");
+    drop(src_db);
+
+    // Reopening as a node runs the open-time root check against the ledger.
+    let tgt_db = open_with_native_stores(tgt_db_dir.path());
+    assert_eq!(collateral_at(&tgt_db, version), expected);
+    assert_eq!(
+        tgt_db
+            .get_pre_committed_collateral_state_summary()
+            .unwrap()
+            .last_checkpoint()
+            .root_hash(),
+        committed_root
+    );
+}
+
+#[test]
+fn verify_with_collateral() {
+    let (_src_db_dir, src_db, _blocks) = tmp_db_with_random_collateral();
+    backup_and_restore(src_db, None, RocksdbOpt::default());
 }

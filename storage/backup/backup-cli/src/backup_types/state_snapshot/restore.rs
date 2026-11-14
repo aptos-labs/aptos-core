@@ -5,7 +5,7 @@ use crate::{
     backup_types::{
         epoch_ending::restore::EpochHistory,
         state_snapshot::manifest::{
-            PositionSnapshotBackup, SnapshotKind, StateSnapshotBackup, StateSnapshotChunk,
+            NativeSnapshotBackup, SnapshotKind, StateSnapshotBackup, StateSnapshotChunk,
         },
     },
     metrics::{
@@ -151,62 +151,75 @@ impl StateSnapshotRestoreController {
             .add_chunks(receiver, manifest.chunks, SnapshotKind::State)
             .await?;
 
-        // Positions land before the main tree is finished: a resumed run skips
-        // the snapshot once its tree root exists, so the tree root must be the
-        // last thing written.
-        let positions = self.restore_positions(&txn_info_with_proof, manifest.positions)?;
-        if let Some((root_hash, chunks)) = positions {
-            let receiver = self
-                .run_mode
-                .get_position_restore_receiver(self.version, root_hash)?;
-            let receiver = self
-                .add_chunks(receiver, chunks, SnapshotKind::Position)
-                .await?;
+        // The native trees land before the main tree is finished: a resumed
+        // run skips the snapshot once its tree root exists, so the tree root
+        // must be the last thing written.
+        let txn_info = txn_info_with_proof.transaction_info();
+        for (kind, committed_root, section) in [
+            (
+                SnapshotKind::Position,
+                txn_info.position_state_checkpoint_hash(),
+                manifest.positions,
+            ),
+            (
+                SnapshotKind::Collateral,
+                txn_info.collateral_state_checkpoint_hash(),
+                manifest.collateral,
+            ),
+        ] {
+            let Some((root_hash, chunks)) = self.native_chunks(kind, committed_root, section)?
+            else {
+                continue;
+            };
+            let receiver =
+                self.run_mode
+                    .get_native_restore_receiver(kind, self.version, root_hash)?;
+            let receiver = self.add_chunks(receiver, chunks, kind).await?;
             tokio::task::spawn_blocking(move || receiver.finish()).await??;
             self.run_mode
-                .reset_position_store(self.version, root_hash)?;
+                .reset_native_store(kind, self.version, root_hash)?;
         }
 
         tokio::task::spawn_blocking(move || receiver.finish()).await??;
         Ok(self.run_mode.finish()?)
     }
 
-    /// The position chunks to restore with this snapshot, if any. Positions
-    /// come along only with a usable tree, so a KV-only restore skips them.
-    fn restore_positions(
+    /// The chunks of native store `kind` to restore with this snapshot, if
+    /// any. A native tree comes along only with a usable main tree, so a
+    /// KV-only restore skips it.
+    fn native_chunks(
         &self,
-        txn_info_with_proof: &TransactionInfoWithProof,
-        positions: Option<PositionSnapshotBackup>,
+        kind: SnapshotKind,
+        committed_root: Option<HashValue>,
+        section: Option<NativeSnapshotBackup>,
     ) -> Result<Option<(HashValue, Vec<StateSnapshotChunk>)>> {
-        if !self.run_mode.has_position_store() {
+        if !self.run_mode.has_native_store(kind) {
             return Ok(None);
         }
         match self.restore_mode {
             StateSnapshotRestoreMode::KvOnly => return Ok(None),
             StateSnapshotRestoreMode::Default | StateSnapshotRestoreMode::TreeOnly => (),
         }
-        let Some(committed_root) = txn_info_with_proof
-            .transaction_info()
-            .position_state_checkpoint_hash()
-        else {
+        let Some(committed_root) = committed_root else {
             return Ok(None);
         };
-        let positions = positions.ok_or_else(|| {
+        let label = kind.label();
+        let section = section.ok_or_else(|| {
             anyhow!(
-                "Transaction info at version {} commits position state root {}, but the backup \
-                 carries no position snapshot. It predates position backups; restore from a \
+                "Transaction info at version {} commits {label} state root {}, but the backup \
+                 carries no {label} snapshot. It predates {label} backups; restore from a \
                  newer state snapshot.",
                 self.version,
                 committed_root,
             )
         })?;
         ensure!(
-            positions.root_hash == committed_root,
-            "Position root hash mismatch with that in proof. root hash: {}, expected: {}",
-            positions.root_hash,
+            section.root_hash == committed_root,
+            "Root hash mismatch with that in proof for the {label} tree. root hash: {}, expected: {}",
+            section.root_hash,
             committed_root,
         );
-        Ok(Some((committed_root, positions.chunks)))
+        Ok(Some((committed_root, section.chunks)))
     }
 
     async fn add_chunks(

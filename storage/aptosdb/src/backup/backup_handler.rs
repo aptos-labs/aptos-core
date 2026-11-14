@@ -2,13 +2,16 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    db::PositionBundle,
+    db::{CollateralBundle, PositionBundle},
     ledger_db::LedgerDb,
     metrics::{
         BACKUP_EPOCH_ENDING_EPOCH, BACKUP_STATE_SNAPSHOT_LEAF_IDX, BACKUP_STATE_SNAPSHOT_VERSION,
         BACKUP_TXN_VERSION,
     },
-    native_store::{state_sync::NativeStoreReader, PositionStore},
+    native_store::{
+        bundle::NativeStoreBundle, state_sync::NativeStoreReader, CollateralStore, NativeStoreSpec,
+        PositionStore,
+    },
     state_store::StateStore,
 };
 use aptos_crypto::hash::HashValue;
@@ -39,6 +42,7 @@ pub struct BackupHandler {
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
     position: Option<Arc<PositionBundle>>,
+    collateral: Option<Arc<CollateralBundle>>,
 }
 
 impl BackupHandler {
@@ -46,11 +50,13 @@ impl BackupHandler {
         state_store: Arc<StateStore>,
         ledger_db: Arc<LedgerDb>,
         position: Option<Arc<PositionBundle>>,
+        collateral: Option<Arc<CollateralBundle>>,
     ) -> Self {
         Self {
             state_store,
             ledger_db,
             position,
+            collateral,
         }
     }
 
@@ -211,17 +217,30 @@ impl BackupHandler {
         })
     }
 
-    /// Positions are read at the latest snapshot at or before the requested
-    /// version, which carries the same root. No pruning check: backup only
-    /// serves retained versions.
-    fn position_store_reader(&self) -> Result<NativeStoreReader<'_, PositionStore>> {
-        let position = self.position()?;
-        Ok(NativeStoreReader {
-            kv_db: &position.store.kv_db,
-            merkle_db: &position.store.merkle_db,
+    /// Native stores are read at the latest snapshot at or before the
+    /// requested version, which carries the same root. No pruning check:
+    /// backup only serves retained versions.
+    fn native_store_reader<'a, T: NativeStoreSpec>(
+        &'a self,
+        store: &'a NativeStoreBundle<T>,
+    ) -> NativeStoreReader<'a, T> {
+        NativeStoreReader {
+            kv_db: &store.kv_db,
+            merkle_db: &store.merkle_db,
             pruner: None,
             ledger_metadata_db: self.ledger_db.metadata_db(),
-        })
+        }
+    }
+
+    fn position_store_reader(&self) -> Result<NativeStoreReader<'_, PositionStore>> {
+        Ok(self.native_store_reader(&self.position()?.store))
+    }
+
+    fn collateral_store_reader(&self) -> Result<NativeStoreReader<'_, CollateralStore>> {
+        let collateral = self.collateral.as_ref().ok_or_else(|| {
+            AptosDbError::Other("native-collateral storage is not enabled on this node".into())
+        })?;
+        Ok(self.native_store_reader(&collateral.store))
     }
 
     /// Gets the number of positions in the snapshot at `version`.
@@ -247,6 +266,32 @@ impl BackupHandler {
         version: Version,
     ) -> Result<SparseMerkleRangeProof> {
         self.position_store_reader()?
+            .range_proof(rightmost_key, version)
+    }
+
+    /// Gets the number of collateral entries in the snapshot at `version`.
+    pub fn get_collateral_state_item_count(&self, version: Version) -> Result<usize> {
+        self.collateral_store_reader()?.item_count(version)
+    }
+
+    /// Iterate through collateral entries in the snapshot at `version`.
+    pub fn get_collateral_state_item_iter(
+        &self,
+        version: Version,
+        start_idx: usize,
+        limit: usize,
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync>> {
+        self.collateral_store_reader()?
+            .value_chunk_iter(version, start_idx, limit)
+    }
+
+    /// Gets the proof that proves a range of collateral entries.
+    pub fn get_collateral_state_range_proof(
+        &self,
+        rightmost_key: HashValue,
+        version: Version,
+    ) -> Result<SparseMerkleRangeProof> {
+        self.collateral_store_reader()?
             .range_proof(rightmost_key, version)
     }
 

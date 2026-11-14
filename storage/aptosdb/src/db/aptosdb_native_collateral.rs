@@ -186,6 +186,12 @@ impl AptosDB {
             .store
             .merkle_db
             .latest_snapshot_version_at_or_before(v_overall.unwrap_or(Version::MAX))?;
+        // With no snapshot the store is still as opened: empty, nothing
+        // restored into it.
+        if let Some(version) = snapshot_version {
+            let root_hash = bundle.store.merkle_db.get_root_hash(version)?;
+            self.reset_collateral_after_fast_sync(version, root_hash)?;
+        }
         if let Some((target_version, write_sets)) =
             bundle.store.catch_up(&self.ledger_db, snapshot_version)?
         {
