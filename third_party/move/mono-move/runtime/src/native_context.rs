@@ -13,7 +13,7 @@ use crate::{
         alloc_obj, alloc_or_gc, alloc_vec, deep_copy_batch_or_gc, deep_copy_or_gc,
         deserialize_or_gc, heap_alloc, is_heap_ptr, realloc_vec, Heap, TopFrame,
     },
-    interpreter::saved_return_pc,
+    interpreter::{frame_module, saved_return_pc, walk_callers},
     memory::{
         read_descriptor, read_obj_size, read_ptr, read_vec_len, write_closure_func_ref_and_mask,
         write_enum_tag, write_ptr, write_u64, MemoryRegion,
@@ -120,6 +120,9 @@ pub struct ProductionNativeContext<'a> {
     /// Set after the first [`Self::set_return`]; blocks further `arg` /
     /// allocation calls.
     returns_started: Cell<bool>,
+    /// The VM stack, walked to render stack traces. Set iff the VM runs in
+    /// debug mode (see [`crate::InterpreterOptions::enable_debugging`]).
+    debug_stack: Option<&'a MemoryRegion>,
 }
 
 impl<'a> ProductionNativeContext<'a> {
@@ -136,6 +139,7 @@ impl<'a> ProductionNativeContext<'a> {
         heap: &'a mut Heap,
         rws: &'a mut ResourceReadWriteSet,
         extensions: &'a NativeExtensions,
+        debug_stack: Option<&'a MemoryRegion>,
     ) -> Self {
         Self {
             abi,
@@ -150,19 +154,29 @@ impl<'a> ProductionNativeContext<'a> {
             extensions,
             pool: RootPool::new(),
             returns_started: Cell::new(false),
+            debug_stack,
+        }
+    }
+
+    /// The frame pointer of the Move function calling this native.
+    fn caller_fp(&self) -> *mut u8 {
+        // SAFETY: native dispatch wrote this native's frame metadata by the
+        // call protocol; its saved FP names the live frame of the caller.
+        unsafe {
+            read_ptr(
+                self.frame_ptr.sub(FRAME_METADATA_SIZE),
+                META_SAVED_FP_OFFSET,
+            )
         }
     }
 
     /// The caller of the Move function invoking this native, and its saved return PC.
     fn caller_frame(&self) -> Option<(&Function, usize)> {
-        // SAFETY: native dispatch and Move calls write these metadata fields. The native's
-        // saved FP names its live caller frame, whose saved function is either null (entry)
-        // or an arena-owned function that remains alive throughout execution.
+        let caller_fp = self.caller_fp();
+        // SAFETY: Move calls write these metadata fields. The caller frame's saved
+        // function is either null (entry) or an arena-owned function that remains
+        // alive throughout execution.
         unsafe {
-            let caller_fp = read_ptr(
-                self.frame_ptr.sub(FRAME_METADATA_SIZE),
-                META_SAVED_FP_OFFSET,
-            );
             let metadata = caller_fp.sub(FRAME_METADATA_SIZE);
             let caller =
                 (read_ptr(metadata, META_SAVED_FUNC_PTR_OFFSET) as *const Function).as_ref()?;
@@ -1211,6 +1225,37 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn get_extension<T: NativeExtension>(&self) -> VMResult<RefMut<'_, T>> {
         self.extensions.get_mut::<T>()
+    }
+
+    fn debugging_enabled(&self) -> bool {
+        self.debug_stack.is_some()
+    }
+
+    fn debug_stack_trace(&self) -> VMResult<String> {
+        let Some(stack) = self.debug_stack else {
+            return Err(native_invariant_violation(
+                "stack trace requested outside debug mode".to_string(),
+            ));
+        };
+        // Walk from the frame calling this native, which V1 excludes too: it
+        // is not on V1's call stack while a native runs.
+        //
+        // SAFETY: the caller's frame is live and its metadata chain follows
+        // the call protocol. The loader owns every function on the chain, so
+        // they outlive this call.
+        let callers = unsafe { walk_callers(stack, self.caller_fp())? };
+        let mut out = "Call Stack:\n".to_string();
+        // Function names follow V1's rendering.
+        // TODO(completeness): render type arguments, locals, the source
+        // location, a code window and the operand stack as V1 does.
+        for (i, (func, offset)) in callers.iter().rev().enumerate() {
+            let name = match frame_module(func.module_id) {
+                Some(module_id) => format!("0x{module_id}::{}", func.name()),
+                None => "script::main".to_string(),
+            };
+            out.push_str(&format!("    [{i}] {name} @ {offset}\n"));
+        }
+        Ok(out)
     }
 }
 
