@@ -24,6 +24,16 @@ use serde::{Deserialize, Serialize};
 ///   .build()
 ///   .unwrap();
 /// ```
+///
+/// Example with client_order_id filter for trading events:
+/// ```
+/// use aptos_transaction_filter::EventFilterBuilder;
+///
+/// let filter = EventFilterBuilder::default()
+///   .client_order_id("my-order-123")
+///   .build()
+///   .unwrap();
+/// ```
 #[derive(Clone, Default, Debug, Derivative, Serialize, Deserialize)]
 #[derivative(PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -36,9 +46,17 @@ pub struct EventFilter {
     // Only for events that have a struct as their generic
     #[serde(skip_serializing_if = "Option::is_none")]
     pub struct_type: Option<MoveStructTagFilter>,
+    /// Filter events by client_order_id field. This is useful for querying
+    /// trading events (like OrderEvent) by the client-specified order identifier.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(setter(into, strip_option), default)]
+    pub client_order_id: Option<String>,
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
     data_substring_finder: OnceCell<Finder<'static>>,
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    client_order_id_finder: OnceCell<Finder<'static>>,
 }
 
 impl From<aptos_protos::indexer::v1::EventFilter> for EventFilter {
@@ -46,7 +64,9 @@ impl From<aptos_protos::indexer::v1::EventFilter> for EventFilter {
         Self {
             data_substring_filter: proto_filter.data_substring_filter,
             struct_type: proto_filter.struct_type.map(|f| f.into()),
+            client_order_id: proto_filter.client_order_id,
             data_substring_finder: OnceCell::new(),
+            client_order_id_finder: OnceCell::new(),
         }
     }
 }
@@ -56,6 +76,7 @@ impl From<EventFilter> for aptos_protos::indexer::v1::EventFilter {
         Self {
             struct_type: event_filter.struct_type.map(Into::into),
             data_substring_filter: event_filter.data_substring_filter,
+            client_order_id: event_filter.client_order_id,
         }
     }
 }
@@ -63,12 +84,19 @@ impl From<EventFilter> for aptos_protos::indexer::v1::EventFilter {
 impl Filterable<Event> for EventFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {
-        if self.data_substring_filter.is_none() && self.struct_type.is_none() {
-            return Err(Error::msg("At least one of data or struct_type must be set").into());
+        if self.data_substring_filter.is_none()
+            && self.struct_type.is_none()
+            && self.client_order_id.is_none()
+        {
+            return Err(
+                Error::msg("At least one of data, struct_type, or client_order_id must be set")
+                    .into(),
+            );
         };
 
         self.data_substring_filter.is_valid()?;
         self.struct_type.is_valid()?;
+        self.client_order_id.is_valid()?;
         Ok(())
     }
 
@@ -90,6 +118,16 @@ impl Filterable<Event> for EventFilter {
             let finder = self
                 .data_substring_finder
                 .get_or_init(|| Finder::new(data_substring_filter).into_owned());
+            if finder.find(item.data.as_bytes()).is_none() {
+                return false;
+            }
+        }
+
+        if let Some(client_order_id_filter) = self.client_order_id.as_ref() {
+            let search_pattern = format!("\"client_order_id\":\"{}\"", client_order_id_filter);
+            let finder = self
+                .client_order_id_finder
+                .get_or_init(|| Finder::new(&search_pattern).into_owned());
             if finder.find(item.data.as_bytes()).is_none() {
                 return false;
             }

@@ -1,6 +1,3 @@
-// Copyright (c) Aptos Foundation
-// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
-
 // @generated
 impl serde::Serialize for ApiFilter {
     #[allow(deprecated)]
@@ -261,7 +258,7 @@ impl<'de> serde::Deserialize<'de> for ActiveStream {
                             if start_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startVersion"));
                             }
-                            start_version__ =
+                            start_version__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -269,7 +266,7 @@ impl<'de> serde::Deserialize<'de> for ActiveStream {
                             if end_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("endVersion"));
                             }
-                            end_version__ =
+                            end_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -572,12 +569,18 @@ impl serde::Serialize for EventFilter {
         if self.data_substring_filter.is_some() {
             len += 1;
         }
+        if self.client_order_id.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.EventFilter", len)?;
         if let Some(v) = self.struct_type.as_ref() {
             struct_ser.serialize_field("structType", v)?;
         }
         if let Some(v) = self.data_substring_filter.as_ref() {
             struct_ser.serialize_field("dataSubstringFilter", v)?;
+        }
+        if let Some(v) = self.client_order_id.as_ref() {
+            struct_ser.serialize_field("clientOrderId", v)?;
         }
         struct_ser.end()
     }
@@ -593,12 +596,15 @@ impl<'de> serde::Deserialize<'de> for EventFilter {
             "structType",
             "data_substring_filter",
             "dataSubstringFilter",
+            "client_order_id",
+            "clientOrderId",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             StructType,
             DataSubstringFilter,
+            ClientOrderId,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -622,6 +628,7 @@ impl<'de> serde::Deserialize<'de> for EventFilter {
                         match value {
                             "structType" | "struct_type" => Ok(GeneratedField::StructType),
                             "dataSubstringFilter" | "data_substring_filter" => Ok(GeneratedField::DataSubstringFilter),
+                            "clientOrderId" | "client_order_id" => Ok(GeneratedField::ClientOrderId),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -643,6 +650,7 @@ impl<'de> serde::Deserialize<'de> for EventFilter {
             {
                 let mut struct_type__ = None;
                 let mut data_substring_filter__ = None;
+                let mut client_order_id__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::StructType => {
@@ -657,11 +665,18 @@ impl<'de> serde::Deserialize<'de> for EventFilter {
                             }
                             data_substring_filter__ = map.next_value()?;
                         }
+                        GeneratedField::ClientOrderId => {
+                            if client_order_id__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("clientOrderId"));
+                            }
+                            client_order_id__ = map.next_value()?;
+                        }
                     }
                 }
                 Ok(EventFilter {
                     struct_type: struct_type__,
                     data_substring_filter: data_substring_filter__,
+                    client_order_id: client_order_id__,
                 })
             }
         }
@@ -769,7 +784,7 @@ impl<'de> serde::Deserialize<'de> for FullnodeInfo {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
-                            chain_id__ =
+                            chain_id__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -783,7 +798,7 @@ impl<'de> serde::Deserialize<'de> for FullnodeInfo {
                             if known_latest_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("knownLatestVersion"));
                             }
-                            known_latest_version__ =
+                            known_latest_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -1096,7 +1111,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                             if starting_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startingVersion"));
                             }
-                            starting_version__ =
+                            starting_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -1104,7 +1119,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                             if transactions_count__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("transactionsCount"));
                             }
-                            transactions_count__ =
+                            transactions_count__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -1112,7 +1127,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                             if batch_size__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("batchSize"));
                             }
-                            batch_size__ =
+                            batch_size__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -1247,7 +1262,7 @@ impl<'de> serde::Deserialize<'de> for GrpcManagerInfo {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
-                            chain_id__ =
+                            chain_id__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -1261,7 +1276,7 @@ impl<'de> serde::Deserialize<'de> for GrpcManagerInfo {
                             if known_latest_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("knownLatestVersion"));
                             }
-                            known_latest_version__ =
+                            known_latest_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -1456,7 +1471,7 @@ impl<'de> serde::Deserialize<'de> for HeartbeatResponse {
                             if known_latest_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("knownLatestVersion"));
                             }
-                            known_latest_version__ =
+                            known_latest_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -1582,7 +1597,7 @@ impl<'de> serde::Deserialize<'de> for HistoricalDataServiceInfo {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
-                            chain_id__ =
+                            chain_id__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -1596,7 +1611,7 @@ impl<'de> serde::Deserialize<'de> for HistoricalDataServiceInfo {
                             if known_latest_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("knownLatestVersion"));
                             }
-                            known_latest_version__ =
+                            known_latest_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -1742,7 +1757,7 @@ impl<'de> serde::Deserialize<'de> for LiveDataServiceInfo {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
-                            chain_id__ =
+                            chain_id__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -1756,7 +1771,7 @@ impl<'de> serde::Deserialize<'de> for LiveDataServiceInfo {
                             if known_latest_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("knownLatestVersion"));
                             }
-                            known_latest_version__ =
+                            known_latest_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -1770,7 +1785,7 @@ impl<'de> serde::Deserialize<'de> for LiveDataServiceInfo {
                             if min_servable_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("minServableVersion"));
                             }
-                            min_servable_version__ =
+                            min_servable_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -2186,7 +2201,7 @@ impl<'de> serde::Deserialize<'de> for PingDataServiceRequest {
                             if known_latest_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("knownLatestVersion"));
                             }
-                            known_latest_version__ =
+                            known_latest_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -2409,7 +2424,7 @@ impl<'de> serde::Deserialize<'de> for ProcessedRange {
                             if first_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("firstVersion"));
                             }
-                            first_version__ =
+                            first_version__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -2417,7 +2432,7 @@ impl<'de> serde::Deserialize<'de> for ProcessedRange {
                             if last_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("lastVersion"));
                             }
-                            last_version__ =
+                            last_version__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -2877,7 +2892,7 @@ impl<'de> serde::Deserialize<'de> for StreamProgressSampleProto {
                             if version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("version"));
                             }
-                            version__ =
+                            version__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -2885,7 +2900,7 @@ impl<'de> serde::Deserialize<'de> for StreamProgressSampleProto {
                             if size_bytes__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("sizeBytes"));
                             }
-                            size_bytes__ =
+                            size_bytes__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -3108,7 +3123,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsInStorage {
                             if starting_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startingVersion"));
                             }
-                            starting_version__ =
+                            starting_version__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -3230,7 +3245,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
-                            chain_id__ =
+                            chain_id__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
