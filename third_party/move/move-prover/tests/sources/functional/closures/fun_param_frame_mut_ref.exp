@@ -1,0 +1,30 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `f` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_mut_ref.move:34:9
+   │
+34 │         apply(*f)
+   │         ^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_mut_ref.move:45:9
+   │
+45 │         apply(*f)
+   │         ^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_mut_ref.move:67:9
+   │
+67 │         apply_t(*r)
+   │         ^^^^^^^^^^^
+
+error: cannot establish what function argument `r` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_mut_ref.move:75:9
+   │
+75 │         set(r);
+   │         ^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_mut_ref.move:76:9
+   │
+76 │         apply_t(*r)
+   │         ^^^^^^^^^^^

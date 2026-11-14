@@ -48,6 +48,10 @@ impl<'a> SummaryCache<'a> {
     pub fn global_env(&self) -> &GlobalEnv {
         self.global_env
     }
+
+    pub fn targets(&self) -> &FunctionTargetsHolder {
+        self.targets
+    }
 }
 
 /// Trait that lifts an intraprocedural analysis into a bottom-up, compositional interprocedural

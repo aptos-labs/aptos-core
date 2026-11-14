@@ -1,0 +1,18 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what captured function value for `g` of `fun_param_frame_field_origin_packed::apply_t` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:58:16
+   │
+58 │         call_h(|x| apply_t(g, x), 1);
+   │                ^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `g` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:67:9
+   │
+67 │         apply_t_opaque(o2.o.h.f);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `g` may modify: it is not a closure built in this function, a parameter of this function, or the value of a struct field with a declared frame
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin_packed.move:76:9
+   │
+76 │         apply_t_opaque(e.h.f);
+   │         ^^^^^^^^^^^^^^^^^^^^^

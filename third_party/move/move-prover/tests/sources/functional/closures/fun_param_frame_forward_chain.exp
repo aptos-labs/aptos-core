@@ -1,0 +1,18 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function argument may modify resource `loop_memory_havoc_forward_chain::Counter`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_forward_chain.move:43:17
+   │
+43 │         let g = make_curry(tick_at, a);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument `f` may modify resource `loop_memory_havoc_forward_chain::Counter`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_forward_chain.move:68:13
+   │
+68 │             fwd_outer(f, s);
+   │             ^^^^^^^^^^^^^^^
+
+error: captured function value accesses resource `closure_requires_transparent_hof::R`, which is not declared in `modifies_of`/`reads_of` for `f` of `closure_requires_transparent_hof::hof`
+    ┌─ tests/sources/functional/closures/fun_param_frame_forward_chain.move:108:16
+    │
+108 │         apply2(|y, z| hof(f, y, z), 1)
+    │                ^^^^^^^^^^^^^^^^^^^

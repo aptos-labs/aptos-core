@@ -1,0 +1,24 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function value passed to an invocation accesses resource `apply_carrier_unframed_callback::R`, which is not declared in `modifies_of`/`reads_of` for the parameter of the invoked function value
+   ┌─ tests/sources/functional/closures/apply_carrier_unframed_callback.move:33:17
+   │
+33 │         let a = h(read_r);
+   │                 ^^^^^^^^^
+
+error: function value passed to an invocation accesses resource `apply_carrier_unframed_callback::R`, which is not declared in `modifies_of`/`reads_of` for the parameter of the invoked function value
+   ┌─ tests/sources/functional/closures/apply_carrier_unframed_callback.move:35:17
+   │
+35 │         let b = h(read_r);
+   │                 ^^^^^^^^^
+
+error: function value passed to an invocation accesses resource `apply_carrier_unframed_callback::R`, which is not declared in `modifies_of`/`reads_of` for the parameter of the invoked function value
+   ┌─ tests/sources/functional/closures/apply_carrier_unframed_callback.move:45:17
+   │
+45 │         let a = h(read_r);
+   │                 ^^^^^^^^^
+
+error: function value passed to an invocation accesses resource `apply_carrier_unframed_callback::R`, which is not declared in `modifies_of`/`reads_of` for the parameter of the invoked function value
+   ┌─ tests/sources/functional/closures/apply_carrier_unframed_callback.move:47:17
+   │
+47 │         let b = h(read_r);
+   │                 ^^^^^^^^^

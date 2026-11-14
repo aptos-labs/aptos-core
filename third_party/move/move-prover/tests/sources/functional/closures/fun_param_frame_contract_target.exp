@@ -1,0 +1,56 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function argument may modify resource `fun_param_frame_contract_target::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_contract_target.move:33:25
+   │
+33 │     fun over_native() { apply(native_writer) }
+   │                         ^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `fun_param_frame_contract_target::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_contract_target.move:38:29
+   │
+38 │     fun over_unverified() { apply(unverified_writer) }
+   │                             ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `fun_param_frame_contract_target::G<u64>`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_contract_target.move:43:33
+   │
+43 │     fun over_generic_native() { apply(generic_writer<u64>) }
+   │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `fun_param_frame_contract_target::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_contract_target.move:49:33
+   │
+49 │     fun native_from_factory() { apply(make_native()) }
+   │                                 ^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `fun_param_frame_contract_target::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_contract_target.move:54:37
+   │
+54 │     fun unverified_from_factory() { apply(make_unverified()) }
+   │                                     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: WP could not characterize the aborts of `fun_param_frame_contract_target::__lambda__1__native_in_body` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = callee `0x42::fun_param_frame_contract_target::native_writer` has no trusted complete abort summary
+   ┌─ tests/sources/functional/closures/fun_param_frame_contract_target.move:60:34
+   │
+60 │     fun native_in_body() { apply(|x| { native_writer(x); native_writer(x + 0) }) }
+   │                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `fun_param_frame_contract_target::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_contract_target.move:60:28
+   │
+60 │     fun native_in_body() { apply(|x| { native_writer(x); native_writer(x + 0) }) }
+   │                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: WP could not characterize the aborts of `fun_param_frame_contract_target::__lambda__1__unverified_in_body` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = callee `0x42::fun_param_frame_contract_target::unverified_writer` has no trusted complete abort summary
+   ┌─ tests/sources/functional/closures/fun_param_frame_contract_target.move:65:38
+   │
+65 │     fun unverified_in_body() { apply(|x| { unverified_writer(x); unverified_writer(x + 0) }) }
+   │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `fun_param_frame_contract_target::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_contract_target.move:65:32
+   │
+65 │     fun unverified_in_body() { apply(|x| { unverified_writer(x); unverified_writer(x + 0) }) }
+   │                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

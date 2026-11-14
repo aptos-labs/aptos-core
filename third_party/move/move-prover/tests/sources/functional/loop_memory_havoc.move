@@ -319,46 +319,6 @@ module 0x42::loop_memory_havoc {
             == old(Counter[std::signer::address_of(s)].x);
     }
 
-    // A curried closure of a different type from the captured callback:
-    // the closure scan looks up the closed-over function's usage summary,
-    // which must include the forwarded `modifies_of<f>` frame via
-    // `invoke_frame` transitively.
-    #[persistent]
-    fun tick_at(a: address) acquires Counter {
-        if (exists<Counter>(a) && Counter[a].x < 18446744073709551615) {
-            Counter[a].x = Counter[a].x + 1;
-        }
-    }
-    spec tick_at {
-        pragma opaque;
-        modifies Counter[a];
-        aborts_if false;
-    }
-    fun curry_helper(f: |address| has drop + copy, a: address) { f(a); }
-    spec curry_helper {
-        pragma aborts_if_is_partial;
-        modifies_of<f>(x: address) Counter[x];
-    }
-    #[persistent]
-    fun curry_wrap(f: |address| has drop + copy, a: address, _n: u64) {
-        curry_helper(f, a);
-    }
-    fun make_curry(f: |address| has drop + copy, a: address): |u64| has drop + copy {
-        |n| curry_wrap(f, a, n)
-    }
-    fun fv_curry_fails(a: address, n: u64) {
-        let g = make_curry(tick_at, a);
-        let i = 0;
-        while (i < n) {
-            g(i);
-            i = i + 1;
-        };
-    }
-    spec fv_curry_fails {
-        requires exists<Counter>(a);
-        ensures Counter[a].x == old(Counter[a].x);
-    }
-
     // A forwarding helper with a `modifies_of<f> *` wildcard: its own
     // accessed footprint is empty, so the summary carries the wildcard as a
     // propagated flag rather than a resolved memory set. The caller's loop
@@ -379,30 +339,6 @@ module 0x42::loop_memory_havoc {
     spec fv_wild_forward_fails {
         pragma aborts_if_is_partial;
         modifies_of<f> *;
-        requires exists<Counter>(std::signer::address_of(s));
-        ensures Counter[std::signer::address_of(s)].x
-            == old(Counter[std::signer::address_of(s)].x);
-    }
-
-    // A forwarding helper whose only effect is invoking its declared
-    // parameter: the helper's `modifies_of<f>` frame must propagate through
-    // its `modified` summary so that a caller's loop invoking the helper
-    // still havocs the declared memory. Verified transitively (depth 2).
-    fun fwd_inner(f: |&signer| has drop + copy, s: &signer) { f(s); }
-    spec fwd_inner {
-        modifies_of<f>(x: signer) Counter[std::signer::address_of(x)];
-    }
-    fun fwd_outer(f: |&signer| has drop + copy, s: &signer) { fwd_inner(f, s); }
-
-    fun fv_forward_depth2_fails(f: |&signer| has drop + copy, s: &signer, n: u64) {
-        let i = 0;
-        while (i < n) {
-            fwd_outer(f, s);
-            i = i + 1;
-        };
-    }
-    spec fv_forward_depth2_fails {
-        modifies_of<f>(x: signer) Counter[std::signer::address_of(x)];
         requires exists<Counter>(std::signer::address_of(s));
         ensures Counter[std::signer::address_of(s)].x
             == old(Counter[std::signer::address_of(s)].x);
@@ -502,5 +438,79 @@ module 0x42::loop_memory_havoc {
         requires exists<R>(addr);
         aborts_if global<R>(addr).x + n > MAX_U64;
         ensures global<R>(addr).x == old(global<R>(addr).x) + n;
+    }
+
+    // A curried closure of a different type from the captured callback:
+    // the closure scan looks up the closed-over function's usage summary,
+    // which must include the forwarded `modifies_of<f>` frame via
+    // `invoke_frame` transitively. Every function on the chain declares the
+    // frame, so the writer stays within it.
+    #[persistent]
+    fun tick_at(a: address) acquires Counter {
+        if (exists<Counter>(a) && Counter[a].x < 18446744073709551615) {
+            Counter[a].x = Counter[a].x + 1;
+        }
+    }
+    spec tick_at {
+        pragma opaque;
+        modifies Counter[a];
+        aborts_if false;
+    }
+    fun curry_helper(f: |address| has drop + copy, a: address) { f(a); }
+    spec curry_helper {
+        pragma aborts_if_is_partial;
+        modifies_of<f>(x: address) Counter[x];
+    }
+    #[persistent]
+    fun curry_wrap(f: |address| has drop + copy, a: address, _n: u64) {
+        curry_helper(f, a);
+    }
+    spec curry_wrap {
+        modifies_of<f>(x: address) Counter[x];
+    }
+    fun make_curry(f: |address| has drop + copy, a: address): |u64| has drop + copy {
+        |n| curry_wrap(f, a, n)
+    }
+    spec make_curry {
+        modifies_of<f>(x: address) Counter[x];
+    }
+    fun fv_curry_fails(a: address, n: u64) {
+        let g = make_curry(tick_at, a);
+        let i = 0;
+        while (i < n) {
+            g(i);
+            i = i + 1;
+        };
+    }
+    spec fv_curry_fails {
+        requires exists<Counter>(a);
+        ensures Counter[a].x == old(Counter[a].x);
+    }
+
+    // A forwarding helper whose only effect is invoking its declared
+    // parameter: the helper's `modifies_of<f>` frame must propagate through
+    // its `modified` summary so that a caller's loop invoking the helper
+    // still havocs the declared memory. Verified transitively (depth 2).
+    fun fwd_inner(f: |&signer| has drop + copy, s: &signer) { f(s); }
+    spec fwd_inner {
+        modifies_of<f>(x: signer) Counter[std::signer::address_of(x)];
+    }
+    fun fwd_outer(f: |&signer| has drop + copy, s: &signer) { fwd_inner(f, s); }
+    spec fwd_outer {
+        modifies_of<f>(x: signer) Counter[std::signer::address_of(x)];
+    }
+
+    fun fv_forward_depth2_fails(f: |&signer| has drop + copy, s: &signer, n: u64) {
+        let i = 0;
+        while (i < n) {
+            fwd_outer(f, s);
+            i = i + 1;
+        };
+    }
+    spec fv_forward_depth2_fails {
+        modifies_of<f>(x: signer) Counter[std::signer::address_of(x)];
+        requires exists<Counter>(std::signer::address_of(s));
+        ensures Counter[std::signer::address_of(s)].x
+            == old(Counter[std::signer::address_of(s)].x);
     }
 }

@@ -1,0 +1,25 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_field_origin_packed_kept.move:44:16: error: the assertion `global<S>(@0x42).v == v0` does not hold
+tests/sources/functional/closures/fun_param_frame_field_origin_packed_kept.move:38:5: error: verex verification failed: the automatic verification of `packed_captured` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_packed_kept.proof.lean`:
+  verify packed_captured by lean =>
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_field_origin_packed_kept.move:52:16: error: the assertion `global<S>(@0x42).v == v0` does not hold
+tests/sources/functional/closures/fun_param_frame_field_origin_packed_kept.move:47:5: error: verex verification failed: the automatic verification of `packed_twice` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_packed_kept.proof.lean`:
+  verify packed_twice by lean =>
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_field_origin_packed_kept.move:60:16: error: the assertion `global<S>(@0x42).v == v0` does not hold
+tests/sources/functional/closures/fun_param_frame_field_origin_packed_kept.move:55:5: error: verex verification failed: the automatic verification of `packed_variant` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_packed_kept.proof.lean`:
+  verify packed_variant by lean =>
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

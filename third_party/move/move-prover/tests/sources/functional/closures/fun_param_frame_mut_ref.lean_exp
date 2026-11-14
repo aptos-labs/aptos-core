@@ -1,0 +1,6 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_mut_ref.move:1:1: error: VIR-SEMANTIC-TYPE: in fun apply_ref: function argument types differ from the callee signature at [2844, 2853)
+VIR-SEMANTIC-TYPE: in fun through_field_ref: function argument types differ from the callee signature at [2161, 2172)
+VIR-SEMANTIC-TYPE: in fun through_mut_param: function argument types differ from the callee signature at [1199, 1208)
+VIR-SEMANTIC-TYPE: in fun through_mut_param_copy: function argument types differ from the callee signature at [1541, 1550)
+VIR-SEMANTIC-TYPE: in fun through_setter: function argument types differ from the callee signature at [2428, 2439)

@@ -1,0 +1,24 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `f` may modify: it is read from field `f` of `fun_param_frame_field_origin::Cb`, which declares no `modifies_of`/`reads_of`
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin.move:36:37
+   │
+36 │     fun unframed_to_empty(cb: Cb) { apply(cb.f) }
+   │                                     ^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is read from field `f` of `fun_param_frame_field_origin::Cb`, which declares no `modifies_of`/`reads_of`
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin.move:40:9
+   │
+40 │         apply(f)
+   │         ^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is read from field `f` of `fun_param_frame_field_origin::CbE`, which declares no `modifies_of`/`reads_of`
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin.move:43:46
+   │
+43 │     fun unframed_variant_to_empty(cb: CbE) { apply(cb.f) }
+   │                                              ^^^^^^^^^^^
+
+error: function argument read from field `f` of `fun_param_frame_field_origin::CbS` may modify resource `fun_param_frame_field_origin::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_field_origin.move:46:36
+   │
+46 │     fun framed_to_empty(cb: CbS) { apply(cb.f) }
+   │                                    ^^^^^^^^^^^

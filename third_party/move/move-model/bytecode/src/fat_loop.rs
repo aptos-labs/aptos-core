@@ -548,6 +548,9 @@ impl FatLoopBuilder<'_> {
             func_target.func_env.get_qualified_id(),
             code,
             &summary_of,
+            &|fun_id, inst| {
+                usage_analysis::contract_effects_reached(env, targets, &summary_of, fun_id, inst)
+            },
         );
         let mut add = |mem: QualifiedInstId<StructId>| {
             if !env.get_struct_qid(mem.to_qualified_id()).is_intrinsic() {
