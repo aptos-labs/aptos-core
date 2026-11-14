@@ -68,13 +68,17 @@ impl IndexerAsyncV2 {
         })
     }
 
+    /// Parses `write_sets` against the state right after the last of them.
     pub fn index_table_info(
         &self,
         db_reader: Arc<dyn DbReader>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
-        let last_version = first_version + write_sets.len() as Version;
+        if write_sets.is_empty() {
+            return Ok(());
+        }
+        let last_version = first_version + write_sets.len() as Version - 1;
         let state_view = db_reader.state_view_at_version(Some(last_version))?;
         let annotator = AptosValueAnnotator::new(&state_view);
         self.index_with_annotator(&annotator, first_version, write_sets)

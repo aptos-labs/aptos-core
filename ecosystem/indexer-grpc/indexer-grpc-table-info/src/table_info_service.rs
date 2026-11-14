@@ -111,7 +111,15 @@ impl TableInfoService {
                 break;
             }
             let batches = self.get_batches(ledger_version).await;
-            let transactions = self.fetch_batches(batches, ledger_version).await.unwrap();
+            let mut transactions = self.fetch_batches(batches, ledger_version).await.unwrap();
+            // Leave a trailing partial block to the next round, so that the last parser batch
+            // ends at a block end. Keep everything if no block ends in this round.
+            if let Some(last_block_end) = transactions
+                .iter()
+                .rposition(|txn| txn.info.has_state_checkpoint_hash())
+            {
+                transactions.truncate(last_block_end + 1);
+            }
             let num_transactions = transactions.len();
             let last_version = transactions
                 .last()
@@ -257,13 +265,15 @@ impl TableInfoService {
             .unwrap_or_default();
 
         let transactions = Arc::new(transactions);
-        for (chunk_idx, batch_size) in transactions
-            .chunks(self.parser_batch_size as usize)
-            .enumerate()
-            .map(|(idx, chunk)| (idx, chunk.len()))
-        {
-            let start = chunk_idx * self.parser_batch_size as usize;
-            let end = start + batch_size;
+        let mut start = 0;
+        while start < transactions.len() {
+            let end = (start + self.parser_batch_size as usize).min(transactions.len());
+            // End the batch at its last block end if it has one, so it's parsed against state at
+            // a block end.
+            let end = transactions[start..end]
+                .iter()
+                .rposition(|txn| txn.info.has_state_checkpoint_hash())
+                .map_or(end, |pos| start + pos + 1);
 
             let transactions = transactions.clone();
             let context = context.clone();
@@ -273,6 +283,7 @@ impl TableInfoService {
                     .await
             });
             tasks.push(task);
+            start = end;
         }
 
         match futures::future::try_join_all(tasks).await {
