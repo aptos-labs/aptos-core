@@ -262,6 +262,11 @@ impl BlockStore {
         }
 
         if let Some(tc) = sync_info.highest_2chain_timeout_cert() {
+            // The TC may carry a higher QC than sync_info's; keep it so our HQC can't fall below it.
+            if tc.highest_hqc_round() > sync_info.highest_quorum_cert().certified_block().round() {
+                self.insert_quorum_cert(tc.quorum_cert(), &mut retriever)
+                    .await?;
+            }
             self.insert_2chain_timeout_certificate(Arc::new(tc.clone()))?;
         }
         Ok(())

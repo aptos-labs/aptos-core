@@ -490,3 +490,193 @@ async fn test_need_sync_for_ledger_info() {
         .need_sync_for_ledger_info(&not_too_far)
         .is_none());
 }
+
+#[tokio::test]
+async fn test_add_certs_retains_2chain_tc_quorum_cert() {
+    use crate::{
+        block_storage::block_store::sync_manager::BlockRetriever,
+        network::NetworkSender,
+        network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
+        persistent_liveness_storage::{LedgerRecoveryData, RecoveryData, RootMetadata},
+    };
+    use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+    use aptos_config::network_id::NetworkId;
+    use aptos_consensus_types::{quorum_cert::QuorumCert, sync_info::SyncInfo};
+    use aptos_crypto::hash::{CryptoHash, ACCUMULATOR_PLACEHOLDER_HASH};
+    use aptos_network::{
+        application::{interface::NetworkClient, storage::PeersAndMetadata},
+        peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
+        protocols::network::NewNetworkSender,
+    };
+    use aptos_safety_rules::{test_utils, PersistentSafetyStorage, SafetyRules, TSafetyRules};
+    use aptos_secure_storage::{InMemoryStorage, Storage};
+    use aptos_types::{
+        block_info::BlockInfo,
+        ledger_info::{generate_ledger_info_with_sig, LedgerInfo},
+        waypoint::Waypoint,
+    };
+    use maplit::hashmap;
+    use std::sync::Arc;
+
+    let (_, block_store) = build_simple_tree().await;
+    let genesis_block = block_store.ordered_root().block().clone();
+    let genesis_qc = block_store
+        .get_quorum_cert_for_block(genesis_block.id())
+        .unwrap()
+        .as_ref()
+        .clone();
+
+    let signer = ValidatorSigner::from_int(0);
+    let (proof, _) = test_utils::make_genesis(&signer);
+    let waypoint =
+        Waypoint::new_epoch_boundary(proof.ledger_info_with_sigs.first().unwrap().ledger_info())
+            .unwrap();
+    let safety_storage = PersistentSafetyStorage::initialize(
+        Storage::from(InMemoryStorage::new()),
+        signer.author(),
+        signer.private_key().clone(),
+        waypoint,
+        true,
+    );
+    let mut safety_rules = SafetyRules::new(safety_storage, false);
+    safety_rules.initialize(&proof).unwrap();
+
+    let make_qc = |certified: &Block, parent: &Block, commit: Option<&Block>| -> QuorumCert {
+        let vote_data = VoteData::new(
+            certified.gen_block_info(*ACCUMULATOR_PLACEHOLDER_HASH, 0, None),
+            parent.gen_block_info(*ACCUMULATOR_PLACEHOLDER_HASH, 0, None),
+        );
+        let commit_info = commit.map_or(BlockInfo::empty(), |b| {
+            b.gen_block_info(*ACCUMULATOR_PLACEHOLDER_HASH, 0, None)
+        });
+        let ledger_info = LedgerInfo::new(commit_info, vote_data.hash());
+        QuorumCert::new(
+            vote_data,
+            generate_ledger_info_with_sig(&[signer.clone()], ledger_info),
+        )
+    };
+
+    // Committed branch B12 <- B13, then an uncommitted jump-round chain B15 <- B17 <- B19 <- B20
+    // on top of it. (Issue #20801 roots the jump chain at genesis; that fork conflicts with the
+    // committed B12 and could not be re-inserted after rebuilding at B12.)
+    let b12 = test_utils::make_proposal_with_qc(12, genesis_qc.clone(), &signer);
+    let qc12 = make_qc(b12.block(), &genesis_block, None);
+    let b13 = test_utils::make_proposal_with_qc(13, qc12.clone(), &signer);
+    let qc13 = make_qc(b13.block(), b12.block(), Some(b12.block()));
+    let b15 = test_utils::make_proposal_with_qc(15, qc13.clone(), &signer);
+    let qc15 = make_qc(b15.block(), b13.block(), None);
+    let b17 = test_utils::make_proposal_with_qc(17, qc15.clone(), &signer);
+    let qc17 = make_qc(b17.block(), b15.block(), None);
+    let b19 = test_utils::make_proposal_with_qc(19, qc17.clone(), &signer);
+    let qc19 = make_qc(b19.block(), b17.block(), None);
+    let b20 = test_utils::make_proposal_with_qc(20, qc19.clone(), &signer);
+
+    // Voting on B20 raises SafetyRules' preferred_round to 17 and one_chain_round to 19
+    safety_rules
+        .construct_and_sign_vote_two_chain(&b20, None)
+        .unwrap();
+    assert_eq!(
+        safety_rules.consensus_state().unwrap().preferred_round(),
+        17
+    );
+    assert_eq!(
+        safety_rules.consensus_state().unwrap().one_chain_round(),
+        19
+    );
+
+    // Rebuild at B12, dropping QC15/QC17/QC19 so the BlockStore HQC falls below round 17
+    let (root, root_metadata, blocks, quorum_certs) = RecoveryData::new(
+        None,
+        LedgerRecoveryData::new(qc13.ledger_info().clone()),
+        vec![
+            b17.block().clone(),
+            b15.block().clone(),
+            b13.block().clone(),
+            b12.block().clone(),
+            genesis_block.clone(),
+        ],
+        RootMetadata::new_empty(),
+        vec![qc13.clone(), qc12, genesis_qc],
+        None,
+        false,
+        None,
+    )
+    .unwrap()
+    .take();
+    block_store
+        .rebuild(root, root_metadata, blocks, quorum_certs)
+        .await;
+    let hqc_round_after_rebuild = block_store.highest_quorum_cert().certified_block().round();
+    assert!(hqc_round_after_rebuild < 17);
+
+    let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+    let (connection_reqs_tx, _connection_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+    let network_client = NetworkClient::new(
+        DIRECT_SEND.into(),
+        RPC.into(),
+        hashmap! {NetworkId::Validator => aptos_network::protocols::network::NetworkSender::new(
+            PeerManagerRequestSender::new(network_reqs_tx),
+            ConnectionRequestSender::new(connection_reqs_tx),
+        )},
+        PeersAndMetadata::new(&[NetworkId::Validator]),
+    );
+    let (self_loop_tx, _self_loop_rx) = aptos_channels::new_unbounded_test();
+    let network = Arc::new(NetworkSender::new(
+        signer.author(),
+        ConsensusNetworkClient::new(network_client),
+        self_loop_tx,
+        Arc::new(random_validator_verifier(1, None, false).1),
+    ));
+    let retriever = || {
+        BlockRetriever::new(
+            network.clone(),
+            signer.author(),
+            vec![signer.author()],
+            10,
+            block_store.pending_blocks(),
+        )
+    };
+
+    // Control: a TC whose hqc round does not exceed the SyncInfo HQC round leaves the HQC alone
+    let tc14 = test_utils::make_timeout_cert(14, &qc13, &signer);
+    let sync_info = SyncInfo::new(
+        qc13.clone(),
+        qc13.clone().into_wrapped_ledger_info(),
+        Some(tc14),
+    );
+    block_store
+        .add_certs(&sync_info, retriever())
+        .await
+        .unwrap();
+    assert_eq!(
+        block_store.highest_quorum_cert().certified_block().round(),
+        hqc_round_after_rebuild
+    );
+    assert_eq!(
+        block_store.highest_2chain_timeout_cert().unwrap().round(),
+        14
+    );
+
+    // SyncInfo(HQC=QC13, TC20(hqc=17)): the TC's QC17 must be retained
+    let tc20 = test_utils::make_timeout_cert(20, &qc17, &signer);
+    let sync_info = SyncInfo::new(
+        qc13.clone(),
+        qc13.clone().into_wrapped_ledger_info(),
+        Some(tc20),
+    );
+    block_store
+        .add_certs(&sync_info, retriever())
+        .await
+        .unwrap();
+    assert_eq!(
+        block_store.highest_quorum_cert().certified_block().round(),
+        17
+    );
+
+    // The round 21 leader can now sign a proposal on top of the retained HQC
+    let hqc = block_store.highest_quorum_cert().as_ref().clone();
+    let b21 = test_utils::make_proposal_with_qc(21, hqc, &signer);
+    safety_rules
+        .sign_proposal(b21.block().block_data())
+        .unwrap();
+}
