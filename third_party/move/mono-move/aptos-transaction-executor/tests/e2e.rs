@@ -2436,7 +2436,7 @@ fn execute_v2_interrupting<S: StateView>(
         usage,
     );
     let outcome = executor.execute_transaction(&txn, &aux_info);
-    let interrupted = matches!(outcome, TxnOutcome::Interrupted { .. });
+    let interrupted = matches!(outcome, TxnOutcome::Interrupted);
     let output = outcome
         .materialize(
             &guard,
