@@ -113,7 +113,7 @@ impl DbStateViewAtVersion for Arc<dyn DbReader> {
         Ok(DbStateView {
             db: self.clone(),
             version,
-            at_checkpoint: false,
+            at_checkpoint: version.is_some_and(|v| self.is_known_state_checkpoint(v)),
             maybe_verify_against_state_root_hash: None,
         })
     }
