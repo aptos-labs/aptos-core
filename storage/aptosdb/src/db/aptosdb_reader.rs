@@ -996,6 +996,7 @@ impl DbReader for AptosDB {
             },
             StateKind::Position => self.position_store_reader()?.item_count(version),
             StateKind::Order => self.order_store_reader()?.item_count(version),
+            StateKind::Collateral => self.collateral_store_reader()?.item_count(version),
         })
     }
 
@@ -1021,6 +1022,11 @@ impl DbReader for AptosDB {
                 self.order_store_reader()?
                     .value_chunk_with_proof(version, first_index, chunk_size)
             },
+            StateKind::Collateral => self.collateral_store_reader()?.value_chunk_with_proof(
+                version,
+                first_index,
+                chunk_size,
+            ),
         })
     }
 
@@ -1058,6 +1064,14 @@ impl DbReader for AptosDB {
                 )?;
                 Ok(iter as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>)
             },
+            StateKind::Collateral => {
+                let iter = self.collateral_store_reader()?.value_chunk_iter(
+                    version,
+                    first_index,
+                    chunk_size,
+                )?;
+                Ok(iter as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>)
+            },
         })
     }
 
@@ -1083,6 +1097,11 @@ impl DbReader for AptosDB {
                 self.order_store_reader()?
                     .value_chunk_proof(version, first_index, state_key_values)
             },
+            StateKind::Collateral => self.collateral_store_reader()?.value_chunk_proof(
+                version,
+                first_index,
+                state_key_values,
+            ),
         })
     }
 

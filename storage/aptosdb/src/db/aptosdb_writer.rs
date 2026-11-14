@@ -213,6 +213,17 @@ impl DbWriter for AptosDB {
                     expected_root_hash,
                 )
             },
+            StateKind::Collateral => {
+                let collateral = self.collateral.as_ref().ok_or_else(|| {
+                    AptosDbError::Other("native-collateral store is not enabled".into())
+                })?;
+                crate::native_store::state_sync::get_native_snapshot_receiver(
+                    &collateral.store.kv_db,
+                    &collateral.store.merkle_db,
+                    version,
+                    expected_root_hash,
+                )
+            },
         })
     }
 
@@ -285,6 +296,18 @@ impl DbWriter for AptosDB {
                      native-order snapshot cannot be restored or verified. Enable \
                      COMPUTE_TRADING_NATIVE_STATE_ROOTS on the source chain, or run without \
                      native-order storage.",
+                    version,
+                );
+            }
+            let collateral_root =
+                output_with_proof.proof.transaction_infos[0].collateral_state_checkpoint_hash();
+            if self.collateral.is_some() {
+                ensure!(
+                    collateral_root.is_some(),
+                    "Fast sync target at version {} commits no collateral state root, so the \
+                     native-collateral snapshot cannot be restored or verified. Enable \
+                     COMPUTE_TRADING_NATIVE_STATE_ROOTS on the source chain, or run without \
+                     native-collateral storage.",
                     version,
                 );
             }
@@ -437,6 +460,9 @@ impl DbWriter for AptosDB {
             }
             if let Some(expected_root_hash) = order_root {
                 self.reset_order_after_fast_sync(version, expected_root_hash)?;
+            }
+            if let Some(expected_root_hash) = collateral_root {
+                self.reset_collateral_after_fast_sync(version, expected_root_hash)?;
             }
 
             Ok(())
