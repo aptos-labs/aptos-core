@@ -5,7 +5,7 @@
 
 use aptos_logger::prelude::*;
 use backtrace::Backtrace;
-use move_core_types::state::{self, VMState};
+use move_core_types::state;
 use serde::Serialize;
 use std::{
     panic::{self, PanicHookInfo},
@@ -45,11 +45,12 @@ fn handle_panic(panic_info: &PanicHookInfo<'_>) {
     // Wait till the logs have been flushed
     aptos_logger::flush();
 
-    // Do not kill the process if the panics happened at move-bytecode-verifier.
-    // This is safe because the `state::get_state()` uses a thread_local for storing states. Thus the state can only be mutated to VERIFIER by the thread that's running the bytecode verifier.
+    // Do not kill the process if the panic happened inside `state::catch_unwind_in` (the Move
+    // deserializer or bytecode verifier), which turns the panic into an error. The state is
+    // thread-local, so it only reflects the panicking thread.
     //
     // TODO: once `can_unwind` is stable, we should assert it. See https://github.com/rust-lang/rust/issues/92988.
-    if state::get_state() == VMState::VERIFIER || state::get_state() == VMState::DESERIALIZER {
+    if state::panic_is_contained() {
         return;
     }
 
