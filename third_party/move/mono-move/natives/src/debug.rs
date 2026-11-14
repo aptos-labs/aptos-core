@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Natives for the `debug` module. Both are no-ops unless the VM runs in debug
-//! mode.
+//! mode, as defined by the runtime's `InterpreterOptions::enable_debugging`.
 
 use crate::{monomorphic_natives, NativeEntry};
 use mono_move_core::{
@@ -15,8 +15,8 @@ use mono_move_core::{
 /// `0x1::debug::native_print(x: String)`
 ///
 /// Prints `x`, already formatted by the Move-side `debug::print`.
-//
-// TODO(metering): charge gas.
+///
+/// Charges no gas, like V1.
 pub fn native_print<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     if !ctx.debugging_enabled() {
         return Ok(NativeStatus::Success);
@@ -37,8 +37,8 @@ pub fn native_print<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
 /// `0x1::debug::native_stack_trace(): String`
 ///
 /// Returns the caller's call stack, or an empty string outside debug mode.
-//
-// TODO(metering): charge gas.
+///
+/// Charges no gas, like V1.
 pub fn native_stack_trace<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let trace = if ctx.debugging_enabled() {
         ctx.debug_stack_trace()?

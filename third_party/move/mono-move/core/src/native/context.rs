@@ -380,8 +380,8 @@ pub trait NativeContext {
     /// Errors if `T` is not installed, or if it is already borrowed.
     fn get_extension<T: NativeExtension>(&self) -> VMResult<RefMut<'_, T>>;
 
-    /// Whether the VM runs in debug mode. Debug natives (e.g.
-    /// `0x1::debug::native_print`) are no-ops outside it.
+    /// Whether the VM runs in debug mode, as defined by the runtime's
+    /// `InterpreterOptions::enable_debugging`.
     fn debugging_enabled(&self) -> bool;
 
     /// Renders the callers of the function calling this native, outermost

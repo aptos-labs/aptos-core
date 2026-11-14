@@ -591,7 +591,7 @@ impl fmt::Display for CallError<'_, '_> {
 }
 
 /// The [`ModuleId`] naming a frame's module, or [`None`] for a script frame.
-fn frame_module(module_id: InternedModuleId) -> Option<ModuleId> {
+pub(crate) fn frame_module(module_id: InternedModuleId) -> Option<ModuleId> {
     (!is_script_module_id(module_id)).then(|| module_id_of(module_id))
 }
 
@@ -701,14 +701,14 @@ unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<
 /// `fp` must point to the root frame of `stack`, to a live frame of the
 /// current run, or to a frame from its last run with the stack unchanged since.
 /// The metadata chain must be the one written by the call protocol, and every
-/// function it references must stay alive for `'f`.
+/// function it references must stay alive while `stack` is borrowed.
 // TODO(completeness): consider including the current frame. It is excluded to
 // match V1, and because the error or abort location already records it.
 #[cold]
-pub(crate) unsafe fn walk_callers<'f>(
+pub(crate) unsafe fn walk_callers(
     stack: &MemoryRegion,
     mut fp: *mut u8,
-) -> VMResult<Vec<(&'f Function, BytecodeOffset)>> {
+) -> VMResult<Vec<(&Function, BytecodeOffset)>> {
     let lowest = root_frame_base(stack);
     let highest = stack.as_ptr().wrapping_add(stack.len());
     let mut frames = Vec::new();
@@ -795,8 +795,15 @@ pub struct InterpreterContext<'guard> {
 pub struct InterpreterOptions {
     /// The VM heap's capacity in bytes.
     pub heap_size: usize,
-    /// Debug mode: enables debug natives such as `0x1::debug::native_print`,
-    /// which are no-ops otherwise.
+    /// Debug mode. It only affects the debug natives: `0x1::debug::native_print`
+    /// prints to stdout, and `0x1::debug::native_stack_trace` returns the
+    /// caller's call stack. Outside debug mode, the first does nothing and the
+    /// second returns an empty string. Nothing else changes.
+    ///
+    /// Enable it only for local testing, such as unit tests and test harnesses,
+    /// where V1 enables its `testing` feature. Never enable it on validators or
+    /// wherever execution must be deterministic: the stack trace is a value
+    /// visible to Move code, so nodes in different modes can diverge.
     pub enable_debugging: bool,
 }
 
