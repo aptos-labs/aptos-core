@@ -3,6 +3,10 @@
 
 import VerexSL
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 /-! Generic enum construction and payload observations compose at the same
 abstract parameter representation, including across verified function calls. -/
 

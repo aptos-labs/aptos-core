@@ -3,6 +3,10 @@
 
 import VerexSL
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 verex module 0x42::given_failure_diagnostics where
   pragma verify = false
   opaque spec fun permitted {T}(value : u64) : Bool

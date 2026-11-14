@@ -3,6 +3,10 @@
 
 import VerexSL
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 /-! A generic callable result instantiated at Unit has no returned slot.
 The specialized frame must still prove the callable contract; ordinary
 non-Unit results continue to use the generic theorem. -/

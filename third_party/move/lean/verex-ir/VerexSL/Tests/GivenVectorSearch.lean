@@ -3,6 +3,10 @@
 
 import VerexSL
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 open Lean Elab Command VerexSL.Verify
 
 /-! Generic vector membership uses one search witness after certification and

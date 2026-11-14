@@ -3,6 +3,10 @@
 
 import VerexSL
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 /-! A named ordering specification observes plain keys from a generic ADT's
 invariant. Given clause generation must choose the plain ordering operation
 without requiring a certificate for a key inside that clause. The resulting

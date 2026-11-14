@@ -3,6 +3,10 @@
 
 import VerexSL
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 -- The invariant belongs to the generic read's frame. Its nonphantom field
 -- ensures that selecting the declaration cannot identify the two frames by
 -- their scalar fields alone.

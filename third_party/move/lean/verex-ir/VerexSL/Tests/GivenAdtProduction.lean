@@ -3,6 +3,10 @@
 
 import VerexSL
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 /-! Source-level Given verification keeps declared ADT invariants at packing
 and loan boundaries while treating parameter payloads as opaque values. The
 negative commands restore their state and require that no proof or transfer

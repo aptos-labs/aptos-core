@@ -3,6 +3,10 @@
 
 import VerexSL
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 /-! An otherwise supported generic identity uses the explicit concrete path
 when another ADT in its unit needs a function-value invariant interpretation.
 The unsupported declaration is checked before any Given proof starts. -/

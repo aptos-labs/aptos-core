@@ -112,15 +112,21 @@ subtype at the storage interface, a global borrow's prophecy chosen among
 valid values, no new assumption in the public theorems.
 
 **U2. The Given route is parked until G2.** Its source stays and compiles
-through the collapse, with its types adapted. A switch is added and is off by
-default, so that every generic member is verified on the concrete route, which
-is the route of the reference. Its tests are off while it is parked.
-`OrderedMap`'s authored proofs get a version for the concrete route. After G2
-it is adapted to the validity predicate of a type parameter, switched on and
-completed as a step of its own with its own gate. One check comes first:
-phase 0 measures both routes, and if the Given route is clearly the cheaper on
-the generic targets it stays on and the generic repairs are made on both
-routes.
+through the collapse, with its types adapted. A switch selects it
+(`verex.givenRoute`). After G2 the route is adapted to the validity predicate
+of a type parameter, switched on and completed as a step of its own with its
+own gate.
+
+Phase 0 measured both routes, and the parking cannot start yet: with the route
+off, every generic function of `OrderedMap` fails on the concrete route (7 of
+its 17 targets), where at the reference they verified concretely. At this tip
+the Given route is what verifies generic members. So the option is **on** by
+default now, and it is turned off at the switch of phase 2, where the lent
+layer goes and the concrete route for generic members is restored;
+`OrderedMap`'s authored proofs get their version for the concrete route then.
+The tests that assert what the route does select it explicitly, so they keep
+running whatever the default. This timing was put to the user and awaits his
+confirmation.
 
 **U3. The path-only obligation waits.** A mutation's end owing only its path,
 and any analysis of which levels a death closes, are taken up after G2.
@@ -481,25 +487,14 @@ No behavior changes.
    verification and certification apart, on the reference and on the base. A
    switch for the Given route is added for this and stays (U2). The revisions
    that can be built for attribution are named here.
-6. **One experiment, one day.** A temporary option under which
-   `dataOwnTerms` carries no declaration, so that the condition layer owns all
-   of them while the carrier is still the subtype. A source read says what to
-   expect, and the experiment is there to confirm it and find what the read
-   missed:
-   - The unit then declares no invariant to the carriers
-     (`declaresDataInvariants` is false), so it gets the trivial inhabitants
-     and its artifacts bind none. This is the first cost signal: how much of
-     the regression goes with the certificates alone, before the subtype does.
-   - The memory predicate comes back for every `key` declaration. The cost of
-     `primary_fungible_store::deposit` under it, now that a global loan's
-     death has its own obligation, tests the diagnosis of 2026-11-05.
-   - Known to change: a function reaching a resource whose deeper walk now
-     raises is refused; the Given route keeps its own table. The checks made
-     under this option are the solver's and are not part of the theorem (C1),
-     so its verdicts are a signal for cost and coverage only.
-   Recorded: which fixtures change verdict, which controls pass, the cost of
-   `OrderedMap`, `DenotePerformance` and `deposit`. This is the input to
-   phase 1 and decides nothing by itself.
+6. **One experiment, one day: made, and dropped.** A temporary option under
+   which `dataOwnTerms` carries no declaration is not a sound switch: on
+   `OrderedMap` it gives type mismatches at the module's own command, between
+   a parameter's inhabitant and a concrete carrier, and the scenario targets
+   never elaborate. It was not repaired and is not in the tree. One signal
+   came from it: with the Given route off and nothing carried, four generic
+   functions verify at about half their present cost, near their reference
+   figures.
 
 Gate: the base builds, its state is recorded against the reference, the
 controls run, the experiment's table exists.

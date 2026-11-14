@@ -2,6 +2,10 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexSL
+
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
 open Lean Meta Elab Command VerexSL VerexSL.Contract VerexSL.Verify
 open VerexIR.Proofs VerexIR.Proofs.Denote
 verex module 0x42::given_production where

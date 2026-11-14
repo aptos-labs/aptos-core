@@ -4,6 +4,10 @@
 import VerexSL
 import VerexIR.Tests.GivenExecution
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 /-! Explicit concrete-transfer dependencies propagate separately from trusted
 lemma assumptions. The artifact audit rejects misplaced transfer premises
 and Given proof metadata that does not describe a completed body proof. -/

@@ -3,6 +3,10 @@
 
 import VerexSL.Proofs
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 namespace VerexSL.Tests.GivenPlainVectorReads
 
 open Lean Meta Elab Command VerexIR VerexIR.Proofs.Denote VerexSL

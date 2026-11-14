@@ -4,6 +4,7 @@
 import VerexSL.Verify.FunctionValues
 import VerexSL.Verify.Given
 import VerexSL.Verify.GivenTransfer
+import VerexSL.Switches
 import VerexIR.Proofs.Denote.Authored
 import VerexIR.Proofs.IndexedTyping
 
@@ -4455,7 +4456,10 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
       Option.any_some, Int.reduceLT, Int.reduceToNat, Bool.and_true,
       ite_true, ite_false, verexScopedEntry]
     all_goals clear verexScopedEntry))
-  if generic && !model && cycle.isEmpty && !summary then
+  -- Unset, `verex.givenRoute` leaves a generic function on the concrete
+  -- route, exactly where the Given interpretation's refusal leaves one: no
+  -- eligibility is computed and no Given artifact is declared.
+  if verex.givenRoute.get (← getOptions) && generic && !model && cycle.isEmpty && !summary then
     -- Eligibility translates the same declaration clauses the Given proof
     -- consumes. Keep this work in the target's measured verification cost.
     let eligibilityStart ← IO.getNumHeartbeats

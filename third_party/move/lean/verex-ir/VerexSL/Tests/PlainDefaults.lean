@@ -3,6 +3,10 @@
 
 import VerexSL
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 open Lean Meta Elab Command VerexSL.Contract VerexIR.Proofs.Denote
 
 -- Plain defaults are constructible without certified inhabitants and depend

@@ -3,6 +3,10 @@
 
 import VerexSL
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
+
 /-! Native models requiring concrete reflection must select that interpretation
 before proof generation. Other native models keep their actual Given proofs. -/
 
