@@ -84,3 +84,46 @@ fn test_db_for_batch_id() {
         BatchId::new_for_test(2)
     );
 }
+
+#[test]
+fn test_clean_and_get_batch_id_discards_newer_epoch() {
+    let tmp_dir = TempPath::new();
+    let db = QuorumStoreDB::new(&tmp_dir);
+
+    assert_ok!(db.save_batch_id(5, BatchId::new_for_test(7)));
+
+    assert_eq!(
+        db.clean_and_get_batch_id(3)
+            .expect("could not read from db"),
+        None
+    );
+
+    // Deleted rather than skipped: a surviving row would surface here.
+    assert_eq!(
+        db.clean_and_get_batch_id(5)
+            .expect("could not read from db"),
+        None
+    );
+}
+
+#[test]
+fn test_clean_and_get_batch_id_deletes_older_epochs() {
+    let tmp_dir = TempPath::new();
+    let db = QuorumStoreDB::new(&tmp_dir);
+
+    assert_ok!(db.save_batch_id(2, BatchId::new_for_test(2)));
+    assert_ok!(db.save_batch_id(3, BatchId::new_for_test(3)));
+
+    assert_eq!(
+        db.clean_and_get_batch_id(3)
+            .expect("could not read from db"),
+        Some(BatchId::new_for_test(3))
+    );
+
+    assert_ok!(db.delete_batch_id(3));
+    assert_eq!(
+        db.clean_and_get_batch_id(2)
+            .expect("could not read from db"),
+        None
+    );
+}
