@@ -1,5 +1,13 @@
 # Canonical parameters in Given verification
 
+> **Partly superseded.** The certified carriers are withdrawn
+> ([`../plan/plain-values.md`](../plan/plain-values.md)). One abstract sort
+> per parameter, the one interpreter and the concrete export stand. The
+> distinction between a plain and a certified role, and the section "ADTs keep
+> their certificates", describe the source until the carrier is plain: after
+> that an ADT has one representation in a Given frame as elsewhere, and its
+> declared clauses are conditions.
+
 ## One abstract sort per parameter
 
 A generic body verifies at one uninterpreted sort per type parameter. Its
@@ -102,6 +110,16 @@ cached within one emission scope; unresolved expressions are not cached.
 
 ## Which members take the route, and what happens when they cannot
 
+**The Given interpretation is incomplete, and the incompleteness is a defect of
+this design, not part of it.** A generic member is meant to be verified once,
+in a Given frame, whatever its body and contract use. Today
+`givenUnsupported?` refuses the route for the features listed below, and such a
+member is verified by the concrete interpretation instead. That second route
+for generic members is unfinished work to be removed: each refusal is an
+interpretation the Given frame does not have yet. Completing them is open in
+[`../plan/roadmap.md`](../plan/roadmap.md) ("The Given interpretation is
+complete").
+
 A member is verified through a Given proof when its declaration is generic, is
 not verified through a model, belongs to no cycle of calls, and is not being
 summarized for its callers (`verifyMember`, `VerexSL/Verify/Members.lean`).
@@ -132,11 +150,11 @@ nothing and the caller could not establish its own clauses. A native, an
 intrinsic map's role and a prelude model state their own contract, which a
 caller assumes as the Move Prover does, so they are exempt.
 
-**The fallback is concrete verification, with the callee inlined, and it is
-logged as information, not as an error** (`VerexSL/Verify/Members.lean`). Only
-an explicit capability result selects the concrete path; a translation bug and a
-failed proof remain errors. Clauses that did translate are reused by the
-emitter.
+Until the interpretation is complete, a refused member is verified concretely,
+with the callee inlined, and the refusal is logged as information
+(`VerexSL/Verify/Members.lean`). Only an explicit capability result selects the
+concrete path; a translation bug and a failed proof remain errors. Clauses that
+did translate are reused by the emitter.
 
 ## The audit of a Given artifact
 

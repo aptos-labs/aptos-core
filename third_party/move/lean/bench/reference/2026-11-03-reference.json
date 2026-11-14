@@ -1,0 +1,4388 @@
+{
+  "schema": "verex-bench",
+  "version": 1,
+  "commit": "73672a3e3c700217bdf3df20ef328ecb13814ca7",
+  "dirty": true,
+  "date": "2026-11-04T04:28:56+00:00",
+  "toolchain": "leanprover/lean4:v4.32.2",
+  "runner": "benchmark-c3d-60-hqbkq-lh7dt",
+  "cpu": "AMD EPYC 9B14",
+  "threads": 8,
+  "branch": "wrwg/verex-fx",
+  "subset": false,
+  "problems": [
+    {
+      "name": "option",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "wall_ms": {
+        "verification": 1657,
+        "total": 7449,
+        "render": 273,
+        "lowering": 102,
+        "load": 772,
+        "frontend": 122,
+        "certification": 3392
+      },
+      "targets": [
+        {
+          "wall_ms": 55,
+          "target": "\u00ab0x1\u00bb.option::none",
+          "heartbeats": 707499
+        },
+        {
+          "wall_ms": 66,
+          "target": "\u00ab0x1\u00bb.option::some",
+          "heartbeats": 861397
+        },
+        {
+          "wall_ms": 118,
+          "target": "\u00ab0x1\u00bb.option::is_none",
+          "heartbeats": 1434533
+        },
+        {
+          "wall_ms": 131,
+          "target": "\u00ab0x1\u00bb.option::is_some",
+          "heartbeats": 1434902
+        },
+        {
+          "wall_ms": 327,
+          "target": "\u00ab0x1\u00bb.option::contains",
+          "heartbeats": 3499235
+        },
+        {
+          "wall_ms": 959,
+          "target": "\u00ab0x1\u00bb.option::from_vec",
+          "heartbeats": 9420994
+        },
+        {
+          "wall_ms": 286,
+          "target": "\u00ab0x1\u00bb.option::borrow",
+          "heartbeats": 3056658
+        },
+        {
+          "wall_ms": 328,
+          "target": "\u00ab0x1\u00bb.option::borrow_with_default",
+          "heartbeats": 3487806
+        },
+        {
+          "wall_ms": 319,
+          "target": "\u00ab0x1\u00bb.option::get_with_default",
+          "heartbeats": 3487700
+        },
+        {
+          "wall_ms": 483,
+          "target": "\u00ab0x1\u00bb.option::borrow_mut",
+          "heartbeats": 4964295
+        },
+        {
+          "wall_ms": 688,
+          "target": "\u00ab0x1\u00bb.option::swap",
+          "heartbeats": 7090262
+        },
+        {
+          "wall_ms": 1029,
+          "target": "\u00ab0x1\u00bb.option::fill",
+          "heartbeats": 10407407
+        },
+        {
+          "wall_ms": 289,
+          "target": "\u00ab0x1\u00bb.option::destroy_with_default",
+          "heartbeats": 3097152
+        },
+        {
+          "wall_ms": 268,
+          "target": "\u00ab0x1\u00bb.option::destroy_some",
+          "heartbeats": 2900412
+        },
+        {
+          "wall_ms": 175,
+          "target": "\u00ab0x1\u00bb.option::destroy_none",
+          "heartbeats": 1955110
+        },
+        {
+          "wall_ms": 981,
+          "target": "\u00ab0x1\u00bb.option::swap_or_fill",
+          "heartbeats": 10137309
+        },
+        {
+          "wall_ms": 555,
+          "target": "\u00ab0x1\u00bb.option::to_vec",
+          "heartbeats": 5851917
+        },
+        {
+          "wall_ms": 1843,
+          "target": "\u00ab0x1\u00bb.option::extract",
+          "heartbeats": 11249006
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.option::none",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::some",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::from_vec",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::is_none",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::is_some",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::borrow",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::borrow_with_default",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::get_with_default",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::fill",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::extract",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::borrow_mut",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::swap",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::swap_or_fill",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::destroy_with_default",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::destroy_some",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::destroy_none",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::to_vec",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 87390935,
+        "total": 132629047,
+        "render": 6215981,
+        "lowering": 2466478,
+        "load": 4993601,
+        "frontend": 459500,
+        "certification": 31102552
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 15144
+    },
+    {
+      "name": "vector",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "wall_ms": {
+        "verification": 126,
+        "total": 1898,
+        "render": 199,
+        "lowering": 66,
+        "load": 777,
+        "frontend": 111,
+        "certification": 367
+      },
+      "targets": [
+        {
+          "wall_ms": 115,
+          "target": "\u00ab0x1\u00bb.vector::singleton",
+          "heartbeats": 1470038
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.vector::singleton",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 1591073,
+        "total": 16344317,
+        "render": 4485168,
+        "lowering": 1460420,
+        "load": 4993601,
+        "frontend": 365256,
+        "certification": 3448799
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 2242
+    },
+    {
+      "name": "string",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "wall_ms": {
+        "verification": 236,
+        "total": 2297,
+        "render": 307,
+        "lowering": 126,
+        "load": 782,
+        "frontend": 123,
+        "certification": 267
+      },
+      "targets": [
+        {
+          "wall_ms": 222,
+          "target": "\u00ab0x1\u00bb.string::utf8",
+          "heartbeats": 2803657
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.string::utf8",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 2944277,
+        "total": 21568394,
+        "render": 7007952,
+        "lowering": 3280034,
+        "load": 4993601,
+        "frontend": 506786,
+        "certification": 2835744
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 2460,
+      "repeats": {
+        "wall_ms": [
+          2297,
+          2318,
+          2295
+        ],
+        "cpu_ms": [
+          2460,
+          2482,
+          2459
+        ],
+        "heartbeats": [
+          21568394,
+          21568374,
+          21568382
+        ]
+      }
+    },
+    {
+      "name": "error",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "wall_ms": {
+        "verification": 136,
+        "total": 1353,
+        "render": 15,
+        "lowering": 9,
+        "load": 771,
+        "frontend": 86,
+        "certification": 78
+      },
+      "targets": [
+        {
+          "wall_ms": 126,
+          "target": "\u00ab0x1\u00bb.error::canonical",
+          "heartbeats": 1616608
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.error::canonical",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 1718989,
+        "total": 7980769,
+        "render": 334314,
+        "lowering": 180165,
+        "load": 4993601,
+        "frontend": 18020,
+        "certification": 735680
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 1502,
+      "repeats": {
+        "wall_ms": [
+          1348,
+          1353,
+          1368
+        ],
+        "cpu_ms": [
+          1500,
+          1502,
+          1522
+        ],
+        "heartbeats": [
+          7980800,
+          7980769,
+          7980758
+        ]
+      }
+    },
+    {
+      "name": "bit_vector",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "wall_ms": {
+        "verification": 8406,
+        "total": 12993,
+        "render": 307,
+        "lowering": 95,
+        "load": 772,
+        "frontend": 122,
+        "certification": 1874
+      },
+      "targets": [
+        {
+          "wall_ms": 450,
+          "target": "\u00ab0x1\u00bb.bit_vector::is_index_set",
+          "heartbeats": 4934419
+        },
+        {
+          "wall_ms": 1075,
+          "target": "\u00ab0x1\u00bb.bit_vector::unset",
+          "heartbeats": 11812178
+        },
+        {
+          "wall_ms": 1077,
+          "target": "\u00ab0x1\u00bb.bit_vector::set",
+          "heartbeats": 11799035
+        },
+        {
+          "wall_ms": 58,
+          "target": "\u00ab0x1\u00bb.bit_vector::length",
+          "heartbeats": 775240
+        },
+        {
+          "wall_ms": 778,
+          "target": "\u00ab0x1\u00bb.bit_vector::new",
+          "heartbeats": 8365110
+        },
+        {
+          "wall_ms": 1465,
+          "target": "\u00ab0x1\u00bb.bit_vector::longest_set_sequence_starting_at",
+          "heartbeats": 17021106
+        },
+        {
+          "wall_ms": 7661,
+          "target": "\u00ab0x1\u00bb.bit_vector::shift_left_for_verification_only",
+          "heartbeats": 102246615
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::new",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::set",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::unset",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::is_index_set",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::length",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::longest_set_sequence_starting_at",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::shift_left_for_verification_only",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 157666325,
+        "total": 188341705,
+        "render": 6684350,
+        "lowering": 2273567,
+        "load": 4993601,
+        "frontend": 515772,
+        "certification": 16208090
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 20300
+    },
+    {
+      "name": "fixed_point32",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "wall_ms": {
+        "verification": 2669,
+        "total": 6230,
+        "render": 67,
+        "lowering": 21,
+        "load": 775,
+        "frontend": 92,
+        "certification": 1229
+      },
+      "targets": [
+        {
+          "wall_ms": 47,
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_raw_value",
+          "heartbeats": 638475
+        },
+        {
+          "wall_ms": 82,
+          "target": "\u00ab0x1\u00bb.fixed_point32::floor",
+          "heartbeats": 945842
+        },
+        {
+          "wall_ms": 150,
+          "target": "\u00ab0x1\u00bb.fixed_point32::max",
+          "heartbeats": 1871664
+        },
+        {
+          "wall_ms": 176,
+          "target": "\u00ab0x1\u00bb.fixed_point32::min",
+          "heartbeats": 1741067
+        },
+        {
+          "wall_ms": 530,
+          "target": "\u00ab0x1\u00bb.fixed_point32::multiply_u64",
+          "heartbeats": 6189351
+        },
+        {
+          "wall_ms": 507,
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_u64",
+          "heartbeats": 5616959
+        },
+        {
+          "wall_ms": 810,
+          "target": "\u00ab0x1\u00bb.fixed_point32::divide_u64",
+          "heartbeats": 9303028
+        },
+        {
+          "wall_ms": 1555,
+          "target": "\u00ab0x1\u00bb.fixed_point32::ceil",
+          "heartbeats": 19552668
+        },
+        {
+          "wall_ms": 894,
+          "target": "\u00ab0x1\u00bb.fixed_point32::round",
+          "heartbeats": 12575494
+        },
+        {
+          "wall_ms": 2760,
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_rational",
+          "heartbeats": 35096539
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::multiply_u64",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::divide_u64",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_rational",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_raw_value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::min",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::max",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_u64",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::floor",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::ceil",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::round",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 94543575,
+        "total": 112076197,
+        "render": 1518136,
+        "lowering": 450072,
+        "load": 4993601,
+        "frontend": 82353,
+        "certification": 10488460
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 12045
+    },
+    {
+      "name": "features",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "wall_ms": {
+        "verification": 13651,
+        "total": 23562,
+        "render": 414,
+        "lowering": 199,
+        "load": 773,
+        "frontend": 133,
+        "certification": 7565
+      },
+      "targets": [
+        {
+          "wall_ms": 3234,
+          "target": "\u00ab0x1\u00bb.features::contains",
+          "heartbeats": 34743533
+        },
+        {
+          "wall_ms": 131,
+          "target": "\u00ab0x1\u00bb.features::periodical_reward_rate_decrease_enabled",
+          "heartbeats": 1408192
+        },
+        {
+          "wall_ms": 113,
+          "target": "\u00ab0x1\u00bb.features::partial_governance_voting_enabled",
+          "heartbeats": 1408572
+        },
+        {
+          "wall_ms": 110,
+          "target": "\u00ab0x1\u00bb.features::module_event_enabled",
+          "heartbeats": 1407384
+        },
+        {
+          "wall_ms": 109,
+          "target": "\u00ab0x1\u00bb.features::abort_if_multisig_payload_mismatch_enabled",
+          "heartbeats": 1408206
+        },
+        {
+          "wall_ms": 109,
+          "target": "\u00ab0x1\u00bb.features::is_default_account_resource_enabled",
+          "heartbeats": 1408062
+        },
+        {
+          "wall_ms": 112,
+          "target": "\u00ab0x1\u00bb.features::is_multisig_timelock_enabled",
+          "heartbeats": 1407777
+        },
+        {
+          "wall_ms": 118,
+          "target": "\u00ab0x1\u00bb.features::is_storage_slot_natives_enabled",
+          "heartbeats": 1408449
+        },
+        {
+          "wall_ms": 333,
+          "target": "\u00ab0x1\u00bb.features::is_enabled",
+          "heartbeats": 3225732
+        },
+        {
+          "wall_ms": 1587,
+          "target": "\u00ab0x1\u00bb.features::change_feature_flags_for_next_epoch",
+          "heartbeats": 16522773
+        },
+        {
+          "wall_ms": 9641,
+          "target": "\u00ab0x1\u00bb.features::change_feature_flags_internal",
+          "heartbeats": 109022262
+        },
+        {
+          "wall_ms": 9496,
+          "target": "\u00ab0x1\u00bb.features::apply_diff",
+          "heartbeats": 113100501
+        },
+        {
+          "wall_ms": 11513,
+          "target": "\u00ab0x1\u00bb.features::on_new_epoch",
+          "heartbeats": 8508976
+        },
+        {
+          "wall_ms": 13495,
+          "target": "\u00ab0x1\u00bb.features::set",
+          "heartbeats": 63930555
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.features::periodical_reward_rate_decrease_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::partial_governance_voting_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::module_event_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::abort_if_multisig_payload_mismatch_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::is_default_account_resource_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::is_storage_slot_natives_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::is_multisig_timelock_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::change_feature_flags_internal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::change_feature_flags_for_next_epoch",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::on_new_epoch",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::is_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::set",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::apply_diff",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 364206479,
+        "total": 438672584,
+        "render": 9174851,
+        "lowering": 6365260,
+        "load": 4993601,
+        "frontend": 882863,
+        "certification": 53049530
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 44450
+    },
+    {
+      "name": "acl",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "wall_ms": {
+        "verification": 1857,
+        "total": 4346,
+        "render": 238,
+        "lowering": 88,
+        "load": 773,
+        "frontend": 114,
+        "certification": 704
+      },
+      "targets": [
+        {
+          "wall_ms": 112,
+          "target": "\u00ab0x1\u00bb.acl::contains",
+          "heartbeats": 1313499
+        },
+        {
+          "wall_ms": 149,
+          "target": "\u00ab0x1\u00bb.acl::empty",
+          "heartbeats": 1886540
+        },
+        {
+          "wall_ms": 446,
+          "target": "\u00ab0x1\u00bb.acl::assert_contains",
+          "heartbeats": 5319991
+        },
+        {
+          "wall_ms": 1010,
+          "target": "\u00ab0x1\u00bb.acl::add",
+          "heartbeats": 11673209
+        },
+        {
+          "wall_ms": 1750,
+          "target": "\u00ab0x1\u00bb.acl::remove",
+          "heartbeats": 21323046
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.acl::empty",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.acl::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.acl::contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.acl::assert_contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.acl::remove",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 43333656,
+        "total": 63429896,
+        "render": 5343633,
+        "lowering": 2284799,
+        "load": 4993601,
+        "frontend": 409423,
+        "certification": 7064784
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 6736,
+      "repeats": {
+        "wall_ms": [
+          4361,
+          4346,
+          4333
+        ],
+        "cpu_ms": [
+          6717,
+          6736,
+          6633
+        ],
+        "heartbeats": [
+          63429660,
+          63429896,
+          63429607
+        ]
+      }
+    },
+    {
+      "name": "cmp",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "wall_ms": {
+        "verification": 751,
+        "total": 3849,
+        "render": 66,
+        "lowering": 25,
+        "load": 778,
+        "frontend": 90,
+        "certification": 1598
+      },
+      "targets": [
+        {
+          "wall_ms": 140,
+          "target": "\u00ab0x1\u00bb.cmp::is_eq",
+          "heartbeats": 1634590
+        },
+        {
+          "wall_ms": 138,
+          "target": "\u00ab0x1\u00bb.cmp::is_ne",
+          "heartbeats": 1693352
+        },
+        {
+          "wall_ms": 135,
+          "target": "\u00ab0x1\u00bb.cmp::is_lt",
+          "heartbeats": 1632910
+        },
+        {
+          "wall_ms": 173,
+          "target": "\u00ab0x1\u00bb.cmp::is_le",
+          "heartbeats": 1693177
+        },
+        {
+          "wall_ms": 136,
+          "target": "\u00ab0x1\u00bb.cmp::is_gt",
+          "heartbeats": 1632621
+        },
+        {
+          "wall_ms": 150,
+          "target": "\u00ab0x1\u00bb.cmp::is_ge",
+          "heartbeats": 1693588
+        },
+        {
+          "wall_ms": 103,
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_preliminary_types",
+          "heartbeats": 1260140
+        },
+        {
+          "wall_ms": 238,
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_vector_of_structs",
+          "heartbeats": 2403544
+        },
+        {
+          "wall_ms": 290,
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_structs",
+          "heartbeats": 3081190
+        },
+        {
+          "wall_ms": 286,
+          "target": "\u00ab0x1\u00bb.cmp::test_compare_bv",
+          "heartbeats": 3103396
+        },
+        {
+          "wall_ms": 461,
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_vectors",
+          "heartbeats": 4872051
+        },
+        {
+          "wall_ms": 751,
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_enums",
+          "heartbeats": 5077667
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_eq",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_ne",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_lt",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_le",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_gt",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_ge",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_preliminary_types",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_vectors",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_structs",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_vector_of_structs",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_enums",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_compare_bv",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 30992321,
+        "total": 53219518,
+        "render": 1511712,
+        "lowering": 528001,
+        "load": 4993601,
+        "frontend": 77497,
+        "certification": 15116386
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 6683,
+      "repeats": {
+        "wall_ms": [
+          3817,
+          3849,
+          3898
+        ],
+        "cpu_ms": [
+          6618,
+          6683,
+          6760
+        ],
+        "heartbeats": [
+          53219316,
+          53219518,
+          53219475
+        ]
+      }
+    },
+    {
+      "name": "math64",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "100a8992bc7c",
+      "wall_ms": {
+        "verification": 508,
+        "total": 2420,
+        "render": 141,
+        "lowering": 47,
+        "load": 768,
+        "frontend": 266,
+        "certification": 332
+      },
+      "targets": [
+        {
+          "wall_ms": 112,
+          "target": "\u00ab0x1\u00bb.math64::min",
+          "heartbeats": 1419294
+        },
+        {
+          "wall_ms": 118,
+          "target": "\u00ab0x1\u00bb.math64::max",
+          "heartbeats": 1430205
+        },
+        {
+          "wall_ms": 354,
+          "target": "\u00ab0x1\u00bb.math64::average",
+          "heartbeats": 4556258
+        },
+        {
+          "wall_ms": 377,
+          "target": "\u00ab0x1\u00bb.math64::clamp",
+          "heartbeats": 4826729
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.math64::max",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math64::min",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math64::average",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math64::clamp",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 12637433,
+        "total": 25478893,
+        "render": 3254207,
+        "lowering": 1215115,
+        "load": 4993601,
+        "frontend": 187758,
+        "certification": 3190779
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 3375
+    },
+    {
+      "name": "math128",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "100a8992bc7c",
+      "wall_ms": {
+        "verification": 1375,
+        "total": 4564,
+        "render": 253,
+        "lowering": 90,
+        "load": 771,
+        "frontend": 272,
+        "certification": 1210
+      },
+      "targets": [
+        {
+          "wall_ms": 203,
+          "target": "\u00ab0x1\u00bb.math128::max",
+          "heartbeats": 2291436
+        },
+        {
+          "wall_ms": 186,
+          "target": "\u00ab0x1\u00bb.math128::min",
+          "heartbeats": 2257783
+        },
+        {
+          "wall_ms": 281,
+          "target": "\u00ab0x1\u00bb.math128::clamp",
+          "heartbeats": 3360905
+        },
+        {
+          "wall_ms": 387,
+          "target": "\u00ab0x1\u00bb.math128::average",
+          "heartbeats": 4544006
+        },
+        {
+          "wall_ms": 491,
+          "target": "\u00ab0x1\u00bb.math128::pow",
+          "heartbeats": 5096224
+        },
+        {
+          "wall_ms": 1033,
+          "target": "\u00ab0x1\u00bb.math128::floor_log2",
+          "heartbeats": 12061447
+        },
+        {
+          "wall_ms": 1138,
+          "target": "\u00ab0x1\u00bb.math128::sqrt",
+          "heartbeats": 16145828
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.math128::max",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::min",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::average",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::clamp",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::pow",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::floor_log2",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::sqrt",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 47673758,
+        "total": 72024127,
+        "render": 5793589,
+        "lowering": 2554765,
+        "load": 4993601,
+        "frontend": 342633,
+        "certification": 10665781
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 8136
+    },
+    {
+      "name": "math_fixed",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "100a8992bc7c",
+      "wall_ms": {
+        "verification": 1308,
+        "total": 4231,
+        "render": 296,
+        "lowering": 111,
+        "load": 784,
+        "frontend": 275,
+        "certification": 902
+      },
+      "targets": [
+        {
+          "wall_ms": 37,
+          "target": "\u00ab0x1\u00bb.math_fixed::0x1::fixed_point32::get_raw_value",
+          "heartbeats": 410687
+        },
+        {
+          "wall_ms": 860,
+          "target": "\u00ab0x1\u00bb.math_fixed::sqrt",
+          "heartbeats": 10589617
+        },
+        {
+          "wall_ms": 1159,
+          "target": "\u00ab0x1\u00bb.math_fixed::mul_div",
+          "heartbeats": 15391794
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.math_fixed::sqrt",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math_fixed::mul_div",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 27883235,
+        "total": 52428437,
+        "render": 6826771,
+        "lowering": 3383529,
+        "load": 4993601,
+        "frontend": 398933,
+        "certification": 8942368
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 5530
+    },
+    {
+      "name": "fixed_point64",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "100a8992bc7c",
+      "wall_ms": {
+        "verification": 2441,
+        "total": 7216,
+        "render": 96,
+        "lowering": 33,
+        "load": 775,
+        "frontend": 260,
+        "certification": 2100
+      },
+      "targets": [
+        {
+          "wall_ms": 39,
+          "target": "\u00ab0x1\u00bb.fixed_point64::get_raw_value",
+          "heartbeats": 409057
+        },
+        {
+          "wall_ms": 49,
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_raw_value",
+          "heartbeats": 636752
+        },
+        {
+          "wall_ms": 171,
+          "target": "\u00ab0x1\u00bb.fixed_point64::min",
+          "heartbeats": 1737762
+        },
+        {
+          "wall_ms": 167,
+          "target": "\u00ab0x1\u00bb.fixed_point64::max",
+          "heartbeats": 1869834
+        },
+        {
+          "wall_ms": 67,
+          "target": "\u00ab0x1\u00bb.fixed_point64::less_or_equal",
+          "heartbeats": 812297
+        },
+        {
+          "wall_ms": 68,
+          "target": "\u00ab0x1\u00bb.fixed_point64::less",
+          "heartbeats": 812385
+        },
+        {
+          "wall_ms": 65,
+          "target": "\u00ab0x1\u00bb.fixed_point64::greater_or_equal",
+          "heartbeats": 815258
+        },
+        {
+          "wall_ms": 67,
+          "target": "\u00ab0x1\u00bb.fixed_point64::greater",
+          "heartbeats": 815749
+        },
+        {
+          "wall_ms": 70,
+          "target": "\u00ab0x1\u00bb.fixed_point64::equal",
+          "heartbeats": 857900
+        },
+        {
+          "wall_ms": 594,
+          "target": "\u00ab0x1\u00bb.fixed_point64::multiply_u128",
+          "heartbeats": 6212080
+        },
+        {
+          "wall_ms": 313,
+          "target": "\u00ab0x1\u00bb.fixed_point64::almost_equal",
+          "heartbeats": 3334255
+        },
+        {
+          "wall_ms": 78,
+          "target": "\u00ab0x1\u00bb.fixed_point64::floor",
+          "heartbeats": 942606
+        },
+        {
+          "wall_ms": 408,
+          "target": "\u00ab0x1\u00bb.fixed_point64::sub",
+          "heartbeats": 4065474
+        },
+        {
+          "wall_ms": 555,
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_u128",
+          "heartbeats": 5636178
+        },
+        {
+          "wall_ms": 562,
+          "target": "\u00ab0x1\u00bb.fixed_point64::add",
+          "heartbeats": 5898951
+        },
+        {
+          "wall_ms": 869,
+          "target": "\u00ab0x1\u00bb.fixed_point64::divide_u128",
+          "heartbeats": 9343705
+        },
+        {
+          "wall_ms": 934,
+          "target": "\u00ab0x1\u00bb.fixed_point64::ceil",
+          "heartbeats": 12471284
+        },
+        {
+          "wall_ms": 2254,
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_rational",
+          "heartbeats": 26794987
+        },
+        {
+          "wall_ms": 958,
+          "target": "\u00ab0x1\u00bb.fixed_point64::round",
+          "heartbeats": 13182344
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_raw_value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::sub",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::multiply_u128",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::divide_u128",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_rational",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::min",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::max",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::less_or_equal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::less",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::greater_or_equal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::greater",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::equal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::almost_equal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_u128",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::floor",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::ceil",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::round",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 98482747,
+        "total": 124340670,
+        "render": 2195804,
+        "lowering": 732311,
+        "load": 4993601,
+        "frontend": 131398,
+        "certification": 17804809
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 14436
+    },
+    {
+      "name": "simple_map",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "100a8992bc7c",
+      "wall_ms": {
+        "verification": 5548,
+        "total": 10568,
+        "render": 495,
+        "lowering": 198,
+        "load": 789,
+        "frontend": 303,
+        "certification": 2065
+      },
+      "targets": [
+        {
+          "wall_ms": 5320,
+          "target": "\u00ab0x1\u00bb.simple_map::add_all",
+          "heartbeats": 68741813
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.simple_map::add_all",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 68919577,
+        "total": 110939937,
+        "render": 11109819,
+        "lowering": 5523342,
+        "load": 4993601,
+        "frontend": 716252,
+        "certification": 19677346
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 11222
+    },
+    {
+      "name": "comparator",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "100a8992bc7c",
+      "wall_ms": {
+        "verification": 3011,
+        "total": 6191,
+        "render": 325,
+        "lowering": 127,
+        "load": 786,
+        "frontend": 293,
+        "certification": 907
+      },
+      "targets": [
+        {
+          "wall_ms": 80,
+          "target": "\u00ab0x1\u00bb.comparator::is_smaller_than",
+          "heartbeats": 936237
+        },
+        {
+          "wall_ms": 87,
+          "target": "\u00ab0x1\u00bb.comparator::is_equal",
+          "heartbeats": 937078
+        },
+        {
+          "wall_ms": 73,
+          "target": "\u00ab0x1\u00bb.comparator::is_greater_than",
+          "heartbeats": 936581
+        },
+        {
+          "wall_ms": 669,
+          "target": "\u00ab0x1\u00bb.comparator::compare",
+          "heartbeats": 7872964
+        },
+        {
+          "wall_ms": 2998,
+          "target": "\u00ab0x1\u00bb.comparator::compare_u8_vector",
+          "heartbeats": 38901831
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.comparator::is_equal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.comparator::is_smaller_than",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.comparator::is_greater_than",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.comparator::compare",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.comparator::compare_u8_vector",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 50192259,
+        "total": 74943236,
+        "render": 7264844,
+        "lowering": 3563342,
+        "load": 4993601,
+        "frontend": 517644,
+        "certification": 8411546
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 7856
+    },
+    {
+      "name": "capability",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "100a8992bc7c",
+      "wall_ms": {
+        "verification": 4737,
+        "total": 8679,
+        "render": 277,
+        "lowering": 110,
+        "load": 766,
+        "frontend": 286,
+        "certification": 1889
+      },
+      "targets": [
+        {
+          "wall_ms": 370,
+          "target": "\u00ab0x1\u00bb.capability::create",
+          "heartbeats": 4115106
+        },
+        {
+          "wall_ms": 376,
+          "target": "\u00ab0x1\u00bb.capability::add_element",
+          "heartbeats": 4121135
+        },
+        {
+          "wall_ms": 2145,
+          "target": "\u00ab0x1\u00bb.capability::delegate",
+          "heartbeats": 23874406
+        },
+        {
+          "wall_ms": 3119,
+          "target": "\u00ab0x1\u00bb.capability::revoke",
+          "heartbeats": 17861954
+        },
+        {
+          "wall_ms": 3913,
+          "target": "\u00ab0x1\u00bb.capability::acquire",
+          "heartbeats": 34864964
+        },
+        {
+          "wall_ms": 4625,
+          "target": "\u00ab0x1\u00bb.capability::acquire_linear",
+          "heartbeats": 34855703
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.capability::create",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.capability::delegate",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.capability::revoke",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.capability::add_element",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.capability::acquire",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.capability::acquire_linear",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 121748988,
+        "total": 153757947,
+        "render": 6330407,
+        "lowering": 3101178,
+        "load": 4993601,
+        "frontend": 457692,
+        "certification": 17126081
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 15912
+    },
+    {
+      "name": "pool_u64",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "100a8992bc7c",
+      "wall_ms": {
+        "verification": 25420,
+        "total": 39779,
+        "render": 769,
+        "lowering": 299,
+        "load": 786,
+        "frontend": 325,
+        "certification": 10324
+      },
+      "targets": [
+        {
+          "wall_ms": 86,
+          "target": "\u00ab0x1\u00bb.pool_u64::total_coins",
+          "heartbeats": 1129124
+        },
+        {
+          "wall_ms": 282,
+          "target": "\u00ab0x1\u00bb.pool_u64::destroy_empty",
+          "heartbeats": 3409241
+        },
+        {
+          "wall_ms": 87,
+          "target": "\u00ab0x1\u00bb.pool_u64::total_shares",
+          "heartbeats": 1134909
+        },
+        {
+          "wall_ms": 360,
+          "target": "\u00ab0x1\u00bb.pool_u64::contains",
+          "heartbeats": 4067787
+        },
+        {
+          "wall_ms": 332,
+          "target": "\u00ab0x1\u00bb.pool_u64::update_total_coins",
+          "heartbeats": 4159499
+        },
+        {
+          "wall_ms": 90,
+          "target": "\u00ab0x1\u00bb.pool_u64::shareholders",
+          "heartbeats": 1155143
+        },
+        {
+          "wall_ms": 92,
+          "target": "\u00ab0x1\u00bb.pool_u64::shareholders_count",
+          "heartbeats": 1175444
+        },
+        {
+          "wall_ms": 699,
+          "target": "\u00ab0x1\u00bb.pool_u64::create_with_scaling_factor",
+          "heartbeats": 7328645
+        },
+        {
+          "wall_ms": 432,
+          "target": "\u00ab0x1\u00bb.pool_u64::new",
+          "heartbeats": 5210778
+        },
+        {
+          "wall_ms": 416,
+          "target": "\u00ab0x1\u00bb.pool_u64::create",
+          "heartbeats": 5121538
+        },
+        {
+          "wall_ms": 1810,
+          "target": "\u00ab0x1\u00bb.pool_u64::multiply_then_divide",
+          "heartbeats": 21487231
+        },
+        {
+          "wall_ms": 1841,
+          "target": "\u00ab0x1\u00bb.pool_u64::shares",
+          "heartbeats": 13842191
+        },
+        {
+          "wall_ms": 497,
+          "target": "\u00ab0x1\u00bb.pool_u64::shares_to_amount_with_total_coins",
+          "heartbeats": 6203228
+        },
+        {
+          "wall_ms": 653,
+          "target": "\u00ab0x1\u00bb.pool_u64::amount_to_shares_with_total_coins",
+          "heartbeats": 8184715
+        },
+        {
+          "wall_ms": 264,
+          "target": "\u00ab0x1\u00bb.pool_u64::shares_to_amount",
+          "heartbeats": 3348027
+        },
+        {
+          "wall_ms": 342,
+          "target": "\u00ab0x1\u00bb.pool_u64::amount_to_shares",
+          "heartbeats": 4540931
+        },
+        {
+          "wall_ms": 1374,
+          "target": "\u00ab0x1\u00bb.pool_u64::balance",
+          "heartbeats": 16402888
+        },
+        {
+          "wall_ms": 7441,
+          "target": "\u00ab0x1\u00bb.pool_u64::redeem_shares",
+          "heartbeats": 96142012
+        },
+        {
+          "wall_ms": 12470,
+          "target": "\u00ab0x1\u00bb.pool_u64::add_shares",
+          "heartbeats": 145384663
+        },
+        {
+          "wall_ms": 1977,
+          "target": "\u00ab0x1\u00bb.pool_u64::transfer_shares",
+          "heartbeats": 24078847
+        },
+        {
+          "wall_ms": 11865,
+          "target": "\u00ab0x1\u00bb.pool_u64::buy_in",
+          "heartbeats": 159145776
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::create_with_scaling_factor",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::new",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::create",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::destroy_empty",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::update_total_coins",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::add_shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::transfer_shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::multiply_then_divide",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::amount_to_shares_with_total_coins",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::amount_to_shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::shares_to_amount_with_total_coins",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::shares_to_amount",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::balance",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::buy_in",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::redeem_shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::total_coins",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::total_shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::shareholders",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::shareholders_count",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 538623753,
+        "total": 670149691,
+        "render": 17451512,
+        "lowering": 8917026,
+        "load": 4993601,
+        "frontend": 1058955,
+        "certification": 99104844
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 65558
+    },
+    {
+      "name": "ristretto255",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "100a8992bc7c",
+      "wall_ms": {
+        "verification": 2969,
+        "total": 16550,
+        "render": 707,
+        "lowering": 370,
+        "load": 782,
+        "frontend": 329,
+        "certification": 10131
+      },
+      "targets": [
+        {
+          "wall_ms": 165,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_sha2_512",
+          "heartbeats": 1815275
+        },
+        {
+          "wall_ms": 440,
+          "target": "\u00ab0x1\u00bb.ristretto255::double_scalar_mul",
+          "heartbeats": 4809025
+        },
+        {
+          "wall_ms": 992,
+          "target": "\u00ab0x1\u00bb.ristretto255::multi_scalar_mul",
+          "heartbeats": 10162722
+        },
+        {
+          "wall_ms": 1229,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_bytes",
+          "heartbeats": 12623377
+        },
+        {
+          "wall_ms": 1034,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u8",
+          "heartbeats": 10097018
+        },
+        {
+          "wall_ms": 195,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u32",
+          "heartbeats": 2068302
+        },
+        {
+          "wall_ms": 151,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u64",
+          "heartbeats": 1724631
+        },
+        {
+          "wall_ms": 152,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u128",
+          "heartbeats": 1725082
+        },
+        {
+          "wall_ms": 1052,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_uniform_from_64_bytes",
+          "heartbeats": 10913430
+        },
+        {
+          "wall_ms": 306,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_zero",
+          "heartbeats": 3240658
+        },
+        {
+          "wall_ms": 1046,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_reduced_from_32_bytes",
+          "heartbeats": 10904663
+        },
+        {
+          "wall_ms": 337,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_is_zero",
+          "heartbeats": 3448738
+        },
+        {
+          "wall_ms": 314,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_one",
+          "heartbeats": 3263236
+        },
+        {
+          "wall_ms": 334,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_is_one",
+          "heartbeats": 3476025
+        },
+        {
+          "wall_ms": 76,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_equals",
+          "heartbeats": 887500
+        },
+        {
+          "wall_ms": 203,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_mul",
+          "heartbeats": 2189252
+        },
+        {
+          "wall_ms": 326,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_mul_assign",
+          "heartbeats": 3353097
+        },
+        {
+          "wall_ms": 200,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_add",
+          "heartbeats": 2189301
+        },
+        {
+          "wall_ms": 309,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_add_assign",
+          "heartbeats": 3353793
+        },
+        {
+          "wall_ms": 305,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_sub_assign",
+          "heartbeats": 3353572
+        },
+        {
+          "wall_ms": 203,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_sub",
+          "heartbeats": 2188955
+        },
+        {
+          "wall_ms": 172,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_neg",
+          "heartbeats": 1917103
+        },
+        {
+          "wall_ms": 49,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_to_bytes",
+          "heartbeats": 632525
+        },
+        {
+          "wall_ms": 198,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_neg_assign",
+          "heartbeats": 2432448
+        },
+        {
+          "wall_ms": 1572,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_invert",
+          "heartbeats": 18988213
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::double_scalar_mul",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::multi_scalar_mul",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_sha2_512",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u8",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u32",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u64",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u128",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_reduced_from_32_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_uniform_from_64_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_zero",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_is_zero",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_one",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_is_one",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_equals",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_invert",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_mul",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_mul_assign",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_add_assign",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_sub",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_sub_assign",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_neg",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_neg_assign",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_to_bytes",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 139128371,
+        "total": 266331969,
+        "render": 15805042,
+        "lowering": 12977798,
+        "load": 4993601,
+        "frontend": 1274514,
+        "certification": 92152643
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 28320
+    },
+    {
+      "name": "ed25519",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "100a8992bc7c",
+      "wall_ms": {
+        "verification": 925,
+        "total": 7537,
+        "render": 602,
+        "lowering": 367,
+        "load": 779,
+        "frontend": 319,
+        "certification": 3565
+      },
+      "targets": [
+        {
+          "wall_ms": 237,
+          "target": "\u00ab0x1\u00bb.ed25519::new_unvalidated_public_key_from_bytes",
+          "heartbeats": 2829152
+        },
+        {
+          "wall_ms": 238,
+          "target": "\u00ab0x1\u00bb.ed25519::new_signature_from_bytes",
+          "heartbeats": 2832235
+        },
+        {
+          "wall_ms": 190,
+          "target": "\u00ab0x1\u00bb.ed25519::signature_verify_strict",
+          "heartbeats": 2327875
+        },
+        {
+          "wall_ms": 299,
+          "target": "\u00ab0x1\u00bb.ed25519::new_signed_message",
+          "heartbeats": 3289907
+        },
+        {
+          "wall_ms": 151,
+          "target": "\u00ab0x1\u00bb.ed25519::unvalidated_public_key_to_authentication_key",
+          "heartbeats": 1796607
+        },
+        {
+          "wall_ms": 150,
+          "target": "\u00ab0x1\u00bb.ed25519::validated_public_key_to_authentication_key",
+          "heartbeats": 1796090
+        },
+        {
+          "wall_ms": 185,
+          "target": "\u00ab0x1\u00bb.ed25519::public_key_bytes_to_authentication_key",
+          "heartbeats": 1988915
+        },
+        {
+          "wall_ms": 711,
+          "target": "\u00ab0x1\u00bb.ed25519::signature_verify_strict_t",
+          "heartbeats": 7965648
+        },
+        {
+          "wall_ms": 886,
+          "target": "\u00ab0x1\u00bb.ed25519::new_validated_public_key_from_bytes",
+          "heartbeats": 10070155
+        },
+        {
+          "wall_ms": 966,
+          "target": "\u00ab0x1\u00bb.ed25519::public_key_validate",
+          "heartbeats": 11277437
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::new_unvalidated_public_key_from_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::new_validated_public_key_from_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::new_signature_from_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::public_key_validate",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::signature_verify_strict",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::signature_verify_strict_t",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::new_signed_message",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::unvalidated_public_key_to_authentication_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::validated_public_key_to_authentication_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::public_key_bytes_to_authentication_key",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 49015891,
+        "total": 116849915,
+        "render": 13479694,
+        "lowering": 15034869,
+        "load": 4993601,
+        "frontend": 1129162,
+        "certification": 33196698
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 11403
+    },
+    {
+      "name": "ordered_map",
+      "kind": "move",
+      "group": "AptosFramework",
+      "input": "a2624e6ffeba",
+      "wall_ms": {
+        "verification": 20385,
+        "total": 51540,
+        "render": 1631,
+        "lowering": 546,
+        "load": 777,
+        "frontend": 1311,
+        "certification": 23873
+      },
+      "targets": [
+        {
+          "wall_ms": 486,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_new_from_1",
+          "heartbeats": 4870816
+        },
+        {
+          "wall_ms": 527,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_remove",
+          "heartbeats": 5360635
+        },
+        {
+          "wall_ms": 4284,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_collect_symbolic",
+          "heartbeats": 46001812
+        },
+        {
+          "wall_ms": 7110,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_sum_symbolic",
+          "heartbeats": 83975655
+        },
+        {
+          "wall_ms": 1022,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_replace_symbolic",
+          "heartbeats": 11073493
+        },
+        {
+          "wall_ms": 1891,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_lower_bound_rank_symbolic",
+          "heartbeats": 20172505
+        },
+        {
+          "wall_ms": 1695,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_lower_bound_gap_symbolic",
+          "heartbeats": 17377173
+        },
+        {
+          "wall_ms": 966,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_remove_out_of_range",
+          "heartbeats": 10184928
+        },
+        {
+          "wall_ms": 894,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_borrow_mut_end",
+          "heartbeats": 9120682
+        },
+        {
+          "wall_ms": 7942,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_remove_shift_symbolic",
+          "heartbeats": 11612954
+        },
+        {
+          "wall_ms": 692,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_borrow_mut_out_of_range",
+          "heartbeats": 7104722
+        },
+        {
+          "wall_ms": 2997,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_drain_symbolic",
+          "heartbeats": 31481617
+        },
+        {
+          "wall_ms": 555,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_new_from_2",
+          "heartbeats": 6106861
+        },
+        {
+          "wall_ms": 1469,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_remove_shift_at_position",
+          "heartbeats": 16658716
+        },
+        {
+          "wall_ms": 1387,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_borrow_mut_at_position",
+          "heartbeats": 14211961
+        },
+        {
+          "wall_ms": 2434,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_borrow_mut_symbolic",
+          "heartbeats": 25187391
+        },
+        {
+          "wall_ms": 1743,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_add_middle_symbolic",
+          "heartbeats": 18482313
+        },
+        {
+          "wall_ms": 2323,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_add_append_symbolic",
+          "heartbeats": 24544843
+        },
+        {
+          "wall_ms": 993,
+          "target": "\u00ab0x1\u00bb.ordered_map::ground_enum_123",
+          "heartbeats": 10698411
+        },
+        {
+          "wall_ms": 1211,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_borrow_back_key",
+          "heartbeats": 12610304
+        },
+        {
+          "wall_ms": 1230,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_borrow_front_key",
+          "heartbeats": 12800061
+        },
+        {
+          "wall_ms": 1357,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_prev_key",
+          "heartbeats": 14283787
+        },
+        {
+          "wall_ms": 6640,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_walk_mut_symbolic",
+          "heartbeats": 68002684
+        },
+        {
+          "wall_ms": 10919,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_add_out_of_order",
+          "heartbeats": 18662344
+        },
+        {
+          "wall_ms": 5220,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_enumeration_view",
+          "heartbeats": 60746518
+        },
+        {
+          "wall_ms": 9362,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_pop_rank",
+          "heartbeats": 117391574
+        },
+        {
+          "wall_ms": 12545,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_upsert",
+          "heartbeats": 80755981
+        },
+        {
+          "wall_ms": 13200,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_next_key",
+          "heartbeats": 17622307
+        },
+        {
+          "wall_ms": 16028,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_remove_or_none",
+          "heartbeats": 69465936
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_new_from_1",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_remove",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_remove_shift_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_collect_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_sum_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_replace_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_lower_bound_rank_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_lower_bound_gap_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_add_out_of_order",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_remove_out_of_range",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_borrow_mut_end",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_borrow_mut_out_of_range",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_drain_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_walk_mut_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_new_from_2",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_remove_shift_at_position",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_borrow_mut_at_position",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_borrow_mut_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_add_middle_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_add_append_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::ground_enum_123",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_borrow_front_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_borrow_back_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_upsert",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_next_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_prev_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_remove_or_none",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_enumeration_view",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_pop_rank",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 852374905,
+        "total": 1169072520,
+        "render": 38105755,
+        "lowering": 13680238,
+        "load": 4993601,
+        "frontend": 1919948,
+        "certification": 257998073
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 116275
+    },
+    {
+      "name": "storage",
+      "kind": "move",
+      "group": "VerexBench",
+      "input": "8999beb32224",
+      "wall_ms": {
+        "verification": 2324,
+        "total": 5224,
+        "render": 75,
+        "lowering": 175,
+        "load": 775,
+        "frontend": 99,
+        "certification": 1584
+      },
+      "targets": [
+        {
+          "wall_ms": 117,
+          "target": "\u00ab0xbe\u00bb.storage::value",
+          "heartbeats": 1377197
+        },
+        {
+          "wall_ms": 263,
+          "target": "\u00ab0xbe\u00bb.storage::publish",
+          "heartbeats": 2753550
+        },
+        {
+          "wall_ms": 350,
+          "target": "\u00ab0xbe\u00bb.storage::increment",
+          "heartbeats": 3827170
+        },
+        {
+          "wall_ms": 709,
+          "target": "\u00ab0xbe\u00bb.storage::increment_twice",
+          "heartbeats": 7282392
+        },
+        {
+          "wall_ms": 535,
+          "target": "\u00ab0xbe\u00bb.storage::increment_beside",
+          "heartbeats": 5760868
+        },
+        {
+          "wall_ms": 186,
+          "target": "\u00ab0xbe\u00bb.storage::take",
+          "heartbeats": 2096061
+        },
+        {
+          "wall_ms": 461,
+          "target": "\u00ab0xbe\u00bb.storage::reset",
+          "heartbeats": 4635297
+        },
+        {
+          "wall_ms": 381,
+          "target": "\u00ab0xbe\u00bb.storage::set_bounded",
+          "heartbeats": 4064519
+        },
+        {
+          "wall_ms": 138,
+          "target": "\u00ab0xbe\u00bb.storage::bounded",
+          "heartbeats": 1635879
+        },
+        {
+          "wall_ms": 821,
+          "target": "\u00ab0xbe\u00bb.storage::swap",
+          "heartbeats": 9111728
+        },
+        {
+          "wall_ms": 706,
+          "target": "\u00ab0xbe\u00bb.storage::deposit",
+          "heartbeats": 7409239
+        },
+        {
+          "wall_ms": 687,
+          "target": "\u00ab0xbe\u00bb.storage::deposit_a",
+          "heartbeats": 7310364
+        },
+        {
+          "wall_ms": 1353,
+          "target": "\u00ab0xbe\u00bb.storage::deposit_both",
+          "heartbeats": 15328109
+        },
+        {
+          "wall_ms": 1559,
+          "target": "\u00ab0xbe\u00bb.storage::deposit_twice",
+          "heartbeats": 17396825
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0xbe\u00bb.storage::publish",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::increment",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::increment_twice",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::increment_beside",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::take",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::reset",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::swap",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::set_bounded",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::bounded",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::deposit",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::deposit_a",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::deposit_both",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::deposit_twice",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 95874601,
+        "total": 117629770,
+        "render": 1697838,
+        "lowering": 568757,
+        "load": 4993601,
+        "frontend": 93154,
+        "certification": 14401819
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 13534,
+      "repeats": {
+        "wall_ms": [
+          5227,
+          5205,
+          5224
+        ],
+        "cpu_ms": [
+          13550,
+          13522,
+          13534
+        ],
+        "heartbeats": [
+          117630455,
+          117629556,
+          117629770
+        ]
+      }
+    },
+    {
+      "name": "behavior",
+      "kind": "move",
+      "group": "VerexBench",
+      "input": "8999beb32224",
+      "wall_ms": {
+        "verification": 1525,
+        "total": 5309,
+        "render": 52,
+        "lowering": 17,
+        "load": 786,
+        "frontend": 97,
+        "certification": 2315
+      },
+      "targets": [
+        {
+          "wall_ms": 140,
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__add_five",
+          "heartbeats": 1613253
+        },
+        {
+          "wall_ms": 163,
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__checked",
+          "heartbeats": 1923898
+        },
+        {
+          "wall_ms": 130,
+          "target": "\u00ab0xbe\u00bb.behavior::increment",
+          "heartbeats": 1597495
+        },
+        {
+          "wall_ms": 592,
+          "target": "\u00ab0xbe\u00bb.behavior::halve",
+          "heartbeats": 4490907
+        },
+        {
+          "wall_ms": 134,
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__captured",
+          "heartbeats": 1715849
+        },
+        {
+          "wall_ms": 43,
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__with_requires",
+          "heartbeats": 557936
+        },
+        {
+          "wall_ms": 152,
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__sum",
+          "heartbeats": 1722610
+        },
+        {
+          "wall_ms": 191,
+          "target": "\u00ab0xbe\u00bb.behavior::apply",
+          "heartbeats": 2227449
+        },
+        {
+          "wall_ms": 195,
+          "target": "\u00ab0xbe\u00bb.behavior::apply_result",
+          "heartbeats": 2323640
+        },
+        {
+          "wall_ms": 186,
+          "target": "\u00ab0xbe\u00bb.behavior::apply_requires",
+          "heartbeats": 2323890
+        },
+        {
+          "wall_ms": 188,
+          "target": "\u00ab0xbe\u00bb.behavior::apply2",
+          "heartbeats": 2416853
+        },
+        {
+          "wall_ms": 369,
+          "target": "\u00ab0xbe\u00bb.behavior::apply_twice",
+          "heartbeats": 4655187
+        },
+        {
+          "wall_ms": 254,
+          "target": "\u00ab0xbe\u00bb.behavior::with_requires",
+          "heartbeats": 2645054
+        },
+        {
+          "wall_ms": 257,
+          "target": "\u00ab0xbe\u00bb.behavior::named",
+          "heartbeats": 2764928
+        },
+        {
+          "wall_ms": 184,
+          "target": "\u00ab0xbe\u00bb.behavior::known",
+          "heartbeats": 1866636
+        },
+        {
+          "wall_ms": 258,
+          "target": "\u00ab0xbe\u00bb.behavior::add_five",
+          "heartbeats": 2761852
+        },
+        {
+          "wall_ms": 253,
+          "target": "\u00ab0xbe\u00bb.behavior::checked",
+          "heartbeats": 2705502
+        },
+        {
+          "wall_ms": 310,
+          "target": "\u00ab0xbe\u00bb.behavior::captured",
+          "heartbeats": 3217520
+        },
+        {
+          "wall_ms": 268,
+          "target": "\u00ab0xbe\u00bb.behavior::sum",
+          "heartbeats": 3045170
+        },
+        {
+          "wall_ms": 475,
+          "target": "\u00ab0xbe\u00bb.behavior::named_result",
+          "heartbeats": 5823901
+        },
+        {
+          "wall_ms": 906,
+          "target": "\u00ab0xbe\u00bb.behavior::add_two",
+          "heartbeats": 11494936
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::apply",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::apply_result",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::apply_requires",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::apply2",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::apply_twice",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::increment",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::halve",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__add_five",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::add_five",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__checked",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::checked",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::named",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::named_result",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__captured",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::captured",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::with_requires",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__sum",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::sum",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::add_two",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::known",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 66125442,
+        "total": 96095221,
+        "render": 1192865,
+        "lowering": 358349,
+        "load": 4993601,
+        "frontend": 61192,
+        "certification": 23363772
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 10287,
+      "repeats": {
+        "wall_ms": [
+          5318,
+          5267,
+          5309
+        ],
+        "cpu_ms": [
+          10317,
+          10306,
+          10287
+        ],
+        "heartbeats": [
+          96091109,
+          96086912,
+          96095221
+        ]
+      }
+    },
+    {
+      "name": "closures",
+      "kind": "move",
+      "group": "VerexBench",
+      "input": "8999beb32224",
+      "wall_ms": {
+        "verification": 843,
+        "total": 3589,
+        "render": 37,
+        "lowering": 11,
+        "load": 771,
+        "frontend": 95,
+        "certification": 1454
+      },
+      "targets": [
+        {
+          "wall_ms": 139,
+          "target": "\u00ab0xbe\u00bb.closures::add",
+          "heartbeats": 1739581
+        },
+        {
+          "wall_ms": 128,
+          "target": "\u00ab0xbe\u00bb.closures::mul",
+          "heartbeats": 1732493
+        },
+        {
+          "wall_ms": 112,
+          "target": "\u00ab0xbe\u00bb.closures::__lambda__1__two_captures",
+          "heartbeats": 1285308
+        },
+        {
+          "wall_ms": 156,
+          "target": "\u00ab0xbe\u00bb.closures::leading",
+          "heartbeats": 1887905
+        },
+        {
+          "wall_ms": 201,
+          "target": "\u00ab0xbe\u00bb.closures::field",
+          "heartbeats": 2307484
+        },
+        {
+          "wall_ms": 169,
+          "target": "\u00ab0xbe\u00bb.closures::trailing",
+          "heartbeats": 1904222
+        },
+        {
+          "wall_ms": 244,
+          "target": "\u00ab0xbe\u00bb.closures::two_captures",
+          "heartbeats": 2983366
+        },
+        {
+          "wall_ms": 282,
+          "target": "\u00ab0xbe\u00bb.closures::add_twice",
+          "heartbeats": 3385824
+        },
+        {
+          "wall_ms": 333,
+          "target": "\u00ab0xbe\u00bb.closures::choose",
+          "heartbeats": 3757598
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0xbe\u00bb.closures::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::mul",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::leading",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::trailing",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::two_captures",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::field",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::choose",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::add_twice",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 24552084,
+        "total": 45504073,
+        "render": 831464,
+        "lowering": 226757,
+        "load": 4993601,
+        "frontend": 36500,
+        "certification": 14863667
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 5337,
+      "repeats": {
+        "wall_ms": [
+          3613,
+          3589,
+          3583
+        ],
+        "cpu_ms": [
+          5365,
+          5337,
+          5280
+        ],
+        "heartbeats": [
+          45504024,
+          45504073,
+          45504293
+        ]
+      }
+    },
+    {
+      "name": "closure_loop",
+      "kind": "move",
+      "group": "VerexBench",
+      "input": "8999beb32224",
+      "wall_ms": {
+        "verification": 656,
+        "total": 2282,
+        "render": 11,
+        "lowering": 3,
+        "load": 778,
+        "frontend": 93,
+        "certification": 416
+      },
+      "targets": [
+        {
+          "wall_ms": 134,
+          "target": "\u00ab0xbe\u00bb.closure_loop::add",
+          "heartbeats": 1739443
+        },
+        {
+          "wall_ms": 495,
+          "target": "\u00ab0xbe\u00bb.closure_loop::count_up",
+          "heartbeats": 6715629
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0xbe\u00bb.closure_loop::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closure_loop::count_up",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 8658701,
+        "total": 18020502,
+        "render": 231705,
+        "lowering": 56341,
+        "load": 4993601,
+        "frontend": 11826,
+        "certification": 4068328
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 2545,
+      "repeats": {
+        "wall_ms": [
+          2289,
+          2265,
+          2282
+        ],
+        "cpu_ms": [
+          2550,
+          2519,
+          2545
+        ],
+        "heartbeats": [
+          18020591,
+          18020590,
+          18020502
+        ]
+      }
+    },
+    {
+      "name": "amm",
+      "kind": "move",
+      "group": "examples",
+      "input": "d18f7898a9e2",
+      "wall_ms": {
+        "verification": 32215,
+        "total": 37639,
+        "render": 80,
+        "lowering": 24,
+        "load": 782,
+        "frontend": 75,
+        "certification": 3069
+      },
+      "targets": [
+        {
+          "wall_ms": 1499,
+          "target": "\u00ab0x42\u00bb.amm::constant_product",
+          "heartbeats": 18218730
+        },
+        {
+          "wall_ms": 2480,
+          "target": "\u00ab0x42\u00bb.amm::swap",
+          "heartbeats": 28567449
+        },
+        {
+          "wall_ms": 2485,
+          "target": "\u00ab0x42\u00bb.amm::create_constant_product_pool",
+          "heartbeats": 31500874
+        },
+        {
+          "wall_ms": 18931,
+          "target": "\u00ab0x42\u00bb.amm::constant_product_with_fee_non_compliant",
+          "heartbeats": 230498865
+        },
+        {
+          "wall_ms": 22010,
+          "target": "\u00ab0x42\u00bb.amm::constant_product_with_fee",
+          "heartbeats": 235628835
+        },
+        {
+          "wall_ms": 2239,
+          "target": "\u00ab0x42\u00bb.amm::create_compliant_fee_pool",
+          "heartbeats": 30188866
+        },
+        {
+          "wall_ms": 11204,
+          "target": "\u00ab0x42\u00bb.amm::create_noncompliant_fee_pool",
+          "heartbeats": 154844221
+        }
+      ],
+      "status": "failed",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.amm::constant_product",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::constant_product_with_fee",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::constant_product_with_fee_non_compliant",
+          "status": "rejected",
+          "errors": 4
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::create_constant_product_pool",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::swap",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::create_compliant_fee_pool",
+          "status": "rejected",
+          "errors": 2
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::create_noncompliant_fee_pool",
+          "status": "rejected",
+          "errors": 5
+        }
+      ],
+      "heartbeats": {
+        "verification": 743319034,
+        "total": 783138537,
+        "render": 1817700,
+        "lowering": 567643,
+        "load": 4993601,
+        "frontend": 91414,
+        "certification": 32349145
+      },
+      "errors": 11,
+      "error_messages": [
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.proof.lean:112:3: error: `decide` does not close the obligation from the block's facts:\n  case ensures_2_2\n  initialState\u271d : Memory unit\n  owner : NTy.address.carrier \u2026 (2746 more characters)",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.proof.lean:112:3: error: `decide` does not close the obligation from the block's facts:\n  case ensures_1_2\n  initialState\u271d : Memory unit\n  owner : NTy.address.carrier \u2026 (2737 more characters)",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.proof.lean:7:1: error: unsolved goals\ncase ensures_2_2\ninitialState\u271d : VerexIR.Proofs.Denote.Memory unit\nowner : VerexIR.Proofs.Denote.NTy.address.carrier \u2026 (6348 more characters)",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.proof.lean:111:8: error: verex verification failed: the proof of `constant_product_with_fee_non_compliant` does not establish its specification",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.proof.lean:198:43: error: the step's fact is not proved:\n  executable\u271d : Validation.ExecutableUnit unit\n  nativesTyped : NativesTyped executable\u271d\n  nativesShift : NativesShift executable\u271d \u2026 (21903 more characters)",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.proof.lean:187:8: error: verex verification failed: the proof of `create_compliant_fee_pool` does not establish its specification",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.move:30:9: error: the data invariant `invariant \u2200 (S : StateDomain; r_in : u64; r_out : u64; amt : u64),\n        !(S.. |~ aborts_of<this.pricing>(r_in, r_out, amt))` does not hold where a value is constructed",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.move:34:9: error: the data invariant `invariant \u2200 (S : StateDomain; r_in : u64; r_out : u64; amt : u64),\n        (S.. |~ result_of<this.pricing>(r_in, r_out, amt)) <= r_out` does not hold where a value is constructed",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.move:38:9: error: the data invariant `invariant \u2200 (S : StateDomain; r_in : u64; r_out : u64; a1 : u64; a2 : u64),\n        a1 <= a2\n          ==> (S.. |~ result_of<this.pricing>(r_in, r_out, a1))\n            <= (S.. |~ result_of<this.pricing>(r_in, r_out, a2))` does not hold where a value is constructed",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.move:45:9: error: the data invariant `invariant \u2200 (S : StateDomain; r_in : u64; r_out : u64; amt : u64),\n        (r_in + amt)\n          * (r_out - (S.. |~ result_of<this.pricing>(r_in, r_out, amt)))\n          >= r_in * r_out` does not hold where a value is constructed"
+      ],
+      "cpu_ms": 76806,
+      "expected_rejections": [
+        "\u00ab0x42\u00bb.amm::create_noncompliant_fee_pool"
+      ]
+    },
+    {
+      "name": "calculator",
+      "kind": "move",
+      "group": "examples",
+      "input": "d18f7898a9e2",
+      "wall_ms": {
+        "verification": 9839,
+        "total": 14094,
+        "render": 77,
+        "lowering": 22,
+        "load": 768,
+        "frontend": 74,
+        "certification": 2226
+      },
+      "targets": [
+        {
+          "wall_ms": 99,
+          "target": "\u00ab0x42\u00bb.calculator::storable_add",
+          "heartbeats": 1150380
+        },
+        {
+          "wall_ms": 103,
+          "target": "\u00ab0x42\u00bb.calculator::storable_sub",
+          "heartbeats": 1311680
+        },
+        {
+          "wall_ms": 269,
+          "target": "\u00ab0x42\u00bb.calculator::init_module",
+          "heartbeats": 3185863
+        },
+        {
+          "wall_ms": 516,
+          "target": "\u00ab0x42\u00bb.calculator::view",
+          "heartbeats": 5562147
+        },
+        {
+          "wall_ms": 8896,
+          "target": "\u00ab0x42\u00bb.calculator::process",
+          "heartbeats": 117222162
+        },
+        {
+          "wall_ms": 502,
+          "target": "\u00ab0x42\u00bb.calculator::add",
+          "heartbeats": 6041325
+        },
+        {
+          "wall_ms": 498,
+          "target": "\u00ab0x42\u00bb.calculator::sub",
+          "heartbeats": 6055857
+        },
+        {
+          "wall_ms": 603,
+          "target": "\u00ab0x42\u00bb.calculator::number",
+          "heartbeats": 7031789
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.calculator::init_module",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::storable_add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::storable_sub",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::process",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::number",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::sub",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::view",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 148508776,
+        "total": 178398168,
+        "render": 1735577,
+        "lowering": 506802,
+        "load": 4993601,
+        "frontend": 83115,
+        "certification": 22570297
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 17341
+    },
+    {
+      "name": "Quicksort",
+      "kind": "lean",
+      "group": "VerexSL",
+      "input": "6c32ba44aba8",
+      "wall_ms": {
+        "verification": 13337,
+        "total": 18536,
+        "render": 0,
+        "lowering": 21,
+        "load": 796,
+        "frontend": 0,
+        "certification": 1670
+      },
+      "targets": [
+        {
+          "wall_ms": 7198,
+          "target": "\u00ab0x42\u00bb.quicksort::partition",
+          "heartbeats": 97730389
+        },
+        {
+          "wall_ms": 5094,
+          "target": "\u00ab0x42\u00bb.quicksort::quick_sort_range",
+          "heartbeats": 65016463
+        },
+        {
+          "wall_ms": 546,
+          "target": "\u00ab0x42\u00bb.quicksort::quick_sort",
+          "heartbeats": 7410697
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.quicksort::partition",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.quicksort::quick_sort_range",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.quicksort::quick_sort",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 171708514,
+        "total": 194477003,
+        "render": 0,
+        "lowering": 586944,
+        "load": 4997587,
+        "frontend": 0,
+        "certification": 17183958
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 20479
+    },
+    {
+      "name": "OrderedMap",
+      "kind": "lean",
+      "group": "VerexSL",
+      "input": "06f30da1ed2e",
+      "wall_ms": {
+        "verification": 15516,
+        "total": 34182,
+        "render": 0,
+        "lowering": 53,
+        "load": 790,
+        "frontend": 0,
+        "certification": 7671
+      },
+      "targets": [
+        {
+          "wall_ms": 141,
+          "target": "\u00ab0x42\u00bb.ordered_map::length",
+          "heartbeats": 1946157
+        },
+        {
+          "wall_ms": 234,
+          "target": "\u00ab0x42\u00bb.ordered_map::empty",
+          "heartbeats": 3193157
+        },
+        {
+          "wall_ms": 395,
+          "target": "\u00ab0x42\u00bb.ordered_map::borrow_key_at",
+          "heartbeats": 5203393
+        },
+        {
+          "wall_ms": 2635,
+          "target": "\u00ab0x42\u00bb.ordered_map::lower_bound_loop",
+          "heartbeats": 35424728
+        },
+        {
+          "wall_ms": 797,
+          "target": "\u00ab0x42\u00bb.ordered_map::lower_bound",
+          "heartbeats": 8817037
+        },
+        {
+          "wall_ms": 1833,
+          "target": "\u00ab0x42\u00bb.ordered_map::contains",
+          "heartbeats": 19345692
+        },
+        {
+          "wall_ms": 2648,
+          "target": "\u00ab0x42\u00bb.ordered_map::borrow",
+          "heartbeats": 29133664
+        },
+        {
+          "wall_ms": 5024,
+          "target": "\u00ab0x42\u00bb.ordered_map::add",
+          "heartbeats": 54592652
+        },
+        {
+          "wall_ms": 4050,
+          "target": "\u00ab0x42\u00bb.ordered_map::remove",
+          "heartbeats": 43114261
+        },
+        {
+          "wall_ms": 3873,
+          "target": "\u00ab0x42\u00bb.ordered_map::duplicate_scenario",
+          "heartbeats": 39157750
+        },
+        {
+          "wall_ms": 1665,
+          "target": "\u00ab0x42\u00bb.ordered_map::missing_scenario",
+          "heartbeats": 17954181
+        },
+        {
+          "wall_ms": 3896,
+          "target": "\u00ab0x42\u00bb.ordered_map::absent_lookup_scenario",
+          "heartbeats": 40234687
+        },
+        {
+          "wall_ms": 8226,
+          "target": "\u00ab0x42\u00bb.ordered_map::lookup_scenario",
+          "heartbeats": 84603895
+        },
+        {
+          "wall_ms": 5585,
+          "target": "\u00ab0x42\u00bb.ordered_map::bool_key_scenario",
+          "heartbeats": 57990898
+        },
+        {
+          "wall_ms": 10963,
+          "target": "\u00ab0x42\u00bb.ordered_map::remove_scenario",
+          "heartbeats": 108615620
+        },
+        {
+          "wall_ms": 7560,
+          "target": "\u00ab0x42\u00bb.ordered_map::ordering_scenario",
+          "heartbeats": 78394673
+        },
+        {
+          "wall_ms": 12521,
+          "target": "\u00ab0x42\u00bb.ordered_map::remove_edges_scenario",
+          "heartbeats": 128925843
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::empty",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::lower_bound_loop",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::lower_bound",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::length",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::borrow_key_at",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::borrow",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::remove",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::remove_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::remove_edges_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::lookup_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::duplicate_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::missing_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::ordering_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::absent_lookup_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::bool_key_scenario",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 768099192,
+        "total": 857159776,
+        "render": 0,
+        "lowering": 1163963,
+        "load": 4997587,
+        "frontend": 0,
+        "certification": 82899034
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 98382
+    },
+    {
+      "name": "VectorOperations",
+      "kind": "lean",
+      "group": "VerexSL",
+      "input": "abc42fc99538",
+      "wall_ms": {
+        "verification": 3394,
+        "total": 12173,
+        "render": 0,
+        "lowering": 50,
+        "load": 786,
+        "frontend": 0,
+        "certification": 6867
+      },
+      "targets": [
+        {
+          "wall_ms": 51,
+          "target": "\u00ab0x42\u00bb.vector_operations::empty_length",
+          "heartbeats": 611263
+        },
+        {
+          "wall_ms": 165,
+          "target": "\u00ab0x42\u00bb.vector_operations::pushed",
+          "heartbeats": 1688824
+        },
+        {
+          "wall_ms": 631,
+          "target": "\u00ab0x42\u00bb.vector_operations::set_edges",
+          "heartbeats": 6242078
+        },
+        {
+          "wall_ms": 259,
+          "target": "\u00ab0x42\u00bb.vector_operations::nested",
+          "heartbeats": 2427806
+        },
+        {
+          "wall_ms": 91,
+          "target": "\u00ab0x42\u00bb.vector_operations::borrowed_length",
+          "heartbeats": 1116353
+        },
+        {
+          "wall_ms": 127,
+          "target": "\u00ab0x42\u00bb.vector_operations::bool_round_trip",
+          "heartbeats": 1389025
+        },
+        {
+          "wall_ms": 309,
+          "target": "\u00ab0x42\u00bb.vector_operations::mutate_then_borrow_other",
+          "heartbeats": 3051428
+        },
+        {
+          "wall_ms": 268,
+          "target": "\u00ab0x42\u00bb.vector_operations::mutate_and_read",
+          "heartbeats": 2741698
+        },
+        {
+          "wall_ms": 404,
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_middle",
+          "heartbeats": 3917780
+        },
+        {
+          "wall_ms": 663,
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_edges",
+          "heartbeats": 6519671
+        },
+        {
+          "wall_ms": 494,
+          "target": "\u00ab0x42\u00bb.vector_operations::remove_middle",
+          "heartbeats": 5034856
+        },
+        {
+          "wall_ms": 517,
+          "target": "\u00ab0x42\u00bb.vector_operations::swap_values",
+          "heartbeats": 5318110
+        },
+        {
+          "wall_ms": 363,
+          "target": "\u00ab0x42\u00bb.vector_operations::pop_back",
+          "heartbeats": 3623636
+        },
+        {
+          "wall_ms": 177,
+          "target": "\u00ab0x42\u00bb.vector_operations::pop_empty",
+          "heartbeats": 1851116
+        },
+        {
+          "wall_ms": 417,
+          "target": "\u00ab0x42\u00bb.vector_operations::append_values",
+          "heartbeats": 4026443
+        },
+        {
+          "wall_ms": 677,
+          "target": "\u00ab0x42\u00bb.vector_operations::trim_values",
+          "heartbeats": 7813192
+        },
+        {
+          "wall_ms": 380,
+          "target": "\u00ab0x42\u00bb.vector_operations::reverse_slice_values",
+          "heartbeats": 3749143
+        },
+        {
+          "wall_ms": 586,
+          "target": "\u00ab0x42\u00bb.vector_operations::rotate_values",
+          "heartbeats": 5632311
+        },
+        {
+          "wall_ms": 613,
+          "target": "\u00ab0x42\u00bb.vector_operations::trim_reverse_values",
+          "heartbeats": 7320401
+        },
+        {
+          "wall_ms": 636,
+          "target": "\u00ab0x42\u00bb.vector_operations::rotate_slice_values",
+          "heartbeats": 6143180
+        },
+        {
+          "wall_ms": 122,
+          "target": "\u00ab0x42\u00bb.vector_operations::destroy_empty",
+          "heartbeats": 1322094
+        },
+        {
+          "wall_ms": 190,
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_out_of_bounds",
+          "heartbeats": 1967126
+        },
+        {
+          "wall_ms": 196,
+          "target": "\u00ab0x42\u00bb.vector_operations::contains_value",
+          "heartbeats": 2097573
+        },
+        {
+          "wall_ms": 82,
+          "target": "\u00ab0x42\u00bb.vector_operations::read_out_of_bounds",
+          "heartbeats": 978293
+        },
+        {
+          "wall_ms": 86,
+          "target": "\u00ab0x42\u00bb.vector_operations::write_out_of_bounds",
+          "heartbeats": 1001980
+        },
+        {
+          "wall_ms": 281,
+          "target": "\u00ab0x42\u00bb.vector_operations::conditional_writes",
+          "heartbeats": 2862096
+        },
+        {
+          "wall_ms": 148,
+          "target": "\u00ab0x42\u00bb.vector_operations::write_then_read_owner",
+          "heartbeats": 1616747
+        },
+        {
+          "wall_ms": 1984,
+          "target": "\u00ab0x42\u00bb.vector_operations::swap_remove_value",
+          "heartbeats": 6569317
+        },
+        {
+          "wall_ms": 2618,
+          "target": "\u00ab0x42\u00bb.vector_operations::index_of_value",
+          "heartbeats": 5731404
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::empty_length",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::pushed",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::set_edges",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::nested",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::borrowed_length",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::bool_round_trip",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::mutate_and_read",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::mutate_then_borrow_other",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_middle",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_edges",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::remove_middle",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::swap_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::pop_back",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::pop_empty",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::swap_remove_value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::append_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::trim_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::reverse_slice_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::trim_reverse_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::rotate_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::rotate_slice_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::destroy_empty",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::contains_value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::index_of_value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_out_of_bounds",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::read_out_of_bounds",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::write_out_of_bounds",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::conditional_writes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::write_then_read_owner",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 107482407,
+        "total": 165967083,
+        "render": 0,
+        "lowering": 1029812,
+        "load": 4997587,
+        "frontend": 0,
+        "certification": 52457277
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 21935,
+      "repeats": {
+        "wall_ms": [
+          12173,
+          12305,
+          12076
+        ],
+        "cpu_ms": [
+          21935,
+          21960,
+          21784
+        ],
+        "heartbeats": [
+          165967083,
+          165967134,
+          165967093
+        ]
+      }
+    },
+    {
+      "name": "GenericStorage",
+      "kind": "lean",
+      "group": "VerexSL",
+      "input": "2779639ee826",
+      "wall_ms": {
+        "verification": 585,
+        "total": 2478,
+        "render": 0,
+        "lowering": 10,
+        "load": 779,
+        "frontend": 0,
+        "certification": 638
+      },
+      "targets": [
+        {
+          "wall_ms": 123,
+          "target": "\u00ab0x42\u00bb.generic_storage::has_generic",
+          "heartbeats": 1699403
+        },
+        {
+          "wall_ms": 220,
+          "target": "\u00ab0x42\u00bb.generic_storage::has_u64_vault",
+          "heartbeats": 2553683
+        },
+        {
+          "wall_ms": 382,
+          "target": "\u00ab0x42\u00bb.generic_storage::publish_u64",
+          "heartbeats": 4497679
+        },
+        {
+          "wall_ms": 524,
+          "target": "\u00ab0x42\u00bb.generic_storage::bump_vault",
+          "heartbeats": 5765223
+        },
+        {
+          "wall_ms": 608,
+          "target": "\u00ab0x42\u00bb.generic_storage::publish_generic",
+          "heartbeats": 6808716
+        },
+        {
+          "wall_ms": 525,
+          "target": "\u00ab0x42\u00bb.generic_storage::mirror",
+          "heartbeats": 6054885
+        },
+        {
+          "wall_ms": 626,
+          "target": "\u00ab0x42\u00bb.generic_storage::take_generic",
+          "heartbeats": 7192971
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::publish_generic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::has_generic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::has_u64_vault",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::take_generic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::bump_vault",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::mirror",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::publish_u64",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 36012551,
+        "total": 47257945,
+        "render": 0,
+        "lowering": 190012,
+        "load": 4992970,
+        "frontend": 0,
+        "certification": 6062412
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 5318,
+      "repeats": {
+        "wall_ms": [
+          2495,
+          2469,
+          2478
+        ],
+        "cpu_ms": [
+          5349,
+          5300,
+          5318
+        ],
+        "heartbeats": [
+          47257989,
+          47257979,
+          47257945
+        ]
+      }
+    },
+    {
+      "name": "bounds",
+      "kind": "rust",
+      "group": "Rust",
+      "input": "a96c1beffb29",
+      "wall_ms": {
+        "verification": 368,
+        "total": 1794,
+        "render": 6,
+        "lowering": 5,
+        "load": 785,
+        "frontend": 164,
+        "certification": 199
+      },
+      "targets": [
+        {
+          "wall_ms": 191,
+          "target": "bounds::min",
+          "heartbeats": 2238064
+        },
+        {
+          "wall_ms": 178,
+          "target": "bounds::max",
+          "heartbeats": 2231387
+        },
+        {
+          "wall_ms": 178,
+          "target": "bounds::raise",
+          "heartbeats": 2204043
+        },
+        {
+          "wall_ms": 221,
+          "target": "bounds::clamp",
+          "heartbeats": 2591727
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "bounds::max",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "bounds::min",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "bounds::clamp",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "bounds::raise",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 9613351,
+        "total": 16591637,
+        "render": 124044,
+        "lowering": 84573,
+        "load": 4993601,
+        "frontend": 30954,
+        "certification": 1745114
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 2459,
+      "repeats": {
+        "wall_ms": [
+          12707,
+          1792,
+          1794
+        ],
+        "cpu_ms": [
+          26525,
+          2445,
+          2459
+        ],
+        "heartbeats": [
+          16591627,
+          16591643,
+          16591637
+        ]
+      }
+    }
+  ]
+}

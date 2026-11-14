@@ -10,6 +10,26 @@ runtime values a unit admits. The design was checked on a standalone prototype
 (a generic struct, a nested struct with an invariant, a live loan); this plan
 is its integration.
 
+> **Revised by [`plain-values.md`](plain-values.md) (2026-11-13).** Nominal
+> type identity stays and is built early, on plain values. A nominal type
+> carries no invariant:
+>
+> - "Identity", "Plain basis", "Per-unit generation", "Operations" and the
+>   stages stand, with the requirements of "Nominal types" in that plan. In
+>   particular a unit's setup synthesizes no proofs per declaration. Two
+>   things are unresolved and decided in that plan's design step: a carrier
+>   that also defines a recursive group, and the model of an owner with an
+>   abstract layout.
+> - "Certification" is withdrawn, with `nominalHolds`, its laws and
+>   `nominalOwn`. There is no certified carrier of a nominal and no plain
+>   family beside the carriers; where the text below says "plain" it means the
+>   one carrier.
+> - In "Model", `holds_iff` and the certified operations go. A model is the
+>   isomorphism between a nominal value and its one-layer row.
+> - The closed and open sorts of
+>   [`nominal-invariant-sorts.md`](nominal-invariant-sorts.md) are closed and
+>   do not apply.
+
 ## Principles
 
 - The design is for the verifier's performance: the cost of a type is paid in

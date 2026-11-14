@@ -14,6 +14,16 @@ Designs: [`denotation.md`](../designs/denotation.md),
 [`proof-strategy.md`](../designs/proof-strategy.md),
 [`lemmas.md`](../designs/lemmas.md).
 
+- **Plain values and nominal types.** First in priority, and the order of
+  work for this track until it is done:
+  [`plain-values.md`](plain-values.md). The certified carriers are withdrawn;
+  a value is plain, a data invariant is a condition owed at the cuts and
+  assumed at the receipts, every declared type becomes a nominal type without
+  an invariant, and the code relating two layers of a value is deleted. The
+  target is the completeness and cost of the tree before the carriers. The
+  nominal closed and open sorts
+  ([`nominal-invariant-sorts.md`](nominal-invariant-sorts.md)) are closed.
+
 - **Native verification, remaining items.** BigOrderedMap's
   `test_verify_modify`; the cost of generic map targets; reframe lemmas for
   enum and table fields of a parameter's type, and an opaque specification
@@ -30,6 +40,21 @@ Designs: [`denotation.md`](../designs/denotation.md),
   whole. A function updating a spec variable in a loop therefore has the
   frame `modifies *`, and any function's closed frame over a loop's real
   writes fails. A frame per loop, from what its body writes, removes both.
+- **The Given interpretation is complete.** A generic member is verified in
+  a Given frame unless `givenUnsupported?` (`VerexSL/Verify/Given.lean`)
+  refuses it, and a refused member is verified by the concrete interpretation
+  ([`given-parameters.md`](../designs/given-parameters.md), "Which members
+  take the route, and what happens when they cannot"). Every refusal is an
+  interpretation the Given frame lacks, to be built, after which the concrete
+  route for generic members and the capability check are removed: a ghost
+  declared in the unit; an in-body assumption; storage (a `modifies` clause or
+  memory in the contract's frame); a recursive or function-value call; a call
+  at a type argument holding a mutable reference; a scoped method; type
+  reflection and the aggregator model; a callee without a contract (next
+  item); a callee with shape contracts; a behavioral contract; an authored
+  assertion; a declaration whose data invariant the Given own table does not
+  interpret. In the e2e expectations the refusals taken most often are the
+  recursive or function-value call and storage.
 - **A generic callee without a contract takes its caller off the Given
   route.** `givenUnsupported?` (`VerexSL/Verify/Given.lean`) reports "calls
   to callees without a contract", and the caller is verified concretely with
@@ -40,6 +65,32 @@ Designs: [`denotation.md`](../designs/denotation.md),
   excludes a member being summarized. A summary derived over a Given
   interpretation would keep such callers on the route; it is the same work
   as the generic-signature callees of "Cost" below.
+- **Modular verification as a stated principle.** When one verification
+  condition is proved, every other condition in scope may be assumed: a
+  verification succeeds only if all its conditions do. A cyclic dependency
+  between conditions is admissible where it is an induction, that is, where
+  going around the cycle takes a step of the execution (a call, a loop
+  iteration) and the conditions are safety properties, as for recursion and
+  loop invariants today; two conditions at the same point that assume each
+  other with no step between them prove nothing. The designs state this for
+  whole functions (a callee through
+  its contract, [`ghost-fields.md`](../designs/ghost-fields.md) and
+  [`denotation.md`](../designs/denotation.md); a cycle by fixed-point
+  induction; a callee's contract assumed until its verification is audited,
+  [`source-verification.md`](../designs/source-verification.md)) and for data
+  invariants (certified at construction and at a loan's end, assumed
+  elsewhere), but not as one principle, and not for single obligations within
+  a function. To do: state it once; establish what the solver does today
+  between sibling obligations; apply it where it simplifies a condition. First
+  uses: rebuilding an owner from fields whose validity another condition
+  owes, which removes repeated aggregate checks at a loan's end; a validity
+  fact owed where a value is produced and taken as given downstream, in place
+  of re-deriving it from an unopened `NTy.Holds`; the specialized contract of
+  a generic callee, proved once and assumed at every call. Each assumed
+  condition is a hypothesis discharged elsewhere in a well-founded order, or
+  an induction hypothesis of a stated induction (over calls by the unit's
+  fixed point, over iterations, over the points of a path), so that an
+  unproved condition cannot support its neighbours.
 - **Quantifier syntax aligned with Move.** VerexSL's `∀ (i : T), P` should
   move toward Move's spelling, `forall i: T @ P`, with `forall` and `@`
   also accepted as symbol tokens.

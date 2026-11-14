@@ -1,0 +1,4481 @@
+{
+  "schema": "verex-bench",
+  "version": 1,
+  "commit": "c76de5271aee6c673518a5d88c7e898b3fce87b3",
+  "dirty": true,
+  "date": "2026-11-10T22:35:06+00:00",
+  "toolchain": "leanprover/lean4:v4.32.2",
+  "runner": "benchmark-c3d-60-hqbkq-6mz26",
+  "cpu": "AMD EPYC 9B14",
+  "threads": 8,
+  "jobs": 1,
+  "default_timeout_seconds": 300,
+  "branch": "wrwg/verex-fx",
+  "subset": false,
+  "problems": [
+    {
+      "name": "option",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 11733,
+        "total": 17065,
+        "render": 273,
+        "lowering": 103,
+        "load": 799,
+        "frontend": 126,
+        "certification": 3396
+      },
+      "targets": [
+        {
+          "wall_ms": 128,
+          "target": "\u00ab0x1\u00bb.option::none",
+          "heartbeats": 1586548
+        },
+        {
+          "wall_ms": 206,
+          "target": "\u00ab0x1\u00bb.option::some",
+          "heartbeats": 2824486
+        },
+        {
+          "wall_ms": 953,
+          "target": "\u00ab0x1\u00bb.option::from_vec",
+          "heartbeats": 11026091
+        },
+        {
+          "wall_ms": 67,
+          "target": "\u00ab0x1\u00bb.option::is_none",
+          "heartbeats": 850049
+        },
+        {
+          "wall_ms": 62,
+          "target": "\u00ab0x1\u00bb.option::is_some",
+          "heartbeats": 834736
+        },
+        {
+          "wall_ms": 470,
+          "target": "\u00ab0x1\u00bb.option::contains",
+          "heartbeats": 5800716
+        },
+        {
+          "wall_ms": 367,
+          "target": "\u00ab0x1\u00bb.option::borrow",
+          "heartbeats": 4784628
+        },
+        {
+          "wall_ms": 446,
+          "target": "\u00ab0x1\u00bb.option::borrow_with_default",
+          "heartbeats": 5707861
+        },
+        {
+          "wall_ms": 445,
+          "target": "\u00ab0x1\u00bb.option::get_with_default",
+          "heartbeats": 5710538
+        },
+        {
+          "wall_ms": 1676,
+          "target": "\u00ab0x1\u00bb.option::fill",
+          "heartbeats": 21320942
+        },
+        {
+          "wall_ms": 1753,
+          "target": "\u00ab0x1\u00bb.option::extract",
+          "heartbeats": 22858255
+        },
+        {
+          "wall_ms": 990,
+          "target": "\u00ab0x1\u00bb.option::borrow_mut",
+          "heartbeats": 12575198
+        },
+        {
+          "wall_ms": 1324,
+          "target": "\u00ab0x1\u00bb.option::swap",
+          "heartbeats": 16123262
+        },
+        {
+          "wall_ms": 1110,
+          "target": "\u00ab0x1\u00bb.option::swap_or_fill",
+          "heartbeats": 13653054
+        },
+        {
+          "wall_ms": 427,
+          "target": "\u00ab0x1\u00bb.option::destroy_with_default",
+          "heartbeats": 5378428
+        },
+        {
+          "wall_ms": 362,
+          "target": "\u00ab0x1\u00bb.option::destroy_some",
+          "heartbeats": 4590118
+        },
+        {
+          "wall_ms": 215,
+          "target": "\u00ab0x1\u00bb.option::destroy_none",
+          "heartbeats": 2774685
+        },
+        {
+          "wall_ms": 707,
+          "target": "\u00ab0x1\u00bb.option::to_vec",
+          "heartbeats": 8986538
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.option::none",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::some",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::from_vec",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::is_none",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::is_some",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::borrow",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::borrow_with_default",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::get_with_default",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::fill",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::extract",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::borrow_mut",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::swap",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::swap_or_fill",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::destroy_with_default",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::destroy_some",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::destroy_none",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.option::to_vec",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 147386439,
+        "total": 192914426,
+        "render": 6215981,
+        "lowering": 2468788,
+        "load": 5031812,
+        "frontend": 464562,
+        "certification": 31346844
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 19230
+    },
+    {
+      "name": "vector",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 129,
+        "total": 2081,
+        "render": 196,
+        "lowering": 66,
+        "load": 800,
+        "frontend": 114,
+        "certification": 384
+      },
+      "targets": [
+        {
+          "wall_ms": 128,
+          "target": "\u00ab0x1\u00bb.vector::singleton",
+          "heartbeats": 1465985
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.vector::singleton",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 1466002,
+        "total": 16415493,
+        "render": 4485168,
+        "lowering": 1461965,
+        "load": 5031812,
+        "frontend": 369815,
+        "certification": 3600731
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 2259
+    },
+    {
+      "name": "string",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 316,
+        "total": 2419,
+        "render": 303,
+        "lowering": 128,
+        "load": 791,
+        "frontend": 125,
+        "certification": 277
+      },
+      "targets": [
+        {
+          "wall_ms": 301,
+          "target": "\u00ab0x1\u00bb.string::utf8",
+          "heartbeats": 3688440
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.string::utf8",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 3829558,
+        "total": 22593096,
+        "render": 7007952,
+        "lowering": 3282764,
+        "load": 5031812,
+        "frontend": 512080,
+        "certification": 2928930
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 2605,
+      "repeats": {
+        "wall_ms": [
+          2419,
+          2465,
+          2411
+        ],
+        "cpu_ms": [
+          2605,
+          2651,
+          2597
+        ],
+        "heartbeats": [
+          22593096,
+          22593111,
+          22593120
+        ]
+      }
+    },
+    {
+      "name": "error",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 121,
+        "total": 1372,
+        "render": 15,
+        "lowering": 9,
+        "load": 791,
+        "frontend": 89,
+        "certification": 83
+      },
+      "targets": [
+        {
+          "wall_ms": 111,
+          "target": "\u00ab0x1\u00bb.error::canonical",
+          "heartbeats": 1494408
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.error::canonical",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 1597339,
+        "total": 7963843,
+        "render": 334314,
+        "lowering": 180228,
+        "load": 5031812,
+        "frontend": 18032,
+        "certification": 802118
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 1532,
+      "repeats": {
+        "wall_ms": [
+          1372,
+          1382,
+          1362
+        ],
+        "cpu_ms": [
+          1532,
+          1538,
+          1523
+        ],
+        "heartbeats": [
+          7963843,
+          7963857,
+          7963852
+        ]
+      }
+    },
+    {
+      "name": "bit_vector",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 36240,
+        "total": 41668,
+        "render": 292,
+        "lowering": 95,
+        "load": 798,
+        "frontend": 124,
+        "certification": 2274
+      },
+      "targets": [
+        {
+          "wall_ms": 808,
+          "target": "\u00ab0x1\u00bb.bit_vector::is_index_set",
+          "heartbeats": 8858071
+        },
+        {
+          "wall_ms": 71,
+          "target": "\u00ab0x1\u00bb.bit_vector::length",
+          "heartbeats": 916841
+        },
+        {
+          "wall_ms": 1216,
+          "target": "\u00ab0x1\u00bb.bit_vector::new",
+          "heartbeats": 12651214
+        },
+        {
+          "wall_ms": 2261,
+          "target": "\u00ab0x1\u00bb.bit_vector::set",
+          "heartbeats": 21195699
+        },
+        {
+          "wall_ms": 2265,
+          "target": "\u00ab0x1\u00bb.bit_vector::unset",
+          "heartbeats": 21201560
+        },
+        {
+          "wall_ms": 2303,
+          "target": "\u00ab0x1\u00bb.bit_vector::longest_set_sequence_starting_at",
+          "heartbeats": 23292341
+        },
+        {
+          "wall_ms": 35214,
+          "target": "\u00ab0x1\u00bb.bit_vector::shift_left_for_verification_only",
+          "heartbeats": 255304483
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::new",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::set",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::unset",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::is_index_set",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::length",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::longest_set_sequence_starting_at",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.bit_vector::shift_left_for_verification_only",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 350344317,
+        "total": 383116780,
+        "render": 6684350,
+        "lowering": 2277669,
+        "load": 5031812,
+        "frontend": 523208,
+        "certification": 18255424
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 55349
+    },
+    {
+      "name": "fixed_point32",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 2949,
+        "total": 5734,
+        "render": 67,
+        "lowering": 23,
+        "load": 813,
+        "frontend": 95,
+        "certification": 1238
+      },
+      "targets": [
+        {
+          "wall_ms": 120,
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_raw_value",
+          "heartbeats": 1288594
+        },
+        {
+          "wall_ms": 198,
+          "target": "\u00ab0x1\u00bb.fixed_point32::min",
+          "heartbeats": 2083063
+        },
+        {
+          "wall_ms": 191,
+          "target": "\u00ab0x1\u00bb.fixed_point32::max",
+          "heartbeats": 2124849
+        },
+        {
+          "wall_ms": 83,
+          "target": "\u00ab0x1\u00bb.fixed_point32::floor",
+          "heartbeats": 1015762
+        },
+        {
+          "wall_ms": 357,
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_u64",
+          "heartbeats": 3839230
+        },
+        {
+          "wall_ms": 631,
+          "target": "\u00ab0x1\u00bb.fixed_point32::multiply_u64",
+          "heartbeats": 7159313
+        },
+        {
+          "wall_ms": 964,
+          "target": "\u00ab0x1\u00bb.fixed_point32::divide_u64",
+          "heartbeats": 10896565
+        },
+        {
+          "wall_ms": 1706,
+          "target": "\u00ab0x1\u00bb.fixed_point32::ceil",
+          "heartbeats": 20716700
+        },
+        {
+          "wall_ms": 2077,
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_rational",
+          "heartbeats": 25098292
+        },
+        {
+          "wall_ms": 988,
+          "target": "\u00ab0x1\u00bb.fixed_point32::round",
+          "heartbeats": 13853366
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::multiply_u64",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::divide_u64",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_rational",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_raw_value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::min",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::max",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::create_from_u64",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::floor",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::ceil",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point32::round",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 89093258,
+        "total": 106576464,
+        "render": 1518136,
+        "lowering": 450317,
+        "load": 5031812,
+        "frontend": 82537,
+        "certification": 10400404
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 11912
+    },
+    {
+      "name": "features",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 13595,
+        "total": 25283,
+        "render": 410,
+        "lowering": 198,
+        "load": 810,
+        "frontend": 137,
+        "certification": 9222
+      },
+      "targets": [
+        {
+          "wall_ms": 113,
+          "target": "\u00ab0x1\u00bb.features::0x1::error::permission_denied",
+          "heartbeats": 1108213
+        },
+        {
+          "wall_ms": 145,
+          "target": "\u00ab0x1\u00bb.features::ensure_framework_signer",
+          "heartbeats": 1678906
+        },
+        {
+          "wall_ms": 3308,
+          "target": "\u00ab0x1\u00bb.features::contains",
+          "heartbeats": 35961090
+        },
+        {
+          "wall_ms": 104,
+          "target": "\u00ab0x1\u00bb.features::periodical_reward_rate_decrease_enabled",
+          "heartbeats": 1289571
+        },
+        {
+          "wall_ms": 101,
+          "target": "\u00ab0x1\u00bb.features::partial_governance_voting_enabled",
+          "heartbeats": 1290071
+        },
+        {
+          "wall_ms": 106,
+          "target": "\u00ab0x1\u00bb.features::module_event_enabled",
+          "heartbeats": 1289725
+        },
+        {
+          "wall_ms": 103,
+          "target": "\u00ab0x1\u00bb.features::abort_if_multisig_payload_mismatch_enabled",
+          "heartbeats": 1289731
+        },
+        {
+          "wall_ms": 108,
+          "target": "\u00ab0x1\u00bb.features::is_default_account_resource_enabled",
+          "heartbeats": 1289054
+        },
+        {
+          "wall_ms": 113,
+          "target": "\u00ab0x1\u00bb.features::is_storage_slot_natives_enabled",
+          "heartbeats": 1289106
+        },
+        {
+          "wall_ms": 107,
+          "target": "\u00ab0x1\u00bb.features::is_multisig_timelock_enabled",
+          "heartbeats": 1290404
+        },
+        {
+          "wall_ms": 377,
+          "target": "\u00ab0x1\u00bb.features::is_enabled",
+          "heartbeats": 3537326
+        },
+        {
+          "wall_ms": 8093,
+          "target": "\u00ab0x1\u00bb.features::change_feature_flags_internal",
+          "heartbeats": 87051022
+        },
+        {
+          "wall_ms": 10983,
+          "target": "\u00ab0x1\u00bb.features::change_feature_flags_for_next_epoch",
+          "heartbeats": 27791442
+        },
+        {
+          "wall_ms": 11697,
+          "target": "\u00ab0x1\u00bb.features::on_new_epoch",
+          "heartbeats": 10615887
+        },
+        {
+          "wall_ms": 13387,
+          "target": "\u00ab0x1\u00bb.features::set",
+          "heartbeats": 54191447
+        },
+        {
+          "wall_ms": 15094,
+          "target": "\u00ab0x1\u00bb.features::apply_diff",
+          "heartbeats": 130675297
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.features::periodical_reward_rate_decrease_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::partial_governance_voting_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::module_event_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::abort_if_multisig_payload_mismatch_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::is_default_account_resource_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::is_storage_slot_natives_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::is_multisig_timelock_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::change_feature_flags_internal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::change_feature_flags_for_next_epoch",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::on_new_epoch",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::is_enabled",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::set",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.features::apply_diff",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 363595502,
+        "total": 439004770,
+        "render": 9174851,
+        "lowering": 6368280,
+        "load": 5031812,
+        "frontend": 888094,
+        "certification": 53946231
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 50033
+    },
+    {
+      "name": "acl",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 4157,
+        "total": 6890,
+        "render": 233,
+        "lowering": 89,
+        "load": 800,
+        "frontend": 120,
+        "certification": 737
+      },
+      "targets": [
+        {
+          "wall_ms": 121,
+          "target": "\u00ab0x1\u00bb.acl::0x1::error::invalid_argument",
+          "heartbeats": 1227834
+        },
+        {
+          "wall_ms": 107,
+          "target": "\u00ab0x1\u00bb.acl::contains",
+          "heartbeats": 1283327
+        },
+        {
+          "wall_ms": 324,
+          "target": "\u00ab0x1\u00bb.acl::empty",
+          "heartbeats": 3676339
+        },
+        {
+          "wall_ms": 637,
+          "target": "\u00ab0x1\u00bb.acl::assert_contains",
+          "heartbeats": 7444298
+        },
+        {
+          "wall_ms": 2241,
+          "target": "\u00ab0x1\u00bb.acl::add",
+          "heartbeats": 24805900
+        },
+        {
+          "wall_ms": 4020,
+          "target": "\u00ab0x1\u00bb.acl::remove",
+          "heartbeats": 43691289
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.acl::empty",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.acl::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.acl::contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.acl::assert_contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.acl::remove",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 82873482,
+        "total": 102903603,
+        "render": 5343633,
+        "lowering": 2286510,
+        "load": 5031812,
+        "frontend": 414067,
+        "certification": 6954099
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 11106,
+      "repeats": {
+        "wall_ms": [
+          6890,
+          6812,
+          6917
+        ],
+        "cpu_ms": [
+          11106,
+          11048,
+          11200
+        ],
+        "heartbeats": [
+          102903603,
+          102903413,
+          102903556
+        ]
+      }
+    },
+    {
+      "name": "cmp",
+      "kind": "move",
+      "group": "MoveStdlib",
+      "input": "049559bb478c",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 1946,
+        "total": 5084,
+        "render": 65,
+        "lowering": 26,
+        "load": 805,
+        "frontend": 93,
+        "certification": 1327
+      },
+      "targets": [
+        {
+          "wall_ms": 58,
+          "target": "\u00ab0x1\u00bb.cmp::is_eq",
+          "heartbeats": 692693
+        },
+        {
+          "wall_ms": 54,
+          "target": "\u00ab0x1\u00bb.cmp::is_ne",
+          "heartbeats": 722127
+        },
+        {
+          "wall_ms": 54,
+          "target": "\u00ab0x1\u00bb.cmp::is_lt",
+          "heartbeats": 691138
+        },
+        {
+          "wall_ms": 54,
+          "target": "\u00ab0x1\u00bb.cmp::is_le",
+          "heartbeats": 721482
+        },
+        {
+          "wall_ms": 50,
+          "target": "\u00ab0x1\u00bb.cmp::is_gt",
+          "heartbeats": 691015
+        },
+        {
+          "wall_ms": 52,
+          "target": "\u00ab0x1\u00bb.cmp::is_ge",
+          "heartbeats": 722033
+        },
+        {
+          "wall_ms": 110,
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_preliminary_types",
+          "heartbeats": 1391139
+        },
+        {
+          "wall_ms": 377,
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_vector_of_structs",
+          "heartbeats": 4164809
+        },
+        {
+          "wall_ms": 407,
+          "target": "\u00ab0x1\u00bb.cmp::test_compare_bv",
+          "heartbeats": 4487046
+        },
+        {
+          "wall_ms": 504,
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_vectors",
+          "heartbeats": 5527162
+        },
+        {
+          "wall_ms": 585,
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_structs",
+          "heartbeats": 6302546
+        },
+        {
+          "wall_ms": 1946,
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_enums",
+          "heartbeats": 24239651
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_eq",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_ne",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_lt",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_le",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_gt",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::is_ge",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_preliminary_types",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_vectors",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_structs",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_vector_of_structs",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_verify_compare_enums",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.cmp::test_compare_bv",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 51570553,
+        "total": 70880171,
+        "render": 1511712,
+        "lowering": 528600,
+        "load": 5031812,
+        "frontend": 77815,
+        "certification": 12159679
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 8243,
+      "repeats": {
+        "wall_ms": [
+          5113,
+          5055,
+          5084
+        ],
+        "cpu_ms": [
+          8344,
+          8234,
+          8243
+        ],
+        "heartbeats": [
+          70880331,
+          70880120,
+          70880171
+        ]
+      }
+    },
+    {
+      "name": "math64",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "2588d7ed06e5",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 853,
+        "total": 2815,
+        "render": 140,
+        "lowering": 48,
+        "load": 793,
+        "frontend": 266,
+        "certification": 339
+      },
+      "targets": [
+        {
+          "wall_ms": 110,
+          "target": "\u00ab0x1\u00bb.math64::min",
+          "heartbeats": 1416419
+        },
+        {
+          "wall_ms": 116,
+          "target": "\u00ab0x1\u00bb.math64::max",
+          "heartbeats": 1427696
+        },
+        {
+          "wall_ms": 373,
+          "target": "\u00ab0x1\u00bb.math64::average",
+          "heartbeats": 4634658
+        },
+        {
+          "wall_ms": 722,
+          "target": "\u00ab0x1\u00bb.math64::clamp",
+          "heartbeats": 14175604
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.math64::max",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math64::min",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math64::average",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math64::clamp",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 22061603,
+        "total": 34971377,
+        "render": 3254207,
+        "lowering": 1215521,
+        "load": 5031812,
+        "frontend": 187977,
+        "certification": 3220257
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 3798
+    },
+    {
+      "name": "math128",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "2588d7ed06e5",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 1805,
+        "total": 5037,
+        "render": 250,
+        "lowering": 90,
+        "load": 796,
+        "frontend": 271,
+        "certification": 1227
+      },
+      "targets": [
+        {
+          "wall_ms": 197,
+          "target": "\u00ab0x1\u00bb.math128::max",
+          "heartbeats": 2280583
+        },
+        {
+          "wall_ms": 179,
+          "target": "\u00ab0x1\u00bb.math128::min",
+          "heartbeats": 2247022
+        },
+        {
+          "wall_ms": 99,
+          "target": "\u00ab0x1\u00bb.math128::0x1::error::invalid_argument",
+          "heartbeats": 1080350
+        },
+        {
+          "wall_ms": 239,
+          "target": "\u00ab0x1\u00bb.math128::clamp",
+          "heartbeats": 2910617
+        },
+        {
+          "wall_ms": 408,
+          "target": "\u00ab0x1\u00bb.math128::average",
+          "heartbeats": 4622715
+        },
+        {
+          "wall_ms": 461,
+          "target": "\u00ab0x1\u00bb.math128::pow",
+          "heartbeats": 4773658
+        },
+        {
+          "wall_ms": 1031,
+          "target": "\u00ab0x1\u00bb.math128::floor_log2",
+          "heartbeats": 11903394
+        },
+        {
+          "wall_ms": 1557,
+          "target": "\u00ab0x1\u00bb.math128::sqrt",
+          "heartbeats": 23789546
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.math128::max",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::min",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::average",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::clamp",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::pow",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::floor_log2",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math128::sqrt",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 54402454,
+        "total": 78847466,
+        "render": 5793589,
+        "lowering": 2555784,
+        "load": 5031812,
+        "frontend": 343239,
+        "certification": 10720588
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 8628
+    },
+    {
+      "name": "math_fixed",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "2588d7ed06e5",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 1616,
+        "total": 4624,
+        "render": 293,
+        "lowering": 113,
+        "load": 797,
+        "frontend": 285,
+        "certification": 925
+      },
+      "targets": [
+        {
+          "wall_ms": 43,
+          "target": "\u00ab0x1\u00bb.math_fixed::0x1::fixed_point32::get_raw_value",
+          "heartbeats": 463414
+        },
+        {
+          "wall_ms": 104,
+          "target": "\u00ab0x1\u00bb.math_fixed::0x1::error::invalid_argument",
+          "heartbeats": 1083174
+        },
+        {
+          "wall_ms": 857,
+          "target": "\u00ab0x1\u00bb.math_fixed::sqrt",
+          "heartbeats": 11068267
+        },
+        {
+          "wall_ms": 1468,
+          "target": "\u00ab0x1\u00bb.math_fixed::mul_div",
+          "heartbeats": 19596626
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.math_fixed::sqrt",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.math_fixed::mul_div",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 32572857,
+        "total": 57110113,
+        "render": 6826771,
+        "lowering": 3384891,
+        "load": 5031812,
+        "frontend": 399628,
+        "certification": 8894154
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 5920
+    },
+    {
+      "name": "fixed_point64",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "2588d7ed06e5",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 2777,
+        "total": 6810,
+        "render": 94,
+        "lowering": 34,
+        "load": 794,
+        "frontend": 260,
+        "certification": 2045
+      },
+      "targets": [
+        {
+          "wall_ms": 43,
+          "target": "\u00ab0x1\u00bb.fixed_point64::get_raw_value",
+          "heartbeats": 461525
+        },
+        {
+          "wall_ms": 75,
+          "target": "\u00ab0x1\u00bb.fixed_point64::less_or_equal",
+          "heartbeats": 874425
+        },
+        {
+          "wall_ms": 130,
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_raw_value",
+          "heartbeats": 1286952
+        },
+        {
+          "wall_ms": 196,
+          "target": "\u00ab0x1\u00bb.fixed_point64::min",
+          "heartbeats": 2070591
+        },
+        {
+          "wall_ms": 200,
+          "target": "\u00ab0x1\u00bb.fixed_point64::max",
+          "heartbeats": 2110508
+        },
+        {
+          "wall_ms": 71,
+          "target": "\u00ab0x1\u00bb.fixed_point64::less",
+          "heartbeats": 874165
+        },
+        {
+          "wall_ms": 70,
+          "target": "\u00ab0x1\u00bb.fixed_point64::greater_or_equal",
+          "heartbeats": 877656
+        },
+        {
+          "wall_ms": 72,
+          "target": "\u00ab0x1\u00bb.fixed_point64::greater",
+          "heartbeats": 878910
+        },
+        {
+          "wall_ms": 73,
+          "target": "\u00ab0x1\u00bb.fixed_point64::equal",
+          "heartbeats": 922031
+        },
+        {
+          "wall_ms": 437,
+          "target": "\u00ab0x1\u00bb.fixed_point64::almost_equal",
+          "heartbeats": 4298010
+        },
+        {
+          "wall_ms": 707,
+          "target": "\u00ab0x1\u00bb.fixed_point64::multiply_u128",
+          "heartbeats": 7173261
+        },
+        {
+          "wall_ms": 373,
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_u128",
+          "heartbeats": 3860214
+        },
+        {
+          "wall_ms": 84,
+          "target": "\u00ab0x1\u00bb.fixed_point64::floor",
+          "heartbeats": 1005404
+        },
+        {
+          "wall_ms": 425,
+          "target": "\u00ab0x1\u00bb.fixed_point64::sub",
+          "heartbeats": 4468261
+        },
+        {
+          "wall_ms": 661,
+          "target": "\u00ab0x1\u00bb.fixed_point64::add",
+          "heartbeats": 6844423
+        },
+        {
+          "wall_ms": 1016,
+          "target": "\u00ab0x1\u00bb.fixed_point64::divide_u128",
+          "heartbeats": 10933185
+        },
+        {
+          "wall_ms": 1766,
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_rational",
+          "heartbeats": 20384515
+        },
+        {
+          "wall_ms": 1035,
+          "target": "\u00ab0x1\u00bb.fixed_point64::ceil",
+          "heartbeats": 13676286
+        },
+        {
+          "wall_ms": 1051,
+          "target": "\u00ab0x1\u00bb.fixed_point64::round",
+          "heartbeats": 14519628
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_raw_value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::sub",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::multiply_u128",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::divide_u128",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_rational",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::min",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::max",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::less_or_equal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::less",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::greater_or_equal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::greater",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::equal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::almost_equal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::create_from_u128",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::floor",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::ceil",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.fixed_point64::round",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 99362136,
+        "total": 125063516,
+        "render": 2195804,
+        "lowering": 732799,
+        "load": 5031812,
+        "frontend": 131773,
+        "certification": 17609192
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 14650
+    },
+    {
+      "name": "simple_map",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "2588d7ed06e5",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 7981,
+        "total": 13906,
+        "render": 496,
+        "lowering": 197,
+        "load": 792,
+        "frontend": 306,
+        "certification": 3100
+      },
+      "targets": [
+        {
+          "wall_ms": 7980,
+          "target": "\u00ab0x1\u00bb.simple_map::add_all",
+          "heartbeats": 99294035
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.simple_map::add_all",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 99294052,
+        "total": 152563345,
+        "render": 11109819,
+        "lowering": 5530138,
+        "load": 5031812,
+        "frontend": 725340,
+        "certification": 30872184
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 15017
+    },
+    {
+      "name": "comparator",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "2588d7ed06e5",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 5660,
+        "total": 9110,
+        "render": 320,
+        "lowering": 128,
+        "load": 805,
+        "frontend": 295,
+        "certification": 1023
+      },
+      "targets": [
+        {
+          "wall_ms": 614,
+          "target": "\u00ab0x1\u00bb.comparator::compare",
+          "heartbeats": 7213649
+        },
+        {
+          "wall_ms": 96,
+          "target": "\u00ab0x1\u00bb.comparator::is_equal",
+          "heartbeats": 1070483
+        },
+        {
+          "wall_ms": 89,
+          "target": "\u00ab0x1\u00bb.comparator::is_smaller_than",
+          "heartbeats": 1070160
+        },
+        {
+          "wall_ms": 86,
+          "target": "\u00ab0x1\u00bb.comparator::is_greater_than",
+          "heartbeats": 1070522
+        },
+        {
+          "wall_ms": 5035,
+          "target": "\u00ab0x1\u00bb.comparator::compare_u8_vector",
+          "heartbeats": 52959337
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.comparator::is_equal",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.comparator::is_smaller_than",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.comparator::is_greater_than",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.comparator::compare",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.comparator::compare_u8_vector",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 63848430,
+        "total": 89814877,
+        "render": 7264844,
+        "lowering": 3565938,
+        "load": 5031812,
+        "frontend": 522822,
+        "certification": 9581031
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 10248
+    },
+    {
+      "name": "capability",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "2588d7ed06e5",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 5500,
+        "total": 12039,
+        "render": 280,
+        "lowering": 120,
+        "load": 814,
+        "frontend": 287,
+        "certification": 4466
+      },
+      "targets": [
+        {
+          "wall_ms": 119,
+          "target": "\u00ab0x1\u00bb.capability::0x1::error::already_exists",
+          "heartbeats": 1105010
+        },
+        {
+          "wall_ms": 503,
+          "target": "\u00ab0x1\u00bb.capability::create",
+          "heartbeats": 5655511
+        },
+        {
+          "wall_ms": 3562,
+          "target": "\u00ab0x1\u00bb.capability::delegate",
+          "heartbeats": 37176024
+        },
+        {
+          "wall_ms": 5385,
+          "target": "\u00ab0x1\u00bb.capability::revoke",
+          "heartbeats": 28713286
+        },
+        {
+          "wall_ms": 811,
+          "target": "\u00ab0x1\u00bb.capability::add_element",
+          "heartbeats": 8644715
+        },
+        {
+          "wall_ms": 5723,
+          "target": "\u00ab0x1\u00bb.capability::acquire",
+          "heartbeats": 40692058
+        },
+        {
+          "wall_ms": 6717,
+          "target": "\u00ab0x1\u00bb.capability::acquire_linear",
+          "heartbeats": 40698443
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.capability::create",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.capability::delegate",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.capability::revoke",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.capability::add_element",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.capability::acquire",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.capability::acquire_linear",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 163457865,
+        "total": 196020034,
+        "render": 6330407,
+        "lowering": 3103191,
+        "load": 5031812,
+        "frontend": 462642,
+        "certification": 17634117
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 22192
+    },
+    {
+      "name": "pool_u64",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "2588d7ed06e5",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 63976,
+        "total": 190820,
+        "render": 762,
+        "lowering": 291,
+        "load": 810,
+        "frontend": 335,
+        "certification": 118747
+      },
+      "targets": [
+        {
+          "wall_ms": 123,
+          "target": "\u00ab0x1\u00bb.pool_u64::0x1::error::invalid_state",
+          "heartbeats": 1227733
+        },
+        {
+          "wall_ms": 102,
+          "target": "\u00ab0x1\u00bb.pool_u64::0x1::error::invalid_argument",
+          "heartbeats": 1212401
+        },
+        {
+          "wall_ms": 72,
+          "target": "\u00ab0x1\u00bb.pool_u64::total_coins",
+          "heartbeats": 849143
+        },
+        {
+          "wall_ms": 70,
+          "target": "\u00ab0x1\u00bb.pool_u64::total_shares",
+          "heartbeats": 853693
+        },
+        {
+          "wall_ms": 77,
+          "target": "\u00ab0x1\u00bb.pool_u64::shareholders",
+          "heartbeats": 900970
+        },
+        {
+          "wall_ms": 80,
+          "target": "\u00ab0x1\u00bb.pool_u64::shareholders_count",
+          "heartbeats": 936882
+        },
+        {
+          "wall_ms": 357,
+          "target": "\u00ab0x1\u00bb.pool_u64::destroy_empty",
+          "heartbeats": 3540303
+        },
+        {
+          "wall_ms": 399,
+          "target": "\u00ab0x1\u00bb.pool_u64::contains",
+          "heartbeats": 4254380
+        },
+        {
+          "wall_ms": 1210,
+          "target": "\u00ab0x1\u00bb.pool_u64::create_with_scaling_factor",
+          "heartbeats": 12262744
+        },
+        {
+          "wall_ms": 264,
+          "target": "\u00ab0x1\u00bb.pool_u64::new",
+          "heartbeats": 3160614
+        },
+        {
+          "wall_ms": 238,
+          "target": "\u00ab0x1\u00bb.pool_u64::create",
+          "heartbeats": 3041235
+        },
+        {
+          "wall_ms": 3433,
+          "target": "\u00ab0x1\u00bb.pool_u64::multiply_then_divide",
+          "heartbeats": 39062797
+        },
+        {
+          "wall_ms": 1299,
+          "target": "\u00ab0x1\u00bb.pool_u64::shares_to_amount_with_total_coins",
+          "heartbeats": 14733267
+        },
+        {
+          "wall_ms": 1510,
+          "target": "\u00ab0x1\u00bb.pool_u64::amount_to_shares_with_total_coins",
+          "heartbeats": 17924031
+        },
+        {
+          "wall_ms": 718,
+          "target": "\u00ab0x1\u00bb.pool_u64::shares_to_amount",
+          "heartbeats": 8443752
+        },
+        {
+          "wall_ms": 977,
+          "target": "\u00ab0x1\u00bb.pool_u64::amount_to_shares",
+          "heartbeats": 11125363
+        },
+        {
+          "wall_ms": 23843,
+          "target": "\u00ab0x1\u00bb.pool_u64::update_total_coins",
+          "heartbeats": 197602019
+        },
+        {
+          "wall_ms": 60563,
+          "target": "\u00ab0x1\u00bb.pool_u64::add_shares",
+          "heartbeats": 465960179
+        },
+        {
+          "wall_ms": 63583,
+          "target": "\u00ab0x1\u00bb.pool_u64::shares",
+          "heartbeats": 18503957
+        },
+        {
+          "wall_ms": 2155,
+          "target": "\u00ab0x1\u00bb.pool_u64::balance",
+          "heartbeats": 22304965
+        },
+        {
+          "wall_ms": 66508,
+          "target": "\u00ab0x1\u00bb.pool_u64::buy_in",
+          "heartbeats": 563890374
+        },
+        {
+          "wall_ms": 8987,
+          "target": "\u00ab0x1\u00bb.pool_u64::transfer_shares",
+          "heartbeats": 72162052
+        },
+        {
+          "wall_ms": 100649,
+          "target": "\u00ab0x1\u00bb.pool_u64::redeem_shares",
+          "heartbeats": 696423987
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::create_with_scaling_factor",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::new",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::create",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::destroy_empty",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::update_total_coins",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::add_shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::transfer_shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::multiply_then_divide",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::amount_to_shares_with_total_coins",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::amount_to_shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::shares_to_amount_with_total_coins",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::shares_to_amount",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::balance",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::buy_in",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::redeem_shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::total_coins",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::total_shares",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::shareholders",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.pool_u64::shareholders_count",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 2167113707,
+        "total": 2355315918,
+        "render": 17451512,
+        "lowering": 8925548,
+        "load": 5031812,
+        "frontend": 1069707,
+        "certification": 155723632
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 346934
+    },
+    {
+      "name": "ristretto255",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "2588d7ed06e5",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 4798,
+        "total": 19034,
+        "render": 698,
+        "lowering": 385,
+        "load": 798,
+        "frontend": 340,
+        "certification": 10382
+      },
+      "targets": [
+        {
+          "wall_ms": 109,
+          "target": "\u00ab0x1\u00bb.ristretto255::0x1::error::invalid_state",
+          "heartbeats": 1088153
+        },
+        {
+          "wall_ms": 77,
+          "target": "\u00ab0x1\u00bb.ristretto255::0x1::features::bulletproofs_enabled",
+          "heartbeats": 963004
+        },
+        {
+          "wall_ms": 84,
+          "target": "\u00ab0x1\u00bb.ristretto255::0x1::error::invalid_argument",
+          "heartbeats": 1061625
+        },
+        {
+          "wall_ms": 255,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_sha2_512",
+          "heartbeats": 2730486
+        },
+        {
+          "wall_ms": 514,
+          "target": "\u00ab0x1\u00bb.ristretto255::double_scalar_mul",
+          "heartbeats": 5742150
+        },
+        {
+          "wall_ms": 950,
+          "target": "\u00ab0x1\u00bb.ristretto255::multi_scalar_mul",
+          "heartbeats": 10105670
+        },
+        {
+          "wall_ms": 2034,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_bytes",
+          "heartbeats": 19961137
+        },
+        {
+          "wall_ms": 1530,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u8",
+          "heartbeats": 15483917
+        },
+        {
+          "wall_ms": 256,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u32",
+          "heartbeats": 2845980
+        },
+        {
+          "wall_ms": 231,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u64",
+          "heartbeats": 2489335
+        },
+        {
+          "wall_ms": 223,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u128",
+          "heartbeats": 2490137
+        },
+        {
+          "wall_ms": 1733,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_reduced_from_32_bytes",
+          "heartbeats": 17411111
+        },
+        {
+          "wall_ms": 492,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_zero",
+          "heartbeats": 5437849
+        },
+        {
+          "wall_ms": 1750,
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_uniform_from_64_bytes",
+          "heartbeats": 17416168
+        },
+        {
+          "wall_ms": 325,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_is_zero",
+          "heartbeats": 3554748
+        },
+        {
+          "wall_ms": 572,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_one",
+          "heartbeats": 6168153
+        },
+        {
+          "wall_ms": 336,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_is_one",
+          "heartbeats": 3578908
+        },
+        {
+          "wall_ms": 88,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_equals",
+          "heartbeats": 1030849
+        },
+        {
+          "wall_ms": 321,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_mul",
+          "heartbeats": 3355936
+        },
+        {
+          "wall_ms": 600,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_mul_assign",
+          "heartbeats": 6079433
+        },
+        {
+          "wall_ms": 323,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_add",
+          "heartbeats": 3354246
+        },
+        {
+          "wall_ms": 595,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_add_assign",
+          "heartbeats": 6080661
+        },
+        {
+          "wall_ms": 313,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_sub",
+          "heartbeats": 3357575
+        },
+        {
+          "wall_ms": 567,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_sub_assign",
+          "heartbeats": 6079946
+        },
+        {
+          "wall_ms": 262,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_neg",
+          "heartbeats": 2924343
+        },
+        {
+          "wall_ms": 58,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_to_bytes",
+          "heartbeats": 705786
+        },
+        {
+          "wall_ms": 326,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_neg_assign",
+          "heartbeats": 3887815
+        },
+        {
+          "wall_ms": 2839,
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_invert",
+          "heartbeats": 30807126
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::double_scalar_mul",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::multi_scalar_mul",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_sha2_512",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u8",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u32",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u64",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_from_u128",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_reduced_from_32_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::new_scalar_uniform_from_64_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_zero",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_is_zero",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_one",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_is_one",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_equals",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_invert",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_mul",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_mul_assign",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_add_assign",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_sub",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_sub_assign",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_neg",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_neg_assign",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ristretto255::scalar_to_bytes",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 202000788,
+        "total": 329155060,
+        "render": 15805042,
+        "lowering": 12983259,
+        "load": 5031812,
+        "frontend": 1281316,
+        "certification": 92052843
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 35520
+    },
+    {
+      "name": "ed25519",
+      "kind": "move",
+      "group": "AptosStdlib",
+      "input": "2588d7ed06e5",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 1963,
+        "total": 9001,
+        "render": 600,
+        "lowering": 370,
+        "load": 793,
+        "frontend": 321,
+        "certification": 3816
+      },
+      "targets": [
+        {
+          "wall_ms": 109,
+          "target": "\u00ab0x1\u00bb.ed25519::0x1::error::invalid_argument",
+          "heartbeats": 1086624
+        },
+        {
+          "wall_ms": 1635,
+          "target": "\u00ab0x1\u00bb.ed25519::signature_verify_strict_t",
+          "heartbeats": 12465303
+        },
+        {
+          "wall_ms": 828,
+          "target": "\u00ab0x1\u00bb.ed25519::new_signed_message",
+          "heartbeats": 7487336
+        },
+        {
+          "wall_ms": 224,
+          "target": "\u00ab0x1\u00bb.ed25519::signature_verify_strict",
+          "heartbeats": 2411004
+        },
+        {
+          "wall_ms": 304,
+          "target": "\u00ab0x1\u00bb.ed25519::new_signature_from_bytes",
+          "heartbeats": 3516989
+        },
+        {
+          "wall_ms": 302,
+          "target": "\u00ab0x1\u00bb.ed25519::new_unvalidated_public_key_from_bytes",
+          "heartbeats": 3510274
+        },
+        {
+          "wall_ms": 163,
+          "target": "\u00ab0x1\u00bb.ed25519::unvalidated_public_key_to_authentication_key",
+          "heartbeats": 1811794
+        },
+        {
+          "wall_ms": 165,
+          "target": "\u00ab0x1\u00bb.ed25519::validated_public_key_to_authentication_key",
+          "heartbeats": 1809734
+        },
+        {
+          "wall_ms": 191,
+          "target": "\u00ab0x1\u00bb.ed25519::public_key_bytes_to_authentication_key",
+          "heartbeats": 2008573
+        },
+        {
+          "wall_ms": 897,
+          "target": "\u00ab0x1\u00bb.ed25519::new_validated_public_key_from_bytes",
+          "heartbeats": 9895557
+        },
+        {
+          "wall_ms": 1057,
+          "target": "\u00ab0x1\u00bb.ed25519::public_key_validate",
+          "heartbeats": 11366380
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::new_unvalidated_public_key_from_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::new_validated_public_key_from_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::new_signature_from_bytes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::public_key_validate",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::signature_verify_strict",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::signature_verify_strict_t",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::new_signed_message",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::unvalidated_public_key_to_authentication_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::validated_public_key_to_authentication_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ed25519::public_key_bytes_to_authentication_key",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 62219104,
+        "total": 133446363,
+        "render": 13479694,
+        "lowering": 15039925,
+        "load": 5031812,
+        "frontend": 1135535,
+        "certification": 36540293
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 14100
+    },
+    {
+      "name": "ordered_map",
+      "kind": "move",
+      "group": "AptosFramework",
+      "input": "00063c6e18ec",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 27649,
+        "total": 81082,
+        "render": 1614,
+        "lowering": 563,
+        "load": 799,
+        "frontend": 1324,
+        "certification": 43381
+      },
+      "targets": [
+        {
+          "wall_ms": 497,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_new_from_1",
+          "heartbeats": 5192662
+        },
+        {
+          "wall_ms": 939,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_remove",
+          "heartbeats": 9402159
+        },
+        {
+          "wall_ms": 5655,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_collect_symbolic",
+          "heartbeats": 53744938
+        },
+        {
+          "wall_ms": 1884,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_replace_symbolic",
+          "heartbeats": 18721326
+        },
+        {
+          "wall_ms": 2109,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_lower_bound_rank_symbolic",
+          "heartbeats": 21432930
+        },
+        {
+          "wall_ms": 2407,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_add_out_of_order",
+          "heartbeats": 22974881
+        },
+        {
+          "wall_ms": 1665,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_remove_out_of_range",
+          "heartbeats": 16246926
+        },
+        {
+          "wall_ms": 1636,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_borrow_mut_end",
+          "heartbeats": 15467825
+        },
+        {
+          "wall_ms": 1267,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_borrow_mut_out_of_range",
+          "heartbeats": 12075135
+        },
+        {
+          "wall_ms": 6427,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_drain_symbolic",
+          "heartbeats": 55906722
+        },
+        {
+          "wall_ms": 603,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_new_from_2",
+          "heartbeats": 6310819
+        },
+        {
+          "wall_ms": 2440,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_remove_shift_at_position",
+          "heartbeats": 23619030
+        },
+        {
+          "wall_ms": 2331,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_borrow_mut_at_position",
+          "heartbeats": 21147793
+        },
+        {
+          "wall_ms": 5593,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_borrow_mut_symbolic",
+          "heartbeats": 46932152
+        },
+        {
+          "wall_ms": 2731,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_add_middle_symbolic",
+          "heartbeats": 25752322
+        },
+        {
+          "wall_ms": 4194,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_add_append_symbolic",
+          "heartbeats": 39188443
+        },
+        {
+          "wall_ms": 2050,
+          "target": "\u00ab0x1\u00bb.ordered_map::ground_enum_123",
+          "heartbeats": 16756625
+        },
+        {
+          "wall_ms": 1942,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_lower_bound_gap_symbolic",
+          "heartbeats": 18908437
+        },
+        {
+          "wall_ms": 1422,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_borrow_front_key",
+          "heartbeats": 15352989
+        },
+        {
+          "wall_ms": 1497,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_borrow_back_key",
+          "heartbeats": 15505952
+        },
+        {
+          "wall_ms": 2007,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_next_key",
+          "heartbeats": 19726858
+        },
+        {
+          "wall_ms": 1793,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_prev_key",
+          "heartbeats": 17487186
+        },
+        {
+          "wall_ms": 6209,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_enumeration_view",
+          "heartbeats": 59888484
+        },
+        {
+          "wall_ms": 9902,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_sum_symbolic",
+          "heartbeats": 80735002
+        },
+        {
+          "wall_ms": 10180,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_remove_or_none",
+          "heartbeats": 98861468
+        },
+        {
+          "wall_ms": 9221,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_pop_rank",
+          "heartbeats": 91032811
+        },
+        {
+          "wall_ms": 12407,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_upsert",
+          "heartbeats": 120043778
+        },
+        {
+          "wall_ms": 24489,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_walk_mut_symbolic",
+          "heartbeats": 141970193
+        },
+        {
+          "wall_ms": 24431,
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_remove_shift_symbolic",
+          "heartbeats": 17823318
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_new_from_1",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_remove",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_collect_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_replace_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_lower_bound_rank_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_add_out_of_order",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_remove_out_of_range",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_borrow_mut_end",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_iter_borrow_mut_out_of_range",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_drain_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_walk_mut_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_aborts_if_new_from_2",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_remove_shift_at_position",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_borrow_mut_at_position",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_borrow_mut_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_add_middle_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_add_append_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::ground_enum_123",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_remove_shift_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_lower_bound_gap_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_iter_sum_symbolic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_borrow_front_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_borrow_back_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_upsert",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_next_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_prev_key",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_remove_or_none",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_enumeration_view",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x1\u00bb.ordered_map::test_verify_pop_rank",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 1114502779,
+        "total": 1658833913,
+        "render": 38105755,
+        "lowering": 13695822,
+        "load": 5031812,
+        "frontend": 1933844,
+        "certification": 485563901
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 190230
+    },
+    {
+      "name": "storage",
+      "kind": "move",
+      "group": "VerexBench",
+      "input": "8999beb32224",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 4736,
+        "total": 7905,
+        "render": 74,
+        "lowering": 273,
+        "load": 805,
+        "frontend": 103,
+        "certification": 1715
+      },
+      "targets": [
+        {
+          "wall_ms": 883,
+          "target": "\u00ab0xbe\u00bb.storage::increment",
+          "heartbeats": 9097696
+        },
+        {
+          "wall_ms": 324,
+          "target": "\u00ab0xbe\u00bb.storage::take",
+          "heartbeats": 3679130
+        },
+        {
+          "wall_ms": 695,
+          "target": "\u00ab0xbe\u00bb.storage::deposit",
+          "heartbeats": 6966454
+        },
+        {
+          "wall_ms": 3727,
+          "target": "\u00ab0xbe\u00bb.storage::deposit_twice",
+          "heartbeats": 38950360
+        },
+        {
+          "wall_ms": 154,
+          "target": "\u00ab0xbe\u00bb.storage::value",
+          "heartbeats": 1655473
+        },
+        {
+          "wall_ms": 332,
+          "target": "\u00ab0xbe\u00bb.storage::publish",
+          "heartbeats": 3597379
+        },
+        {
+          "wall_ms": 596,
+          "target": "\u00ab0xbe\u00bb.storage::increment_twice",
+          "heartbeats": 6265053
+        },
+        {
+          "wall_ms": 560,
+          "target": "\u00ab0xbe\u00bb.storage::increment_beside",
+          "heartbeats": 6090854
+        },
+        {
+          "wall_ms": 503,
+          "target": "\u00ab0xbe\u00bb.storage::reset",
+          "heartbeats": 5164305
+        },
+        {
+          "wall_ms": 706,
+          "target": "\u00ab0xbe\u00bb.storage::set_bounded",
+          "heartbeats": 7371523
+        },
+        {
+          "wall_ms": 279,
+          "target": "\u00ab0xbe\u00bb.storage::bounded",
+          "heartbeats": 2907171
+        },
+        {
+          "wall_ms": 1281,
+          "target": "\u00ab0xbe\u00bb.storage::swap",
+          "heartbeats": 12468719
+        },
+        {
+          "wall_ms": 1339,
+          "target": "\u00ab0xbe\u00bb.storage::deposit_a",
+          "heartbeats": 13774813
+        },
+        {
+          "wall_ms": 2756,
+          "target": "\u00ab0xbe\u00bb.storage::deposit_both",
+          "heartbeats": 29206701
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0xbe\u00bb.storage::publish",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::increment",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::increment_twice",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::increment_beside",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::take",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::reset",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::swap",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::set_bounded",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::bounded",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::deposit",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::deposit_a",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::deposit_both",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.storage::deposit_twice",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 151201021,
+        "total": 172973960,
+        "render": 1697838,
+        "lowering": 569171,
+        "load": 5031812,
+        "frontend": 93527,
+        "certification": 14380591
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 19857,
+      "repeats": {
+        "wall_ms": [
+          7768,
+          7929,
+          7905
+        ],
+        "cpu_ms": [
+          19752,
+          20075,
+          19857
+        ],
+        "heartbeats": [
+          172974273,
+          172973911,
+          172973960
+        ]
+      }
+    },
+    {
+      "name": "behavior",
+      "kind": "move",
+      "group": "VerexBench",
+      "input": "8999beb32224",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 2291,
+        "total": 7235,
+        "render": 52,
+        "lowering": 17,
+        "load": 809,
+        "frontend": 100,
+        "certification": 3306
+      },
+      "targets": [
+        {
+          "wall_ms": 148,
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__add_five",
+          "heartbeats": 1697409
+        },
+        {
+          "wall_ms": 176,
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__checked",
+          "heartbeats": 1959078
+        },
+        {
+          "wall_ms": 152,
+          "target": "\u00ab0xbe\u00bb.behavior::increment",
+          "heartbeats": 1687180
+        },
+        {
+          "wall_ms": 390,
+          "target": "\u00ab0xbe\u00bb.behavior::halve",
+          "heartbeats": 4462213
+        },
+        {
+          "wall_ms": 148,
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__captured",
+          "heartbeats": 1796082
+        },
+        {
+          "wall_ms": 45,
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__with_requires",
+          "heartbeats": 579397
+        },
+        {
+          "wall_ms": 152,
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__sum",
+          "heartbeats": 1802687
+        },
+        {
+          "wall_ms": 261,
+          "target": "\u00ab0xbe\u00bb.behavior::apply",
+          "heartbeats": 3114559
+        },
+        {
+          "wall_ms": 257,
+          "target": "\u00ab0xbe\u00bb.behavior::apply_result",
+          "heartbeats": 3089100
+        },
+        {
+          "wall_ms": 305,
+          "target": "\u00ab0xbe\u00bb.behavior::apply2",
+          "heartbeats": 3818451
+        },
+        {
+          "wall_ms": 272,
+          "target": "\u00ab0xbe\u00bb.behavior::apply_requires",
+          "heartbeats": 3224082
+        },
+        {
+          "wall_ms": 594,
+          "target": "\u00ab0xbe\u00bb.behavior::apply_twice",
+          "heartbeats": 7021818
+        },
+        {
+          "wall_ms": 284,
+          "target": "\u00ab0xbe\u00bb.behavior::known",
+          "heartbeats": 3136203
+        },
+        {
+          "wall_ms": 870,
+          "target": "\u00ab0xbe\u00bb.behavior::named",
+          "heartbeats": 4387266
+        },
+        {
+          "wall_ms": 817,
+          "target": "\u00ab0xbe\u00bb.behavior::add_five",
+          "heartbeats": 4381608
+        },
+        {
+          "wall_ms": 787,
+          "target": "\u00ab0xbe\u00bb.behavior::checked",
+          "heartbeats": 4359767
+        },
+        {
+          "wall_ms": 730,
+          "target": "\u00ab0xbe\u00bb.behavior::captured",
+          "heartbeats": 5017597
+        },
+        {
+          "wall_ms": 693,
+          "target": "\u00ab0xbe\u00bb.behavior::sum",
+          "heartbeats": 4998163
+        },
+        {
+          "wall_ms": 1007,
+          "target": "\u00ab0xbe\u00bb.behavior::with_requires",
+          "heartbeats": 5805193
+        },
+        {
+          "wall_ms": 1034,
+          "target": "\u00ab0xbe\u00bb.behavior::named_result",
+          "heartbeats": 7020539
+        },
+        {
+          "wall_ms": 1389,
+          "target": "\u00ab0xbe\u00bb.behavior::add_two",
+          "heartbeats": 14747361
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::apply",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::apply_result",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::apply_requires",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::apply2",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::apply_twice",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::increment",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::halve",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__add_five",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::add_five",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__checked",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::checked",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::named",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::named_result",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__captured",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::captured",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::with_requires",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::__lambda__1__sum",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::sum",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::add_two",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.behavior::known",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 90336546,
+        "total": 134691029,
+        "render": 1192865,
+        "lowering": 358449,
+        "load": 5031812,
+        "frontend": 61211,
+        "certification": 37710146
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 15164,
+      "repeats": {
+        "wall_ms": [
+          7235,
+          7289,
+          7162
+        ],
+        "cpu_ms": [
+          15164,
+          15381,
+          15049
+        ],
+        "heartbeats": [
+          134691029,
+          134687655,
+          134689017
+        ]
+      }
+    },
+    {
+      "name": "closures",
+      "kind": "move",
+      "group": "VerexBench",
+      "input": "8999beb32224",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 3254,
+        "total": 6596,
+        "render": 38,
+        "lowering": 11,
+        "load": 789,
+        "frontend": 96,
+        "certification": 1981
+      },
+      "targets": [
+        {
+          "wall_ms": 149,
+          "target": "\u00ab0xbe\u00bb.closures::add",
+          "heartbeats": 1813849
+        },
+        {
+          "wall_ms": 135,
+          "target": "\u00ab0xbe\u00bb.closures::mul",
+          "heartbeats": 1809667
+        },
+        {
+          "wall_ms": 87,
+          "target": "\u00ab0xbe\u00bb.closures::__lambda__1__two_captures",
+          "heartbeats": 1087286
+        },
+        {
+          "wall_ms": 160,
+          "target": "\u00ab0xbe\u00bb.closures::leading",
+          "heartbeats": 1890336
+        },
+        {
+          "wall_ms": 162,
+          "target": "\u00ab0xbe\u00bb.closures::trailing",
+          "heartbeats": 1913980
+        },
+        {
+          "wall_ms": 268,
+          "target": "\u00ab0xbe\u00bb.closures::two_captures",
+          "heartbeats": 3147477
+        },
+        {
+          "wall_ms": 298,
+          "target": "\u00ab0xbe\u00bb.closures::field",
+          "heartbeats": 3323590
+        },
+        {
+          "wall_ms": 305,
+          "target": "\u00ab0xbe\u00bb.closures::add_twice",
+          "heartbeats": 3632489
+        },
+        {
+          "wall_ms": 2706,
+          "target": "\u00ab0xbe\u00bb.closures::choose",
+          "heartbeats": 19556082
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0xbe\u00bb.closures::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::mul",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::leading",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::trailing",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::two_captures",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::field",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::choose",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closures::add_twice",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 42094972,
+        "total": 70224025,
+        "render": 831464,
+        "lowering": 226833,
+        "load": 5031812,
+        "frontend": 36525,
+        "certification": 22002419
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 8874,
+      "repeats": {
+        "wall_ms": [
+          6587,
+          6609,
+          6596
+        ],
+        "cpu_ms": [
+          8827,
+          8915,
+          8874
+        ],
+        "heartbeats": [
+          70224065,
+          70224150,
+          70224025
+        ]
+      }
+    },
+    {
+      "name": "closure_loop",
+      "kind": "move",
+      "group": "VerexBench",
+      "input": "8999beb32224",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 704,
+        "total": 2465,
+        "render": 11,
+        "lowering": 3,
+        "load": 796,
+        "frontend": 97,
+        "certification": 504
+      },
+      "targets": [
+        {
+          "wall_ms": 139,
+          "target": "\u00ab0xbe\u00bb.closure_loop::add",
+          "heartbeats": 1813869
+        },
+        {
+          "wall_ms": 538,
+          "target": "\u00ab0xbe\u00bb.closure_loop::count_up",
+          "heartbeats": 7001946
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0xbe\u00bb.closure_loop::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0xbe\u00bb.closure_loop::count_up",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 9020626,
+        "total": 19519990,
+        "render": 231705,
+        "lowering": 56349,
+        "load": 5031812,
+        "frontend": 11828,
+        "certification": 5167670
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 2748,
+      "repeats": {
+        "wall_ms": [
+          2489,
+          2465,
+          2457
+        ],
+        "cpu_ms": [
+          2766,
+          2748,
+          2736
+        ],
+        "heartbeats": [
+          19519894,
+          19519990,
+          19519942
+        ]
+      }
+    },
+    {
+      "name": "amm",
+      "kind": "move",
+      "group": "examples",
+      "input": "d18f7898a9e2",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 32001,
+        "total": 37436,
+        "render": 79,
+        "lowering": 24,
+        "load": 798,
+        "frontend": 78,
+        "certification": 3552
+      },
+      "targets": [
+        {
+          "wall_ms": 1546,
+          "target": "\u00ab0x42\u00bb.amm::constant_product",
+          "heartbeats": 18147556
+        },
+        {
+          "wall_ms": 3180,
+          "target": "\u00ab0x42\u00bb.amm::swap",
+          "heartbeats": 34938995
+        },
+        {
+          "wall_ms": 3908,
+          "target": "\u00ab0x42\u00bb.amm::create_constant_product_pool",
+          "heartbeats": 39568886
+        },
+        {
+          "wall_ms": 19824,
+          "target": "\u00ab0x42\u00bb.amm::constant_product_with_fee",
+          "heartbeats": 247417838
+        },
+        {
+          "wall_ms": 22918,
+          "target": "\u00ab0x42\u00bb.amm::constant_product_with_fee_non_compliant",
+          "heartbeats": 279536724
+        },
+        {
+          "wall_ms": 5496,
+          "target": "\u00ab0x42\u00bb.amm::create_compliant_fee_pool",
+          "heartbeats": 72946418
+        },
+        {
+          "wall_ms": 8450,
+          "target": "\u00ab0x42\u00bb.amm::create_noncompliant_fee_pool",
+          "heartbeats": 117011947
+        }
+      ],
+      "status": "expected rejection",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.amm::constant_product",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::constant_product_with_fee",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::constant_product_with_fee_non_compliant",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::create_constant_product_pool",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::swap",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::create_compliant_fee_pool",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.amm::create_noncompliant_fee_pool",
+          "status": "rejected",
+          "errors": 5
+        }
+      ],
+      "heartbeats": {
+        "verification": 823909180,
+        "total": 870889654,
+        "render": 1817700,
+        "lowering": 567774,
+        "load": 5031812,
+        "frontend": 91543,
+        "certification": 39471645
+      },
+      "errors": 5,
+      "error_messages": [
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.move:30:9: error: the data invariant `invariant \u2200 (S : StateDomain; r_in : u64; r_out : u64; amt : u64),\n        !(S.. |~ aborts_of<this.pricing>(r_in, r_out, amt))` does not hold where a value is constructed",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.move:34:9: error: the data invariant `invariant \u2200 (S : StateDomain; r_in : u64; r_out : u64; amt : u64),\n        (S.. |~ result_of<this.pricing>(r_in, r_out, amt)) <= r_out` does not hold where a value is constructed",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.move:38:9: error: the data invariant `invariant \u2200 (S : StateDomain; r_in : u64; r_out : u64; a1 : u64; a2 : u64),\n        a1 <= a2\n          ==> (S.. |~ result_of<this.pricing>(r_in, r_out, a1))\n            <= (S.. |~ result_of<this.pricing>(r_in, r_out, a2))` does not hold where a value is constructed",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.move:45:9: error: the data invariant `invariant \u2200 (S : StateDomain; r_in : u64; r_out : u64; amt : u64),\n        (r_in + amt)\n          * (r_out - (S.. |~ result_of<this.pricing>(r_in, r_out, amt)))\n          >= r_in * r_out` does not hold where a value is constructed",
+        "third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.move:241:5: error: verex verification failed: the automatic verification of `create_noncompliant_fee_pool` failed; provide a proof in `third_party/move/move-prover/doc/higher-order-paper-26/examples/sources/amm_example.proof.lean`:\n  verify create_noncompliant_fee_pool by lean =>\n    verex_obligations\n    verex_on \u2026 (300 more characters)"
+      ],
+      "cpu_ms": 78723,
+      "expected_rejections": [
+        "\u00ab0x42\u00bb.amm::create_noncompliant_fee_pool"
+      ]
+    },
+    {
+      "name": "calculator",
+      "kind": "move",
+      "group": "examples",
+      "input": "d18f7898a9e2",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 29711,
+        "total": 35687,
+        "render": 77,
+        "lowering": 24,
+        "load": 812,
+        "frontend": 77,
+        "certification": 4432
+      },
+      "targets": [
+        {
+          "wall_ms": 115,
+          "target": "\u00ab0x42\u00bb.calculator::storable_add",
+          "heartbeats": 1215962
+        },
+        {
+          "wall_ms": 116,
+          "target": "\u00ab0x42\u00bb.calculator::storable_sub",
+          "heartbeats": 1382537
+        },
+        {
+          "wall_ms": 397,
+          "target": "\u00ab0x42\u00bb.calculator::init_module",
+          "heartbeats": 4457354
+        },
+        {
+          "wall_ms": 711,
+          "target": "\u00ab0x42\u00bb.calculator::view",
+          "heartbeats": 8152013
+        },
+        {
+          "wall_ms": 25527,
+          "target": "\u00ab0x42\u00bb.calculator::process",
+          "heartbeats": 279910280
+        },
+        {
+          "wall_ms": 3775,
+          "target": "\u00ab0x42\u00bb.calculator::add",
+          "heartbeats": 45968969
+        },
+        {
+          "wall_ms": 3877,
+          "target": "\u00ab0x42\u00bb.calculator::number",
+          "heartbeats": 48176187
+        },
+        {
+          "wall_ms": 3795,
+          "target": "\u00ab0x42\u00bb.calculator::sub",
+          "heartbeats": 46068254
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.calculator::init_module",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::storable_add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::storable_sub",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::process",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::number",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::sub",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.calculator::view",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 436283535,
+        "total": 470058315,
+        "render": 1735577,
+        "lowering": 507104,
+        "load": 5031812,
+        "frontend": 83378,
+        "certification": 26416909
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 46897
+    },
+    {
+      "name": "Quicksort",
+      "kind": "lean",
+      "group": "VerexSL",
+      "input": "bf50e5714501",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 15886,
+        "total": 22484,
+        "render": 0,
+        "lowering": 22,
+        "load": 795,
+        "frontend": 0,
+        "certification": 3029
+      },
+      "targets": [
+        {
+          "wall_ms": 8481,
+          "target": "\u00ab0x42\u00bb.quicksort::partition",
+          "heartbeats": 109873605
+        },
+        {
+          "wall_ms": 6804,
+          "target": "\u00ab0x42\u00bb.quicksort::quick_sort_range",
+          "heartbeats": 89757269
+        },
+        {
+          "wall_ms": 477,
+          "target": "\u00ab0x42\u00bb.quicksort::quick_sort",
+          "heartbeats": 6121096
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.quicksort::partition",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.quicksort::quick_sort_range",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.quicksort::quick_sort",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 206755947,
+        "total": 246762023,
+        "render": 0,
+        "lowering": 593395,
+        "load": 5035800,
+        "frontend": 0,
+        "certification": 34376881
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 24698
+    },
+    {
+      "name": "OrderedMap",
+      "kind": "lean",
+      "group": "VerexSL",
+      "input": "a0aeb147b4cb",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 93932,
+        "total": 139223,
+        "render": 0,
+        "lowering": 54,
+        "load": 826,
+        "frontend": 0,
+        "certification": 17331
+      },
+      "targets": [
+        {
+          "wall_ms": 698,
+          "target": "\u00ab0x42\u00bb.ordered_map::empty",
+          "heartbeats": 8792125
+        },
+        {
+          "wall_ms": 130,
+          "target": "\u00ab0x42\u00bb.ordered_map::length",
+          "heartbeats": 1818438
+        },
+        {
+          "wall_ms": 1294,
+          "target": "\u00ab0x42\u00bb.ordered_map::borrow_key_at",
+          "heartbeats": 16362511
+        },
+        {
+          "wall_ms": 3215,
+          "target": "\u00ab0x42\u00bb.ordered_map::lower_bound_loop",
+          "heartbeats": 39890633
+        },
+        {
+          "wall_ms": 1627,
+          "target": "\u00ab0x42\u00bb.ordered_map::lower_bound",
+          "heartbeats": 21055176
+        },
+        {
+          "wall_ms": 2584,
+          "target": "\u00ab0x42\u00bb.ordered_map::contains",
+          "heartbeats": 33899228
+        },
+        {
+          "wall_ms": 4498,
+          "target": "\u00ab0x42\u00bb.ordered_map::borrow",
+          "heartbeats": 57984206
+        },
+        {
+          "wall_ms": 19105,
+          "target": "\u00ab0x42\u00bb.ordered_map::add",
+          "heartbeats": 243452237
+        },
+        {
+          "wall_ms": 10932,
+          "target": "\u00ab0x42\u00bb.ordered_map::remove",
+          "heartbeats": 135830294
+        },
+        {
+          "wall_ms": 20744,
+          "target": "\u00ab0x42\u00bb.ordered_map::duplicate_scenario",
+          "heartbeats": 199357661
+        },
+        {
+          "wall_ms": 7950,
+          "target": "\u00ab0x42\u00bb.ordered_map::missing_scenario",
+          "heartbeats": 81073188
+        },
+        {
+          "wall_ms": 18391,
+          "target": "\u00ab0x42\u00bb.ordered_map::absent_lookup_scenario",
+          "heartbeats": 170227108
+        },
+        {
+          "wall_ms": 29257,
+          "target": "\u00ab0x42\u00bb.ordered_map::remove_edges_scenario",
+          "heartbeats": 300000574
+        },
+        {
+          "wall_ms": 29340,
+          "target": "\u00ab0x42\u00bb.ordered_map::remove_scenario",
+          "heartbeats": 300000541
+        },
+        {
+          "wall_ms": 47048,
+          "target": "\u00ab0x42\u00bb.ordered_map::ordering_scenario",
+          "heartbeats": 418460723
+        },
+        {
+          "wall_ms": 39380,
+          "target": "\u00ab0x42\u00bb.ordered_map::bool_key_scenario",
+          "heartbeats": 377391271
+        },
+        {
+          "wall_ms": 52633,
+          "target": "\u00ab0x42\u00bb.ordered_map::lookup_scenario",
+          "heartbeats": 466377339
+        }
+      ],
+      "status": "timeout",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::empty",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::lower_bound_loop",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::lower_bound",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::length",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::borrow_key_at",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::contains",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::borrow",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::add",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::remove",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::remove_scenario",
+          "status": "timeout",
+          "errors": 2
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::remove_edges_scenario",
+          "status": "timeout",
+          "errors": 2
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::lookup_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::duplicate_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::missing_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::ordering_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::absent_lookup_scenario",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.ordered_map::bool_key_scenario",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 2882800803,
+        "total": 3079167558,
+        "render": 0,
+        "lowering": 1205301,
+        "load": 5035800,
+        "frontend": 0,
+        "certification": 190125654
+      },
+      "errors": 4,
+      "error_messages": [
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Examples/OrderedMap.lean:574:8: (deterministic) timeout at `whnf`, maximum number of heartbeats (300000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.\n \u2026 (106 more characters)",
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Examples/OrderedMap.lean:574:8: verex verification failed: the automatic verification of `remove_scenario` exceeded its budget of 300000 maxHeartbeats after deciding 9 leaves (stage interrupted); provide a proof in the module:\n  verify remove_scenario by lean =>\n    verex_obligations\n    verex_on \u2026 (112 more characters)",
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Examples/OrderedMap.lean:623:8: (deterministic) timeout at `whnf`, maximum number of heartbeats (300000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.\n \u2026 (106 more characters)",
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Examples/OrderedMap.lean:623:8: verex verification failed: the automatic verification of `remove_edges_scenario` exceeded its budget of 300000 maxHeartbeats after deciding 9 leaves (stage interrupted); provide a proof in the module:\n  verify remove_edges_scenario by lean =>\n    verex_obligations\n    verex_on \u2026 (112 more characters)"
+      ],
+      "cpu_ms": 343961
+    },
+    {
+      "name": "VectorOperations",
+      "kind": "lean",
+      "group": "VerexSL",
+      "input": "abc42fc99538",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 4458,
+        "total": 13646,
+        "render": 0,
+        "lowering": 51,
+        "load": 809,
+        "frontend": 0,
+        "certification": 7240
+      },
+      "targets": [
+        {
+          "wall_ms": 64,
+          "target": "\u00ab0x42\u00bb.vector_operations::empty_length",
+          "heartbeats": 616436
+        },
+        {
+          "wall_ms": 184,
+          "target": "\u00ab0x42\u00bb.vector_operations::pushed",
+          "heartbeats": 1833836
+        },
+        {
+          "wall_ms": 1066,
+          "target": "\u00ab0x42\u00bb.vector_operations::set_edges",
+          "heartbeats": 9927768
+        },
+        {
+          "wall_ms": 266,
+          "target": "\u00ab0x42\u00bb.vector_operations::nested",
+          "heartbeats": 2725618
+        },
+        {
+          "wall_ms": 92,
+          "target": "\u00ab0x42\u00bb.vector_operations::borrowed_length",
+          "heartbeats": 1119442
+        },
+        {
+          "wall_ms": 152,
+          "target": "\u00ab0x42\u00bb.vector_operations::bool_round_trip",
+          "heartbeats": 1540254
+        },
+        {
+          "wall_ms": 480,
+          "target": "\u00ab0x42\u00bb.vector_operations::mutate_and_read",
+          "heartbeats": 4668815
+        },
+        {
+          "wall_ms": 685,
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_middle",
+          "heartbeats": 6504178
+        },
+        {
+          "wall_ms": 515,
+          "target": "\u00ab0x42\u00bb.vector_operations::mutate_then_borrow_other",
+          "heartbeats": 5083940
+        },
+        {
+          "wall_ms": 996,
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_edges",
+          "heartbeats": 9470550
+        },
+        {
+          "wall_ms": 792,
+          "target": "\u00ab0x42\u00bb.vector_operations::remove_middle",
+          "heartbeats": 7703388
+        },
+        {
+          "wall_ms": 578,
+          "target": "\u00ab0x42\u00bb.vector_operations::pop_back",
+          "heartbeats": 5733059
+        },
+        {
+          "wall_ms": 328,
+          "target": "\u00ab0x42\u00bb.vector_operations::pop_empty",
+          "heartbeats": 3265608
+        },
+        {
+          "wall_ms": 798,
+          "target": "\u00ab0x42\u00bb.vector_operations::swap_values",
+          "heartbeats": 7850993
+        },
+        {
+          "wall_ms": 912,
+          "target": "\u00ab0x42\u00bb.vector_operations::trim_values",
+          "heartbeats": 10137845
+        },
+        {
+          "wall_ms": 673,
+          "target": "\u00ab0x42\u00bb.vector_operations::append_values",
+          "heartbeats": 6560676
+        },
+        {
+          "wall_ms": 652,
+          "target": "\u00ab0x42\u00bb.vector_operations::reverse_slice_values",
+          "heartbeats": 6224150
+        },
+        {
+          "wall_ms": 870,
+          "target": "\u00ab0x42\u00bb.vector_operations::trim_reverse_values",
+          "heartbeats": 9683135
+        },
+        {
+          "wall_ms": 862,
+          "target": "\u00ab0x42\u00bb.vector_operations::rotate_values",
+          "heartbeats": 8275540
+        },
+        {
+          "wall_ms": 905,
+          "target": "\u00ab0x42\u00bb.vector_operations::rotate_slice_values",
+          "heartbeats": 8745517
+        },
+        {
+          "wall_ms": 120,
+          "target": "\u00ab0x42\u00bb.vector_operations::destroy_empty",
+          "heartbeats": 1355795
+        },
+        {
+          "wall_ms": 317,
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_out_of_bounds",
+          "heartbeats": 3196195
+        },
+        {
+          "wall_ms": 186,
+          "target": "\u00ab0x42\u00bb.vector_operations::contains_value",
+          "heartbeats": 2099737
+        },
+        {
+          "wall_ms": 78,
+          "target": "\u00ab0x42\u00bb.vector_operations::read_out_of_bounds",
+          "heartbeats": 1003200
+        },
+        {
+          "wall_ms": 88,
+          "target": "\u00ab0x42\u00bb.vector_operations::write_out_of_bounds",
+          "heartbeats": 1031036
+        },
+        {
+          "wall_ms": 310,
+          "target": "\u00ab0x42\u00bb.vector_operations::conditional_writes",
+          "heartbeats": 3208323
+        },
+        {
+          "wall_ms": 182,
+          "target": "\u00ab0x42\u00bb.vector_operations::write_then_read_owner",
+          "heartbeats": 1994027
+        },
+        {
+          "wall_ms": 2607,
+          "target": "\u00ab0x42\u00bb.vector_operations::swap_remove_value",
+          "heartbeats": 9326938
+        },
+        {
+          "wall_ms": 3049,
+          "target": "\u00ab0x42\u00bb.vector_operations::index_of_value",
+          "heartbeats": 5890156
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::empty_length",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::pushed",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::set_edges",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::nested",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::borrowed_length",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::bool_round_trip",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::mutate_and_read",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::mutate_then_borrow_other",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_middle",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_edges",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::remove_middle",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::swap_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::pop_back",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::pop_empty",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::swap_remove_value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::append_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::trim_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::reverse_slice_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::trim_reverse_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::rotate_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::rotate_slice_values",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::destroy_empty",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::contains_value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::index_of_value",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::insert_out_of_bounds",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::read_out_of_bounds",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::write_out_of_bounds",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::conditional_writes",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.vector_operations::write_then_read_owner",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 149910359,
+        "total": 209611940,
+        "render": 0,
+        "lowering": 1030409,
+        "load": 5035800,
+        "frontend": 0,
+        "certification": 53635372
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 27283,
+      "repeats": {
+        "wall_ms": [
+          13646,
+          13547,
+          13729
+        ],
+        "cpu_ms": [
+          27283,
+          27684,
+          27362
+        ],
+        "heartbeats": [
+          209611940,
+          209611877,
+          209612005
+        ]
+      }
+    },
+    {
+      "name": "GenericStorage",
+      "kind": "lean",
+      "group": "VerexSL",
+      "input": "2779639ee826",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 738,
+        "total": 2759,
+        "render": 0,
+        "lowering": 10,
+        "load": 796,
+        "frontend": 0,
+        "certification": 687
+      },
+      "targets": [
+        {
+          "wall_ms": 150,
+          "target": "\u00ab0x42\u00bb.generic_storage::has_generic",
+          "heartbeats": 2061178
+        },
+        {
+          "wall_ms": 423,
+          "target": "\u00ab0x42\u00bb.generic_storage::publish_generic",
+          "heartbeats": 4791996
+        },
+        {
+          "wall_ms": 432,
+          "target": "\u00ab0x42\u00bb.generic_storage::take_generic",
+          "heartbeats": 5052587
+        },
+        {
+          "wall_ms": 227,
+          "target": "\u00ab0x42\u00bb.generic_storage::has_u64_vault",
+          "heartbeats": 2758541
+        },
+        {
+          "wall_ms": 531,
+          "target": "\u00ab0x42\u00bb.generic_storage::publish_u64",
+          "heartbeats": 6234020
+        },
+        {
+          "wall_ms": 675,
+          "target": "\u00ab0x42\u00bb.generic_storage::bump_vault",
+          "heartbeats": 7672038
+        },
+        {
+          "wall_ms": 685,
+          "target": "\u00ab0x42\u00bb.generic_storage::mirror",
+          "heartbeats": 7708501
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::publish_generic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::has_generic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::has_u64_vault",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::take_generic",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::bump_vault",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::mirror",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "\u00ab0x42\u00bb.generic_storage::publish_u64",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 37733378,
+        "total": 49362248,
+        "render": 0,
+        "lowering": 190199,
+        "load": 5031181,
+        "frontend": 0,
+        "certification": 6407490
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 5642,
+      "repeats": {
+        "wall_ms": [
+          2759,
+          2724,
+          2770
+        ],
+        "cpu_ms": [
+          5642,
+          5565,
+          5653
+        ],
+        "heartbeats": [
+          49362248,
+          49362253,
+          49362220
+        ]
+      }
+    },
+    {
+      "name": "bounds",
+      "kind": "rust",
+      "group": "Rust",
+      "input": "a96c1beffb29",
+      "timeout_seconds": 300,
+      "wall_ms": {
+        "verification": 361,
+        "total": 1871,
+        "render": 6,
+        "lowering": 5,
+        "load": 819,
+        "frontend": 174,
+        "certification": 207
+      },
+      "targets": [
+        {
+          "wall_ms": 209,
+          "target": "bounds::min",
+          "heartbeats": 2225682
+        },
+        {
+          "wall_ms": 198,
+          "target": "bounds::max",
+          "heartbeats": 2221250
+        },
+        {
+          "wall_ms": 181,
+          "target": "bounds::clamp",
+          "heartbeats": 2227533
+        },
+        {
+          "wall_ms": 205,
+          "target": "bounds::raise",
+          "heartbeats": 2498253
+        }
+      ],
+      "status": "verified",
+      "outcomes": [
+        {
+          "target": "bounds::max",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "bounds::min",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "bounds::clamp",
+          "status": "verified",
+          "errors": 0
+        },
+        {
+          "target": "bounds::raise",
+          "status": "verified",
+          "errors": 0
+        }
+      ],
+      "heartbeats": {
+        "verification": 9522199,
+        "total": 16579308,
+        "render": 124044,
+        "lowering": 84591,
+        "load": 5031812,
+        "frontend": 30973,
+        "certification": 1785689
+      },
+      "errors": 0,
+      "error_messages": [],
+      "cpu_ms": 2600,
+      "repeats": {
+        "wall_ms": [
+          12814,
+          1808,
+          1871
+        ],
+        "cpu_ms": [
+          26818,
+          2494,
+          2600
+        ],
+        "heartbeats": [
+          16579246,
+          16579290,
+          16579308
+        ]
+      }
+    }
+  ]
+}

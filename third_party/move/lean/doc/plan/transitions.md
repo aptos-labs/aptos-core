@@ -128,6 +128,86 @@ reading the executable unit, a precondition or memory, so all of it is still in
 the tree. And the global-invariant scheme, which the same file designed, is not
 implemented at all.
 
+### What it cost, and the decision to withdraw it (2026-11-13)
+
+The certified carriers are being withdrawn. The forward plan is
+[`plain-values.md`](plain-values.md); this section records the measurements
+that decided it. Line counts are Lean source of `verex-ir` without tests.
+
+| State | Source lines | OrderedMap verified | OrderedMap heartbeats | Certification | Problems verified | Framework sample verified |
+|---|---:|---:|---:|---:|---:|---:|
+| Before the carriers (2026-11-03 to 11-05) | 157.8k | 17 of 17 | 757M | 83M | 30 of 31 | 382 |
+| Carriers, last checkpoint before the merge (2026-11-08) | | red | | | 17 of 31 | 244 |
+| Carriers as merged (2026-11-10) | 175.4k | 15 of 17, timed out | 2872M | 190M | 29 of 31 | |
+| Nominal invariant sorts, last measured state (2026-11-13, never committed) | 229.9k, of which the Rust work is 18.5k | 15 of 17 | 1143M | 265M | not run | not run |
+
+Over all 31 problems of the benchmark the verification phase went from 4.97G
+heartbeats at the reference to 10.01G with the carriers as merged, and
+certification from 0.98G to 1.44G.
+
+The reference row is the benchmark of CI run 41770462997, on commit
+`73672a3e3c7` (2026-11-03). Test expectations are taken from `81ad86eb3ee`
+(2026-11-05), the last tree before the carriers; the two are different
+commits. The last row is not like for like: its `OrderedMap` fixture had
+adapted authored proofs and a staged option enabled, two targets rejected, so
+1143M is not the cost of 17 proofs, and the full gate was never run on that
+state.
+
+The measurement that decided the carriers was
+`primary_fungible_store::deposit`, at 2 374M heartbeats. It was not measured
+again after the carriers landed. The module timed out as a whole at the last
+checkpoint before the merge.
+
+What the carriers added, by mechanism:
+
+- **Two layers of every value.** A certified value and its plain layer are two
+  terms, and so are their types, their projections and the families that
+  interpret them. `forget`, `ofDeepHolds`, `plainOf`, `certificateFree`, the
+  respellings and the family transports exist to relate them. Most failures
+  after the transition were a normal form that erased the layer a later step
+  read.
+- **A second obligation system beside the first.** The memory predicate was
+  kept for the declarations a carrier cannot state, so both are in the tree.
+- **Inhabitants.** A certified type can be empty, which needed
+  `DataInvariantsSatisfiable`, `CarriersNonempty` and three spellings of an
+  element default.
+- **Generic bodies.** A type parameter needed a lent layer, the `Skolems`
+  transports of certificates, and then the Given frame, whose interpretation
+  is incomplete.
+- **Fact extraction at leaves.** A read owes nothing, but a leaf that uses an
+  invariant has to produce it from the value's certificate. That production
+  was 12 to 24% of the `OrderedMap` scenario targets.
+
+The nominal invariant sorts (2026-11-11 to 11-13) were an attempt to keep the
+carrier model and remove its cost, by giving each declaration a generated
+closed sort and open sort in place of the subtype. They recovered part of the
+regression (`OrderedMap` 1811M to 1143M on one tree) and did not reach the
+reference. They added about 32k lines that were never committed. Generation
+raised a unit's setup from 0.64M to about 102M heartbeats and its declarations
+from 14 to 397, and an invariant-free declaration paid about 30M of that. Each
+remaining failure had a cause of its own, so the count of red targets gave no
+estimate of the work left. The plan and its status record are
+[`nominal-invariant-sorts.md`](nominal-invariant-sorts.md) and
+[`../status/nominal-invariant-sorts.md`](../status/nominal-invariant-sorts.md),
+both closed.
+
+Two things about the process, kept as rules in the plan:
+
+- The carriers were built without a sizing. The problem statement of
+  2026-11-05 named a narrow change, owing the invariant where a global loan
+  dies and deleting the memory predicate's search, and named the carrier as
+  the unsized alternative. The first checkpoint of the carriers followed a day
+  later with suites red, and the narrow change was not measured.
+- No state was held green. The carriers merged at 3.8 times the reference
+  cost, later figures were compared with that state and not with the
+  reference, and the last three days of work lived in scratch copies.
+
+What the period found that stands, whatever the representation: the Move
+Prover does not check a `&mut` argument's invariant at a hand-over, so the
+verifier must; the death of a reborrow through a reference has to check the
+invariant of the value it writes back before any equation states it; a
+mutation through a global borrow needs its own obligation where the loan dies.
+
 ## The proof language (2026-10 → 2026-11)
 
 Authored proofs were Lean tactic scripts over the leaves `verex_obligations`

@@ -1,5 +1,24 @@
 # Data invariants as part of a type
 
+> **Being replaced.** This document describes the certified carriers, which
+> are what the source does today. The representation is withdrawn: a value
+> returns to its plain carrier and a data invariant becomes a condition. The
+> cuts this document describes are kept as steps that owe the invariant, the
+> missing ones are added, and a value's invariant is a stated fact where the
+> value is received. The plan is
+> [`../plan/plain-values.md`](../plan/plain-values.md), and this document is
+> rewritten when the source changes. Until then:
+>
+> - The sections on where an obligation falls stay the design: "Two kinds,
+>   kept apart", "Where a value is made", "Open while lent, repacked where the
+>   loan dies", "A call boundary", "A returned reference".
+> - "A borrowed path" is unsound where it says that the death of a reborrow
+>   through a reference owes nothing. It owes the invariant of the value it
+>   writes back.
+> - The sections on the two families of carriers, on inhabitants, on what a
+>   read owes, on generic declarations and on the storage ledger entry describe
+>   what is being removed.
+
 A data invariant is a property of a struct or enum value that is part of what
 it means for the value to be of its type, as an integer's range is part of
 being a `u64`. This document describes how the verifier carries that property:

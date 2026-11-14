@@ -6,6 +6,22 @@ what is open in [`data-and-global-invariants.md`](data-and-global-invariants.md)
 and what [`native-nominal-types.md`](native-nominal-types.md) designs, and it
 takes precedence over the order either of them suggests.
 
+> **Superseded as the order of work by [`plain-values.md`](plain-values.md)
+> (2026-11-13).** The certified carriers this plan follows are withdrawn.
+>
+> - The goal, the principles and "Target: the leaf's normal form" stand and
+>   are that plan's too. With a plain carrier the Layer axis of the diagnosis
+>   has no second spelling left.
+> - D2 (a generic callee at the caller's row), D3 (a narrow family literal)
+>   and the one element default of D4 are landed and kept.
+> - D1 keeps the subtype as the semantic carrier and is withdrawn. Its leaf
+>   form, a plain value with one folded fact, is the form of an invariant in
+>   the new plan.
+> - S3 and S7 do not apply. S4, S5, S9 and S10 are the nominal track of the
+>   new plan, without certification. S6's single producers remain open items.
+> - [`nominal-invariant-sorts.md`](nominal-invariant-sorts.md), which took
+>   precedence over D1 and S4–S5 for a time, is closed.
+
 ## Goal
 
 1. Every suite passes: the four Lean suites, the Move Prover's lean gate, the

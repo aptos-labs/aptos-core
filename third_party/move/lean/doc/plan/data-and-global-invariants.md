@@ -14,6 +14,23 @@ A declaration is cited by name, with its file relative to
 `third_party/move/lean/verex-ir`. The Move Prover's sources and the fixtures
 named as reproducers are relative to `third_party/move`.
 
+> **Revised by [`plain-values.md`](plain-values.md) (2026-11-13).** The
+> certified carriers are withdrawn, which changes what is open here:
+>
+> - "The stored-invariant layer still exists…" changes its direction: what is
+>   removed is the certified representation of a value, not the obligation of
+>   the carriers' cuts. The predicate over memory stays for behavioural
+>   clauses. How a stored value is checked and assumed is being designed.
+> - "`constructedAt` and `mutationEndAt` are emitted where they check nothing"
+>   stays open. These markers are no step of the denotation, so a condition
+>   behind one is the solver's check and not part of the theorem.
+> - "Failures the certified carriers introduced against main" is scheduled to
+>   close with the second spelling. Each problem closes only when its
+>   reproducer passes.
+> - "Global invariants are not implemented", "The native models are not
+>   audited for data invariants", "Behavioural clauses inside a data
+>   invariant" and the three single problems after it stand as written.
+
 ## The stored-invariant layer still exists for the declarations the carriers do not state
 
 **What is missing.** The whole machinery that states the data invariants of
