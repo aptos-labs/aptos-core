@@ -51,9 +51,9 @@ use mono_move_core::{
     },
     BytecodeOffset, CallClosureOp, CallFrame, CmpKind, CodeOffset, ConstantPoolIndex,
     ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef, GasMeter,
-    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
-    PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult, VecPackOp,
-    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, InterruptedError, MicroOp,
+    PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult,
+    VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
     CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
@@ -744,6 +744,9 @@ pub struct InterpreterContext<'guard> {
     /// Read-set of the modules loaded by this transaction.
     read_set: ModuleReadSet<'guard>,
     pub(crate) gas_meter: GasMeter,
+    /// Whether this session raised an [`InterruptedError`], however the error
+    /// was handled afterwards.
+    interrupted: bool,
     /// A process-wide global native function table.
     natives: &'guard ProductionNativeRegistry,
     /// Per-transaction native extensions, shared across native calls.
@@ -843,6 +846,7 @@ impl<'guard> InterpreterContext<'guard> {
             loader,
             read_set: ModuleReadSet::new(),
             gas_meter,
+            interrupted: false,
             natives,
             extensions: NativeExtensions::new(),
             resource_provider,
@@ -1013,6 +1017,12 @@ impl<'guard> InterpreterContext<'guard> {
         self.gas_meter.balance()
     }
 
+    /// Whether this session was interrupted on request of the resource
+    /// provider. Its effects must not be published.
+    pub fn is_interrupted(&self) -> bool {
+        self.interrupted
+    }
+
     /// Consumes the context, returning the transaction's side effects for
     /// publication. The effects are copied out of the session heap into a
     /// buffer sized to what the session allocated, which is then frozen into
@@ -1028,6 +1038,7 @@ impl<'guard> InterpreterContext<'guard> {
             loader,
             read_set: _,
             gas_meter: _,
+            interrupted: _,
             natives: _,
             extensions,
             resource_provider: _,
@@ -1075,9 +1086,13 @@ impl<'guard> InterpreterContext<'guard> {
     /// Runs `f` with gas metering suspended: the meter is swapped for an
     /// effectively unbounded one and restored afterwards, so loads and
     /// execution inside `f` never touch the transaction's budget. Used for
-    /// system code (prologue, epilogue) that runs unmetered by design.
+    /// system code (prologue, epilogue) that runs unmetered by design. The
+    /// swapped-in meter keeps the chunk size, so a session that polls for
+    /// interrupts keeps polling inside `f`.
     pub fn unmetered<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
-        let saved = std::mem::replace(&mut self.gas_meter, GasMeter::with_max_budget());
+        let unbounded =
+            GasMeter::with_max_budget().with_interrupt_polling(self.gas_meter.chunk_size());
+        let saved = std::mem::replace(&mut self.gas_meter, unbounded);
         let result = f(self);
         self.gas_meter = saved;
         result
@@ -1123,6 +1138,7 @@ impl<'guard> InterpreterContext<'guard> {
         self.read_write_set = ResourceReadWriteSet::new();
         self.root_pool = RootPool::new();
         self.gas_meter.reset(gas_budget);
+        self.interrupted = false;
         self.rng = StdRng::seed_from_u64(0);
     }
 
@@ -1187,12 +1203,7 @@ impl<'guard> InterpreterContext<'guard> {
 // in one place.
 //
 // `#[inline(always)]` ensures the closures and the helper itself are
-// folded into the caller in release builds. Inlining verified by
-// inspecting the release-build x64 asm for `step::<SimpleGasMeter>` on
-// 2026-04-30: zero standalone definitions for any helper or closure,
-// zero call/jmp instructions targeting them, and individual arms
-// compile to a handful of direct memory ops (e.g. AddU64 is 4 movs +
-// addq + jae + jmp).
+// folded into the caller in release builds.
 //
 // TODO(perf): re-verify inlining after non-trivial changes to the helpers,
 // the call sites, or the rustc/LLVM versions the workspace pins to.
@@ -1716,6 +1727,28 @@ unsafe fn int_cmp_bool(fp: *mut u8, lhs: FrameOffset, op: CmpKind, rhs: &IntOper
 // ---------------------------------------------------------------------------
 
 impl InterpreterContext<'_> {
+    /// Charges `amount` units at a jump, a call, or the entry of a run. Every
+    /// loop iteration and every recursion passes one of these.
+    #[inline(always)]
+    fn charge_gas(&mut self, amount: u64) -> VMResult<()> {
+        if self.gas_meter.try_charge_in_chunk(amount) {
+            return Ok(());
+        }
+        self.charge_gas_slow(amount)
+    }
+
+    /// Runs once per gas chunk: polls for an interrupt, then starts the next
+    /// chunk or runs out of gas.
+    #[cold]
+    #[inline(never)]
+    fn charge_gas_slow(&mut self, amount: u64) -> VMResult<()> {
+        if self.gas_meter.polls_interrupts() && self.resource_provider.interrupt_requested() {
+            self.interrupted = true;
+            return Err(InterruptedError.into());
+        }
+        Ok(self.gas_meter.charge(amount)?)
+    }
+
     /// Shared body of the conditional `Jump*` micro-ops: charge the chosen
     /// edge's cost, then jump to `target` or fall through to the next pc.
     #[inline(always)]
@@ -1728,10 +1761,10 @@ impl InterpreterContext<'_> {
         regs: &mut VMRegisters,
     ) -> VMResult<()> {
         if cond {
-            self.gas_meter.charge(gas_taken)?;
+            self.charge_gas(gas_taken)?;
             regs.pc = target.into();
         } else {
-            self.gas_meter.charge(gas_fallthrough)?;
+            self.charge_gas(gas_fallthrough)?;
             regs.pc += 1;
         }
         Ok(())
@@ -1780,7 +1813,7 @@ impl InterpreterContext<'_> {
     fn dispatch_loop(&mut self, regs: &mut VMRegisters) -> VMResult<RuntimeStatus> {
         // Charge the entry function's entry block before any of its instructions run.
         let entry_gas = unsafe { regs.func.as_ref() }.entry_gas;
-        self.gas_meter.charge(entry_gas)?;
+        self.charge_gas(entry_gas)?;
 
         Ok(loop {
             // SAFETY: Current function is always a valid, non-null pointer because
@@ -2135,7 +2168,7 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::Jump { target, gas } => {
-                        self.gas_meter.charge(gas)?;
+                        self.charge_gas(gas)?;
                         regs.pc = target.into();
                         continue;
                     },
@@ -3589,7 +3622,7 @@ impl InterpreterContext<'_> {
         flag: FrameFlag,
     ) -> VMResult<()> {
         // Charge the callee's entry block before any of its instructions run.
-        self.gas_meter.charge(callee.entry_gas)?;
+        self.charge_gas(callee.entry_gas)?;
         unsafe {
             // Zero everything beyond parameters (locals, metadata, callee
             // arg/return region) so pointer slots start as null.

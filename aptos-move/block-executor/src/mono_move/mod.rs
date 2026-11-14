@@ -233,6 +233,8 @@ impl MonoTxnOutput {
                 //   should be handled at execution time!
                 TxnOutcome::UnexpectedSystemTransactionFailure(_) => None,
                 TxnOutcome::Panic(_) => None,
+                // Never stored: `execute` reports it as a speculative failure.
+                TxnOutcome::Interrupted => None,
             },
             MonoTxnOutput::SkippedToRetry => None,
         }
@@ -336,6 +338,8 @@ impl TxnOutput for MonoTxnOutput {
                 TxnOutcome::ExecutedNoEffects(_) => FeeStatement::zero(),
                 TxnOutcome::UnexpectedSystemTransactionFailure(_) => FeeStatement::zero(),
                 TxnOutcome::Panic(_) => FeeStatement::zero(),
+                // Never stored: `execute` reports it as a speculative failure.
+                TxnOutcome::Interrupted => FeeStatement::zero(),
             },
             MonoTxnOutput::SkippedToRetry => FeeStatement::zero(),
         }
@@ -474,6 +478,16 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             return Err(code_invariant_error(format!(
                 "MonoMove: could not close the session: {err:?}"
             )));
+        }
+
+        // Like the v1 VM, an interrupted execution is a speculative failure and
+        // its effects are dropped.
+        //
+        // TODO(perf): with parallel execution, the interrupted run's write keys
+        // could serve as estimates for what the re-execution writes. The
+        // outcome would need to carry them.
+        if matches!(outcome, TxnOutcome::Interrupted) {
+            return Ok((ExecutionStatus::SpeculativeFailure, MonoReads));
         }
 
         // A reconfiguration (new epoch) event cuts the block early. Record this
