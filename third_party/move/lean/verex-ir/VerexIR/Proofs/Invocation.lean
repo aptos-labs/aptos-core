@@ -247,7 +247,7 @@ theorem closureRun_defined {unit : ValidatedUnit} [FunctionCarriers unit]
   have encoded : (resultCodec shape).encode result = values :=
     Option.some.inj ((ResultShape.lend_encode shape shapeFree result).symm.trans lend_result)
   rw [← encoded] at undecoded
-  exact undecoded ⟨result, args, [], lent,
+  exact undecoded ⟨result, args, [], HList.ResolvedHolds.refl σs args, lent,
     ⟨LoanCorrespondence.valid_nil,
       by simpa using NRow.corresponds_refFree [] σs free args,
       ResultShape.corresponds_refFree [] shape shapeFree result,
@@ -337,21 +337,10 @@ variable [Carriers]
 any other argument's encoding. -/
 noncomputable def Denote.HList.entries : {row : NRow} → HList row → List RuntimeValue
   | .nil, _ => []
-  | .cons (.ref σ) _, values => σ.plainEncode values.1.1 :: HList.entries values.2
+  | .cons (.ref σ) _, values => σ.encode values.1.1 :: HList.entries values.2
   | .cons (.sliceRef σ) _, values =>
       (NTy.vector σ).encode values.1.currentVector :: HList.entries values.2
   | .cons τ _, values => τ.encode values.1 :: HList.entries values.2
-
-/-- The values a plain row of arguments passes, as a settled row is
-(`HList.settle`). -/
-noncomputable def Denote.HListPlain.entries : {row : NRow} → HListPlain row → List RuntimeValue
-  | .nil, _ => []
-  | .cons (.ref σ) _, values => σ.plainEncode values.1.1 :: HListPlain.entries values.2
-  -- A slice reference passes its current reading alone, as `HList.entries`
-  -- has it.
-  | .cons (.sliceRef σ) _, values =>
-      (NTy.vector σ).plainEncode values.1.currentVector :: HListPlain.entries values.2
-  | .cons τ _, values => τ.plainEncode values.1 :: HListPlain.entries values.2
 
 /-- The entry values of a row of arguments hold no loan. -/
 theorem Denote.HList.entries_plain : (row : NRow) → (values : HList row) →
@@ -362,32 +351,26 @@ theorem Denote.HList.entries_plain : (row : NRow) → (values : HList row) →
         rcases member with rfl | member <;>
         first
           | exact NTy.encode_plain _ _
-          | exact NTy.plainEncode_plain _ _
           | exact HList.entries_plain rest values.2 entry member
 
 /-- Settled arguments pass the arguments' entry values. -/
 theorem Denote.HList.entries_settle : (row : NRow) → (values : HList row) →
-    HListPlain.entries (HList.settle row values) = HList.entries values
+    HList.entries (HList.settle row values) = HList.entries values
   | .nil, _ => rfl
   | .cons τ rest, values => by
       have later := Denote.HList.entries_settle rest values.2
       cases τ <;>
-        simp only [HList.settle, HList.entries, HListPlain.entries, later] <;>
-        first
-          | rfl
-          | rw [show NTy.settle _ values.1 = NTy.forget _ values.1 from rfl,
-              NTy.plainEncode_forget]
-          | exact congrArg (· :: _) (NTy.plainEncode_forget (.vector _) values.1.currentVector)
+        simp only [HList.settle, HList.entries, NTy.settle, later] <;>
+        rfl
 
 /-- Settling is idempotent. -/
 theorem Denote.HList.settle_settle : (row : NRow) → (values : HList row) →
-    HListPlain.settle row (HList.settle row values) = HList.settle row values
+    HList.settle row (HList.settle row values) = HList.settle row values
   | .nil, _ => rfl
   | .cons τ rest, values => by
       have later := Denote.HList.settle_settle rest values.2
       cases τ <;>
-        simp only [HList.settle, HListPlain.settle, NTy.settle, NTy.settlePlain, NTy.forget,
-          later] <;>
+        simp only [HList.settle, NTy.settle, later] <;>
         rfl
 
 /-- A result's values as a run returns them, read as `readResults` reads
@@ -395,7 +378,7 @@ them: a returned mutable reference as its current value. -/
 noncomputable def Denote.ResultShape.current : (shape : ResultShape) → shape.carrier →
     Array RuntimeValue
   | .none, _ => #[]
-  | .one (.ref σ), value => #[σ.plainEncode value.1]
+  | .one (.ref σ), value => #[σ.encode value.1]
   | .one (.sliceRef σ), value => #[(NTy.vector σ).encode value.currentVector]
   | .one τ, value => #[τ.encode value]
 
@@ -406,7 +389,7 @@ theorem Denote.ResultShape.current_plain : (shape : ResultShape) → (result : s
   | .one τ, result, value, member => by
       cases τ <;> simp only [ResultShape.current, List.mem_toArray, List.mem_singleton] at member <;>
         subst member <;>
-        first | exact NTy.encode_plain _ _ | exact NTy.plainEncode_plain _ _
+        exact NTy.encode_plain _ _
 
 /-- Settled results read as the same values are equal. -/
 theorem Denote.ResultShape.eq_of_current : (shape : ResultShape) → {result result' : shape.carrier} →
@@ -418,10 +401,9 @@ theorem Denote.ResultShape.eq_of_current : (shape : ResultShape) → {result res
       cases τ with
       | ref σ =>
           simp only [ResultShape.current, ResultShape.Settled, List.toList_toArray,
-            List.cons.injEq, and_true, NTy.plainEncode,
+            List.cons.injEq, and_true, NTy.encode,
             Codec.encode_eq_encode] at listed settled settled'
-          refine Prod.ext listed (NTy.encode_injective σ ?_)
-          rw [← NTy.plainEncode_forget, ← NTy.plainEncode_forget, ← settled, ← settled', listed]
+          exact Prod.ext listed (settled.symm.trans (listed.trans settled'))
       | sliceRef σ =>
           have current : result.currentVector = result'.currentVector := by
             simpa only [ResultShape.current, List.toList_toArray, List.cons.injEq,
@@ -451,7 +433,7 @@ theorem Denote.NRow.lend_lentFlat : (row : NRow) → row.lentFlat = true → (va
           | nil => rfl
           | cons loan loans =>
               simp only [NRow.lend, NTy.lend, Bool.false_eq_true, if_false,
-                NTy.plainLend_refFree σ flat.1, Option.map_some,
+                NTy.lend_refFree σ flat.1, Option.map_some,
                 Option.bind_some, NRow.mutable, HList.entries,
                 lendMutable, NRow.lend_lentFlat rest flat.2 values.2 loans, ite_false]
       | sliceRef σ =>
@@ -492,7 +474,7 @@ theorem Denote.ResultShape.lend_settled : (shape : ResultShape) → shape.row.le
           simp only [ResultShape.Settled] at settled
           simp only [ResultShape.row, NRow.lentFlat, Bool.and_true] at flat
           cases loans <;>
-            simp [ResultShape.lend, NTy.lend, settled, NTy.plainLend_refFree σ flat]
+            simp [ResultShape.lend, NTy.lend, settled, NTy.lend_refFree σ flat]
       | sliceRef σ =>
           change result.currentVector = result.finalVector at settled
           cases loans <;> simp [ResultShape.lend, NTy.lend, settled]
@@ -517,13 +499,13 @@ theorem Denote.ResultShape.readResults_lend : (shape : ResultShape) → shape.ro
           | [], lent => simp [ResultShape.lend, NTy.lend] at lent
           | loan :: rest, lent =>
               cases rest <;> simp only [ResultShape.lend, NTy.lend, Bool.false_eq_true, if_false,
-                NTy.plainLend_refFree σ flat,
+                NTy.lend_refFree σ flat,
                 Option.map_some, Option.some.injEq, reduceCtorEq] at lent
               subst lent
-              simp only [NRow.mutable, List.toList_toArray, readResults, ite_false,
-                RuntimeValue.observe,
-                RuntimeValue.observe_of_plain (NTy.plainEncode_plain σ result.1),
-                ResultShape.current, NTy.plainEncode]
+              simp only [NRow.mutable, List.toList_toArray, readResults,
+                RuntimeValue.observe, ResultShape.current]
+              exact congrArg List.singleton
+                (RuntimeValue.observe_of_plain (NTy.encode_plain σ result.1))
       | sliceRef σ =>
           match loans, lent with
           | [], lent => simp [ResultShape.lend, NTy.lend] at lent
@@ -531,9 +513,8 @@ theorem Denote.ResultShape.readResults_lend : (shape : ResultShape) → shape.ro
               cases rest <;> simp only [ResultShape.lend, NTy.lend,
                 Option.some.injEq, reduceCtorEq] at lent
               subst lent
-              simp only [NRow.mutable, List.toList_toArray, readResults, ite_false,
-                RuntimeValue.observe, RuntimeValue.observe_of_plain
-                  (NTy.encode_plain (.vector σ) result.currentVector), ResultShape.current]
+              simp only [NRow.mutable, List.toList_toArray, readResults,
+                RuntimeValue.observe, ResultShape.current]
               exact congrArg List.singleton
                 (RuntimeValue.observe_of_plain (NTy.encode_plain (.vector σ) result.currentVector))
       | _ =>
@@ -560,11 +541,11 @@ theorem Denote.ResultShape.corresponds_lend_flat (correspondence : LoanCorrespon
           simp only [ResultShape.row, NRow.lentFlat, Bool.and_true] at flat
           obtain ⟨loan, current, final, rfl, _, currentRelated, _⟩ := related
           have currentEq :=
-            (NTy.plainCorresponds_refFree_iff correspondence σ flat result.1 current).mp
+            (NTy.corresponds_refFree_iff correspondence σ flat result.1 current).mp
               currentRelated
           subst current
           exact ⟨[loan], by
-            simp [ResultShape.lend, NTy.lend, NTy.plainLend_refFree σ flat]⟩
+            simp [ResultShape.lend, NTy.lend, NTy.lend_refFree σ flat]⟩
       | sliceRef σ =>
           obtain ⟨loan, rfl, _⟩ := related
           exact ⟨[loan], rfl⟩
@@ -1061,7 +1042,7 @@ arguments of its own entry values: `aborts_of` as a clause states it
 theorem not_abortsOfEntries_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
     {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
     {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
-    {args : HList σs} {entries : HListPlain σs} (same : HList.settle σs args = entries)
+    {args : HList σs} {entries : HList σs} (same : HList.settle σs args = entries)
     {state post : Memory unit} {result : shape.carrier}
     (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post) :
     ¬AbortsOfEntries (closureMeaning executable) σs shared shape function entries state := by
@@ -1095,7 +1076,7 @@ arguments of the same entry values. -/
 theorem resultOf_eq_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
     {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
     {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
-    (shapeFlat : shape.row.lentFlat = true) {args : HList σs} {entries : HListPlain σs}
+    (shapeFlat : shape.row.lentFlat = true) {args : HList σs} {entries : HList σs}
     (same : HList.settle σs args = entries) {state post : Memory unit}
     {result : shape.carrier}
     (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post)
@@ -1114,7 +1095,7 @@ of the same entry values that returns a settled result. -/
 theorem stateOf_eq_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
     {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
     {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
-    (shapeFlat : shape.row.lentFlat = true) {args : HList σs} {entries : HListPlain σs}
+    (shapeFlat : shape.row.lentFlat = true) {args : HList σs} {entries : HList σs}
     (same : HList.settle σs args = entries) {state post : Memory unit}
     {result : shape.carrier}
     (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post)
@@ -1846,7 +1827,7 @@ theorem FramedAt.ofVerified {unit : ValidatedUnit} [FunctionCarriers unit]
   obtain ⟨valid, assumed, permitted⟩ := held args pre memoryTyped
   exact framed args pre post result
     (ensuresOf_closureOf_verified weave capturedFree coherent captures args verified ensures closed
-      assumed permitted valid).2.1
+      assumed permitted valid).2.2.1
 
 end Rows
 

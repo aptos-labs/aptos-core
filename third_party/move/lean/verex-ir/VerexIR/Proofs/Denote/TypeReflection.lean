@@ -126,9 +126,9 @@ def NTy.aggregatorMax : NTy → Int
   | .int width _ => 2 ^ width - 1
   | _ => 0
 
-/-- An aggregator element's integer at the plain layer: the native model
-reads fields and values through this one observation. -/
-def NTy.aggregatorValuePlain : (τ : NTy) → @NTy.plain (Carriers.runtime unit) τ → Int
+/-- An aggregator element's integer: the native model reads fields and
+values through this one observation. -/
+def NTy.aggregatorValue : (τ : NTy) → @NTy.carrier (Carriers.runtime unit) τ → Int
   | .int _ _, value => SpecInt.val value
   | _, _ => 0
 
@@ -140,10 +140,10 @@ def Skolems.isAggregatorElement (Θ : Skolems unit) (τ : NTy) : Bool :=
 def Skolems.aggregatorMax (Θ : Skolems unit) (τ : NTy) : Int :=
   (Θ.resolve τ).aggregatorMax
 
-/-- `NTy.aggregatorValuePlain` of a lent value of a frame. -/
-def Skolems.aggregatorValuePlain (Θ : Skolems unit) (τ : NTy)
-    (value : @NTy.plain Θ.toCarriers τ) : Int :=
-  NTy.aggregatorValuePlain (Θ.resolve τ) (Θ.plainToRuntime τ value)
+/-- `NTy.aggregatorValue` of a value of a frame. -/
+def Skolems.aggregatorValue (Θ : Skolems unit) (τ : NTy)
+    (value : @NTy.carrier Θ.toCarriers τ) : Int :=
+  NTy.aggregatorValue (Θ.resolve τ) (Θ.toRuntime τ value)
 
 @[vir_denote, vir_denote_norm] theorem Skolems.isAggregatorElement_instantiate
     (θ : TypeArgs) (Θ : Skolems unit) (τ : NTy) :
@@ -153,15 +153,14 @@ def Skolems.aggregatorValuePlain (Θ : Skolems unit) (τ : NTy)
     (θ : TypeArgs) (Θ : Skolems unit) (τ : NTy) :
     (Skolems.instantiate θ Θ).aggregatorMax τ = Θ.aggregatorMax (τ.subst θ.1) := rfl
 
-@[vir_denote, vir_denote_norm] theorem Skolems.aggregatorValuePlain_instantiate
+@[vir_denote, vir_denote_norm] theorem Skolems.aggregatorValue_instantiate
     (θ : TypeArgs) (Θ : Skolems unit) (τ : NTy)
-    (value : @NTy.plain (Skolems.instantiate θ Θ).toCarriers τ) :
-    (Skolems.instantiate θ Θ).aggregatorValuePlain τ value =
-      Θ.aggregatorValuePlain (τ.subst θ.1)
-        (@NTy.plainOfSkolem Θ.toCarriers inferInstance θ τ value) := rfl
+    (value : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers τ) :
+    (Skolems.instantiate θ Θ).aggregatorValue τ value =
+      Θ.aggregatorValue (τ.subst θ.1)
+        (@NTy.ofSkolem Θ.toCarriers θ τ value) := rfl
 
-@[vir_denote, vir_denote_norm] theorem Skolems.isAggregatorElement_runtime
-    [CarriersNonempty (Carriers.runtime unit)] (τ : NTy) :
+@[vir_denote, vir_denote_norm] theorem Skolems.isAggregatorElement_runtime (τ : NTy) :
     (Skolems.runtime unit).isAggregatorElement τ = τ.isAggregatorElement := rfl
 
 @[vir_denote, vir_denote_norm] theorem Skolems.isAggregatorElement_int (Θ : Skolems unit)
@@ -174,14 +173,14 @@ def Skolems.aggregatorValuePlain (Θ : Skolems unit) (τ : NTy)
     Θ.aggregatorMax (.int width signed) = 2 ^ width - 1 := by
   simp only [Skolems.aggregatorMax, Θ.resolve_int, NTy.aggregatorMax]
 
-/-- At an integer type every frame's plain value is the integer itself. -/
-@[vir_denote, vir_denote_norm] theorem Skolems.aggregatorValuePlain_int (Θ : Skolems unit)
+/-- At an integer type every frame's value is the integer itself. -/
+@[vir_denote, vir_denote_norm] theorem Skolems.aggregatorValue_int (Θ : Skolems unit)
     (width : Nat) (signed : Bool) (value : SpecInt (.bits width) signed) :
-    Θ.aggregatorValuePlain (.int width signed) value = value.val := by
-  have encoded := Θ.plainEncode_plainToRuntime (.int width signed) value
+    Θ.aggregatorValue (.int width signed) value = value.val := by
+  have encoded := Θ.encode_toRuntime (.int width signed) value
   have resolved := Θ.resolve_int width signed
-  unfold Skolems.aggregatorValuePlain
-  generalize Θ.plainToRuntime (.int width signed) value = moved at encoded ⊢
+  unfold Skolems.aggregatorValue
+  generalize Θ.toRuntime (.int width signed) value = moved at encoded ⊢
   generalize Θ.resolve (.int width signed) = τ at resolved moved encoded ⊢
   subst resolved
   have same := RuntimeValue.integer.inj encoded

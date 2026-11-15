@@ -87,17 +87,16 @@ theorem ResultShape.encode_plain : (shape : ResultShape) → (value : shape.carr
 actual returned reference. -/
 theorem LoanCorrespondence.returnedRow_ref_settled (loans : LoanCorrespondence)
     {σ : NTy} (free : σ.refFree = true) (value : (NTy.ref σ).carrier)
-    (settled : value.1 = σ.forget value.2) {raw : RuntimeValue}
+    (settled : value.1 = value.2) {raw : RuntimeValue}
     (related : NTy.corresponds loans (.ref σ) value raw) :
     loans.returnedRow #[raw] = #[raw] := by
   obtain ⟨loan, current, final, rfl, found, currentRelated, finalRelated⟩ := related
-  have currentEq :=
-    (NTy.plainCorresponds_refFree_iff loans σ free value.1 current).mp currentRelated
+  have currentEq := (NTy.corresponds_refFree_iff loans σ free value.1 current).mp currentRelated
   have finalEq := (NTy.corresponds_refFree_iff loans σ free value.2 final).mp finalRelated
   subst current
   subst final
-  rw [← NTy.plainEncode_forget σ value.2, ← settled] at found
-  exact loans.returnedRow_singleBorrow (NTy.plainEncode_plain σ value.1) found
+  rw [← settled] at found
+  exact loans.returnedRow_singleBorrow (NTy.encode_plain σ value.1) found
 
 theorem LoanCorrespondence.returnedRow_slice_settled (loans : LoanCorrespondence)
     {σ : NTy} (value : (NTy.sliceRef σ).carrier)

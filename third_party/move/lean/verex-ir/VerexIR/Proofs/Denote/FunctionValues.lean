@@ -15,23 +15,12 @@ sites before its instance exists; the closures of a function type no site
 encodes (`ForeignClosure`); and the laws relating the codecs, which the
 generated laws instantiate.
 
-The codecs agree with the base frame's (`Carriers.runtime`): at a concrete
-type, `NTy.carrierWith unit (FunctionCarriers.carrier unit) τ` is the base
-frame's carrier by definition, and the codecs are the base frame's at the
-instance's function arm.
-
-That definitional equality now holds only away from a struct, a variant and
-a reference. `NTy.carrierWith` is a *plain* family — a struct is its field
-row, a variant its row under its name — while the base frame's carrier of
-such a type is certified by its data invariant (`NTy.carrier`,
-`doc/designs/data-invariants.md`): `{ row : HListPlain fields //
-NTy.deepHolds … row }` at a struct, and `σ.plain × σ.carrier` at a
-reference. A generated family whose site captures a struct, a variant or a
-reference therefore spells a carrier the base frame does not have, and its
-`carrier…` equation does not close by `rfl`. Reconciling the two families —
-either by mirroring the certified one here or by certifying once where a
-decoded capture becomes a carrier value — is open, and the generator
-(`VerexSL/Verify/FunctionValues.lean`) changes with it.
+The carriers and codecs agree with the base frame's (`Carriers.runtime`) at
+every native type: `NTy.carrierWith unit (FunctionCarriers.carrier unit) τ`
+is `@NTy.carrier (Carriers.runtime unit) τ` by definition, and the codecs
+are the base frame's at the instance's function arm, while parameterizing
+explicitly over the function arm avoids a typeclass cycle before
+`FunctionCarriers unit` is constructed.
 -/
 
 namespace VerexIR.Proofs.Denote
@@ -1003,8 +992,8 @@ private theorem and_right {left right : Bool} (both : (left && right) = true) : 
 
 include admitted in
 mutual
-/-- An encoding admits its type, where the function arm's below the bound
-admit theirs. -/
+/-- An encoding admits its type, where the function arm's encodings below
+the bound are admitted at theirs. -/
 theorem NTy.admits_encodeWith : (τ : NTy) → (value : τ.carrierWith unit C) →
     sizeOf (NTy.encodeWith encode τ value) < bound →
     τ.supported (NominalCarriers.supports unit) = true →
@@ -2098,27 +2087,25 @@ theorem encode_site_eq (index : Fin Φ.sites.length)
 
 /-- At the base frame, construction is the value whose closure it creates:
 a site's constructor where the closure is the site's (`encode_site_eq`),
-whatever its instantiation.  The base frame is the runtime family, so the
-unit's inhabitants are assumed here as everywhere a frame is built
-(`Skolems.runtime`); the data invariants the family carries play no part. -/
+whatever its instantiation (`Skolems.runtime`); the data invariants the
+family carries play no part. -/
 theorem construct_eq {own : StructHandle → NRow → RuntimeValue → Prop}
-    [@CarriersNonempty (@Carriers.runtime unit (Φ.functionCarriers own))]
     {parameters : NRow} {shared : Sharing} {results : NRow}
     {handle : FunctionHandle} {mask : Nat} {typeInstantiation : Array (TypeId × TypeId)}
     {σs : NRow} (captures : @HList (@Carriers.runtime unit (Φ.functionCarriers own)) σs)
     (typed : @SiteTyped unit (Φ.functionCarriers own)
-      (@Skolems.runtime unit (Φ.functionCarriers own) inferInstance)
+      (@Skolems.runtime unit (Φ.functionCarriers own))
       parameters shared results handle mask typeInstantiation σs)
     (value : Φ.F parameters shared results)
     (closed : @closureOf unit (Φ.functionCarriers own)
-      (@Skolems.runtime unit (Φ.functionCarriers own) inferInstance)
+      (@Skolems.runtime unit (Φ.functionCarriers own))
       handle mask typeInstantiation σs captures = Φ.encode value) :
     @Skolems.construct unit (Φ.functionCarriers own)
-      (@Skolems.runtime unit (Φ.functionCarriers own) inferInstance)
+      (@Skolems.runtime unit (Φ.functionCarriers own))
       parameters shared results handle mask typeInstantiation σs captures typed = value :=
   (Φ.functions parameters shared results).closure_injective
     ((@Skolems.closure_construct unit (Φ.functionCarriers own)
-      (@Skolems.runtime unit (Φ.functionCarriers own) inferInstance)
+      (@Skolems.runtime unit (Φ.functionCarriers own))
       parameters shared results handle mask typeInstantiation σs captures typed).trans closed)
 
 end SiteFamily

@@ -529,28 +529,17 @@ def Compiled.some {ρ : ResultShape} {Γ : NRow} : Compiled unit ρ Γ → Σ τ
   | .at τ term => ⟨τ, term⟩
   | .never term => ⟨.unit, term .unit⟩
 
-/-- A copy of a mutable reference's current value: the term that owes the
-data invariants of the referent at `site` where its type carries a
-certificate, and the one that owes nothing where it carries none, which
-the compiler decides of the type (`Term.copy`,
-`doc/designs/data-invariants.md`). -/
+/-- A copy of a mutable reference's current value at `site` (`Term.deref`). -/
 def copyOut {ρ : ResultShape} {Γ : NRow} {τ : NTy} (site : Nat)
     (value : Term unit ρ Γ (.ref τ)) : Term unit ρ Γ τ :=
-  if free : τ.certificateFree = true then .copy value free else .deref site value
+  .deref site value
 
-/-- A read of the component a path reaches: through a dereference, the
-copy that owes the component's data invariants at `site` where its type
-carries a certificate and the one that owes nothing where it carries none;
-without a dereference, the certified read, which owes nothing either way
-(`Term.copyPlace`). -/
+/-- A read of the component a path reaches (`Term.readPlace`). -/
 def readOut {ρ : ResultShape} {Γ : NRow} {τ σ : NTy} (site : Nat) (mismatch : Option Failure)
     (x : Var Γ τ) (path : Proj τ σ) : Term unit ρ Γ σ :=
-  if free : σ.certificateFree = true then
-    if path.hasDeref then .copyPlace mismatch x path free
-    else .readPlace site mismatch x path
-  else .readPlace site mismatch x path
+  .readPlace site mismatch x path
 
-/-- Forget a shared slice's runtime type only while reading its contents. -/
+/-- View a shared slice as a vector only while reading its contents. -/
 def Compiled.sequenceContents {ρ : ResultShape} {Γ : NRow} : Compiled unit ρ Γ → Compiled unit ρ Γ
   | .at (.slice element) value => .at (.vector element) (.sliceVector value)
   | value => value
@@ -998,12 +987,12 @@ explicit `return` leaves through `Flow.return_`, which `Flow.bind` passes on
 without running a continuation, so the certification is stated on the
 returned value itself, before the control outcome is built.  The case is
 decided here, over the result shape the compiler knows, so the denotation
-keeps no case on it.  A certificate-free referent, and a result that is not a
+keeps no case on it.  An invariant-free referent, and a result that is not a
 mutable reference, owe nothing. -/
 def certifiedResult {Γ : NRow} (site : Nat) :
     {shape : ResultShape} → Term unit shape Γ shape.bodyType →
       Term unit shape Γ shape.bodyType
-  | .one (.ref σ), value => if σ.certificateFree then value else .returned site value
+  | .one (.ref σ), value => if σ.invariantFree then value else .returned site value
   | _, value => value
 
 /-- The typed path certificate steps name into a value of a type. -/
@@ -2276,7 +2265,7 @@ mutual
         let head ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel argument).at? σ
         let head : Term unit ρ Γ σ := match σ, head with
           | .ref referent, head =>
-              if handsOver && !referent.certificateFree then
+              if handsOver && !referent.invariantFree then
                 .handedOver (ns.site argument.index) head
               else head
           | _, head => head
@@ -3078,12 +3067,12 @@ def mutableSlots (Γ : NRow) : Nat → Nat → Except String (Mutables Γ)
 /-- A body with the data invariants of every mutable-reference parameter's
 current assumed before it: implicit in the parameter's type and owed by the
 caller where it handed the reference over (`Term.assumeCurrent`). A referent
-with no certificates needs no assumption (`Term.denote_assumeCurrent_certificateFree`). -/
+with no invariants needs no assumption (`Term.denote_assumeCurrent_invariantFree`). -/
 def Mutables.assumedAtEntry {ρ : ResultShape} {Γ : NRow} {τ : NTy} :
     Mutables Γ → Term unit ρ Γ τ → Term unit ρ Γ τ
   | .nil, body => body
   | .cons (τ := τ) x rest, body =>
-      if τ.certificateFree then rest.assumedAtEntry body
+      if τ.invariantFree then rest.assumedAtEntry body
       else .drop (.assumeCurrent x) (rest.assumedAtEntry body)
   -- A reference an aggregate slot holds at a path has no slot of its own for
   -- `Term.assumeCurrent` to name.

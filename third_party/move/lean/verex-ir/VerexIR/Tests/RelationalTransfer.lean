@@ -20,19 +20,20 @@ example : ¬Spec.RelationalRefinesAt Eq Eq Eq
   obtain ⟨error, aborts, _⟩ := refines.aborts 7 rfl
   exact aborts
 
+-- A failed checking step produces no normal outcome.
+example : ¬(Spec.certified (Invariant := False) False.elim : Spec Unit Nat Nat).ok () 0 () :=
+  fun ⟨holds, _⟩ => holds
+
 -- Same-frame refinement relates outcomes only where the refined computation
 -- is defined. A run that goes on past a failed data invariant keeps its
--- outcome, while the certifying step has none and is undefined there: the
--- outcome is no outcome of the certifying step, so the refinement can hold
+-- outcome, while the checking step has none and is undefined there: the
+-- outcome is no outcome of the checking step, so the refinement can hold
 -- only because the step is undefined, and a weakest precondition, which
 -- excludes that start, still transfers.
 example : Spec.Refines (Spec.pure 0 : Spec Unit Nat Nat)
     (Spec.certified (Invariant := False) False.elim) :=
   ⟨fun _ _ _ _ => .inr not_false, fun _ _ aborts => aborts.elim,
     fun _ undefined => undefined.elim⟩
-
-example : ¬(Spec.certified (Invariant := False) False.elim : Spec Unit Nat Nat).ok () 0 () :=
-  fun ⟨holds, _⟩ => holds
 
 -- Failures need not have the same representation, but a permitted given
 -- failure must justify the actual concrete failure along the error relation.
@@ -133,5 +134,160 @@ example : Satisfies (fun _ : Unit => (Spec.pure 7 : Spec Unit Nat Nat)) concrete
       exact impossible
     · intro impossible
       exact impossible
+
+-- Instantiating a Given-verified generic `identity<T>(value : T) -> T` at an
+-- invariant-bearing type `Percent` (`value ≤ 100`):
+-- On the Given side, `GivenFrame.toCarriers` sets parameter validity to `True`
+-- (`validArgs = fun _ => True`, `validResult = fun _ => True`).
+-- On the concrete side, `validArgs` and `validResult` enforce `· ≤ 100`.
+section GivenInvariantInstantiation
+
+private def percentIdentityConcreteContract : Contract Unit Nat Nat Nat where
+  requires := fun _ _ => True
+  ensures := fun args _ result _ => result = args
+  aborts := fun _ _ _ => False
+  mayAbort := fun _ _ => False
+  validArgs := fun value => value ≤ 100
+  validResult := fun result => result ≤ 100
+
+private def givenIdentityContract (α : Type) : Contract Unit Nat α α where
+  requires := fun _ _ => True
+  ensures := fun args _ result _ => result = args
+  aborts := fun _ _ _ => False
+  mayAbort := fun _ _ => False
+  validArgs := fun _ => True
+  validResult := fun _ => True
+
+-- Negative control (first): uncertified plain `Eq` transfer at `Percent` is
+-- uninhabited because `givenIdentityContract` supplies only `True` in
+-- `validResult`, which cannot establish `result ≤ 100` at `result := 101`.
+theorem uncertified_percent_transfer_refused :
+    ¬ Nonempty (Contract.RelationalTransfer Eq Eq Eq Eq
+      percentIdentityConcreteContract (givenIdentityContract Nat)) := by
+  rintro ⟨compatible⟩
+  have invalid : 101 ≤ 100 := compatible.validResult 101 101 rfl trivial
+  omega
+
+-- Positive control 1 (inhabited subtype carrier): choosing `{ n : Nat // n ≤ 100 }`
+-- on the Given side threads `concreteContract.validArgs` (`x ≤ 100`) through
+-- `relatedStarts` and discharges `compatible.validResult` from the subtype witness.
+private abbrev CertifiedPercent := { n : Nat // n ≤ 100 }
+private def percentValRel (concrete : Nat) (given : CertifiedPercent) : Prop :=
+  concrete = given.val
+
+private def percentIdentityCertificate :
+    Contract.RelationalCertificate
+      (fun x : Nat => (Spec.pure x : Spec Unit Nat Nat))
+      (fun gx : CertifiedPercent => (Spec.pure gx : Spec Unit Nat CertifiedPercent))
+      percentIdentityConcreteContract
+      (givenIdentityContract CertifiedPercent) where
+  argsRel := percentValRel
+  stateRel := Eq
+  resultRel := percentValRel
+  errorRel := Eq
+  admissible := fun x _ => x ≤ 100
+  refines := by
+    intro args givenArgs initial givenInitial relatedArgs relatedInitial _
+    cases initial
+    cases givenInitial
+    refine ⟨?_, ?_, ?_⟩
+    · intro result final execution
+      exact ⟨givenArgs, (), ⟨rfl, rfl⟩, execution.1.trans relatedArgs, execution.2⟩
+    · intro _ impossible
+      exact impossible.elim
+    · intro impossible
+      exact impossible.elim
+  compatible := {
+    assumes := fun _ _ _ _ _ _ _ => trivial
+    requires := fun _ _ _ _ _ _ _ => trivial
+    ensures := fun _ _ _ _ _ _ _ _ relatedArgs _ relatedResult _ eqGiven =>
+      relatedResult.trans ((congrArg Subtype.val eqGiven).trans relatedArgs.symm)
+    frame := fun _ _ initial _ _ _ final _ _ _ _ _ _ => by
+      cases initial
+      cases final
+      rfl
+    aborts := fun _ _ _ _ _ _ _ _ _ impossible => impossible.elim
+    mayAbort := fun _ _ _ _ _ _ impossible => impossible.elim
+    mustAbort := fun _ _ _ _ _ _ impossible => impossible.elim
+    validArgs := fun _ _ _ _ => trivial
+    validResult := fun _ givenResult relatedResult _ =>
+      relatedResult ▸ givenResult.property
+  }
+  admissibleStarts := fun _ _ valid _ _ => valid
+  relatedStarts := fun args initial valid _ _ => ⟨⟨args, valid⟩, initial, rfl, rfl⟩
+
+theorem certified_percent_identity_satisfies :
+    Satisfies (fun x : Nat => (Spec.pure x : Spec Unit Nat Nat))
+      percentIdentityConcreteContract := by
+  refine Contract.RelationalCertificate.transfer ⟨percentIdentityCertificate⟩ ?_
+  intro gx initial _ _ _
+  refine ⟨?_, ?_, ?_⟩
+  · intro result final execution
+    exact ⟨trivial, fun _ => execution.1, execution.2, fun impossible => impossible.elim⟩
+  · intro _ impossible
+    exact impossible.elim
+  · intro impossible
+    exact impossible.elim
+
+-- Positive control 2 (plain sort `Nat`, no subtype carrier): validity travels
+-- purely in the relational evidence `concrete = given ∧ concrete ≤ 100`
+-- seeded from `admissible := fun x _ => x ≤ 100` and `concreteContract.validArgs`,
+-- without instantiating the Given sort at a subtype.
+private def plainPercentIdentityCertificate :
+    Contract.RelationalCertificate
+      (fun x : Nat => (Spec.pure x : Spec Unit Nat Nat))
+      (fun gx : Nat => (Spec.pure gx : Spec Unit Nat Nat))
+      percentIdentityConcreteContract
+      (givenIdentityContract Nat) where
+  argsRel := fun concrete given : Nat => concrete = given ∧ concrete ≤ 100
+  stateRel := Eq
+  resultRel := fun concrete given : Nat => concrete = given ∧ concrete ≤ 100
+  errorRel := Eq
+  admissible := fun x _ => x ≤ 100
+  refines := by
+    intro args givenArgs initial givenInitial relatedArgs relatedInitial admissibleStart
+    cases initial
+    cases givenInitial
+    refine ⟨?_, ?_, ?_⟩
+    · intro result final execution
+      refine ⟨givenArgs, (), ⟨rfl, rfl⟩, ⟨execution.1.trans relatedArgs.1, ?_⟩, execution.2⟩
+      rw [execution.1]
+      exact admissibleStart
+    · intro _ impossible
+      exact impossible.elim
+    · intro impossible
+      exact impossible.elim
+  compatible := {
+    assumes := fun _ _ _ _ _ _ _ => trivial
+    requires := fun _ _ _ _ _ _ _ => trivial
+    ensures := fun _ _ _ _ _ _ _ _ relatedArgs _ relatedResult _ eqGiven =>
+      relatedResult.1.trans (eqGiven.trans relatedArgs.1.symm)
+    frame := fun _ _ initial _ _ _ final _ _ _ _ _ _ => by
+      cases initial
+      cases final
+      rfl
+    aborts := fun _ _ _ _ _ _ _ _ _ impossible => impossible.elim
+    mayAbort := fun _ _ _ _ _ _ impossible => impossible.elim
+    mustAbort := fun _ _ _ _ _ _ impossible => impossible.elim
+    validArgs := fun _ _ _ _ => trivial
+    validResult := fun _ _ relatedResult _ => relatedResult.2
+  }
+  admissibleStarts := fun _ _ valid _ _ => valid
+  relatedStarts := fun args initial valid _ _ => ⟨args, initial, ⟨rfl, valid⟩, rfl⟩
+
+theorem plain_percent_identity_satisfies :
+    Satisfies (fun x : Nat => (Spec.pure x : Spec Unit Nat Nat))
+      percentIdentityConcreteContract := by
+  refine Contract.RelationalCertificate.transfer ⟨plainPercentIdentityCertificate⟩ ?_
+  intro gx initial _ _ _
+  refine ⟨?_, ?_, ?_⟩
+  · intro result final execution
+    exact ⟨trivial, fun _ => execution.1, execution.2, fun impossible => impossible.elim⟩
+  · intro _ impossible
+    exact impossible.elim
+  · intro impossible
+    exact impossible.elim
+
+end GivenInvariantInstantiation
 
 end VerexIR.Tests.RelationalTransfer

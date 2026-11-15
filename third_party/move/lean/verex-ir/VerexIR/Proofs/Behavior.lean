@@ -33,54 +33,14 @@ variable [Carriers]
 /-- A result whose returned mutable reference has its current value as its
 prophecy, as the reference's death leaves it (`Term.resolve`). -/
 def Denote.ResultShape.Settled : (shape : ResultShape) → shape.carrier → Prop
-  | .one (.ref referent), value => value.1 = NTy.forget referent value.2
-  -- A slice reference's carrier keeps both readings certified
-  -- (`NTy.carrier`, `.sliceRef`), so the settled comparison is between two
-  -- values of one type and needs no `forget`.
+  | .one (.ref _), value => value.1 = value.2
   | .one (.sliceRef _), value => value.currentVector = value.finalVector
   | _, _ => True
 
 /-- A value with a mutable reference's prophecy replaced by its entry value:
 an argument as `aborts_of` and `result_of` read it, which no final value
-names.  A reference's prophecy is certified and its current plain, and
-nothing certifies a current, so a settled value is plain: the comparison of
-two settled rows is the comparison of their plain forms
-(`doc/designs/data-invariants.md`). -/
-def Denote.NTy.settle : (τ : NTy) → τ.carrier → τ.plain
-  | .ref _, value => (value.1, value.1)
-  | .unit, value => value
-  | .bool, value => value
-  | .int _ _, value => value
-  | .num, value => value
-  | .address, value => value
-  | .signer, value => value
-  | .string, value => value
-  | .bytes, value => value
-  | .tuple elements, value => NTy.forget (.tuple elements) value
-  | .struct source arguments fields, value => NTy.forget (.struct source arguments fields) value
-  | .enum source arguments names rows distinct, value =>
-      NTy.forget (.enum source arguments names rows distinct) value
-  | .vector element, value => NTy.forget (.vector element) value
-  | .slice element, value => NTy.forget (.slice element) value
-  | .array element length, value => NTy.forget (.array element length) value
-  -- A slice reference's carrier is homogeneous, so its settled form is the
-  -- pair settled at the current, forgotten to the plain layer.
-  | .sliceRef element, value =>
-      NTy.forget (.sliceRef element) (SpecSliceRef.ofArrays value.current value.current)
-  | .char, value => value
-  | .table key value', value => NTy.forget (.table key value') value
-  | .ghost slot, value => NTy.forget (.ghost slot) value
-  | .param index, value => NTy.forget (.param index) value
-  | .nominal source arguments productive, value =>
-      NTy.forget (.nominal source arguments productive) value
-  -- A substitution's marked entry stands for a reference-free type, as a
-  -- parameter does: settling only forgets its certificates.
-  | .observed referent, value => NTy.forget (.observed referent) value
-  | .function _ _ _, value => value
-
-/-- A plain value with a mutable reference's prophecy replaced by its
-entry value: a settled value settled again. -/
-def Denote.NTy.settlePlain : (τ : NTy) → τ.plain → τ.plain
+names. -/
+def Denote.NTy.settle : (τ : NTy) → τ.carrier → τ.carrier
   | .ref _, value => (value.1, value.1)
   | .sliceRef _, value => SpecSliceRef.ofArrays value.current value.current
   | .unit, value => value
@@ -108,14 +68,9 @@ def Denote.NTy.settlePlain : (τ : NTy) → τ.plain → τ.plain
   | .observed _, value => value
 
 /-- A row of arguments, each settled. -/
-def Denote.HList.settle : (row : NRow) → HList row → HListPlain row
+def Denote.HList.settle : (row : NRow) → HList row → HList row
   | .nil, _ => ()
   | .cons τ rest, values => (τ.settle values.1, HList.settle rest values.2)
-
-/-- A plain row of arguments, each settled. -/
-def Denote.HListPlain.settle : (row : NRow) → HListPlain row → HListPlain row
-  | .nil, values => values
-  | .cons τ rest, values => (τ.settlePlain values.1, HListPlain.settle rest values.2)
 
 /-- The referents of a row's mutable references, in the row's order: the
 row of final values a clause names of them (`ensures_of`). -/
@@ -135,9 +90,9 @@ def Denote.NRow.finals : NRow → NRow
   | .cons (.observed _) rest => NRow.finals rest
 
 /-- The prophecies a row of arguments holds, in the order of its mutable
-references: the final values a clause names of them, which settling forgets
-(`HList.settle`).  Every type of the row is named, as `NTy.settle` names
-them, so that the row of finals reduces with the row. -/
+references: the final values a clause names of them, which settling replaces
+with entry values (`HList.settle`).  Every type of the row is named, as
+`NTy.settle` names them, so that the row of finals reduces with the row. -/
 def Denote.HList.finals : (row : NRow) → HList row → HList (NRow.finals row)
   | .nil, _ => ()
   | .cons (.ref _) rest, values => (values.1.2, HList.finals rest values.2)
@@ -170,7 +125,7 @@ of a mutable reference, and of two rows of the same entry values an
 invocation aborts alike (`not_abortsOf_of_ok`), so `aborts_of` is stated
 this way — of an invocation (`AbortsOfEntries`) and of a known target read
 directly, whose call or whose contract takes the row itself. -/
-def Denote.AtEntries (σs : NRow) (holds : HList σs → Prop) (entries : HListPlain σs) : Prop :=
+def Denote.AtEntries (σs : NRow) (holds : HList σs → Prop) (entries : HList σs) : Prop :=
   ∃ args, HList.settle σs args = entries ∧ holds args
 
 /-- A property of an arguments row holds of their entry values. -/
@@ -180,11 +135,9 @@ theorem Denote.atEntries_of_holds {σs : NRow} {holds : HList σs → Prop} {arg
 
 /-- A property of an arguments row as a clause states it of their entry
 values and of the finals of its mutable references: it holds of some row
-that passes both.  A clause names values and no certificate, so the
-certified row is quantified, as `AtEntries` quantifies it for `aborts_of`;
-settling forgets the prophecies, so the finals a clause names of them pin
-them (`HList.finals`, `doc/designs/data-invariants.md`). -/
-def Denote.AtEntryFinals (σs : NRow) (holds : HList σs → Prop) (entries : HListPlain σs)
+that passes both.  Settling replaces the prophecies with entry values, so
+the finals a clause names of them pin them (`HList.finals`). -/
+def Denote.AtEntryFinals (σs : NRow) (holds : HList σs → Prop) (entries : HList σs)
     (finals : HList (NRow.finals σs)) : Prop :=
   ∃ args, HList.settle σs args = entries ∧ HList.finals σs args = finals ∧ holds args
 
@@ -195,37 +148,28 @@ theorem Denote.atEntryFinals_of_holds {σs : NRow} {holds : HList σs → Prop} 
     AtEntryFinals σs holds (HList.settle σs args) (HList.finals σs args) :=
   ⟨args, rfl, rfl, held⟩
 
-/-- The two components a settled row's equation gives: the head value as the
-clause layer reads it, and the settled tail. -/
+/-- The two components a settled row's equation gives: the settled head value
+and the settled tail. -/
 theorem Denote.HList.settle_cons_inj {τ : NTy} {rest : NRow} {left right : HList (.cons τ rest)}
     (settled : HList.settle (.cons τ rest) left = HList.settle (.cons τ rest) right) :
     NTy.settle τ left.1 = NTy.settle τ right.1 ∧
       HList.settle rest left.2 = HList.settle rest right.2 := by
-  have pair : ((NTy.settle τ left.1, HList.settle rest left.2) : HListPlain (.cons τ rest)) =
+  have pair : ((NTy.settle τ left.1, HList.settle rest left.2) : HList (.cons τ rest)) =
       (NTy.settle τ right.1, HList.settle rest right.2) := settled
   rw [Prod.mk.injEq] at pair
   exact pair
 
-/-- A row is its head and its tail, the head read off its forgetting: the step
-every type but a mutable reference and a mutable slice reference takes, where
-settling is forgetting. -/
-theorem Denote.HList.cons_injective_of_forget {τ : NTy} {rest : NRow}
-    {left right : HList (.cons τ rest)}
-    (head : NTy.forget τ left.1 = NTy.forget τ right.1) (tail : left.2 = right.2) :
-    left = right :=
-  Prod.ext (NTy.forget_injective τ head) tail
-
-/-- A row of certified arguments is determined by its entry values and the
-finals of its mutable references: settling keeps every value a clause can
-name, and the one value it drops — the prophecy of a top-level mutable
-reference, and of a mutable slice reference its final reading — is exactly
-what `HList.finals` returns. -/
+/-- A row of arguments is determined by its entry values and the finals of
+its mutable references: settling keeps every value a clause can name, and
+the one value it drops — the prophecy of a top-level mutable reference, and
+of a mutable slice reference its final reading — is exactly what
+`HList.finals` returns. -/
 theorem Denote.HList.settle_finals_injective : (row : NRow) → ∀ {left right : HList row},
     HList.settle row left = HList.settle row right →
     HList.finals row left = HList.finals row right → left = right
   | .nil, _, _, _, _ => rfl
   | .cons (.ref σ) rest, left, right, settled, finals => by
-      have currents : ((left.1.1, left.1.1) : (NTy.ref σ).plain) = (right.1.1, right.1.1) :=
+      have currents : ((left.1.1, left.1.1) : (NTy.ref σ).carrier) = (right.1.1, right.1.1) :=
         (HList.settle_cons_inj settled).1
       rw [Prod.mk.injEq] at currents
       have parts :
@@ -238,7 +182,7 @@ theorem Denote.HList.settle_finals_injective : (row : NRow) → ∀ {left right 
   | .cons (.sliceRef element) rest, left, right, settled, finals => by
       have same : SpecSliceRef.ofArrays left.1.current left.1.current =
           SpecSliceRef.ofArrays right.1.current right.1.current :=
-        NTy.forget_injective (.sliceRef element) (HList.settle_cons_inj settled).1
+        (HList.settle_cons_inj settled).1
       have current : (SpecSliceRef.ofArrays left.1.current left.1.current).currentVector =
           (SpecSliceRef.ofArrays right.1.current right.1.current).currentVector :=
         congrArg SpecSliceRef.currentVector same
@@ -270,28 +214,8 @@ theorem Denote.HList.settle_finals_injective : (row : NRow) → ∀ {left right 
   | .cons (.function _ _ _) rest, _, _, settled, finals
   | .cons (.nominal _ _ _) rest, _, _, settled, finals
   | .cons (.observed _) rest, _, _, settled, finals =>
-      HList.cons_injective_of_forget (HList.settle_cons_inj settled).1
+      Prod.ext (HList.settle_cons_inj settled).1
         (HList.settle_finals_injective rest (HList.settle_cons_inj settled).2 finals)
-
-/-- Certified values of a type are equal where the values they certify are:
-the entry-value equation of an argument read at its own type. -/
-theorem Denote.NTy.forget_eq_forget (τ : NTy) {left right : τ.carrier} :
-    (@Eq (no_index τ.plain) (τ.forget left) (τ.forget right)) = (left = right) :=
-  propext ⟨NTy.forget_injective τ, fun equal => equal ▸ rfl⟩
-
-/-- Certified values of a type parameter are equal where the values they
-lend are: lending keeps a value's encoding (`ParamPlain.encode_of`), which
-a certified encoder does not identify.  The entry-value equation of an
-argument of a parameter's type is read at the lent map, which is what
-forgetting is there, and not at the type (`NTy.forget_eq_forget`). -/
-@[simp, vir_denote_norm] theorem Denote.Carriers.lent_of_eq_of (index : Nat)
-    {left right : Denote.Carriers.carrier index} :
-    ((Denote.Carriers.lent index).of left = (Denote.Carriers.lent index).of right) =
-      (left = right) :=
-  propext ⟨fun equal => (Denote.Carriers.codec index).encode_injective (by
-      rw [← (Denote.Carriers.lent index).encode_of left, equal,
-        (Denote.Carriers.lent index).encode_of]),
-    fun equal => equal ▸ rfl⟩
 
 end
 
@@ -307,13 +231,9 @@ def EnsuresOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : 
 
 /-- `ensures_of<f>(x, r, f̄)` as a clause states it: the invocation runs
 from `pre` to `post` returning `result` on arguments of the entry values
-`entries` whose mutable references end at the final values `finals`.  A
-clause names a value, never a certificate, so the certified row is
-quantified here, as `aborts_of` quantifies it (`AtEntries`); settling
-forgets the prophecies, so the finals pin them (`HList.finals`)
-(`doc/designs/data-invariants.md`). -/
+`entries` whose mutable references end at the final values `finals`. -/
 def EnsuresOfEntries (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : ResultShape)
-    (function : (NTy.function σs shared shape.row).carrier) (entries : HListPlain σs)
+    (function : (NTy.function σs shared shape.row).carrier) (entries : HList σs)
     (finals : HList (NRow.finals σs)) (result : shape.carrier)
     (pre post : Memory unit) : Prop :=
   AtEntryFinals σs
@@ -334,100 +254,27 @@ run returns a settled reference (`ResultShape.Settled`) whose current value
 is `current`, the one the clause names.  A clause sees a returned reference
 as its current value and holds no prophecy of it, as it holds none of a
 mutable argument, so the prophecy the run returns is quantified here and
-the current is read off it (`EnsuresOfEntries`). -/
+identified with `current` (`EnsuresOfEntries`). -/
 def EnsuresOfSettled (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (σ : NTy)
     (function : (NTy.function σs shared (ResultShape.one (.ref σ)).row).carrier)
-    (entries : HListPlain σs) (finals : HList (NRow.finals σs)) (current : σ.plain)
+    (entries : HList σs) (finals : HList (NRow.finals σs)) (current : σ.carrier)
     (pre post : Memory unit) : Prop :=
-  ∃ prophecy : σ.carrier, NTy.forget σ prophecy = current ∧
+  ∃ prophecy : σ.carrier, prophecy = current ∧
     EnsuresOfEntries invoke σs shared (.one (.ref σ)) function entries finals
-      (NTy.forget σ prophecy, prophecy) pre post
+      (prophecy, prophecy) pre post
 
-/-- A run returning a reference is a run returning one settled at the
-current value of its prophecy. -/
+/-- A run returning a settled reference is an `EnsuresOfSettled` run at its
+prophecy. -/
 theorem ensuresOfSettled_of_ensuresOfEntries {invoke : InvokeMeaning} {σs : NRow}
     {shared : Sharing} {σ : NTy}
     {function : (NTy.function σs shared (ResultShape.one (.ref σ)).row).carrier}
-    {entries : HListPlain σs} {finals : HList (NRow.finals σs)} {prophecy : σ.carrier}
+    {entries : HList σs} {finals : HList (NRow.finals σs)} {prophecy : σ.carrier}
     {pre post : Memory unit}
     (ensures : EnsuresOfEntries invoke σs shared (.one (.ref σ)) function entries finals
-      (NTy.forget σ prophecy, prophecy) pre post) :
-    EnsuresOfSettled invoke σs shared σ function entries finals (NTy.forget σ prophecy)
+      (prophecy, prophecy) pre post) :
+    EnsuresOfSettled invoke σs shared σ function entries finals prophecy
       pre post :=
   ⟨prophecy, rfl, ensures⟩
-
-/-- `ensures_of<f>(x, r, f̄)` as a clause states it, at the plain layer: the
-entry values, the plain finals of the mutable references and the plain result
-of a run.  One form in place of `EnsuresOfEntries`, `EnsuresOfSettled` and the
-inline existential over finals; it is equivalent to `EnsuresOf`, a row being
-determined by its settled entries and its finals
-(`Denote.HList.settle_finals_injective`). -/
-def EnsuresOfPlain (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : ResultShape)
-    (function : (NTy.function σs shared shape.row).carrier) (entries : HListPlain σs)
-    (finals : HListPlain (NRow.finals σs)) (result : shape.plain)
-    (pre post : Memory unit) : Prop :=
-  ∃ (args : HList σs) (value : shape.carrier), HList.settle σs args = entries ∧
-    HList.forget (NRow.finals σs) (HList.finals σs args) = finals ∧
-    shape.forget value = result ∧
-    EnsuresOf invoke σs shared shape function args value pre post
-
-/-- A run of an invocation, read at the plain layer, is that run. -/
-theorem ensuresOfPlain_iff_ensuresOf {invoke : InvokeMeaning} {σs : NRow} {shared : Sharing}
-    {shape : ResultShape} {function : (NTy.function σs shared shape.row).carrier}
-    {args : HList σs} {result : shape.carrier} {pre post : Memory unit} :
-    EnsuresOfPlain invoke σs shared shape function (HList.settle σs args)
-        (HList.forget (NRow.finals σs) (HList.finals σs args)) (shape.forget result) pre post ↔
-      EnsuresOf invoke σs shared shape function args result pre post := by
-  constructor
-  · rintro ⟨row, value, settled, forgotFinals, forgot, ensures⟩
-    obtain rfl : row = args :=
-      Denote.HList.settle_finals_injective σs settled
-        (HList.forget_injective (NRow.finals σs) forgotFinals)
-    obtain rfl : value = result := shape.forget_injective forgot
-    exact ensures
-  · intro ensures
-    exact ⟨args, result, rfl, rfl, rfl, ensures⟩
-
-/-- The plain form states what `EnsuresOfEntries` states of a certified row of
-finals and a certified result. -/
-theorem ensuresOfPlain_iff_ensuresOfEntries {invoke : InvokeMeaning} {σs : NRow}
-    {shared : Sharing} {shape : ResultShape}
-    {function : (NTy.function σs shared shape.row).carrier} {entries : HListPlain σs}
-    {finals : HList (NRow.finals σs)} {result : shape.carrier} {pre post : Memory unit} :
-    EnsuresOfPlain invoke σs shared shape function entries
-        (HList.forget (NRow.finals σs) finals) (shape.forget result) pre post ↔
-      EnsuresOfEntries invoke σs shared shape function entries finals result pre post := by
-  constructor
-  · rintro ⟨row, value, settled, forgotFinals, forgot, ensures⟩
-    obtain rfl : value = result := shape.forget_injective forgot
-    exact ⟨row, settled, HList.forget_injective (NRow.finals σs) forgotFinals, ensures⟩
-  · rintro ⟨row, settled, finalsEq, ensures⟩
-    exact ⟨row, result, settled,
-      congrArg (HList.forget (NRow.finals σs)) finalsEq, rfl, ensures⟩
-
-/-- And what `EnsuresOfSettled` states of a returned mutable reference:
-forgetting a reference keeps its current value and forgets its prophecy, so
-the plain result of a run returning a settled one is that value twice. -/
-theorem ensuresOfPlain_iff_ensuresOfSettled {invoke : InvokeMeaning} {σs : NRow}
-    {shared : Sharing} {σ : NTy}
-    {function : (NTy.function σs shared (ResultShape.one (.ref σ)).row).carrier}
-    {entries : HListPlain σs} {finals : HList (NRow.finals σs)} {current : σ.plain}
-    {pre post : Memory unit} :
-    EnsuresOfPlain invoke σs shared (.one (.ref σ)) function entries
-        (HList.forget (NRow.finals σs) finals) (current, current) pre post ↔
-      EnsuresOfSettled invoke σs shared σ function entries finals current pre post := by
-  constructor
-  · rintro ⟨row, value, settled, forgotFinals, forgot, ensures⟩
-    refine ⟨value.2, congrArg Prod.snd forgot, row, settled,
-      HList.forget_injective (NRow.finals σs) forgotFinals, ?_⟩
-    have same : (NTy.forget σ value.2, value.2) = value :=
-      Prod.ext ((congrArg Prod.snd forgot).trans (congrArg Prod.fst forgot).symm) rfl
-    rw [same]
-    exact ensures
-  · rintro ⟨prophecy, forgotten, row, settled, finalsEq, ensures⟩
-    exact ⟨row, (NTy.forget σ prophecy, prophecy), settled,
-      congrArg (HList.forget (NRow.finals σs)) finalsEq,
-      Prod.ext forgotten forgotten, ensures⟩
 
 /-- `aborts_of<f>(x)`: the invocation of `function` on `args` aborts from
 `state`. -/
@@ -438,7 +285,7 @@ def AbortsOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : R
 /-- `aborts_of<f>(x)` as a clause states it: the invocation aborts on
 arguments of the entry values of `x` (`AtEntries`). -/
 def AbortsOfEntries (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : ResultShape)
-    (function : (NTy.function σs shared shape.row).carrier) (entries : HListPlain σs)
+    (function : (NTy.function σs shared shape.row).carrier) (entries : HList σs)
     (state : Memory unit) : Prop :=
   ∃ args, HList.settle σs args = entries ∧ AbortsOf invoke σs shared shape function args state
 
@@ -456,7 +303,7 @@ is settled, as the clause layer builds it (`Invocation.entryArguments`): no run'
 settled arguments meet an unsettled row, and the labels then read their
 defaults. -/
 def SettledRun (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : ResultShape)
-    (function : (NTy.function σs shared shape.row).carrier) (entries : HListPlain σs)
+    (function : (NTy.function σs shared shape.row).carrier) (entries : HList σs)
     (state : Memory unit) (run : HList σs × shape.carrier × Memory unit) : Prop :=
   HList.settle σs run.1 = entries ∧ shape.Settled run.2.1 ∧
     EnsuresOf invoke σs shared shape function run.1 run.2.1 state run.2.2
@@ -470,7 +317,7 @@ noncomputable def runEncoding (σs : NRow) (shape : ResultShape) (run : HList σ
 /-- The encodings of the settled runs `result_of` and `state_of` read. -/
 def SettledEncoding (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
     (shape : ResultShape) (function : (NTy.function σs shared shape.row).carrier)
-    (entries : HListPlain σs)
+    (entries : HList σs)
     (state : Memory unit) (encoded : List RuntimeValue × Array RuntimeValue × Memory unit) : Prop :=
   ∃ run, SettledRun invoke σs shared shape function entries state run ∧
     runEncoding σs shape run = encoded
@@ -481,7 +328,7 @@ open Classical in
 of a frame names the same run; `default` where there is none. -/
 noncomputable def ResultOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
     (shape : ResultShape) (function : (NTy.function σs shared shape.row).carrier)
-    (entries : HListPlain σs)
+    (entries : HList σs)
     (state : Memory unit) (default : shape.carrier) : shape.carrier :=
   if returns : ∃ encoded, SettledEncoding invoke σs shared shape function entries state encoded then
     ((Denote.resultCodec shape).decode? returns.choose.2.1).getD default
@@ -492,7 +339,7 @@ open Classical in
 none, so that using the label does not assume that the invocation returns. -/
 noncomputable def StateOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
     (shape : ResultShape) (function : (NTy.function σs shared shape.row).carrier)
-    (entries : HListPlain σs) (state : Memory unit) : Memory unit :=
+    (entries : HList σs) (state : Memory unit) : Memory unit :=
   if returns : ∃ encoded, SettledEncoding invoke σs shared shape function entries state encoded then
     returns.choose.2.2
   else state
@@ -501,7 +348,7 @@ noncomputable def StateOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharin
 one whose encodings are the chosen ones. -/
 theorem settledEncoding_choose {invoke : InvokeMeaning} {σs : NRow} {shared : Sharing}
     {shape : ResultShape} {function : (NTy.function σs shared shape.row).carrier}
-    {entries : HListPlain σs} {state : Memory unit}
+    {entries : HList σs} {state : Memory unit}
     (returns : ∃ encoded, SettledEncoding invoke σs shared shape function entries state encoded)
     (default : shape.carrier) :
     ∃ run, SettledRun invoke σs shared shape function entries state run ∧
@@ -519,7 +366,7 @@ theorem settledEncoding_choose {invoke : InvokeMeaning} {σs : NRow} {shared : S
 /-- Where a settled run returns, `result_of` and `state_of` name one. -/
 theorem settledRun_resultOf {invoke : InvokeMeaning} {σs : NRow} {shared : Sharing}
     {shape : ResultShape} {function : (NTy.function σs shared shape.row).carrier}
-    {entries : HListPlain σs}
+    {entries : HList σs}
     {state : Memory unit} {run : HList σs × shape.carrier × Memory unit}
     (returns : SettledRun invoke σs shared shape function entries state run)
     (default : shape.carrier) :
@@ -599,10 +446,10 @@ the function value holds at every arguments row whose entry values are
 a precondition reads a reference's entry value, so it holds alike at two
 rows of the same entry values; stated so, the predicate is provable where
 the entry values are known and usable at a call, which an existential form
-would not be (`doc/designs/data-invariants.md`). -/
+would not be. -/
 def RequiresOfEntries (requires : RequiresMeaning unit) (σs : NRow) (shared : Sharing)
     (results : NRow) (function : (NTy.function σs shared results).carrier)
-    (entries : HListPlain σs) (state : Memory unit) : Prop :=
+    (entries : HList σs) (state : Memory unit) : Prop :=
   ∀ args : HList σs, HList.settle σs args = entries →
     RequiresOf requires σs shared results function args state
 
@@ -619,7 +466,7 @@ theorem requiresOf_of_entries {requires : RequiresMeaning unit} {σs : NRow} {sh
 omit Θ in
 /-- At the base frame, `requires_of` is the requires meaning of the value at
 the arguments. -/
-theorem requiresOf_runtime [@CarriersNonempty (Carriers.runtime unit)]
+theorem requiresOf_runtime
     (requires : RequiresMeaning unit) (σs : NRow) (shared : Sharing)
     (results : NRow) (function : @NTy.carrier (Carriers.runtime unit) (.function σs shared results))
     (args : @HList (Carriers.runtime unit) σs) (state : Memory unit) :
@@ -728,19 +575,19 @@ its current value and prophecy there. -/
     Θ.toRuntimeFree .bytes free value = value :=
   @NTy.encode_injective (Carriers.runtime unit) .bytes _ _ (Θ.encode_toRuntimeFree _ free value)
 
-/-- A mutable reference at the base frame pairs its current value, lent
-there, with its prophecy there (`Skolems.plainToRuntimeFree`). -/
+/-- A mutable reference at the base frame pairs its current value with its
+prophecy there (`Skolems.toRuntimeFree`). -/
 @[vir_denote_norm] theorem Denote.Skolems.toRuntimeFree_ref {σ : NTy}
     (free : (NTy.ref σ).paramFree = true) (value : (NTy.ref σ).carrier) :
     Θ.toRuntimeFree (.ref σ) free value =
-      (Skolems.plainToRuntimeFree σ (by simpa only [NTy.paramFree] using free) value.1,
+      (Θ.toRuntimeFree σ (by simpa only [NTy.paramFree] using free) value.1,
         Θ.toRuntimeFree σ (by simpa only [NTy.paramFree] using free) value.2) := by
   apply @NTy.encode_injective (Carriers.runtime unit) (.ref σ)
   rw [Θ.encode_toRuntimeFree]
-  show RuntimeValue.tuple #[σ.plainEncode value.1, σ.encode value.2] =
-    RuntimeValue.tuple #[@NTy.plainEncode (Carriers.runtime unit) σ _,
+  show RuntimeValue.tuple #[σ.encode value.1, σ.encode value.2] =
+    RuntimeValue.tuple #[@NTy.encode (Carriers.runtime unit) σ _,
       @NTy.encode (Carriers.runtime unit) σ _]
-  rw [Skolems.plainEncode_plainToRuntimeFree, Θ.encode_toRuntimeFree]
+  rw [Θ.encode_toRuntimeFree, Θ.encode_toRuntimeFree]
 
 /-- Values of a row without type parameters at the frame, at the base frame
 at the same row. -/
@@ -773,7 +620,7 @@ theorem HList.encode_toRuntimeFree (row : NRow) (free : row.paramFree = true) (v
 
 omit Θ in
 /-- A construction at the base frame at equal rows and captures. -/
-theorem Skolems.construct_heq_runtime [@CarriersNonempty (Carriers.runtime unit)]
+theorem Skolems.construct_heq_runtime
     {parameters parameters' results results' captured captured' : NRow}
     (shared : Sharing) (handle : FunctionHandle) (mask : Nat)
     (typeInstantiation : Array (TypeId × TypeId)) (sameParameters : parameters = parameters')
@@ -923,8 +770,8 @@ theorem abortsOf_closureOf {executable : ExecutableUnit unit} {handle : Function
 
 /-- `ensures_of` of a function value whose target is verified: where what the
 target's theorem assumes and its precondition hold at the woven arguments,
-what its contract ensures of the run, its frame, and that no condition under
-which it must abort held. -/
+its result validity, what its contract ensures of the run, its frame, and
+that no condition under which it must abort held. -/
 theorem ensuresOf_closureOf_verified {executable : ExecutableUnit unit} {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
     (capturedFree : captured.refFree = true) {typeInstantiation : Array (TypeId × TypeId)}
@@ -942,12 +789,13 @@ theorem ensuresOf_closureOf_verified {executable : ExecutableUnit unit} {handle 
     (assumed : contract.assumes (weave.compose captures args) pre)
     (permitted : contract.requires (weave.compose captures args) pre)
     (valid : contract.validArgs (weave.compose captures args) := by trivial) :
-    (¬contract.mayAbort (weave.compose captures args) pre →
-        contract.ensures (weave.compose captures args) pre result post) ∧
-      contract.frame (weave.compose captures args) pre result post ∧
-      ¬contract.mustAbort (weave.compose captures args) pre :=
-  ((verified _ pre valid assumed permitted).1 result post
-    (ensuresOf_closureOf weave capturedFree coherent captures args ensures closed)).2
+    contract.validResult result ∧
+      (¬contract.mayAbort (weave.compose captures args) pre →
+          contract.ensures (weave.compose captures args) pre result post) ∧
+        contract.frame (weave.compose captures args) pre result post ∧
+        ¬contract.mustAbort (weave.compose captures args) pre :=
+  (verified _ pre valid assumed permitted).1 result post
+    (ensuresOf_closureOf weave capturedFree coherent captures args ensures closed)
 
 /-- `aborts_of` of a function value whose target is verified: where what the
 target's theorem assumes and its precondition hold at the woven arguments,
@@ -1150,55 +998,53 @@ theorem requiresOf_instantiate (Θ : Skolems unit) (θ : TypeArgs) (requires : R
 
 section Settle
 
-/-- Settling a value without a reference only forgets its certificates. -/
+/-- Settling a value without a reference leaves it unchanged. -/
 theorem Denote.NTy.settle_self_of_refFree [Carriers] (τ : NTy) (free : τ.refFree = true)
-    (value : τ.carrier) : NTy.settle τ value = NTy.forget τ value := by
+    (value : τ.carrier) : NTy.settle τ value = value := by
   cases τ <;> first | rfl | simp [NTy.refFree] at free
+
+theorem Denote.NTy.settle_of_refFree [Carriers] (τ : NTy) (free : τ.refFree = true)
+    (value : τ.carrier) : NTy.settle τ value = value :=
+  NTy.settle_self_of_refFree τ free value
+
+/-- Settling a row without a reference leaves its values unchanged. -/
+theorem Denote.HList.settle_of_refFree [Carriers] : (row : NRow) → row.refFree = true →
+    (values : HList row) → HList.settle row values = values
+  | .nil, _, () => rfl
+  | .cons τ rest, free, (head, tail) => by
+      simp only [NRow.refFree, Bool.and_eq_true] at free
+      exact Prod.ext (NTy.settle_self_of_refFree τ free.1 head)
+        (HList.settle_of_refFree rest free.2 tail)
 
 /-- Settling commutes with reading a value in the outer view, where the
 type arguments hold no reference. -/
-theorem Denote.NTy.settle_ofSkolem [Θ : Carriers] [@CarriersNonempty Θ] (θ : TypeArgs)
+theorem Denote.NTy.settle_ofSkolem [Θ : Carriers] (θ : TypeArgs)
     (free : θ.1.refFree = true) :
     (τ : NTy) → (value : @NTy.carrier (Carriers.instantiate θ Θ) τ) →
     NTy.settle (τ.subst θ.1) (NTy.ofSkolem θ τ value) =
-      NTy.plainOfSkolem θ τ (@NTy.settle (Carriers.instantiate θ Θ) τ value)
+      NTy.ofSkolem θ τ (@NTy.settle (Carriers.instantiate θ Θ) τ value)
   | .param index, value => by
       rw [NTy.settle_self_of_refFree _
-          ((NTy.refFree_unmark _).trans (NRow.getD_refFree θ.1 free index (.param index) rfl)),
-        (NTy.forget_ofSkolem θ (.param index) value).symm]
+          ((NTy.refFree_unmark _).trans (NRow.getD_refFree θ.1 free index (.param index) rfl))]
       rfl
+  | .sliceRef _, _ => by
+      apply SpecSliceRef.ext <;> rfl
   | .ref _, _ | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _
-  | .string, _ | .bytes, _ | .char, _ | .function _ _ _, _ => rfl
-  | .tuple elements, value => (NTy.forget_ofSkolem θ (.tuple elements) value).symm
-  | .struct source arguments fields, value =>
-      (NTy.forget_ofSkolem θ (.struct source arguments fields) value).symm
-  | .enum source arguments names rows distinct, value =>
-      (NTy.forget_ofSkolem θ (.enum source arguments names rows distinct) value).symm
-  | .vector element, value => (NTy.forget_ofSkolem θ (.vector element) value).symm
-  | .slice element, value => (NTy.forget_ofSkolem θ (.slice element) value).symm
-  | .array element length, value => (NTy.forget_ofSkolem θ (.array element length) value).symm
-  -- Settling a slice reference forgets the pair settled at its current,
-  -- the composition `NTy.forget_ofSkolem` gives at `.sliceRef`.
-  | .sliceRef element, value =>
-      (NTy.forget_ofSkolem θ (.sliceRef element)
-        (SpecSliceRef.ofArrays value.current value.current)).symm
-  | .nominal source arguments productive, value =>
-      (NTy.forget_ofSkolem θ (.nominal source arguments productive) value).symm
-  | .observed referent, value => (NTy.forget_ofSkolem θ (.observed referent) value).symm
-  | .table key values, value => (NTy.forget_ofSkolem θ (.table key values) value).symm
-  | .ghost slot, value => (NTy.forget_ofSkolem θ (.ghost slot) value).symm
+  | .string, _ | .bytes, _ | .char, _ | .tuple _, _ | .struct _ _ _, _ | .enum _ _ _ _ _, _
+  | .vector _, _ | .slice _, _ | .array _ _, _ | .table _ _, _ | .ghost _, _
+  | .function _ _ _, _ | .nominal _ _ _, _ | .observed _, _ => rfl
 
-theorem Denote.HList.settle_ofSkolem [Θ : Carriers] [@CarriersNonempty Θ] (θ : TypeArgs)
+theorem Denote.HList.settle_ofSkolem [Θ : Carriers] (θ : TypeArgs)
     (free : θ.1.refFree = true) :
     (row : NRow) → (values : @HList (Carriers.instantiate θ Θ) row) →
     HList.settle (NRow.subst θ.1 row) (HList.ofSkolem θ row values) =
-      HListPlain.ofSkolem θ row (@HList.settle (Carriers.instantiate θ Θ) row values)
+      HList.ofSkolem θ row (@HList.settle (Carriers.instantiate θ Θ) row values)
   | .nil, _ => rfl
   | .cons τ rest, values => by
       show (NTy.settle (τ.subst θ.1) (NTy.ofSkolem θ τ values.1),
           HList.settle (NRow.subst θ.1 rest) (HList.ofSkolem θ rest values.2)) =
-        (NTy.plainOfSkolem θ τ (@NTy.settle (Carriers.instantiate θ Θ) τ values.1),
-          HListPlain.ofSkolem θ rest (@HList.settle (Carriers.instantiate θ Θ) rest values.2))
+        (NTy.ofSkolem θ τ (@NTy.settle (Carriers.instantiate θ Θ) τ values.1),
+          HList.ofSkolem θ rest (@HList.settle (Carriers.instantiate θ Θ) rest values.2))
       rw [NTy.settle_ofSkolem θ free τ, HList.settle_ofSkolem θ free rest]
 
 /-- A value without a reference is settled. -/
@@ -1212,21 +1058,18 @@ theorem Denote.ResultShape.settled_one_of_refFree [Carriers] : (τ : NTy) → τ
   | .nominal _ _ _, _, _ | .observed _, _, _ => trivial
 
 /-- A result is settled in either view alike. -/
-theorem Denote.ResultShape.settled_ofSkolem [Θ : Carriers] [@CarriersNonempty Θ] (θ : TypeArgs)
+theorem Denote.ResultShape.settled_ofSkolem [Θ : Carriers] (θ : TypeArgs)
     (free : θ.1.refFree = true) : (shape : ResultShape) →
     (value : @ResultShape.carrier (Carriers.instantiate θ Θ) shape) →
     ((shape.subst θ.1).Settled (ResultShape.ofSkolem θ shape value) ↔
       @ResultShape.Settled (Carriers.instantiate θ Θ) shape value)
   | .none, _ => Iff.rfl
   | .one (.ref τ), value => by
-      show NTy.plainOfSkolem θ τ value.1 =
-          NTy.forget (τ.subst θ.1) (NTy.ofSkolem θ τ value.2) ↔
-        value.1 = @NTy.forget (Carriers.instantiate θ Θ) τ value.2
-      rw [← NTy.forget_ofSkolem θ τ value.2]
+      show NTy.ofSkolem θ τ value.1 = NTy.ofSkolem θ τ value.2 ↔ value.1 = value.2
       constructor
       · intro same
-        have := congrArg (NTy.plainToSkolem θ τ) same
-        rwa [NTy.plainToSkolem_ofSkolem, NTy.plainToSkolem_ofSkolem] at this
+        have := congrArg (NTy.toSkolem θ τ) same
+        rwa [NTy.toSkolem_ofSkolem, NTy.toSkolem_ofSkolem] at this
       · intro same; rw [same]
   | .one (.param index), value => by
       have settled := ResultShape.settled_one_of_refFree ((NTy.param index).subst θ.1)
@@ -1249,7 +1092,7 @@ theorem Denote.ResultShape.settled_ofSkolem [Θ : Carriers] [@CarriersNonempty �
   | .one (.nominal _ _ _), _ | .one (.observed _), _ => Iff.rfl
 
 /-- A result encodes alike in either view. -/
-theorem Denote.resultCodec_encode_ofSkolem [Θ : Carriers] [@CarriersNonempty Θ] (θ : TypeArgs) :
+theorem Denote.resultCodec_encode_ofSkolem [Θ : Carriers] (θ : TypeArgs) :
     (shape : ResultShape) →
     (value : @ResultShape.carrier (Carriers.instantiate θ Θ) shape) →
     (resultCodec (shape.subst θ.1)).encode (ResultShape.ofSkolem θ shape value) =
@@ -1270,20 +1113,20 @@ outer frame on the entry values read in its view. -/
 theorem settledEncoding_instantiate (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit)
     (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
     (shape : ResultShape) (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
-    (entries : @HListPlain (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
+    (entries : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
     @SettledEncoding unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared
         shape function entries state =
       @SettledEncoding unit _ Θ (invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
-        (shape.functionOfSkolem θ σs shared function) (HListPlain.ofSkolem θ σs entries) state := by
+        (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs entries) state := by
   funext encoded
   apply propext
   constructor
   · rintro ⟨⟨values, result, final⟩, ⟨settles, settled, ran⟩, rfl⟩
     refine ⟨(HList.ofSkolem θ σs values, ResultShape.ofSkolem θ shape result, final),
       ⟨?_, ?_, ?_⟩, ?_⟩
-    · show HList.settle _ (HList.ofSkolem θ σs values) = HListPlain.ofSkolem θ σs entries
+    · show HList.settle _ (HList.ofSkolem θ σs values) = HList.ofSkolem θ σs entries
       rw [HList.settle_ofSkolem θ free]
-      exact congrArg (HListPlain.ofSkolem θ σs) settles
+      exact congrArg (HList.ofSkolem θ σs) settles
     · exact (ResultShape.settled_ofSkolem θ free shape result).mpr settled
     · rw [← ensuresOf_instantiate coherent Θ θ free]; exact ran
     · show (HList.encode (HList.ofSkolem θ σs values),
@@ -1293,9 +1136,9 @@ theorem settledEncoding_instantiate (coherent : InvokeMeaning.Coherent invoke) (
   · rintro ⟨⟨values, result, final⟩, ⟨settles, settled, ran⟩, rfl⟩
     refine ⟨(HList.toSkolem θ σs values, ResultShape.toSkolem θ shape result, final),
       ⟨?_, ?_, ?_⟩, ?_⟩
-    · have := congrArg (HListPlain.toSkolem θ σs) settles
+    · have := congrArg (HList.toSkolem θ σs) settles
       rw [← HList.ofSkolem_toSkolem θ σs values, HList.settle_ofSkolem θ free,
-        HListPlain.toSkolem_ofSkolem, HListPlain.toSkolem_ofSkolem] at this
+        HList.toSkolem_ofSkolem, HList.toSkolem_ofSkolem] at this
       exact this
     · rw [← ResultShape.settled_ofSkolem θ free, ResultShape.ofSkolem_toSkolem]; exact settled
     · rw [ensuresOf_instantiate coherent Θ θ free, HList.ofSkolem_toSkolem,
@@ -1312,11 +1155,11 @@ theorem settledEncoding_instantiate (coherent : InvokeMeaning.Coherent invoke) (
 theorem stateOf_instantiate (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit)
     (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
     (shape : ResultShape) (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
-    (entries : @HListPlain (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
+    (entries : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
     @StateOf unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared shape
         function entries state =
       @StateOf unit _ Θ (invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
-        (shape.functionOfSkolem θ σs shared function) (HListPlain.ofSkolem θ σs entries) state := by
+        (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs entries) state := by
   unfold StateOf
   rw [settledEncoding_instantiate coherent Θ θ free]
 
@@ -1325,13 +1168,13 @@ back. -/
 theorem resultOf_instantiate (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit)
     (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
     (shape : ResultShape) (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
-    (entries : @HListPlain (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit)
+    (entries : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit)
     (default : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) :
     @ResultOf unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared shape
         function entries state default =
       ResultShape.toSkolem θ shape (@ResultOf unit _ Θ (invoke Θ) (NRow.subst θ.1 σs) shared
         (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function)
-        (HListPlain.ofSkolem θ σs entries) state
+        (HList.ofSkolem θ σs entries) state
         (ResultShape.ofSkolem θ shape default)) := by
   unfold ResultOf
   rw [settledEncoding_instantiate coherent Θ θ free]
@@ -1360,7 +1203,7 @@ variable (executable : ExecutableUnit unit) (model : ModelUnit unit) (Θ : Skole
   (θ : TypeArgs) (σs : NRow) (shared : Sharing) (shape : ResultShape)
   (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
   (args : @HList (Skolems.instantiate θ Θ).toCarriers σs)
-  (entries : @HListPlain (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit)
+  (entries : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit)
 
 theorem closureMeaning_ensuresOf_instantiate (free : θ.1.refFree = true)
     (result : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) (post : Memory unit) :
@@ -1387,7 +1230,7 @@ theorem closureMeaning_resultOf_instantiate (free : θ.1.refFree = true)
         σs shared shape function entries state default =
       ResultShape.toSkolem θ shape (@ResultOf unit _ Θ (@closureMeaning unit _ executable Θ)
         (NRow.subst θ.1 σs) shared (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function)
-        (HListPlain.ofSkolem θ σs entries) state (ResultShape.ofSkolem θ shape default)) :=
+        (HList.ofSkolem θ σs entries) state (ResultShape.ofSkolem θ shape default)) :=
   resultOf_instantiate (closureMeaning_coherent executable) Θ θ free σs shared shape function entries
     state default
 
@@ -1395,7 +1238,7 @@ theorem closureMeaning_stateOf_instantiate (free : θ.1.refFree = true) :
     @StateOf unit _ (Skolems.instantiate θ Θ) (@closureMeaning unit _ executable (Skolems.instantiate θ Θ))
         σs shared shape function entries state =
       @StateOf unit _ Θ (@closureMeaning unit _ executable Θ) (NRow.subst θ.1 σs) shared
-        (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function) (HListPlain.ofSkolem θ σs entries)
+        (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs entries)
         state :=
   stateOf_instantiate (closureMeaning_coherent executable) Θ θ free σs shared shape function entries
     state
@@ -1422,7 +1265,7 @@ theorem ModelUnit.resultOf_instantiate (free : θ.1.refFree = true)
     @ResultOf unit _ (Skolems.instantiate θ Θ) (model.invoke (Skolems.instantiate θ Θ))
         σs shared shape function entries state default =
       ResultShape.toSkolem θ shape (@ResultOf unit _ Θ (model.invoke Θ) (NRow.subst θ.1 σs) shared
-        (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function) (HListPlain.ofSkolem θ σs entries)
+        (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs entries)
         state (ResultShape.ofSkolem θ shape default)) :=
   VerexIR.Proofs.resultOf_instantiate model.coherent Θ θ free σs shared shape function entries state
     default
@@ -1431,7 +1274,7 @@ theorem ModelUnit.stateOf_instantiate (free : θ.1.refFree = true) :
     @StateOf unit _ (Skolems.instantiate θ Θ) (model.invoke (Skolems.instantiate θ Θ))
         σs shared shape function entries state =
       @StateOf unit _ Θ (model.invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
-        (shape.functionOfSkolem θ σs shared function) (HListPlain.ofSkolem θ σs entries) state :=
+        (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs entries) state :=
   VerexIR.Proofs.stateOf_instantiate model.coherent Θ θ free σs shared shape function entries state
 
 end Instances
@@ -1468,7 +1311,6 @@ theorem forall_ok_unit_self_of_wp {σ ε : Type} {action : Spec σ ε Unit}
 -- normal form would reach first and leave quantified.
 attribute [vir_denote_norm] Denote.NTy.refFree Denote.NRow.refFree Denote.NRows.refFree
 attribute [vir_denote_norm] Denote.ResultShape.Settled Denote.NTy.settle Denote.HList.settle
-  Denote.NTy.settlePlain Denote.HListPlain.settle
 
 /-- A generic closure's verified target applies at the induced frame, with
 captured dictionaries woven into its ordinary arguments. -/
@@ -1498,19 +1340,20 @@ theorem ensuresOf_generic_verified {unit : ValidatedUnit} [FunctionCarriers unit
     (permitted : contract.requires (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre)
     (valid : contract.validArgs (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) := by
       trivial) :
-    (¬contract.mayAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre →
-      contract.ensures (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
-        (ResultShape.toSkolem θ shape result) post) ∧
-    contract.frame (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
-      (ResultShape.toSkolem θ shape result) post ∧
-    ¬contract.mustAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre := by
+    contract.validResult (ResultShape.toSkolem θ shape result) ∧
+      (¬contract.mayAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre →
+        contract.ensures (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
+          (ResultShape.toSkolem θ shape result) post) ∧
+      contract.frame (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
+        (ResultShape.toSkolem θ shape result) post ∧
+      ¬contract.mustAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre := by
   unfold EnsuresOf at ensures
   rw [closureMeaning_closureOfGeneric executable θ free weave capturedFree shape handle outer typeArgs coherent] at ensures
   rcases ensures with ⟨value, middle, run, same, state⟩
   subst post
   subst result
   rw [NTy.toSkolem_ofSkolem_shape]
-  exact ((verified _ pre valid assumed permitted).1 value middle run).2
+  exact (verified _ pre valid assumed permitted).1 value middle run
 
 /-! ## A behavior at a row
 
@@ -1552,77 +1395,55 @@ theorem Denote.Weave.finals_eq : {full captured supplied : NRow} →
 end
 
 section
-variable [Carriers]
+variable {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
-/-- The plain argument row of a target, woven from plain captures and plain
-supplied arguments: `Weave.compose` at the plain layer, which a site's
-constructor holds its captures at (`doc/designs/data-invariants.md`). -/
-def Denote.Weave.composePlain : {full captured supplied : NRow} → Weave full captured supplied →
-    HListPlain captured → HListPlain supplied → HListPlain full
-  | _, _, _, .nil, _, _ => ()
-  | _, _, _, .captured rest, captures, args => (captures.1, rest.composePlain captures.2 args)
-  | _, _, _, .supplied rest, captures, args => (args.1, rest.composePlain captures args.2)
+@[simp, vir_denote, vir_denote_norm] theorem Denote.Weave.compose_nil
+    (captures args : HList .nil) : Weave.nil.compose (unit := unit) captures args = () := rfl
 
-@[simp, vir_denote, vir_denote_norm] theorem Denote.Weave.composePlain_nil
-    (captures args : HListPlain .nil) : Weave.nil.composePlain captures args = () := rfl
-
-@[simp, vir_denote, vir_denote_norm] theorem Denote.Weave.composePlain_captured {τ : NTy}
+@[simp, vir_denote, vir_denote_norm] theorem Denote.Weave.compose_captured {τ : NTy}
     {full captured supplied : NRow} (rest : Weave full captured supplied)
-    (captures : HListPlain (.cons τ captured)) (args : HListPlain supplied) :
-    (Weave.captured rest).composePlain captures args =
-      (captures.1, rest.composePlain captures.2 args) := rfl
+    (captures : HList (.cons τ captured)) (args : HList supplied) :
+    (Weave.captured rest).compose (unit := unit) captures args =
+      (captures.1, rest.compose captures.2 args) := rfl
 
-@[simp, vir_denote, vir_denote_norm] theorem Denote.Weave.composePlain_supplied {τ : NTy}
+@[simp, vir_denote, vir_denote_norm] theorem Denote.Weave.compose_supplied {τ : NTy}
     {full captured supplied : NRow} (rest : Weave full captured supplied)
-    (captures : HListPlain captured) (args : HListPlain (.cons τ supplied)) :
-    (Weave.supplied rest).composePlain captures args =
-      (args.1, rest.composePlain captures args.2) := rfl
+    (captures : HList captured) (args : HList (.cons τ supplied)) :
+    (Weave.supplied rest).compose (unit := unit) captures args =
+      (args.1, rest.compose captures args.2) := rfl
 
-/-- A plain woven row determines its captures and its arguments. -/
-theorem Denote.Weave.composePlain_injective : {full captured supplied : NRow} →
+/-- A woven row determines its captures and its arguments. -/
+theorem Denote.Weave.compose_injective : {full captured supplied : NRow} →
     (weave : Weave full captured supplied) →
-    {captures captures' : HListPlain captured} → {args args' : HListPlain supplied} →
-    weave.composePlain captures args = weave.composePlain captures' args' →
+    {captures captures' : HList captured} → {args args' : HList supplied} →
+    weave.compose (unit := unit) captures args = weave.compose (unit := unit) captures' args' →
       captures = captures' ∧ args = args'
   | _, _, _, .nil, (), (), (), (), _ => ⟨rfl, rfl⟩
   | _, _, _, .captured rest, (c, cs), (c', cs'), _, _, equal => by
       have heads : c = c' := congrArg Prod.fst equal
-      obtain ⟨rests, argsEq⟩ := rest.composePlain_injective (congrArg Prod.snd equal)
+      obtain ⟨rests, argsEq⟩ := rest.compose_injective (congrArg Prod.snd equal)
       have rests : cs = cs' := rests
       exact ⟨by subst heads; subst rests; rfl, argsEq⟩
   | _, _, _, .supplied rest, _, _, (a, as), (a', as'), equal => by
       have heads : a = a' := congrArg Prod.fst equal
-      obtain ⟨capturesEq, rests⟩ := rest.composePlain_injective (congrArg Prod.snd equal)
+      obtain ⟨capturesEq, rests⟩ := rest.compose_injective (congrArg Prod.snd equal)
       have rests : as = as' := rests
       exact ⟨capturesEq, by subst heads; subst rests; rfl⟩
 
-/-- Rows of equal values forget alike. -/
-theorem Denote.HList.heq_forget {row row' : NRow} (rows : row = row')
-    {values : HList row} {values' : HList row'} (same : HEq values values') :
-    HEq (HList.forget row values) (HList.forget row' values') := by
-  cases rows
-  cases same
-  rfl
-
-end
-
-section
-variable {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
-
-/-- Settling a woven row of reference-free captures is weaving the forgotten
-captures with the settled arguments. -/
+/-- Settling a woven row of reference-free captures is weaving the captures
+with the settled arguments. -/
 theorem Denote.Weave.settle_compose : {full captured supplied : NRow} →
     (weave : Weave full captured supplied) → captured.refFree = true →
     (captures : HList captured) → (args : HList supplied) →
     HList.settle full (weave.compose captures args) =
-      weave.composePlain (HList.forget captured captures) (HList.settle supplied args)
+      weave.compose captures (HList.settle supplied args)
   | _, _, _, .nil, _, _, _ => rfl
   | _, _, _, .captured (τ := τ) rest, free, captures, args => by
       simp only [NRow.refFree, Bool.and_eq_true] at free
-      simp only [Weave.compose, HList.settle, HList.forget, Weave.composePlain,
+      simp only [Weave.compose, HList.settle,
         NTy.settle_self_of_refFree τ free.1, rest.settle_compose free.2]
   | _, _, _, .supplied rest, free, captures, args => by
-      simp only [Weave.compose, HList.settle, Weave.composePlain, rest.settle_compose free]
+      simp only [Weave.compose, HList.settle, rest.settle_compose free]
 
 /-- The final values a woven row names are the supplied arguments': a capture
 holds no reference (`Weave.finals_eq`). -/
@@ -1644,7 +1465,7 @@ theorem Denote.HList.heq_finals_compose : {full captured supplied : NRow} →
         | exact Denote.heq_pair HEq.rfl inner
 
 /-- The final values a clause names of a woven row are the supplied
-arguments', certified (`HList.heq_finals_compose`). -/
+arguments' (`HList.heq_finals_compose`). -/
 theorem Denote.Weave.finals_compose_iff {full captured supplied : NRow}
     (weave : Weave full captured supplied) (free : captured.refFree = true)
     (captures : HList captured) (args : HList supplied)
@@ -1659,72 +1480,52 @@ theorem Denote.Weave.finals_compose_iff {full captured supplied : NRow}
   · intro held
     exact eq_of_heq ((woven.trans (heq_of_eq held)).trans same.symm)
 
-/-- And at the plain layer. -/
-theorem Denote.Weave.finals_compose_plain_iff {full captured supplied : NRow}
-    (weave : Weave full captured supplied) (free : captured.refFree = true)
-    (captures : HList captured) (args : HList supplied)
-    {finals : HListPlain (NRow.finals supplied)} {finals' : HListPlain (NRow.finals full)}
-    (same : HEq finals' finals) :
-    (HList.forget (NRow.finals full) (HList.finals full (weave.compose captures args)) = finals') ↔
-      (HList.forget (NRow.finals supplied) (HList.finals supplied args) = finals) := by
-  have woven := HList.heq_forget (weave.finals_eq free)
-    (HList.heq_finals_compose weave free captures args)
-  constructor
-  · intro held
-    exact eq_of_heq ((woven.symm.trans (heq_of_eq held)).trans same)
-  · intro held
-    exact eq_of_heq ((woven.trans (heq_of_eq held)).trans same.symm)
-
 /-- `aborts_of` of a meaning at a row, as a clause states it: the run on
 arguments of the entry values `entries` aborts from `state`.  Of an invocation
 meaning at a function value (`abortsOfEntries_eq_abortsOfMeaning`) and of a known
 target's meaning at its full row alike. -/
 def AbortsOfMeaning (σs : NRow) (shape : ResultShape) (run : HList σs → Comp unit shape.carrier)
-    (entries : HListPlain σs) (state : Memory unit) : Prop :=
+    (entries : HList σs) (state : Memory unit) : Prop :=
   ∃ args, HList.settle σs args = entries ∧ CallAborts (run args) state
 
-/-- `ensures_of` of a meaning at a row, as a clause states it, at the plain
-layer: the run on arguments of the entry values `entries` runs from `pre` to
-`post`, its mutable references ending at the plain finals `finals` and its
-plain result `result` (`EnsuresOfPlain`). -/
+/-- `ensures_of` of a meaning at a row, as a clause states it: the run on
+arguments of the entry values `entries` runs from `pre` to `post`, its
+mutable references ending at `finals` and returning `result`
+(`EnsuresOfEntries`). -/
 def EnsuresOfMeaning (σs : NRow) (shape : ResultShape) (run : HList σs → Comp unit shape.carrier)
-    (entries : HListPlain σs) (finals : HListPlain (NRow.finals σs)) (result : shape.plain)
+    (entries : HList σs) (finals : HList (NRow.finals σs)) (result : shape.carrier)
     (pre post : Memory unit) : Prop :=
-  ∃ (args : HList σs) (value : shape.carrier), HList.settle σs args = entries ∧
-    HList.forget (NRow.finals σs) (HList.finals σs args) = finals ∧
-    shape.forget value = result ∧ CallEnsures (run args) value pre post
+  ∃ args : HList σs, HList.settle σs args = entries ∧
+    HList.finals σs args = finals ∧ CallEnsures (run args) result pre post
 
 /-- `aborts_of` of a function value is its invocation meaning at the value,
 read at the value's own row. -/
 theorem abortsOfEntries_eq_abortsOfMeaning (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
     (shape : ResultShape) (function : (NTy.function σs shared shape.row).carrier)
-    (entries : HListPlain σs) (state : Memory unit) :
+    (entries : HList σs) (state : Memory unit) :
     AbortsOfEntries invoke σs shared shape function entries state =
       AbortsOfMeaning σs shape (invoke σs shared shape function) entries state := rfl
 
 /-- `aborts_of` of a known target read directly is its call at the row. -/
 theorem atEntries_callAborts_eq_abortsOfMeaning {σs : NRow} {shape : ResultShape}
-    (run : HList σs → Comp unit shape.carrier) (entries : HListPlain σs)
+    (run : HList σs → Comp unit shape.carrier) (entries : HList σs)
     (state : Memory unit) :
     AtEntries σs (fun args => CallAborts (run args) state) entries =
       AbortsOfMeaning σs shape run entries state := rfl
 
-/-- `ensures_of` of a function value, at the plain layer, is its invocation
-meaning at the value. -/
-theorem ensuresOfPlain_eq_ensuresOfMeaning (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
+/-- `ensures_of` of a function value is its invocation meaning at the value. -/
+theorem ensuresOfEntries_eq_ensuresOfMeaning (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
     (shape : ResultShape) (function : (NTy.function σs shared shape.row).carrier)
-    (entries : HListPlain σs) (finals : HListPlain (NRow.finals σs)) (result : shape.plain)
+    (entries : HList σs) (finals : HList (NRow.finals σs)) (result : shape.carrier)
     (pre post : Memory unit) :
-    EnsuresOfPlain invoke σs shared shape function entries finals result pre post =
+    EnsuresOfEntries invoke σs shared shape function entries finals result pre post =
       EnsuresOfMeaning σs shape (invoke σs shared shape function) entries finals result pre post := rfl
 
 /-- `ensures_of` of a known target read directly is its call at the row. -/
 theorem atEntryFinals_callEnsures_eq_ensuresOfMeaning {σs : NRow} {shape : ResultShape}
-    (run : HList σs → Comp unit shape.carrier) (entries : HListPlain σs)
-    (finals : HListPlain (NRow.finals σs)) (result : shape.plain) (pre post : Memory unit) :
-    (∃ (args : HList σs) (value : shape.carrier), HList.settle σs args = entries ∧
-        HList.forget (NRow.finals σs) (HList.finals σs args) = finals ∧
-        shape.forget value = result ∧ CallEnsures (run args) value pre post) =
+    (run : HList σs → Comp unit shape.carrier) (entries : HList σs)
+    (finals : HList (NRow.finals σs)) (result : shape.carrier) (pre post : Memory unit) :
+    AtEntryFinals σs (fun args => CallEnsures (run args) result pre post) entries finals =
       EnsuresOfMeaning σs shape run entries finals result pre post := rfl
 
 /-- `aborts_of` of a meaning at a row, read at a row the captures of a weave
@@ -1733,10 +1534,9 @@ closure's behavior at its target, in the meaning and with no closure in it. -/
 theorem abortsOfMeaning_woven {full captured supplied : NRow} (weave : Weave full captured supplied)
     (free : captured.refFree = true) {shape : ResultShape}
     (run : HList full → Comp unit shape.carrier) (captures : HList captured)
-    (entries : HListPlain supplied) (state : Memory unit) :
+    (entries : HList supplied) (state : Memory unit) :
     AbortsOfMeaning supplied shape (fun args => run (weave.compose captures args)) entries state =
-      AbortsOfMeaning full shape run (weave.composePlain (HList.forget captured captures) entries)
-        state := by
+      AbortsOfMeaning full shape run (weave.compose captures entries) state := by
   apply propext
   constructor
   · rintro ⟨args, settled, aborts⟩
@@ -1744,40 +1544,37 @@ theorem abortsOfMeaning_woven {full captured supplied : NRow} (weave : Weave ful
   · rintro ⟨woven, settled, aborts⟩
     have split := weave.compose_split woven
     rw [← split, weave.settle_compose free] at settled
-    obtain ⟨capturesEq, argsEq⟩ := weave.composePlain_injective settled
-    have same := HList.forget_injective _ capturesEq
+    obtain ⟨capturesEq, argsEq⟩ := weave.compose_injective settled
     refine ⟨(weave.split woven).2, argsEq, ?_⟩
     show CallAborts (run (weave.compose captures (weave.split woven).2)) state
-    rw [← same, split]
+    rw [← capturesEq, split]
     exact aborts
 
 /-- `ensures_of` of a meaning at a row, at the woven entry values
 (`abortsOfMeaning_woven`); the finals are the supplied arguments', a capture naming
-none (`Weave.finals_compose_plain_iff`). -/
+none (`Weave.finals_compose_iff`). -/
 theorem ensuresOfMeaning_woven {full captured supplied : NRow} (weave : Weave full captured supplied)
     (free : captured.refFree = true) {shape : ResultShape}
     (run : HList full → Comp unit shape.carrier) (captures : HList captured)
-    (entries : HListPlain supplied) {finals : HListPlain (NRow.finals supplied)}
-    {finals' : HListPlain (NRow.finals full)} (same : HEq finals' finals)
-    (result : shape.plain) (pre post : Memory unit) :
+    (entries : HList supplied) {finals : HList (NRow.finals supplied)}
+    {finals' : HList (NRow.finals full)} (same : HEq finals' finals)
+    (result : shape.carrier) (pre post : Memory unit) :
     EnsuresOfMeaning supplied shape (fun args => run (weave.compose captures args)) entries finals
         result pre post =
-      EnsuresOfMeaning full shape run (weave.composePlain (HList.forget captured captures) entries)
+      EnsuresOfMeaning full shape run (weave.compose captures entries)
         finals' result pre post := by
   apply propext
   constructor
-  · rintro ⟨args, value, settled, finalsEq, forgot, ensures⟩
-    refine ⟨weave.compose captures args, value, by rw [weave.settle_compose free, settled], ?_,
-      forgot, ensures⟩
-    exact (weave.finals_compose_plain_iff free captures args same).mpr finalsEq
-  · rintro ⟨woven, value, settled, finalsEq, forgot, ensures⟩
+  · rintro ⟨args, settled, finalsEq, ensures⟩
+    refine ⟨weave.compose captures args, by rw [weave.settle_compose free, settled], ?_, ensures⟩
+    exact (weave.finals_compose_iff free captures args same).mpr finalsEq
+  · rintro ⟨woven, settled, finalsEq, ensures⟩
     have split := weave.compose_split woven
     rw [← split, weave.settle_compose free] at settled
-    obtain ⟨capturesEq, argsEq⟩ := weave.composePlain_injective settled
-    have captured := HList.forget_injective _ capturesEq
-    rw [← split, captured] at finalsEq ensures
-    refine ⟨(weave.split woven).2, value, argsEq, ?_, forgot, ensures⟩
-    exact (weave.finals_compose_plain_iff free captures (weave.split woven).2 same).mp finalsEq
+    obtain ⟨capturesEq, argsEq⟩ := weave.compose_injective settled
+    rw [← split, capturesEq] at finalsEq ensures
+    refine ⟨(weave.split woven).2, argsEq, ?_, ensures⟩
+    exact (weave.finals_compose_iff free captures (weave.split woven).2 same).mp finalsEq
 
 /-- Invoking a function value whose target, weave, and captures a proof sees
 is invoking the function value naming its target, at the woven arguments. -/
@@ -1799,7 +1596,7 @@ theorem closureMeaning_closureOf_named {executable : ExecutableUnit unit} {handl
 
 /-- `aborts_of` as a clause states it (`AbortsOfEntries`) of a function value
 capturing values, as of the function value naming its target (`named`) at the
-woven entry values: the captures forgotten, the entry values supplied. -/
+woven entry values. -/
 theorem abortsOfEntries_closureOf_woven {executable : ExecutableUnit unit}
     {handle : FunctionHandle} {full captured supplied : NRow}
     (weave : Weave full captured supplied) (free : captured.refFree = true)
@@ -1811,10 +1608,10 @@ theorem abortsOfEntries_closureOf_woven {executable : ExecutableUnit unit}
     {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
     (naming : (Carriers.functions full named_shared shape.row).closure named =
       closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
-    (entries : HListPlain supplied) (state : Memory unit) :
+    (entries : HList supplied) (state : Memory unit) :
     AbortsOfEntries (closureMeaning executable) supplied shared shape function entries state =
       AbortsOfEntries (closureMeaning executable) full named_shared shape named
-        (weave.composePlain (HList.forget captured captures) entries) state := by
+        (weave.compose captures entries) state := by
   rw [abortsOfEntries_eq_abortsOfMeaning, abortsOfEntries_eq_abortsOfMeaning,
     show (closureMeaning executable supplied shared shape function) =
         fun args => closureMeaning executable full named_shared shape named
@@ -1838,34 +1635,20 @@ theorem ensuresOfEntries_closureOf_woven {executable : ExecutableUnit unit}
     {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
     (naming : (Carriers.functions full named_shared shape.row).closure named =
       closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
-    (entries : HListPlain supplied) {finals : HList (NRow.finals supplied)}
+    (entries : HList supplied) {finals : HList (NRow.finals supplied)}
     {finals' : HList (NRow.finals full)} (same : HEq finals' finals)
     (result : shape.carrier) (pre post : Memory unit) :
     EnsuresOfEntries (closureMeaning executable) supplied shared shape function entries finals
         result pre post =
       EnsuresOfEntries (closureMeaning executable) full named_shared shape named
-        (weave.composePlain (HList.forget captured captures) entries) finals' result pre post := by
-  have woven := fun args => closureMeaning_closureOf_named (executable := executable) weave free
-    typeInstantiation captures shared shape function closed named naming args
-  apply propext
-  constructor
-  · rintro ⟨args, settled, finalsEq, ensures⟩
-    refine ⟨weave.compose captures args, by rw [weave.settle_compose free, settled], ?_, ?_⟩
-    · exact (weave.finals_compose_iff free captures args same).mpr finalsEq
-    · unfold EnsuresOf at ensures
-      rw [woven args] at ensures
-      exact ensures
-  · rintro ⟨wovenArgs, settled, finalsEq, ensures⟩
-    have split := weave.compose_split wovenArgs
-    rw [← split, weave.settle_compose free] at settled
-    obtain ⟨capturesEq, argsEq⟩ := weave.composePlain_injective settled
-    have captured := HList.forget_injective _ capturesEq
-    rw [← split, captured] at finalsEq ensures
-    refine ⟨(weave.split wovenArgs).2, argsEq, ?_, ?_⟩
-    · exact (weave.finals_compose_iff free captures (weave.split wovenArgs).2 same).mp finalsEq
-    · unfold EnsuresOf at ensures
-      rw [← woven (weave.split wovenArgs).2] at ensures
-      exact ensures
+        (weave.compose captures entries) finals' result pre post := by
+  rw [ensuresOfEntries_eq_ensuresOfMeaning, ensuresOfEntries_eq_ensuresOfMeaning,
+    show (closureMeaning executable supplied shared shape function) =
+        fun args => closureMeaning executable full named_shared shape named
+          (weave.compose captures args) from
+      funext fun args => closureMeaning_closureOf_named weave free typeInstantiation captures
+        shared shape function closed named naming args]
+  exact ensuresOfMeaning_woven weave free _ captures entries same result pre post
 
 /-- `ensures_of` of a function value returning a mutable reference
 (`EnsuresOfSettled`), as of the function value naming its target at the woven
@@ -1882,22 +1665,22 @@ theorem ensuresOfSettled_closureOf_woven {executable : ExecutableUnit unit}
     (named : (NTy.function full named_shared (ResultShape.one (.ref σ)).row).carrier)
     (naming : (Carriers.functions full named_shared (ResultShape.one (.ref σ)).row).closure
       named = closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
-    (entries : HListPlain supplied) {finals : HList (NRow.finals supplied)}
+    (entries : HList supplied) {finals : HList (NRow.finals supplied)}
     {finals' : HList (NRow.finals full)} (same : HEq finals' finals)
-    (current : σ.plain) (pre post : Memory unit) :
+    (current : σ.carrier) (pre post : Memory unit) :
     EnsuresOfSettled (closureMeaning executable) supplied shared σ function entries finals
         current pre post =
       EnsuresOfSettled (closureMeaning executable) full named_shared σ named
-        (weave.composePlain (HList.forget captured captures) entries) finals' current
+        (weave.compose captures entries) finals' current
         pre post := by
   unfold EnsuresOfSettled
   apply propext
   constructor
-  · rintro ⟨prophecy, forgotten, ensures⟩
-    exact ⟨prophecy, forgotten, (ensuresOfEntries_closureOf_woven weave free typeInstantiation
+  · rintro ⟨prophecy, settled, ensures⟩
+    exact ⟨prophecy, settled, (ensuresOfEntries_closureOf_woven weave free typeInstantiation
       captures shared _ function closed named naming entries same _ pre post) ▸ ensures⟩
-  · rintro ⟨prophecy, forgotten, ensures⟩
-    exact ⟨prophecy, forgotten, (ensuresOfEntries_closureOf_woven weave free typeInstantiation
+  · rintro ⟨prophecy, settled, ensures⟩
+    exact ⟨prophecy, settled, (ensuresOfEntries_closureOf_woven weave free typeInstantiation
       captures shared _ function closed named naming entries same _ pre post).symm ▸ ensures⟩
 
 end

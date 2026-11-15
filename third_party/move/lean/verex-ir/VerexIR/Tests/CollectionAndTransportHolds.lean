@@ -1,7 +1,9 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import VerexSL
+import VerexIR.Proofs.Denote.Resources
+import VerexIR.Proofs.Denote.VectorOperations
+import VerexIR.Proofs.Denote.NativeMaps
 
 namespace VerexIR.Tests.CollectionAndTransportHolds
 
@@ -9,105 +11,174 @@ open VerexIR VerexIR.Proofs.Denote
 
 /-! # Unit tests for frame/skolem transport `Holds` laws and collection/`SpecMap` `Holds` lemmas -/
 
-section TransportTests
-variable [Θ : Carriers] [@CarriersNonempty Θ]
+-- ============================================================================
+-- Section 1: Skolem Carrier Transport `Holds` Laws (`vir_transport`)
+-- ============================================================================
 
-example (θ : TypeArgs) (τ : NTy) (v : (τ.subst θ.1).plain) :
-    (@NTy.Holds (Carriers.instantiate θ Θ) τ (NTy.plainToSkolem θ τ v)) ↔
+section TransportTests
+variable [Θ : Carriers]
+
+-- Negative 1 (first): transporting an invalid value (`¬Holds`) into a skolem
+-- frame via `NTy.toSkolem` does not manufacture `NTy.Holds`.
+example (θ : TypeArgs) (τ : NTy) (v : (τ.subst θ.1).carrier)
+    (bad : ¬@NTy.Holds Θ (τ.subst θ.1) v) :
+    ¬@NTy.Holds (Carriers.instantiate θ Θ) τ (NTy.toSkolem θ τ v) := by
+  simp only [vir_transport]
+  exact bad
+
+-- Negative 2: transporting an invalid skolem value back via `NTy.ofSkolem`
+-- does not manufacture `NTy.Holds`.
+example (θ : TypeArgs) (τ : NTy) (v : @NTy.carrier (Carriers.instantiate θ Θ) τ)
+    (bad : ¬@NTy.Holds (Carriers.instantiate θ Θ) τ v) :
+    ¬@NTy.Holds Θ (τ.subst θ.1) (NTy.ofSkolem θ τ v) := by
+  simp only [vir_transport]
+  exact bad
+
+-- Positive 1–6: `toSkolem` and `ofSkolem` preserve `Holds` bijectively across
+-- `NTy`, `HList`, and `variantCarrier`.
+example (θ : TypeArgs) (τ : NTy) (v : (τ.subst θ.1).carrier) :
+    (@NTy.Holds (Carriers.instantiate θ Θ) τ (NTy.toSkolem θ τ v)) ↔
       @NTy.Holds Θ (τ.subst θ.1) v := by
   simp only [vir_transport]
 
-example (θ : TypeArgs) (τ : NTy) (v : @NTy.plain (Carriers.instantiate θ Θ) τ) :
-    (@NTy.Holds Θ (τ.subst θ.1) (NTy.plainOfSkolem θ τ v)) ↔
+example (θ : TypeArgs) (τ : NTy) (v : @NTy.carrier (Carriers.instantiate θ Θ) τ) :
+    (@NTy.Holds Θ (τ.subst θ.1) (NTy.ofSkolem θ τ v)) ↔
       @NTy.Holds (Carriers.instantiate θ Θ) τ v := by
   simp only [vir_transport]
 
-example (θ : TypeArgs) (row : NRow) (vs : HListPlain (NRow.subst θ.1 row)) :
-    (@HListPlain.Holds (Carriers.instantiate θ Θ) row (HListPlain.toSkolem θ row vs)) ↔
-      @HListPlain.Holds Θ (NRow.subst θ.1 row) vs := by
+example (θ : TypeArgs) (row : NRow) (vs : HList (NRow.subst θ.1 row)) :
+    (@HList.Holds (Carriers.instantiate θ Θ) row (HList.toSkolem θ row vs)) ↔
+      @HList.Holds Θ (NRow.subst θ.1 row) vs := by
   simp only [vir_transport]
 
-example (θ : TypeArgs) (row : NRow) (vs : @HListPlain (Carriers.instantiate θ Θ) row) :
-    (@HListPlain.Holds Θ (NRow.subst θ.1 row) (HListPlain.ofSkolem θ row vs)) ↔
-      @HListPlain.Holds (Carriers.instantiate θ Θ) row vs := by
-  simp only [vir_transport]
-
-example (θ : TypeArgs) (names : List String) (rows : NRows)
-    (v : variantPlain names (NRows.subst θ.1 rows)) :
-    (@variantPlain.Holds (Carriers.instantiate θ Θ) names rows
-        (variantPlain.toSkolem θ names rows v)) ↔
-      @variantPlain.Holds Θ names (NRows.subst θ.1 rows) v := by
+example (θ : TypeArgs) (row : NRow) (vs : @HList (Carriers.instantiate θ Θ) row) :
+    (@HList.Holds Θ (NRow.subst θ.1 row) (HList.ofSkolem θ row vs)) ↔
+      @HList.Holds (Carriers.instantiate θ Θ) row vs := by
   simp only [vir_transport]
 
 example (θ : TypeArgs) (names : List String) (rows : NRows)
-    (v : @variantPlain (Carriers.instantiate θ Θ) names rows) :
-    (@variantPlain.Holds Θ names (NRows.subst θ.1 rows)
-        (variantPlain.ofSkolem θ names rows v)) ↔
-      @variantPlain.Holds (Carriers.instantiate θ Θ) names rows v := by
+    (v : variantCarrier names (NRows.subst θ.1 rows)) :
+    (@variantCarrier.Holds (Carriers.instantiate θ Θ) names rows
+        (variantCarrier.toSkolem θ names rows v)) ↔
+      @variantCarrier.Holds Θ names (NRows.subst θ.1 rows) v := by
+  simp only [vir_transport]
+
+example (θ : TypeArgs) (names : List String) (rows : NRows)
+    (v : @variantCarrier (Carriers.instantiate θ Θ) names rows) :
+    (@variantCarrier.Holds Θ names (NRows.subst θ.1 rows)
+        (variantCarrier.ofSkolem θ names rows v)) ↔
+      @variantCarrier.Holds (Carriers.instantiate θ Θ) names rows v := by
   simp only [vir_transport]
 
 end TransportTests
 
+-- ============================================================================
+-- Section 2: `Skolems` Frame Transport `Holds` Laws (`vir_transport`)
+-- ============================================================================
+
 section FrameTests
 variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
 
-example [Θ : Skolems unit] (τ : NTy) (v : @NTy.plain Θ.toCarriers τ) :
-    @NTy.Holds (Carriers.runtime unit) (Θ.resolve τ) (Θ.plainToRuntime τ v) ↔
+-- Negative 1 (first): `Θ.toRuntime` preserves invalidity (`¬NTy.Holds`).
+example [Θ : Skolems unit] (τ : NTy) (v : @NTy.carrier Θ.toCarriers τ)
+    (bad : ¬@NTy.Holds Θ.toCarriers τ v) :
+    ¬@NTy.Holds (Carriers.runtime unit) (Θ.resolve τ) (Θ.toRuntime τ v) := by
+  simp only [vir_transport]
+  exact bad
+
+-- Negative 2: `Θ.reframe` preserves invalidity (`¬NTy.Holds`).
+example (Θ : Skolems unit) {params : NRow}
+    (own : params.isParamsFrom 0 = true) {τ : NTy}
+    (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
+    (v : @NTy.carrier Θ.toCarriers τ) (bad : ¬@NTy.Holds Θ.toCarriers τ v) :
+    ¬@NTy.Holds (Θ.instance params own).toCarriers τ (Θ.reframe own bounded v) := by
+  simp only [vir_transport]
+  exact bad
+
+-- Positive 1–4: `toRuntime`, `ofRuntime`, `reframe`, and `Skolems.instantiate`
+-- preserve `NTy.Holds` bijectively via `vir_transport`.
+example [Θ : Skolems unit] (τ : NTy) (v : @NTy.carrier Θ.toCarriers τ) :
+    @NTy.Holds (Carriers.runtime unit) (Θ.resolve τ) (Θ.toRuntime τ v) ↔
       @NTy.Holds Θ.toCarriers τ v := by
   simp only [vir_transport]
 
-example [Θ : Skolems unit] (τ : NTy) (v : @NTy.plain (Carriers.runtime unit) (Θ.resolve τ)) :
-    @NTy.Holds Θ.toCarriers τ (Θ.plainOfRuntime τ v) ↔
+example [Θ : Skolems unit] (τ : NTy) (v : @NTy.carrier (Carriers.runtime unit) (Θ.resolve τ)) :
+    @NTy.Holds Θ.toCarriers τ (Θ.ofRuntime τ v) ↔
       @NTy.Holds (Carriers.runtime unit) (Θ.resolve τ) v := by
   simp only [vir_transport]
 
-example [@CarriersNonempty (Carriers.runtime unit)] (Θ : Skolems unit) {params : NRow}
+example (Θ : Skolems unit) {params : NRow}
     (own : params.isParamsFrom 0 = true) {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
-    (v : @NTy.plain Θ.toCarriers τ) :
-    @NTy.Holds (Θ.instance params own).toCarriers τ (Θ.plainReframe own bounded v) ↔
+    (v : @NTy.carrier Θ.toCarriers τ) :
+    @NTy.Holds (Θ.instance params own).toCarriers τ (Θ.reframe own bounded v) ↔
       @NTy.Holds Θ.toCarriers τ v := by
   simp only [vir_transport]
 
 example [Θ : Skolems unit] (θ : TypeArgs) (τ : NTy)
-    (v : @NTy.plain Θ.toCarriers (τ.subst θ.1)) :
-    @NTy.Holds (Skolems.instantiate θ Θ).toCarriers τ (NTy.plainToSkolem θ τ v) ↔
+    (v : @NTy.carrier Θ.toCarriers (τ.subst θ.1)) :
+    @NTy.Holds (Skolems.instantiate θ Θ).toCarriers τ (NTy.toSkolem θ τ v) ↔
       @NTy.Holds Θ.toCarriers (τ.subst θ.1) v := by
   simp only [vir_transport]
 
 end FrameTests
 
+-- ============================================================================
+-- Section 3: Collection (`SpecVector`, `SpecArray`, `SpecSliceRef`) `Holds`
+-- ============================================================================
+
 section CollectionTests
 variable [Carriers]
 
-example {τ : NTy} {vec : (NTy.vector τ).plain}
+-- Negative 1 (first): a singleton vector holding an invalid element fails
+-- `NTy.Holds (.vector τ)`.
+example {τ : NTy} (x : τ.carrier) (bad : ¬τ.Holds x) :
+    ¬NTy.Holds (.vector τ) (⟨#[x], by simp⟩ : (NTy.vector τ).carrier) := by
+  intro held
+  exact bad (held.of_getElem 0 (by simp))
+
+-- Negative 2: pushing an invalid element onto any vector refutes
+-- `NTy.Holds (.vector τ)` on the resulting vector.
+example {τ : NTy} {vec rPush : (NTy.vector τ).carrier} {x : τ.carrier}
+    (bad : ¬τ.Holds x)
+    (bPush : SpecVector.ofArray? (vec.values.push x) = some rPush) :
+    ¬NTy.Holds (.vector τ) rPush := by
+  intro held
+  unfold SpecVector.ofArray? at bPush
+  split at bPush
+  · cases Option.some.inj bPush
+    exact bad (held.of_mem (Array.mem_push.mpr (.inr rfl)))
+  · cases bPush
+
+-- Positive 1–7: single-carrier collection read & construction `Holds` preservation.
+example {τ : NTy} {vec : (NTy.vector τ).carrier}
     (held : NTy.Holds (.vector τ) vec) (i : Nat) (h : i < vec.values.size) :
     τ.Holds (vec.values[i]'h) :=
   held.of_getElem i h
 
-example {τ : NTy} {len : Nat} {arr : (NTy.array τ len).plain}
+example {τ : NTy} {len : Nat} {arr : (NTy.array τ len).carrier}
     (held : NTy.Holds (.array τ len) arr) :
     NTy.Holds (.vector τ) arr.vector :=
   held.arrayVector
 
-example {τ : NTy} {vec : SpecVector τ.plain}
+example {τ : NTy} {vec : SpecVector τ.carrier}
     (held : NTy.Holds (.vector τ) vec) (len : Nat) (sized : vec.values.size = len) :
     NTy.Holds (.array τ len) ⟨vec, sized⟩ :=
   held.of_arrayOf sized
 
-example {τ : NTy} {ref : (NTy.sliceRef τ).plain}
+example {τ : NTy} {ref : (NTy.sliceRef τ).carrier}
     (held : NTy.Holds (.sliceRef τ) ref) :
     NTy.Holds (.vector τ) ref.currentVector :=
   NTy.Holds.slice_iff_vector.mp held.sliceCurrent
 
-example {τ : NTy} (x y : τ.plain) (hx : τ.Holds x) (hy : τ.Holds y)
-    {v : (NTy.vector τ).plain}
-    (built : SpecVector.ofArray? (HListPlain.toListOf 2 (x, (y, ()))).toArray = some v) :
+example {τ : NTy} (x y : τ.carrier) (hx : τ.Holds x) (hy : τ.Holds y)
+    {v : (NTy.vector τ).carrier}
+    (built : SpecVector.ofArray? (HList.toListOf 2 (x, (y, ()))).toArray = some v) :
     NTy.Holds (.vector τ) v :=
-  have held : HListPlain.Holds (NRow.replicate 2 τ) (x, (y, ())) := ⟨hx, hy, trivial⟩
+  have held : HList.Holds (NRow.replicate 2 τ) (x, (y, ())) := ⟨hx, hy, trivial⟩
   NTy.Holds.of_vectorLit held built
 
-example {τ : NTy} {vec res : (NTy.vector τ).plain} {x : τ.plain}
+example {τ : NTy} {vec res : (NTy.vector τ).carrier} {x : τ.carrier}
     (held : NTy.Holds (.vector τ) vec) (hx : τ.Holds x)
     (i j : Nat)
     (rep : SpecVector.ofArray? (Array.replicate 3 x) = some res) :
@@ -122,8 +193,8 @@ example {τ : NTy} {vec res : (NTy.vector τ).plain} {x : τ.plain}
    held.swapBounded i j,
    held.eraseBounded i⟩
 
-example {τ : NTy} {vec rPush rIns rRem rSwap rCat rSl rRev : (NTy.vector τ).plain}
-    {x y : τ.plain} {i j : Nat}
+example {τ : NTy} {vec rPush rIns rRem rSwap rCat rSl rRev : (NTy.vector τ).carrier}
+    {x y : τ.carrier} {i j : Nat}
     (held : NTy.Holds (.vector τ) vec) (hx : τ.Holds x) (hy : τ.Holds y)
     (bPush : SpecVector.ofArray? (vec.values.push x) = some rPush)
     (bIns : SpecVector.ofArray? (vec.values.insertIdxIfInBounds i x) = some rIns)
@@ -146,14 +217,30 @@ example {τ : NTy} {vec rPush rIns rRem rSwap rCat rSl rRev : (NTy.vector τ).pl
 
 end CollectionTests
 
-section MapAndEnvTests
-variable [Θ : Carriers] [@CarriersNonempty Θ]
+-- ============================================================================
+-- Section 4: `SpecMap` & Single-Carrier `HEnv.Holds`
+-- ============================================================================
 
--- Identity plain view (concrete non-integer types)
-example {κ ν : NTy} [DecidableEq κ.plain] [Inhabited κ.plain] [Inhabited ν.plain]
-    {table : (NTy.table κ ν).plain} (held : NTy.Holds (.table κ ν) table)
-    (k k2 : κ.plain) (v2 : ν.plain) (hk2 : κ.Holds k2) (hv2 : ν.Holds v2)
-    (valFound : ν.plain)
+section MapAndEnvTests
+variable [Θ : Carriers]
+
+-- Negative 1 (first): an initialized slot holding an invalid value fails `HEnv.Holds`.
+example {τ σ : NTy} (badVal : τ.carrier) (bad : ¬τ.Holds badVal) :
+    ¬HEnv.Holds (.cons τ (.cons σ .nil)) (some badVal, (none, ())) :=
+  fun held => bad held.1
+
+-- Negative 2: a `SpecMap` containing an entry with an invalid value fails `SpecMap.EntriesHold`.
+example {κ ν : NTy} [DecidableEq κ.carrier] (k : κ.carrier) (badVal : ν.carrier)
+    (bad : ¬ν.Holds badVal) :
+    ¬SpecMap.EntriesHold κ ν id id [(k, badVal)] := by
+  intro hMap
+  exact bad (NTy.Holds.of_specMap_get? (key := k) hMap (by simp [SpecMap.get?]))
+
+-- Positive 1: identity carrier view (concrete non-integer types).
+example {κ ν : NTy} [DecidableEq κ.carrier] [Inhabited κ.carrier] [Inhabited ν.carrier]
+    {table : (NTy.table κ ν).carrier} (held : NTy.Holds (.table κ ν) table)
+    (k k2 : κ.carrier) (v2 : ν.carrier) (hk2 : κ.Holds k2) (hv2 : ν.Holds v2)
+    (valFound : ν.carrier)
     (found : SpecMap.get? (SpecMap.ofEntries id id table) k = some valFound)
     (present : SpecMap.hasKey (SpecMap.ofEntries id id table) k = true)
     (idx : Int) (low : 0 ≤ idx) (high : idx < SpecMap.size (SpecMap.ofEntries id id table)) :
@@ -173,34 +260,34 @@ example {κ ν : NTy} [DecidableEq κ.plain] [Inhabited κ.plain] [Inhabited ν.
     NTy.Holds.of_specMap_keyAt hMap low high,
     NTy.Holds.of_writeBack hRem⟩
 
--- Integer key + `readPlain` value view
+-- Positive 2: integer key + `NTy.read` / `NTy.unread` value view.
 example {ν : NTy} (hν : ν.inhabitable = true)
-    {table : (NTy.table (.int 64 false) ν).plain}
+    {table : (NTy.table (.int 64 false) ν).carrier}
     (held : NTy.Holds (.table (.int 64 false) ν) table)
     (fallback : SpecInt (.bits 64) false) (k : Int)
-    (present : SpecMap.hasKey (SpecMap.ofEntries SpecInt.val (NTy.readPlain ν hν) table) k = true) :
-    let unreadVal := fun x => NTy.forget ν (NTy.unread ν hν x)
+    (present : SpecMap.hasKey (SpecMap.ofEntries SpecInt.val (NTy.read ν) table) k = true) :
+    let unreadVal := NTy.unread ν hν
     let _ : Inhabited ν.readCarrier := NTy.readInhabited ν hν
     let _ : DecidableEq ν.readCarrier := NTy.readDecEq ν
     ν.Holds (unreadVal
       (@SpecMap.valueAt Int ν.readCarrier _ (NTy.readInhabited ν hν)
-        (SpecMap.ofEntries SpecInt.val (NTy.readPlain ν hν) table) k)) ∧
+        (SpecMap.ofEntries SpecInt.val (NTy.read ν) table) k)) ∧
       NTy.Holds (.table (.int 64 false) ν)
         (SpecMap.writeBack (fun entry => (SpecInt.ofInt fallback entry.1, unreadVal entry.2))
-          (SpecMap.ofEntries SpecInt.val (NTy.readPlain ν hν) table)) := by
+          (SpecMap.ofEntries SpecInt.val (NTy.read ν) table)) := by
   intro unreadVal _ _
   have hMap : SpecMap.EntriesHold (.int 64 false) ν (SpecInt.ofInt fallback) unreadVal
-      (SpecMap.ofEntries SpecInt.val (NTy.readPlain ν hν) table) :=
-    SpecMap.entries_hold_ofEntries held (valueHolds := fun _ h => h.unread_readPlain hν)
+      (SpecMap.ofEntries SpecInt.val (NTy.read ν) table) :=
+    SpecMap.entries_hold_ofEntries held
+      (valueHolds := fun v h => by dsimp only [unreadVal]; rwa [NTy.unread_read ν hν v])
   exact ⟨@NTy.Holds.of_specMap_valueAt _ Int ν.readCarrier _ (NTy.readInhabited ν hν)
       (.int 64 false) ν _ _ _ hMap k present,
     NTy.Holds.of_writeBack hMap⟩
 
--- Plain environment `HEnvPlain.Holds`
-example {τ σ : NTy} (v : τ.plain) (hv : τ.Holds v) (env : HEnv (.cons τ (.cons σ .nil))) :
-    HEnvPlain.Holds (.cons τ (.cons σ .nil)) (some v, (none, ())) ∧
-      HEnvPlain.Holds (.cons τ (.cons σ .nil)) (HEnv.forget (.cons τ (.cons σ .nil)) env) :=
-  ⟨⟨hv, trivial, trivial⟩, HEnv.holds_forget (.cons τ (.cons σ .nil)) env⟩
+-- Positive 3: single-carrier environment `HEnv.Holds`.
+example {τ σ : NTy} (v : τ.carrier) (hv : τ.Holds v) :
+    HEnv.Holds (.cons τ (.cons σ .nil)) (some v, (none, ())) :=
+  ⟨hv, trivial, trivial⟩
 
 end MapAndEnvTests
 

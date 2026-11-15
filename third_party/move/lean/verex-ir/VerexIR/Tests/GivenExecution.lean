@@ -14,31 +14,42 @@ bodies require no assumptions about them.
 open VerexIR.Proofs VerexIR.Proofs.Denote
 namespace VerexIR.Tests.GivenExecution
 
--- Specification views and their ordering use the single abstract sort.
+section ParameterViews
+
+-- Negative control: fixed-width integer `NTy.readCarrier` (`Int`) is distinct from `NTy.carrier` (`SpecInt`),
+-- unlike an abstract Given parameter whose specification view and carrier coincide.
+example (frame : GivenFrame) : True := by
+  fail_if_success
+    have : @NTy.readCarrier frame.toCarriers (.int 64 false) =
+        @NTy.carrier frame.toCarriers (.int 64 false) := rfl
+  trivial
+
+-- Positive controls: specification views and their ordering on a Given parameter use the single abstract sort.
 example (frame : GivenFrame) (i : Nat)
     (value : @NTy.carrier frame.toCarriers (.param i)) :
     @NTy.read frame.toCarriers (.param i) value = value := rfl
+
 example (frame : GivenFrame) (i : Nat)
-    [@CarriersNonempty frame.toCarriers]
     (value : @NTy.readCarrier frame.toCarriers (.param i)) :
-    @NTy.unread frame.toCarriers _ (.param i) rfl value = value := rfl
+    @NTy.unread frame.toCarriers (.param i) rfl value = value := rfl
+
 example (frame : GivenFrame) (i : Nat) (rank : ValueRanks)
     (left right : @NTy.carrier frame.toCarriers (.param i)) :
     (@NTy.readOrder frame.toCarriers rank (.param i)).compare left right =
-      @NTy.plainOrder frame.toCarriers rank (.param i) left right := rfl
+      @NTy.order frame.toCarriers rank (.param i) left right := rfl
 
--- Given parameters retain both API roles with one definitional representation.
-example (frame : GivenFrame) (index : Nat) :
-    @NTy.plain frame.toCarriers (.param index) =
-      @NTy.carrier frame.toCarriers (.param index) := rfl
+end ParameterViews
 
-example (frame : GivenFrame) (index : Nat)
-    (value : @NTy.carrier frame.toCarriers (.param index)) :
-    @NTy.forget frame.toCarriers (.param index) value = value := rfl
-
-example (frame : GivenFrame) (index : Nat)
-    (value : @NTy.plain frame.toCarriers (.param index)) :
-    @NTy.ofDeepHolds frame.toCarriers (.param index) value trivial = value := rfl
+def emptyPack (unit : VerexIR.Validation.ValidatedUnit) (source : VerexIR.StructHandle) :
+    Function unit where
+  params := .nil
+  locals := .nil
+  frame := .nil
+  frame_eq := rfl
+  result := .one (.struct source .nil .nil)
+  body := .pack 0 source .nil .nil .nil
+  mutables := .nil
+  exitSite := 0
 
 def identity (unit : VerexIR.Validation.ValidatedUnit) : Function unit where
   params := .cons (.param 0) .nil
@@ -60,7 +71,37 @@ def swapped (unit : VerexIR.Validation.ValidatedUnit) : Function unit where
   mutables := .nil
   exitSite := 0
 
+-- The concrete adapter is the exact entry point used by existing verification.
+theorem concrete_adapter {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
+    {executable : VerexIR.Validation.ExecutableUnit unit} [Skolems unit]
+    (meanings : Meanings executable) (f : Function unit) (args : HList f.params) :
+    f.denoteWith meanings args = f.denoteIn meanings.interpreterOps args := rfl
+
 set_option maxRecDepth 2000
+
+section SharedInterpreterExecution
+
+/-- Negative control: trivial abstract parameter validity in a Given frame does not
+erase a declared ADT invariant. A deliberately false nominal invariant still fails at pack. -/
+theorem false_pack_undefined [C : Carriers] {State : Type}
+    (unit : VerexIR.Validation.ValidatedUnit) (ops : InterpreterOps unit C State)
+    (source : VerexIR.StructHandle)
+    (broken : ¬ C.own source .nil (NTy.encode (.struct source .nil .nil) ()))
+    (initial : State) :
+    ((emptyPack unit source).denoteIn ops ()).undefined initial := by
+  simp only [emptyPack, Function.denoteIn, Term.denoteIn, Args.denoteIn,
+    initialEnv, Flow.bind_pure_value, GhostInits.initialize, Spec.pure_bind]
+  exact Or.inl (Or.inl (fun held => broken held.deepHolds.1))
+
+/-- Negative control: the same false nominal invariant makes concrete `Function.denoteWith` undefined. -/
+theorem concrete_false_pack_undefined {unit : VerexIR.Validation.ValidatedUnit}
+    [FunctionCarriers unit] {executable : VerexIR.Validation.ExecutableUnit unit}
+    [Θ : Skolems unit] (meanings : Meanings executable) (source : VerexIR.StructHandle)
+    (broken : ¬ Θ.toCarriers.own source .nil (NTy.encode (.struct source .nil .nil) ()))
+    (initial : Memory unit) :
+    ((emptyPack unit source).denoteWith meanings ()).undefined initial := by
+  rw [concrete_adapter]
+  exact false_pack_undefined unit meanings.interpreterOps source broken initial
 
 theorem identity_denote [C : Carriers] {State : Type}
     (unit : VerexIR.Validation.ValidatedUnit) (ops : InterpreterOps unit C State)
@@ -77,13 +118,7 @@ theorem swapped_denote [C : Carriers] {State : Type}
     initialEnv, Var.get, Var.clear, ResultShape.finish, Mutables.resolve, ResultShape.ofBody]
   rfl
 
--- The concrete adapter is the exact entry point used by existing verification.
-theorem concrete_adapter {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
-    {executable : VerexIR.Validation.ExecutableUnit unit} [Skolems unit]
-    (meanings : Meanings executable) (f : Function unit) (args : HList f.params) :
-    f.denoteWith meanings args = f.denoteIn meanings.interpreterOps args := rfl
-
-/-- A source-level identity contract at arbitrary certified parameter carriers. -/
+/-- A source-level identity contract at arbitrary parameter carriers. -/
 def identityContract [Carriers] (State : Type) :
     Contract State Failure (HList (.cons (.param 0) .nil)) (NTy.carrier (.param 0)) where
   requires := fun _ _ => True
@@ -102,7 +137,7 @@ theorem identity_verified [C : Carriers] {State : Type}
     fun _ impossible => impossible, fun impossible => impossible⟩
 
 /-- The whole-value swap has no precondition about the representations of
-its abstract parameters. The certified values travel intact. -/
+its abstract parameters. The parameter values travel intact. -/
 def swappedContract [Carriers] (State : Type) :
     Contract State Failure (HList (.cons (.param 0) (.cons (.param 1) .nil)))
       (NTy.carrier (.tuple (.cons (.param 1) (.cons (.param 0) .nil)))) where
@@ -180,41 +215,9 @@ theorem swapped_refines {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarri
   · intro impossible
     exact False.elim impossible
 
-def emptyPack (unit : VerexIR.Validation.ValidatedUnit) (source : VerexIR.StructHandle) :
-    Function unit where
-  params := .nil
-  locals := .nil
-  frame := .nil
-  frame_eq := rfl
-  result := .one (.struct source .nil .nil)
-  body := .pack 0 source .nil .nil .nil
-  mutables := .nil
-  exitSite := 0
-
-/-- Trivial abstract parameter certification does not erase a declared
-ADT invariant. A deliberately false nominal invariant still fails at pack. -/
-theorem false_pack_undefined [C : Carriers] {State : Type}
-    (unit : VerexIR.Validation.ValidatedUnit) (ops : InterpreterOps unit C State)
-    (source : VerexIR.StructHandle)
-    (broken : ¬ C.own source .nil (NTy.plainEncode (.struct source .nil .nil) ()))
-    (initial : State) :
-    ((emptyPack unit source).denoteIn ops ()).undefined initial := by
-  simp only [emptyPack, Function.denoteIn, Term.denoteIn, Args.denoteIn,
-    initialEnv, Flow.bind_pure_value, GhostInits.initialize, Spec.pure_bind]
-  exact Or.inl (Or.inl (fun held => broken held.1))
-
-theorem concrete_false_pack_undefined {unit : VerexIR.Validation.ValidatedUnit}
-    [FunctionCarriers unit] {executable : VerexIR.Validation.ExecutableUnit unit}
-    [Θ : Skolems unit] (meanings : Meanings executable) (source : VerexIR.StructHandle)
-    (broken : ¬ Θ.toCarriers.own source .nil (NTy.plainEncode (.struct source .nil .nil) ()))
-    (initial : Memory unit) :
-    ((emptyPack unit source).denoteWith meanings ()).undefined initial := by
-  rw [concrete_adapter]
-  exact false_pack_undefined unit meanings.interpreterOps source broken initial
-
-/-- The given parameter sort is the concrete certified sort for these
-closed examples. Concrete temporary views remain on the concrete side of the
-explicit relational transfer. -/
+/-- The given parameter sort is the concrete carrier sort for these closed
+examples. Concrete temporary views remain on the concrete side of the explicit
+relational transfer. -/
 private def abstractParameters (C : Carriers) : GivenFrame where
   operations := C
 
@@ -268,6 +271,8 @@ theorem swapped_concrete_from_given {unit : VerexIR.Validation.ValidatedUnit}
     (fun _ _ _ _ _ => trivial) (fun args initial _ _ _ => ⟨args, initial, rfl, rfl⟩)
   exact @swapped_verified (abstractParameters Θ.toCarriers).toCarriers (Memory unit) unit givenOps
 
+end SharedInterpreterExecution
+
 namespace ConcreteCompatibility
 open VerexIR
 
@@ -275,8 +280,33 @@ variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
   {executable : Validation.ExecutableUnit unit} [Θ : Skolems unit]
   (meanings : Meanings executable)
 
-/-- The refactored generic-call boundary has exactly the previous concrete
-transport on arguments and results, including all failure/undefined outcomes. -/
+/-- Negative control: when the target resource cell is absent (`none`), a concrete
+`Term.globalRead` on a pure key aborts and therefore fails `wp` with `aborts := fun _ => False`. -/
+theorem global_read_absent_refused {ρ : ResultShape} {Γ : NRow} {κ τ : NTy}
+    (site : Nat) (arguments : NRow) (key : Term unit ρ Γ κ) (env : HEnv Γ)
+    (k : κ.carrier) (memory : Memory unit)
+    (hKey : key.denote meanings env = Spec.pure (.value k env))
+    (hAbsent : memory (Skolems.resource τ arguments) (κ.storageKey k) = none) :
+    ¬ wp ((Term.globalRead (τ := τ) site arguments key).denote meanings env)
+        (fun _ _ => True) (fun _ => False) memory := by
+  intro hwp
+  have hRead : (Term.globalRead (τ := τ) site arguments key).denote meanings env =
+      Spec.bind Spec.get fun memory =>
+        match memory (Skolems.resource τ arguments) (κ.storageKey k) with
+        | none => abortAt site (Failure.ofInts .abort #[])
+        | some stored => Spec.pure (.value (Skolems.ofRuntime τ stored.val) env) := by
+    unfold Term.denote
+    dsimp only [Term.denoteIn]
+    change Flow.bind (key.denote meanings env) _ = _
+    rw [hKey]
+    simp only [Flow.bind_pure_value, Meanings.interpreterOps, Skolems.plainAt_def]
+    congr 1; funext mem; cases mem (Skolems.resource τ arguments) (κ.storageKey k) <;> rfl
+  rw [hRead, wp_bind_get] at hwp
+  simp only [hAbsent, abortAt] at hwp
+  exact hwp.2.1 (Failure.ofInts .abort #[]) rfl
+
+/-- The refactored generic-call boundary has the exact concrete transport on
+arguments and results, including all failure/undefined outcomes. -/
 theorem generic_call {ρ : ResultShape} {Γ σs σs' : NRow}
     (site : Nat) (handle : FunctionHandle) (typeArgs : Array GenericArgument) (θ : TypeArgs)
     (shape shape' : ResultShape)
@@ -292,8 +322,9 @@ theorem generic_call {ρ : ResultShape} {Γ σs σs' : NRow}
   simp only [Term.denote, Term.denoteIn, Args.denote, Meanings.interpreterOps, specializedMeaning,
     callAt, Spec.bind_assoc, Spec.pure_bind]
 
-/-- A concrete global read still produces the same certified runtime view,
-and aborts precisely when the resource is absent. -/
+/-- Under Storage Option A, a concrete global read produces the frame's
+`Skolems.ofRuntime` view of the stored cell's runtime value, and aborts
+precisely when the resource is absent. -/
 theorem global_read {ρ : ResultShape} {Γ : NRow} {κ τ : NTy}
     (site : Nat) (arguments : NRow) (key : Term unit ρ Γ κ) (env : HEnv Γ) :
     (Term.globalRead (τ := τ) site arguments key).denote meanings env =
@@ -301,24 +332,23 @@ theorem global_read {ρ : ResultShape} {Γ : NRow} {κ τ : NTy}
         Spec.bind Spec.get fun memory =>
           match memory (Skolems.resource τ arguments) (κ.storageKey k) with
           | none => abortAt site (Failure.ofInts .abort #[])
-          | some value => Spec.pure (.value (Skolems.ofRuntime τ value) env) := by
+          | some stored => Spec.pure (.value (Skolems.ofRuntime τ stored.val) env) := by
   simp only [Term.denote, Term.denoteIn, Meanings.interpreterOps, Skolems.plainAt_def]
   congr 1
   funext k env
   congr 1
   funext memory
-  cases memory (Skolems.resource τ arguments) (κ.storageKey k) with
-  | none => rfl
-  | some value => simp only [Option.map_some, Option.bind_some, NTy.ofPlain?_forget]
+  cases memory (Skolems.resource τ arguments) (κ.storageKey k) <;> rfl
 
 end ConcreteCompatibility
 
 -- This gate rejects a new global transfer axiom or an admitted test proof.
 open Lean Elab Command in
 run_cmd do
-  for name in [``identity_verified, ``swapped_verified, ``identity_refines, ``swapped_refines,
+  for name in [``false_pack_undefined, ``concrete_false_pack_undefined,
+      ``identity_verified, ``swapped_verified, ``identity_refines, ``swapped_refines,
       ``identity_concrete_from_given, ``swapped_concrete_from_given,
-      ``false_pack_undefined, ``concrete_false_pack_undefined,
+      ``ConcreteCompatibility.global_read_absent_refused,
       ``ConcreteCompatibility.generic_call, ``ConcreteCompatibility.global_read] do
     let axioms ← collectAxioms name
     unless axioms.all ([``propext, ``Classical.choice, ``Quot.sound].contains ·) do

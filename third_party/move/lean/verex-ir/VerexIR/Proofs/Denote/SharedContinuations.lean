@@ -17,36 +17,10 @@ proves the continuation under that relation. Only normal value flows join.
 
 namespace VerexIR.Proofs.Denote
 
-/-- A plain local-environment slot satisfies the data invariants of its type
-when empty or when its held plain value satisfies `NTy.Holds`. -/
-@[reducible] def SlotPlain.Holds [Carriers] (τ : NTy) (slot : Option τ.plain) : Prop :=
-  Option.elim slot True (NTy.Holds τ)
-
-/-- A certified local-environment slot's forgotten plain view satisfies
-`SlotPlain.Holds`. -/
+/-- A local-environment slot satisfies the data invariants of its type
+when empty or when its held value satisfies `NTy.Holds`. -/
 @[reducible] def Slot.Holds [Carriers] (τ : NTy) (slot : Option τ.carrier) : Prop :=
-  SlotPlain.Holds τ (slot.map (NTy.forget τ))
-
-/-- A certified local environment's forgotten plain view satisfies
-`HEnvPlain.Holds`. -/
-@[reducible] def HEnv.Holds [Carriers] (Γ : NRow) (env : HEnv Γ) : Prop :=
-  HEnvPlain.Holds Γ (HEnv.forget Γ env)
-
-/-- A certified row's forgotten plain view satisfies `HListPlain.Holds`. -/
-@[reducible] def HList.Holds [Carriers] (Γ : NRow) (values : HList Γ) : Prop :=
-  HListPlain.Holds Γ (HList.forget Γ values)
-
-@[simp, vir_denote_norm] theorem Slot.holds_carrier [Carriers] (τ : NTy) (slot : Option τ.carrier) :
-    Slot.Holds τ slot :=
-  NTy.holds_map_forget τ slot
-
-@[simp, vir_denote_norm] theorem HEnv.holds_carrier [Carriers] (Γ : NRow) (env : HEnv Γ) :
-    HEnv.Holds Γ env :=
-  HEnv.holds_forget Γ env
-
-@[simp, vir_denote_norm] theorem HList.holds_carrier [Carriers] (Γ : NRow) (values : HList Γ) :
-    HList.Holds Γ values :=
-  HList.holds_forget Γ values
+  Option.elim slot True (NTy.Holds τ)
 
 end VerexIR.Proofs.Denote
 
@@ -183,7 +157,7 @@ structure Node where
   row (`sealNode`). Empty otherwise. -/
   invariantProofs : Array Lean.Expr := #[]
   /-- Per arrival, the proofs (or pending goal metavariables) of the mandatory
-  `Holds` premise bundle over non-`certificateFree` abstracted variables (`sealNode`). -/
+  `Holds` premise bundle over non-`invariantFree` abstracted variables (`sealNode`). -/
   holdsProofs : Array (Array Lean.Expr) := #[]
   /-- Arrival-indexed `Holds` obligations not closed structurally at `sealNode`,
   queued on their arrival's path and budget (`resumeShared`). -/
@@ -747,7 +721,7 @@ def partitionArrivals [BEq κ] (key : Arrival → κ) (arrivals : Array Arrival)
 private def mentionsAnyBinder (binders : Array Lean.Expr) (e : Lean.Expr) : Bool :=
   e.hasAnyFVar fun id => binders.any (·.fvarId! == id)
 
-/-- Collect mandatory `Holds` obligations for non-`certificateFree` components
+/-- Collect mandatory `Holds` obligations for non-`invariantFree` components
 of `shaped` that vary across arrivals (mention at least one binder in `binders`).
 For `NTy.ref σ` decomposed as `Prod.mk current prophecy`, ONLY `prophecy`
 receives a `Holds` obligation, NEVER the open reference current `current`.
@@ -760,7 +734,7 @@ private partial def collectHoldsSpecs (binders : Array Lean.Expr) (type shaped :
   let shaped := shaped.consumeMData.headBeta
   if type.isAppOfArity ``HEnv 2 then
     let (carriers, Γ) := (type.getArg! 0, type.getArg! 1)
-    if ← isCertificateFreeNRow Γ then return #[]
+    if ← isInvariantFreeNRow Γ then return #[]
     let Γ' ← (try whnfD Γ catch _ => pure Γ)
     if Γ'.isAppOfArity ``NRow.nil 0 then return #[]
     if Γ'.isAppOfArity ``NRow.cons 2 && shaped.isAppOfArity ``Prod.mk 4 then
@@ -770,21 +744,9 @@ private partial def collectHoldsSpecs (binders : Array Lean.Expr) (type shaped :
       return (← collectHoldsSpecs binders slotType (shaped.getArg! 2)) ++
         (← collectHoldsSpecs binders restType (shaped.getArg! 3))
     return #[mkApp3 (mkConst ``HEnv.Holds) carriers Γ shaped]
-  if type.isAppOfArity ``HEnvPlain 2 then
-    let (carriers, Γ) := (type.getArg! 0, type.getArg! 1)
-    if ← isCertificateFreeNRow Γ then return #[]
-    let Γ' ← (try whnfD Γ catch _ => pure Γ)
-    if Γ'.isAppOfArity ``NRow.nil 0 then return #[]
-    if Γ'.isAppOfArity ``NRow.cons 2 && shaped.isAppOfArity ``Prod.mk 4 then
-      let (τ, rest) := (Γ'.getArg! 0, Γ'.getArg! 1)
-      let slotType ← mkAppM ``Option #[mkApp2 (mkConst ``NTy.plain) carriers τ]
-      let restType := mkApp2 (mkConst ``HEnvPlain) carriers rest
-      return (← collectHoldsSpecs binders slotType (shaped.getArg! 2)) ++
-        (← collectHoldsSpecs binders restType (shaped.getArg! 3))
-    return #[mkApp3 (mkConst ``HEnvPlain.Holds) carriers Γ shaped]
   if type.isAppOfArity ``HList 2 then
     let (carriers, Γ) := (type.getArg! 0, type.getArg! 1)
-    if ← isCertificateFreeNRow Γ then return #[]
+    if ← isInvariantFreeNRow Γ then return #[]
     let Γ' ← (try whnfD Γ catch _ => pure Γ)
     if Γ'.isAppOfArity ``NRow.nil 0 then return #[]
     if Γ'.isAppOfArity ``NRow.cons 2 && shaped.isAppOfArity ``Prod.mk 4 then
@@ -792,16 +754,6 @@ private partial def collectHoldsSpecs (binders : Array Lean.Expr) (type shaped :
       return (← collectHoldsSpecs binders (mkApp2 (mkConst ``NTy.carrier) carriers τ) (shaped.getArg! 2)) ++
         (← collectHoldsSpecs binders (mkApp2 (mkConst ``HList) carriers rest) (shaped.getArg! 3))
     return #[mkApp3 (mkConst ``HList.Holds) carriers Γ shaped]
-  if type.isAppOfArity ``HListPlain 2 then
-    let (carriers, Γ) := (type.getArg! 0, type.getArg! 1)
-    if ← isCertificateFreeNRow Γ then return #[]
-    let Γ' ← (try whnfD Γ catch _ => pure Γ)
-    if Γ'.isAppOfArity ``NRow.nil 0 then return #[]
-    if Γ'.isAppOfArity ``NRow.cons 2 && shaped.isAppOfArity ``Prod.mk 4 then
-      let (τ, rest) := (Γ'.getArg! 0, Γ'.getArg! 1)
-      return (← collectHoldsSpecs binders (mkApp2 (mkConst ``NTy.plain) carriers τ) (shaped.getArg! 2)) ++
-        (← collectHoldsSpecs binders (mkApp2 (mkConst ``HListPlain) carriers rest) (shaped.getArg! 3))
-    return #[mkApp3 (mkConst ``HListPlain.Holds) carriers Γ shaped]
   if type.isAppOfArity ``Option 1 then
     let elemType := (type.getArg! 0).consumeMData.headBeta
     if shaped.isAppOfArity ``Option.none 1 then return #[]
@@ -809,12 +761,8 @@ private partial def collectHoldsSpecs (binders : Array Lean.Expr) (type shaped :
       return ← collectHoldsSpecs binders elemType (shaped.getArg! 1)
     if elemType.isAppOfArity ``NTy.carrier 2 then
       let (carriers, τ) := (elemType.getArg! 0, elemType.getArg! 1)
-      if ← isCertificateFreeNTy τ then return #[]
+      if ← isInvariantFreeNTy τ then return #[]
       return #[mkApp3 (mkConst ``Slot.Holds) carriers τ shaped]
-    if elemType.isAppOfArity ``NTy.plain 2 then
-      let (carriers, τ) := (elemType.getArg! 0, elemType.getArg! 1)
-      if ← isCertificateFreeNTy τ then return #[]
-      return #[mkApp3 (mkConst ``SlotPlain.Holds) carriers τ shaped]
     return #[]
   if type.isAppOfArity ``ResultShape.carrier 2 then
     let (carriers, shape) := (type.getArg! 0, type.getArg! 1)
@@ -822,93 +770,126 @@ private partial def collectHoldsSpecs (binders : Array Lean.Expr) (type shaped :
     if shape'.isAppOfArity ``ResultShape.none 0 then return #[]
     if shape'.isAppOfArity ``ResultShape.one 1 then
       return ← collectHoldsSpecs binders (mkApp2 (mkConst ``NTy.carrier) carriers (shape'.getArg! 0)) shaped
-    let forgotten := mkApp3 (mkConst ``ResultShape.forget) carriers shape shaped
-    return #[mkApp3 (mkConst ``ResultShape.Holds) carriers shape forgotten]
-  if type.isAppOfArity ``ResultShape.plain 2 then
-    let (carriers, shape) := (type.getArg! 0, type.getArg! 1)
-    let shape' ← (try whnfD shape catch _ => pure shape)
-    if shape'.isAppOfArity ``ResultShape.none 0 then return #[]
-    if shape'.isAppOfArity ``ResultShape.one 1 then
-      return ← collectHoldsSpecs binders (mkApp2 (mkConst ``NTy.plain) carriers (shape'.getArg! 0)) shaped
     return #[mkApp3 (mkConst ``ResultShape.Holds) carriers shape shaped]
   if type.isAppOfArity ``NTy.carrier 2 then
     let (carriers, τ) := (type.getArg! 0, type.getArg! 1)
-    if ← isCertificateFreeNTy τ then return #[]
+    if ← isInvariantFreeNTy τ then return #[]
     let τ' ← (try whnfD τ catch _ => pure τ)
     if τ'.isAppOfArity ``NTy.ref 1 && shaped.isAppOfArity ``Prod.mk 4 then
       let σ := τ'.getArg! 0
       return ← collectHoldsSpecs binders (mkApp2 (mkConst ``NTy.carrier) carriers σ) (shaped.getArg! 3)
     if τ'.isAppOfArity ``NTy.tuple 1 && shaped.isAppOfArity ``Prod.mk 4 then
       return ← collectHoldsSpecs binders (mkApp2 (mkConst ``HList) carriers (τ'.getArg! 0)) shaped
-    let forgotten := mkApp3 (mkConst ``NTy.forget) carriers τ shaped
-    return #[mkApp3 (mkConst ``NTy.Holds) carriers τ forgotten]
-  if type.isAppOfArity ``NTy.plain 2 then
-    let (carriers, τ) := (type.getArg! 0, type.getArg! 1)
-    if ← isCertificateFreeNTy τ then return #[]
-    let τ' ← (try whnfD τ catch _ => pure τ)
-    if τ'.isAppOfArity ``NTy.ref 1 && shaped.isAppOfArity ``Prod.mk 4 then
-      let σ := τ'.getArg! 0
-      return ← collectHoldsSpecs binders (mkApp2 (mkConst ``NTy.plain) carriers σ) (shaped.getArg! 3)
-    if τ'.isAppOfArity ``NTy.tuple 1 && shaped.isAppOfArity ``Prod.mk 4 then
-      return ← collectHoldsSpecs binders (mkApp2 (mkConst ``HListPlain) carriers (τ'.getArg! 0)) shaped
     return #[mkApp3 (mkConst ``NTy.Holds) carriers τ shaped]
   if type.isAppOfArity ``Prod 2 && shaped.isAppOfArity ``Prod.mk 4 then
     return (← collectHoldsSpecs binders (type.getArg! 0) (shaped.getArg! 2)) ++
       (← collectHoldsSpecs binders (type.getArg! 1) (shaped.getArg! 3))
   return #[]
 
-/-- Default prover for a single `Holds` obligation at a join arrival: handles
-certified-carrier obligations directly, checks local context hypotheses, and
-structurally opens `SlotPlain` / `HEnvPlain` / `HListPlain` / `NTy.ref` /
-`NTy.tuple` / `certificateFree` obligations. -/
+/-- Search an unsplit `And` / `HList.Holds` / `HEnv.Holds` hypothesis spine up
+to bounded depth for a conjunct definitionally equal to `expected`. -/
+private partial def findSpineHoldsProof? (proof ty expected : Lean.Expr) (fuel : Nat) :
+    MetaM (Option Lean.Expr) := do
+  let ty := ty.consumeMData
+  if ty.isAppOfArity ``NTy.Holds 3 then
+    if ← withNewMCtxDepth (isDefEq ty expected) then return some proof
+    return none
+  if fuel == 0 then return none
+  let reduced ← (try whnfD ty catch _ => pure ty)
+  if reduced.isAppOfArity ``NTy.Holds 3 then
+    if ← withNewMCtxDepth (isDefEq reduced expected) then return some proof
+    return none
+  if reduced.isAppOfArity ``And 2 then
+    let (leftTy, rightTy) := (reduced.getArg! 0, reduced.getArg! 1)
+    let leftProof := mkApp3 (mkConst ``And.left) leftTy rightTy proof
+    if let some found ← findSpineHoldsProof? leftProof leftTy expected (fuel - 1) then
+      return some found
+    let rightProof := mkApp3 (mkConst ``And.right) leftTy rightTy proof
+    return ← findSpineHoldsProof? rightProof rightTy expected (fuel - 1)
+  return none
+
+/-- Find an `NTy.Holds` proof in the local context directly (`findHoldsHypothesis?`)
+or inside an unsplit `HList.Holds` / `HEnv.Holds` / `And` hypothesis. -/
+private def findContextHoldsProof? (expected : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  if let some proof ← findHoldsHypothesis? expected then
+    return some proof
+  for decl in ← getLCtx do
+    if decl.isAuxDecl then continue
+    let raw := decl.type.consumeMData
+    let ty ← if raw.hasMVar then pure (← instantiateMVars raw).consumeMData else pure raw
+    unless ty.isAppOfArity ``HList.Holds 3 || ty.isAppOfArity ``HEnv.Holds 3 ||
+        ty.isAppOfArity ``And 2 do
+      continue
+    if let some proof ← findSpineHoldsProof? decl.toExpr ty expected 24 then
+      return some proof
+  return none
+
+/-- Default prover for a single `Holds` obligation at a join arrival: checks
+local context hypotheses (`findHoldsHypothesis?` and row spines) and
+structurally opens `Slot` / `HEnv` / `HList` / `ResultShape` / `NTy.ref` /
+`NTy.tuple` / `invariantFree` obligations. -/
 partial def defaultProveHoldsGoal? (goal : MVarId) : MetaM Bool := goal.withContext do
   let target := (← instantiateMVars (← goal.getType)).consumeMData.headBeta
   if target.isAppOfArity ``NTy.Holds 3 then
     let (carriers, τ, val) := (target.getArg! 0, target.getArg! 1, (target.getArg! 2).consumeMData.headBeta)
-    if let some proof ← trivialHoldsProof? carriers τ val then
+    if let some proof ← findContextHoldsProof? target then
       goal.assign proof
       return true
-    if ← isCertificateFreeNTy τ then
-      let free := mkApp (mkConst ``NTy.certificateFree) τ
+    if ← isInvariantFreeNTy τ then
+      let free := mkApp (mkConst ``NTy.invariantFree) τ
       let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
         (← mkEq free (mkConst ``Bool.true))
-      goal.assign (mkAppN (mkConst ``NTy.holds_of_certificateFree) #[carriers, τ, decided, val])
+      goal.assign (mkAppN (mkConst ``NTy.holds_of_invariantFree) #[carriers, τ, decided, val])
       return true
     let τ' ← (try whnfD τ catch _ => pure τ)
     if τ'.isAppOfArity ``NTy.ref 1 then
+      let σ := τ'.getArg! 0
+      let goal ← if τ == τ' then pure goal else goal.change (mkApp3 (mkConst ``NTy.Holds) carriers τ' val)
       let snd ← mkAppM ``Prod.snd #[val]
-      let next ← goal.change (mkApp3 (mkConst ``NTy.Holds) carriers (τ'.getArg! 0) snd)
+      let next ← goal.replaceTargetEq (mkApp3 (mkConst ``NTy.Holds) carriers σ snd)
+        (mkApp3 (mkConst ``NTy.holds_ref) carriers σ val)
       return ← defaultProveHoldsGoal? next
     if τ'.isAppOfArity ``NTy.tuple 1 then
-      let next ← goal.change (mkApp3 (mkConst ``HListPlain.Holds) carriers (τ'.getArg! 0) val)
+      let elements := τ'.getArg! 0
+      let goal ← if τ == τ' then pure goal else goal.change (mkApp3 (mkConst ``NTy.Holds) carriers τ' val)
+      let next ← goal.replaceTargetEq (mkApp3 (mkConst ``HList.Holds) carriers elements val)
+        (mkApp3 (mkConst ``NTy.holds_tuple) carriers elements val)
       return ← defaultProveHoldsGoal? next
+    if τ'.isAppOfArity ``NTy.ghost 1 then
+      let slot := τ'.getArg! 0
+      let goal ← if τ == τ' then pure goal else goal.change (mkApp3 (mkConst ``NTy.Holds) carriers τ' val)
+      let next ← goal.replaceTargetEq (mkApp3 (mkConst ``NTy.Holds) carriers slot val)
+        (mkApp3 (mkConst ``NTy.holds_ghost) carriers slot val)
+      return ← defaultProveHoldsGoal? next
+    if τ'.isAppOfArity ``NTy.observed 1 then
+      let referent := τ'.getArg! 0
+      let goal ← if τ == τ' then pure goal else goal.change (mkApp3 (mkConst ``NTy.Holds) carriers τ' val)
+      let next ← goal.replaceTargetEq (mkApp3 (mkConst ``NTy.Holds) carriers referent val)
+        (mkApp3 (mkConst ``NTy.holds_observed) carriers referent val)
+      return ← defaultProveHoldsGoal? next
+    if τ'.isAppOfArity ``NTy.nominal 3 then
+      let goal ← if τ == τ' then pure goal else goal.change (mkApp3 (mkConst ``NTy.Holds) carriers τ' val)
+      let next ← goal.replaceTargetEq (mkConst ``True)
+        (mkAppN (mkConst ``NTy.holds_nominal)
+          #[carriers, τ'.getArg! 0, τ'.getArg! 1, τ'.getArg! 2, val])
+      next.assign (mkConst ``True.intro)
+      return true
+    let deep := mkApp3 (mkConst ``NTy.deepHolds) carriers τ val
+    if ← withNewMCtxDepth (isDefEq deep (mkConst ``True)) then
+      let proof ← mkAppOptM ``NTy.Holds.intro #[some carriers, some τ, some val, some (mkConst ``True.intro)]
+      goal.assign proof
+      return true
     return false
   if let some headName := target.getAppFn.constName? then
     let arity := target.getAppNumArgs
     for decl in ← getLCtx do
-      if decl.isImplementationDetail then continue
+      if decl.isAuxDecl then continue
       let raw := decl.type.consumeMData
       let ty ← if raw.hasMVar then pure (← instantiateMVars raw).consumeMData else pure raw
       unless ty.isAppOfArity headName arity do continue
       if ← withNewMCtxDepth (isDefEq ty target) then
         goal.assign decl.toExpr
         return true
-  if target.isAppOfArity ``Slot.Holds 3 then
-    goal.assign (mkApp3 (mkConst ``Slot.holds_carrier) (target.getArg! 0) (target.getArg! 1) (target.getArg! 2))
-    return true
-  if target.isAppOfArity ``HEnv.Holds 3 then
-    goal.assign (mkApp3 (mkConst ``HEnv.holds_carrier) (target.getArg! 0) (target.getArg! 1) (target.getArg! 2))
-    return true
-  if target.isAppOfArity ``HList.Holds 3 then
-    goal.assign (mkApp3 (mkConst ``HList.holds_carrier) (target.getArg! 0) (target.getArg! 1) (target.getArg! 2))
-    return true
-  if target.isAppOfArity ``ResultShape.Holds 3 then
-    let (carriers, shape, val) := (target.getArg! 0, target.getArg! 1, (target.getArg! 2).consumeMData.headBeta)
-    if val.isAppOfArity ``ResultShape.forget 3 then
-      if ← isDefEq (val.getArg! 0) carriers then
-        if ← isDefEq (val.getArg! 1) shape then
-          goal.assign (mkApp3 (mkConst ``ResultShape.holds_forget) carriers shape (val.getArg! 2))
-          return true
   let reduced ← (try whnfD target catch _ => pure target)
   if reduced.isTrue then
     goal.assign (mkConst ``True.intro)
@@ -931,20 +912,6 @@ private def proveHoldsAtArrival? (arrivalGoal : MVarId) (obligation : Lean.Expr)
     (proveGoal? : MVarId → MetaM Bool) : MetaM (Option Lean.Expr) :=
   arrivalGoal.withContext do
     let obligation := obligation.consumeMData.headBeta
-    if obligation.isAppOfArity ``NTy.Holds 3 then
-      let (carriers, τ, val) := (obligation.getArg! 0, obligation.getArg! 1,
-        (obligation.getArg! 2).consumeMData.headBeta)
-      if val.isAppOfArity ``NTy.forget 3 && val.getArg! 0 == carriers && val.getArg! 1 == τ then
-        return some (mkApp3 (mkConst ``NTy.holds_forget) carriers τ (val.getArg! 2))
-    if obligation.isAppOfArity ``Slot.Holds 3 then
-      return some (mkApp3 (mkConst ``Slot.holds_carrier)
-        (obligation.getArg! 0) (obligation.getArg! 1) (obligation.getArg! 2))
-    if obligation.isAppOfArity ``HEnv.Holds 3 then
-      return some (mkApp3 (mkConst ``HEnv.holds_carrier)
-        (obligation.getArg! 0) (obligation.getArg! 1) (obligation.getArg! 2))
-    if obligation.isAppOfArity ``HList.Holds 3 then
-      return some (mkApp3 (mkConst ``HList.holds_carrier)
-        (obligation.getArg! 0) (obligation.getArg! 1) (obligation.getArg! 2))
     let saved ← saveState
     let mvar ← mkFreshExprSyntheticOpaqueMVar obligation
     if ← proveGoal? mvar.mvarId! then
@@ -959,7 +926,7 @@ product is distributed. With a proof per arrival of the stored invariants of
 its memory, the summary assumes them of its memory row: a leaf then closes
 them over the row as the default walk closes them over the concrete memory,
 and the edge proofs carry them inductively through nested joins.
-Every non-`certificateFree` abstracted variable also receives a mandatory
+Every non-`invariantFree` abstracted variable also receives a mandatory
 `Holds` premise in the summary telescope; any premise not closed structurally
 at an arrival becomes a pending obligation goal owed by that arrival
 (`pendingHolds`). -/
@@ -1188,19 +1155,8 @@ private partial def entryValue (expression : Lean.Expr) : MetaM Lean.Expr := do
   if let .letE _ _ value body _ := e then return ← entryValue (body.instantiate1 value)
   if let .fvar id := e then
     if let some value := (← id.getDecl).value? then return ← entryValue value
-  let ofDeepHoldsPlain? (v : Lean.Expr) : MetaM (Option Lean.Expr) := do
-    unless v.isAppOfArity ``VerexIR.Proofs.Denote.NTy.ofDeepHolds 4 do return none
-    let τ ← whnfD (v.getArg! 1)
-    if τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.nominal 3 ||
-       τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.struct 3 ||
-       τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.enum 5 then
-      return some (v.getArg! 2)
-    return none
-  if let .proj name index value := e then
+  if let .proj _ index value := e then
     let value ← entryValue value
-    if name == ``Subtype && index == 0 then
-      if let some plain ← ofDeepHoldsPlain? value then
-        return ← entryValue plain
     if let some constructor ← isConstructorAppCore? value then
       if let some field := value.getAppArgs[constructor.numParams + index]? then
         return ← entryValue field
@@ -1209,9 +1165,6 @@ private partial def entryValue (expression : Lean.Expr) : MetaM Lean.Expr := do
       let arguments := e.getAppArgs
       if let some value := arguments[projection.numParams]? then
         let value ← entryValue value
-        if name == ``Subtype.val then
-          if let some plain ← ofDeepHoldsPlain? value then
-            return ← entryValue (mkAppN plain (arguments.extract (projection.numParams + 1)))
         if value.isAppOf projection.ctorName then
           if let some field := value.getAppArgs[projection.numParams + projection.i]? then
             return ← entryValue (mkAppN field (arguments.extract (projection.numParams + 1)))
@@ -1246,7 +1199,7 @@ private partial def entryValue (expression : Lean.Expr) : MetaM Lean.Expr := do
     let σs := e.getArg! 3
     let choice ← entryValue (e.getArg! 4)
     let variant ← entryValue (e.getArg! 5)
-    let rowTy := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HListPlain) carriers σs
+    let rowTy := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers σs
     if choice.isAppOfArity ``VerexIR.Proofs.Denote.Which.here 4 then
       if variant.isAppOfArity ``Sum.inl 3 then
         return ← entryValue (mkApp2 (mkConst ``Option.some [0]) rowTy (variant.getArg! 2))

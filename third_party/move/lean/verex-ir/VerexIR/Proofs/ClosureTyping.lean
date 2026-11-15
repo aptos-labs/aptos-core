@@ -987,7 +987,7 @@ theorem memoryTyped (unit : ValidatedUnit) [FunctionCarriers unit] (resources : 
         have ordinary := runtimeResourceOf_kind named
         rcases resource with ⟨native, arguments, kind⟩
         cases ordinary
-        obtain ⟨value, -, encoded⟩ := Option.map_eq_some_iff.mp found.symm
+        obtain ⟨⟨value, _⟩, -, encoded⟩ := Option.map_eq_some_iff.mp found.symm
         obtain ⟨ns, type, namespace_eq, resolves, typed, closed, plain, closures⟩ :=
           resources _ _ _ named
         obtain ⟨representation, normalized, typedRepresentation⟩ :=

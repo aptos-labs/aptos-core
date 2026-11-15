@@ -145,8 +145,7 @@ theorem satisfies_summary (contract : Contract σ ε Args Result) :
 
 /-- A contract of other arguments and another result: each condition read
 through a map of the arguments, and the postcondition, frame, and result
-validity also through a map of the result.  The image of a contract stated at
-one layer in another (`Contract.atPlain`). -/
+validity also through a map of the result.-/
 def Contract.comap {σ ε Args Result Args' Result' : Type} (contract : Contract σ ε Args Result)
     (arguments : Args' → Args) (result : Result' → Result) : Contract σ ε Args' Result' where
   requires := fun args initial => contract.requires (arguments args) initial

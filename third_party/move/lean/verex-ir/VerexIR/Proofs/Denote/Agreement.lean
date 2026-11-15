@@ -41,7 +41,7 @@ To be proved by induction on the fuel of `compileExpr`, one case per term
 constructor.
 
 The refinement relates the outcomes of a start only where the denotation
-is defined there, and its certifying steps are undefined where a data
+is defined there, and its checking steps are undefined where a data
 invariant fails: a run that packs a value breaking its invariant, or that
 ends a mutable loan over one, keeps its big-step outcomes while the
 denotation is undefined at its start, so nothing is asserted of that start,
@@ -275,7 +275,7 @@ section Public
 
 /-- The runtime form of a contract over native arguments and typed memory.
 A runtime call lends the argument references under admissible loans from a
-state whose stores encode a memory, and the contract holds for every
+state whose stores encode a memory, and the contract holds for every valid
 prophecy of theirs and every memory the stores encode. A successful
 execution supplies one loan correspondence spanning arguments, results, and
 exports. The correspondence follows replacement references by their actual
@@ -285,38 +285,76 @@ def _root_.VerexIR.Proofs.Contract.prophetic (unit : ValidatedUnit) [FunctionCar
     (shape : ResultShape) (contract : Contract (Memory unit) Failure (HList σs) shape.carrier) :
     FunctionContract where
   requires := fun arguments initial =>
-    (∃ loans args, Admissible initial loans ∧ lendArguments σs args loans = some arguments) ∧
+    (∃ loans args, Admissible initial loans ∧ contract.validArgs args ∧
+      lendArguments σs args loans = some arguments) ∧
       (∃ memory, StorageEncodes unit memory initial) ∧
       ∀ memory, StorageEncodes unit memory initial →
-        ∀ loans args, lendArguments σs args loans = some arguments → contract.requires args memory
+        ∀ loans args, contract.validArgs args →
+          lendArguments σs args loans = some arguments → contract.requires args memory
   assumes := fun arguments initial =>
     ∀ memory, StorageEncodes unit memory initial →
-      ∀ loans args, lendArguments σs args loans = some arguments → contract.assumes args memory
+      ∀ loans args, contract.validArgs args →
+        lendArguments σs args loans = some arguments → contract.assumes args memory
   ensures := fun arguments initial results final =>
     ∃ memory memory' loans args result correspondence,
       StorageEncodes unit memory initial ∧
       StorageEncodesReturned unit memory' final (correspondence.returnedRow results) ∧
+      contract.validArgs args ∧ contract.validResult result ∧
       lendArguments σs args loans = some arguments ∧
       BoundaryCorrespondence σs args shape result arguments results loans
         (exportsAfter initial.pending final.pending) correspondence ∧
       contract.ensures args memory result memory'
   aborts := fun arguments initial error =>
     ∃ memory loans args failure, StorageEncodes unit memory initial ∧
+      contract.validArgs args ∧
       lendArguments σs args loans = some arguments ∧ failure.encode = error ∧
       contract.aborts args memory failure
   mayAbort := fun arguments initial =>
     ∃ memory loans args, StorageEncodes unit memory initial ∧
+      contract.validArgs args ∧
       lendArguments σs args loans = some arguments ∧ contract.mayAbort args memory
   mustAbort := fun arguments initial =>
     ∀ memory, StorageEncodes unit memory initial →
-      ∀ loans args, lendArguments σs args loans = some arguments → contract.mustAbort args memory
+      ∀ loans args, contract.validArgs args →
+        lendArguments σs args loans = some arguments → contract.mustAbort args memory
   frame := fun arguments initial results final =>
     ∃ memory memory' loans args result correspondence, StorageEncodes unit memory initial ∧
       StorageEncodesReturned unit memory' final (correspondence.returnedRow results) ∧
+      contract.validArgs args ∧ contract.validResult result ∧
       lendArguments σs args loans = some arguments ∧
       BoundaryCorrespondence σs args shape result arguments results loans
         (exportsAfter initial.pending final.pending) correspondence ∧
       contract.frame args memory result memory'
+
+private theorem resolvedHolds_apply [Carriers] : (σs : NRow) → {args resolved : HList σs} →
+    HList.Holds σs args → HList.ResolvedHolds σs args resolved → HList.Holds σs resolved
+  | .nil, _, _, _, _ => trivial
+  | .cons _ rest, _, _, holds, resolved =>
+      ⟨resolved.1 holds.1, resolvedHolds_apply rest holds.2 resolved.2⟩
+
+private theorem resolvedHolds_toSkolem {Θ : Carriers} (θ : TypeArgs) :
+    (σs : NRow) → {args resolved : @HList Θ (NRow.subst θ.1 σs)} →
+    @HList.ResolvedHolds Θ (NRow.subst θ.1 σs) args resolved →
+    @HList.ResolvedHolds (Carriers.instantiate θ Θ) σs
+      (HList.toSkolem θ σs args) (HList.toSkolem θ σs resolved)
+  | .nil, _, _, _ => trivial
+  | .cons τ rest, _, _, resolved =>
+      ⟨fun holds => (NTy.holds_toSkolem_iff (Θ := Θ) θ τ _).mpr
+          (resolved.1 ((NTy.holds_toSkolem_iff (Θ := Θ) θ τ _).mp holds)),
+        resolvedHolds_toSkolem θ rest resolved.2⟩
+
+/-- Automatic discharge that `contract.validArgs` is preserved across
+`HList.ResolvedHolds` (`HList.Holds σs` on generated contracts and
+`fun _ => True` on vacuous or unguarded contracts). -/
+class PreservedValidArgs [Carriers] (σs : NRow) (validArgs : HList σs → Prop) : Prop where
+  preserved : ∀ args resolved, validArgs args → HList.ResolvedHolds σs args resolved →
+    validArgs resolved
+
+instance [Carriers] (σs : NRow) : PreservedValidArgs σs (HList.Holds σs) :=
+  ⟨fun _ _ => resolvedHolds_apply σs⟩
+
+instance [Carriers] (σs : NRow) : PreservedValidArgs σs (fun _ => True) :=
+  ⟨fun _ _ _ _ => True.intro⟩
 
 /-- A contract satisfied by the prophetic run at a runtime type instantiation
 holds of the big-step meaning there in its runtime form, for a unit whose
@@ -324,7 +362,6 @@ runs keep global memory typed.  Every runtime execution from an admissible
 start is a prophetic outcome with a shared loan correspondence and final
 memory, whose existence the contract's definedness guarantees. -/
 theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
-    [@CarriersNonempty (Carriers.runtime unit)]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId)) (σs : NRow)
@@ -333,23 +370,25 @@ theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
       (@ResultShape.carrier (Carriers.runtime unit) shape))
     (verified : letI : Skolems unit := Skolems.runtime unit
       Satisfies (propheticRun executable typeInstantiation handle σs shape) contract)
-    (validArgs : letI : Skolems unit := Skolems.runtime unit
-      ∀ args, HListPlain.Holds σs (HList.forget σs args) → contract.validArgs args := by
-        intros; trivial) :
+    (preservedValid : letI : Skolems unit := Skolems.runtime unit
+      ∀ args resolved, contract.validArgs args → HList.ResolvedHolds σs args resolved →
+        contract.validArgs resolved := by
+          intros _ _ _ _; trivial) :
     letI : Skolems unit := Skolems.runtime unit
     SatisfiesFunctionAt executable handle typeInstantiation
       (contract.prophetic unit σs shape) := by
   letI : Skolems unit := Skolems.runtime unit
   intro arguments initial _ assumed permitted
-  obtain ⟨⟨loans, args, admissible, lent⟩, ⟨memory, encoded⟩, required⟩ := permitted
-  have established := verified args memory (validArgs args (HList.holds_forget σs args))
-    (assumed memory encoded loans args lent)
-    (required memory encoded loans args lent)
+  obtain ⟨⟨loans, args, admissible, validArgs0, lent⟩, ⟨memory, encoded⟩, required⟩ := permitted
+  have established := verified args memory validArgs0
+    (assumed memory encoded loans args validArgs0 lent)
+    (required memory encoded loans args validArgs0 lent)
   refine ⟨?_, ?_, fun obligation => obligation⟩
   · intro results final execution
     obtain ⟨memory', encoded', agree⟩ :=
       preserved handle typeInstantiation initial arguments results final memory encoded execution
     have view : ∃ result, ∃ resolved : HList σs, ∃ correspondence,
+        HList.ResolvedHolds σs args resolved ∧
         lendArguments σs resolved loans = some arguments ∧
         BoundaryCorrespondence σs resolved shape result arguments results loans
           (exportsAfter initial.pending final.pending) correspondence ∧
@@ -357,7 +396,9 @@ theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
       refine Classical.byContradiction fun none => established.2.2 ?_
       exact ⟨initial, loans, arguments, results, final, encoded, admissible, lent, execution,
         none⟩
-    obtain ⟨result, resolved, correspondence, lentResolved, boundary, storage⟩ := view
+    obtain ⟨result, resolved, correspondence, resolvedHolds, lentResolved, boundary, storage⟩ := view
+    have validResolved : contract.validArgs resolved :=
+      preservedValid args resolved validArgs0 resolvedHolds
     have encodedCorrespondence :
         StorageEncodesReturned unit memory' final (correspondence.returnedRow results) := by
       change StorageEncodes unit memory' (final.resolveReturned (correspondence.returnedRow results))
@@ -368,30 +409,23 @@ theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
           memory' :=
       ⟨initial, loans, arguments, results, final, correspondence, encoded, admissible,
         lentResolved, execution, boundary, encodedCorrespondence, agree⟩
-    obtain ⟨_, ensured, framed, notMust⟩ :=
-      (verified resolved memory (validArgs resolved (HList.holds_forget σs resolved))
-        (assumed memory encoded loans resolved lentResolved)
-        (required memory encoded loans resolved lentResolved)).1 result _ outcome
+    obtain ⟨validRes, ensured, framed, notMust⟩ :=
+      (verified resolved memory validResolved
+        (assumed memory encoded loans resolved validResolved lentResolved)
+        (required memory encoded loans resolved validResolved lentResolved)).1 result _ outcome
     refine ⟨trivial, fun notMay => ?_,
       ⟨memory, memory', loans, resolved, result, correspondence, encoded, encodedCorrespondence,
-        lentResolved, boundary, framed⟩,
-      fun must => notMust (must memory encoded loans resolved lentResolved)⟩
-    exact ⟨memory, memory', loans, resolved, result, correspondence, encoded, encodedCorrespondence, lentResolved,
-      boundary, ensured fun may => notMay ⟨memory, loans, resolved, encoded, lentResolved, may⟩⟩
+        validResolved, validRes, lentResolved, boundary, framed⟩,
+      fun must => notMust (must memory encoded loans resolved validResolved lentResolved)⟩
+    exact ⟨memory, memory', loans, resolved, result, correspondence, encoded, encodedCorrespondence,
+      validResolved, validRes, lentResolved, boundary,
+      ensured fun may => notMay ⟨memory, loans, resolved, encoded, validResolved, lentResolved, may⟩⟩
   · intro error failed
     obtain ⟨failure, rfl⟩ := integral handle typeInstantiation initial arguments error failed
-    exact ⟨memory, loans, args, failure, encoded, lent, rfl,
+    exact ⟨memory, loans, args, failure, encoded, validArgs0, lent, rfl,
       established.2.1 failure ⟨initial, loans, arguments, encoded, admissible, lent, failed⟩⟩
 
-/-- Discharge `contract.validArgs` automatically when it reduces to `fun _ => True`. -/
-class TrivialValidArgs {α : Type} (validArgs : α → Prop) : Prop where
-  holds : ∀ args, validArgs args
-
-instance {α : Type} : TrivialValidArgs (fun _ : α => True) :=
-  ⟨fun _ => True.intro⟩
-
 theorem satisfies_prophetic_valid {unit : ValidatedUnit} [FunctionCarriers unit]
-    [@CarriersNonempty (Carriers.runtime unit)]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (σs : NRow) (shape : ResultShape)
@@ -399,12 +433,14 @@ theorem satisfies_prophetic_valid {unit : ValidatedUnit} [FunctionCarriers unit]
       (@ResultShape.carrier (Carriers.runtime unit) shape))
     (verified : letI : Skolems unit := Skolems.runtime unit
       Satisfies (propheticMeaning executable #[] handle σs shape) contract)
-    (validArgs : ∀ args, contract.validArgs args) :
+    (preservedValid : letI : Skolems unit := Skolems.runtime unit
+      ∀ args resolved, contract.validArgs args → HList.ResolvedHolds σs args resolved →
+        contract.validArgs resolved) :
     letI : Skolems unit := Skolems.runtime unit
     SatisfiesFunction executable handle (contract.prophetic unit σs shape) := by
   letI : Skolems unit := Skolems.runtime unit
   refine satisfies_run_at executable preserved integral handle #[] σs shape contract ?_
-    (validArgs := fun args _ => validArgs args)
+    (preservedValid := preservedValid)
   have meaning : propheticMeaning executable #[] handle σs shape =
       propheticRun executable #[] handle σs shape :=
     funext (propheticMeaning_of_coherent (coherent_runtime unit handle) σs shape)
@@ -413,7 +449,7 @@ theorem satisfies_prophetic_valid {unit : ValidatedUnit} [FunctionCarriers unit]
 /-- A contract satisfied by the prophetic meaning at the runtime frame and
 the empty instantiation holds of the big-step meaning in its runtime form,
 for a unit whose runs keep global memory typed. -/
-theorem satisfies_prophetic {unit : ValidatedUnit} [FunctionCarriers unit] [@CarriersNonempty (Carriers.runtime unit)]
+theorem satisfies_prophetic {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (σs : NRow) (shape : ResultShape)
@@ -421,14 +457,13 @@ theorem satisfies_prophetic {unit : ValidatedUnit} [FunctionCarriers unit] [@Car
       (@ResultShape.carrier (Carriers.runtime unit) shape))
     (verified : letI : Skolems unit := Skolems.runtime unit
       Satisfies (propheticMeaning executable #[] handle σs shape) contract)
-    [validArgs : TrivialValidArgs contract.validArgs] :
+    [validArgs : @PreservedValidArgs (Carriers.runtime unit) σs contract.validArgs] :
     letI : Skolems unit := Skolems.runtime unit
     SatisfiesFunction executable handle (contract.prophetic unit σs shape) :=
   satisfies_prophetic_valid executable preserved integral handle σs shape contract verified
-    validArgs.holds
+    validArgs.preserved
 
 theorem satisfies_generic_at_valid {unit : ValidatedUnit} [FunctionCarriers unit]
-    [@CarriersNonempty (Carriers.runtime unit)]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (θ : TypeArgs)
@@ -440,14 +475,17 @@ theorem satisfies_generic_at_valid {unit : ValidatedUnit} [FunctionCarriers unit
       typeInstantiation)
     (verified : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
       Satisfies (propheticMeaning executable typeInstantiation handle σs shape) contract)
-    (validArgs : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
-      ∀ args, contract.validArgs args) :
+    (preservedValid : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
+      ∀ args resolved, contract.validArgs args → HList.ResolvedHolds σs args resolved →
+        contract.validArgs resolved) :
     letI : Skolems unit := Skolems.runtime unit
     SatisfiesFunctionAt executable handle typeInstantiation
       ((contract.ofSkolem θ).prophetic unit (NRow.subst θ.1 σs) (shape.subst θ.1)) := by
   letI : Skolems unit := Skolems.runtime unit
   refine satisfies_run_at executable preserved integral handle typeInstantiation _ _ _ ?_
-    (validArgs := fun args _ => validArgs (HList.toSkolem θ σs args))
+    (preservedValid := fun args resolved valid resolvedHolds =>
+      preservedValid (HList.toSkolem θ σs args) (HList.toSkolem θ σs resolved) valid
+        (resolvedHolds_toSkolem (Θ := Carriers.runtime unit) θ σs resolvedHolds))
   have meaning : @propheticMeaning _ _ executable (Skolems.instantiate θ (Skolems.runtime unit))
         typeInstantiation handle σs shape =
       @propheticRun _ _ executable (Skolems.instantiate θ (Skolems.runtime unit)) typeInstantiation
@@ -462,7 +500,7 @@ theorem satisfies_generic_at_valid {unit : ValidatedUnit} [FunctionCarriers unit
 frame type arguments induce over the runtime family, holds, read at the
 arguments' types, of its big-step meaning at every runtime type
 instantiation coherent with that frame. -/
-theorem satisfies_generic_at {unit : ValidatedUnit} [FunctionCarriers unit] [@CarriersNonempty (Carriers.runtime unit)]
+theorem satisfies_generic_at {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (θ : TypeArgs)
@@ -475,12 +513,12 @@ theorem satisfies_generic_at {unit : ValidatedUnit} [FunctionCarriers unit] [@Ca
     (verified : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
       Satisfies (propheticMeaning executable typeInstantiation handle σs shape) contract)
     [validArgs : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
-      TrivialValidArgs contract.validArgs] :
+      PreservedValidArgs σs contract.validArgs] :
     letI : Skolems unit := Skolems.runtime unit
     SatisfiesFunctionAt executable handle typeInstantiation
       ((contract.ofSkolem θ).prophetic unit (NRow.subst θ.1 σs) (shape.subst θ.1)) :=
   satisfies_generic_at_valid executable preserved integral handle θ free typeInstantiation σs shape
-    contract coherent verified validArgs.holds
+    contract coherent verified validArgs.preserved
 
 end Public
 

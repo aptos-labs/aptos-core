@@ -39,6 +39,9 @@ run_meta do
   let parameter := mkApp (mkConst ``NTy.param) (mkNatLit 0)
   let boolean := mkConst ``NTy.bool
   let row := mkApp2 (mkConst ``NRow.cons) boolean (mkConst ``NRow.nil)
+  let unknown := mkConst `UnregisteredDescriptor
+  unless (FamilyTransport.substituteNTy row unknown (some (← getEnv))).isNone do
+    throwError "arbitrary constant accepted"
   for declarationIndex in [0, 1, 2] do
     let some schema := structNTy unit ⟨⟨0⟩, declarationIndex⟩ | throwError "missing schema"
     let generic ← withNominalUnit `VerexIR.Tests.NominalTransport.unit (quoteNativeType schema)
@@ -46,18 +49,18 @@ run_meta do
       (quoteNativeType (schema.subst (.cons .bool .nil)))
     let other ← withNominalUnit `VerexIR.Tests.NominalTransport.other (quoteNativeType schema)
     let env ← getEnv
-    unless FamilyTransport.spelledNTy generic (some env) do throwError "descriptor not spelled"
-    unless FamilyTransport.substituteNTy row generic (some env) == some instantiated do
-      throwError "nominal substitution did not preserve descriptor"
     unless generic.getAppFn != other.getAppFn do throwError "different units share descriptor"
-    unless instantiated.getArg! 0 == boolean && generic.getArg! 0 == parameter do
-      throwError "explicit arguments lost, including phantom"
-    unless ← isDefEq (mkApp2 (mkConst ``NTy.subst) row generic) instantiated do
-      throwError "substitution is not kernel definitionally equal"
     unless (FamilyTransport.substituteNTy row generic.getAppFn (some env)).isNone do
       throwError "partial application accepted"
     unless (FamilyTransport.substituteNTy row (mkApp generic boolean) (some env)).isNone do
       throwError "overapplication accepted"
+    unless FamilyTransport.spelledNTy generic (some env) do throwError "descriptor not spelled"
+    unless FamilyTransport.substituteNTy row generic (some env) == some instantiated do
+      throwError "nominal substitution did not preserve descriptor"
+    unless instantiated.getArg! 0 == boolean && generic.getArg! 0 == parameter do
+      throwError "explicit arguments lost, including phantom"
+    unless ← isDefEq (mkApp2 (mkConst ``NTy.subst) row generic) instantiated do
+      throwError "substitution is not kernel definitionally equal"
     let expression := mkApp2 (mkConst ``NTy.subst) row generic
     unless (← FamilyTransport.respellInducedFamily expression) == instantiated do
       throwError "induced substitution did not preserve nominal descriptor"
@@ -74,64 +77,66 @@ run_meta do
     let args := mkApp4 (mkConst ``Subtype.mk [Level.one]) (mkConst ``NRow)
       (typeArgs.getArg! 1) row (← mkEqRefl (mkConst ``Bool.true))
     withLocalDeclD `outer (mkConst ``Carriers) fun outer => do
-      do
-        let family := mkApp2 (mkConst ``Carriers.instantiate) args outer
-        let carried := mkApp2 (mkConst ``NTy.carrier) family generic
-        let expected := mkApp2 (mkConst ``NTy.carrier) outer instantiated
-        unless (← FamilyTransport.respellInducedFamily carried) == expected do
-          throwError "carrier lost its descriptor"
-        unless ← isDefEq carried expected do throwError "carriers differ"
-        let encoding := mkApp2 (mkConst ``NTy.encode) family generic
-        let expectedEncoding := mkApp2 (mkConst ``NTy.encode) outer instantiated
-        unless (← FamilyTransport.respellOperation? encoding) == some expectedEncoding do
-          throwError "operation lost its descriptor"
-
-        -- HEnv is a product of optional carriers. Its canonical spelling
-        -- retains registered nominal descriptors, including phantom and
-        -- nested arguments, while substituting every heterogeneous slot.
-        let cons := mkApp2 (mkConst ``NRow.cons)
-        let tuple := mkApp (mkConst ``NTy.tuple) (cons parameter (cons boolean nil))
-        let fields := cons parameter (cons boolean (cons generic
-          (cons (mkApp (mkConst ``NTy.ghost) generic) (cons tuple nil))))
-        let concreteTuple := mkApp (mkConst ``NTy.tuple) (cons boolean (cons boolean nil))
-        let concreteFields := cons boolean (cons boolean (cons instantiated
-          (cons (mkApp (mkConst ``NTy.ghost) instantiated) (cons concreteTuple nil))))
-        for (fields, concreteFields) in [(nil, nil), (cons boolean nil, cons boolean nil),
-            (fields, concreteFields)] do
+      let family := mkApp2 (mkConst ``Carriers.instantiate) args outer
+      let cons := mkApp2 (mkConst ``NRow.cons)
+      withLocalDeclD `opaqueRow (mkConst ``NRow) fun opaqueRow => do
+        for fields in [opaqueRow, cons generic opaqueRow] do
           let source := mkApp2 (mkConst ``HEnv) family fields
-          let expected := mkApp2 (mkConst ``HEnv) outer concreteFields
-          let .done actual ← FamilyTransport.respellInducedNode source
-              (fun _ _ => throwError "structural HEnv spelling requested conversion")
-            | throwError "environment was not structurally respelled"
-          unless actual == expected do throwError "environment lost its canonical row spelling"
-          unless (← FamilyTransport.respellInducedFamily source) == expected do
-            throwError "environment traversal changed its canonical spelling"
-          unless (← FamilyTransport.respellInducedFamily expected) == expected do
-            throwError "environment canonicalization is not idempotent"
-          unless ← isDefEq source expected do throwError "environment carriers do not convert"
-          -- A reflexivity proof at the canonical type must also certify the
-          -- original type equality in the kernel, under an arbitrary family.
-          let theoremType ← mkForallFVars #[outer] (← mkEq source expected)
-          let proof ← mkLambdaFVars #[outer] (← mkEqRefl expected)
-          let suffix := if fields == nil then "nil" else if fields == cons boolean nil
-            then "bool" else "heterogeneous"
-          addDecl (.thmDecl {
-            name := Name.str (Name.num `VerexIR.Tests.NominalTransport.henv declarationIndex) suffix,
-            levelParams := [], type := theoremType, value := proof })
-        withLocalDeclD `opaqueRow (mkConst ``NRow) fun opaqueRow => do
-          for fields in [opaqueRow, cons generic opaqueRow] do
-            let source := mkApp2 (mkConst ``HEnv) family fields
-            unless (← FamilyTransport.respellInducedFamily source) == source do
-              throwError "opaque environment row was partially substituted"
-    let unknown := mkConst `UnregisteredDescriptor
-    unless (FamilyTransport.substituteNTy row unknown (some env)).isNone do
-      throwError "arbitrary constant accepted"
+          unless (← FamilyTransport.respellInducedFamily source) == source do
+            throwError "opaque environment row was partially substituted"
+      let carried := mkApp2 (mkConst ``NTy.carrier) family generic
+      let expected := mkApp2 (mkConst ``NTy.carrier) outer instantiated
+      unless (← FamilyTransport.respellInducedFamily carried) == expected do
+        throwError "carrier lost its descriptor"
+      unless ← isDefEq carried expected do throwError "carriers differ"
+      let encoding := mkApp2 (mkConst ``NTy.encode) family generic
+      let expectedEncoding := mkApp2 (mkConst ``NTy.encode) outer instantiated
+      unless (← FamilyTransport.respellOperation? encoding) == some expectedEncoding do
+        throwError "operation lost its descriptor"
 
--- `NTy.plainFallback` stays noncomputable and equates across `Carriers.instantiate`
--- by kernel definitional equality (`rfl`): carrier types convert definitionally,
--- and proof irrelevance equates the two `Nonempty` witnesses.
+      -- HEnv is a product of optional carriers. Its canonical spelling
+      -- retains registered nominal descriptors, including phantom and
+      -- nested arguments, while substituting every heterogeneous slot.
+      let tuple := mkApp (mkConst ``NTy.tuple) (cons parameter (cons boolean nil))
+      let fields := cons parameter (cons boolean (cons generic
+        (cons (mkApp (mkConst ``NTy.ghost) generic) (cons tuple nil))))
+      let concreteTuple := mkApp (mkConst ``NTy.tuple) (cons boolean (cons boolean nil))
+      let concreteFields := cons boolean (cons boolean (cons instantiated
+        (cons (mkApp (mkConst ``NTy.ghost) instantiated) (cons concreteTuple nil))))
+      for (fields, concreteFields) in [(nil, nil), (cons boolean nil, cons boolean nil),
+          (fields, concreteFields)] do
+        let source := mkApp2 (mkConst ``HEnv) family fields
+        let expected := mkApp2 (mkConst ``HEnv) outer concreteFields
+        let .done actual ← FamilyTransport.respellInducedNode source
+            (fun _ _ => throwError "structural HEnv spelling requested conversion")
+          | throwError "environment was not structurally respelled"
+        unless actual == expected do throwError "environment lost its canonical row spelling"
+        unless (← FamilyTransport.respellInducedFamily source) == expected do
+          throwError "environment traversal changed its canonical spelling"
+        unless (← FamilyTransport.respellInducedFamily expected) == expected do
+          throwError "environment canonicalization is not idempotent"
+        unless ← isDefEq source expected do throwError "environment carriers do not convert"
+        -- A reflexivity proof at the canonical type must also certify the
+        -- original type equality in the kernel, under an arbitrary family.
+        let theoremType ← mkForallFVars #[outer] (← mkEq source expected)
+        let proof ← mkLambdaFVars #[outer] (← mkEqRefl expected)
+        let suffix := if fields == nil then "nil" else if fields == cons boolean nil
+          then "bool" else "heterogeneous"
+        addDecl (.thmDecl {
+          name := Name.str (Name.num `VerexIR.Tests.NominalTransport.henv declarationIndex) suffix,
+          levelParams := [], type := theoremType, value := proof })
+
+-- `NTy.plainFallback` stays opaque (negative control first) and equates across
+-- `Carriers.instantiate` by kernel definitional equality (`rfl`): carrier types
+-- convert definitionally, and proof irrelevance equates the two `Nonempty` witnesses.
 section PlainFallbackInstantiateDefEq
 private def fallbackArgs : TypeArgs := ⟨.cons (.int 64 false) .nil, rfl⟩
+
+-- Negative control (first): `NTy.plainFallback` is opaque and never reduces to a literal.
+example [outer : Carriers] : True := by
+  fail_if_success
+    have : (@NTy.plainFallback outer .bool rfl) = false := rfl
+  trivial
 
 example [outer : Carriers] :
     @NTy.plainFallback (Carriers.instantiate fallbackArgs outer) (.param 0) rfl =

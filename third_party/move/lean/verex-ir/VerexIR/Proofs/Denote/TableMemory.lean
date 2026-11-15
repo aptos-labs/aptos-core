@@ -35,11 +35,25 @@ def allocationResource : ResourceType := ⟨.address, .nil, .collection⟩
     allocationResource ≠ ({ type, arguments } : ResourceType) :=
   (value_ne_allocationResource type arguments).symm
 
-def encodeAllocated (handles : Array String) : allocationResource.carrier unit := handles
+def encodeAllocated (handles : Array String) : allocationResource.carrier unit :=
+  handles.map fun (h : String) =>
+    (⟨h, @NTy.Holds.intro (Carriers.runtime unit) .address h trivial⟩ :
+      ResourceType.Stored unit .address)
 
 theorem encodeAllocated_injective (left right : Array String)
-    (equal : encodeAllocated (unit := unit) left = encodeAllocated right) : left = right := by
-  exact equal
+    (equal : encodeAllocated (unit := unit) left = encodeAllocated right) : left = right :=
+  (Array.map_inj_right fun _ _ h => congrArg Subtype.val h).mp equal
+
+@[simp, vir_denote_norm] theorem encodeAllocated_empty :
+    encodeAllocated (unit := unit) #[] = #[] := by
+  simp [encodeAllocated]
+
+@[simp, vir_denote_norm] theorem encodeAllocated_push (handles : Array String) (handle : String) :
+    encodeAllocated (unit := unit) (handles.push handle) =
+      (encodeAllocated (unit := unit) handles).push
+        (⟨handle, @NTy.Holds.intro (Carriers.runtime unit) .address handle trivial⟩ :
+          ResourceType.Stored unit .address) :=
+  Array.map_push
 
 end VerexIR.Proofs.Denote.TableMemory
 

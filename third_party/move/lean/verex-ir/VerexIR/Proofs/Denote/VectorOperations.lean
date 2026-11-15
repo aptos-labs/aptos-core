@@ -69,7 +69,7 @@ def swapBounded {α : Type} (v : SpecVector α) (i j : Nat) : SpecVector α :=
 @[vir_denote_norm] theorem swapBounded_values {α : Type} (v : SpecVector α) (i j : Nat) :
     (swapBounded v i j).values = v.values.swapIfInBounds i j := rfl
 
-theorem NTy.Holds.swapBounded [Carriers] {τ : NTy} {vector : (NTy.vector τ).plain}
+theorem NTy.Holds.swapBounded [Carriers] {τ : NTy} {vector : (NTy.vector τ).carrier}
     (held : NTy.Holds (.vector τ) vector) (i j : Nat) :
     NTy.Holds (.vector τ) (Denote.swapBounded vector i j) := by
   rw [NTy.holds_vector, swapBounded_values]
@@ -139,7 +139,7 @@ def eraseBounded {α : Type} (v : SpecVector α) (i : Nat) : SpecVector α :=
 @[vir_denote_norm] theorem eraseBounded_values {α : Type} (v : SpecVector α) (i : Nat) :
     (eraseBounded v i).values = v.values.eraseIdxIfInBounds i := rfl
 
-theorem NTy.Holds.eraseBounded [Carriers] {τ : NTy} {vector : (NTy.vector τ).plain}
+theorem NTy.Holds.eraseBounded [Carriers] {τ : NTy} {vector : (NTy.vector τ).carrier}
     (held : NTy.Holds (.vector τ) vector) (i : Nat) :
     NTy.Holds (.vector τ) (Denote.eraseBounded vector i) := by
   rw [NTy.holds_vector, eraseBounded_values]

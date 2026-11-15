@@ -86,7 +86,7 @@ def NTy.corresponds (loans : LoanCorrespondence) :
   | .ref σ, value, raw =>
       ∃ loan current final, raw = .borrow loan current ∧
         exportedRaw? loan loans = some final ∧
-        σ.plainCorresponds loans value.1 current ∧ σ.corresponds loans value.2 final
+        σ.corresponds loans value.1 current ∧ σ.corresponds loans value.2 final
   | .sliceRef σ, value, raw =>
       ∃ loan, raw = .borrow loan (NTy.encode (.vector σ) value.currentVector) ∧
         exportedRaw? loan loans = some (NTy.encode (.vector σ) value.finalVector)
@@ -94,9 +94,9 @@ def NTy.corresponds (loans : LoanCorrespondence) :
       ∃ rows, raw = .tuple rows ∧ NRow.corresponds loans fields values rows.toList
   | .struct source _ fields, values, raw =>
       ∃ rows, raw = .nominal source none rows ∧
-        HListPlain.corresponds loans fields values.val rows.toList
+        NRow.corresponds loans fields values rows.toList
   | .enum source _ names rows _, value, raw =>
-      variantPlainCorresponds loans source names rows value.val raw
+      variantCorresponds loans source names rows value raw
   | .unit, value, raw => raw = NTy.encode .unit value
   | .bool, value, raw => raw = NTy.encode .bool value
   | .int width signed, value, raw => raw = NTy.encode (.int width signed) value
@@ -125,61 +125,15 @@ def NRow.corresponds (loans : LoanCorrespondence) :
       ∃ head tail, raw = head :: tail ∧ τ.corresponds loans values.1 head ∧
         NRow.corresponds loans rest values.2 tail
 
-/-- A plain value and an actual runtime value use one shared loan map: the
-layer a mutable reference's current lives at (`NTy.carrier`). -/
-def NTy.plainCorresponds (loans : LoanCorrespondence) :
-    (τ : NTy) → τ.plain → RuntimeValue → Prop
-  | .ref σ, value, raw =>
-      ∃ loan current final, raw = .borrow loan current ∧
-        exportedRaw? loan loans = some final ∧
-        σ.plainCorresponds loans value.1 current ∧ σ.plainCorresponds loans value.2 final
-  | .sliceRef σ, value, raw =>
-      ∃ loan, raw = .borrow loan (NTy.plainEncode (.vector σ) value.currentVector) ∧
-        exportedRaw? loan loans = some (NTy.plainEncode (.vector σ) value.finalVector)
-  | .tuple fields, values, raw =>
-      ∃ rows, raw = .tuple rows ∧ HListPlain.corresponds loans fields values rows.toList
-  | .struct source _ fields, values, raw =>
-      ∃ rows, raw = .nominal source none rows ∧
-        HListPlain.corresponds loans fields values rows.toList
-  | .enum source _ names rows _, value, raw =>
-      variantPlainCorresponds loans source names rows value raw
-  | .unit, value, raw => raw = NTy.plainEncode .unit value
-  | .bool, value, raw => raw = NTy.plainEncode .bool value
-  | .int width signed, value, raw => raw = NTy.plainEncode (.int width signed) value
-  | .num, value, raw => raw = NTy.plainEncode .num value
-  | .address, value, raw => raw = NTy.plainEncode .address value
-  | .signer, value, raw => raw = NTy.plainEncode .signer value
-  | .string, value, raw => raw = NTy.plainEncode .string value
-  | .bytes, value, raw => raw = NTy.plainEncode .bytes value
-  | .char, value, raw => raw = NTy.plainEncode .char value
-  | .vector element, value, raw => raw = NTy.plainEncode (.vector element) value
-  | .slice element, value, raw => raw = NTy.plainEncode (.slice element) value
-  | .array element length, value, raw => raw = NTy.plainEncode (.array element length) value
-  | .table key element, value, raw => raw = NTy.plainEncode (.table key element) value
-  | .ghost slot, value, raw => raw = NTy.plainEncode (.ghost slot) value
-  | .param index, value, raw => raw = NTy.plainEncode (.param index) value
-  | .function parameters shared results, value, raw =>
-      raw = NTy.plainEncode (.function parameters shared results) value
-  | .nominal source arguments productive, value, raw =>
-      raw = NTy.plainEncode (.nominal source arguments productive) value
-  | .observed referent, value, raw => raw = NTy.plainEncode (.observed referent) value
-
-def HListPlain.corresponds (loans : LoanCorrespondence) :
-    (row : NRow) → HListPlain row → List RuntimeValue → Prop
-  | .nil, _, raw => raw = []
-  | .cons τ rest, values, raw =>
-      ∃ head tail, raw = head :: tail ∧ τ.plainCorresponds loans values.1 head ∧
-        HListPlain.corresponds loans rest values.2 tail
-
-def variantPlainCorresponds (loans : LoanCorrespondence) (source : StructHandle) :
-    (names : List String) → (rows : NRows) → variantPlain names rows → RuntimeValue → Prop
+def variantCorresponds (loans : LoanCorrespondence) (source : StructHandle) :
+    (names : List String) → (rows : NRows) → variantCarrier names rows → RuntimeValue → Prop
   | _, .nil, value, _ => nomatch value
   | [], .cons _ _, value, _ => nomatch value
   | name :: _, .cons fields _, .inl values, raw =>
       ∃ rows, raw = .nominal source (some name) rows ∧
-        HListPlain.corresponds loans fields values rows.toList
+        NRow.corresponds loans fields values rows.toList
   | _ :: names, .cons _ rest, .inr later, raw =>
-      variantPlainCorresponds loans source names rest later raw
+      variantCorresponds loans source names rest later raw
 end
 
 def ResultShape.corresponds (loans : LoanCorrespondence) :
@@ -196,10 +150,10 @@ theorem NTy.corresponds_refFree (loans : LoanCorrespondence) : (τ : NTy) →
       refine ⟨values.encode.toArray, rfl, ?_⟩
       simpa using NRow.corresponds_refFree loans fields free values
   | .struct source arguments fields, free, values => by
-      refine ⟨(HListPlain.encode values.val).toArray, rfl, ?_⟩
-      simpa using HListPlain.corresponds_refFree loans fields free values.val
+      refine ⟨values.encode.toArray, rfl, ?_⟩
+      simpa using NRow.corresponds_refFree loans fields free values
   | .enum source arguments names rows distinct, free, value =>
-      variantPlainCorresponds_refFree loans source arguments names rows distinct free value.val
+      variantCorresponds_refFree loans source arguments names rows distinct free value
   | .unit, _, _ | .bool, _, _ | .int _ _, _, _ | .num, _, _ | .address, _, _
   | .signer, _, _ | .string, _, _ | .bytes, _, _ | .char, _, _
   | .vector _, _, _ | .slice _, _, _ | .array _ _, _, _ | .table _ _, _, _
@@ -214,47 +168,21 @@ theorem NRow.corresponds_refFree (loans : LoanCorrespondence) : (row : NRow) →
       exact ⟨_, _, rfl, NTy.corresponds_refFree loans τ free.1 values.1,
         NRow.corresponds_refFree loans rest free.2 values.2⟩
 
-theorem NTy.plainCorresponds_refFree (loans : LoanCorrespondence) : (τ : NTy) →
-    τ.refFree = true → (value : τ.plain) →
-      τ.plainCorresponds loans value (τ.plainEncode value)
-  | .ref _, free, _ | .sliceRef _, free, _ => by simp [NTy.refFree] at free
-  | .tuple fields, free, values => by
-      refine ⟨(HListPlain.encode values).toArray, rfl, ?_⟩
-      simpa using HListPlain.corresponds_refFree loans fields free values
-  | .struct source arguments fields, free, values => by
-      refine ⟨(HListPlain.encode values).toArray, rfl, ?_⟩
-      simpa using HListPlain.corresponds_refFree loans fields free values
-  | .enum source arguments names rows distinct, free, value =>
-      variantPlainCorresponds_refFree loans source arguments names rows distinct free value
-  | .unit, _, _ | .bool, _, _ | .int _ _, _, _ | .num, _, _ | .address, _, _
-  | .signer, _, _ | .string, _, _ | .bytes, _, _ | .char, _, _
-  | .vector _, _, _ | .slice _, _, _ | .array _ _, _, _ | .table _ _, _, _
-  | .ghost _, _, _ | .param _, _, _ | .function _ _ _, _, _ | .nominal _ _ _, _, _
-  | .observed _, _, _ => rfl
-
-theorem HListPlain.corresponds_refFree (loans : LoanCorrespondence) : (row : NRow) →
-    row.refFree = true → (values : HListPlain row) →
-      HListPlain.corresponds loans row values values.encode
-  | .nil, _, _ => rfl
-  | .cons τ rest, free, values => by
-      simp only [NRow.refFree, Bool.and_eq_true] at free
-      exact ⟨_, _, rfl, NTy.plainCorresponds_refFree loans τ free.1 values.1,
-        HListPlain.corresponds_refFree loans rest free.2 values.2⟩
-
-theorem variantPlainCorresponds_refFree (loans : LoanCorrespondence) (source : StructHandle)
+theorem variantCorresponds_refFree (loans : LoanCorrespondence) (source : StructHandle)
     (arguments : NRow) : (names : List String) → (rows : NRows) →
-    (distinct : names.Nodup) → rows.refFree = true → (value : variantPlain names rows) →
-    variantPlainCorresponds loans source names rows value
-      (NTy.plainEncode (.enum source arguments names rows distinct) value)
+    (distinct : names.Nodup) → rows.refFree = true → (value : variantCarrier names rows) →
+    variantCorresponds loans source names rows value
+      (NTy.encode (.enum source arguments names rows distinct) value)
   | _, .nil, _, _, value => nomatch value
   | [], .cons _ _, _, _, value => nomatch value
   | name :: names, .cons fields rest, distinct, free, .inl values => by
       simp only [NRows.refFree, Bool.and_eq_true] at free
-      refine ⟨(HListPlain.encode values).toArray, rfl, ?_⟩
-      simpa using HListPlain.corresponds_refFree loans fields free.1 values
+      refine ⟨values.encode.toArray, rfl, ?_⟩
+      simpa using NRow.corresponds_refFree loans fields free.1 values
   | name :: names, .cons fields rest, distinct, free, .inr later => by
       simp only [NRows.refFree, Bool.and_eq_true] at free
-      exact variantPlainCorresponds_refFree loans source arguments names rest (List.nodup_cons.mp distinct).2 free.2 later
+      exact variantCorresponds_refFree loans source arguments names rest
+        (List.nodup_cons.mp distinct).2 free.2 later
 end
 
 /-- Every initially lent loan settles separately, or remains live at exit.
