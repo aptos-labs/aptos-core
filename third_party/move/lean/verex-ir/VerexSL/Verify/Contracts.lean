@@ -802,10 +802,10 @@ partial def _root_.VerexIR.Proofs.Denote.Term.foldNodes {α : Type}
   -- An invocation of a closure runs its target, whose theorem a proof uses.
   | _, _, .closure handle weave _ _ _ _ _ _ captures, found =>
       captures.foldNodes visit atSite atClosure
-        (atClosure handle weave.mask #[] none (visit handle #[] none found))
+        (atClosure handle weave.mask #[] none found)
   | _, _, .closureGeneric handle weave typeArgs θ _ _ _ _ _ _ _ captures, found =>
       captures.foldNodes visit atSite atClosure
-        (atClosure handle weave.mask typeArgs (some θ) (visit handle typeArgs (some θ) found))
+        (atClosure handle weave.mask typeArgs (some θ) found)
   | _, _, .invoke site _ function arguments, found =>
       arguments.foldNodes visit atSite atClosure (function.foldNodes visit atSite atClosure (atSite "invoke" site found))
   | _, _, .tuple elements, found => elements.foldNodes visit atSite atClosure found
@@ -906,24 +906,27 @@ is `Term.callInstance`, every other call with type arguments `Term.callGeneric`.
 def _root_.VerexIR.Proofs.Denote.TypeArgs.atInstance (θ : TypeArgs) (unit : ValidatedUnit)
     (handle : FunctionHandle) : Bool := !transfersAt unit handle θ.1
 
-/-- Fold over the calls and decision sites of a term (`Term.foldNodes`
-without its closures). -/
+/-- Fold over the calls, closure targets, and decision sites of a term. -/
 def _root_.VerexIR.Proofs.Denote.Term.foldCalls {α : Type}
     (visit : FunctionHandle → Array VerexIR.GenericArgument → Option TypeArgs → α → α)
     (atSite : String → Nat → α → α) {unit : ValidatedUnit} {ρ : ResultShape} {Γ : NRow}
     {τ : NTy} (term : Term unit ρ Γ τ) (found : α) : α :=
-  term.foldNodes visit atSite (fun _ _ _ _ found => found) found
+  term.foldNodes visit atSite (fun handle _ typeArgs θ found => visit handle typeArgs θ found) found
 
 /-- The callees a term calls whose meaning is its generic one, in order of
 first occurrence: a call routed to the callee's body compiled at its row
 (`atRow`) needs no certificate of the generic body, so a callee all of whose
-calls are so routed is not among them. -/
+calls are so routed is not among them; a closure's target always uses its
+generic body and theorem. -/
 def _root_.VerexIR.Proofs.Denote.Term.calleesWith {unit : ValidatedUnit} {ρ : ResultShape}
     {Γ : NRow} {τ : NTy} (atRow : FunctionHandle → TypeArgs → Bool)
     (term : Term unit ρ Γ τ) (found : Array FunctionHandle) : Array FunctionHandle :=
-  term.foldCalls (fun handle _ θ found =>
+  term.foldNodes
+    (fun handle _ θ found =>
       if θ.any (atRow handle ·) || found.contains handle then found else found.push handle)
     (fun _ _ found => found)
+    (fun handle _ _ θ found =>
+      if θ.any (·.atInstance unit handle) || found.contains handle then found else found.push handle)
     found
 
 /-- The callees a term calls, in order of first occurrence. -/
@@ -932,14 +935,14 @@ def _root_.VerexIR.Proofs.Denote.Term.callees {unit : ValidatedUnit} {ρ : Resul
     (term : Term unit ρ Γ τ) (found : Array FunctionHandle) : Array FunctionHandle :=
   term.calleesWith (fun handle θ => θ.atInstance unit handle) found
 
-/-- The calls of a term routed to the callee's body compiled at their type
+/-- The direct calls of a term routed to the callee's body compiled at their type
 arguments (`atRow`): each a callee compiled at a row, which no other call at
 the same row shares. -/
 def _root_.VerexIR.Proofs.Denote.Term.rowCalls {unit : ValidatedUnit} {ρ : ResultShape} {Γ : NRow}
     {τ : NTy} (atRow : FunctionHandle → TypeArgs → Bool) (term : Term unit ρ Γ τ)
     (found : Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs)) :
     Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs) :=
-  term.foldCalls (fun handle typeArgs θ found => match θ with
+  term.foldNodes (fun handle typeArgs θ found => match θ with
       | some θ =>
           if atRow handle θ &&
               !found.any (fun other => other.1 == handle && other.2.2.1 == θ.1) then
@@ -947,6 +950,7 @@ def _root_.VerexIR.Proofs.Denote.Term.rowCalls {unit : ValidatedUnit} {ρ : Resu
           else found
       | none => found)
     (fun _ _ found => found)
+    (fun _ _ _ _ found => found)
     found
 
 /-- The calls of a term at type arguments holding a mutable reference: each a callee

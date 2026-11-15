@@ -1420,6 +1420,16 @@ def DroppedTypeArgumentsTrivial (unit : ValidatedUnit) (handle : FunctionHandle)
     holdsDestructor unit (θ.1.getD index .unit) = false ∧
       (θ.1.getD index .unit).refFree = true
 
+/-- Decides `DroppedTypeArgumentsTrivial` directly on `(unit, handle, θ)` without
+compiling the callee: every dropped type parameter of `handle` receives a
+destructor-free, reference-free argument in `θ`. -/
+def TypeArgs.droppedTrivial (θ : TypeArgs) (unit : ValidatedUnit)
+    (handle : FunctionHandle) : Bool :=
+  let fuel := unit.namespaces.foldl (fun n ns => n + ns.expressions.size + 1) 1
+  (List.range θ.1.toList.length).all fun index =>
+    !dropsParameter unit fuel [] [(handle, index)] ||
+      (!holdsDestructor unit (θ.1.getD index .unit) && (θ.1.getD index .unit).refFree)
+
 /-- A generic instantiation in the caller's types over all binder positions: no
 carrier reads a lifetime's or a constant's position, which holds a placeholder. -/
 def CompileNamespace.instantiation? (ns : CompileNamespace) (unit : ValidatedUnit)

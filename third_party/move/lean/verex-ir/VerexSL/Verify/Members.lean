@@ -2558,10 +2558,14 @@ private def carriesConditionsAtRow (unit : ValidatedUnit) (handle : FunctionHand
 /-- Whether a call with type arguments is routed to the callee's body compiled
 at them rather than to its generic meaning at the family they induce
 (`doc/plan/one-spelling.md`, D2): a callee whose generic theorem does not
-transfer to the arguments, as before; and, at reference-free arguments, an
-inlined callee whose body owes no condition of its own. -/
+transfer to the arguments, as before; and, at reference-free arguments whose
+dropped parameters remain trivial in Rust after shared-reference erasure
+(`θ.droppedTrivial`), an inlined callee whose body owes no condition of its own. -/
 private def atRowCall (unit : ValidatedUnit) (handle : FunctionHandle) (θ : TypeArgs) : Bool :=
-  θ.atInstance unit handle || (θ.1.refFree && carriesConditionsAtRow unit handle)
+  θ.atInstance unit handle ||
+    (θ.1.refFree &&
+      ((declarationOf? unit handle).all (·.profile != .rust) || θ.droppedTrivial unit handle) &&
+      carriesConditionsAtRow unit handle)
 
 /-- Collects the callees of `m`'s body and of every inlined callee's, from
 `worklist`, into `found`: each by its contract as a hypothesis, by its
