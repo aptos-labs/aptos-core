@@ -22,8 +22,11 @@ use aptos_types::{
     account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::ValidatorSet,
+    state_store::state_key::StateKey,
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
+    write_set::{WriteOp, WriteSetMut},
 };
 use rand::Rng;
 use std::ops::RangeInclusive;
@@ -763,7 +766,7 @@ fn test_replayer_keeps_partial_block_on_failure() {
     let replay = |range: RangeInclusive<Version>, forge_epoch_change: bool| {
         let (txn_list, persisted_aux_info) = ledger.transactions(&range).into_parts();
         let num_txns = range.end() - range.start() + 1;
-        let write_sets = reader
+        let mut write_sets: Vec<_> = reader
             .get_write_set_iterator(*range.start(), num_txns)
             .unwrap()
             .map(|write_set| write_set.unwrap())
@@ -774,7 +777,17 @@ fn test_replayer_keeps_partial_block_on_failure() {
             .map(|events| events.unwrap())
             .collect();
         if forge_epoch_change {
-            // Fails applying the outputs, since the new validator set isn't written.
+            // Fails applying the outputs, since the new validator set is deleted.
+            let last_write_set = write_sets.last_mut().unwrap();
+            let mut write_set_mut: WriteSetMut = last_write_set
+                .write_op_iter()
+                .map(|(key, op)| (key.clone(), op.clone()))
+                .collect();
+            write_set_mut.insert((
+                StateKey::on_chain_config::<ValidatorSet>().unwrap(),
+                WriteOp::legacy_deletion(),
+            ));
+            *last_write_set = write_set_mut.freeze().unwrap();
             event_vecs.last_mut().unwrap().push(
                 ContractEvent::new_v2(
                     NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
