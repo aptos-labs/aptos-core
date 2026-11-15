@@ -292,6 +292,17 @@ impl StateKvDb {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
+        Ok(self
+            .get_state_value_row_by_version(state_key, version)?
+            .and_then(|(version, value_opt)| value_opt.map(|value| (version, value))))
+    }
+
+    /// Returns the latest row of `state_key` at or before `version`, including tombstones.
+    pub(crate) fn get_state_value_row_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, Option<StateValue>)>> {
         let mut read_opts = ReadOptions::default();
 
         // We want `None` if the state_key changes in iteration.
@@ -303,7 +314,27 @@ impl StateKvDb {
         Ok(iter
             .next()
             .transpose()?
-            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+            .map(|((_, version), value_opt)| (version, value_opt)))
+    }
+
+    /// Returns the version of the earliest row of `state_key` after `version`.
+    pub(crate) fn get_next_state_value_row_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<Version>> {
+        let Some(next_version) = version.checked_add(1) else {
+            return Ok(None);
+        };
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_prefix_same_as_start(true);
+        let mut iter = self
+            .db_shard(state_key.get_shard_id())
+            .rev_iter_with_opts::<StateValueByKeyHashSchema>(read_opts)?;
+        // Versions are encoded in descending order, so this lands on the smallest version at or
+        // after `next_version`.
+        iter.seek_for_prev(&(state_key.hash(), next_version))?;
+        Ok(iter.next().transpose()?.map(|((_, version), _)| version))
     }
 
     /// Returns the latest hot state entry for the given key hash at or before
