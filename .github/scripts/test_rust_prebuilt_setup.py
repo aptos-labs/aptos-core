@@ -52,7 +52,7 @@ elif name == 'rustc':
         print('LLVM version: ' + str(state['rust_llvm']) + '.1.0')
     else:
         print('rustc ' + os.environ.get('COMPILER_CHANNEL', state.get('compiler_version', channel)) + ' (fixture)')
-elif name == 'clang':
+elif name in ('clang', 'clang++'):
     print('Ubuntu clang version ' + str(state['clang_llvm']) + '.1.0')
 elif name == 'ld.lld':
     print(os.environ.get('LLD_PREFIX', 'Ubuntu ') + 'LLD ' + str(state['lld_llvm']) + '.1.0 (compatible with GNU linkers)')
@@ -102,6 +102,7 @@ class PrebuiltSetupTests(unittest.TestCase):
             "rustc",
             "cargo",
             "clang",
+            "clang++",
             "ld.lld",
             "protoc",
             "pre-commit",
@@ -134,6 +135,46 @@ class PrebuiltSetupTests(unittest.TestCase):
             "RUNNER_ENVIRONMENT": "self-hosted",
             "PYTHONDONTWRITEBYTECODE": "1",
         }
+
+    def test_native_identity_changes_when_compiler_bytes_change(self):
+        def identity():
+            result = subprocess.run(
+                [sys.executable, str(self.root / "setup.py"), "cache-identity"],
+                cwd=self.root,
+                env=dict(self.env, PATH=f"{self.home}/bin:" + self.env["PATH"]),
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return (self.root / "github-env").read_text().splitlines()[-1]
+
+        first = identity()
+        with (self.root / "stub").open("a") as stream:
+            stream.write("\n# changed compiler binary\n")
+        self.assertNotEqual(first, identity())
+        self.assertEqual(identity(), identity())
+
+    def test_cache_command_excludes_only_toolchain_enumeration(self):
+        wrapper = ACTION / "cache-command.sh"
+        self.assertEqual(
+            subprocess.check_output(
+                ["bash", str(wrapper), "rustup", "toolchain", "list", "--quiet"],
+                text=True,
+            ),
+            "",
+        )
+        self.assertEqual(
+            subprocess.check_output(
+                ["bash", str(wrapper), "printf", "selected-compiler"], text=True
+            ),
+            "selected-compiler",
+        )
+        restored = next(s for s in self.steps if s.get("id") == "cache")
+        self.assertEqual(restored["with"]["env-vars"], "APTOS_BUILD_ENV")
+        names = [s.get("name") for s in self.steps]
+        self.assertLess(
+            names.index("Finalize compiler setup"), self.steps.index(restored)
+        )
 
     def set_toolchain(self, channel):
         (self.root / "rust-toolchain.toml").write_text(

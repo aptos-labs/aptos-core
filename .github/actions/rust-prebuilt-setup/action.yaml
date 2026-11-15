@@ -31,16 +31,36 @@ runs:
         test "$HOME" = /home/runner
         export PATH="$HOME/bin:$HOME/.cargo/bin:$HOME/.dotnet/tools:$HOME/.local/bin:$PATH"
         python3 "$GITHUB_ACTION_PATH/setup.py" prepare
+    - name: Finalize compiler setup
+      if: ${{ steps.setup.outputs.system-setup == 'true' }}
+      shell: bash
+      env:
+        RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        ALLOW_SYSTEM_SETUP: ${{ inputs.allow-system-setup }}
+      run: |
+        export PATH="$HOME/bin:$HOME/.cargo/bin:$HOME/.dotnet/tools:$HOME/.local/bin:$PATH"
+        python3 "$GITHUB_ACTION_PATH/setup.py" compilers
+    - name: Select compiled cache identity
+      shell: bash
+      run: |
+        export PATH="$HOME/bin:$HOME/.cargo/bin:$HOME/.dotnet/tools:$HOME/.local/bin:$PATH"
+        python3 "$GITHUB_ACTION_PATH/setup.py" cache-identity
+        printf '%s\n' "$HOME/bin" "$HOME/.cargo/bin" "$HOME/.dotnet/tools" "$HOME/.local/bin" >> "$GITHUB_PATH"
     - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
       id: cache
       with:
         key: ${{ inputs.cache-key }}
+        env-vars: APTOS_BUILD_ENV
+        cmd-format: bash .github/actions/rust-prebuilt-setup/cache-command.sh {0}
+        cache-workspace-crates: "false"
         save-if: ${{ inputs.save-cache == 'true' }}
     - name: Install checkout dependencies when required
       if: ${{ steps.setup.outputs.system-setup == 'true' }}
       uses: ./.github/actions/rust-setup
       with:
         SKIP_CACHE: "true"
+        COMPILERS_READY: "true"
+        PRESERVE_TOOLCHAINS: "true"
     - name: Verify active tools
       shell: bash
       env:

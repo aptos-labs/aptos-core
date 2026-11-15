@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -106,15 +107,93 @@ def llvm_matches():
     rustc = output("rustc", "-vV")
     try:
         clang = output("clang", "--version")
+        clangxx = output("clang++", "--version")
         linker = output("ld.lld", "--version")
     except FileNotFoundError:
         return False
     versions = [
         re.search(r"^LLVM version: (\d+)\.", rustc, re.MULTILINE),
         re.search(r"clang version (\d+)\.", clang),
+        re.search(r"clang version (\d+)\.", clangxx),
         re.search(r"(?:^|\s)LLD (\d+)\.", linker),
     ]
     return all(versions) and len({match[1] for match in versions}) == 1
+
+
+def provision_compilers():
+    if not system_setup_allowed():
+        fail("Compiler installation requires explicit system setup permission")
+    version = re.search(r"^LLVM version: (\d+)\.", output("rustc", "-vV"), re.MULTILINE)
+    if not version:
+        fail("Cannot determine the active compiler's LLVM major")
+    major = version[1]
+    subprocess.run(["sudo", "apt-get", "update"], check=True)
+    subprocess.run(
+        [
+            "sudo",
+            "apt-get",
+            "install",
+            "--assume-yes",
+            "--no-install-recommends",
+            "build-essential",
+            "ca-certificates",
+            "curl",
+            "git",
+            "gnupg",
+            "lsb-release",
+            "wget",
+            "libpq-dev",
+            "libssl-dev",
+            "lsof",
+            "pkg-config",
+            "software-properties-common",
+        ],
+        check=True,
+    )
+    script = Path(os.environ["RUNNER_TEMP"]) / "aptos-llvm.sh"
+    subprocess.run(
+        ["wget", "-O", str(script), "https://apt.llvm.org/llvm.sh"], check=True
+    )
+    subprocess.run(["sudo", "bash", str(script), major], check=True)
+    for tool in ("clang", "clang++", "lld", "ld.lld"):
+        subprocess.run(
+            ["sudo", "update-alternatives", "--remove-all", tool], check=False
+        )
+        subprocess.run(
+            [
+                "sudo",
+                "update-alternatives",
+                "--install",
+                f"/usr/bin/{tool}",
+                tool,
+                f"/usr/bin/{tool}-{major}",
+                "100",
+            ],
+            check=True,
+        )
+    if not llvm_matches():
+        fail("Provisioned LLVM tools do not match the active compiler")
+
+
+def cache_identity():
+    if not llvm_matches():
+        fail("Finalize compiler provisioning before selecting the cache")
+    identity = hashlib.sha256()
+    for tool, args in (
+        ("rustc", ("-vV",)),
+        ("cargo", ("--version",)),
+        ("clang", ("--version",)),
+        ("clang++", ("--version",)),
+        ("ld.lld", ("--version",)),
+    ):
+        identity.update(tool.encode() + b"\0" + output(tool, *args).encode() + b"\0")
+        executable = shutil.which(tool)
+        if executable is None:
+            fail(f"Missing compiler tool: {tool}")
+        identity.update(Path(executable).resolve().read_bytes())
+    identity.update(Path("scripts/dev_setup.sh").read_bytes())
+    with Path(os.environ["GITHUB_ENV"]).open("a") as stream:
+        stream.write("APTOS_BUILD_ENV=" + identity.hexdigest() + "\n")
 
 
 def system_setup_allowed():
@@ -152,6 +231,10 @@ def main(mode):
             select_system_setup(
                 "Prebuilt LLVM tools do not match the active Rust compiler"
             )
+    elif mode == "compilers":
+        provision_compilers()
+    elif mode == "cache-identity":
+        cache_identity()
     elif mode == "verify":
         config, selection = toolchain()
         reconcile_rust(config)

@@ -1,0 +1,77 @@
+name: Validate Rust cache transitions
+on:
+  pull_request:
+    paths:
+      - .github/actions/rust-prebuilt-setup/**
+      - .github/actions/rust-setup/**
+      - .github/scripts/**
+      - .github/workflows/validate-rust-cache.yaml
+      - docker/builder/**
+      - scripts/dev_setup.sh
+permissions:
+  contents: read
+jobs:
+  cold:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - run: |
+          rustup toolchain install 1.85.1 --profile minimal
+          sudo apt-get update
+          sudo apt-get install --assume-yes clang-19 lld-19
+          mkdir -p /tmp/cache-compilers
+          ln -s /usr/bin/clang-19 /tmp/cache-compilers/clang
+          ln -s /usr/bin/clang++-19 /tmp/cache-compilers/clang++
+          ln -s /usr/bin/ld.lld-19 /tmp/cache-compilers/ld.lld
+          echo /tmp/cache-compilers >> "$GITHUB_PATH"
+          echo RUSTUP_TOOLCHAIN=1.85.1 >> "$GITHUB_ENV"
+      - run: python3 .github/scripts/rust_cache_fixture.py prepare
+      - run: python3 .github/actions/rust-prebuilt-setup/setup.py cache-identity
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+        id: cache
+        with:
+          shared-key: cache-contract-${{ github.run_id }}
+          env-vars: APTOS_BUILD_ENV
+          cmd-format: bash .github/actions/rust-prebuilt-setup/cache-command.sh {0}
+          workspaces: cache-fixture -> target
+          cache-workspace-crates: "false"
+          cache-bin: "false"
+      - run: python3 .github/scripts/rust_cache_fixture.py cold
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+  warm:
+    needs: cold
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - run: |
+          rustup toolchain install 1.85.1 --profile minimal
+          sudo apt-get update
+          sudo apt-get install --assume-yes clang-19 lld-19
+          mkdir -p /tmp/cache-compilers
+          ln -s /usr/bin/clang-19 /tmp/cache-compilers/clang
+          ln -s /usr/bin/clang++-19 /tmp/cache-compilers/clang++
+          ln -s /usr/bin/ld.lld-19 /tmp/cache-compilers/ld.lld
+          echo /tmp/cache-compilers >> "$GITHUB_PATH"
+          echo RUSTUP_TOOLCHAIN=1.85.1 >> "$GITHUB_ENV"
+      - run: python3 .github/scripts/rust_cache_fixture.py prepare
+      - run: python3 .github/actions/rust-prebuilt-setup/setup.py cache-identity
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+        id: cache
+        with:
+          shared-key: cache-contract-${{ github.run_id }}
+          env-vars: APTOS_BUILD_ENV
+          cmd-format: bash .github/actions/rust-prebuilt-setup/cache-command.sh {0}
+          workspaces: cache-fixture -> target
+          cache-workspace-crates: "false"
+          cache-bin: "false"
+          save-if: "false"
+      - run: python3 .github/scripts/rust_cache_fixture.py warm
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}

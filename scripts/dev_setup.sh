@@ -513,6 +513,10 @@ function install_toolchain {
 }
 
 function install_rustup_components_and_nightly {
+  if [[ "${APTOS_PRESERVE_TOOLCHAINS:-false}" == "true" ]]; then
+    rustup show active-toolchain
+    return
+  fi
   echo "Updating rustup and installing the latest rustc, rustfmt & clippy"
   rustup update
   rustup toolchain install stable # Install the latest toolchain to ensure that dependencies can always be built (even if aptos-core is behind)

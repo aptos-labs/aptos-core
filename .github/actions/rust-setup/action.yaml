@@ -11,6 +11,12 @@ inputs:
   SKIP_CACHE:
     description: "Let a caller restore the cache after its own tool verification"
     default: "false"
+  COMPILERS_READY:
+    description: "Caller has provisioned and verified Linux compilers before cache restore"
+    default: "false"
+  PRESERVE_TOOLCHAINS:
+    description: "Install dependencies without updating already reconciled Rust toolchains"
+    default: "false"
   macos:
     description: "If the machine is using macOS"
     required: false
@@ -19,7 +25,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - if: ${{inputs.macos != 'true'}}
+    - if: ${{ inputs.macos != 'true' && inputs.COMPILERS_READY != 'true' }}
       name: Linux - Setup dependencies
       run: |
         sudo apt-get update
@@ -47,6 +53,8 @@ runs:
     - if: ${{inputs.macos != 'true'}}
       name: Linux - install protoc and related tools
       shell: bash
+      env:
+        APTOS_PRESERVE_TOOLCHAINS: ${{ inputs.PRESERVE_TOOLCHAINS }}
       run: scripts/dev_setup.sh -b -r -y -P -J -t
 
     - if: ${{inputs.macos == 'true'}}
