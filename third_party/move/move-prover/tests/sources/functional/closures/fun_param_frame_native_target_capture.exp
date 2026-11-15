@@ -1,0 +1,48 @@
+Move prover returns: exiting with bytecode transformation errors
+error: captured function value may modify resource `fun_param_frame_native_target_capture::S`, which is not declared in `modifies_of` for `f` of `fun_param_frame_native_target_capture::run_spec`
+   ┌─ tests/sources/functional/closures/fun_param_frame_native_target_capture.move:51:16
+   │
+51 │         call_h(|x| run_spec(w, x), 1);
+   │                ^^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: the closure's effects are not known
+   ┌─ tests/sources/functional/closures/fun_param_frame_native_target_capture.move:51:9
+   │
+51 │         call_h(|x| run_spec(w, x), 1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: captured function value may modify resource `fun_param_frame_native_target_capture::S`, which is not declared in `modifies_of` for `f` of `fun_param_frame_native_target_capture::run_spec`
+   ┌─ tests/sources/functional/closures/fun_param_frame_native_target_capture.move:58:16
+   │
+58 │         call_g(|x| run_spec(w, x), 1);
+   │                ^^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: `fun_param_frame_native_target_capture::call_g` declares no `modifies_of` for it, and the argument is not a closure with a known footprint built at this call site
+   ┌─ tests/sources/functional/closures/fun_param_frame_native_target_capture.move:58:9
+   │
+58 │         call_g(|x| run_spec(w, x), 1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: captured function value may modify resource `fun_param_frame_native_target_capture::S`, which is not declared in `modifies_of` for `f` of `fun_param_frame_native_target_capture::run_bare`
+   ┌─ tests/sources/functional/closures/fun_param_frame_native_target_capture.move:65:16
+   │
+65 │         call_h(|x| run_bare(w, x), 1);
+   │                ^^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: the closure's effects are not known
+   ┌─ tests/sources/functional/closures/fun_param_frame_native_target_capture.move:65:9
+   │
+65 │         call_h(|x| run_bare(w, x), 1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: captured function value may modify resource `fun_param_frame_native_target_capture::S`, which is not declared in `modifies_of` for `f` of `fun_param_frame_native_target_capture::run_opaque`
+   ┌─ tests/sources/functional/closures/fun_param_frame_native_target_capture.move:72:16
+   │
+72 │         call_h(|x| run_opaque(w, x), 1);
+   │                ^^^^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: the closure's effects are not known
+   ┌─ tests/sources/functional/closures/fun_param_frame_native_target_capture.move:72:9
+   │
+72 │         call_h(|x| run_opaque(w, x), 1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

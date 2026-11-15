@@ -1,0 +1,27 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_stored.move:26:5: error: the specification clause `f1 : Fn(u64) -> Unit has Copy, Drop` is not established
+tests/sources/functional/closures/fun_param_frame_stored.move:26:5: error: the specification clause `f2 : Fn(u64) -> Unit has Copy, Drop` is not established
+tests/sources/functional/closures/fun_param_frame_stored.move:43:5: error: verex verification failed: the automatic verification of `pack_all` failed; provide a proof in the module:
+  verify pack_all by lean =>
+    verex_obligations
+    verex_on
+    | after_bump => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_stored.move:26:5: error: the specification clause `f1 : Fn(u64) -> Unit has Copy, Drop` is not established
+tests/sources/functional/closures/fun_param_frame_stored.move:26:5: error: the specification clause `f2 : Fn(u64) -> Unit has Copy, Drop` is not established
+tests/sources/functional/closures/fun_param_frame_stored.move:47:5: error: verex verification failed: the automatic verification of `pack_and_invoke` failed; provide a proof in the module:
+  verify pack_and_invoke by lean =>
+    verex_obligations
+    verex_on
+    | after_bump => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_stored.move:26:5: error: the specification clause `f1 : Fn(u64) -> Unit has Copy, Drop` is not established
+tests/sources/functional/closures/fun_param_frame_stored.move:52:5: error: verex verification failed: the automatic verification of `pack_spec` failed; provide a proof in the module:
+  verify pack_spec by lean =>
+    verex_obligations
+    verex_on
+    | after_bump => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

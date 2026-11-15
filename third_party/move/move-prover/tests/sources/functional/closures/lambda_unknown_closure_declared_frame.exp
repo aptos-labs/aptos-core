@@ -5,6 +5,12 @@ error: cannot establish what function argument `h` may modify: the closure's eff
 32 │         op(|y| g(f0, y), before + 1);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+error: captured function value may modify resource `lambda_unknown_closure_declared_frame::R`, which is not declared in `modifies_of` for `f` of `lambda_unknown_closure_declared_frame::apply`
+   ┌─ tests/sources/functional/closures/lambda_unknown_closure_declared_frame.move:58:12
+   │
+58 │         op(|y| apply(w, y), before + 1);
+   │            ^^^^^^^^^^^^^^^
+
 error: cannot establish what function argument `h` may modify: the closure's effects are not known
    ┌─ tests/sources/functional/closures/lambda_unknown_closure_declared_frame.move:58:9
    │

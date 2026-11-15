@@ -1,9 +1,15 @@
 Move prover returns: exiting with bytecode transformation errors
-error: cannot establish what function argument `g` may modify: `lambda_deferred_frame_target_fun_param::call_g` declares no `modifies_of` for it, and the argument is not a closure with a known footprint built at this call site
-   ┌─ tests/sources/functional/closures/lambda_deferred_frame_target_fun_param.move:47:9
+error: captured function value may modify resource `lambda_deferred_frame_target_fun_param::R`, which is not declared in `modifies_of` for `h` of `lambda_deferred_frame_target_fun_param::both`
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_target_fun_param.move:47:16
    │
 47 │         call_g(|y| both(h, y), before + 1);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                ^^^^^^^^^^^^^^
+
+error: function value passed to an invocation may modify resource `lambda_deferred_frame_target_fun_param::C`, which is not declared in `modifies_of` for the parameter of the invoked function value
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_target_fun_param.move:72:9
+   │
+72 │         g(|y| bump(y), a)
+   │         ^^^^^^^^^^^^^^^^^
 
 error: cannot establish what function argument `g` may modify: `lambda_deferred_frame_target_fun_param::d` declares no `modifies_of` for it, and the argument is not a closure with a known footprint built at this call site
    ┌─ tests/sources/functional/closures/lambda_deferred_frame_target_fun_param.move:80:9

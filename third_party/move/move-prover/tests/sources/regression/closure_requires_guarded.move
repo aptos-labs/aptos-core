@@ -218,6 +218,7 @@ module 0x42::closure_requires_guarded {
 
 // A transparent higher-order target with a `requires`, wrapped in a closure of another type,
 // verifies: transparent targets are dispatched to their body, not to behavioral predicates.
+// The reader of R stays within the declared `reads_of` frames.
 module 0x42::closure_requires_transparent_hof {
     struct R has key { v: u64 }
 
@@ -233,6 +234,7 @@ module 0x42::closure_requires_transparent_hof {
         f(x)
     }
     spec hof {
+        reads_of<f> R;
         requires x < 100;
         aborts_if aborts_of<f>(x);
         ensures result == result_of<f>(x);
@@ -240,6 +242,9 @@ module 0x42::closure_requires_transparent_hof {
 
     fun apply2(g: |u64, bool| u64 has drop, x: u64): u64 {
         g(x, true)
+    }
+    spec apply2 {
+        reads_of<g> R;
     }
 
     fun test(a: address): u64 acquires R {

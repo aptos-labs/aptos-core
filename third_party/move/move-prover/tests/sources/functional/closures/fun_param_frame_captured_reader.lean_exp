@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_captured_reader.move:38:9: error: the specification clause `ensures result` is not established
+tests/sources/functional/closures/fun_param_frame_captured_reader.move:36:5: error: verex verification failed: the automatic verification of `test` failed; provide a proof in the module:
+  verify test by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_captured_reader.move:62:9: error: the specification clause `ensures result` is not established
+tests/sources/functional/closures/fun_param_frame_captured_reader.move:60:5: error: verex verification failed: the automatic verification of `apply2` failed; provide a proof in the module:
+  verify apply2 by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

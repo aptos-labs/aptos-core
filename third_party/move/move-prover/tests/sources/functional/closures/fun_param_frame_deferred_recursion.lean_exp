@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_deferred_recursion.move:38:5: error: `f` reaches itself through `back`, which is unspecified; a function on a cycle of calls is used through its contract, so specify `back`

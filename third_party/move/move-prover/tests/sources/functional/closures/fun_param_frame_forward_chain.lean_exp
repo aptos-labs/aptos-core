@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_forward_chain.move:52:9: error: the specification clause `ensures global<Counter>(a).x == old(global<Counter>(a).x)` is not established
+tests/sources/functional/closures/fun_param_frame_forward_chain.move:50:5: error: verex verification failed: the automatic verification of `fv_curry_fails` failed; provide a proof in the module:
+  verify fv_curry_fails by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_forward_chain.move:75:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
+tests/sources/functional/closures/fun_param_frame_forward_chain.move:72:5: error: verex verification failed: the automatic verification of `fv_forward_depth2_fails` failed; provide a proof in the module:
+  verify fv_forward_depth2_fails by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
