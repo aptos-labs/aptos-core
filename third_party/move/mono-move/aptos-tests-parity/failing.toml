@@ -158,6 +158,10 @@ note = "MonoMove does not execute multisig payloads."
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_payload_succeeds"
 
 [[test]]
+name = "aptos-api::aptos_api$tests::nested_values_test::test_table_item_beyond_depth_limit"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
 name = "aptos-api::aptos_api$tests::objects::test_gen_object"
 
 [[test]]
@@ -308,6 +312,14 @@ name = "aptos-api::aptos_api$tests::view_function::test_view_option_vec"
 name = "aptos-api::aptos_api$tests::view_function::test_view_tuple"
 
 [[test]]
+name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_apply_features_after_init"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_benchmark_default"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_benchmark_orderless_transaction"
 
 [[test]]
@@ -318,6 +330,14 @@ name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_compare_v
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_compare_vm_and_vm_uncoordinated"
+
+[[test]]
+name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_external_lib_bench_larger"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_external_lib_bench_test"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_fibonacci_iterative"
@@ -338,7 +358,15 @@ name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_native_lo
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_native_value_cache_loose_block_executor_benchmark"
 
 [[test]]
+name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_native_vm_benchmark_transaction"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_publish_transaction"
+
+[[test]]
+name = "aptos-executor::storage_integration_test$test_epilogue_hotness_survives_state_sync"
+note = "MonoMove does not report its reads to the block executor (empty `MonoReads`), so nothing is promoted to hot state."
 
 [[test]]
 name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/call_function.move"
@@ -363,7 +391,7 @@ name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/write
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::access_path_test::access_path_panic"
-note = "TODO"
+note = "MonoMove returns UNKNOWN_INVARIANT_VIOLATION_ERROR instead of VALUE_SERIALIZATION_ERROR for a resource whose deeply nested struct tag cannot form an access path."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregator_lifetime_lower_limit"
@@ -425,94 +453,98 @@ name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2::test_cases::test_sn
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2::test_too_many_aggregators_in_a_resource::usetype_useresourcegrouptype_expects"
-note = "TODO"
+note = "MonoMove does not enforce the delayed-field count limit (no TOO_MANY_DELAYED_FIELDS)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2::test_too_many_aggregators_in_a_resource::usetype_useresourcetype_expects"
-note = "TODO"
+note = "MonoMove does not enforce the delayed-field count limit (no TOO_MANY_DELAYED_FIELDS)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_enums::test_aggregators_in_enums"
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_function_values::test_function_value_captures_aggregator"
-note = "TODO"
+note = "MonoMove lets a closure capture a delayed field (no UNABLE_TO_CAPTURE_DELAYED_FIELDS)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_function_values::test_function_value_captures_aggregator_is_not_storable"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_function_values::test_function_value_uses_aggregator_is_storable"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_runtime_checks::run_all_tests"
-note = "TODO"
+note = "MonoMove allows comparing aggregators and snapshots, which V1 rejects at runtime."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::any::test_any_with_function_values"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv). `any::pack` of a closure does not abort."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::attributes::test_bad_fun_attribute_in_compiled_module"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::attributes::test_bad_view_attribute_in_compiled_module"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::attributes::verify_module_events_fail_when_not_enabled"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::attributes::verify_resource_group_member_fails_when_not_enabled"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::attributes::verify_resource_groups_fail_when_not_enabled"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_bcs_to_bytes_execution_limit"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_bcs_to_bytes_value_size_metering"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_constant_serialized_size_dag_no_stall"
-note = "TODO"
+note = "MonoMove fails with UNKNOWN_INVARIANT_VIOLATION_ERROR on `bcs::constant_serialized_size` over a depth-128 struct DAG."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_from_bytes_value_node_metering"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_function_value_serialization"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_load_resource_value_node_metering"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_table_load_value_node_metering"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::closure_captured_layout_metering::closures_with_large_captured_layouts_hit_memory_quota"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::closure_stale_generic_ability::coin_duplication_prevented_by_ability_recheck_when_revalidation_disabled"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::closure_stale_generic_ability::coin_duplication_prevented_when_revalidation_enabled"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::constructor_args::constructor_args_bad_runtime"
-note = "TODO"
+note = "MonoMove rejects invalid UTF-8 string arguments while decoding them (FAILED_TO_DESERIALIZE_ARGUMENT); V1 aborts in 0x1::string with EINVALID_UTF8."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::constructor_args::constructor_args_good"
@@ -520,59 +552,55 @@ note = "MonoMove rejects struct entry function arguments with INVALID_MAIN_FUNCT
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::dependencies::exceeding_max_num_dependencies::false_false_expects"
-note = "TODO"
+note = "MonoMove does not enforce the dependency limits (no DEPENDENCY_LIMIT_REACHED)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::dependencies::exceeding_max_num_dependencies::false_true_expects"
-note = "TODO"
+note = "MonoMove does not enforce the dependency limits (no DEPENDENCY_LIMIT_REACHED)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::dependencies::exceeding_max_num_dependencies::true_false_expects"
-note = "TODO"
+note = "MonoMove does not enforce the dependency limits (no DEPENDENCY_LIMIT_REACHED)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::dependencies::exceeding_max_num_dependencies::true_true_expects"
-note = "TODO"
+note = "MonoMove does not enforce the dependency limits (no DEPENDENCY_LIMIT_REACHED)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::enum_upgrade_fv::enum_upgrade"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::enum_variant_tag_serialization::out_of_range_variant_tag_does_not_stall_block"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::error_map::error_map"
-note = "TODO"
+note = "MonoMove does not attach AbortInfo from the module error map (V1: AptosVM::inject_abort_info_if_available)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::error_map::error_map_unspecified_abort_code"
-note = "TODO"
+note = "MonoMove does not attach AbortInfo from the module error map (V1: AptosVM::inject_abort_info_if_available)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::fee_payer::test_account_not_exist_and_move_abort_with_fee_payer_create_account"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::fee_payer::test_account_not_exist_move_abort_with_fee_payer_out_of_gas"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::fee_payer::test_account_not_exist_with_fee_payer"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::fee_payer::test_existing_account_with_fee_payer"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::fee_payer::test_existing_account_with_fee_payer_aborts"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::function_caches::test_function_caches_for_recursive_functions_do_not_leak_memory"
-note = "Exceeds the CI time limit under MonoMove."
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_type_ability_bounds::excess_function_type_abilities_are_rejected"
@@ -581,96 +609,96 @@ name = "e2e-move-tests::e2e_move_tests$tests::function_type_ability_bounds::exce
 name = "e2e-move-tests::e2e_move_tests$tests::function_type_ability_bounds::fake_key_no_longer_satisfies_a_key_constraint"
 
 [[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::function_value_depth::test_pack_closure_captured_values_metering"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
+
+[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_value_depth::test_vm_value_too_deep_with_function_values"
-note = "TODO"
+note = "MonoMove does not enforce the value depth limit (no VM_MAX_VALUE_DEPTH_REACHED)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_value_layout_dag::captured_layout_dag_over_cap_rejected"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_value_layout_dag::captured_layout_dag_under_cap_succeeds"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_value_serialization_restriction::closure_serialization_fails_while_flag_on"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_value_serialization_restriction::closure_serialization_works_while_flag_off"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_values::function_value_persistent"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_values::function_value_registry"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::fv_as_table_keys::fv_in_table"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::fv_as_table_keys::fv_in_table_with_captured_vars"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::fv_as_table_keys::fv_in_table_with_refs"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::gas_profiling::test_gas_profiling_report"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::generic_cmp::function_generic_cmp"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::governance_updates::alt_execution_limit_for_gov_proposals"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::governance_updates::large_transactions"
-note = "TODO"
+note = "MonoMove cannot compare function values (`Unsupported` in runtime/src/value_cmp.rs)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_aggregator_v1_delta_write_excludes_promotion"
-note = "TODO"
+note = "Aggregators V1 are not supported by MonoMove."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_aggregator_v1_materialized_read_excludes_promotion"
-note = "TODO"
+note = "Aggregators V1 are not supported by MonoMove."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_block_promotions_cover_reads_and_exclude_writes"
-note = "TODO"
+note = "MonoMove does not report its reads to the block executor (empty `MonoReads`), so nothing is promoted to hot state."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_config_reads_are_promoted"
-note = "TODO"
+note = "MonoMove does not report its reads to the block executor (empty `MonoReads`), so nothing is promoted to hot state."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_epilogue_reads_are_promoted"
+note = "MonoMove does not report its reads to the block executor (empty `MonoReads`), so nothing is promoted to hot state."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_exists_on_absent_resource_is_recorded"
-note = "TODO"
+note = "MonoMove does not report its reads to the block executor (empty `MonoReads`), so nothing is promoted to hot state."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_module_reads_are_promoted"
-note = "TODO"
+note = "MonoMove does not report its reads to the block executor (empty `MonoReads`), so nothing is promoted to hot state."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_plain_resource_read_is_promoted"
-note = "TODO"
+note = "MonoMove does not report its reads to the block executor (empty `MonoReads`), so nothing is promoted to hot state."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_republished_module_not_promoted"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_resource_group_member_read_promotes_group_key"
-note = "TODO"
+note = "MonoMove does not report its reads to the block executor (empty `MonoReads`), so nothing is promoted to hot state."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_script_module_dependencies_are_promoted"
@@ -680,190 +708,258 @@ name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_table_item_read_is
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_aborts_when_feature_disabled"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_account_self_init_survives_key_rotation"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_flag_upgradable_to_only_once"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_mixed_bundle_resets_before_legacy_init"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_no_rerun_without_upgrade"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_not_resolvable_by_reflection"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_only_once_flag_is_immutable"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_only_once_survives_upgrade"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_reruns_after_upgrade"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_runs_on_first_deployment"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_script_caller_aborts"
-note = "TODO"
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_script_caller_rejected"
+note = "MonoMove accepts a script that references `init_maybe_initialize`; V1 rejects it with INVALID_OPERATION_IN_SCRIPT."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_self_upgrade_cannot_consume_reset"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_stale_object_signer_cannot_refresh_owner"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_upgrade_while_disabled"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_module_eager_disabled_allows_module_without_initializer"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_module_eager_initialization_disabled::lazy_disabled"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_module_eager_initialization_disabled::lazy_enabled"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_module_not_run_at_publish_with_lazy_initialization::eager_allowed"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_module_not_run_at_publish_with_lazy_initialization::eager_disabled"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_module_remains_supported_with_lazy_initialization"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::poc_type_confusion_module_upgrade_parallel"
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::stale_closure_memo_kept_when_timed_feature_disabled"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::stale_closure_memo_re_resolved_after_same_txn_upgrade::eager_loading"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::stale_closure_memo_re_resolved_after_same_txn_upgrade::lazy_loading"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_feature_gating_with_zk_off"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_feature_gating_with_zk_on"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_federated_keyless_at_jwk_addr"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_federated_keyless_override_at_0x1"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_proof_simulation"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_rotate_vk"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_object_code_deployment_basic"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_object_code_deployment_upgrade_success_compat"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_publishing_basic"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_upgrade_fail_compat"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_upgrade_fail_immutable"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_upgrade_fail_overlapping_module"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_upgrade_success_compat"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::layout_caches::test_layout_cache_successful_reads"
-note = "TODO"
+note = "MonoMove does not enforce the dependency limits (no DEPENDENCY_LIMIT_REACHED)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::lazy_natives::lazy_natives"
-note = "TODO"
+note = "MonoMove fails at the call to an unbound native (ExecutionFailure); V1 reports MISSING_DEPENDENCY."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::legacy_bytecode_publishing::legacy_v5_module_publishing_is_gated"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::legacy_bytecode_publishing::min_module_bytecode_version_is_gated_by_gas_schedule"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::memory_quota::add_vec_to_table"
-note = "TODO"
+note = "MonoMove does not meter V1's memory_quota; its own heap limit triggers at different points."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::memory_quota::clone_large_vectors"
-note = "TODO"
+note = "MonoMove does not meter V1's memory_quota; its own heap limit triggers at different points."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::memory_quota::deeply_nested_structs"
-note = "TODO"
+note = "MonoMove does not meter V1's memory_quota; its own heap limit triggers at different points."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::memory_quota::test_poc_display_recursion_overflow_thread_diff"
-note = "TODO"
+note = "MonoMove overflows a 512 KiB thread stack on a 10,000-deep nested struct; V1 bounds the depth."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::memory_quota::test_poc_nested_struct_drop_overflow_thread_diff"
-note = "TODO"
+note = "MonoMove overflows a 512 KiB thread stack on a 10,000-deep nested struct; V1 bounds the depth."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::metadata::test_compilation_metadata"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::metadata::test_duplicate_compilation_metadata_entries"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::metadata::test_duplicate_entries"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::metadata::test_malformed_metadata_value"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::metadata::test_unknown_metadata_key"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::mint_nft::mint_nft_e2e"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::module_event::test_event_emission_not_allowed_in_scripts"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::mono_move::dependent_transfers_block_matches_v1"
-note = "TODO"
+note = "Differential against V1, but the reference side runs under this variable, so it is MonoMove too (legacy charged no gas)."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::mono_move::group_member_added_then_sibling_modified_matches_v1"
+note = "Differential against V1, but the reference side runs under this variable, so it is MonoMove too (legacy charged no gas)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::mono_move::single_transfer_block_matches_v1"
-note = "TODO"
+note = "Differential against V1, but the reference side runs under this variable, so it is MonoMove too (legacy charged no gas)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::mono_move::transfer_to_fresh_recipient_block_matches_v1"
-note = "TODO"
+note = "Differential against V1, but the reference side runs under this variable, so it is MonoMove too (legacy charged no gas)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::move_executor_coverage::test_coverage"
-note = "TODO"
+note = "MonoMove does not report executed code to coverage or function-usage observers."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::move_executor_coverage::test_function_usage_observer"
-note = "TODO"
+note = "MonoMove does not report executed code to coverage or function-usage observers."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::native_collateral::balance_constructor_writes_a_signed_balance"
+note = "MonoMove does not implement the `native_collateral` natives (native_set_collateral, native_delete_collateral)."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::native_collateral::collateral_writes_require_delayed_fields"
+note = "MonoMove does not implement the `native_collateral` natives (native_set_collateral, native_delete_collateral)."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::native_collateral::collateral_writes_require_native_collateral"
+note = "MonoMove does not implement the `native_collateral` natives (native_set_collateral, native_delete_collateral)."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::native_collateral::credits_in_one_block_write_the_running_balance"
+note = "MonoMove does not implement the `native_collateral` natives (native_set_collateral, native_delete_collateral)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::nft_dao::test_nft_dao_txn_arguments"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::object_code_deployment::freeze_code_object_fail_when_having_mutable_dependency"
@@ -872,84 +968,88 @@ name = "e2e-move-tests::e2e_move_tests$tests::object_code_deployment::freeze_cod
 name = "e2e-move-tests::e2e_move_tests$tests::object_code_deployment::freeze_code_object_fail_when_not_owner"
 
 [[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::object_code_deployment::freeze_code_object_fail_when_package_registry_does_not_exist"
+note = "MonoMove does not abort when freezing a code object that has no PackageRegistry."
+
+[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::offer_rotation_capability_rejected_in_multisig_payload"
 note = "MonoMove does not execute multisig payloads."
 
 [[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::paranoid_type_check_cost::paranoid_type_check_cost_is_independent_of_type_size"
+note = "MonoMove cannot compare function values (`Unsupported` in runtime/src/value_cmp.rs)."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::paranoid_type_check_scaling::paranoid_type_check_cost_does_not_scale_with_type_size"
+note = "MonoMove cannot compare function values (`Unsupported` in runtime/src/value_cmp.rs)."
+
+[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::per_category_gas_limits::io_limit_reached_by_load_resource"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_negative_phantom_option_package"
-note = "TODO"
+note = "MonoMove rejects Option<T>/enum entry arguments by type when T is ineligible (INVALID_MAIN_FUNCTION_SIGNATURE); V1 accepts None/empty values."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_option_in_public_struct"
-note = "TODO"
+note = "MonoMove rejects Option<T>/enum entry arguments by type when T is ineligible (INVALID_MAIN_FUNCTION_SIGNATURE); V1 accepts None/empty values."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_option_private_type_package"
-note = "TODO"
+note = "MonoMove rejects Option<T>/enum entry arguments by type when T is ineligible (INVALID_MAIN_FUNCTION_SIGNATURE); V1 accepts None/empty values."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_pack_default_features"
-note = "TODO"
+note = "MonoMove does not cap argument-constructor invocations (33 Option elements are accepted)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_pack_feature_disabled"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_pair_type_params_package"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_phantom_validation_package"
-note = "MonoMove rejects struct entry function arguments with INVALID_MAIN_FUNCTION_SIGNATURE."
+note = "MonoMove does not support disabling features. Nor does it cap argument-constructor invocations."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::public_structs_enums_upgrade::test_public_struct_args_feature_disabled_then_enabled"
-note = "TODO"
+note = "MonoMove does not support disabling features. PUBLIC_STRUCT_ENUM_ARGS stays on."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::randomness_test_and_abort::test_and_abort_defense_is_sound_and_correct"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::randomness_test_and_abort::test_unbiasable_annotation"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::scripts::test_script_with_object_parameter"
-note = "TODO"
+note = "MonoMove does not support disabling features. ALLOW_SERIALIZED_SCRIPT_ARGS stays on."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::serialize_effects_determinism::cold_vs_warm_status_matches"
-note = "TODO"
+note = "MonoMove cannot serialize function values (`Unsupported(\"function values are not yet supported\")` in runtime/src/value_conv)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::simple_defi::exchange_e2e_test"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::state_metadata::test_metadata_tracking"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added. No storage fees, so the slot deposit stays 0."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::storage_refund::test_refunds"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::string_args::string_args_bad_utf8"
-note = "TODO"
+note = "MonoMove rejects invalid UTF-8 string arguments while decoding them (FAILED_TO_DESERIALIZE_ARGUMENT); V1 aborts in 0x1::string with EINVALID_UTF8."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::string_utils::test_function_value_formatting_in_modules::case_1"
-note = "TODO"
+note = "MonoMove cannot format function values (`Unsupported` in runtime/src/value_display.rs)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::string_utils::test_function_value_formatting_in_scripts"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::transaction_context::test_transaction_context_multisig_payload"
@@ -960,16 +1060,28 @@ name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_feature_d
 note = "MonoMove does not support disabling features."
 
 [[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_high_limit_txn_execution_excess_pays_multiplier"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_high_limit_txn_io_excess_pays_multiplier"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_high_limit_txn_storage_fee_pays_gas_price"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
+
+[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::type_too_large::type_too_large"
-note = "TODO"
+note = "MonoMove does not enforce the type size limit (no TOO_MANY_TYPE_NODES)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::vm::encrypted_transaction_charges_decryption_surcharge"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added. The decryption surcharge is not charged."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::vm::failed_encrypted_transaction_increments_sequence_number"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added. The decryption surcharge is not charged."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::create_account::create_account"
@@ -1041,237 +1153,481 @@ name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::test_t
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::verify_multi_agent_duplicate_secondary_signer"
 
 [[test]]
+name = "smoke-test::smoke_test$aptos_cli::validator::test_join_and_leave_validator"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$aptos_cli::validator::test_owner_create_and_delegate_flow"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
 name = "smoke-test::smoke_test$aptos_cli::validator::test_register_and_update_validator"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes. Validator set changes then abort with stake::ERECONFIGURATION_IN_PROGRESS."
 
 [[test]]
 name = "smoke-test::smoke_test$chunky_dkg::correctness::chunky_dkg_correctness"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$chunky_dkg::enable_feature::chunky_dkg_enable_feature"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$chunky_dkg::epoch_timeout::epoch_timeout_watchdog_force_ends_epoch"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$chunky_dkg::governance_recovery::chunky_dkg_stall_governance_recovery"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
+
+[[test]]
+name = "smoke-test::smoke_test$chunky_dkg::redeal_certification::chunky_dkg_certifies_after_dealer_redeals"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
+
+[[test]]
+name = "smoke-test::smoke_test$chunky_dkg::restart_during_reconfiguration::validator_restart_after_randomness_dkg_completion"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$chunky_dkg::shadow_mode::chunky_dkg_shadow_mode"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$chunky_dkg::shadow_mode::chunky_dkg_shadow_mode_grace_period_failpoint"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$chunky_dkg::shadow_mode::chunky_dkg_shadow_to_v1"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$chunky_dkg::stall_recovery::chunky_dkg_stall_recovery"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$chunky_dkg::with_validator_down::chunky_dkg_with_validator_down"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_execution_retry"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_faulty_votes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_no_failures"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_ordered_only_cert"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_round_timeout_msg_rollout"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_batch_id_on_restart_same_db"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_batch_id_on_restart_wiped_db"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_onchain_config_quorum_store_enabled_and_disabled"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_remote_batch_reads"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_swarm_with_bad_non_qs_node"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$consensus_key_rotation::consensus_key_rotation"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fast_sync_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_restart"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_restart_wipe"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync_disable_quorum_store"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync_disconnected"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync_multiple_nodes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_public_fullnode_sync"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_validator_restart"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_validator_restart_wipe"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$decryption::secret_share_rpc_path::secret_share_rpc_path"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$decryption::test_decryption_v1_to_v3_transition"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$decryption::test_decryption_v2_to_v3_transition"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$decryption::test_encryption_key_rotation_and_encrypted_txns"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$decryption::test_fee_payer_encrypted_transaction"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
+
+[[test]]
+name = "smoke-test::smoke_test$execution::block_epilogue_upgrade_test"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$execution::fallback_test"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
+
+[[test]]
+name = "smoke-test::smoke_test$fullnode::test_internal_indexer_with_fast_sync"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$genesis::test_validator_genesis_transaction_and_db_restore_flow"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes. The recovery genesis then aborts with stake::ERECONFIGURATION_IN_PROGRESS."
+
+[[test]]
+name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_execution_sync"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_fast_sync"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_output_sync"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_restart_across_v1_boundary"
-note = "TODO"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_sync_across_v1_boundary"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes. TRANSACTION_INFO_V1 is never enabled."
+
+[[test]]
+name = "smoke-test::smoke_test$hot_state::test_hot_state_on_chain_config"
+note = "MonoMove does not implement the `hot_state_config::validate_internal` native."
+
+[[test]]
+name = "smoke-test::smoke_test$hot_state::test_hot_state_validator_fast_sync_and_participate"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$hot_state::test_hot_state_validator_restart"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$jwks::jwk_consensus_basic::jwk_consensus_basic"
-note = "TODO"
+note = "Needs JWK consensus; MonoMove discards ObservedJWKUpdate validator transactions."
 
 [[test]]
 name = "smoke-test::smoke_test$jwks::jwk_consensus_per_issuer::jwk_consensus_per_issuer"
-note = "TODO"
+note = "Needs JWK consensus; MonoMove discards ObservedJWKUpdate validator transactions."
 
 [[test]]
 name = "smoke-test::smoke_test$jwks::jwk_consensus_per_key::jwk_consensus_per_key"
-note = "TODO"
+note = "Needs JWK consensus; MonoMove discards ObservedJWKUpdate validator transactions."
 
 [[test]]
 name = "smoke-test::smoke_test$jwks::jwk_consensus_provider_change_mind::jwk_consensus_provider_change_mind"
-note = "TODO"
+note = "Needs JWK consensus; MonoMove discards ObservedJWKUpdate validator transactions."
 
 [[test]]
 name = "smoke-test::smoke_test$jwks::jwk_patching"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::federated_keyless_should_fail_when_feature_flag_is_unset"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::federated_keyless_should_fail_when_fed_jwk_is_missing"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::federated_keyless_should_work_otherwise"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_groth16_verifies"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_groth16_verifies_using_rust_sdk"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_groth16_verifies_using_rust_sdk_from_jwt"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_groth16_with_bad_tw_signature"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_groth16_with_mauled_proof"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_no_extra_field_groth16_verifies"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_no_training_wheels_groth16_verifies"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_oidc_txn_verifies"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_oidc_txn_with_bad_jwt_sig"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_oidc_txn_with_expired_epk"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_rotate_vk"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$keyless::test_keyless_secure_test_jwk_initialized_at_genesis"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$priority_fee::test_high_gas_limit_parallel"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added. No fees are charged, so priority fees cannot differ."
 
 [[test]]
 name = "smoke-test::smoke_test$priority_fee::test_high_gas_limit_sequential"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added. No fees are charged, so priority fees cannot differ."
 
 [[test]]
 name = "smoke-test::smoke_test$priority_fee::test_low_gas_limit_parallel"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added. No fees are charged, so priority fees cannot differ."
 
 [[test]]
 name = "smoke-test::smoke_test$priority_fee::test_low_gas_limit_sequential"
-note = "TODO"
+note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added. No fees are charged, so priority fees cannot differ."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::disable_feature_0::disable_feature_0"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::disable_feature_1::disable_feature_1"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::dkg_with_validator_down::dkg_with_validator_down"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::dkg_with_validator_join_leave::dkg_with_validator_join_leave"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::e2e_basic_consumption::e2e_basic_consumption"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::e2e_correctness::randomness_correctness"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::enable_feature_0::enable_feature_0"
-note = "TODO"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::enable_feature_1::enable_feature_1"
-note = "TODO"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::enable_feature_2::enable_feature_2"
-note = "TODO"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::entry_func_attrs::randomness_attr_000"
-note = "TODO"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::optimistic_verification::optimistic_verification"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::randomness_stall_recovery::randomness_stall_recovery"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::validator_restart_during_dkg::validator_restart_during_dkg"
-note = "TODO"
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_account_balance"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_block"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_block_transactions"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_delegation_pool_operations"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_invalid_transaction_gas_charged"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_network"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_transfer"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_execution_sync_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_fast_and_intelligent_sync_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_fast_sync_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_fast_sync_no_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_intelligent_sync_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_output_sync_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_output_sync_exponential_backoff"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_single_validator_reboot"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_execution_sync_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_fast_sync_and_participate_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_fast_sync_exponential_backoff_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_intelligent_sync_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_output_sync_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_output_sync_exponential_backoff"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_sync_and_participate_epoch_changes"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$storage::test_db_restart"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$storage::test_db_restore"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$storage_native_position::test_db_restore_with_native_positions"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
+
+[[test]]
+name = "smoke-test::smoke_test$storage_native_position::test_enable_native_positions_on_running_chain"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$transaction_filter::test_consensus_block_filter"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$transaction_filter::test_mempool_transaction_filter"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+
+[[test]]
+name = "smoke-test::smoke_test$transaction_filter::test_quorum_store_batch_filter"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$txn_emitter::test_txn_emmitter_low_funds"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "smoke-test::smoke_test$txn_emitter::test_txn_emmitter_with_high_pending_latency"
-note = "TODO"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
