@@ -334,8 +334,6 @@ impl<'a, V> Vector<'a, V> {
     pub(crate) unsafe fn transmute_unchecked<U>(self) -> Vector<'a, U> {
         Vector::from_handle(self.handle)
     }
-
-    // TODO(completeness): Other vector APIs, added on-demand.
 }
 
 impl<'a, V: VMValue<'a>> Vector<'a, V> {
