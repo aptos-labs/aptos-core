@@ -60,7 +60,9 @@ def run(phase):
     source = ROOT / "src/main.rs"
     source.write_text(source.read_text() + "\n// source transition\n")
     assert all(m["fresh"] for m in build()), "Source changes should retain dependencies"
-    flags = dict(os.environ, RUSTFLAGS="-C opt-level=1")
+    flags = dict(
+        os.environ, RUSTFLAGS="-C opt-level=" + ("1" if phase == "cold" else "2")
+    )
     assert all(not m["fresh"] for m in build(flags)), (
         "Flag changes must rebuild dependencies"
     )
