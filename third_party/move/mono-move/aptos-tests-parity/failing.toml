@@ -13,84 +13,111 @@
 
 [[test]]
 name = "aptos-api::aptos_api$tests::account_abstraction_test::test_account_abstraction_multi_agent_with_abstracted_sender::case_1"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::account_abstraction_test::test_account_abstraction_multi_agent_with_abstracted_sender::case_2"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::account_abstraction_test::test_account_abstraction_multi_agent_with_abstracted_sender::case_3"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::account_abstraction_test::test_account_abstraction_single_signer::case_1"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::account_abstraction_test::test_account_abstraction_single_signer::case_2"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::account_abstraction_test::test_account_abstraction_single_signer::case_3"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::accounts_test::account_resource_created_only_by_seq_number_based_txns::case_1"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::accounts_test::account_resource_created_only_by_seq_number_based_txns::case_2"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::accounts_test::account_resource_created_only_by_seq_number_based_txns::case_3"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::accounts_test::test_get_account_modules_by_ledger_version"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::event_v2_translation_test::test_event_v2_translation_token_objects::case_1"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::event_v2_translation_test::test_event_v2_translation_token_objects::case_2"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::events_test::test_module_events::case_1"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::events_test::test_module_events::case_2"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::function_value_test::test_function_values"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::function_value_test::test_function_values_with_captured_struct"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::function_value_test::test_function_values_with_references"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::modules::test_abi"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_existing_account::case_1"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_existing_account::case_2"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_existing_account::case_3"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_failing_execution::case_1"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_failing_execution::case_2"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_failing_execution::case_3"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_matching_payload::case_1"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_matching_payload::case_2"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_matching_payload::case_3"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_mismatching_payload::case_3"
@@ -98,12 +125,15 @@ note = "MonoMove does not execute multisig payloads."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_hash::case_1"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_hash::case_2"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_hash::case_3"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_hash_and_failing_execution::case_1"
@@ -119,36 +149,47 @@ note = "MonoMove does not execute multisig payloads."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_succeeds::case_1"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_succeeds::case_2"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_succeeds::case_3"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_to_update_owners"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_update_signature_threshold"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_existing_account::case_1"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_existing_account::case_2"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_existing_account::case_3"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_matching_payload"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_payload_and_failing_execution"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_payload_hash"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_payload_hash_and_failing_execution"
@@ -156,6 +197,7 @@ note = "MonoMove does not execute multisig payloads."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_payload_succeeds"
+note = "MonoMove does not execute multisig payloads (discarded as FEATURE_UNDER_GATING)."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::nested_values_test::test_table_item_beyond_depth_limit"
@@ -163,153 +205,203 @@ note = "MonoMove does not support in-transaction code publishing (no `code::requ
 
 [[test]]
 name = "aptos-api::aptos_api$tests::objects::test_gen_object"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::option_test::run_option"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::public_struct_enum_negative_test::test_generic_container_with_non_public_type_arg_rejected::case_1"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::public_struct_enum_negative_test::test_generic_container_with_non_public_type_arg_rejected::case_2"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::public_struct_enum_negative_test::test_invalid_args_rejected"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::public_struct_enum_test::test_public_struct_enum_entry_functions"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::public_struct_enum_test::test_public_struct_enum_views"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::resource_groups::test_gen_resource_group::case_1"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::resource_groups::test_gen_resource_group::case_2"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::signed_int_test::test_signed_ints"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::simulation_test::test_simulate_txn_with_aggregator::case_1"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::simulation_test::test_simulate_txn_with_aggregator::case_2"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::simulation_test::test_simulate_txn_with_aggregator::case_3"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::simulation_test::test_simulate_txn_with_randomness"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::state_test::test_get_table_item"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::string_resource_test::test_renders_move_acsii_string_into_utf8_string"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_transactions_output_user_transaction_with_entry_function_payload::case_1"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_transactions_output_user_transaction_with_entry_function_payload::case_2"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_transactions_output_user_transaction_with_entry_function_payload::case_3"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_transactions_returns_last_page_when_start_version_is_not_specified::case_1"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_transactions_returns_last_page_when_start_version_is_not_specified::case_2"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_transactions_returns_last_page_when_start_version_is_not_specified::case_3"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_entry_function_validation::case_1"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_entry_function_validation::case_2"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_entry_function_validation::case_3"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_address::case_1"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_address::case_2"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_address::case_3"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_arguments::case_1"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_arguments::case_2"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_arguments::case_3"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_module_name::case_1"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_module_name::case_2"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_module_name::case_3"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_name::case_1"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_name::case_2"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_entry_function_name::case_3"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_script_payload_bytecode::case_1"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_script_payload_bytecode::case_2"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_invalid_script_payload_bytecode::case_3"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_missing_entry_function_arguments::case_1"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_missing_entry_function_arguments::case_2"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::transactions_test::test_get_txn_execute_failed_by_missing_entry_function_arguments::case_3"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::view_function::test_view_aggregator"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::view_function::test_view_option"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::view_function::test_view_option_some::case_1"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::view_function::test_view_option_some::case_2"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::view_function::test_view_option_struct"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::view_function::test_view_option_vec"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::view_function::test_view_tuple"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_apply_features_after_init"
@@ -321,15 +413,19 @@ note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, 
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_benchmark_orderless_transaction"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_benchmark_transaction"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_compare_vm_and_native_parallel_uncoordinated"
+note = "Compares against the native executor: MonoMove drops writes whose value is unchanged, which V1 emits, so the write sets differ in size."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_compare_vm_and_vm_uncoordinated"
+note = "Compares two runs with different settings; MonoMove charges no gas, so the FeeStatement events differ. TODO(metering)."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_external_lib_bench_larger"
@@ -341,21 +437,27 @@ note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, 
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_fibonacci_iterative"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_fibonacci_recursive"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_fibonacci_tail_recursive"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_native_direct_raw_loose_block_executor_benchmark"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_native_loose_block_executor_benchmark"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_native_value_cache_loose_block_executor_benchmark"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_native_vm_benchmark_transaction"
@@ -363,6 +465,7 @@ note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, 
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_publish_transaction"
+note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "aptos-executor::storage_integration_test$test_epilogue_hotness_survives_state_sync"
@@ -370,24 +473,31 @@ note = "MonoMove does not report its reads to the block executor (empty `MonoRea
 
 [[test]]
 name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/call_function.move"
+note = "Baseline differs: MonoMove charges no gas, so every FeeStatement event is zero. TODO(metering)."
 
 [[test]]
 name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/events.move"
+note = "MonoMove fails materializing an event whose type tag nests too deeply (\"type tag nesting exceeded\"); V1 aborts in 0x1::event with ECANNOT_CREATE_EVENT."
 
 [[test]]
 name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/reflect_typaram_reference.masm"
+note = "MonoMove does not attach AbortInfo from the module error map (V1: AptosVM::inject_abort_info_if_available)."
 
 [[test]]
 name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/smoke_test.move"
+note = "Baseline differs: MonoMove charges no gas, so every FeeStatement event is zero. TODO(metering)."
 
 [[test]]
 name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/string_fmt.move"
+note = "Exceeds the CI time limit under MonoMove."
 
 [[test]]
 name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/table.move"
+note = "Baseline differs: MonoMove charges no gas, so every FeeStatement event is zero. TODO(metering)."
 
 [[test]]
 name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/write_set_too_large.move"
+note = "MonoMove does not enforce the write-set size limit, so the oversized write commits."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::access_path_test::access_path_panic"
@@ -447,9 +557,11 @@ note = "Aggregators V1 are not supported by MonoMove."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2::test_aggregator_with_republish"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2::test_cases::test_snapshot_concat"
+note = "MonoMove does not implement the `0x1::debug` natives (native_print, native_stack_trace)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2::test_too_many_aggregators_in_a_resource::usetype_useresourcegrouptype_expects"
@@ -461,6 +573,7 @@ note = "MonoMove does not enforce the delayed-field count limit (no TOO_MANY_DEL
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_enums::test_aggregators_in_enums"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The package is published with a raw run_block."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_function_values::test_function_value_captures_aggregator"
@@ -604,9 +717,11 @@ note = "MonoMove does not support gas metering. TODO(metering): remove once mete
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_type_ability_bounds::excess_function_type_abilities_are_rejected"
+note = "MonoMove does not reject excess function-type abilities in type arguments (no CONSTRAINT_NOT_SATISFIED)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_type_ability_bounds::fake_key_no_longer_satisfies_a_key_constraint"
+note = "MonoMove does not reject excess function-type abilities in type arguments (no CONSTRAINT_NOT_SATISFIED)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_value_depth::test_pack_closure_captured_values_metering"
@@ -702,9 +817,11 @@ note = "MonoMove does not report its reads to the block executor (empty `MonoRea
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_script_module_dependencies_are_promoted"
+note = "MonoMove does not report its reads to the block executor (empty `MonoReads`), so nothing is promoted to hot state."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_table_item_read_is_promoted"
+note = "MonoMove does not report its reads to the block executor (empty `MonoReads`), so nothing is promoted to hot state."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_aborts_when_feature_disabled"
@@ -788,6 +905,7 @@ note = "MonoMove does not support in-transaction code publishing (no `code::requ
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::poc_type_confusion_module_upgrade_parallel"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::stale_closure_memo_kept_when_timed_feature_disabled"
@@ -963,9 +1081,11 @@ note = "MonoMove does not support in-transaction code publishing (no `code::requ
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::object_code_deployment::freeze_code_object_fail_when_having_mutable_dependency"
+note = "MonoMove does not attach AbortInfo from the module error map (V1: AptosVM::inject_abort_info_if_available)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::object_code_deployment::freeze_code_object_fail_when_not_owner"
+note = "MonoMove does not attach AbortInfo from the module error map (V1: AptosVM::inject_abort_info_if_available)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::object_code_deployment::freeze_code_object_fail_when_package_registry_does_not_exist"
@@ -1085,72 +1205,95 @@ note = "MonoMove does not support gas metering. TODO(metering): remove once mete
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::create_account::create_account"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::invariant_violation::invariant_violation_error"
+note = "Injects an invariant violation through an AptosVM failpoint, which MonoMove never reaches."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::loader::smaller_world"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::loader::smaller_world_and_test_deps_charging"
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::scripts::script_bad_sig_function_dep"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::scripts::script_code_unverifiable"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::scripts::script_nested_type_argument_module_does_not_exist"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::scripts::script_non_existing_function_dep"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::scripts::script_none_existing_module_dep"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::scripts::script_type_argument_module_does_not_exist"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::state_store::borrow_after_move"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::state_store::change_after_move"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::state_store::move_from_across_blocks"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::test_arbitrary_script_execution"
+note = "Golden output differs: MonoMove charges no gas (gas_used 0) and drops unchanged writes. TODO(metering): partly fixed by metering."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::test_script_dependency_fails_verification::false_expects"
+note = "MonoMove reports a dependency that fails verification as a provider error, not UNEXPECTED_VERIFIER_ERROR (aptos-state-view-providers verify_module)."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::test_script_dependency_fails_verification::true_expects"
+note = "MonoMove reports a dependency that fails verification as a provider error, not UNEXPECTED_VERIFIER_ERROR (aptos-state-view-providers verify_module)."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::test_script_transitive_dependency_fails_verification_bar::false_expects"
+note = "MonoMove reports a dependency that fails verification as a provider error, not UNEXPECTED_VERIFIER_ERROR (aptos-state-view-providers verify_module)."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::test_script_transitive_dependency_fails_verification_foo::false_expects"
+note = "MonoMove reports a dependency that fails verification as a provider error, not UNEXPECTED_VERIFIER_ERROR (aptos-state-view-providers verify_module)."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::test_script_transitive_dependency_fails_verification_foo::true_expects"
+note = "MonoMove reports a dependency that fails verification as a provider error, not UNEXPECTED_VERIFIER_ERROR (aptos-state-view-providers verify_module)."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::test_type_tag_dependency_fails_verification::false_expects"
+note = "MonoMove reports a dependency that fails verification as a provider error, not UNEXPECTED_VERIFIER_ERROR (aptos-state-view-providers verify_module)."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::test_type_tag_dependency_fails_verification::true_expects"
+note = "MonoMove reports a dependency that fails verification as a provider error, not UNEXPECTED_VERIFIER_ERROR (aptos-state-view-providers verify_module)."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::test_type_tag_transitive_dependency_fails_verification::false_expects"
+note = "MonoMove reports a dependency that fails verification as a provider error, not UNEXPECTED_VERIFIER_ERROR (aptos-state-view-providers verify_module)."
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::verify_multi_agent_duplicate_secondary_signer"
+note = "MonoMove checks the fee balance before duplicate secondary signers (INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE instead of SIGNERS_CONTAIN_DUPLICATES)."
 
 [[test]]
 name = "smoke-test::smoke_test$aptos_cli::validator::test_join_and_leave_validator"
