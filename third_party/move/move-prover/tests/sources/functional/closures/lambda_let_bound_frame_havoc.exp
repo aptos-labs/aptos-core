@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_let_bound_frame_havoc.move:40:9
+   │
+40 │         ensures global<Counter>(a).n == old(global<Counter>(a).n);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_let_bound_frame_havoc.move:31: claims_unchanged
+   =         b = <redacted>
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/lambda_let_bound_frame_havoc.move:32: claims_unchanged
+   =         f = <redacted>
+   =     at tests/sources/functional/closures/lambda_let_bound_frame_havoc.move:36: claims_unchanged
+   =         b = <redacted>
+   =     at tests/sources/functional/closures/lambda_let_bound_frame_havoc.move:40: claims_unchanged (spec)

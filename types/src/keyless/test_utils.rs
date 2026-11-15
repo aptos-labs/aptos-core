@@ -26,7 +26,7 @@ use aptos_crypto::{
 };
 use ark_bn254::Bn254;
 use ark_groth16::{prepare_verifying_key, PreparedVerifyingKey};
-use base64::{encode_config, URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
 use ring::{signature, signature::RsaKeyPair};
@@ -293,7 +293,7 @@ pub fn get_sample_jwt_token_from_payload(payload: &str) -> String {
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
     let rng = ring::rand::SystemRandom::new();
     let sk = &*SAMPLE_JWK_SK;
-    let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
+    let mut jwt_sig = vec![0u8; sk.public().modulus_len()];
 
     sk.sign(
         &signature::RSA_PKCS1_SHA256,
@@ -303,13 +303,13 @@ pub fn get_sample_jwt_token_from_payload(payload: &str) -> String {
     )
     .unwrap();
 
-    let base64url_string = encode_config(jwt_sig.clone(), URL_SAFE_NO_PAD);
+    let base64url_string = URL_SAFE_NO_PAD.encode(&jwt_sig);
 
     format!("{}.{}", msg, base64url_string)
 }
 
 pub fn oidc_provider_sign(sk: &RsaKeyPair, msg: &[u8]) -> Vec<u8> {
-    let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
+    let mut jwt_sig = vec![0u8; sk.public().modulus_len()];
     let rng = ring::rand::SystemRandom::new();
     sk.sign(
         &signature::RSA_PKCS1_SHA256,
@@ -330,7 +330,7 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
     let rng = ring::rand::SystemRandom::new();
     let sk = *SAMPLE_JWK_SK;
-    let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
+    let mut jwt_sig = vec![0u8; sk.public().modulus_len()];
 
     sk.sign(
         &signature::RSA_PKCS1_SHA256,

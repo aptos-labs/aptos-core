@@ -4,7 +4,7 @@
 //! Shared native-extension fixtures for the mono-move test harnesses.
 
 use aptos_types::transaction::user_transaction_context::{
-    TransactionIndexKind, UserTransactionContext,
+    EntryFunctionPayload, MultisigPayload, TransactionIndexKind, UserTransactionContext,
 };
 use mono_move_core::native::NativeExtensions;
 use mono_move_natives::{
@@ -23,6 +23,7 @@ pub(crate) const TEST_STATE_ITEMS: u64 = 100;
 pub(crate) const TEST_STATE_BYTES: u64 = 2000;
 pub(crate) const TEST_SESSION_COUNTER: u8 = 2;
 pub(crate) const TEST_TXN_INDEX: u32 = 5;
+pub(crate) const TEST_MULTISIG_ADDRESS: AccountAddress = AccountAddress::TWO;
 
 /// Builds the per-transaction native extensions initialized with the fixed
 /// dummy inputs.
@@ -51,6 +52,10 @@ pub(crate) fn seed_extensions(user_transaction_context: bool) -> NativeExtension
 }
 
 /// The user transaction context both VMs use.
+//
+// TODO(completeness): both payloads are seeded `Some`, so the `None` path (a
+// script transaction, or a non-multisig one) goes uncovered here. Check whether
+// the parity tests reach it, and add FakeExecutor coverage if they do not.
 pub(crate) fn test_user_transaction_context() -> UserTransactionContext {
     UserTransactionContext::new(
         AccountAddress::ZERO,
@@ -59,12 +64,25 @@ pub(crate) fn test_user_transaction_context() -> UserTransactionContext {
         0,
         0,
         TEST_CHAIN_ID,
-        None,
-        None,
+        Some(test_entry_function_payload()),
+        // The inner payload is left empty so the `Option` field inside the
+        // multisig payload is exercised too.
+        Some(MultisigPayload::new(TEST_MULTISIG_ADDRESS, None)),
         TransactionIndexKind::BlockExecution {
             transaction_index: TEST_TXN_INDEX,
         },
         false,
         false,
+    )
+}
+
+/// The entry function payload both VMs see.
+pub(crate) fn test_entry_function_payload() -> EntryFunctionPayload {
+    EntryFunctionPayload::new(
+        AccountAddress::ONE,
+        "some_module".to_string(),
+        "some_function".to_string(),
+        vec!["u64".to_string(), "0x1::string::String".to_string()],
+        vec![vec![1, 2, 3], vec![]],
     )
 }

@@ -45,4 +45,6 @@ fn runner(path: &Path) -> datatest_stable::Result<()> {
     test_runner(path, ModelBuilderOptions::default())
 }
 
-datatest_stable::harness!(runner, "tests/sources", r".*\.move$");
+datatest_stable::harness! {
+    { test = runner, root = "tests/sources", pattern = r".*\.move$" },
+}

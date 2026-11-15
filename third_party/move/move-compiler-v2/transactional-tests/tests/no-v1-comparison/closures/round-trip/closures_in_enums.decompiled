@@ -4,20 +4,20 @@
 module 0xc0ffee::m {
     enum Function has copy, drop {
         NoParam {
-            _0: ||(u64) has copy + drop,
+            _0: ||u64 has copy + drop,
         }
         OneParam {
-            _0: |u64|(u64) has copy + drop,
+            _0: |u64|u64 has copy + drop,
         }
         TwoParam {
-            _0: |u64, u64|(u64) has copy + drop,
+            _0: |u64, u64|u64 has copy + drop,
         }
     }
-    fun get_func(p0: &Function): &||(u64) has copy {
+    fun get_func(p0: &Function): &||u64 has copy {
         assert!(p0 is NoParam, 42);
         &p0.NoParam._0
     }
-    fun get_func_recursive(p0: Function): ||(u64) {
+    fun get_func_recursive(p0: Function): ||u64 {
         let _v0 = &p0;
         'l0: loop {
             loop {
@@ -35,10 +35,10 @@ module 0xc0ffee::m {
         let Function::TwoParam{_0: _v3} = p0;
         get_func_recursive(Function::OneParam{_0: |x| lambda__2__get_func_recursive(_v3, x)})
     }
-    fun lambda__1__get_func_recursive(p0: |u64|(u64) has copy + drop): u64 {
+    fun lambda__1__get_func_recursive(p0: |u64|u64 has copy + drop): u64 {
         p0(0)
     }
-    fun lambda__2__get_func_recursive(p0: |u64, u64|(u64) has copy + drop, p1: u64): u64 {
+    fun lambda__2__get_func_recursive(p0: |u64, u64|u64 has copy + drop, p1: u64): u64 {
         p0(0, p1)
     }
     fun runner_1(p0: Function): u64 {
@@ -74,10 +74,10 @@ module 0xc0ffee::m {
         } else abort 14566554180833181697;
         _v0()
     }
-    fun lambda__1__runner_2(p0: |u64|(u64) has copy + drop): u64 {
+    fun lambda__1__runner_2(p0: |u64|u64 has copy + drop): u64 {
         p0(0)
     }
-    fun lambda__2__runner_2(p0: |u64, u64|(u64) has copy + drop): u64 {
+    fun lambda__2__runner_2(p0: |u64, u64|u64 has copy + drop): u64 {
         p0(0, 0)
     }
     fun runner_3(p0: &Function): u64 {

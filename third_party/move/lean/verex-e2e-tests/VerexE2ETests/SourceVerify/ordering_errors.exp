@@ -1,0 +1,16 @@
+VerexE2ETests/SourceVerify/ordering_errors.spec.lean:6:3: error: the specification clause `ensures result == (a <= b)` is not established
+VerexE2ETests/SourceVerify/ordering_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `comparator` failed; provide a proof in the module:
+  verify comparator by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/ordering_errors.spec.lean:10:3: error: the specification clause `ensures a < b ==> result == 1` is not established
+VerexE2ETests/SourceVerify/ordering_errors.spec.lean:8:6: error: verex verification failed: the automatic verification of `order` failed; provide a proof in the module:
+  verify order by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -1271,9 +1271,9 @@ mod tests {
         move_subsystem.related_test_packages.clear();
         move_subsystem.path_rules.clear();
         for path in [
-            "move/lean/leaner-e2e-tests/LeanerE2ETests/Check/example.lean",
-            "move/lean/leaner-e2e-tests/shim/monovm_shim.c",
-            "move/lean/leaner-rust/rust-exporter/src/main.rs",
+            "move/lean/verex-e2e-tests/VerexE2ETests/Check/example.lean",
+            "move/lean/verex-e2e-tests/shim/monovm_shim.c",
+            "move/lean/verex-rust/rust-exporter/src/main.rs",
         ] {
             let selected = run(&config, &graph, &graph, &[path]);
             assert!(
@@ -1287,7 +1287,7 @@ mod tests {
         }
         // Lean producers activate the mapped Rust consumers as well as Lake.
         let selected = run(&config, &graph, &graph, &[
-            "move/lean/leaner-move/LeanerMove/Xir/Lower.lean",
+            "move/lean/verex-move/VerexMove/Xir/Lower.lean",
         ]);
         assert_eq!(
             selected.packages,
@@ -1311,7 +1311,7 @@ mod tests {
         assert!(selected.e2e_tests.is_empty());
         let mixed = run(&config, &graph, &graph, &[
             "move/independent/src/lib.rs",
-            "move/lean/leaner-e2e-tests/Main.lean",
+            "move/lean/verex-e2e-tests/Main.lean",
         ]);
         assert_eq!(mixed.packages, set(&["independent"]));
         assert_eq!(mixed.e2e_tests.into_keys().collect::<Vec<_>>(), vec![

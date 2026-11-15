@@ -52,6 +52,10 @@ module 0x42::guarded_state_labels {
             let b = S1..S2 |~ result_of<extract>(signer::address_of(account));
             S2.. |~ publish<Config>(a, b)
         };
+        ensures [inferred = sathard] (..S1 |~ result_of<pending>(signer::address_of(account))) ==> {
+            let a = S1..S2 |~ result_of<extract>(signer::address_of(account));
+            S1..S2 |~ ensures_of<extract>(signer::address_of(account), a)
+        };
         aborts_if [inferred] (..S1 |~ result_of<pending>(signer::address_of(account))) && (S1 |~ aborts_of<extract>(signer::address_of(account)));
     }
 

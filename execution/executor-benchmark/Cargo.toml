@@ -42,6 +42,7 @@ aptos-mvhashmap = { workspace = true }
 aptos-node-resource-metrics = { workspace = true }
 aptos-protos = { workspace = true }
 aptos-push-metrics = { workspace = true }
+aptos-runtimes = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
@@ -59,6 +60,7 @@ clap = { workspace = true }
 dashmap = { workspace = true }
 derivative = { workspace = true }
 futures = { workspace = true }
+hyper = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }

@@ -21,10 +21,11 @@ use blstrs::{
     G1Affine as BlstrsG1Affine, G1Projective as BlstrsG1Projective, G2Affine as BlstrsG2Affine,
     G2Projective as BlstrsG2Projective, Scalar as BlstrsFr,
 };
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ff::Field;
 use group::{prime::PrimeCurveAffine, Group};
 use serde::Serialize;
+use std::hint::black_box;
 
 // The goal of this file is
 // (i) To test how much speed is gained serializing projective group elements in `arkworks` and `blstrs` manually using a `normalize_batch()` type approach
@@ -104,13 +105,11 @@ fn batch_inversion<F: Field>(v: &mut [F]) {
 
 const N: usize = 10_000;
 
-fn ark_g1_projective_1k<R: rand_core::RngCore + rand_core::CryptoRng>(
-    rng: &mut R,
-) -> Vec<ArkG1Projective> {
+fn ark_g1_projective_1k<R: rand::RngCore + rand::CryptoRng>(rng: &mut R) -> Vec<ArkG1Projective> {
     random_projective_vec_ark::<ArkG1Projective, _>(N, rng)
 }
 
-fn blstrs_g1_projective_1k<R: rand_core::RngCore + rand_core::CryptoRng>(
+fn blstrs_g1_projective_1k<R: rand::RngCore + rand::CryptoRng>(
     rng: &mut R,
 ) -> Vec<BlstrsG1Projective> {
     random_projective_g1_vec_blstrs(N, rng)
@@ -256,7 +255,7 @@ fn das_sizes() -> DasSizes {
 
 fn random_projective_vec_ark<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
 where
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     unsafe_random_points_group::<C, _>(n, rng)
         .into_iter()
@@ -266,7 +265,7 @@ where
 
 fn random_projective_g1_vec_blstrs<R>(n: usize, rng: &mut R) -> Vec<BlstrsG1Projective>
 where
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     insecure_random_g1_points(n, rng)
         .into_iter()
@@ -276,7 +275,7 @@ where
 
 fn random_projective_g2_vec_blstrs<R>(n: usize, rng: &mut R) -> Vec<BlstrsG2Projective>
 where
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     insecure_random_g2_points(n, rng)
         .into_iter()
@@ -289,7 +288,7 @@ fn random_projective_chunky_transcript<R>(
     rng: &mut R,
 ) -> ArkTranscriptSimulatorProj
 where
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     ArkTranscriptSimulatorProj {
         G1_vec: random_projective_vec_ark::<ArkG1Projective, _>(sizes.g1, rng),
@@ -303,7 +302,7 @@ fn random_projective_das_transcript<R>(
     rng: &mut R,
 ) -> BlstrsTranscriptSimulatorProj
 where
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     BlstrsTranscriptSimulatorProj {
         G1_vec: random_projective_g1_vec_blstrs(sizes.g1, rng),

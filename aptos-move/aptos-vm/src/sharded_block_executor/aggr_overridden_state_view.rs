@@ -6,6 +6,7 @@ use aptos_types::{
         errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
         state_value::StateValue, StateView, TStateView,
     },
+    transaction::Version,
     write_set::TOTAL_SUPPLY_STATE_KEY,
 };
 
@@ -51,5 +52,9 @@ impl<S: StateView + Sync + Send> TStateView for AggregatorOverriddenStateView<'_
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.base_view.get_usage()
+    }
+
+    fn next_version(&self) -> Version {
+        self.base_view.next_version()
     }
 }

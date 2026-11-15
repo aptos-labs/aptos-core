@@ -1,0 +1,38 @@
+VerexE2ETests/SourceVerify/partial_operations_errors.spec.lean:7:6: error: verification failed with a residual obligation:
+case left
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+a b : (VerexIR.Proofs.Denote.NTy.int 32 false).carrier
+snd✝ : VerexIR.Proofs.Denote.HList VerexIR.Proofs.Denote.NRow.nil
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+verexContinuation : VerexIR.Proofs.Denote.Flow
+    (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 32 false))
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false)
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil))
+    (VerexIR.Proofs.Denote.NTy.int 32 false).carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+      (fun result final => final = initialState✝ ∧ ¬b.val = 0)
+      (fun failure =>
+        VerexIR.Proofs.Obligation "partial_operations_errors.rs.lean" 515 531 (b.val = 0))
+      state
+a✝ : b.val = 0
+⊢ False
+VerexE2ETests/SourceVerify/partial_operations_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `divide` failed; provide a proof in the module:
+  verify divide by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/partial_operations_errors.spec.lean:11:3: error: the specification clause `ensures result == a + b` is not established
+VerexE2ETests/SourceVerify/partial_operations_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `overflow_value` failed; provide a proof in the module:
+  verify overflow_value by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

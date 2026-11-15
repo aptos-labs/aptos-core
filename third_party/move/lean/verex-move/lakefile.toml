@@ -1,0 +1,21 @@
+name = "verex-move"
+defaultTargets = ["VerexMove", "verex-move"]
+testDriver = "Tests"
+
+[[require]]
+name = "verex-ir"
+path = "../verex-ir"
+
+[[lean_lib]]
+name = "VerexMove"
+
+[[lean_exe]]
+name = "verex-move"
+root = "Main"
+# Elaborating the rendering runs imported elaborators, which may reach the
+# interpreter.
+supportInterpreter = true
+
+[[lean_lib]]
+name = "Tests"
+roots = ["Tests.Profile", "Tests.Intrinsics", "Tests.Xir", "Tests.Xast", "Tests.BitVectorConversion"]

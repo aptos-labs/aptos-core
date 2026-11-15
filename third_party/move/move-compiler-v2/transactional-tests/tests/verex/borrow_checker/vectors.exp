@@ -1,0 +1,10 @@
+processed 5 tasks
+task 0 lines 3-37:  publish [import VerexMove]
+task 1 lines 39-39:  run 0x0::VerexBorrowVectors::insert_without_element_borrow
+return values: 3
+task 2 lines 41-41:  run 0x0::VerexBorrowVectors::freeze_element
+return values: 6
+task 3 lines 43-43:  run 0x0::VerexBorrowVectors::pop_without_element_borrow
+return values: 4
+task 4 lines 45-45:  run 0x0::VerexBorrowVectors::swap_without_element_borrow
+return values: 2

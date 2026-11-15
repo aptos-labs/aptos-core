@@ -18,7 +18,8 @@ use aptos_types::{
     chain_id::ChainId,
     keyless::{Configuration, Groth16VerificationKey, KeylessOnchainConfig},
     on_chain_config::{
-        ConfigurationResource, Features, OnChainConfig, TimedFeatures, TimedFeaturesBuilder,
+        ConfigurationResource, Features, OnChainConfig, OnChainHotStateConfig, TimedFeatures,
+        TimedFeaturesBuilder,
     },
     state_store::StateView,
 };
@@ -107,6 +108,12 @@ impl AptosEnvironment {
         self.0.keyless_configuration.as_ref()
     }
 
+    /// Returns the on-chain hot state config, `None` if it doesn't exist.
+    #[inline]
+    pub fn hot_state_config(&self) -> Option<&OnChainHotStateConfig> {
+        self.0.hot_state_config.as_ref()
+    }
+
     /// Returns the [VMConfig] used by this environment.
     #[inline]
     pub fn vm_config(&self) -> &VMConfig {
@@ -189,6 +196,9 @@ struct Environment {
     keyless_pvk: OnceLock<Option<PreparedVerifyingKey<Bn254>>>,
     /// Some keyless configurations which are not frequently updated.
     keyless_configuration: Option<Configuration>,
+
+    /// Validated by `0x1::hot_state_config::set_for_next_epoch`.
+    hot_state_config: Option<OnChainHotStateConfig>,
 
     /// Gas feature version used in this environment.
     gas_feature_version: u64,
@@ -307,6 +317,9 @@ impl Environment {
                 config
             });
 
+        let hot_state_config =
+            fetch_config_and_update_hash::<OnChainHotStateConfig>(&mut sha3_256, state_view);
+
         let hash = sha3_256.finalize().into();
 
         #[allow(deprecated)]
@@ -317,6 +330,7 @@ impl Environment {
             keyless_vk,
             keyless_pvk,
             keyless_configuration,
+            hot_state_config,
             gas_feature_version,
             gas_params,
             storage_gas_params,
@@ -350,8 +364,10 @@ pub mod tests {
     use super::*;
     use aptos_types::{
         keyless::{Groth16VerificationKey, KeylessGroupResource, VERIFICATION_KEY_FOR_TESTING},
-        on_chain_config::{FeatureFlag, GasScheduleV2},
-        state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
+        on_chain_config::{FeatureFlag, GasScheduleV2, HotStateConfigV1},
+        state_store::{
+            state_key::StateKey, state_value::StateValue, MockStateView, NUM_STATE_SHARDS,
+        },
     };
     use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
     use serde::Serialize;
@@ -393,6 +409,35 @@ pub mod tests {
             StateKey::resource(T::address(), &T::struct_tag()).unwrap(),
             StateValue::new_legacy(bcs::to_bytes(&config).unwrap().into()),
         )]))
+    }
+
+    fn hot_state_config() -> OnChainHotStateConfig {
+        OnChainHotStateConfig::V1(HotStateConfigV1 {
+            max_items_per_shard: vec![1; NUM_STATE_SHARDS],
+            max_bytes_per_shard: vec![u64::MAX; NUM_STATE_SHARDS],
+            refresh_interval_versions: 0,
+            max_promotion_bytes_per_block: 0,
+            defer_cold_writes_to_eviction: false,
+        })
+    }
+
+    fn state_view_with_hot_state_config(config: &OnChainHotStateConfig) -> MockStateView<StateKey> {
+        // The resource wraps the BCS bytes of the config.
+        let bytes = bcs::to_bytes(&bcs::to_bytes(config).unwrap()).unwrap();
+        MockStateView::new(HashMap::from([(
+            StateKey::on_chain_config::<OnChainHotStateConfig>().unwrap(),
+            StateValue::new_legacy(bytes.into()),
+        )]))
+    }
+
+    #[test]
+    fn test_hot_state_config() {
+        let environment = AptosEnvironment::new(&MockStateView::empty());
+        assert!(environment.hot_state_config().is_none());
+
+        let config = hot_state_config();
+        let environment = AptosEnvironment::new(&state_view_with_hot_state_config(&config));
+        assert_eq!(environment.hot_state_config(), Some(&config));
     }
 
     fn state_view_with_keyless_vk(vk: Groth16VerificationKey) -> MockStateView<StateKey> {
@@ -517,6 +562,8 @@ pub mod tests {
                 feature_version: 0,
                 entries: vec![],
             }),
+            // Different hot state config.
+            state_view_with_hot_state_config(&hot_state_config()),
         ];
         for i in 0..state_views.len() {
             for j in 0..state_views.len() {

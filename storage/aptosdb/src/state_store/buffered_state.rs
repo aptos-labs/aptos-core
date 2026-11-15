@@ -5,7 +5,6 @@ use crate::{
     common::{spawn_commit_pipeline, BufferedStateCore, BufferedStateExtras},
     metrics::{LATEST_CHECKPOINT_VERSION, OTHER_TIMERS_SECONDS},
     state_store::{
-        hot_state::LoadedHotState,
         persisted_state::PersistedState,
         state_merkle_batch_committer::StateMerkleBatchCommitter,
         state_snapshot_committer::{
@@ -18,7 +17,6 @@ use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
     empty_hot_state_updates,
-    state_summary::StateSummary,
     state_with_summary::{LedgerStateWithSummary, StateWithSummary},
     HotStateShardUpdates, HotStateUpdates,
 };
@@ -37,19 +35,15 @@ pub type BufferedState = crate::common::BufferedState<
 >;
 
 /// `pending` covers `(last_snapshot, current.last_checkpoint()]` and
-/// drains into the snapshot payload on every flush. `post_checkpoint`
-/// covers `(last_checkpoint, latest()]` and folds into `pending` once
-/// a later chunk advances the checkpoint past it.
+/// drains into the snapshot payload on every flush.
 pub struct HotStateAccumulator {
     pending: [HotStateShardUpdates; NUM_STATE_SHARDS],
-    post_checkpoint: [HotStateShardUpdates; NUM_STATE_SHARDS],
 }
 
 impl HotStateAccumulator {
     pub fn new() -> Self {
         Self {
             pending: empty_hot_state_updates(),
-            post_checkpoint: empty_hot_state_updates(),
         }
     }
 
@@ -72,20 +66,9 @@ impl Default for HotStateAccumulator {
 impl BufferedStateExtras<SnapshotToCommit, StateWithSummary> for HotStateAccumulator {
     type ChunkInput = HotStateUpdates;
 
-    fn absorb_chunk(&mut self, input: HotStateUpdates, checkpoint_advanced: bool) {
-        // Order: (1) fold prior post_checkpoint into pending if the
-        // checkpoint advanced past it, (2) merge this chunk's
-        // pre-checkpoint share into pending, (3) merge this chunk's
-        // post-checkpoint share into post_checkpoint.
-        if checkpoint_advanced {
-            let prev_post = std::mem::replace(&mut self.post_checkpoint, empty_hot_state_updates());
-            Self::merge_hot_state_updates(&mut self.pending, prev_post);
-        }
+    fn absorb_chunk(&mut self, input: HotStateUpdates) {
         if let Some(shards) = input.for_last_checkpoint {
             Self::merge_hot_state_updates(&mut self.pending, shards);
-        }
-        if let Some(shards) = input.for_latest {
-            Self::merge_hot_state_updates(&mut self.post_checkpoint, shards);
         }
     }
 
@@ -99,22 +82,17 @@ impl BufferedStateExtras<SnapshotToCommit, StateWithSummary> for HotStateAccumul
 }
 
 impl BufferedState {
+    /// Starts the snapshot pipeline on top of `last_snapshot`, which `current_state` and
+    /// `persisted_state` must already be at.
     pub(crate) fn new_at_snapshot(
         state_db: &Arc<StateDb>,
-        hot_state: LoadedHotState,
-        summary: StateSummary,
+        last_snapshot: StateWithSummary,
         target_items: usize,
-        out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
-        out_persisted_state: PersistedState,
+        current_state: Arc<Mutex<LedgerStateWithSummary>>,
+        persisted_state: PersistedState,
     ) -> Self {
         let arc_state_db = Arc::clone(state_db);
-        // Install before starting the snapshot pipeline so its commits use the loaded base.
-        let last_snapshot = out_persisted_state.install_snapshot(hot_state, summary);
-        *out_current_state.lock() =
-            LedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone());
-
         let merklize_state_db = Arc::clone(&arc_state_db);
-        let persisted_state_clone = out_persisted_state.clone();
         let commit_thread = spawn_commit_pipeline(
             "state-committer",
             ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize,
@@ -122,8 +100,7 @@ impl BufferedState {
             STATE_BATCH_CHANNEL_SIZE,
             last_snapshot.clone(),
             move |batch_receiver| {
-                StateMerkleBatchCommitter::new(arc_state_db, batch_receiver, persisted_state_clone)
-                    .run();
+                StateMerkleBatchCommitter::new(arc_state_db, batch_receiver, persisted_state).run();
             },
             move |last_snapshot, input| {
                 merklize_main_state(&merklize_state_db, last_snapshot, input)
@@ -131,7 +108,7 @@ impl BufferedState {
         );
         BufferedState::new(
             BufferedStateCore::new(
-                out_current_state,
+                current_state,
                 last_snapshot,
                 commit_thread,
                 target_items,

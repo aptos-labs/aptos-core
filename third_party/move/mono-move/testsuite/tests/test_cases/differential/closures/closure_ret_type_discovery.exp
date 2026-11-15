@@ -1,0 +1,29 @@
+=== stackless ===
+// module 0x42::closure_ret_type_discovery
+
+fun pair(r0): S<_0> * S<_0> {
+  slots: params(1), locals(0), temps(3)
+    r0: _0
+    r1: _0
+    r2: 0x42::closure_ret_type_discovery::S<_0>
+    r3: 0x42::closure_ret_type_discovery::S<_0>
+  code:
+  L0:
+    0: r1 := copy r0 @0
+    1: r2 := pack 0x42::closure_ret_type_discovery::S<_0>, [r1] @1
+    2: r3 := pack 0x42::closure_ret_type_discovery::S<_0>, [r0] @3
+    3: ret [r2, r3] @4
+}
+
+fun test(r0): bool {
+  slots: params(1), locals(1), temps(1), transfer(2)
+    r0: u64
+    r1: |u64|(0x42::closure_ret_type_discovery::S<u64>, 0x42::closure_ret_type_discovery::S<u64>) has drop
+    r2: bool
+  code:
+  L0:
+    0: r1 := pack_closure pair<u64>, 0, [] @0
+    1: [x0, x1] := call_closure [|u64|(0x42::closure_ret_type_discovery::S<u64>, 0x42::closure_ret_type_discovery::S<u64>) has drop], [r0, r1] @4
+    2: r2 := eq x0, x1 @5
+    3: ret [r2] @6
+}

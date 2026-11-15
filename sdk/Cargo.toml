@@ -32,7 +32,6 @@ hex = { workspace = true }
 lazy_static = "1.4.0"
 move-core-types = { workspace = true }
 rand = { workspace = true }
-rand_core = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

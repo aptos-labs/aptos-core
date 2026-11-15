@@ -175,8 +175,10 @@ pub enum SnapshotKind {
 }
 
 impl SnapshotKind {
+    pub const COLLATERAL: Self = Self::State(StateKind::Collateral);
     pub const HOT_STATE: Self = Self::HotState;
     pub const MAIN_STATE: Self = Self::State(StateKind::MainState);
+    pub const ORDER: Self = Self::State(StateKind::Order);
     pub const POSITION: Self = Self::State(StateKind::Position);
 
     /// Describes the snapshot in logs and errors.
@@ -184,6 +186,8 @@ impl SnapshotKind {
         match self {
             Self::MAIN_STATE => "state",
             Self::POSITION => "position state",
+            Self::ORDER => "order state",
+            Self::COLLATERAL => "collateral state",
             Self::HOT_STATE => "hot state",
         }
     }
@@ -192,7 +196,7 @@ impl SnapshotKind {
         match self {
             // Main state at a real snapshot is never empty
             Self::MAIN_STATE => false,
-            Self::POSITION | Self::HOT_STATE => true,
+            Self::POSITION | Self::ORDER | Self::COLLATERAL | Self::HOT_STATE => true,
         }
     }
 
@@ -457,8 +461,8 @@ impl DataStreamEngine for StateStreamEngine {
     }
 
     fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
-        // TODO(HotState): peers don't advertise hot state separately, so this
-        // assumes they retain hot snapshots as long as the main ones.
+        // Hot snapshots share the main ones' pruning windows, so `states` covers
+        // them too.
         Ok(AdvertisedData::contains_range(
             self.request.version,
             self.request.version,

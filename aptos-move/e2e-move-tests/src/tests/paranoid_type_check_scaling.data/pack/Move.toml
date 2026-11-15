@@ -1,0 +1,11 @@
+[package]
+name = "paranoid_type_check_scaling"
+version = "0.0.0"
+
+[addresses]
+attacker = "0xcafe"
+
+[dependencies]
+AptosFramework = { local = "../../../../../framework/aptos-framework" }
+AptosStdlib = { local = "../../../../../framework/aptos-stdlib" }
+MoveStdlib = { local = "../../../../../framework/move-stdlib" }

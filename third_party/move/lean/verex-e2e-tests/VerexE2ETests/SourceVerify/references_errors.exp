@@ -1,0 +1,24 @@
+VerexE2ETests/SourceVerify/references_errors.spec.lean:8:3: error: the specification clause `ensures left == old(left)` is not established
+VerexE2ETests/SourceVerify/references_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `swap` failed; provide a proof in the module:
+  verify swap by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/references_errors.spec.lean:11:3: error: the specification clause `ensures pair.first == old(pair.first)` is not established
+VerexE2ETests/SourceVerify/references_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `swap_fields` failed; provide a proof in the module:
+  verify swap_fields by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/references_errors.spec.lean:18:3: error: the specification clause `ensures pair.first == old(pair.first)` is not established
+VerexE2ETests/SourceVerify/references_errors.spec.lean:17:6: error: verex verification failed: the automatic verification of `clear_twice` failed; provide a proof in the module:
+  verify clear_twice by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

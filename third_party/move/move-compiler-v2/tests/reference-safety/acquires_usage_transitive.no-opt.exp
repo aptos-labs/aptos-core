@@ -1,0 +1,17 @@
+
+Diagnostics:
+error: function acquires global `m::R` which is currently borrowed
+   ┌─ tests/reference-safety/acquires_usage_transitive.move:14:23
+   │
+ 6 │     fun acq(addr: address): R acquires R {
+   │                                        -- `acquires` declared here
+   ·
+12 │         let r = borrow_global<R>(addr);
+   │                 ---------------------- struct `m::R` previously borrowed here
+13 │         let f_ref = &r.f;
+14 │         let R { f } = acq(addr);
+   │                       ^^^^^^^^^ function called here
+15 │         let x = *f_ref;
+   │                 ------ conflicting reference `f_ref` used here
+16 │         x + r.f + f
+   │             --- conflicting reference `r` used here

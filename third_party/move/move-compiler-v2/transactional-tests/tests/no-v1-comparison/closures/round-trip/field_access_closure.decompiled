@@ -3,19 +3,19 @@
 //# publish
 module 0xc0ffee::m {
     struct Func1 has copy, drop {
-        bar: ||(u64) has copy + drop,
+        bar: ||u64 has copy + drop,
     }
     enum Func2 has copy, drop {
         V1 {
-            bar: |u64|(u64) has copy + drop,
+            bar: |u64|u64 has copy + drop,
         }
         V2 {
-            bar: |u64|(u64) has copy + drop,
+            bar: |u64|u64 has copy + drop,
             x: u64,
         }
     }
     struct Func3 has copy, drop {
-        _0: ||(u64) has copy + drop,
+        _0: ||u64 has copy + drop,
     }
     fun test1(): u64 {
         let _v0 = Func1{bar: || lambda__1__test1()};

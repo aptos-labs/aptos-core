@@ -1,2 +1,0 @@
-Move prover returns: exiting with verification errors
-tests/sources/regression/mono_on_axiom_spec_type.move:19:9: error: generic module axioms are outside the current LeanerLang parser

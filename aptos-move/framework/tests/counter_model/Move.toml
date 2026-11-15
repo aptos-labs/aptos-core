@@ -1,0 +1,9 @@
+[package]
+name = "CounterModel"
+version = "0.0.0"
+
+[addresses]
+counter_model = "0x42"
+
+[dependencies]
+AptosFramework = { local = "../../aptos-framework" }

@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/loop_local_errors.spec.lean:7:15: error: VEREX-LOCAL-NAME: unknown local or constant `step`

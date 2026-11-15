@@ -14,13 +14,21 @@ use crate::{
 use abstract_domain_derive::AbstractDomain;
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
+use move_core_types::function::ClosureMask;
 use move_model::{
-    ast::{ConditionKind, Spec},
-    model::{FunctionEnv, GlobalEnv, QualifiedId, QualifiedInstId, StructId},
+    ast::{ConditionKind, FunParamAccessOf, Spec, TempIndex},
+    model::{FunId, FunctionEnv, GlobalEnv, QualifiedId, QualifiedInstId, StructId},
+    pragmas::VERIFY_PRAGMA,
+    spec_derivation,
     ty::Type,
 };
 use paste::paste;
-use std::{collections::BTreeSet, fmt, fmt::Formatter};
+use std::{
+    cell::OnceCell,
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+    fmt::Formatter,
+};
 
 pub fn get_memory_usage<'env>(target: &FunctionTarget<'env>) -> &'env UsageState {
     target
@@ -62,6 +70,10 @@ pub struct UsageState {
     /// so callers must resolve the wildcard against *their* accessed
     /// footprint at each use site (loop-header havoc, Invoke, etc.).
     pub invoke_frame_wildcard: bool,
+    /// True if this function's code, or the code of any function it calls, invokes a
+    /// function value whose effects nothing bounds (see `has_unbounded_invoke`). A summary
+    /// with this flag set does not account for everything a call to the function does.
+    pub unbounded_invoke: bool,
     /// `invoke_frame` without the enclosing function's own parameter frames: the
     /// struct-field frames and the callees' `invoke_frame`s. At a call site, the
     /// parameter frames can be replaced by what the arguments actually modify.
@@ -220,6 +232,7 @@ impl UsageState {
             .extend(callee_invoke_frame.iter().cloned());
         self.add_transitive_invoke_frame_iter(callee_invoke_frame.into_iter());
         self.invoke_frame_wildcard |= callee.invoke_frame_wildcard;
+        self.unbounded_invoke |= callee.unbounded_invoke;
     }
 }
 
@@ -371,6 +384,9 @@ impl MemoryUsageAnalysis<'_> {
         if !has_invoke {
             return;
         }
+        if has_unbounded_invoke(target) {
+            state.unbounded_invoke = true;
+        }
         let mem_is_closed =
             |mem: &QualifiedInstId<StructId>| mem.inst.iter().all(|ty| !ty.is_open());
         let mut wildcard = false;
@@ -427,6 +443,672 @@ impl MemoryUsageAnalysis<'_> {
             state.invoke_frame_wildcard = true;
         }
     }
+
+    /// Accounts for closures handed to a callee that leaves their frame to the call site.
+    ///
+    /// See [`deferred_closure_targets`]: the callee's own summary records none of what such
+    /// a closure does, so the function making the call carries it, exactly as if it had
+    /// invoked the closure itself.
+    fn compute_deferred_closure_usage(&self, target: &FunctionTarget, state: &mut UsageState) {
+        let env = self.cache.global_env();
+        let code = target.get_bytecode();
+        let summaries = |id: QualifiedId<FunId>| {
+            self.cache
+                .get::<UsageState>(id, &FunctionVariant::Baseline)
+                .cloned()
+        };
+        let closures = closures_with_known_footprint(
+            env,
+            target.func_env.get_qualified_id(),
+            code,
+            &summaries,
+            &|fun_id, inst| {
+                contract_effects_reached(env, self.cache.targets(), &summaries, fun_id, inst)
+            },
+        );
+        for bc in code {
+            let Bytecode::Call(_, _, Operation::Function(mid, fid, _), srcs, _) = bc else {
+                continue;
+            };
+            let callee = env.get_function(mid.qualified(*fid));
+            for closure in deferred_closure_targets(&callee, srcs, &closures) {
+                state.add_transitive_modified_iter(closure.writes.iter().cloned());
+                state.add_transitive_accessed_iter(closure.accessed.iter().cloned());
+            }
+        }
+    }
+}
+
+/// Whether the postcondition of `fun` at `inst` may only be related to its result over an
+/// actual transition of the function.
+///
+/// A behavioral predicate over `fun` is evaluated in the memory its contract observes
+/// (`behavioral_target_memory`). The `result_of` axiom relates that memory to the
+/// contract's postcondition. When a call to `fun` writes none of that memory, one memory
+/// state is both the pre- and the post-state of any call, and the postcondition holds at
+/// every state the function does not abort in; otherwise the postcondition holds only
+/// between the pre- and post-state of an actual call, and a postcondition such as
+/// `v == old(v) + 1` is false at any other pair, including a single state. The Boogie
+/// backend then guards the axiom with a transition witness which only an assumed
+/// `ensures_of` establishes, and spec inference anchors the carrier it substitutes for
+/// such a call by the `ensures_of` fact of the call.
+///
+/// A function writing none of that memory still has its `result_of` axiom quantified over
+/// a pair of states once its contract reads the pre-state (`old(..)` or a pre-state `let`):
+/// a clause relating the two states (`v == old(v)`, or a post-state read next to a
+/// pre-state `let`) is false off the diagonal and would force the abort condition there.
+/// Such a function is guarded too, unless every `ensures` clause reads the pre-state
+/// alone, which holds at any pair.
+///
+/// Unknown effects (`call_effects` returns `None`) are treated as writes.
+pub fn behavioral_transition_guarded(
+    env: &GlobalEnv,
+    fun_id: QualifiedId<FunId>,
+    inst: &[Type],
+    summary_of: &dyn Fn(QualifiedId<FunId>) -> Option<UsageState>,
+) -> bool {
+    let fun = env.get_function(fun_id);
+    let old_memory = spec_derivation::behavioral_old_memory_instantiated(&fun, inst);
+    let mut observed = spec_derivation::behavioral_target_memory(env, fun_id, inst);
+    observed.extend(old_memory.iter().cloned());
+    if observed.is_empty() {
+        return false;
+    }
+    let may_write = match call_effects(env, fun_id, inst, summary_of) {
+        None => true,
+        Some(effects) => observed.iter().any(|mem| effects.writes.contains(mem)),
+    };
+    may_write || (!old_memory.is_empty() && !spec_derivation::fun_ensures_are_pre_state_only(&fun))
+}
+
+/// Whether `behavioral_transition_guarded` may hold for `fun_id` at some instantiation of its
+/// type parameters, over-approximated. At the identity instantiation, the memory selected
+/// by a bare type parameter (the `T` in `object::spec_exists_at<T>`) is not resolved, and a
+/// resource read at a type parameter (`R<T>`) differs from one written at a concrete type
+/// (`R<u64>`); either may become guarded once instantiated. So a function with such memory
+/// counts as guarded, and observed and written memory are compared by struct only.
+pub fn behavioral_transition_guarded_at_some_instance(
+    env: &GlobalEnv,
+    fun_id: QualifiedId<FunId>,
+    summary_of: &dyn Fn(QualifiedId<FunId>) -> Option<UsageState>,
+) -> bool {
+    let fun = env.get_function(fun_id);
+    let inst: Vec<Type> = (0..fun.get_type_parameter_count())
+        .map(|idx| Type::TypeParameter(idx as u16))
+        .collect();
+    if behavioral_transition_guarded(env, fun_id, &inst, summary_of) {
+        return true;
+    }
+    let spec = fun.get_spec();
+    let generic_aborts = || {
+        !spec_derivation::spec_aborts_are_exact(env, fun_id)
+            && spec_derivation::derive_fun_aborts_conditions(env, fun_id, &inst).is_some_and(
+                |aborts| {
+                    aborts
+                        .iter()
+                        .any(|exp| !exp.directly_generic_used_memory(env).is_empty())
+                },
+            )
+    };
+    if !fun.get_spec_generic_used_memory().is_empty()
+        || !fun.get_spec_generic_old_memory().is_empty()
+        || spec.conditions.iter().any(|cond| {
+            matches!(cond.kind, ConditionKind::LetPre(..))
+                && !cond.exp.directly_generic_used_memory(env).is_empty()
+        })
+        || generic_aborts()
+    {
+        return true;
+    }
+    let mut observed = spec_derivation::behavioral_target_memory(env, fun_id, &inst);
+    observed.extend(spec_derivation::behavioral_old_memory_instantiated(
+        &fun, &inst,
+    ));
+    match call_effects(env, fun_id, &inst, summary_of) {
+        None => !observed.is_empty(),
+        Some(effects) => observed.iter().any(|mem| {
+            effects
+                .writes
+                .iter()
+                .any(|write| write.module_id == mem.module_id && write.id == mem.id)
+        }),
+    }
+}
+
+/// `behavioral_transition_guarded` over the usage summaries recorded in `targets`.
+pub fn behavioral_transition_guarded_in(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    fun_id: QualifiedId<FunId>,
+    inst: &[Type],
+) -> bool {
+    behavioral_transition_guarded(env, fun_id, inst, &|callee| {
+        targets
+            .get_data(&callee, &FunctionVariant::Baseline)
+            .and_then(|data| data.annotations.get::<UsageState>().cloned())
+    })
+}
+
+/// What a closure built in some function writes and accesses, as the prover sees a call to
+/// its target.
+#[derive(Clone, Debug)]
+pub struct ClosureEffects {
+    /// Every resource a call to the target can write, instantiated.
+    pub writes: BTreeSet<QualifiedInstId<StructId>>,
+    /// Every resource a call to the target can read or write, instantiated.
+    pub accessed: BTreeSet<QualifiedInstId<StructId>>,
+}
+
+/// Whether a call to `fun` is encoded from its contract rather than from a verified body: a
+/// native, or an opaque function under `pragma verify = false`. Its usage summary does not
+/// record what its `modifies` frame declares.
+pub fn is_encoded_from_contract(fun: &FunctionEnv) -> bool {
+    fun.is_native() || (fun.is_opaque() && fun.is_pragma_false(VERIFY_PRAGMA))
+}
+
+/// What a call to `fun_id` at `inst` writes and accesses, as the prover encodes the call:
+/// `None` when that is not known.
+///
+/// - A native, or an opaque function under `pragma verify = false`, is encoded from its
+///   contract, so its declared `modifies` frame is what it writes; for the opaque function,
+///   a call also havocs what its body writes outside that frame, which is added from its
+///   usage summary. A frame that is a wildcard, or that names memory through a bare type
+///   parameter, is not a known set.
+/// - Any other function is described by its usage summary, which `summary_of` supplies. It
+///   is not known when there is no summary (a member of a recursive cycle whose summary is
+///   still being computed), or when the summary has `unbounded_invoke` or a wildcard invoke
+///   frame: some function value it runs has effects nothing records.
+///
+/// A native or intrinsic also writes and accesses what the declared frames of its
+/// function-typed parameters allow, since it may invoke them; with a parameter whose frame is
+/// undeclared or a wildcard, the effects are not known.
+pub fn call_effects(
+    env: &GlobalEnv,
+    fun_id: QualifiedId<FunId>,
+    inst: &[Type],
+    summary_of: &dyn Fn(QualifiedId<FunId>) -> Option<UsageState>,
+) -> Option<ClosureEffects> {
+    let fun = env.get_function(fun_id);
+    let mut effects = own_call_effects(env, &fun, fun_id, inst, summary_of)?;
+    if fun.is_native_or_intrinsic() {
+        let accesses = fun.get_fun_param_access_of();
+        for param in fun.get_parameters() {
+            if !param.1.skip_reference().is_function() {
+                continue;
+            }
+            let access = accesses
+                .iter()
+                .find(|access| access.fun_param == param.0)
+                .filter(|access| !access.frame_spec.modifies_all && !access.frame_spec.reads_all)?;
+            if frame_names_open_memory(access, inst) {
+                return None;
+            }
+            effects.writes.extend(
+                access
+                    .old_memory
+                    .iter()
+                    .map(|mem| mem.instantiate_ref(inst)),
+            );
+            effects.accessed.extend(
+                access
+                    .used_memory
+                    .iter()
+                    .map(|mem| mem.instantiate_ref(inst)),
+            );
+        }
+        effects.accessed.extend(effects.writes.iter().cloned());
+    }
+    Some(effects)
+}
+
+/// Whether a function-typed parameter's declared frame, at `inst`, still names memory through a
+/// type parameter. Such a frame is not a known set, as for a function's own `modifies` frame
+/// ([`own_call_effects`]): an open `G<T>` does not cover the concrete `G<u64>` a caller's
+/// instantiation makes of it.
+fn frame_names_open_memory(access: &FunParamAccessOf, inst: &[Type]) -> bool {
+    access
+        .old_memory
+        .iter()
+        .chain(access.used_memory.iter())
+        .any(|mem| mem.instantiate_ref(inst).inst.iter().any(|ty| ty.is_open()))
+}
+
+/// [`call_effects`] without the frames of a native's function-typed parameters.
+fn own_call_effects(
+    env: &GlobalEnv,
+    fun: &FunctionEnv,
+    fun_id: QualifiedId<FunId>,
+    inst: &[Type],
+    summary_of: &dyn Fn(QualifiedId<FunId>) -> Option<UsageState>,
+) -> Option<ClosureEffects> {
+    if is_encoded_from_contract(fun) {
+        let mut writes = BTreeSet::new();
+        if let Some(frame) = fun.get_frame_spec() {
+            if frame.modifies_all {
+                return None;
+            }
+            for target in &frame.modifies_targets {
+                let Type::Struct(mid, sid, targs) =
+                    env.get_node_type(target.node_id()).skip_reference().clone()
+                else {
+                    return None;
+                };
+                let mem = mid.qualified_inst(sid, targs).instantiate(inst);
+                if mem.inst.iter().any(|ty| ty.is_open()) {
+                    return None;
+                }
+                writes.insert(mem);
+            }
+        }
+        let mut accessed = writes.clone();
+        accessed.extend(fun.get_spec_used_memory_instantiated(inst));
+        // A direct call also havocs what the body writes outside the frame, so a closure
+        // over this target must be charged with the same.
+        if !fun.is_native() {
+            let summary = summary_of(fun_id)?;
+            if summary.unbounded_invoke || summary.invoke_frame_wildcard {
+                return None;
+            }
+            writes.extend(summary.modified.get_all_inst(inst));
+            writes.extend(summary.invoke_frame.get_all_inst(inst));
+            accessed.extend(summary.accessed.get_all_inst(inst));
+            accessed.extend(writes.iter().cloned());
+        }
+        return Some(ClosureEffects { writes, accessed });
+    }
+    let summary = summary_of(fun_id)?;
+    if summary.unbounded_invoke || summary.invoke_frame_wildcard {
+        return None;
+    }
+    let mut writes = summary.modified.get_all_inst(inst);
+    writes.extend(summary.invoke_frame.get_all_inst(inst));
+    let mut accessed = summary.accessed.get_all_inst(inst);
+    accessed.extend(writes.iter().cloned());
+    Some(ClosureEffects { writes, accessed })
+}
+
+/// Whether `target` invokes a function value whose effects nothing bounds (see
+/// `UsageState::unbounded_invoke`).
+///
+/// An invocation is bounded only when its operand is one of the function's own parameters,
+/// never reassigned in the body, whose argument is checked against a bound at every call
+/// site, capture and invocation (`check_fun_arg_frames`, which runs in every mode): the
+/// declared `modifies_of`/`reads_of` frame (the writes are in `invoke_frame`), the empty
+/// frame when there is no declaration, or, for an opaque function, a frame left to the call
+/// site, which must supply a closure with known effects. Any other operand -- a value read
+/// from storage or a struct field, a local of any other origin -- is unbounded.
+///
+/// The check runs on target modules only, and a caller that forwards or captures its own
+/// parameter is itself bounded only by its callers. So an undeclared parameter of a
+/// transparent function is bounded only when the function and all its transitive users are in
+/// target modules ([`used_only_from_targets`]), and no dependency names a target module at all
+/// ([`no_dependency_uses_target`]), so that no dependency code can reach one of its functions.
+/// A function value a target stores in a dependency's own struct is outside both conditions;
+/// the check at the store relies on the field's frame, as for any stored parameter.
+fn has_unbounded_invoke(target: &FunctionTarget) -> bool {
+    let fun = target.func_env;
+    let params = fun.get_parameters();
+    let code = target.get_bytecode();
+    let reassigned: BTreeSet<TempIndex> = code.iter().flat_map(|bc| bc.dests()).collect();
+    let all_uses_checked = OnceCell::new();
+    let bounded_param = |idx: TempIndex| {
+        idx < params.len()
+            && !reassigned.contains(&idx)
+            && params[idx].1.skip_reference().is_function()
+            && (fun.is_opaque()
+                || fun
+                    .get_fun_param_access_of()
+                    .iter()
+                    .any(|access| access.fun_param == params[idx].0)
+                || *all_uses_checked.get_or_init(|| all_callers_checked(fun)))
+    };
+    code.iter().any(|bc| match bc {
+        Bytecode::Call(_, _, Operation::Invoke, srcs, _) => {
+            srcs.last().is_none_or(|operand| !bounded_param(*operand))
+        },
+        _ => false,
+    })
+}
+
+/// Whether every site that can supply a function-typed argument to `fun` is checked against the
+/// parameter's frame: `fun` and all its transitive users are in target modules, and no
+/// dependency names a target module ([`no_dependency_uses_target`]). An undeclared parameter of
+/// a transparent function is bounded by the empty frame only then, whether the function invokes
+/// it or forwards it.
+pub fn all_callers_checked(fun: &FunctionEnv) -> bool {
+    let env = fun.module_env.env;
+    if !no_dependency_uses_target(env) {
+        return false;
+    }
+    if !env.has_extension::<UsedOnlyFromTargets>() {
+        env.set_extension(UsedOnlyFromTargets::default());
+    }
+    let cache = env
+        .get_extension::<UsedOnlyFromTargets>()
+        .expect("extension set above");
+    let id = fun.get_qualified_id();
+    if let Some(answer) = cache.0.borrow().get(&id) {
+        return *answer;
+    }
+    let answer = used_only_from_targets(fun);
+    cache.0.borrow_mut().insert(id, answer);
+    answer
+}
+
+/// Cached answers of [`used_only_from_targets`], per function.
+#[derive(Default)]
+struct UsedOnlyFromTargets(std::cell::RefCell<BTreeMap<QualifiedId<FunId>, bool>>);
+
+/// Whether `fun` and every function that reaches it through calls and closure constructions
+/// (`FunctionEnv::get_using_functions`, transitively) are in target modules. `false` when a
+/// user set is not available.
+fn used_only_from_targets(fun: &FunctionEnv) -> bool {
+    let env = fun.module_env.env;
+    let mut visited = BTreeSet::new();
+    let mut todo = vec![fun.get_qualified_id()];
+    while let Some(id) = todo.pop() {
+        if !visited.insert(id) {
+            continue;
+        }
+        let user = env.get_function(id);
+        if !user.module_env.is_target() {
+            return false;
+        }
+        let Some(users) = user.get_using_functions() else {
+            return false;
+        };
+        todo.extend(users);
+    }
+    true
+}
+
+/// Cached answer of [`no_dependency_uses_target`].
+struct NoDependencyUsesTarget(bool);
+
+/// Whether no module outside the target modules uses one of them, in code or in specifications.
+/// Always true in a package build, where a dependency cannot name the package being verified;
+/// false only when a dependency source names a target module.
+fn no_dependency_uses_target(env: &GlobalEnv) -> bool {
+    if let Some(cached) = env.get_extension::<NoDependencyUsesTarget>() {
+        return cached.0;
+    }
+    let answer = env.get_modules().filter(|m| !m.is_target()).all(|m| {
+        m.get_used_modules(true)
+            .iter()
+            .all(|id| !env.get_module(*id).is_target())
+    });
+    env.set_extension(NoDependencyUsesTarget(answer));
+    answer
+}
+
+/// The closures built in `code` whose effects the prover can state, by the temporary each is
+/// bound to.
+///
+/// A closure qualifies when:
+///
+/// - its temporary is defined exactly once, by the `Closure` operation (a closure rebuilt in
+///   a loop, or overwritten, has no single target);
+/// - its target is not `enclosing`, the function being analysed, whose summary is still
+///   being computed;
+/// - its target leaves none of its own function-typed parameters' frames to its call sites:
+///   such a target's effects omit the closure it runs, so a closure that partially applies it
+///   (`|y| apply(h, y)`, lowered to `Closure(apply, [h])`) would hide the captured `h`;
+/// - every function-typed parameter of its target is captured, in a target module: the
+///   target's summary bounds what invoking such a parameter writes by the check made on the
+///   value supplied for it, which for a closure is the capture check; a value supplied by
+///   whoever invokes the closure is not checked (see [`closure_target_effects`]);
+/// - a call to its target has known effects ([`call_effects`]): for a native or an
+///   unverified opaque function, its declared frame; otherwise its usage summary together with
+///   what the functions encoded from their contracts that its code reaches do
+///   ([`contract_effects_reached`], as `reached_of` returns it, within `enclosing`), which the
+///   summary omits;
+/// - those effects write no spec variable (ghost memory): a call-site havoc never covers
+///   one, so deferring would drop the write.
+///
+/// Every analysis that needs a closure's effects, and every check that decides whether a
+/// callee may leave a closure's frame to its call site, must use this one set, so that a
+/// closure is deferred exactly when its effects are accounted for. Any other closure has no
+/// footprint, and an undeclared frame stays empty for it.
+pub fn closures_with_known_footprint(
+    env: &GlobalEnv,
+    enclosing: QualifiedId<FunId>,
+    code: &[Bytecode],
+    summary_of: &dyn Fn(QualifiedId<FunId>) -> Option<UsageState>,
+    reached_of: &dyn Fn(QualifiedId<FunId>, &[Type]) -> Option<ReachedEffects>,
+) -> BTreeMap<TempIndex, ClosureEffects> {
+    let mut def_counts: BTreeMap<TempIndex, usize> = BTreeMap::new();
+    for bc in code {
+        for dest in bc.dests() {
+            *def_counts.entry(dest).or_default() += 1;
+        }
+    }
+    code.iter()
+        .filter_map(|bc| match bc {
+            Bytecode::Call(_, dests, Operation::Closure(mid, fid, targs, mask), _, _)
+                if dests.len() == 1 && def_counts[&dests[0]] == 1 =>
+            {
+                let target_id = mid.qualified(*fid);
+                let mut effects = closure_target_effects(
+                    env,
+                    enclosing,
+                    target_id,
+                    targs,
+                    Some(*mask),
+                    summary_of,
+                )?;
+                if !is_encoded_from_contract(&env.get_function(target_id)) {
+                    let reached = reached_of(target_id, targs)?.within(env, enclosing)?;
+                    if reached
+                        .writes
+                        .iter()
+                        .any(|mem| env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory())
+                    {
+                        return None;
+                    }
+                    effects.accessed.extend(reached.writes.iter().cloned());
+                    effects.writes.extend(reached.writes);
+                    effects.accessed.extend(reached.accessed);
+                }
+                Some((dests[0], effects))
+            },
+            _ => None,
+        })
+        .collect()
+}
+
+/// The effects of a closure over `target_id` at `targs` built in `enclosing`, when the prover
+/// can state them: every condition of [`closures_with_known_footprint`] except the single
+/// definition of the closure's temporary.
+///
+/// With `captured`, the closure's mask, a target whose function-typed parameters are all
+/// captured qualifies: each captured value is checked against the parameter's frame where the
+/// closure is built (`check_fun_arg_frames`), which bounds what the target writes through it.
+/// That check runs on target modules only, and a parameter of `enclosing` captured there is
+/// bounded by its frame only if every caller of `enclosing` is checked too. So the mask counts
+/// only when `enclosing` is in a target module and no dependency uses a target module
+/// ([`no_dependency_uses_target`]): a dependency calling `enclosing` supplies the value unchecked.
+/// A value supplied by whoever invokes the closure is not checked against it, so a target
+/// with an uncaptured function-typed parameter never qualifies. The effects include each
+/// captured parameter's declared frame; a `*` frame makes them unknown. A native or intrinsic
+/// target qualifies only when every function-typed parameter declares a frame: its contract
+/// says nothing about what it does through an undeclared one.
+pub fn closure_target_effects(
+    env: &GlobalEnv,
+    enclosing: QualifiedId<FunId>,
+    target_id: QualifiedId<FunId>,
+    targs: &[Type],
+    captured: Option<ClosureMask>,
+    summary_of: &dyn Fn(QualifiedId<FunId>) -> Option<UsageState>,
+) -> Option<ClosureEffects> {
+    let target = env.get_function(target_id);
+    let captured = captured.filter(|_| {
+        env.get_function(enclosing).module_env.is_target() && no_dependency_uses_target(env)
+    });
+    let takes_fun_value = target
+        .get_parameters()
+        .iter()
+        .enumerate()
+        .any(|(i, param)| {
+            param.1.skip_reference().is_function()
+                && !captured.is_some_and(|mask| mask.is_captured(i))
+        });
+    let defers_itself = target
+        .get_parameters()
+        .iter()
+        .any(|param| target.leaves_fun_param_frame_to_call_site(param.0));
+    let undeclared_native_param = target.is_native_or_intrinsic()
+        && target.get_parameters().iter().any(|param| {
+            param.1.skip_reference().is_function()
+                && !target
+                    .get_fun_param_access_of()
+                    .iter()
+                    .any(|access| access.fun_param == param.0)
+        });
+    if takes_fun_value || target_id == enclosing || defers_itself || undeclared_native_param {
+        return None;
+    }
+    let mut effects = call_effects(env, target_id, targs, summary_of)?;
+    for access in target.get_fun_param_access_of() {
+        if access.frame_spec.modifies_all
+            || access.frame_spec.reads_all
+            || frame_names_open_memory(access, targs)
+        {
+            return None;
+        }
+        effects.writes.extend(
+            access
+                .old_memory
+                .iter()
+                .map(|mem| mem.instantiate_ref(targs)),
+        );
+        effects.accessed.extend(
+            access
+                .used_memory
+                .iter()
+                .map(|mem| mem.instantiate_ref(targs)),
+        );
+    }
+    effects.accessed.extend(effects.writes.iter().cloned());
+    Some(effects).filter(|effects| {
+        !effects
+            .writes
+            .iter()
+            .any(|mem| env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory())
+    })
+}
+
+/// Bound on the instantiated functions `contract_effects_reached` walks before giving up.
+const CONTRACT_EFFECTS_WALK_LIMIT: usize = 512;
+
+/// The result of [`contract_effects_reached`].
+#[derive(Clone, Debug)]
+pub struct ReachedEffects {
+    effects: ClosureEffects,
+    /// Every function whose body the walk read, and every contract-encoded function whose
+    /// effects it took.
+    through: BTreeSet<QualifiedId<FunId>>,
+}
+
+impl ReachedEffects {
+    /// The effects as seen from `enclosing`: `None` when the walk passed through it, or through
+    /// a function that reaches it. The usage and loop analyses walk while `enclosing`'s body is
+    /// removed from the holder and while the functions of its recursive cycle have no summary
+    /// yet, so they cannot see what those reach; every user must give the same answer they do,
+    /// or the frame check would accept a footprint the function's own summary never gained.
+    pub fn within(self, env: &GlobalEnv, enclosing: QualifiedId<FunId>) -> Option<ClosureEffects> {
+        let cyclic = self.through.iter().any(|fun| {
+            *fun == enclosing
+                || env
+                    .get_function(*fun)
+                    .get_transitive_closure_of_used_functions()
+                    .contains(&enclosing)
+        });
+        (!cyclic).then_some(self.effects)
+    }
+}
+
+/// What the functions encoded from their contracts ([`is_encoded_from_contract`])
+/// that a call to `fun_id` at `inst` reaches through code may write and access. Usage
+/// summaries omit their `modifies` frames, so a summary of code calling them does too. `None`
+/// when one of those effects is not known, the walk exceeds its bound, or it reaches a function
+/// whose body is absent from `targets` or cleared: the answer must come from the bodies as
+/// they were before instrumentation, which removes or rewrites them.
+pub fn contract_effects_reached(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    summary_of: &dyn Fn(QualifiedId<FunId>) -> Option<UsageState>,
+    fun_id: QualifiedId<FunId>,
+    inst: &[Type],
+) -> Option<ReachedEffects> {
+    let mut effects = ClosureEffects {
+        writes: BTreeSet::new(),
+        accessed: BTreeSet::new(),
+    };
+    let mut through = BTreeSet::new();
+    let mut visited = BTreeSet::new();
+    let mut todo = vec![(fun_id, inst.to_vec())];
+    while let Some((id, inst)) = todo.pop() {
+        if !visited.insert((id, inst.clone())) {
+            continue;
+        }
+        if visited.len() > CONTRACT_EFFECTS_WALK_LIMIT {
+            return None;
+        }
+        through.insert(id);
+        let fun = env.get_function(id);
+        let data = targets.get_data(&id, &FunctionVariant::Baseline)?;
+        if data.code.is_empty() {
+            return None;
+        }
+        for bc in FunctionTarget::new(&fun, data).get_bytecode() {
+            // An inlined body the spec instrumentation has processed marks an opaque call by
+            // `OpaqueCallBegin` in place of the call.
+            let (Bytecode::Call(_, _, Operation::Function(mid, fid, callee_targs), _, _)
+            | Bytecode::Call(_, _, Operation::OpaqueCallBegin(mid, fid, callee_targs), _, _)) = bc
+            else {
+                continue;
+            };
+            let callee_id = mid.qualified(*fid);
+            let callee_inst = Type::instantiate_vec(callee_targs.clone(), &inst);
+            if is_encoded_from_contract(&env.get_function(callee_id)) {
+                let callee_effects = call_effects(env, callee_id, &callee_inst, summary_of)?;
+                through.insert(callee_id);
+                effects.writes.extend(callee_effects.writes);
+                effects.accessed.extend(callee_effects.accessed);
+            } else {
+                todo.push((callee_id, callee_inst));
+            }
+        }
+    }
+    Some(ReachedEffects { effects, through })
+}
+
+/// The effects of the closures a call to `callee` with arguments `srcs` runs on the callee's
+/// behalf without the callee's own summary accounting for them.
+///
+/// A callee that leaves a function-typed parameter's frame to its call sites
+/// (`FunctionEnv::leaves_fun_param_frame_to_call_site`) records nothing for that parameter.
+/// Whatever the closure passed for it does is therefore part of what *this call* does, and
+/// every analysis that asks what a call modifies -- the summary of the function making it,
+/// the havoc at a loop head that contains it -- must add the effects returned here.
+/// `closures` is [`closures_with_known_footprint`] of the calling function; an argument of
+/// any other origin has no footprint and is rejected by the frame check, so it never reaches
+/// the prover.
+pub fn deferred_closure_targets<'a>(
+    callee: &FunctionEnv,
+    srcs: &[TempIndex],
+    closures: &'a BTreeMap<TempIndex, ClosureEffects>,
+) -> Vec<&'a ClosureEffects> {
+    if !callee.is_opaque() {
+        return vec![];
+    }
+    callee
+        .get_parameters()
+        .iter()
+        .zip(srcs)
+        .filter(|(param, _)| callee.leaves_fun_param_frame_to_call_site(param.0))
+        .filter_map(|(_, src)| closures.get(src))
+        .collect()
 }
 
 pub struct UsageProcessor();
@@ -447,6 +1129,7 @@ impl UsageProcessor {
         let mut summary = analysis.summarize(&func_target, UsageState::default());
         analysis.compute_spec_usage(&func_env.get_spec(), &mut summary);
         analysis.compute_invoke_usage(&func_target, &mut summary);
+        analysis.compute_deferred_closure_usage(&func_target, &mut summary);
         summary
     }
 }

@@ -9,14 +9,14 @@ use crate::{
     },
     transaction::Version,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::HashValue;
 use StateSlotKind::*;
 
 /// Represents the content of a state slot along with its key and information about
 /// whether the slot is present in the cold or/and hot state.
 ///
-/// `state_key` is `None` when the slot is loaded from the persisted hot state KV DB,
-/// which stores only the key hash, not the full key.
+/// `state_key` is `None` for slots from the hot state base, which keeps only the key hash to save
+/// memory. That includes slots loaded from the hot state KV DB.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StateSlot {
     state_key: Option<StateKey>,
@@ -98,10 +98,8 @@ impl StateSlot {
         self.state_key = Some(state_key);
     }
 
-    pub fn expect_state_key(&self) -> &StateKey {
-        self.state_key
-            .as_ref()
-            .expect("StateSlot: state_key is None (loaded from DB without key)")
+    pub fn clear_state_key(&mut self) {
+        self.state_key = None;
     }
 
     pub fn kind(&self) -> &StateSlotKind {
@@ -145,23 +143,7 @@ impl StateSlot {
         }
     }
 
-    /// When committing speculative state to the DB, determine if to make changes to the cold JMT.
-    pub fn maybe_update_jmt(
-        &self,
-        min_version: Version,
-    ) -> Option<(HashValue, Option<(HashValue, StateKey)>)> {
-        // Filter out the slots that carry no cold JMT change, including slots that are only changed
-        // because of LRU pointer updates.
-        let value_opt = self.maybe_update_cold_state(min_version)?;
-        let state_key = self.expect_state_key();
-        Some((
-            *state_key.crypto_hash_ref(),
-            value_opt.map(|v| (CryptoHash::hash(v), state_key.clone())),
-        ))
-    }
-
-    /// JMT-pass inclusion filter, decoupled from the tuple build that
-    /// [`Self::maybe_update_jmt`] does. Returns `true` for slots that
+    /// JMT-pass inclusion filter. Returns `true` for slots that
     /// should contribute a JMT-pass entry; `false` for slots that
     /// haven't changed since `min_version` (only LRU pointer updates,
     /// stale hot evictions, etc.). Used by the shared pipeline-level

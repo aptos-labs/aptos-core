@@ -11,7 +11,7 @@
 //!   program point via a forward dataflow analysis.
 //! * `UninitializedUseChecker` which checks that all locals are initialized before use.
 
-use im::Vector;
+use imbl::Vector;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{

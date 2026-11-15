@@ -7,13 +7,11 @@ use aptos_config::{
     config::{NodeConfig, SECURE_STORAGE_FILENAME},
     keys::ConfigKey,
 };
-use aptos_db::{
-    common::{
-        HOT_STATE_KV_DB_FOLDER_NAME, HOT_STATE_MERKLE_DB_FOLDER_NAME, LEDGER_DB_FOLDER_NAME,
-        POSITION_DB_FOLDER_NAME, POSITION_MERKLE_DB_FOLDER_NAME, STATE_KV_DB_FOLDER_NAME,
-        STATE_MERKLE_DB_FOLDER_NAME,
-    },
-    fast_sync_storage_wrapper::SECONDARY_DB_DIR,
+use aptos_db::common::{
+    COLLATERAL_DB_FOLDER_NAME, COLLATERAL_MERKLE_DB_FOLDER_NAME, HOT_STATE_KV_DB_FOLDER_NAME,
+    HOT_STATE_MERKLE_DB_FOLDER_NAME, LEDGER_DB_FOLDER_NAME, ORDER_DB_FOLDER_NAME,
+    ORDER_MERKLE_DB_FOLDER_NAME, POSITION_DB_FOLDER_NAME, POSITION_MERKLE_DB_FOLDER_NAME,
+    STATE_KV_DB_FOLDER_NAME, STATE_MERKLE_DB_FOLDER_NAME,
 };
 use aptos_logger::{debug, error, info};
 use aptos_sdk::{
@@ -425,8 +423,11 @@ impl Node for LocalNode {
             HOT_STATE_KV_DB_FOLDER_NAME,
             POSITION_DB_FOLDER_NAME,
             POSITION_MERKLE_DB_FOLDER_NAME,
+            ORDER_DB_FOLDER_NAME,
+            ORDER_MERKLE_DB_FOLDER_NAME,
+            COLLATERAL_DB_FOLDER_NAME,
+            COLLATERAL_MERKLE_DB_FOLDER_NAME,
             STATE_SYNC_DB_NAME,
-            SECONDARY_DB_DIR,
         ]
         .map(|name| storage_dir.join(name));
 

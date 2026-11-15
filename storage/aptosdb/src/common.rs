@@ -28,6 +28,10 @@ pub const HOT_STATE_MERKLE_DB_FOLDER_NAME: &str = "hot_state_merkle_db";
 pub const HOT_STATE_KV_DB_FOLDER_NAME: &str = "hot_state_kv_db";
 pub const POSITION_DB_FOLDER_NAME: &str = "position_db";
 pub const POSITION_MERKLE_DB_FOLDER_NAME: &str = "position_merkle_db";
+pub const ORDER_DB_FOLDER_NAME: &str = "order_db";
+pub const ORDER_MERKLE_DB_FOLDER_NAME: &str = "order_merkle_db";
+pub const COLLATERAL_DB_FOLDER_NAME: &str = "collateral_db";
+pub const COLLATERAL_MERKLE_DB_FOLDER_NAME: &str = "collateral_merkle_db";
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
@@ -310,10 +314,6 @@ where
         }
     }
 
-    pub(crate) fn force_last_snapshot(&mut self, snapshot: S) {
-        self.last_snapshot = snapshot;
-    }
-
     /// Drain + shut down the commit pipeline against the current
     /// `current_state` family. Must run *before* any caller repoints
     /// `current_state` at a new MapLayer family — otherwise the
@@ -355,7 +355,7 @@ impl LedgerStateView for LedgerStateWithSummary {
 
 pub trait BufferedStateExtras<P, S>: Send + 'static {
     type ChunkInput;
-    fn absorb_chunk(&mut self, input: Self::ChunkInput, checkpoint_advanced: bool);
+    fn absorb_chunk(&mut self, input: Self::ChunkInput);
     fn build_payload(&mut self, snapshot: S) -> P;
 }
 
@@ -405,7 +405,7 @@ where
 
         *self.core.current_state.lock() = new_state;
 
-        self.extras.absorb_chunk(chunk_input, checkpoint_advanced);
+        self.extras.absorb_chunk(chunk_input);
         self.maybe_commit(checkpoint_to_commit_opt, sync_commit);
 
         Ok(())
@@ -414,10 +414,6 @@ where
     pub(crate) fn sync_commit(&mut self) {
         let checkpoint = self.core.current_state.lock().last_checkpoint_snapshot();
         self.maybe_commit(Some(checkpoint), /* sync_commit = */ true);
-    }
-
-    pub(crate) fn force_last_snapshot(&mut self, snapshot: S) {
-        self.core.force_last_snapshot(snapshot);
     }
 
     fn maybe_commit(&mut self, checkpoint: Option<S>, sync_commit: bool) {

@@ -38,3 +38,7 @@ regex = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+
+[dev-dependencies]
+aptos-executor-test-helpers = { workspace = true }
+aptos-temppath = { workspace = true }

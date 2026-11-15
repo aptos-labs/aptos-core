@@ -507,6 +507,25 @@ impl BatchGenerator {
             .await
             .unwrap_or_default();
 
+        // Local batches can reach our own proposal pipeline without peer batch
+        // verification. Recheck the submission representation before batching,
+        // including transactions admitted before this check was deployed.
+        pulled_txns = pulled_txns
+            .into_par_iter()
+            .filter(|txn| {
+                if let Err(error) = txn.verify_encrypted_payload_for_submission() {
+                    warn!(
+                        "QS: skipping invalid encrypted transaction {}: {}",
+                        txn.committed_hash(),
+                        error,
+                    );
+                    false
+                } else {
+                    true
+                }
+            })
+            .collect();
+
         trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
 
         // Record QsBatchPull with context for traced transactions.

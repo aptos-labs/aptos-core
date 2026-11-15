@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Transpiler
-import LeanerIR.TestInfra
+import VerexIR.TestInfra
 
 /-! Printer baselines.  Every `*.move` under `Transpiler/Tests/Programs` is
 exported by the Aptos CLI at elaboration time, transpiled, and compared byte
@@ -17,12 +17,12 @@ UB=1 lake build Transpiler.Tests.Baseline
 ```
 
 Every generated module is imported, `BasicCoin` included (its `pragma
-aborts_if_is_partial` clause and two-directional `aborts_if` are Leaner
+aborts_if_is_partial` clause and two-directional `aborts_if` are Verex
 features now); `AptosFramework/Counter.lean` exercises the root namespace of
 an aliased module (E1). -/
 
 open Transpiler Transpiler.Driver
-open LeanerIR.TestInfra
+open VerexIR.TestInfra
 
 def programsDir : System.FilePath := "Transpiler/Tests/Programs"
 
@@ -65,12 +65,12 @@ UB=1 lake build Transpiler.Tests.Baseline
 
 `Transpiler/Tests.lean` imports every generated module (all 14 transpiled
 stdlib modules elaborate; `vector` is curated), so the suite is also the
-elaboration gate of the stdlib output — Leaner's derivation of the
+elaboration gate of the stdlib output — Verex's derivation of the
 specification versions of the Move functions the specifications apply
 included. -/
 
 def stdlibSourceDir : System.FilePath :=
-  "../../leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/MoveStdlib"
+  "../../verex-e2e-tests/VerexE2ETests/MoveToVerexSL/MoveStdlib"
 
 def stdlibExpectedDir : System.FilePath := "Transpiler/Tests/Programs/MoveStdlib"
 

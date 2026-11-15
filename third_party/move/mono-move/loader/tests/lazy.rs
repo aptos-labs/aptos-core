@@ -121,3 +121,64 @@ fn load_function_gas_is_cache_state_independent() {
         "cache state must not change gas charged"
     );
 }
+
+const SCRIPT_SOURCE: &str = r#"
+script {
+    fun main(_x: u64) {}
+}
+"#;
+
+// Every script loads under one shared module ID, so resolving through it must
+// fail even while a script is loaded under it.
+#[test]
+fn resolve_function_does_not_find_scripts() {
+    use mono_move_core::{
+        interner::{script_module_id, SCRIPT_MAIN},
+        native::FunctionResolutionError,
+        types::{EMPTY_TYPE_LIST, U64_TY},
+        Interner,
+    };
+    use move_core_types::ability::AbilitySet;
+
+    let script =
+        mono_move_testsuite::compile_move_script(SCRIPT_SOURCE).expect("compilation failed");
+    let mut script_bytes = vec![];
+    script
+        .serialize(&mut script_bytes)
+        .expect("script serializes");
+
+    let module_provider = InMemoryModuleProvider::new();
+    let ctx = GlobalContext::with_num_execution_workers(1);
+    let guard = ctx.try_execution_context(0).unwrap();
+    let loader = Loader::new_with_policy(
+        &guard,
+        &module_provider,
+        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+        &NoNatives,
+    );
+
+    let mut read_set = ModuleReadSet::new();
+    let mut gas = GasMeter::with_max_budget();
+    loader
+        .load_script(&mut read_set, &mut gas, &script_bytes, EMPTY_TYPE_LIST)
+        .expect("script must load");
+
+    let main_ty = guard.function_of(
+        guard.type_list_of(&[U64_TY]),
+        EMPTY_TYPE_LIST,
+        AbilitySet::PUBLIC_FUNCTIONS,
+    );
+    let result = loader
+        .resolve_function(
+            &mut read_set,
+            &mut gas,
+            script_module_id(&guard),
+            SCRIPT_MAIN,
+            main_ty,
+        )
+        .expect("resolution must not fail the transaction");
+    assert!(matches!(
+        result,
+        Err(FunctionResolutionError::FunctionNotFound)
+    ));
+}

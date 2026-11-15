@@ -1,0 +1,37 @@
+`concrete_in_generic` uses concrete verification: Given interpretation does not yet support type reflection interpretation
+`generic` uses concrete verification: Given interpretation does not yet support type reflection interpretation
+`generic_try` uses concrete verification: Given interpretation does not yet support type reflection interpretation
+VerexE2ETests/Check/Calls/AggregatorModel.lean:154:4: error: the specification clause `ensures spec_get_value(result) == 6` is not established
+VerexE2ETests/Check/Calls/AggregatorModel.lean:153:7: error: verex verification failed: the automatic verification of `wrong_sum` failed; provide a proof in the module:
+  verify wrong_sum by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Calls/AggregatorModel.lean:158:7: error: the continuation after `0x1::aggregator_v2::create_aggregator` is not established
+VerexE2ETests/Check/Calls/AggregatorModel.lean:158:7: error: verex verification failed: the automatic verification of `wrong_abort` failed; provide a proof in the module:
+  verify wrong_abort by lean =>
+    verex_obligations
+    verex_on
+    | after_create_aggregator => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+`unconstrained` uses concrete verification: Given interpretation does not yet support type reflection interpretation
+VerexE2ETests/Check/Calls/AggregatorModel.lean:166:4: error: the specification clause `ensures result` is not established
+VerexE2ETests/Check/Calls/AggregatorModel.lean:164:7: error: verex verification failed: the automatic verification of `unconstrained` failed; provide a proof in the module:
+  verify unconstrained by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+`generic_add` uses concrete verification: Given interpretation does not yet support type reflection interpretation
+VerexE2ETests/Check/Calls/AggregatorModel.lean:174:4: error: the specification clause `aborts_if type_name::<T>().bytes != b"u64" && type_name::<T>().bytes != b"u128"` is not established
+VerexE2ETests/Check/Calls/AggregatorModel.lean:173:7: error: verex verification failed: the automatic verification of `generic_add` failed; provide a proof in the module:
+  verify generic_add by lean =>
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

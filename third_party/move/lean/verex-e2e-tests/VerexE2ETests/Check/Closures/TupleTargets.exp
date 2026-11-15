@@ -1,0 +1,1 @@
+VerexE2ETests/Check/Closures/TupleTargets.lean:34:14: error: no denotation for `of_reference`: a closure whose rows are not its target's is not carried by the denotation

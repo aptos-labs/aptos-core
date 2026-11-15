@@ -7,11 +7,13 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Context, Result};
 use bollard::{
-    container::{CreateContainerOptions, InspectContainerOptions, StartContainerOptions},
-    image::CreateImageOptions,
-    network::CreateNetworkOptions,
-    secret::ContainerInspectResponse,
-    volume::CreateVolumeOptions,
+    models::{
+        ContainerCreateBody, ContainerInspectResponse, NetworkCreateRequest, VolumeCreateRequest,
+    },
+    query_parameters::{
+        CreateContainerOptions, CreateImageOptionsBuilder, InspectContainerOptions,
+        RemoveVolumeOptions,
+    },
     Docker,
 };
 use futures::TryStreamExt;
@@ -36,10 +38,9 @@ pub async fn create_docker_network_permanent(
         };
 
         let res = docker
-            .create_network(CreateNetworkOptions {
+            .create_network(NetworkCreateRequest {
                 name: name.clone(),
-                internal: false,
-                check_duplicate: true,
+                internal: Some(false),
                 ..Default::default()
             })
             .await;
@@ -114,10 +115,9 @@ pub fn create_docker_network(
             *needs_cleanup.lock().await = true;
 
             docker
-                .create_network(CreateNetworkOptions {
+                .create_network(NetworkCreateRequest {
                     name: name.clone(),
-                    internal: false,
-                    check_duplicate: true,
+                    internal: Some(false),
                     ..Default::default()
                 })
                 .await
@@ -216,8 +216,8 @@ pub fn create_docker_volume(
             *needs_cleanup.lock().await = true;
 
             docker
-                .create_volume(CreateVolumeOptions {
-                    name: name.clone(),
+                .create_volume(VolumeCreateRequest {
+                    name: Some(name.clone()),
                     ..Default::default()
                 })
                 .await
@@ -249,7 +249,9 @@ pub fn create_docker_volume(
             let cleanup = async move {
                 if *needs_cleanup.lock().await {
                     let docker = fut_docker.await?;
-                    docker.remove_volume(volume_name, None).await?;
+                    docker
+                        .remove_volume(volume_name, None::<RemoveVolumeOptions>)
+                        .await?;
                 }
 
                 anyhow::Ok(())
@@ -290,8 +292,8 @@ pub fn create_docker_volume(
 pub fn create_start_and_inspect_container(
     shutdown: CancellationToken,
     fut_docker: impl Future<Output = Result<Docker, ArcError>> + Clone + Send + 'static,
-    options: CreateContainerOptions<String>,
-    config: bollard::container::Config<String>,
+    options: CreateContainerOptions,
+    config: ContainerCreateBody,
 ) -> (
     impl Future<Output = Result<Arc<ContainerInspectResponse>, ArcError>> + Clone,
     impl Future<Output = ()>,
@@ -309,7 +311,7 @@ pub fn create_start_and_inspect_container(
     // Note: The `Arc<Mutex<..>>` is used to satisfy Rust's borrow checking rules.
     //       Exclusive access is ensured by the sequencing of the futures.
     let state = Arc::new(Mutex::new(State::Initial));
-    let name = options.name.clone();
+    let name = options.name.clone().expect("container name must be set");
 
     let fut_run = make_shared({
         let state = state.clone();
@@ -339,10 +341,11 @@ pub fn create_start_and_inspect_container(
 
                     docker
                         .create_image(
-                            Some(CreateImageOptions {
-                                from_image: image_name.clone(),
-                                ..Default::default()
-                            }),
+                            Some(
+                                CreateImageOptionsBuilder::new()
+                                    .from_image(image_name)
+                                    .build(),
+                            ),
                             None,
                             None,
                         )
@@ -368,7 +371,7 @@ pub fn create_start_and_inspect_container(
             }
             *state = State::Started;
             docker
-                .start_container(&name, None::<StartContainerOptions<&str>>)
+                .start_container(&name, None)
                 .await
                 .context("failed to start docker container")?;
             no_panic_println!("Started docker container {}", name);

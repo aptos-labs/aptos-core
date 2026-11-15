@@ -1,0 +1,25 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/result_of_transition_exists_at.move:27:9: error: the specification clause `ensures !spec_exists_at::<R>(a)` is not established
+tests/sources/functional/closures/result_of_transition_exists_at.move:24:5: error: verex verification failed: the automatic verification of `take` failed; provide a proof in the module:
+  verify take by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_exists_at.move:37:9: error: the specification clause `ensures result_of<function[Fn(Address) -> u64](take)>(a) == 5` is not established
+tests/sources/functional/closures/result_of_transition_exists_at.move:35:5: error: verex verification failed: the automatic verification of `bad` failed; provide a proof in the module:
+  verify bad by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_exists_at.move:48:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_exists_at.move:44:5: error: verex verification failed: the automatic verification of `caller_false` failed; provide a proof in the module:
+  verify caller_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

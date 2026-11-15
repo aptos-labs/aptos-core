@@ -7,17 +7,17 @@ module 0xc0ffee::m {
         value: T0,
     }
     public fun init(p0: &signer) {
-        let _v0 = Wrapper<|u64|(u64) has copy + drop + store>{value: |x| identity<u64>(x)};
-        move_to<Wrapper<|u64|(u64) has copy + drop + store>>(p0, _v0);
+        let _v0 = Wrapper<|u64|u64 has copy + drop + store>{value: |x| identity<u64>(x)};
+        move_to<Wrapper<|u64|u64 has copy + drop + store>>(p0, _v0);
     }
     public fun identity<T0>(p0: T0): T0 {
         p0
     }
-    public fun compare(p0: |u64|(u64) has copy + drop + store, p1: &signer): bool
+    public fun compare(p0: |u64|u64 has copy + drop + store, p1: &signer): bool
         acquires Wrapper
     {
         let _v0 = signer::address_of(p1);
-        *&borrow_global<Wrapper<|u64|(u64) has copy + drop + store>>(_v0).value == p0
+        *&borrow_global<Wrapper<|u64|u64 has copy + drop + store>>(_v0).value == p0
     }
 }
 

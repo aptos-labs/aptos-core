@@ -1,0 +1,8 @@
+VerexE2ETests/SourceVerify/temporary_reads_errors.spec.lean:17:3: error: the specification clause `ensures result == a[v]` is not established
+VerexE2ETests/SourceVerify/temporary_reads_errors.spec.lean:14:6: error: verex verification failed: the automatic verification of `index_then_write_false` failed; provide a proof in the module:
+  verify index_then_write_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

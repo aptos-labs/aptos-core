@@ -1,0 +1,23 @@
+[package]
+name = "vm-comparison"
+description = "State overrides that let a transaction captured from a real network replay identically on Move VM V1 and on MonoMove."
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-cached-packages = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm-environment = { workspace = true }
+bcs = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }

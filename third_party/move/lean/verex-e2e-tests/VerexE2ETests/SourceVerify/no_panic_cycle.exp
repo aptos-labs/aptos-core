@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/no_panic_cycle.spec.lean:7:6: error: `caller` reaches `ping` again through callees that are inlined; only a function calling itself directly is verified by induction, so specify and verify the callees on the cycle
+VerexE2ETests/SourceVerify/no_panic_cycle.spec.lean:10:6: error: `tick` reaches itself through `tock`, which is unspecified; a function on a cycle of calls is used through its contract, so specify `tock`

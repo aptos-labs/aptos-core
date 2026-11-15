@@ -1,0 +1,88 @@
+Move prover returns: exiting with verification errors
+warning: This assignment/binding to the left-hand-side variable `j` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_j`), or renaming to `_`
+   ┌─ tests/sources/regression/index_write_under_loan.move:44:17
+   │
+44 │         let j = 0;
+   │                 ^
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/index_write_under_loan.move:25:9
+   │
+25 │         ensures false; // error: refused, the index local is written under a live loan
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/index_write_under_loan.move:17: write_under_loan_call
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:18: write_under_loan_call
+   =         i = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:19: write_under_loan_call
+   =     at tests/sources/regression/index_write_under_loan.move:20: write_under_loan_call
+   =         i = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:21: write_under_loan_call
+   =         r = <redacted>
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:17: write_under_loan_call
+   =         result = <redacted>
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:25: write_under_loan_call (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/index_write_under_loan.move:37:9
+   │
+37 │         ensures false; // error: refused, the index local is written under a live loan
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/index_write_under_loan.move:29: write_under_loan_index
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:30: write_under_loan_index
+   =         i = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:31: write_under_loan_index
+   =     at tests/sources/regression/index_write_under_loan.move:32: write_under_loan_index
+   =         i = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:33: write_under_loan_index
+   =         r = <redacted>
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:29: write_under_loan_index
+   =         result = <redacted>
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:37: write_under_loan_index (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/index_write_under_loan.move:51:9
+   │
+51 │         ensures false; // error: refused, the index local is written under a live loan
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/index_write_under_loan.move:42: write_under_loan_destructure
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:43: write_under_loan_destructure
+   =     at tests/sources/regression/index_write_under_loan.move:45: write_under_loan_destructure
+   =     at tests/sources/regression/index_write_under_loan.move:47: write_under_loan_destructure
+   =         r = <redacted>
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:46: write_under_loan_destructure
+   =     at tests/sources/regression/index_write_under_loan.move:48: write_under_loan_destructure
+   =     at tests/sources/regression/index_write_under_loan.move:42: write_under_loan_destructure
+   =         result = <redacted>
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:51: write_under_loan_destructure (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/index_write_under_loan.move:64:9
+   │
+64 │         ensures false; // error: the postcondition does not hold
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/index_write_under_loan.move:56: move_under_loan
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:57: move_under_loan
+   =         i = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:58: move_under_loan
+   =     at tests/sources/regression/index_write_under_loan.move:60: move_under_loan
+   =         r = <redacted>
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:56: move_under_loan
+   =         result = <redacted>
+   =         v = <redacted>
+   =     at tests/sources/regression/index_write_under_loan.move:64: move_under_loan (spec)
+

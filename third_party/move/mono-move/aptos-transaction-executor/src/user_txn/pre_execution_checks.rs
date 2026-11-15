@@ -53,8 +53,6 @@ impl<'a> PreExecutionChecker<'a> {
         self.check_gas_price_bounds()?;
         self.check_gas_budget_upper_bound()?;
         self.check_gas_budget_covers_base_cost()?;
-        // TODO(completeness, metering): the account-creation affordability
-        // check, once lazy account creation is supported.
         // TODO(security, completeness): the authenticator feature gates
         // (`SingleSender`, WebAuthn, SLH-DSA) are not enforced, so an
         // authenticator governance has disabled still executes.

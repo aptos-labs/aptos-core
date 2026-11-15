@@ -24,7 +24,7 @@ module 0x66::registry {
 module 0x66::delayed_work {
     use 0x66::registry;
     struct Work has store {
-        _0: |u64|(u64) has store,
+        _0: |u64|u64 has store,
     }
     entry fun add(p0: &signer, p1: u64) {
         let _v0 = registry::remove<Work>(p0);

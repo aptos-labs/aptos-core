@@ -754,22 +754,21 @@ impl<'env> ModelBuilder<'env> {
         }
     }
 
-    /// Looks up field declaration, returning a list of optional variant name and type of the field
-    /// in the variant. The variant name is None and the list a singleton for proper struct types.
+    /// Looks up field declaration, returning a list of optional variant name and declared
+    /// (uninstantiated) type of the field in the variant. The variant name is None and the list
+    /// a singleton for proper struct types.
     pub fn lookup_struct_field_decl(
         &self,
-        id: &QualifiedInstId<StructId>,
+        id: &QualifiedId<StructId>,
         field_name: Symbol,
     ) -> (Vec<(Option<Symbol>, Type)>, bool) {
-        let entry = self.lookup_struct_entry(id.to_qualified_id());
-        let get_instantiated_field = |fields: &BTreeMap<Symbol, FieldData>| {
-            fields
-                .get(&field_name)
-                .map(|data| data.ty.instantiate(&id.inst))
+        let entry = self.lookup_struct_entry(*id);
+        let get_field = |fields: &BTreeMap<Symbol, FieldData>| {
+            fields.get(&field_name).map(|data| data.ty.clone())
         };
         match &entry.layout {
             StructLayout::Singleton(fields, _) => (
-                get_instantiated_field(fields)
+                get_field(fields)
                     .map(|ty| vec![(None, ty)])
                     .unwrap_or_default(),
                 false,
@@ -777,7 +776,7 @@ impl<'env> ModelBuilder<'env> {
             StructLayout::Variants(variants) => (
                 variants
                     .iter()
-                    .filter_map(|v| get_instantiated_field(&v.fields).map(|ty| (Some(v.name), ty)))
+                    .filter_map(|v| get_field(&v.fields).map(|ty| (Some(v.name), ty)))
                     .collect(),
                 true,
             ),
@@ -785,18 +784,18 @@ impl<'env> ModelBuilder<'env> {
         }
     }
 
-    /// Looks up the type of a ghost field (`ghost f: T;`) declared in the
-    /// struct's spec block, if any. Ghost fields are variant-agnostic and
-    /// only accessible in specification expressions.
+    /// Looks up the declared (uninstantiated) type of a ghost field (`ghost f: T;`) declared in
+    /// the struct's spec block, if any. Ghost fields are variant-agnostic and only accessible in
+    /// specification expressions.
     pub fn lookup_struct_ghost_field_decl(
         &self,
-        id: &QualifiedInstId<StructId>,
+        id: &QualifiedId<StructId>,
         field_name: Symbol,
     ) -> Option<Type> {
-        self.lookup_struct_entry(id.to_qualified_id())
+        self.lookup_struct_entry(*id)
             .ghost_fields
             .get(&field_name)
-            .map(|data| data.ty.instantiate(&id.inst))
+            .map(|data| data.ty.clone())
     }
 
     pub fn get_function_wrapper_type(&self, id: &QualifiedInstId<StructId>) -> Option<Type> {

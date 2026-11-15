@@ -1,0 +1,50 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/folds_of_projection_anchors.move:67:9
+   │
+67 │         ensures result == 6; // error: the second vector sums to 15
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:57: wrong
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:58: wrong
+   =         b = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:59: wrong
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:10: each_pair
+   =         v1 = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:59: wrong
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:10: each_pair
+   =         v2 = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:56: wrong
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:11: each_pair
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:12: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:13: each_pair
+   =         remaining = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:17: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:18: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:19: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:20: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:21: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:22: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:23: each_pair
+   =     enter loop, variable(s) a, b, v1, v2, remaining havocked and reassigned
+   =         a = <redacted>
+   =         b = <redacted>
+   =         v1 = <redacted>
+   =         v2 = <redacted>
+   =         remaining = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:18: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:19: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:20: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:21: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:22: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:23: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:14: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:25: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:26: each_pair
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:56: wrong
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:66: wrong (spec)
+   =     at tests/sources/functional/closures/inline/folds_of_projection_anchors.move:67: wrong (spec)

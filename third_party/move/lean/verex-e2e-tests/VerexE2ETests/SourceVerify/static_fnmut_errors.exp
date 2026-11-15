@@ -1,0 +1,37 @@
+VerexE2ETests/SourceVerify/static_fnmut_errors.rs:13:1: info: `apply_mut` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/static_fnmut_errors.rs:13:1: info: `forward` uses concrete verification: Given interpretation does not yet support behavioral contract interpretation
+VerexE2ETests/SourceVerify/static_fnmut_errors.rs:13:1: info: `apply_bool` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/static_fnmut_errors.spec.lean:36:3: error: the specification clause `ensures result == value` is not established
+VerexE2ETests/SourceVerify/static_fnmut_errors.spec.lean:35:6: error: verex verification failed: the automatic verification of `counter` failed; provide a proof in the module:
+  verify counter by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/static_fnmut_errors.spec.lean:39:3: error: the specification clause `ensures result == !value` is not established
+VerexE2ETests/SourceVerify/static_fnmut_errors.spec.lean:38:6: error: verex verification failed: the automatic verification of `toggle` failed; provide a proof in the module:
+  verify toggle by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/static_fnmut_errors.spec.lean:43:3: error: `no panic when aborts at op 1` is not established: the operation `count += 1` at VerexE2ETests/SourceVerify/static_fnmut_errors.rs:39:9 may panic
+  from: ¬(0 ≤ self_count.val + 1 ∧ self_count.val + 1 ≤ 18446744073709551615)
+VerexE2ETests/SourceVerify/static_fnmut_errors.spec.lean:43:8: error: verex verification failed: the automatic verification of `panicking::{closure#0}::call_mut` failed; provide a proof in the module:
+  verify «panicking::{closure#0}»::call_mut by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/static_fnmut_errors.spec.lean:58:6: error: `captured_loan` calls `forward` at a reference type argument, and `forward` is opaque: a generic contract does not transfer to a mutable reference, so it has no reading there
+VerexE2ETests/SourceVerify/static_fnmut_errors.spec.lean:65:5: error: the specification clause `ensures self.count == old(self.count)` is not established
+VerexE2ETests/SourceVerify/static_fnmut_errors.spec.lean:63:8: error: verex verification failed: the automatic verification of `wrong_body::{closure#0}::call_mut` failed; provide a proof in the module:
+  verify «wrong_body::{closure#0}»::call_mut by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -113,6 +113,10 @@ impl ShardedJmtMerkleDb {
         Arc::clone(&self.shards[shard_id])
     }
 
+    pub(crate) fn shards(&self) -> &[Arc<DB>; NUM_STATE_SHARDS] {
+        &self.shards
+    }
+
     pub(crate) fn db(&self, shard_id: Option<usize>) -> &DB {
         if let Some(shard_id) = shard_id {
             self.db_shard(shard_id)

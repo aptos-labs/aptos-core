@@ -16,13 +16,13 @@ module 0x42::m {
 
   friend enum Data2<T1, T2> has drop {
     V1{x: T1},
-    V2{y: u64, x: T2}
+    V2{y: T2, x: T1}
     V3
   }
 
   friend enum Data3<T1, T2> has drop {
     V1{x: T1},
-    V2{y: u64, x: T2}
+    V2{y: T2, x: T1}
     V3{x: T1}
   }
 
@@ -40,7 +40,6 @@ module 0x42::m2 {
   use 0x42::m::Data;
   use 0x42::m::Data2;
   use 0x42::m::Data3;
-  use 0x42::m::Data4;
 
   fun test_v1() {
     let d = Data::V1{x: 43};
@@ -82,14 +81,6 @@ module 0x42::m2 {
     let ref_x = &mut_ref_d.x;
   }
 
-  fun test_data4_mut_borrow() {
-    let d = Data4::V2<u64, u64>{x: 44, y: 43};
-    let mut_ref_d = &mut d;
-    let ref_x = &mut_ref_d.x;
-    assert!(*ref_x == 44, 1);
-  }
-
-
 }
 
 //# run 0x42::m2::test_v1
@@ -102,4 +93,15 @@ module 0x42::m2 {
 
 //# run 0x42::m2::test_data3_mut_borrow
 
-//# run 0x42::m2::test_data4_mut_borrow
+//# publish
+module 0x42::m2 {
+
+  use 0x42::m::Data4;
+
+  fun test_data4_mut_borrow() {
+    let d = Data4::V2<u64, u64>{x: 44, y: 43};
+    let mut_ref_d = &mut d;
+    let ref_x = &mut_ref_d.x;
+    assert!(*ref_x == 44, 1);
+  }
+}

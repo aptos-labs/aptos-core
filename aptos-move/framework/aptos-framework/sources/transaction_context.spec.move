@@ -151,9 +151,24 @@ spec aptos_framework::transaction_context {
         aborts_if [abstract] false;
     }
 
+    spec module {
+        /// How many values the counter has issued so far.
+        global spec_counter_draws: num;
+        /// The counter packs timestamp, transaction index, session and a per-session
+        /// counter, most significant first, so later values are strictly larger.
+        axiom forall i: num, j: num where i < j: spec_counter_issued(i) < spec_counter_issued(j);
+    }
+
+    /// The i-th value the counter issued. Typed `num`, not `u128`: no strictly
+    /// increasing function over all integers fits in u128, so a `u128` result would
+    /// make the axiom above unsatisfiable. Drawn values are still u128, through the
+    /// result type of `monotonically_increasing_counter`.
+    spec fun spec_counter_issued(i: num): num;
+
     spec monotonically_increasing_counter(): u128 {
         pragma opaque;
-        // Assume that the monotonically increasing counter is always increasing.
         aborts_if [abstract] false;
+        ensures [abstract] result == spec_counter_issued(old(spec_counter_draws));
+        update spec_counter_draws = spec_counter_draws + 1;
     }
 }

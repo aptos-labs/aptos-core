@@ -9,18 +9,6 @@ use aptos_metrics_core::{
 use aptos_types::state_store::NUM_STATE_SHARDS;
 use once_cell::sync::Lazy;
 
-pub static LEDGER_COUNTER: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        // metric name
-        "aptos_storage_ledger",
-        // metric description
-        "Aptos storage ledger counters",
-        // metric labels (dimensions)
-        &["type"]
-    )
-    .unwrap()
-});
-
 pub static COMMITTED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_storage_committed_txns",

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::elgamal::ElGamalFriendlyGroup;
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use std::ops::Mul;
 
 /// ElGamal encryption over Curve25519.

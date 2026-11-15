@@ -4,9 +4,12 @@
 #![forbid(unsafe_code)]
 
 use crate::common::HashMap;
-use aptos_types::state_store::{
-    state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-    StateView, StateViewResult, TStateView,
+use aptos_types::{
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        StateView, StateViewResult, TStateView,
+    },
+    transaction::Version,
 };
 pub struct OverlayedStateView<'view> {
     base_view: &'view dyn StateView,
@@ -46,5 +49,9 @@ impl TStateView for OverlayedStateView<'_> {
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         // TODO(aldenhu): maybe remove get_usage() from StateView
         unimplemented!()
+    }
+
+    fn next_version(&self) -> Version {
+        self.base_view.next_version()
     }
 }

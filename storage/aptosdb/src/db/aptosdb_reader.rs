@@ -7,12 +7,11 @@ use crate::{
         aptosdb_internal::{error_if_too_many_requested, gauged_api},
         AptosDB,
     },
-    position_buffered_state::{PositionLedgerStateWithSummary, PositionStateWithSummary},
+    native_store::buffered_state::{NativeLedgerStateWithSummary, NativeStateWithSummary},
     pruner::PrunerManager,
     schema::block_info::BlockInfoSchema,
 };
 use aptos_crypto::HashValue;
-use aptos_jellyfish_merkle::JellyfishMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{
@@ -65,42 +64,27 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_persisted_position_state_summary(&self) -> Result<PositionStateWithSummary> {
+    fn get_persisted_position_state_summary(&self) -> Result<NativeStateWithSummary> {
         gauged_api("get_persisted_position_state_summary", || {
-            // Only reached with the feature on; fail fast (don't fabricate an
-            // empty base) if position storage isn't initialized, so enabling
-            // without ENABLE_TRADING_NATIVE errors here instead of halting later.
+            // Only reached with the feature on; fail fast rather than
+            // fabricate an empty base.
             self.position
                 .as_ref()
-                .and_then(|bundle| bundle.persisted.as_ref())
+                .and_then(|bundle| bundle.store.persisted.as_ref())
                 .map(|persisted| persisted.get())
-                .ok_or_else(|| {
-                    AptosDbError::Other(
-                        "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
-                         storage is not initialized (ENABLE_TRADING_NATIVE is off)"
-                            .to_string(),
-                    )
-                })
+                .ok_or_else(|| self.position_storage_unavailable())
         })
     }
 
-    fn get_pre_committed_position_state_summary(&self) -> Result<PositionLedgerStateWithSummary> {
+    fn get_pre_committed_position_state_summary(&self) -> Result<NativeLedgerStateWithSummary> {
         gauged_api("get_pre_committed_position_state_summary", || {
             // Pre-committed tip from the buffered state (includes committed
-            // writes not yet merklized). Fail fast like
-            // `get_persisted_position_state_summary` when position storage is
-            // absent, so enabling without ENABLE_TRADING_NATIVE errors here.
+            // writes not yet merklized).
             self.position
                 .as_ref()
-                .and_then(|bundle| bundle.state_store.as_ref())
+                .and_then(|bundle| bundle.store.state_store.as_ref())
                 .map(|store| store.current_state().lock().clone())
-                .ok_or_else(|| {
-                    AptosDbError::Other(
-                        "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
-                         storage is not initialized (ENABLE_TRADING_NATIVE is off)"
-                            .to_string(),
-                    )
-                })
+                .ok_or_else(|| self.position_storage_unavailable())
         })
     }
 
@@ -109,13 +93,104 @@ impl DbReader for AptosDB {
             self.position
                 .as_ref()
                 .map(|bundle| bundle.positions.lock().clone())
-                .ok_or_else(|| {
-                    AptosDbError::Other(
-                        "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
-                         storage is not initialized (ENABLE_TRADING_NATIVE is off)"
-                            .to_string(),
-                    )
-                })
+                .ok_or_else(|| self.position_storage_unavailable())
+        })
+    }
+
+    fn get_persisted_order_state_summary(&self) -> Result<NativeStateWithSummary> {
+        gauged_api("get_persisted_order_state_summary", || {
+            self.order
+                .as_ref()
+                .and_then(|bundle| bundle.store.persisted.as_ref())
+                .map(|persisted| persisted.get())
+                .ok_or_else(|| self.order_storage_unavailable())
+        })
+    }
+
+    fn get_pre_committed_order_state_summary(&self) -> Result<NativeLedgerStateWithSummary> {
+        gauged_api("get_pre_committed_order_state_summary", || {
+            self.order
+                .as_ref()
+                .and_then(|bundle| bundle.store.state_store.as_ref())
+                .map(|store| store.current_state().lock().clone())
+                .ok_or_else(|| self.order_storage_unavailable())
+        })
+    }
+
+    fn get_order_state_proof_by_version_ext(
+        &self,
+        key_hash: &HashValue,
+        version: Version,
+        root_depth: usize,
+    ) -> Result<SparseMerkleProofExt> {
+        gauged_api("get_order_state_proof_by_version_ext", || {
+            let bundle = self
+                .order
+                .as_ref()
+                .ok_or_else(|| AptosDbError::Other("native order is not enabled".to_string()))?;
+            // As for positions: the requested version tracks the merkle
+            // pruner's target, but a pruned version must not panic in the JMT.
+            if let Some(pruner) = bundle.store.pruner.as_ref() {
+                let min_readable = pruner.state_merkle_pruner.get_min_readable_version();
+                ensure!(
+                    version >= min_readable,
+                    "order state merkle at version {version} is pruned, \
+                     min available version is {min_readable}",
+                );
+            }
+            let (_value, proof) = bundle
+                .store
+                .merkle_db
+                .get_with_proof_ext(key_hash, version, root_depth)?;
+            Ok(proof)
+        })
+    }
+
+    fn get_persisted_collateral_state_summary(&self) -> Result<NativeStateWithSummary> {
+        gauged_api("get_persisted_collateral_state_summary", || {
+            self.collateral
+                .as_ref()
+                .and_then(|bundle| bundle.store.persisted.as_ref())
+                .map(|persisted| persisted.get())
+                .ok_or_else(|| self.collateral_storage_unavailable())
+        })
+    }
+
+    fn get_pre_committed_collateral_state_summary(&self) -> Result<NativeLedgerStateWithSummary> {
+        gauged_api("get_pre_committed_collateral_state_summary", || {
+            self.collateral
+                .as_ref()
+                .and_then(|bundle| bundle.store.state_store.as_ref())
+                .map(|store| store.current_state().lock().clone())
+                .ok_or_else(|| self.collateral_storage_unavailable())
+        })
+    }
+
+    fn get_collateral_state_proof_by_version_ext(
+        &self,
+        key_hash: &HashValue,
+        version: Version,
+        root_depth: usize,
+    ) -> Result<SparseMerkleProofExt> {
+        gauged_api("get_collateral_state_proof_by_version_ext", || {
+            let bundle = self.collateral.as_ref().ok_or_else(|| {
+                AptosDbError::Other("native collateral is not enabled".to_string())
+            })?;
+            // As for positions: the requested version tracks the merkle
+            // pruner's target, but a pruned version must not panic in the JMT.
+            if let Some(pruner) = bundle.store.pruner.as_ref() {
+                let min_readable = pruner.state_merkle_pruner.get_min_readable_version();
+                ensure!(
+                    version >= min_readable,
+                    "collateral state merkle at version {version} is pruned, \
+                     min available version is {min_readable}",
+                );
+            }
+            let (_value, proof) = bundle
+                .store
+                .merkle_db
+                .get_with_proof_ext(key_hash, version, root_depth)?;
+            Ok(proof)
         })
     }
 
@@ -135,7 +210,7 @@ impl DbReader for AptosDB {
             // committer), so live nodes are normally retained. Guard anyway —
             // like `error_if_state_merkle_pruned` for main state — so a pruned
             // version returns a typed error instead of panicking in the JMT.
-            if let Some(pruner) = bundle.position_pruner.as_ref() {
+            if let Some(pruner) = bundle.store.pruner.as_ref() {
                 let min_readable = pruner.state_merkle_pruner.get_min_readable_version();
                 ensure!(
                     version >= min_readable,
@@ -143,8 +218,10 @@ impl DbReader for AptosDB {
                      min available version is {min_readable}",
                 );
             }
-            let tree = JellyfishMerkleTree::new(bundle.merkle_db.as_ref());
-            let (_value, proof) = tree.get_with_proof_ext(key_hash, version, root_depth)?;
+            let (_value, proof) = bundle
+                .store
+                .merkle_db
+                .get_with_proof_ext(key_hash, version, root_depth)?;
             Ok(proof)
         })
     }
@@ -201,7 +278,7 @@ impl DbReader for AptosDB {
 
     fn get_pre_committed_version(&self) -> Result<Option<Version>> {
         gauged_api("get_pre_committed_version", || {
-            Ok(self.state_store.current_state_locked().version())
+            Ok(self.state_store.live()?.current_state_locked().version())
         })
     }
 
@@ -635,6 +712,49 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn is_known_state_checkpoint(&self, version: Version) -> bool {
+        // The latest ledger info is cached and always at a block end.
+        let latest_version = self
+            .ledger_db
+            .metadata_db()
+            .get_latest_ledger_info_option()
+            .map(|li| li.ledger_info().version());
+        latest_version == Some(version)
+            || self
+                .ledger_db
+                .transaction_info_db()
+                .get_transaction_info(version)
+                .is_ok_and(|txn_info| txn_info.has_state_checkpoint_hash())
+    }
+
+    fn get_state_value_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        gauged_api("get_state_value_at_checkpoint", || {
+            self.error_if_state_kv_pruned("StateValue", version)?;
+            self.debug_assert_block_end(version);
+
+            self.state_store
+                .get_state_value_by_version(state_key, version)
+        })
+    }
+
+    fn get_state_value_with_version_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        gauged_api("get_state_value_with_version_at_checkpoint", || {
+            self.error_if_state_kv_pruned("StateValue", version)?;
+            self.debug_assert_block_end(version);
+
+            self.state_store
+                .get_state_value_with_version_by_version(state_key, version)
+        })
+    }
+
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
@@ -705,6 +825,7 @@ impl DbReader for AptosDB {
         gauged_api("get_pre_committed_ledger_summary", || {
             let (state, state_summary) = self
                 .state_store
+                .live()?
                 .current_state_locked()
                 .to_state_and_summary();
             let num_txns = state.next_version();
@@ -720,18 +841,40 @@ impl DbReader for AptosDB {
             let position_state_summary = self
                 .position
                 .as_ref()
-                .and_then(|bundle| bundle.state_store.as_ref())
+                .and_then(|bundle| bundle.store.state_store.as_ref())
                 .map(|store| store.current_state().lock().clone());
             let positions = self
                 .position
                 .as_ref()
                 .map(|bundle| bundle.positions.lock().clone());
+            let orders = self
+                .order
+                .as_ref()
+                .map(|bundle| bundle.orders.lock().clone());
+            let collateral = self
+                .collateral
+                .as_ref()
+                .map(|bundle| bundle.collateral.lock().clone());
+            let order_state_summary = self
+                .order
+                .as_ref()
+                .and_then(|bundle| bundle.store.state_store.as_ref())
+                .map(|store| store.current_state().lock().clone());
+            let collateral_state_summary = self
+                .collateral
+                .as_ref()
+                .and_then(|bundle| bundle.store.state_store.as_ref())
+                .map(|store| store.current_state().lock().clone());
             Ok(LedgerSummary {
                 state,
                 state_summary,
                 transaction_accumulator,
                 position_state_summary,
+                order_state_summary,
+                collateral_state_summary,
                 positions,
+                orders,
+                collateral,
             })
         })
     }
@@ -812,6 +955,7 @@ impl DbReader for AptosDB {
         gauged_api("get_latest_state_checkpoint_version", || {
             Ok(self
                 .state_store
+                .live()?
                 .current_state_locked()
                 .last_checkpoint()
                 .version())
@@ -870,31 +1014,11 @@ impl DbReader for AptosDB {
         gauged_api("get_state_item_count", || match kind {
             StateKind::MainState => {
                 self.error_if_state_merkle_pruned("State merkle", version)?;
-                self.ledger_db
-                    .metadata_db()
-                    .get_usage(version)
-                    .map(|usage| usage.items())
+                self.state_store.get_value_count(version)
             },
-            StateKind::Position => {
-                self.error_if_position_pruned("Native-position state merkle", version)?;
-                let position = self.position.as_ref().ok_or_else(|| {
-                    AptosDbError::Other("native-position subsystem is not enabled".into())
-                })?;
-                // Position snapshots are sparse; resolve to the latest at or
-                // before `version`. `None` means no snapshot yet => empty.
-                match position
-                    .merkle_db
-                    .latest_snapshot_version_at_or_before(version)?
-                {
-                    Some(snapshot_version) => {
-                        crate::position_state_sync::get_position_state_item_count(
-                            &position.merkle_db,
-                            snapshot_version,
-                        )
-                    },
-                    None => Ok(0),
-                }
-            },
+            StateKind::Position => self.position_store_reader()?.item_count(version),
+            StateKind::Order => self.order_store_reader()?.item_count(version),
+            StateKind::Collateral => self.collateral_store_reader()?.item_count(version),
         })
     }
 
@@ -911,28 +1035,20 @@ impl DbReader for AptosDB {
                 self.state_store
                     .get_value_chunk_with_proof(version, first_index, chunk_size)
             },
-            StateKind::Position => {
-                self.error_if_position_pruned("Native-position state merkle", version)?;
-                let position = self.position.as_ref().ok_or_else(|| {
-                    AptosDbError::Other("native-position subsystem is not enabled".into())
-                })?;
-                let snapshot_version = position
-                    .merkle_db
-                    .latest_snapshot_version_at_or_before(version)?
-                    .ok_or_else(|| {
-                        AptosDbError::Other(format!(
-                            "no native-position snapshot at or before version {version}"
-                        ))
-                    })?;
-                let position_db = Arc::clone(&position.kv_db);
-                crate::state_value_chunk::value_chunk_with_proof(
-                    Arc::clone(&position.merkle_db),
-                    snapshot_version,
-                    first_index,
-                    chunk_size,
-                    move |key, version| position_db.expect_value_by_version(key, version),
-                )
+            StateKind::Position => self.position_store_reader()?.value_chunk_with_proof(
+                version,
+                first_index,
+                chunk_size,
+            ),
+            StateKind::Order => {
+                self.order_store_reader()?
+                    .value_chunk_with_proof(version, first_index, chunk_size)
             },
+            StateKind::Collateral => self.collateral_store_reader()?.value_chunk_with_proof(
+                version,
+                first_index,
+                chunk_size,
+            ),
         })
     }
 
@@ -955,30 +1071,28 @@ impl DbReader for AptosDB {
                     >)
             },
             StateKind::Position => {
-                self.error_if_position_pruned("Native-position state merkle", version)?;
-                let position = self.position.as_ref().ok_or_else(|| {
-                    AptosDbError::Other("native-position subsystem is not enabled".into())
-                })?;
-                match position
-                    .merkle_db
-                    .latest_snapshot_version_at_or_before(version)?
-                {
-                    Some(snapshot_version) => {
-                        let iter = position.merkle_db.iter_active_leaves_chunk(
-                            position.kv_db.clone(),
-                            snapshot_version,
-                            first_index,
-                            chunk_size,
-                        )?;
-                        Ok(Box::new(iter)
-                            as Box<
-                                dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_,
-                            >)
-                    },
-                    // No snapshot at or before `version` => empty position state.
-                    None => Ok(Box::new(std::iter::empty())
-                        as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>),
-                }
+                let iter = self.position_store_reader()?.value_chunk_iter(
+                    version,
+                    first_index,
+                    chunk_size,
+                )?;
+                Ok(iter as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>)
+            },
+            StateKind::Order => {
+                let iter = self.order_store_reader()?.value_chunk_iter(
+                    version,
+                    first_index,
+                    chunk_size,
+                )?;
+                Ok(iter as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>)
+            },
+            StateKind::Collateral => {
+                let iter = self.collateral_store_reader()?.value_chunk_iter(
+                    version,
+                    first_index,
+                    chunk_size,
+                )?;
+                Ok(iter as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>)
             },
         })
     }
@@ -996,34 +1110,26 @@ impl DbReader for AptosDB {
                 self.state_store
                     .get_value_chunk_proof(version, first_index, state_key_values)
             },
-            StateKind::Position => {
-                self.error_if_position_pruned("Native-position state merkle", version)?;
-                let position = self.position.as_ref().ok_or_else(|| {
-                    AptosDbError::Other("native-position subsystem is not enabled".into())
-                })?;
-                let snapshot_version = position
-                    .merkle_db
-                    .latest_snapshot_version_at_or_before(version)?
-                    .ok_or_else(|| {
-                        AptosDbError::Other(format!(
-                            "no native-position snapshot at or before version {version}"
-                        ))
-                    })?;
-                crate::state_value_chunk::build_value_chunk_proof(
-                    position.merkle_db.as_ref(),
-                    snapshot_version,
-                    first_index,
-                    state_key_values,
-                )
+            StateKind::Position => self.position_store_reader()?.value_chunk_proof(
+                version,
+                first_index,
+                state_key_values,
+            ),
+            StateKind::Order => {
+                self.order_store_reader()?
+                    .value_chunk_proof(version, first_index, state_key_values)
             },
+            StateKind::Collateral => self.collateral_store_reader()?.value_chunk_proof(
+                version,
+                first_index,
+                state_key_values,
+            ),
         })
     }
 
     fn get_hot_state_item_count(&self, version: Version) -> Result<usize> {
         gauged_api("get_hot_state_item_count", || {
             self.error_if_hot_state_merkle_pruned("Hot state merkle", version)?;
-            // TODO(HotState): read from hot state usage tracking once it exists, as cold's
-            // `get_state_item_count` does, rather than the hot JMT root node's leaf count.
             self.state_store.get_hot_state_item_count(version)
         })
     }
@@ -1228,5 +1334,16 @@ impl AptosDB {
             events,
             proof,
         })
+    }
+
+    fn debug_assert_block_end(&self, version: Version) {
+        // Skipped if the txn info is unavailable (e.g. pruned).
+        debug_assert!(
+            self.ledger_db
+                .transaction_info_db()
+                .get_transaction_info(version)
+                .map_or(true, |txn_info| txn_info.has_state_checkpoint_hash()),
+            "Version {version} is not a block end.",
+        );
     }
 }

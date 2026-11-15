@@ -71,6 +71,27 @@ impl Constant {
 
     pub fn deserialize_constant(&self) -> Option<MoveValue> {
         let ty = sig_to_ty(&self.type_)?;
-        MoveValue::simple_deserialize(&self.data, &ty).ok()
+        // Constant types contain no function values, so a constant is never nested deeper
+        // than its type, and the depth limit cannot affect verification.
+        let (_, type_depth) = self.type_.num_nodes_with_max_depth();
+        MoveValue::simple_deserialize_with_max_depth(&self.data, &ty, type_depth as u64).ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::file_format_common::SIGNATURE_TOKEN_DEPTH_MAX;
+
+    #[test]
+    fn deep_constant_decodes() {
+        // Constants are bounded by the depth of their type, not by the value depth limit.
+        let depth = SIGNATURE_TOKEN_DEPTH_MAX - 1;
+        let layout = (0..depth).fold(MoveTypeLayout::U8, |l, _| {
+            MoveTypeLayout::Vector(Box::new(l))
+        });
+        let value = (0..depth).fold(MoveValue::U8(1), |v, _| MoveValue::Vector(vec![v]));
+        let constant = Constant::serialize_constant(&layout, &value).expect("must serialize");
+        assert_eq!(constant.deserialize_constant(), Some(value));
     }
 }

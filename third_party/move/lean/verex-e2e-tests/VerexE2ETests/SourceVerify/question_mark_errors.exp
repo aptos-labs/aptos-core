@@ -1,0 +1,49 @@
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:7:3: error: the specification clause `ensures result is Some` is not established
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:6:6: error: verex verification failed: the automatic verification of `option_add` failed; provide a proof in the module:
+  verify option_add by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:10:3: error: the specification clause `ensures (result is Some) == (x is Some || y is Some)` is not established
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:9:6: error: verex verification failed: the automatic verification of `option_two` failed; provide a proof in the module:
+  verify option_two by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:13:3: error: the specification clause `ensures x is Err ==> result is Ok` is not established
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:12:6: error: verex verification failed: the automatic verification of `result_add` failed; provide a proof in the module:
+  verify result_add by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:16:3: error: the specification clause `ensures x is Ok && y is Err ==> core.data.selectVariants[core::result::Result<u32, u64>, Err.0](result) == core.data.selectVariants[core::result::Result<u32, u64>, Ok.0](x) + 1` is not established
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:15:6: error: verex verification failed: the automatic verification of `result_two` failed; provide a proof in the module:
+  verify result_two by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:19:3: error: the specification clause `ensures x is Err ==> core.data.selectVariants[core::result::Result<Bool, u64>, Err.0](result) != core.data.selectVariants[core::result::Result<u32, u64>, Err.0](x)` is not established
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:18:6: error: verex verification failed: the automatic verification of `result_to_other_ok` failed; provide a proof in the module:
+  verify result_to_other_ok by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:21:1: error: `no panic when aborts at op 1` is not established: the operation `v + 1` at VerexE2ETests/SourceVerify/question_mark_errors.rs:33:10 may panic
+  from: VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) x.val = "Some" → VerexIR.Proofs.Denote.variantPlainName ["Continue", "Break"] (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (question_mark_errors.unit.nominal.namespace.1.declaration✝²⁻⁰ question_mark_errors.unit.nominal.namespace.1.declaration✝⁻⁰) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) branch_at_0_result.val = "Continue"; VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) x.val = "Some" → (Option.map VerexIR.Proofs.Denote.Var.here.selectPlain (VerexIR.Proofs.Denote.Which.here.project? branch_at_0_result.val)).getD ((VerexIR.Proofs.Denote.NTy.int 32 false).inhabitant ⋯) = (Option.map VerexIR.Proofs.Denote.Var.here.selectPlain (VerexIR.Proofs.Denote.Which.here.there.project? x.val)).getD ((VerexIR.Proofs.Denote.NTy.int 32 false).inhabitant ⋯); VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) x.val = "None" → VerexIR.Proofs.Denote.variantPlainName ["Continue", "Break"] (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (question_mark_errors.unit.nominal.namespace.1.declaration✝²⁻⁰ question_mark_errors.unit.nominal.namespace.1.declaration✝⁻⁰) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) branch_at_0_result.val = "Break"; VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) x.val = "None" → VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons question_mark_errors.unit.nominal.namespace.1.declaration✝⁻⁰ VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) ((VerexIR.Proofs.Denote.withSome (VerexIR.Proofs.Denote.Which.here.there.projectCertified? branch_at_0_result) (fun fields x => some fields.fst) none).getD ((question_mark_errors.unit.nominal.namespace.1.declaration✝²⁻⁰ question_mark_errors.unit.nominal.namespace.1.declaration✝⁻⁰).inhabitant ⋯)).val = "None"; VerexIR.IntegerValueFits (VerexIR.IntWidth.bits 64) true entry✝; attempt_1._verexJoinEntry_1_8 prepared✝ «native_core::option::<std::option::Option<T> as std::ops::FromResidual<std::option::Option<std::convert::Infallible>>>::from_residual» «native_core::option::<std::option::Option<T> as std::ops::Try>::branch.at_0» x assumed permitted branch_at_0_result final branch_ensures_1 branch_ensures_2 branch_ensures_3 branch_ensures_4 entry✝ entry; VerexIR.Proofs.Denote.Which.here.project? val✝.val = some (fst✝, PUnit.unit); (if 0 = entry✝ then some (some x, some branch_at_0_result, none, none, ()) else none) = some (fst✝³, some val✝, fst✝², fst✝¹, PUnit.unit); ¬(0 ≤ fst✝.val + 1 ∧ fst✝.val + 1 ≤ 4294967295)
+VerexE2ETests/SourceVerify/question_mark_errors.spec.lean:21:6: error: verex verification failed: the automatic verification of `option_increment` failed; provide a proof in the module:
+  verify option_increment by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

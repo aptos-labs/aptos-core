@@ -527,6 +527,20 @@ impl StructFieldInformation {
         }
     }
 
+    /// Returns the field at `idx` in a struct or the specified enum variant.
+    /// Returns `None` for native structs, a missing or invalid enum variant,
+    /// or an out-of-range field index.
+    pub fn field(&self, variant: Option<VariantIndex>, idx: usize) -> Option<&FieldDefinition> {
+        use StructFieldInformation::*;
+        match self {
+            Native => None,
+            Declared(fields) => fields.get(idx),
+            DeclaredVariants(variants) => variant
+                .and_then(|variant| variants.get(variant as usize))
+                .and_then(|variant| variant.fields.get(idx)),
+        }
+    }
+
     /// Returns the number of fields. This is an optimized version of
     /// `self.fields(variant).len()`
     pub fn field_count(&self, variant: Option<VariantIndex>) -> usize {

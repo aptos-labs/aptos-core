@@ -29,6 +29,7 @@ use aptos_types::{
     error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
     state_store::{
+        native_collateral::collateral_layout,
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
@@ -367,10 +368,20 @@ impl BlockExecutorLegacyTxnOutput for AptosTransactionOutput {
             .collect()
     }
 
+    fn native_writes_needing_exchange(&self) -> Vec<(StateKey, WriteOp, &'static MoveTypeLayout)> {
+        self.vm_output
+            .collateral_write_set()
+            .iter()
+            .filter(|(_, op)| !op.is_deletion())
+            .map(|(key, op)| (key.clone(), op.clone(), collateral_layout()))
+            .collect()
+    }
+
     fn incorporate_materialized_txn_output(
         self,
         materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
         materialized_events: Vec<ContractEvent>,
+        materialized_native_writes: Vec<(StateKey, WriteOp)>,
     ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
         // Before creating the output, extract the trace for replay.
         let mut vm_output = self.vm_output;
@@ -379,6 +390,7 @@ impl BlockExecutorLegacyTxnOutput for AptosTransactionOutput {
         let committed_output = vm_output.into_transaction_output_with_materialized_write_set(
             materialized_resource_write_set,
             materialized_events,
+            materialized_native_writes,
         )?;
         Ok((committed_output, trace))
     }

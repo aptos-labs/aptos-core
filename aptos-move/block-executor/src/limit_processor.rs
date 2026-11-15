@@ -9,7 +9,7 @@ use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
     error::PanicError,
     fee_statement::FeeStatement,
-    on_chain_config::BlockGasLimitType,
+    on_chain_config::{BlockGasLimitType, OnChainHotStateConfig},
     transaction::block_epilogue::{BlockEndInfo, TBlockEndInfoExt},
 };
 use claims::{assert_le, assert_none};
@@ -44,11 +44,12 @@ where
     pub fn new(
         block_gas_limit_type: BlockGasLimitType,
         block_gas_limit_override: Option<u64>,
+        hot_state_config: Option<&OnChainHotStateConfig>,
         init_size: usize,
     ) -> Self {
         let hot_state_op_accumulator = block_gas_limit_type
             .add_block_limit_outcome_onchain()
-            .then(BlockHotStateOpAccumulator::new);
+            .then(|| BlockHotStateOpAccumulator::new(hot_state_config));
         Self {
             block_gas_limit_type,
             block_gas_limit_override,
@@ -300,13 +301,15 @@ where
         self.finish_update_counters_and_log_info(false, num_committed, num_total, 1)
     }
 
-    pub(crate) fn get_block_end_info<O, F>(
+    pub(crate) fn get_block_end_info<O, F, S>(
         &self,
         convert: F,
+        key_size: S,
     ) -> Result<TBlockEndInfoExt<O>, PanicError>
     where
         O: Debug + Ord,
         F: Fn(&K) -> Result<O, PanicError>,
+        S: Fn(&O) -> usize,
     {
         let inner = BlockEndInfo::V0 {
             block_gas_limit_reached: self
@@ -326,20 +329,27 @@ where
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
 
-        let to_make_hot = self.get_keys_to_make_hot(convert)?;
+        let to_make_hot = self.get_keys_to_make_hot(convert, &key_size)?;
         if self.hot_state_op_accumulator.is_some() {
             counters::HOT_STATE_PROMOTIONS_PER_BLOCK.observe(to_make_hot.len() as f64);
+            let promoted_bytes: usize = to_make_hot.iter().map(key_size).sum();
+            counters::HOT_STATE_PROMOTION_BYTES_PER_BLOCK.observe(promoted_bytes as f64);
         }
         Ok(TBlockEndInfoExt::new(inner, to_make_hot))
     }
 
-    fn get_keys_to_make_hot<O, F>(&self, convert: F) -> Result<BTreeSet<O>, PanicError>
+    fn get_keys_to_make_hot<O, F, S>(
+        &self,
+        convert: F,
+        key_size: S,
+    ) -> Result<BTreeSet<O>, PanicError>
     where
         O: Ord,
         F: Fn(&K) -> Result<O, PanicError>,
+        S: Fn(&O) -> usize,
     {
         match self.hot_state_op_accumulator.as_ref() {
-            Some(acc) => acc.get_keys_to_make_hot(convert),
+            Some(acc) => acc.get_keys_to_make_hot(convert, key_size),
             None => {
                 warn!("BlockHotStateOpAccumulator is not set.");
                 Ok(BTreeSet::new())
@@ -371,7 +381,7 @@ mod test {
 
     #[test]
     fn test_output_limit_not_used() {
-        let mut processor = TestProcessor::new(DEFAULT_COMPLEX_LIMIT, None, 10);
+        let mut processor = TestProcessor::new(DEFAULT_COMPLEX_LIMIT, None, None, 10);
         // Assert passing none here doesn't panic.
         processor.accumulate_fee_statement(FeeStatement::zero(), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -401,7 +411,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, None, 10);
 
         processor.accumulate_fee_statement(execution_fee(10), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -427,7 +437,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, Some(u64::MAX), 10);
+        let mut processor = TestProcessor::new(block_gas_limit, Some(u64::MAX), None, 10);
 
         processor.accumulate_fee_statement(execution_fee(60), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -451,7 +461,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, Some(50), 10);
+        let mut processor = TestProcessor::new(block_gas_limit, Some(50), None, 10);
 
         processor.accumulate_fee_statement(execution_fee(20), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -463,7 +473,7 @@ mod test {
     fn test_override_when_onchain_is_no_limit() {
         // When the onchain config has no cap, the override applies as given:
         // there is no protocol cap to enforce, and Byzantine-amplification is moot.
-        let mut processor = TestProcessor::new(BlockGasLimitType::NoLimit, Some(50), 10);
+        let mut processor = TestProcessor::new(BlockGasLimitType::NoLimit, Some(50), None, 10);
 
         processor.accumulate_fee_statement(execution_fee(20), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -485,7 +495,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, None, 10);
 
         processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(10));
         assert_eq!(processor.accumulated_approx_output_size, 10);
@@ -523,7 +533,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, None, 10);
 
         processor.accumulate_fee_statement(
             execution_fee(10),
@@ -585,7 +595,7 @@ mod test {
             use_granular_resource_group_conflicts: true,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, None, 10);
 
         assert!(!processor.should_end_block_parallel());
         processor.accumulate_fee_statement(

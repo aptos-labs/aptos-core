@@ -13,8 +13,8 @@ use super::{
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use bollard::{
-    container::{Config, CreateContainerOptions, StartContainerOptions, WaitContainerOptions},
-    models::{HostConfig, PortBinding},
+    models::{ContainerCreateBody, HostConfig, PortBinding},
+    query_parameters::{CreateContainerOptionsBuilder, WaitContainerOptionsBuilder},
 };
 use clap::Parser;
 use diesel_async::{pg::AsyncPgConnection, AsyncConnection, RunQueryDsl};
@@ -240,13 +240,14 @@ impl ServiceManager for PostgresManager {
             .await
             .context("Failed to create volume for postgres")?;
 
-        let options = Some(CreateContainerOptions {
-            name: POSTGRES_CONTAINER_NAME,
-            ..Default::default()
-        });
+        let options = Some(
+            CreateContainerOptionsBuilder::new()
+                .name(POSTGRES_CONTAINER_NAME)
+                .build(),
+        );
 
         let port = self.args.get_postgres_port(true).to_string();
-        let exposed_ports = Some(hashmap! {POSTGRES_DEFAULT_PORT.to_string() => hashmap!{}});
+        let exposed_ports = Some(vec![POSTGRES_DEFAULT_PORT.to_string()]);
         let host_config = Some(HostConfig {
             // Bind the container to the network we created in the pre_run. This does
             // not prevent the binary in the container from exposing itself to the host
@@ -267,7 +268,7 @@ impl ServiceManager for PostgresManager {
             ..Default::default()
         });
 
-        let config = Config {
+        let config = ContainerCreateBody {
             image: Some(POSTGRES_IMAGE.to_string()),
             // We set this to false so the container keeps running after the CLI
             // shuts down by default. We manually kill the container if applicable,
@@ -315,7 +316,7 @@ impl ServiceManager for PostgresManager {
         info!("Created container for postgres with this ID: {}", id);
 
         docker
-            .start_container(&id, None::<StartContainerOptions<&str>>)
+            .start_container(&id, None)
             .await
             .context("Failed to start postgres container")?;
 
@@ -325,9 +326,11 @@ impl ServiceManager for PostgresManager {
         let wait = docker
             .wait_container(
                 &id,
-                Some(WaitContainerOptions {
-                    condition: "not-running",
-                }),
+                Some(
+                    WaitContainerOptionsBuilder::new()
+                        .condition("not-running")
+                        .build(),
+                ),
             )
             .try_collect::<Vec<_>>()
             .await

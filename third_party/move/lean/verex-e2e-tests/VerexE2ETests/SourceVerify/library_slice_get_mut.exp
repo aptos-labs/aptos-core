@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/library_slice_get_mut.rs:6:9: error: no denotation for `store`: a dereference of a place that is not a mutable reference is not carried by the denotation

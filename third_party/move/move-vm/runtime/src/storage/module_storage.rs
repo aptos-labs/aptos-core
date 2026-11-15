@@ -569,13 +569,23 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
         &self,
         data: SerializedFunctionData,
     ) -> PartialVMResult<Box<dyn AbstractFunction>> {
-        let ty_args_pseudo_gas_cost = LazyLoadedFunction::compute_ty_args_pseudo_gas_cost(
-            self.module_storage.runtime_environment(),
-            &data.ty_args,
-        );
+        let runtime_environment = self.module_storage.runtime_environment();
+        let ty_args_pseudo_gas_cost =
+            LazyLoadedFunction::compute_ty_args_pseudo_gas_cost(runtime_environment, &data.ty_args);
+        let captured_layouts_size = if runtime_environment
+            .vm_config()
+            .meter_closure_captured_layouts
+        {
+            data.captured_layouts.iter().fold(0, |size: u64, layout| {
+                size.saturating_add(layout.serialized_size())
+            })
+        } else {
+            0
+        };
         Ok(Box::new(LazyLoadedFunction::new_unresolved(
             data,
             ty_args_pseudo_gas_cost,
+            captured_layouts_size,
         )))
     }
 

@@ -15,8 +15,7 @@
 //! records which of the three a message is, so callers comparing against V1
 //! can tell when a mismatch is expected.
 //!
-//! TODO(cleanup): render transactional-test `VMError`s from this mapping
-//! together with the attached error location.
+//! [`v1_vm_error`] assembles a complete V1 `VMError` for test harnesses.
 //!
 //! TODO(cleanup): **exact parity with V1 is not a goal.** These statuses
 //! become the `VMStatus` a transaction commits with, so for now they are what
@@ -34,10 +33,10 @@ use mono_move_core::{
 use mono_move_loader::LoaderError;
 use mono_move_runtime::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError};
 use move_binary_format::{
-    errors::{ExecutionState, Location, VMError},
+    errors::{ExecutionState, Location, PartialVMError, VMError},
     file_format::FunctionDefinitionIndex,
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::vm_status::{AbortLocation, StatusCode};
 use move_vm_types::values::{INDEX_OUT_OF_BOUNDS, POP_EMPTY_VEC, VEC_UNPACK_PARITY_MISMATCH};
 
 /// How a [`V1ErrorInfo`]'s message relates to V1 output.
@@ -177,6 +176,83 @@ pub enum V1Equivalent {
     V1StatusUnknown,
 }
 
+/// A MonoMove failure to report as a V1 [`VMError`].
+pub enum MonoFailure<'a> {
+    /// A Move abort. `stack_trace` lists the callers of the aborting frame.
+    Abort {
+        code: u64,
+        message: Option<String>,
+        location: AbortLocation,
+        /// The aborting instruction; `None` for a native abort.
+        offset: Option<(FunctionDefinitionIndex, BytecodeOffset)>,
+        stack_trace: &'a [CallFrame],
+    },
+    /// A VM error, with its stack trace attached.
+    Error(&'a VMInternalError),
+}
+
+/// Converts `failure` to a V1 [`VMError`]. The boolean indicates whether its
+/// status and sub-status match V1 and its location is known; it does not imply
+/// identical messages or offsets. With `with_execution_state`, attaches the
+/// caller stack trace where V1 records one.
+///
+/// Shared verifier errors are returned unchanged. V1 attributes a native abort
+/// to the native's own definition at offset zero; MonoMove records no
+/// instruction for it, so that abort carries no offset.
+pub fn v1_vm_error(failure: MonoFailure<'_>, with_execution_state: bool) -> (VMError, bool) {
+    let err = match failure {
+        MonoFailure::Abort {
+            code,
+            message,
+            location,
+            offset,
+            stack_trace,
+        } => {
+            let mut error = PartialVMError::new(StatusCode::ABORTED).with_sub_status(code);
+            if let Some(message) = message {
+                error = error.with_message(message);
+            }
+            if let Some((function, code_offset)) = offset {
+                error = error.at_code_offset(function, code_offset);
+            }
+            if with_execution_state {
+                error = error.with_exec_state(v1_execution_state(stack_trace));
+            }
+            let location = match location {
+                AbortLocation::Module(module) => Location::Module(module),
+                AbortLocation::Script => Location::Script,
+            };
+            return (error.finish(location), true);
+        },
+        MonoFailure::Error(err) => err,
+    };
+    let info = match describe(err) {
+        V1Equivalent::Verbatim(error) => return (error, true),
+        equivalent @ (V1Equivalent::Described(_)
+        | V1Equivalent::NoV1Failure
+        | V1Equivalent::V1StatusUnknown) => fallback_info(err, equivalent),
+    };
+    // A fallback's sub-status is unmodelled, so it is never exact. Without a
+    // location, the error cannot be checked against an expected one either.
+    let exact = info.sub_status.is_comparable() && err.location().is_some();
+    let mut error = PartialVMError::new(info.status);
+    if let Some(sub_status) = info.sub_status.known() {
+        error = error.with_sub_status(sub_status);
+    }
+    match info.message {
+        V1Message::Verbatim(text) | V1Message::MonoText(text) => error = error.with_message(text),
+        V1Message::Absent => {},
+    }
+    let (location, offset) = v1_location(err.location());
+    if let Some((function, code_offset)) = offset {
+        error = error.at_code_offset(function, code_offset);
+        if with_execution_state && v1_records_execution_state(err) {
+            error = error.with_exec_state(v1_execution_state(err.stack_trace()));
+        }
+    }
+    (error.finish(location), exact)
+}
+
 /// V1's error location and faulting instruction for `location`.
 pub fn v1_location(
     location: Option<&ErrorLocation>,
@@ -200,7 +276,7 @@ pub fn v1_location(
 
 /// Converts caller frames to V1's execution state, preserving their order.
 /// Both formats represent a script frame with no module and definition index 0.
-pub fn v1_execution_state(stack_trace: &[CallFrame]) -> ExecutionState {
+fn v1_execution_state(stack_trace: &[CallFrame]) -> ExecutionState {
     ExecutionState::new(
         stack_trace
             .iter()
@@ -214,7 +290,7 @@ pub fn v1_execution_state(stack_trace: &[CallFrame]) -> ExecutionState {
 ///
 /// V1 also omits traces for other call setup failures, such as closure argument
 /// mismatches and gas exhaustion. This check cannot identify those cases.
-pub fn v1_records_execution_state(err: &VMInternalError) -> bool {
+fn v1_records_execution_state(err: &VMInternalError) -> bool {
     let stack_overflow = matches!(
         err.downcast_ref::<RuntimeError>(),
         Some(RuntimeError::StackOverflow)
@@ -256,7 +332,7 @@ pub fn describe_or_fallback(err: &VMInternalError) -> V1ErrorInfo {
 /// Returns details from `equivalent`, using a fallback if no V1 equivalent
 /// exists. `equivalent` must be the result of [`describe`] for `err`.
 /// Callers comparing with V1 must treat the fallback as a divergence.
-pub fn fallback_info(err: &VMInternalError, equivalent: V1Equivalent) -> V1ErrorInfo {
+fn fallback_info(err: &VMInternalError, equivalent: V1Equivalent) -> V1ErrorInfo {
     let status = match equivalent {
         V1Equivalent::Described(info) => return info,
         V1Equivalent::Verbatim(error) => return V1ErrorInfo::verbatim(error),
@@ -335,6 +411,24 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
         E::ResourceAlreadyExists { addr } => V1ErrorInfo::with_message(
             StatusCode::RESOURCE_ALREADY_EXISTS,
             format!("Failed to move resource into {addr:?}"),
+        ),
+
+        // V1 names the module in long form.
+        E::ReentrancyUnderModuleLock { module, function } => V1ErrorInfo::with_message(
+            StatusCode::RUNTIME_DISPATCH_ERROR,
+            format!(
+                "Reentrancy disallowed: reentering `{module}` via function `{function}` \
+                 (module lock is active)"
+            ),
+        ),
+        // V1 names the struct in short form, without type arguments.
+        E::ResourceAccessDuringReentrancy { module, name } => V1ErrorInfo::with_message(
+            StatusCode::RUNTIME_DISPATCH_ERROR,
+            format!(
+                "Resource `{}::{name}` cannot be accessed because of active reentrancy of \
+                 defining module.",
+                module.short_str_lossless()
+            ),
         ),
 
         // V1 names both variants ("expected enum variant Circle, found
@@ -421,7 +515,7 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         L::NativeFunctionNotLoadable { .. }
         | L::LoweringSkipped { .. }
         | L::ResourceLayoutNotDerivable => return V1Equivalent::NoV1Failure,
-        L::GlobalContext(_) | L::InvariantViolation(_) => {
+        L::GlobalContext(_) | L::NativeShadowsMoveFunction { .. } | L::InvariantViolation(_) => {
             V1ErrorInfo::with_mono_message(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err)
         },
     };
@@ -503,7 +597,9 @@ fn primitive_name(ty: IntTy) -> &'static str {
 mod tests {
     use super::*;
     use move_binary_format::errors::PartialVMError;
-    use move_core_types::{account_address::AccountAddress, int256::I256};
+    use move_core_types::{
+        account_address::AccountAddress, ident_str, int256::I256, language_storage::ModuleId,
+    };
 
     /// The mapping for an error V1 has a counterpart for.
     fn described(err: &RuntimeError) -> V1ErrorInfo {
@@ -685,6 +781,44 @@ mod tests {
         );
     }
 
+    /// Both reentrancy errors reproduce V1's text: the module in long form for
+    /// the lock error, the struct in short form for the resource error.
+    #[test]
+    fn reentrancy_messages_match_v1() {
+        let module = || {
+            Box::new(ModuleId::new(
+                AccountAddress::from_hex_literal("0x42").unwrap(),
+                ident_str!("caller").to_owned(),
+            ))
+        };
+        let lock = described(&RuntimeError::ReentrancyUnderModuleLock {
+            module: module(),
+            function: ident_str!("do_something").to_owned(),
+        });
+        assert_eq!(lock.status, StatusCode::RUNTIME_DISPATCH_ERROR);
+        assert_eq!(
+            lock.message.text(),
+            Some(
+                "Reentrancy disallowed: reentering \
+                 `0000000000000000000000000000000000000000000000000000000000000042::caller` \
+                 via function `do_something` (module lock is active)"
+            )
+        );
+
+        let resource = described(&RuntimeError::ResourceAccessDuringReentrancy {
+            module: module(),
+            name: ident_str!("R").to_owned(),
+        });
+        assert_eq!(resource.status, StatusCode::RUNTIME_DISPATCH_ERROR);
+        assert_eq!(
+            resource.message.text(),
+            Some(
+                "Resource `0x42::caller::R` cannot be accessed because of active reentrancy \
+                 of defining module."
+            )
+        );
+    }
+
     /// Vector faults report through the sub-status and carry no message.
     #[test]
     fn vector_errors_describe_by_sub_status() {
@@ -836,6 +970,11 @@ mod tests {
                 error: PartialVMError::new(StatusCode::MISSING_DEPENDENCY).finish(Location::Script),
             },
             LoaderError::GlobalContext(std::fmt::Error.into()),
+            LoaderError::NativeShadowsMoveFunction {
+                address: AccountAddress::ONE,
+                module: "m".to_string(),
+                name: "f".to_string(),
+            },
             LoaderError::InvariantViolation(LoaderInvariantViolation::EntryAlreadyExists),
             LoaderError::InvariantViolation(LoaderInvariantViolation::MicroOpVerificationFailed {
                 errors: vec![mono_move_core::VerificationError {
@@ -856,6 +995,7 @@ mod tests {
                 | LoaderError::ScriptDeserializationFailed { .. }
                 | LoaderError::ScriptVerificationFailed { .. }
                 | LoaderError::GlobalContext(_)
+                | LoaderError::NativeShadowsMoveFunction { .. }
                 | LoaderError::InvariantViolation(_) => {},
             }
             let status = match describe_loader_error(err) {
@@ -925,5 +1065,84 @@ mod tests {
             panic!("loader errors are mapped");
         };
         assert_eq!(loader.status, StatusCode::LINKER_ERROR);
+    }
+
+    fn module() -> ModuleId {
+        ModuleId::new(AccountAddress::ONE, ident_str!("m").to_owned())
+    }
+
+    fn at_instruction(err: RuntimeError) -> VMInternalError {
+        VMInternalError::new(err).at(ErrorLocation::Instruction {
+            module: module(),
+            function: FunctionDefinitionIndex(3),
+            offset: 7,
+        })
+    }
+
+    /// An abort is exact, with its offset and, on request, the stack trace.
+    #[test]
+    fn v1_vm_error_reports_an_abort_exactly() {
+        let stack_trace = [CallFrame {
+            module: Some(module()),
+            function: FunctionDefinitionIndex(1),
+            offset: 2,
+        }];
+        let abort = |with_execution_state| {
+            v1_vm_error(
+                MonoFailure::Abort {
+                    code: 42,
+                    message: None,
+                    location: AbortLocation::Module(module()),
+                    offset: Some((FunctionDefinitionIndex(3), 7)),
+                    stack_trace: &stack_trace,
+                },
+                with_execution_state,
+            )
+        };
+        let (error, exact) = abort(true);
+        assert!(exact);
+        assert_eq!(error.major_status(), StatusCode::ABORTED);
+        assert_eq!(error.sub_status(), Some(42));
+        assert_eq!(error.location(), &Location::Module(module()));
+        assert_eq!(error.offsets(), &[(FunctionDefinitionIndex(3), 7)]);
+        assert!(error.exec_state().is_some());
+        assert!(abort(false).0.exec_state().is_none());
+    }
+
+    #[test]
+    fn v1_vm_error_is_exact_only_for_a_known_v1_status() {
+        let (error, exact) = v1_vm_error(
+            MonoFailure::Error(&at_instruction(RuntimeError::PopFromEmptyVector)),
+            false,
+        );
+        assert!(exact);
+        assert_eq!(error.major_status(), StatusCode::VECTOR_OPERATION_ERROR);
+        assert_eq!(error.sub_status(), Some(POP_EMPTY_VEC));
+        assert_eq!(error.offsets(), &[(FunctionDefinitionIndex(3), 7)]);
+
+        // V1 reports a sub-status MonoMove does not model.
+        let (_, exact) = v1_vm_error(
+            MonoFailure::Error(&at_instruction(RuntimeError::EnumVariantMismatch {
+                tag: 2,
+            })),
+            false,
+        );
+        assert!(!exact);
+
+        // V1's status depends on where the bytes came from.
+        let (error, exact) = v1_vm_error(
+            MonoFailure::Error(&at_instruction(RuntimeError::BCSEof)),
+            false,
+        );
+        assert!(!exact);
+        assert_eq!(error.major_status(), StatusCode::UNKNOWN_RUNTIME_STATUS);
+
+        // A known status without a location.
+        let (error, exact) = v1_vm_error(
+            MonoFailure::Error(&VMInternalError::new(RuntimeError::PopFromEmptyVector)),
+            false,
+        );
+        assert!(!exact);
+        assert_eq!(error.location(), &Location::Undefined);
     }
 }

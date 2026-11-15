@@ -1231,7 +1231,7 @@ mod tests {
 
     #[test]
     fn attribute_wire_shape() {
-        // Pin the exact wire shape produced by the Leaner XIR exporter.
+        // Pin the exact wire shape produced by the Verex XIR exporter.
         let json = json!({
             "name": "resource_group",
             "args": [

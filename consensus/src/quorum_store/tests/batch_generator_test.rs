@@ -3,8 +3,12 @@
 
 use crate::{
     quorum_store::{
-        batch_coordinator::BatchCoordinatorCommand, batch_generator::BatchGenerator,
-        batch_store::BatchWriter, quorum_store_db::MockQuorumStoreDB, types::PersistedValue,
+        batch_coordinator::BatchCoordinatorCommand,
+        batch_generator::BatchGenerator,
+        batch_store::{BatchStore, BatchWriter},
+        proof_manager::ProofManager,
+        quorum_store_db::{MockQuorumStoreDB, QuorumStoreDB},
+        types::PersistedValue,
     },
     test_utils::{
         create_signed_transaction, create_vec_signed_transactions,
@@ -13,31 +17,133 @@ use crate::{
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
-    common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::{BatchInfoExt, BatchKind, SignedBatchInfo, TBatchInfo},
-};
-use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519Signature},
-    HashValue, Uniform,
+    common::{Payload, PayloadFilter, TransactionInProgress, TransactionSummary},
+    payload::OptQuorumStorePayload,
+    payload_pull_params::OptQSPayloadPullParams,
+    proof_of_store::{BatchInfoExt, BatchKind, ProofCache, SignedBatchInfo, TBatchInfo},
+    request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
+    utils::PayloadTxnsSize,
 };
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
+use aptos_temppath::TempPath;
 use aptos_types::{
     quorum_store::BatchId,
-    secret_sharing::Ciphertext,
-    transaction::{
-        encrypted_payload::{EncryptedInner, EncryptedPayload},
-        RawTransaction, SignedTransaction, TransactionExtraConfig, TransactionPayload,
+    test_helpers::encrypted_transactions::{
+        encrypted_transaction, encrypted_transaction_with_gas, non_valid_encrypted_transactions,
     },
+    transaction::SignedTransaction,
+    validator_verifier::{random_validator_verifier, ValidatorVerifier},
 };
 use futures::{
-    channel::mpsc::{channel, Receiver},
+    channel::{
+        mpsc::{channel, Receiver},
+        oneshot,
+    },
     StreamExt,
 };
 use move_core_types::account_address::AccountAddress;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
 
 struct MockBatchWriter {}
+
+// Test whether inline txns w/ non-valid EncryptedPayload states are rejected
+#[tokio::test]
+async fn test_local_inline_proposal_rejects_non_encrypted_states() {
+    for txn in non_valid_encrypted_transactions() {
+        assert_inline_proposal_rejects(txn).await;
+    }
+}
+
+async fn assert_inline_proposal_rejects(poisoned: SignedTransaction) {
+    let (mempool_tx, mut mempool_rx) = channel(1_024);
+    let author = AccountAddress::random();
+    let now = aptos_infallible::duration_since_epoch();
+    let mut generator = BatchGenerator::new(
+        10,
+        author,
+        QuorumStoreConfig::default(),
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        mempool_tx,
+        now.as_micros() as u64,
+    );
+    let honest = encrypted_transaction(1, false);
+    let poisoned_hash = poisoned.committed_hash();
+    let response =
+        queue_mempool_batch_response(vec![poisoned, honest.clone()], usize::MAX, &mut mempool_rx);
+    let (batches, _) = tokio::join!(generator.handle_scheduled_pull(100), response);
+
+    let path = TempPath::new();
+    let (signers, _) = random_validator_verifier(1, None, false);
+    let store = BatchStore::new(
+        10,
+        false,
+        10,
+        Arc::new(QuorumStoreDB::new(&path)),
+        5 * 1024 * 1024,
+        5 * 1024 * 1024,
+        100,
+        signers[0].clone(),
+        0,
+    );
+    let mut proof_manager = ProofManager::new(author, 100, 100, store.clone(), true, 1);
+    for batch in batches {
+        let value =
+            PersistedValue::new(batch.batch_info().clone(), Some(batch.into_transactions()));
+        store.insert_to_cache(&value).unwrap();
+        proof_manager.receive_batches(vec![(value.batch_info().clone(), value.summary())]);
+    }
+    let (callback, receiver) = oneshot::channel();
+    proof_manager.handle_proposal_request(GetPayloadCommand::GetPayloadRequest(
+        GetPayloadRequest {
+            max_txns: PayloadTxnsSize::new(100, 1_000_000),
+            max_txns_after_filtering: 100,
+            soft_max_txns_after_filtering: 100,
+            max_inline_txns: PayloadTxnsSize::new(100, 1_000_000),
+            filter: PayloadFilter::InQuorumStore(HashSet::new()),
+            callback,
+            block_timestamp: now,
+            return_non_full: true,
+            // Exclude this author's batches from the optimistic reference pull,
+            // leaving them available for the subsequent inline pull.
+            maybe_optqs_payload_pull_params: Some(OptQSPayloadPullParams {
+                exclude_authors: HashSet::from([author]),
+                minimum_batch_age_usecs: 0,
+                enable_opt_qs_v2_payload: true,
+                per_kind_txn_limits: Default::default(),
+            }),
+        },
+    ));
+    let GetPayloadResponse::GetPayloadResponse(payload) = receiver.await.unwrap().unwrap();
+    let Payload::OptQuorumStore(OptQuorumStorePayload::V2(proposal)) = &payload else {
+        panic!("Expected a V2 inline proposal");
+    };
+    let txns = proposal.inline_batches().transactions();
+    assert!(
+        txns.iter().all(|txn| txn.committed_hash() != poisoned_hash),
+        "Locally generated inline proposal contains an unsigned decryption state"
+    );
+    assert_eq!(
+        txns,
+        vec![honest],
+        "The valid encrypted control must still be proposed inline"
+    );
+    payload
+        .verify(
+            &ValidatorVerifier::new(vec![]),
+            &ProofCache::new(1),
+            true,
+            true,
+            100,
+            1_000_000,
+        )
+        .unwrap();
+}
 
 impl MockBatchWriter {
     fn new() -> Self {
@@ -802,36 +908,7 @@ async fn test_remote_batches_in_progress() {
 
 // Helper function to create an encrypted transaction
 fn create_encrypted_transaction(gas_unit_price: u64) -> SignedTransaction {
-    use aptos_crypto::PrivateKey;
-    let private_key = Ed25519PrivateKey::generate_for_testing();
-    let public_key = private_key.public_key();
-
-    let encrypted_payload = EncryptedPayload::Encrypted(EncryptedInner {
-        ciphertext: Ciphertext::random(),
-        extra_config: TransactionExtraConfig::V1 {
-            multisig_address: None,
-            replay_protection_nonce: None,
-        },
-        payload_hash: HashValue::random(),
-        encryption_epoch: 1,
-        claimed_entry_fun: None,
-    });
-
-    let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);
-    let raw_transaction = RawTransaction::new(
-        AccountAddress::random(),
-        0,
-        transaction_payload,
-        0,
-        gas_unit_price,
-        0,
-        aptos_types::chain_id::ChainId::new(10),
-    );
-    SignedTransaction::new(
-        raw_transaction,
-        public_key,
-        Ed25519Signature::dummy_signature(),
-    )
+    encrypted_transaction_with_gas(0, false, gas_unit_price)
 }
 
 fn create_vec_encrypted_transactions(size: u64) -> Vec<SignedTransaction> {

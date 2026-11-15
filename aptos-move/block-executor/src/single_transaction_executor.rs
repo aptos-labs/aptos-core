@@ -236,15 +236,18 @@ impl<E: ExecutorTask> SingleTransactionExecutor for LegacyTransactionExecutor<E>
     ) -> Result<<E::Output as TxnOutput>::CommittedOutput, PanicOr<ResourceGroupSerializationError>>
     {
         let runtime_environment = shared.runtime_environment;
+        let delayed_field_optimization_enabled = runtime_environment
+            .vm_config()
+            .delayed_field_optimization_enabled;
         let view = build_latest_view(shared, mode, txn_idx);
         let (committed_output, trace) = match input {
             LegacyReads::Parallel(reads) => {
                 let materializer = ParallelMaterializer::new(&view, reads);
-                materialize_output(output, &materializer)?
+                materialize_output(output, &materializer, delayed_field_optimization_enabled)?
             },
             LegacyReads::Sequential(_) => {
                 let materializer = SequentialMaterializer::new(&view);
-                materialize_output(output, &materializer)?
+                materialize_output(output, &materializer, delayed_field_optimization_enabled)?
             },
         };
 

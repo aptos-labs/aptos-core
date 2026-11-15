@@ -27,10 +27,10 @@ use aptos_runtimes::spawn_rayon_thread_pool;
 use blstrs::{G1Projective, G2Projective, Scalar};
 use core::iter::zip;
 use criterion::{
-    black_box, criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion,
+    criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion,
 };
 use rand::{rngs::ThreadRng, thread_rng};
-use std::time::Instant;
+use std::{hint::black_box, time::Instant};
 
 const BENCH_MSG: &[u8; 36] = b"some dummy message for the benchmark";
 
@@ -338,7 +338,7 @@ fn wvuf_augment_random_keypair<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfigBlstrs,
@@ -369,7 +369,7 @@ fn wvuf_augment_all_pubkeys<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfigBlstrs,
@@ -399,7 +399,7 @@ fn wvuf_augment_random_pubkey<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfigBlstrs,
@@ -433,7 +433,7 @@ fn wvuf_create_share_random<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     wc: &WeightedConfigBlstrs,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
@@ -460,7 +460,7 @@ fn wvuf_create_share_specific<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     wc: &WeightedConfigBlstrs,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
@@ -485,7 +485,7 @@ fn wvuf_create_share_average<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     wc: &WeightedConfigBlstrs,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
@@ -527,7 +527,7 @@ fn wvuf_verify_share_random<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     wc: &WeightedConfigBlstrs,
     vuf_pp: &WVUF::PublicParameters,
@@ -558,7 +558,7 @@ fn wvuf_verify_share_average<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     wc: &WeightedConfigBlstrs,
     vuf_pp: &WVUF::PublicParameters,
@@ -602,7 +602,7 @@ fn wvuf_many_verify_shares<
         SecretKeyShare = WT::DealtSecretKeyShare,
         PubKey = WT::DealtPubKey,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     wc: &WeightedConfigBlstrs,
     vuf_pp: &WVUF::PublicParameters,
@@ -634,7 +634,7 @@ fn wvuf_verify_share_specific<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     wc: &WeightedConfigBlstrs,
     vuf_pp: &WVUF::PublicParameters,
@@ -665,7 +665,7 @@ fn wvuf_aggregate_shares<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfigBlstrs,
@@ -699,7 +699,7 @@ fn wvuf_verify_proof<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfigBlstrs,
@@ -752,7 +752,7 @@ fn wvuf_derive_eval<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfigBlstrs,
@@ -796,9 +796,7 @@ fn wvuf_derive_eval<
     );
 }
 
-fn pinkas_wvuf_derive_eval_collect_lagrange_shares_and_rks<
-    R: rand_core::RngCore + rand_core::CryptoRng,
->(
+fn pinkas_wvuf_derive_eval_collect_lagrange_shares_and_rks<R: rand::RngCore + rand::CryptoRng>(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfigBlstrs,
     asks: &Vec<<PinkasWUF as WeightedVUF>::AugmentedSecretKeyShare>,
@@ -838,7 +836,7 @@ fn pinkas_wvuf_derive_eval_collect_lagrange_shares_and_rks<
     );
 }
 
-fn pinkas_wvuf_derive_eval_rks_multiexps<R: rand_core::RngCore + rand_core::CryptoRng>(
+fn pinkas_wvuf_derive_eval_rks_multiexps<R: rand::RngCore + rand::CryptoRng>(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfigBlstrs,
     asks: &Vec<<PinkasWUF as WeightedVUF>::AugmentedSecretKeyShare>,
@@ -896,7 +894,7 @@ fn pinkas_wvuf_derive_eval_rks_multiexps<R: rand_core::RngCore + rand_core::Cryp
     );
 }
 
-fn pinkas_wvuf_derive_eval_multipairing<R: rand_core::RngCore + rand_core::CryptoRng>(
+fn pinkas_wvuf_derive_eval_multipairing<R: rand::RngCore + rand::CryptoRng>(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfigBlstrs,
     group: &mut BenchmarkGroup<WallTime>,
@@ -938,7 +936,7 @@ fn get_apks_and_proofs<
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfigBlstrs,

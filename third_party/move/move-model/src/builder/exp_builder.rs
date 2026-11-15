@@ -271,10 +271,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// In specification expressions, ghost fields (`ghost f: T;` from the
     /// struct's spec block) are selectable like ordinary fields; in code
-    /// contexts they do not exist. Returns the instantiated field type.
+    /// contexts they do not exist. Returns the declared (uninstantiated) field type.
     pub fn lookup_ghost_field_decl(
         &self,
-        id: &QualifiedInstId<StructId>,
+        id: &QualifiedId<StructId>,
         field_name: Symbol,
     ) -> Option<Type> {
         if self.is_spec_mode() {
@@ -878,7 +878,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 impl UnificationContext for ExpTranslator<'_, '_, '_> {
     fn get_struct_field_decls(
         &self,
-        id: &QualifiedInstId<StructId>,
+        id: &QualifiedId<StructId>,
         field_name: Symbol,
     ) -> (Vec<(Option<Symbol>, Type)>, bool) {
         let result = self.parent.parent.lookup_struct_field_decl(id, field_name);
@@ -2579,14 +2579,14 @@ impl ExpTranslator<'_, '_, '_> {
                                 field_name,
                             } => {
                                 // Resolve a field selection into the inferred struct type.
-                                if let Type::Struct(mid, sid, inst) = self
+                                if let Type::Struct(mid, sid, _) = self
                                     .subs
                                     .specialize_with_defaults(struct_ty)
                                     .skip_reference()
                                 {
                                     let oper = self.create_select_oper(
                                         &loc,
-                                        &mid.qualified_inst(*sid, inst.clone()),
+                                        &mid.qualified(*sid),
                                         *field_name,
                                     );
                                     RewriteResult::RewrittenAndDescend(
@@ -5275,9 +5275,9 @@ impl ExpTranslator<'_, '_, '_> {
                 );
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
                 self.set_node_instantiation(id, vec![ty.clone()]);
-                let oper = if let Type::Struct(mid, sid, inst) = self.subs.specialize(&ty) {
+                let oper = if let Type::Struct(mid, sid, _) = self.subs.specialize(&ty) {
                     // Struct known at this point
-                    self.create_select_oper(&loc, &mid.qualified_inst(sid, inst), field_name)
+                    self.create_select_oper(&loc, &mid.qualified(sid), field_name)
                 } else {
                     // Create a placeholder for later resolution.
                     self.placeholder_map
@@ -5297,10 +5297,10 @@ impl ExpTranslator<'_, '_, '_> {
     fn create_select_oper(
         &mut self,
         loc: &Loc,
-        id: &QualifiedInstId<StructId>,
+        id: &QualifiedId<StructId>,
         field_name: Symbol,
     ) -> Operation {
-        let struct_name = self.parent.parent.get_struct_name(id.to_qualified_id());
+        let struct_name = self.parent.parent.get_struct_name(*id);
         // Ghost fields on an otherwise-empty struct are still selectable in
         // spec expressions; only reject empty-struct access when the target
         // is not a declared ghost field.
@@ -5373,18 +5373,18 @@ impl ExpTranslator<'_, '_, '_> {
             let expected_type = &self.subs.specialize(expected_type);
             if let Type::Struct(mid, sid, inst) = self.subs.specialize(expected_type) {
                 let field_name = self.symbol_pool().make(name.value.as_str());
-                let qid = mid.qualified_inst(sid, inst);
+                let qid = mid.qualified(sid);
                 let (field_decls, _) = self
                     .parent
                     .parent
                     .lookup_struct_field_decl(&qid, field_name);
                 let (variant, expected_field_type, is_ghost_field) =
                     if let Some((variant, ty)) = field_decls.into_iter().next() {
-                        (variant, ty, false)
+                        (variant, ty.instantiate(&inst), false)
                     } else if let Some(ty) = self.lookup_ghost_field_decl(&qid, field_name) {
                         // Ghost fields participate in `update_field(s, f, v)` in
                         // spec expressions — variant-agnostic.
-                        (None, ty, true)
+                        (None, ty.instantiate(&inst), true)
                     } else {
                         (None, Type::Error, false) // this error is reported via type unification
                     };

@@ -182,7 +182,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         }
     }
 
-    pub(crate) fn layer(&self) -> u64 {
+    pub fn layer(&self) -> u64 {
         self.inner.layer
     }
 

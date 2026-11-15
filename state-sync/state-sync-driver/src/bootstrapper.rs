@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    driver::DriverConfiguration,
+    driver::{DriverConfiguration, GenesisCommitter},
     error::Error,
     logging::{LogEntry, LogSchema},
     metadata_storage::MetadataStorageInterface,
@@ -41,12 +41,13 @@ pub const GENESIS_TRANSACTION_VERSION: u64 = 0; // The expected version of the g
 
 // The snapshot stores synced during fast sync, in drive order. They are peers
 // (independent stores at the same version), and the fast sync is finalized once
-// all of them are written. Main state goes first since `FastSyncStorageWrapper`
-// only switches writes to the fast-sync DB once its receiver is created.
-const FAST_SYNC_SNAPSHOT_KINDS: [SnapshotKind; 3] = [
+// all of them are written, so this order carries no dependency between them.
+const FAST_SYNC_SNAPSHOT_KINDS: [SnapshotKind; 5] = [
     SnapshotKind::MAIN_STATE,
     SnapshotKind::HOT_STATE,
     SnapshotKind::POSITION,
+    SnapshotKind::ORDER,
+    SnapshotKind::COLLATERAL,
 ];
 
 /// A simple container for verified epoch states and epoch ending ledger infos
@@ -331,6 +332,12 @@ pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
     // The component used to sync native-position state values
     position_value_syncer: StateValueSyncer,
 
+    // The component used to sync native-order state values
+    order_value_syncer: StateValueSyncer,
+
+    // The component used to sync native-collateral state values
+    collateral_value_syncer: StateValueSyncer,
+
     // The component used to sync hot state values
     hot_state_value_syncer: StateValueSyncer,
 
@@ -369,6 +376,8 @@ impl<
         Self {
             state_value_syncer: StateValueSyncer::new(),
             position_value_syncer: StateValueSyncer::new(),
+            order_value_syncer: StateValueSyncer::new(),
+            collateral_value_syncer: StateValueSyncer::new(),
             hot_state_value_syncer: StateValueSyncer::new(),
             active_data_stream: None,
             active_snapshot_kind: None,
@@ -512,14 +521,23 @@ impl<
                 .await;
         }
 
-        // Get the highest synced and known ledger info versions
-        let highest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
+        // Get the highest synced and known ledger info versions. A node that has
+        // never committed anything reports no version at all, which is the same
+        // starting point as genesis for the comparisons below, but not for
+        // deciding whether a snapshot can be restored into it.
+        let pre_committed_version = self.storage.get_pre_committed_version().map_err(|error| {
+            Error::StorageError(format!(
+                "Failed to get the pre-committed version: {error:?}"
+            ))
+        })?;
+        let nothing_committed = pre_committed_version.is_none();
+        let highest_synced_version = pre_committed_version.unwrap_or(GENESIS_TRANSACTION_VERSION);
         let highest_known_ledger_info = self.get_highest_known_ledger_info()?;
         let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
 
         // Check if we need to sync more data
         if self.get_bootstrapping_mode().is_fast_sync()
-            && highest_synced_version == GENESIS_TRANSACTION_VERSION
+            && nothing_committed
             && highest_known_ledger_version == GENESIS_TRANSACTION_VERSION
         {
             // The node is fast syncing and an epoch change isn't
@@ -548,6 +566,7 @@ impl<
         if self.get_bootstrapping_mode().is_fast_sync() {
             // We're fast syncing
             self.fetch_missing_state_snapshot_data(
+                nothing_committed,
                 highest_synced_version,
                 highest_known_ledger_info,
             )
@@ -560,12 +579,20 @@ impl<
     }
 
     /// Fetches all missing state snapshot data in order to bootstrap the node
+    ///
+    /// A snapshot restore writes the state as of the target version and leaves
+    /// anything already committed below it in place, where those older rows go
+    /// on satisfying reads for keys that were deleted before the target. Only a
+    /// node that has committed nothing at all can be restored into; one that
+    /// already holds data (genesis included) has to catch up by syncing
+    /// transactions forward instead.
     async fn fetch_missing_state_snapshot_data(
         &mut self,
+        nothing_committed: bool,
         highest_synced_version: Version,
         highest_known_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
-        if highest_synced_version == GENESIS_TRANSACTION_VERSION {
+        if nothing_committed {
             // We're fast syncing a new node. Resume against the already-pinned
             // target if a snapshot sync has started, otherwise target the highest
             // known ledger info. (All snapshot kinds sync to the same target.)
@@ -576,9 +603,23 @@ impl<
                 Some(target) => target,
                 None => highest_known_ledger_info,
             };
+            // The network has nothing beyond genesis, so there is no snapshot to
+            // sync to. Commit the local genesis blob rather than streaming a copy
+            // of it back from a peer.
+            if target.ledger_info().version() == GENESIS_TRANSACTION_VERSION
+                && let Some(commit_genesis) = self
+                    .driver_configuration
+                    .local_genesis
+                    .as_ref()
+                    .map(|local_genesis| local_genesis.commit.clone())
+            {
+                return self.bootstrap_from_local_genesis(commit_genesis).await;
+            }
             self.drive_snapshot_stages(target).await
         } else {
-            // This node has already synced some state. Ensure the node is not too far behind.
+            // This node has already committed data, so it cannot be restored
+            // into. Ensure it is not too far behind to catch up by syncing
+            // transactions forward.
             let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
             let num_versions_behind = highest_known_ledger_version
                 .checked_sub(highest_synced_version)
@@ -608,6 +649,28 @@ impl<
                        num_versions_behind, highest_known_ledger_version, max_num_versions_behind);
             }
         }
+    }
+
+    /// Commits the local genesis blob and completes bootstrapping.
+    ///
+    /// Used when the fast-sync target is genesis itself. The commit is
+    /// idempotent, so a node that already holds genesis (e.g. restarted after a
+    /// previous run took this path) just proceeds to completion.
+    async fn bootstrap_from_local_genesis(
+        &mut self,
+        commit_genesis: GenesisCommitter,
+    ) -> Result<(), Error> {
+        info!(LogSchema::new(LogEntry::Bootstrapper).message(
+            "The network advertises nothing beyond genesis. Committing local genesis instead of fast syncing to it."
+        ));
+
+        commit_genesis().map_err(|error| {
+            Error::UnexpectedError(format!(
+                "Failed to commit the local genesis blob! Error: {error:?}"
+            ))
+        })?;
+
+        self.bootstrapping_complete().await
     }
 
     /// Attempts to fetch a data notification from the active stream
@@ -1007,6 +1070,8 @@ impl<
         match kind {
             SnapshotKind::MAIN_STATE => &self.state_value_syncer,
             SnapshotKind::POSITION => &self.position_value_syncer,
+            SnapshotKind::ORDER => &self.order_value_syncer,
+            SnapshotKind::COLLATERAL => &self.collateral_value_syncer,
             SnapshotKind::HOT_STATE => &self.hot_state_value_syncer,
         }
     }
@@ -1016,14 +1081,16 @@ impl<
         match kind {
             SnapshotKind::MAIN_STATE => &mut self.state_value_syncer,
             SnapshotKind::POSITION => &mut self.position_value_syncer,
+            SnapshotKind::ORDER => &mut self.order_value_syncer,
+            SnapshotKind::COLLATERAL => &mut self.collateral_value_syncer,
             SnapshotKind::HOT_STATE => &mut self.hot_state_value_syncer,
         }
     }
 
     /// The snapshot root committed for the given kind by the target transaction
-    /// info: main state's state checkpoint hash, or the position/hot state root
-    /// (if committed). All kinds share the target version, so this is taken from
-    /// the target output, not a storage read.
+    /// info: main state's state checkpoint hash, or the position, order,
+    /// collateral or hot state root (if committed). All kinds share the target
+    /// version, so this is taken from the target output, not a storage read.
     fn committed_snapshot_root(&mut self, kind: SnapshotKind) -> Result<Option<HashValue>, Error> {
         let transaction_output_to_sync = self.get_transaction_output_to_sync()?;
         let target_transaction_info = transaction_output_to_sync
@@ -1037,6 +1104,8 @@ impl<
         Ok(match kind {
             SnapshotKind::MAIN_STATE => target_transaction_info.state_checkpoint_hash(),
             SnapshotKind::POSITION => target_transaction_info.position_state_checkpoint_hash(),
+            SnapshotKind::ORDER => target_transaction_info.order_state_checkpoint_hash(),
+            SnapshotKind::COLLATERAL => target_transaction_info.collateral_state_checkpoint_hash(),
             SnapshotKind::HOT_STATE => target_transaction_info.hot_state_checkpoint_hash(),
         })
     }
@@ -1159,7 +1228,7 @@ impl<
     }
 
     /// Whether the given snapshot kind participates in the fast sync to this
-    /// target. Main state always does. Native-position and hot state only
+    /// target. Main state always does. The native stores and hot state only
     /// participate once the target's `TransactionInfo` commits their root: until
     /// the executor sets it there is no authenticated snapshot to sync, so the
     /// stage is skipped rather than trusting an unproved peer-supplied root.
@@ -1170,9 +1239,10 @@ impl<
     fn snapshot_kind_applies_to_target(&mut self, kind: SnapshotKind) -> Result<bool, Error> {
         match kind {
             SnapshotKind::MAIN_STATE => Ok(true),
-            SnapshotKind::POSITION | SnapshotKind::HOT_STATE => {
-                Ok(self.committed_snapshot_root(kind)?.is_some())
-            },
+            SnapshotKind::POSITION
+            | SnapshotKind::ORDER
+            | SnapshotKind::COLLATERAL
+            | SnapshotKind::HOT_STATE => Ok(self.committed_snapshot_root(kind)?.is_some()),
         }
     }
 
@@ -1704,8 +1774,7 @@ impl<
                 Error::UnexpectedError(format!("The {:?} ledger info to sync is missing!", kind))
             })?;
         if self.expected_snapshot_root(kind)? == *SPARSE_MERKLE_PLACEHOLDER_HASH {
-            // TODO(HotState): an empty hot snapshot should still write its (null)
-            // root node at the version, for later hot state updates to build on.
+            // Storage writes the empty hot state root when finalizing the snapshot.
             self.metadata_storage.update_last_persisted_index(
                 &target_ledger_info,
                 0,

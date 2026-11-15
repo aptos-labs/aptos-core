@@ -323,6 +323,8 @@ impl From<RestError> for ApiError {
                 AptosErrorCode::BcsNotSupported => ApiError::InvalidInput(Some(err.error.message)),
                 AptosErrorCode::InternalError => ApiError::InternalError(Some(err.error.message)),
                 AptosErrorCode::ApiDisabled => ApiError::InternalError(Some(err.error.message)),
+                // The node is up but has no ledger data to answer with yet
+                AptosErrorCode::NodeNotBootstrapped => ApiError::NodeIsOffline,
             },
             RestError::Bcs(_) => ApiError::DeserializationFailed(None),
             RestError::Json(_) => ApiError::DeserializationFailed(None),

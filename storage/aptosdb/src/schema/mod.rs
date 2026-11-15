@@ -15,11 +15,11 @@ pub(crate) mod event_accumulator;
 pub(crate) mod hot_state_value_by_key_hash;
 pub(crate) mod jellyfish_merkle_node;
 pub(crate) mod ledger_info;
+pub(crate) mod native_stale_value_index;
+pub(crate) mod native_value;
 pub(crate) mod persisted_auxiliary_info;
-pub(crate) mod position_value;
 pub(crate) mod stale_node_index;
 pub(crate) mod stale_node_index_cross_epoch;
-pub(crate) mod stale_position_value_index;
 pub(crate) mod stale_state_value_index_by_key_hash;
 pub(crate) mod state_value_by_key_hash;
 pub(crate) mod transaction;
@@ -108,14 +108,14 @@ pub mod fuzzing {
             assert_no_panic_decoding::<super::persisted_auxiliary_info::PersistedAuxiliaryInfoSchema>(
                 data,
             );
-            assert_no_panic_decoding::<super::position_value::PositionValueSchema>(data);
+            assert_no_panic_decoding::<super::native_value::NativeValueSchema>(data);
             assert_no_panic_decoding::<super::stale_node_index::StaleNodeIndexSchema>(data);
             assert_no_panic_decoding::<
                 super::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
             >(data);
-            assert_no_panic_decoding::<
-                super::stale_position_value_index::StalePositionValueIndexSchema,
-            >(data);
+            assert_no_panic_decoding::<super::native_stale_value_index::NativeStaleValueIndexSchema>(
+                data,
+            );
             assert_no_panic_decoding::<
                 super::stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
             >(data);

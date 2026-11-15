@@ -4,16 +4,14 @@
 //! Tests for the `PositionValue` instantiation of the KV pruner.
 
 use super::{
-    generics::{PositionValue, PositionValuePrunerManager},
-    StateKvPruner,
+    generics::PositionValue, state_kv_pruner_manager::StateKvPrunerManager, StateKvPruner,
 };
 use crate::{
     native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
-    position_db::PositionDb,
+    native_store::kv_db::PositionDb,
     pruner::{db_pruner::DBPruner, pruner_manager::PrunerManager},
     schema::{
-        position_value::PositionValueSchema,
-        stale_position_value_index::StalePositionValueIndexSchema,
+        native_stale_value_index::NativeStaleValueIndexSchema, native_value::NativeValueSchema,
     },
     sharded_kv_db::ShardedKvDb,
 };
@@ -75,7 +73,12 @@ fn commit_at(db: &Arc<PositionDb>, version: Version, writes: Vec<(StateKey, Writ
     let mut batches = new_sharded_kv_batches();
     let mut in_chunk_prior = InChunkPriorVersions::new();
     committer
-        .apply(version, writes, &mut batches, &mut in_chunk_prior)
+        .apply(
+            version,
+            writes.iter().map(|(key, op)| (key, op)),
+            &mut batches,
+            &mut in_chunk_prior,
+        )
         .expect("apply");
     db.commit(version, None, batches).expect("commit");
 }
@@ -83,7 +86,7 @@ fn commit_at(db: &Arc<PositionDb>, version: Version, writes: Vec<(StateKey, Writ
 fn value_exists(db: &PositionDb, hash: HashValue, version: Version) -> bool {
     let shard = ShardedKvDb::shard_of_hash(hash);
     db.shard(shard)
-        .get::<PositionValueSchema>(&(hash, version))
+        .get::<NativeValueSchema>(&(hash, version))
         .unwrap()
         .is_some()
 }
@@ -92,7 +95,7 @@ fn stale_versions(db: &PositionDb, hash: HashValue) -> Vec<Version> {
     let shard = ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
         .shard(shard)
-        .iter::<StalePositionValueIndexSchema>()
+        .iter::<NativeStaleValueIndexSchema>()
         .unwrap();
     iter.seek_to_first();
     let mut v: Vec<Version> = iter
@@ -192,12 +195,15 @@ fn position_manager_drives_pruning() {
     commit_at(&db, 0, vec![(key.clone(), upsert(100))]);
     commit_at(&db, 5, vec![(key.clone(), upsert(105))]);
 
-    let manager = PositionValuePrunerManager::new(Arc::clone(&db), LedgerPrunerConfig {
-        enable: true,
-        prune_window: 0,
-        batch_size: 1,
-        user_pruning_window_offset: 0,
-    });
+    let manager = StateKvPrunerManager::<PositionValue, PositionDb>::new(
+        Arc::clone(&db),
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
+            user_pruning_window_offset: 0,
+        },
+    );
     manager.wake_and_wait_pruner(5).unwrap();
 
     assert!(!value_exists(&db, hash, 0), "v0 collected by the worker");

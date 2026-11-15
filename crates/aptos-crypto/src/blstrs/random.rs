@@ -31,7 +31,7 @@ pub const DST_RAND_CORE_HELL: &[u8; 24] = b"APTOS_RAND_CORE_HELL_DST";
 /// Returns a random non-zero `blstrs::Scalar`.
 pub fn random_nonzero_scalar<R>(rng: &mut R) -> Scalar
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     crate::blstrs::random_scalar_internal(rng, true)
 }
@@ -47,7 +47,7 @@ pub fn random_scalar_from_uniform_bytes(bytes: &[u8; 2 * SCALAR_NUM_BYTES]) -> S
 /// Generates a random 128-bit `blstrs::Scalar`.
 pub fn random_128bit_scalar<R>(rng: &mut R) -> Scalar
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     let mut low_bytes = [0u8; SCALAR_NUM_BYTES / 2];
     rng.fill(&mut low_bytes[..]);
@@ -66,7 +66,7 @@ where
 /// Slow: Takes 50 microseconds.
 pub fn random_g1_point<R>(rng: &mut R) -> G1Projective
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     let mut rand_seed = [0u8; 2 * G1_PROJ_NUM_BYTES];
     rng.fill(rand_seed.as_mut_slice());
@@ -79,7 +79,7 @@ where
 /// Slow: Takes 150 microseconds.
 pub fn random_g2_point<R>(rng: &mut R) -> G2Projective
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     let mut rand_seed = [0u8; 2 * G2_PROJ_NUM_BYTES];
     rng.fill(rand_seed.as_mut_slice());
@@ -95,7 +95,7 @@ where
 /// random G_T point w.r.t. the generator. In many applications, this is not acceptable.
 pub fn insecure_random_gt_point<R>(rng: &mut R) -> Gt
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     let s = crate::blstrs::random_scalar(rng);
 
@@ -106,7 +106,7 @@ where
 /// Returns a vector of random `blstrs::Scalar`'s, given an RNG as input.
 pub fn random_scalars<R>(n: usize, rng: &mut R) -> Vec<Scalar>
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     let mut v = Vec::with_capacity(n);
 
@@ -122,7 +122,7 @@ where
 /// Returns a vector of random `blstrs::G1Projective`'s, given an RNG as input.
 pub fn random_g1_points<R>(n: usize, rng: &mut R) -> Vec<G1Projective>
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     let mut v = Vec::with_capacity(n);
 
@@ -138,7 +138,7 @@ where
 /// Returns a vector of random `blstrs::G2Projective`'s, given an RNG as input.
 pub fn random_g2_points<R>(n: usize, rng: &mut R) -> Vec<G2Projective>
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     let mut v = Vec::with_capacity(n);
 
@@ -156,7 +156,7 @@ where
 /// WARNING: Insecure. See `insecure_random_gt_point` comments.
 pub fn insecure_random_gt_points<R>(n: usize, rng: &mut R) -> Vec<Gt>
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     let mut v = Vec::with_capacity(n);
 
@@ -173,7 +173,7 @@ where
 /// use this faster **insecure** function instead.
 pub fn insecure_random_g1_points<R>(n: usize, rng: &mut R) -> Vec<G1Projective>
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     let point = random_g1_point(rng);
     let shift = random_g1_point(rng);
@@ -189,7 +189,7 @@ where
 /// Like `insecure_random_g1_points` but for G_2.
 pub fn insecure_random_g2_points<R>(n: usize, rng: &mut R) -> Vec<G2Projective>
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     let point = random_g2_point(rng);
     let shift = random_g2_point(rng);

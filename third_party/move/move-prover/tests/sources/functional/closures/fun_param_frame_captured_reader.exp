@@ -1,0 +1,18 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function argument accesses resource `fun_param_frame_captured_reader::R`, which is not declared in `modifies_of`/`reads_of` for `g`
+   ┌─ tests/sources/functional/closures/fun_param_frame_captured_reader.move:31:18
+   │
+31 │         let r1 = apply2(g, 1);
+   │                  ^^^^^^^^^^^^
+
+error: function argument accesses resource `fun_param_frame_captured_reader::R`, which is not declared in `modifies_of`/`reads_of` for `g`
+   ┌─ tests/sources/functional/closures/fun_param_frame_captured_reader.move:33:18
+   │
+33 │         let r2 = apply2(g, 1);
+   │                  ^^^^^^^^^^^^
+
+error: function argument accesses resource `fun_param_frame_captured_reader_body::R`, which is not declared in `modifies_of`/`reads_of` for `g`
+   ┌─ tests/sources/functional/closures/fun_param_frame_captured_reader.move:68:9
+   │
+68 │         apply2(g, a)
+   │         ^^^^^^^^^^^^

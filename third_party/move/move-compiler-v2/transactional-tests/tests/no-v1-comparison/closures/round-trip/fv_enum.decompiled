@@ -6,21 +6,21 @@ module 0x66::fv_enum_basic {
     enum Action has drop {
         Noop,
         Call {
-            _0: |u64|(u64) has drop,
+            _0: |u64|u64 has drop,
         }
     }
     enum FunVec<T0> has key {
         V1 {
-            v1: vector<|&mut T0|(T0) has copy + store>,
+            v1: vector<|&mut T0|T0 has copy + store>,
         }
         V2 {
             v0: u64,
-            v1: vector<|&mut T0|(T0) has copy + store>,
+            v1: vector<|&mut T0|T0 has copy + store>,
         }
     }
     enum Mapper<T0, T1> has key {
         Id {
-            _0: |T0|(T1) has copy + store,
+            _0: |T0|T1 has copy + store,
         }
         Twice {
             _0: Version<T0, T1>,
@@ -28,7 +28,7 @@ module 0x66::fv_enum_basic {
     }
     enum Version<T0, T1> has copy, store {
         V1 {
-            v1: |T0|(T1) has copy + store,
+            v1: |T0|T1 has copy + store,
         }
     }
     #[persistent]
@@ -75,11 +75,11 @@ module 0x66::fv_enum_basic {
     fun test_fun_vec(p0: &signer)
         acquires FunVec
     {
-        let _v0: |&mut u64|(u64) has copy + drop + store = |x| add_k_persistent_ref(x, 3);
-        let _v1 = 0x1::vector::empty<|&mut u64|(u64) has copy + store>();
+        let _v0: |&mut u64|u64 has copy + drop + store = |x| add_k_persistent_ref(x, 3);
+        let _v1 = 0x1::vector::empty<|&mut u64|u64 has copy + store>();
         let _v2 = &mut _v1;
-        0x1::vector::push_back<|&mut u64|(u64) has copy + store>(_v2, _v0);
-        0x1::vector::push_back<|&mut u64|(u64) has copy + store>(_v2, _v0);
+        0x1::vector::push_back<|&mut u64|u64 has copy + store>(_v2, _v0);
+        0x1::vector::push_back<|&mut u64|u64 has copy + store>(_v2, _v0);
         let _v3 = FunVec::V1<u64>{v1: _v1};
         move_to<FunVec<u64>>(p0, _v3);
         let _v4 = signer::address_of(p0);
@@ -92,7 +92,7 @@ module 0x66::fv_enum_basic {
                 if (_v6 is V1) {
                     let FunVec::V1<u64>{v1: _v9} = _v5;
                     _v8 = _v9;
-                    _v7 = 0x1::vector::pop_back<|&mut u64|(u64) has copy + store>(&mut _v8);
+                    _v7 = 0x1::vector::pop_back<|&mut u64|u64 has copy + store>(&mut _v8);
                     let _v10 = 3;
                     let _v11 = &mut _v10;
                     let _v12 = _v7(_v11);
@@ -102,11 +102,11 @@ module 0x66::fv_enum_basic {
                 };
                 assert!(_v6 is V2, 14566554180833181697);
                 let FunVec::V2<u64>{v0: _v13, v1: _v14} = _v5;
-                0x1::vector::destroy_empty<|&mut u64|(u64) has copy + store>(_v14);
+                0x1::vector::destroy_empty<|&mut u64|u64 has copy + store>(_v14);
                 if (false) break 'l0;
                 abort 2
             };
-            0x1::vector::push_back<|&mut u64|(u64) has copy + store>(&mut _v8, _v7);
+            0x1::vector::push_back<|&mut u64|u64 has copy + store>(&mut _v8, _v7);
             _v3 = FunVec::V2<u64>{v0: 10, v1: _v8};
             move_to<FunVec<u64>>(p0, _v3);
             return ()

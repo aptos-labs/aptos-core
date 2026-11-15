@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::genesis_state::GenesisStateReader;
 use anyhow::anyhow;
 use aptos_config::config::{
     NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL, DEFAULT_NATIVE_RAYON_THREAD_PER_EXEC_THREAD,
@@ -8,7 +9,8 @@ use aptos_config::config::{
 #[cfg(unix)]
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
-    state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReaderWriter,
+    state_store::state_view::db_state_view::{DbStateViewAtVersion, LatestDbStateCheckpointView},
+    DbReader, DbReaderWriter,
 };
 use aptos_types::{
     account_config::ChainIdResource, chain_id::ChainId, on_chain_config::OnChainConfig,
@@ -17,6 +19,7 @@ use aptos_vm::AptosVM;
 use aptos_vm_environment::prod_configs::{
     set_async_runtime_checks, set_layout_caches, set_paranoid_type_checks,
 };
+use std::sync::Arc;
 
 /// Error message to display when non-production features are enabled
 pub const ERROR_MSG_BAD_FEATURE_FLAGS: &str = r#"
@@ -40,14 +43,31 @@ pub fn create_global_rayon_pool(create_global_rayon_pool: bool) {
     }
 }
 
-/// Fetches the chain ID from on-chain resources
-pub fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
+/// Fetches the chain ID from on-chain resources, falling back to the genesis
+/// blob when the node has no state yet.
+///
+/// The chain ID is needed before the network can be brought up, and a node that
+/// is about to fast sync holds no state until its snapshot lands, so it reads
+/// the chain ID out of the genesis blob it was configured with instead.
+pub fn fetch_chain_id(db: &DbReaderWriter, node_config: &NodeConfig) -> anyhow::Result<ChainId> {
     let db_state_view = db
         .reader
         .latest_state_checkpoint_view()
         .map_err(|err| anyhow!("[aptos-node] failed to create db state view {}", err))?;
-    Ok(ChainIdResource::fetch_config(&db_state_view)?
-        .expect("[aptos-node] missing chain ID resource")
+    if let Some(chain_id) = ChainIdResource::fetch_config(&db_state_view)? {
+        return Ok(chain_id.chain_id());
+    }
+    fetch_chain_id_from_genesis(node_config)
+}
+
+/// Reads the chain ID out of the node's genesis blob
+fn fetch_chain_id_from_genesis(node_config: &NodeConfig) -> anyhow::Result<ChainId> {
+    let genesis_reader: Arc<dyn DbReader> = Arc::new(GenesisStateReader::new(node_config)?);
+    let genesis_state_view = genesis_reader
+        .state_view_at_version(Some(GenesisStateReader::VERSION))
+        .map_err(|err| anyhow!("[aptos-node] failed to create genesis state view {}", err))?;
+    Ok(ChainIdResource::fetch_config(&genesis_state_view)?
+        .ok_or_else(|| anyhow!("[aptos-node] genesis writes no chain ID resource"))?
         .chain_id())
 }
 

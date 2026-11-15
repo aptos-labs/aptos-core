@@ -38,7 +38,6 @@ pub fn output(out: &mut dyn Write, abis: &[EntryABI], local_types: bool) -> Resu
 
     emitter.output_preamble()?;
     writeln!(emitter.out, "#![allow(dead_code)]")?;
-    writeln!(emitter.out, "#![allow(unused_imports)]")?;
     writeln!(emitter.out, "#![allow(clippy::too_many_arguments)]")?;
     writeln!(emitter.out, "#![allow(clippy::arc_with_non_send_sync)]")?;
     writeln!(emitter.out, "#![allow(clippy::get_first)]")?;

@@ -38,7 +38,7 @@
 //! (where the use closest to the definition is the most relevant).
 
 use abstract_domain_derive::AbstractDomain;
-use im::{ordmap::Entry as ImEntry, ordset::OrdSet};
+use imbl::{ordmap::Entry as ImEntry, ordset::OrdSet};
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{

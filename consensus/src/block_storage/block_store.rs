@@ -40,11 +40,11 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, proof::accumulator::InMemoryTransactionAccumulator,
 };
 use futures::executor::block_on;
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(test)]
 use std::collections::VecDeque;
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(test)]
 use std::sync::atomic::AtomicBool;
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(test)]
 use std::sync::atomic::Ordering;
 use std::{sync::Arc, time::Duration};
 
@@ -141,7 +141,7 @@ pub struct BlockStore {
     max_commit_gap: u64,
     skip_sync_small_gap_rounds: Option<u64>,
     payload_manager: Arc<dyn TPayloadManager>,
-    #[cfg(any(test, feature = "fuzzing"))]
+    #[cfg(test)]
     back_pressure_for_test: AtomicBool,
     order_vote_enabled: bool,
     /// Window Size for Execution Pool
@@ -325,7 +325,7 @@ impl BlockStore {
             vote_back_pressure_limit,
             max_commit_gap,
             payload_manager,
-            #[cfg(any(test, feature = "fuzzing"))]
+            #[cfg(test)]
             back_pressure_for_test: AtomicBool::new(false),
             order_vote_enabled,
             pending_blocks,
@@ -656,7 +656,7 @@ impl BlockStore {
         Ok(())
     }
 
-    #[cfg(any(test, feature = "fuzzing"))]
+    #[cfg(test)]
     pub fn set_back_pressure_for_test(&self, back_pressure: bool) {
         use std::sync::atomic::Ordering;
 
@@ -771,7 +771,7 @@ impl BlockReader for BlockStore {
 
     /// Return if the consensus is backpressured
     fn vote_back_pressure(&self) -> bool {
-        #[cfg(any(test, feature = "fuzzing"))]
+        #[cfg(test)]
         {
             if self.back_pressure_for_test.load(Ordering::Relaxed) {
                 return true;
@@ -897,6 +897,7 @@ impl BlockStore {
     }
 
     /// The number of pruned blocks that are still available in memory
+    #[cfg(test)]
     pub(super) fn pruned_blocks_in_mem(&self) -> usize {
         self.inner.read().pruned_blocks_in_mem()
     }
@@ -910,7 +911,10 @@ impl BlockStore {
         }
         self.insert_block(block).await
     }
+}
 
+#[cfg(test)]
+impl BlockStore {
     /// Prune the tree up to next_root_id (keep next_root_id's block).  Any branches not part of
     /// the next_root_id's tree should be removed as well.
     ///

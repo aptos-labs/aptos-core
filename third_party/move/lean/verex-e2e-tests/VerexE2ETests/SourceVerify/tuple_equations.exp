@@ -1,0 +1,48 @@
+VerexE2ETests/SourceVerify/tuple_equations.move:7:1: info: `unpacked` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/tuple_equations.move:68:5: error: the continuation after `decode` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:72:9: error: the specification clause `aborts_if !exists<Pending>(@0x1)` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:73:9: error: the specification clause `aborts_if !spec_contains(global<Pending>(@0x1).configs, key)` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:74:9: error: the specification clause `aborts_if stored.name != key` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:75:9: error: the specification clause `aborts_if !spec_decodable::<T>(stored.data)` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:77:9: error: the specification clause `ensures !spec_contains(global<Pending>(@0x1).configs, key)` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:68:5: error: verex verification failed: the automatic verification of `unpacked` failed; provide a proof in `VerexE2ETests/SourceVerify/tuple_equations.proof.lean`:
+  verify unpacked by lean =>
+    verex_obligations
+    verex_on
+    | after_decode => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_equations.move:7:1: info: `extract` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/tuple_equations.move:90:5: error: the continuation after `name_of` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:93:9: error: the specification clause `aborts_if !exists<Pending>(@0x1)` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:94:9: error: the specification clause `aborts_if !spec_contains(global<Pending>(@0x1).configs, key)` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:95:9: error: the specification clause `aborts_if stored.name != key` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:97:9: error: the specification clause `ensures !spec_contains(global<Pending>(@0x1).configs, key)` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:90:5: error: verex verification failed: the automatic verification of `extract` failed; provide a proof in `VerexE2ETests/SourceVerify/tuple_equations.proof.lean`:
+  verify extract by lean =>
+    verex_obligations
+    verex_on
+    | after_name_of => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_equations.move:7:1: info: `extract_wrong` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/tuple_equations.move:110:9: error: the specification clause `ensures result == spec_get(global<Pending>(@0x1).configs, key).data` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:107:5: error: verex verification failed: the automatic verification of `extract_wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/tuple_equations.proof.lean`:
+  verify extract_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_equations.move:138:9: error: the specification clause `ensures (result, spec.result[1]) == split_of(x)` is not established
+VerexE2ETests/SourceVerify/tuple_equations.move:136:5: error: verex verification failed: the automatic verification of `swapped_wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/tuple_equations.proof.lean`:
+  verify swapped_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

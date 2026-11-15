@@ -46,7 +46,7 @@ impl GrpcGateway {
 
     pub(crate) async fn start(&self) -> anyhow::Result<()> {
         let app = Router::new()
-            .route("/*path", any(proxy).with_state(self.config.clone()))
+            .route("/{*path}", any(proxy).with_state(self.config.clone()))
             .layer(from_fn_with_state(
                 self.config.clone(),
                 get_data_service_url,

@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/index_write_under_loan.move:24:5: error: no denotation for `write_under_loan_call`: a write to a local a live mutable borrow uses as an element index is not carried by the denotation
+tests/sources/regression/index_write_under_loan.move:36:5: error: no denotation for `write_under_loan_index`: a write to a local a live mutable borrow uses as an element index is not carried by the denotation
+tests/sources/regression/index_write_under_loan.move:50:5: error: no denotation for `write_under_loan_destructure`: a write to a local a live mutable borrow uses as an element index is not carried by the denotation
+tests/sources/regression/index_write_under_loan.move:64:9: error: the specification clause `ensures false` is not established
+tests/sources/regression/index_write_under_loan.move:63:5: error: verex verification failed: the automatic verification of `move_under_loan` failed; provide a proof in `tests/sources/regression/index_write_under_loan.proof.lean`:
+  verify move_under_loan by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

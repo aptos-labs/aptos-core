@@ -22,10 +22,10 @@ fun trigger(): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call helper, [] @0
+    0: [x0] := call_exempt helper, [] @0
     1: r0 := ld_u64 0 @1
     2: r0 := move x0 @3
-    3: [] := call void_no_arg, [] @4
+    3: [] := call_exempt void_no_arg, [] @4
     4: ret [r0] @6
 }
 === micro-ops ===
@@ -50,9 +50,9 @@ fun trigger() {
   frame_data_size: 8
   entry_gas: 102
   code:
-    0: CallIndirect 0x66::test::helper @0
+    0: CallByNameExempt 0x66::test::helper @0
     1: StoreImm8 [0] <- #0 @1
     2: Move8 [0] <- [32] @3
-    3: CallIndirect 0x66::test::void_no_arg @4
+    3: CallByNameExempt 0x66::test::void_no_arg @4
     4: Return @6
 }

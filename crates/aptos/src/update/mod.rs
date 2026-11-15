@@ -7,6 +7,7 @@ mod aptos;
 mod helpers;
 mod move_mutation_test;
 mod movefmt;
+mod notice;
 mod prover_dependencies;
 mod prover_dependency_installer;
 mod tool;
@@ -16,7 +17,10 @@ use crate::common::types::CliTypedResult;
 use anyhow::{anyhow, Context, Result};
 pub use helpers::get_additional_binaries_dir;
 pub use movefmt::get_movefmt_path;
-use self_update::{update::ReleaseUpdate, version::bump_is_greater, Status};
+pub use notice::UpdateCheck;
+use self_update::{update::ReleaseUpdate, version::bump_is_greater, VersionStatus};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 pub use tool::UpdateTool;
 
 /// Things that implement this trait are able to update a binary.
@@ -39,8 +43,8 @@ trait BinaryUpdater {
         let info = self
             .get_update_info()
             .context("Failed to check if we need to update")?;
-        if !info.update_required()? {
-            return Ok(format!("Already up to date (v{})", info.target_version));
+        if let Some(installed_version) = info.up_to_date_version()? {
+            return Ok(format!("Already up to date (v{})", installed_version));
         }
 
         // Build the updater.
@@ -51,9 +55,18 @@ trait BinaryUpdater {
             .update()
             .map_err(|e| anyhow!("Failed to update {}: {:#}", self.pretty_name(), e))?;
 
+        // self_update keeps the file mode stored in the release archive, which may
+        // not include the executable bit.
+        #[cfg(unix)]
+        {
+            let install_path = updater.bin_install_path();
+            std::fs::set_permissions(install_path, std::fs::Permissions::from_mode(0o755))
+                .with_context(|| format!("Failed to make {} executable", install_path.display()))?;
+        }
+
         let message = match result {
-            Status::UpToDate(_) => unreachable!("We should have caught this already"),
-            Status::Updated(_) => match info.current_version {
+            VersionStatus::UpToDate(_) => unreachable!("We should have caught this already"),
+            VersionStatus::Updated(_) => match info.current_version {
                 Some(current_version) => format!(
                     "Successfully updated {} from v{} to v{}",
                     self.pretty_name(),
@@ -67,6 +80,15 @@ trait BinaryUpdater {
                         info.target_version
                     )
                 },
+            },
+            // `VersionStatus` is `#[non_exhaustive]`, so a catch-all arm is required.
+            status => {
+                return Err(anyhow!(
+                    "Unexpected status updating {}: {}",
+                    self.pretty_name(),
+                    status
+                )
+                .into())
             },
         };
 
@@ -84,6 +106,14 @@ pub struct UpdateRequiredInfo {
 }
 
 impl UpdateRequiredInfo {
+    /// Returns the installed version if it needs no update.
+    fn up_to_date_version(&self) -> Result<Option<&str>> {
+        match &self.current_version {
+            Some(current_version) if !self.update_required()? => Ok(Some(current_version)),
+            Some(_) | None => Ok(None),
+        }
+    }
+
     pub fn update_required(&self) -> Result<bool> {
         match self.current_version {
             Some(ref current_version) => {
@@ -98,7 +128,7 @@ impl UpdateRequiredInfo {
                     &self.target_version
                 };
                 bump_is_greater(current_version, target_version).context(
-                    "Failed to compare current and latest CLI versions, please update manually",
+                    "Failed to compare current and latest versions, please update manually",
                 )
             },
             None => Ok(true),
@@ -114,14 +144,29 @@ async fn update_binary<Updater: BinaryUpdater + Sync + Send + 'static>(
         let info = tokio::task::spawn_blocking(move || updater.get_update_info())
             .await
             .context(format!("Failed to check {} version", name))??;
-        if info.current_version.unwrap_or_default() != info.target_version {
-            return Ok(format!("Update is available ({})", info.target_version));
-        }
-
-        return Ok(format!("Already up to date ({})", info.target_version));
+        return Ok(match info.up_to_date_version()? {
+            Some(installed_version) => format!("Already up to date ({})", installed_version),
+            None => format!("Update is available ({})", info.target_version),
+        });
     }
 
     tokio::task::spawn_blocking(move || updater.update())
         .await
         .context(format!("Failed to install or update {}", name))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_not_required_when_installed_version_is_newer() {
+        let info = UpdateRequiredInfo {
+            current_version: Some("9.5.2".to_string()),
+            target_version: "9.5.1".to_string(),
+        };
+        assert!(!info
+            .update_required()
+            .expect("versions should be comparable"));
+    }
 }

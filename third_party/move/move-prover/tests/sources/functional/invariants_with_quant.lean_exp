@@ -1,7 +1,0 @@
-Move prover returns: exiting with verification errors
-tests/sources/functional/invariants_with_quant.move:14:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/invariants_with_quant.move:14:5: error: leaner verification failed: the automatic verification of `vector_of_proper_positives` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify vector_of_proper_positives by …` in `tests/sources/functional/invariants_with_quant.proof.lean` (`verify vector_of_proper_positives by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

@@ -8,20 +8,24 @@ module 0x42::TupleErrors {
     // Error: 1-tuple - parentheses don't create a tuple, just grouping
     spec fun single(x: u64): (u64) { (x) }
 
-    // Error: tuple too large (12 elements)
+    // Error: tuple too large (21 elements)
     spec fun too_large(a: u64, b: u64, c: u64, d: u64, e: u64,
                        f: u64, g: u64, h: u64, i: u64, j: u64,
-                       k: u64, l: u64):
-        (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) {
-        (a, b, c, d, e, f, g, h, i, j, k, l)
+                       k: u64, l: u64, m: u64, n: u64, o: u64,
+                       p: u64, q: u64, r: u64, s: u64, t: u64,
+                       u: u64):
+        (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) {
+        (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u)
     }
 
-    // Error: tuple way too large (13 elements)
+    // Error: tuple way too large (22 elements)
     spec fun way_too_large(a: u64, b: u64, c: u64, d: u64, e: u64,
-                           f: u64, g: u64, h: u64, i: u64, j: u64,
-                           k: u64, l: u64, m: u64):
-        (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) {
-        (a, b, c, d, e, f, g, h, i, j, k, l, m)
+                       f: u64, g: u64, h: u64, i: u64, j: u64,
+                       k: u64, l: u64, m: u64, n: u64, o: u64,
+                       p: u64, q: u64, r: u64, s: u64, t: u64,
+                       u: u64, v: u64):
+        (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) {
+        (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v)
     }
 
     /// Need to use the spec functions, otherwise the monomorphizer will eliminate them.
@@ -31,9 +35,9 @@ module 0x42::TupleErrors {
         ensures empty() == ();
         ensures single(42) == 42;
         // These are errors - tuples too large
-        ensures too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
-            == too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
-        ensures way_too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
-            == way_too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
+        ensures too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+            == too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21);
+        ensures way_too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22)
+            == way_too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22);
     }
 }

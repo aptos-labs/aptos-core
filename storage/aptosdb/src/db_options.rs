@@ -86,7 +86,7 @@ pub(super) fn ledger_metadata_db_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
-pub(crate) fn position_db_column_families() -> Vec<ColumnFamilyName> {
+pub(crate) fn native_kv_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
         DB_METADATA_CF_NAME,
@@ -95,7 +95,7 @@ pub(crate) fn position_db_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
-pub(crate) fn position_merkle_db_column_families() -> Vec<ColumnFamilyName> {
+pub(crate) fn native_merkle_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
         DB_METADATA_CF_NAME,
@@ -238,28 +238,26 @@ fn state_key_extractor(state_value_raw_key: &[u8]) -> &[u8] {
     &state_value_raw_key[..(state_value_raw_key.len() - VERSION_SIZE)]
 }
 
-#[allow(dead_code)]
-pub(crate) fn gen_position_cfds(
+pub(crate) fn gen_native_kv_cfds(
     rocksdb_config: &RocksdbConfig,
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     gen_cfds(
         rocksdb_config,
         block_cache,
-        position_db_column_families(),
+        native_kv_db_column_families(),
         with_state_key_extractor_processor,
     )
 }
 
-#[allow(dead_code)]
-pub(crate) fn gen_position_merkle_cfds(
+pub(crate) fn gen_native_merkle_cfds(
     rocksdb_config: &RocksdbConfig,
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     gen_cfds(
         rocksdb_config,
         block_cache,
-        position_merkle_db_column_families(),
+        native_merkle_db_column_families(),
         |_, _| {},
     )
 }

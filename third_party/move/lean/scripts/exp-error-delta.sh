@@ -10,7 +10,7 @@
 set -euo pipefail
 
 REVISION="${1:-HEAD}"
-cd "$(dirname "$0")/../leaner-e2e-tests"
+cd "$(dirname "$0")/../verex-e2e-tests"
 PREFIX="$(git rev-parse --show-prefix)"
 
 git diff --name-only "$REVISION" -- . | { grep '\.exp' || true; } | while read -r path; do

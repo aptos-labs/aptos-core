@@ -11,7 +11,7 @@ use super::ssa_function::SSAFunction;
 use crate::{
     stackless_exec_ir::{
         BasicBlock, BinaryOp, CallClosureData, CallData, CmpKind, HomeIndex, ImmValue, Instr,
-        InstrSeq, Label, PackClosureData, SsaSlot, UnaryOp,
+        InstrSeq, Label, PackClosureData, ReentrancyCheck, SsaSlot, UnaryOp,
     },
     validate::TranslationWitness,
 };
@@ -658,12 +658,12 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::Unpack(idx) => {
                 let src = self.pop_slot()?;
-                let ftypes = module
-                    .interned_struct_field_types_at(*idx)
+                let fields = module
+                    .interned_struct_fields_at(*idx)
                     .ok_or(SsaConversionError::ExpectedStructType)?;
-                let mut dsts = Vec::with_capacity(ftypes.len());
-                for &fty in ftypes {
-                    dsts.push(self.alloc_value_id(fty)?);
+                let mut dsts = Vec::with_capacity(fields.len());
+                for f in fields {
+                    dsts.push(self.alloc_value_id(f.ty)?);
                 }
                 let dsts = self.push_results(dsts);
                 let struct_ty = module.interned_nominal_def_type_at(*idx);
@@ -677,15 +677,15 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let src = self.pop_slot()?;
                 let inst = &module.struct_def_instantiations[idx.0 as usize];
                 let fields = module
-                    .interned_struct_field_types_at(inst.def)
+                    .interned_struct_fields_at(inst.def)
                     .ok_or(SsaConversionError::ExpectedStructType)?;
                 let struct_ty = self.struct_inst_ty(module, *idx)?;
                 let ty_args = self
                     .interner
                     .type_list_of(module.interned_types_at(inst.type_parameters));
                 let mut dsts = Vec::with_capacity(fields.len());
-                for &fty in fields {
-                    let fty = self.interner.subst_type(fty, ty_args)?;
+                for f in fields {
+                    let fty = self.interner.subst_type(f.ty, ty_args)?;
                     dsts.push(self.alloc_value_id(fty)?);
                 }
                 let dsts = self.push_results(dsts);
@@ -732,12 +732,12 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let src = self.pop_slot()?;
                 let handle = &module.struct_variant_handles[idx.0 as usize];
                 let variant = handle.variant;
-                let ftypes = module
-                    .interned_variant_field_types_at(handle.struct_index, variant)
+                let fields = module
+                    .interned_variant_fields_at(handle.struct_index, variant)
                     .ok_or(SsaConversionError::ExpectedEnumType)?;
-                let mut dsts = Vec::with_capacity(ftypes.len());
-                for &fty in ftypes {
-                    dsts.push(self.alloc_value_id(fty)?);
+                let mut dsts = Vec::with_capacity(fields.len());
+                for f in fields {
+                    dsts.push(self.alloc_value_id(f.ty)?);
                 }
                 let dsts = self.push_results(dsts);
                 let enum_ty = module.interned_nominal_def_type_at(handle.struct_index);
@@ -754,12 +754,12 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let handle = &module.struct_variant_handles[inst.handle.0 as usize];
                 let variant = handle.variant;
                 let fields = module
-                    .interned_variant_field_types_at(handle.struct_index, variant)
+                    .interned_variant_fields_at(handle.struct_index, variant)
                     .ok_or(SsaConversionError::ExpectedEnumType)?;
                 let (enum_ty, variant_ord, ty_args) = self.variant_inst_parts(module, *idx)?;
                 let mut dsts = Vec::with_capacity(fields.len());
-                for &fty in fields {
-                    let fty = self.interner.subst_type(fty, ty_args)?;
+                for f in fields {
+                    let fty = self.interner.subst_type(f.ty, ty_args)?;
                     dsts.push(self.alloc_value_id(fty)?);
                 }
                 let dsts = self.push_results(dsts);
@@ -1073,6 +1073,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                         function_handle: *idx,
                         ty_args: ty::EMPTY_TYPE_LIST,
                         args,
+                        reentrancy_check: reentrancy_check(module, *idx),
                     }),
                 });
             },
@@ -1095,6 +1096,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                         function_handle: handle_idx,
                         ty_args,
                         args,
+                        reentrancy_check: reentrancy_check(module, handle_idx),
                     }),
                 });
             },
@@ -1348,6 +1350,17 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
 // ================================================================================================
 // Type/field helpers
 // ================================================================================================
+
+/// Whether the reentrancy checker must observe a call through `handle_idx`.
+/// A same-module callee without `#[module_lock]` preserves module activity,
+/// module locks, and resource access, so its call can skip the check.
+fn reentrancy_check(module: &PreparedModule, handle_idx: FunctionHandleIndex) -> ReentrancyCheck {
+    if module.is_unlocked_local_callee(handle_idx) {
+        ReentrancyCheck::Exempt
+    } else {
+        ReentrancyCheck::Required
+    }
+}
 
 fn struct_field_count(module: &PreparedModule, idx: StructDefinitionIndex) -> usize {
     match &module.struct_defs[idx.0 as usize].field_information {

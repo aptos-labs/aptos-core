@@ -190,7 +190,7 @@ fn read_source_info(core_path: &Path) -> Result<SourceInfo> {
         .to_string();
     // Only report an actual branch (a detached HEAD's shorthand is a commit hash).
     let branch = if head.is_branch() {
-        head.shorthand().map(|s| s.to_string())
+        head.shorthand().ok().map(|s| s.to_string())
     } else {
         None
     };

@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/result_of_transition_let_post.move:63:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_let_post.move:58:5: error: verex verification failed: the automatic verification of `direct_false` failed; provide a proof in `tests/sources/functional/closures/result_of_transition_let_post.proof.lean`:
+  verify direct_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/result_of_transition_let_post.move:92:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/result_of_transition_let_post.move:87:5: error: verex verification failed: the automatic verification of `transitive_false` failed; provide a proof in `tests/sources/functional/closures/result_of_transition_let_post.proof.lean`:
+  verify transitive_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

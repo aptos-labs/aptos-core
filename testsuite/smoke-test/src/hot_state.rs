@@ -32,7 +32,11 @@ use aptos_genesis::builder::InitGenesisConfigFn;
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, Features, HotStateConfigV1, OnChainHotStateConfig},
+    state_store::NUM_STATE_SHARDS,
+};
+use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -160,6 +164,82 @@ script {{
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
     info!("TRANSACTION_INFO_V1 + HOT_STATE_ROOT_IN_TXN_INFO are now enabled on chain.");
+}
+
+/// Sets the on-chain hot state config through a governance script submitted as root
+/// and waits for it to take effect at the next epoch.
+async fn set_hot_state_config_via_governance(
+    swarm: &mut LocalSwarm,
+    cli: &mut CliTestFramework,
+    validator_client: &RestClient,
+    config: &OnChainHotStateConfig,
+) {
+    info!("Setting the on-chain hot state config via governance: {config:?}");
+    let config_bytes = bcs::to_bytes(config).unwrap();
+    let root_addr = swarm.chain_info().root_account().address();
+    let root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
+    let script = format!(
+        r#"
+script {{
+    use aptos_framework::aptos_governance;
+    use aptos_framework::hot_state_config;
+
+    fun main(core_resources: &signer) {{
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        hot_state_config::set_for_next_epoch(&framework_signer, x"{}");
+        aptos_governance::reconfigure(&framework_signer);
+    }}
+}}
+"#,
+        hex::encode(&config_bytes),
+    );
+    cli.run_script(root_idx, &script)
+        .await
+        .expect("Failed to set the hot state config via governance.");
+
+    // The epoch may only change after DKG, so wait for the config to land on chain.
+    let deadline = Instant::now() + Duration::from_secs(MAX_CATCH_UP_WAIT_SECS);
+    loop {
+        // The resource holds the config as opaque bytes.
+        let on_chain = validator_client
+            .get_account_resource_bcs::<Vec<u8>>(
+                CORE_CODE_ADDRESS,
+                "0x1::hot_state_config::HotStateConfig",
+            )
+            .await
+            .ok()
+            .map(|response| response.into_inner());
+        if on_chain.as_ref() == Some(&config_bytes) {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "The hot state config was not set in time"
+        );
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+    info!("The on-chain hot state config is now set.");
+}
+
+/// Polls `metric` on `node` until `condition` holds.
+async fn wait_for_metric(node: &LocalNode, metric: &str, condition: impl Fn(Option<i64>) -> bool) {
+    let deadline = Instant::now() + Duration::from_secs(MAX_CATCH_UP_WAIT_SECS);
+    loop {
+        let value = node
+            .inspection_client()
+            .get_node_metric_i64(metric)
+            .await
+            .unwrap();
+        if condition(value) {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Unexpected {metric} on {}: {value:?}",
+            node.name(),
+        );
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
 
 /// A fullnode rebuilds hot state from genesis using the given sync modes, with
@@ -588,4 +668,121 @@ async fn test_hot_state_validator_fast_sync_and_participate() {
         true,
     )
     .await;
+}
+
+/// Shrinks the hot state's item cap and the promotion cap through the on-chain config,
+/// which overrides the much larger local defaults. The reconfig txn evicts the excess,
+/// and a fullnode has to agree on the resulting roots while following along, after a
+/// restart that reloads the config from disk, and after fast syncing past the change.
+///
+/// The byte cap is left unbounded: large values like modules would empty some shards,
+/// leaving too few items to fast sync in several chunks. Unit tests cover it instead.
+#[tokio::test]
+async fn test_hot_state_on_chain_config() {
+    const HOT_STATE_ITEMS_METRIC: &str = "aptos_storage_gauge{name=hot_state_items}";
+    const DROPPED_PROMOTIONS_METRIC: &str =
+        "aptos_hot_state_op_accumulator_counter{name=promotions_dropped_over_cap}";
+
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| snapshot_server_config(config)))
+        .with_init_genesis_config(hot_state_genesis(true))
+        .build_with_cli(0)
+        .await;
+
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
+    persist_hot_state(&mut vfn_config);
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
+
+    let validator_peer_id = swarm.validators().next().unwrap().peer_id();
+    let validator_client = first_validator_client(&swarm);
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let (mut account_0, mut account_1) = create_test_accounts(&mut swarm).await;
+    generate_load(
+        &validator_client,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        10,
+    )
+    .await;
+    wait_for_all_nodes(&mut swarm).await;
+
+    let max_hot_items = (TINY_HOT_STATE_ITEMS_PER_SHARD * NUM_STATE_SHARDS) as i64;
+    let max_promotion_bytes_per_block = 100;
+    let validator = swarm.validator(validator_peer_id).unwrap();
+    wait_for_metric(validator, HOT_STATE_ITEMS_METRIC, |n| {
+        n.is_some_and(|n| n > max_hot_items)
+    })
+    .await;
+    wait_for_metric(validator, DROPPED_PROMOTIONS_METRIC, |n| {
+        n.is_none_or(|n| n == 0)
+    })
+    .await;
+
+    let config = OnChainHotStateConfig::V1(HotStateConfigV1 {
+        max_items_per_shard: vec![TINY_HOT_STATE_ITEMS_PER_SHARD as u64; NUM_STATE_SHARDS],
+        max_bytes_per_shard: vec![u64::MAX; NUM_STATE_SHARDS],
+        refresh_interval_versions: 10,
+        max_promotion_bytes_per_block,
+        defer_cold_writes_to_eviction: false,
+    });
+    set_hot_state_config_via_governance(&mut swarm, &mut cli, &validator_client, &config).await;
+
+    generate_load(
+        &validator_client,
+        &transaction_factory,
+        &mut account_1,
+        &account_0,
+        10,
+    )
+    .await;
+    wait_for_all_nodes(&mut swarm).await;
+    let validator = swarm.validator(validator_peer_id).unwrap();
+    wait_for_metric(validator, HOT_STATE_ITEMS_METRIC, |n| {
+        n.is_some_and(|n| n <= max_hot_items)
+    })
+    .await;
+    wait_for_metric(validator, DROPPED_PROMOTIONS_METRIC, |n| {
+        n.is_some_and(|n| n > 0)
+    })
+    .await;
+
+    info!("Restarting fullnode (storage preserved).");
+    swarm
+        .fullnode_mut(vfn_peer_id)
+        .unwrap()
+        .restart()
+        .await
+        .unwrap();
+    generate_load(
+        &validator_client,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        5,
+    )
+    .await;
+    wait_for_all_nodes(&mut swarm).await;
+
+    info!("Wiping fullnode storage and fast syncing past the change.");
+    state_sync_utils::stop_fullnode_and_delete_storage(&mut swarm, vfn_peer_id, true).await;
+    let vfn = swarm.fullnode_mut(vfn_peer_id).unwrap();
+    use_fast_sync(vfn.config_mut());
+    let config_path = vfn.config_path();
+    vfn.config_mut().save_to_path(&config_path).unwrap();
+    vfn.restart().await.unwrap();
+    wait_for_all_nodes(&mut swarm).await;
+    verify_hot_state_fast_synced(swarm.fullnode(vfn_peer_id).unwrap()).await;
+
+    // Later blocks evict and promote on top of the restored hot state.
+    generate_load(
+        &validator_client,
+        &transaction_factory,
+        &mut account_1,
+        &account_0,
+        10,
+    )
+    .await;
+    wait_for_all_nodes(&mut swarm).await;
 }

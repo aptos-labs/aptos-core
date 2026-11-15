@@ -1,26 +1,39 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use rustc_hash::{FxBuildHasher, FxHashMap};
-use std::{borrow::Borrow, collections::hash_map::Entry, fmt, hash::Hash, iter::FromIterator};
+use rustc_hash::FxBuildHasher;
+use std::{
+    borrow::Borrow,
+    collections::{hash_map::Entry, HashMap},
+    fmt,
+    hash::{BuildHasher, Hash},
+    iter::FromIterator,
+};
 
-/// A fast, non-cryptographic, non-hash-DoS-resistant hash map.
-/// Iteration over keys or key-value pairs are not exposed to avoid any
-/// reliance on non-deterministic ordering.
+/// A hash map that exposes no ordered iteration, to avoid any reliance on
+/// non-deterministic ordering. The only way to walk it is the explicitly named
+/// [`UnorderedMap::into_iter_unordered`].
+///
+/// The default hasher (Fx) is fast, non-cryptographic and **not**
+/// hash-DoS-resistant: use it only for keys an attacker cannot choose, or that
+/// are already cryptographic hashes. For attacker-chosen keys, pass a randomly
+/// keyed hasher as `S` (e.g. `ahash::RandomState`) and build the map with
+/// `Default`. A random key is safe for determinism precisely because the map
+/// exposes no ordered iteration.
 #[derive(Clone)]
-pub struct UnorderedMap<K, V> {
-    inner: FxHashMap<K, V>,
+pub struct UnorderedMap<K, V, S = FxBuildHasher> {
+    inner: HashMap<K, V, S>,
 }
 
 // ---------------------------------------------------------------------------
-// Methods that require no bounds on K/V
+// Constructors for the default hasher
 // ---------------------------------------------------------------------------
 
 impl<K, V> UnorderedMap<K, V> {
     #[inline]
     pub fn new() -> Self {
         Self {
-            inner: FxHashMap::default(),
+            inner: HashMap::default(),
         }
     }
 
@@ -30,10 +43,16 @@ impl<K, V> UnorderedMap<K, V> {
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            inner: FxHashMap::with_capacity_and_hasher(capacity, FxBuildHasher),
+            inner: HashMap::with_capacity_and_hasher(capacity, FxBuildHasher),
         }
     }
+}
 
+// ---------------------------------------------------------------------------
+// Methods that require no bounds on K/V
+// ---------------------------------------------------------------------------
+
+impl<K, V, S> UnorderedMap<K, V, S> {
     #[inline]
     pub fn len(&self) -> usize {
         self.inner.len()
@@ -48,13 +67,23 @@ impl<K, V> UnorderedMap<K, V> {
     pub fn clear(&mut self) {
         self.inner.clear();
     }
+
+    /// Consumes the map, yielding its key-value pairs in an arbitrary order
+    /// that can differ between runs and between machines.
+    ///
+    /// The caller must make sure that order cannot reach any output: sort the
+    /// result, or collect it into a structure that does not preserve order.
+    #[inline]
+    pub fn into_iter_unordered(self) -> impl Iterator<Item = (K, V)> {
+        self.inner.into_iter()
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Methods that require K: Hash + Eq
 // ---------------------------------------------------------------------------
 
-impl<K: Hash + Eq, V> UnorderedMap<K, V> {
+impl<K: Hash + Eq, V, S: BuildHasher> UnorderedMap<K, V, S> {
     #[inline]
     pub fn get<Q>(&self, k: &Q) -> Option<&V>
     where
@@ -143,14 +172,16 @@ impl<K: Hash + Eq, V> UnorderedMap<K, V> {
 // Trait implementations
 // ---------------------------------------------------------------------------
 
-impl<K, V> Default for UnorderedMap<K, V> {
+impl<K, V, S: Default> Default for UnorderedMap<K, V, S> {
     #[inline]
     fn default() -> Self {
-        Self::new()
+        Self {
+            inner: HashMap::default(),
+        }
     }
 }
 
-impl<K, V> fmt::Debug for UnorderedMap<K, V> {
+impl<K, V, S> fmt::Debug for UnorderedMap<K, V, S> {
     /// Only shows the length to avoid exposing arbitrary iteration order.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnorderedMap")
@@ -159,16 +190,16 @@ impl<K, V> fmt::Debug for UnorderedMap<K, V> {
     }
 }
 
-impl<K: Hash + Eq, V: PartialEq> PartialEq for UnorderedMap<K, V> {
+impl<K: Hash + Eq, V: PartialEq, S: BuildHasher> PartialEq for UnorderedMap<K, V, S> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner
     }
 }
 
-impl<K: Hash + Eq, V: Eq> Eq for UnorderedMap<K, V> {}
+impl<K: Hash + Eq, V: Eq, S: BuildHasher> Eq for UnorderedMap<K, V, S> {}
 
-impl<K: Hash + Eq, V> FromIterator<(K, V)> for UnorderedMap<K, V> {
+impl<K: Hash + Eq, V, S: BuildHasher + Default> FromIterator<(K, V)> for UnorderedMap<K, V, S> {
     #[inline]
     fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
         Self {
@@ -177,7 +208,7 @@ impl<K: Hash + Eq, V> FromIterator<(K, V)> for UnorderedMap<K, V> {
     }
 }
 
-impl<K: Hash + Eq, V> Extend<(K, V)> for UnorderedMap<K, V> {
+impl<K: Hash + Eq, V, S: BuildHasher> Extend<(K, V)> for UnorderedMap<K, V, S> {
     #[inline]
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         self.inner.extend(iter);

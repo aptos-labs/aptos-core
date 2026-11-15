@@ -107,9 +107,13 @@ impl Cmd {
         let printer = thread::spawn(move || {
             let start_time = Instant::now();
             let bar = ProgressBar::new(total_leaves as u64);
-            bar.set_style(ProgressStyle::default_bar().template(
-                "[{elapsed_precise} {per_sec}] {bar:100.cyan/blue} {pos} / {len} {percent}% ETA {eta_precise}",
-            ));
+            bar.set_style(
+                ProgressStyle::default_bar()
+                    .template(
+                        "[{elapsed_precise} {per_sec}] {bar:100.cyan/blue} {pos} / {len} {percent}% ETA {eta_precise}",
+                    )
+                    .expect("progress bar template should be valid"),
+            );
 
             for count in 0..total_leaves {
                 let (index, key, key_version, value_version, value, elapsed) =

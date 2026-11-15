@@ -10,8 +10,8 @@ use crate::{
 use aptos_config::config::HotStateConfig;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
-    positions::PositionOverlay, state::LedgerState,
-    state_view::cached_state_view::ShardedStateCache, HotStateUpdates,
+    collateral::CollateralOverlay, orders::OrderOverlay, positions::PositionOverlay,
+    state::LedgerState, state_view::cached_state_view::ShardedStateCache, HotStateUpdates,
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -41,6 +41,8 @@ impl ExecutionOutput {
         to_retry: TransactionsWithOutput,
         result_state: LedgerState,
         positions: Option<PositionOverlay>,
+        orders: Option<OrderOverlay>,
+        collateral: Option<CollateralOverlay>,
         state_reads: ShardedStateCache,
         hot_state_updates: HotStateUpdates,
         block_end_info: Option<BlockEndInfo>,
@@ -51,11 +53,10 @@ impl ExecutionOutput {
         compute_trading_native_state_roots: bool,
     ) -> Self {
         let next_version = first_version + to_commit.len() as Version;
-        assert_eq!(next_version, result_state.latest().next_version());
+        assert_eq!(next_version, result_state.next_version());
         if is_block {
             // If it's a block, ensure it ends with state checkpoint.
             assert!(to_commit.is_empty() || to_commit.ends_with_sole_checkpoint());
-            assert!(result_state.is_checkpoint());
         } else {
             // If it's not, there shouldn't be any transaction to be discarded or retried.
             assert!(to_discard.is_empty() && to_retry.is_empty());
@@ -70,6 +71,8 @@ impl ExecutionOutput {
             to_retry,
             result_state,
             positions,
+            orders,
+            collateral,
             state_reads,
             hot_state_updates,
             block_end_info,
@@ -81,7 +84,12 @@ impl ExecutionOutput {
         })
     }
 
-    pub fn new_empty(state: LedgerState, positions: Option<PositionOverlay>) -> Self {
+    pub fn new_empty(
+        state: LedgerState,
+        positions: Option<PositionOverlay>,
+        orders: Option<OrderOverlay>,
+        collateral: Option<CollateralOverlay>,
+    ) -> Self {
         Self::new_impl(Inner {
             is_block: false,
             first_version: state.next_version(),
@@ -92,6 +100,8 @@ impl ExecutionOutput {
             state_reads: ShardedStateCache::new_empty(state.version()),
             result_state: state,
             positions,
+            orders,
+            collateral,
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: None,
@@ -114,6 +124,8 @@ impl ExecutionOutput {
             to_retry: TransactionsWithOutput::new_empty(),
             result_state: LedgerState::new_empty(HotStateConfig::default()),
             positions: None,
+            orders: None,
+            collateral: None,
             state_reads: ShardedStateCache::new_empty(None),
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
@@ -138,8 +150,10 @@ impl ExecutionOutput {
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
             result_state: self.result_state.clone(),
-            // No writes in a reconfig suffix, so the overlay is unchanged.
+            // No writes in a reconfig suffix, so the overlays are unchanged.
             positions: self.positions.clone(),
+            orders: self.orders.clone(),
+            collateral: self.collateral.clone(),
             state_reads: ShardedStateCache::new_empty(self.next_version().checked_sub(1)),
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
@@ -187,6 +201,12 @@ pub struct Inner {
     /// Native position index after this chunk, the position-side
     /// counterpart of `result_state`. `None` when the feature is off.
     pub positions: Option<PositionOverlay>,
+    /// Native order index after this chunk. `None` when trading-native
+    /// storage is off.
+    pub orders: Option<OrderOverlay>,
+    /// Native collateral index after this chunk. `None` when trading-native
+    /// storage is off.
+    pub collateral: Option<CollateralOverlay>,
     /// State items read during execution, useful for calculating the state storge usage and
     /// indices used by the db pruner.
     pub state_reads: ShardedStateCache,

@@ -14,6 +14,10 @@ runs:
       run: python3 -m unittest discover -s .github/actions/nightly-test-summary -p '*_test.py'
       shell: bash
 
+    - name: Test Lint+Test classification
+      run: python3 -m unittest discover -s .github/actions/lint-test-classifier -p '*_test.py'
+      shell: bash
+
     - name: Test E2E selection workflow integration
       run: python3 -m unittest discover -s .github/actions/e2e-test-determinator -p '*_test.py'
       shell: bash

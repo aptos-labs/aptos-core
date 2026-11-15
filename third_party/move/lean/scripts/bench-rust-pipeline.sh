@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Benchmark the Rust source round-trip or Rust-to-LeanerLang e2e pipeline.
+# Benchmark the Rust source round-trip or Rust-to-VerexSL e2e pipeline.
 #
 # Usage:
-#   scripts/bench-rust-pipeline.sh source   # default: exporter/source/LIR phases
-#   scripts/bench-rust-pipeline.sh e2e      # exporter vs LeanerLang print/re-import
+#   scripts/bench-rust-pipeline.sh source   # default: exporter/source/VIR phases
+#   scripts/bench-rust-pipeline.sh e2e      # exporter vs VerexSL print/re-import
 set -euo pipefail
 
 LEAN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,20 +17,20 @@ quiet_build() {
 
 case "$MODE" in
   source)
-    cd "$LEAN_ROOT/leaner-rust"
-    quiet_build LeanerRust.Driver
-    RAW="$(mktemp "$LEAN_ROOT/leaner-rust/.lake/build/rust-pipeline-bench.XXXXXX")"
+    cd "$LEAN_ROOT/verex-rust"
+    quiet_build VerexRust.Driver
+    RAW="$(mktemp "$LEAN_ROOT/verex-rust/.lake/build/rust-pipeline-bench.XXXXXX")"
     trap 'rm -f "$RAW"' EXIT
-    LEANER_RUST_BENCHMARK=1 LEANER_RUST_BENCHMARK_OUTPUT="$RAW" \
-      lake env lean LeanerRust/Tests/Source.lean
+    VEREX_RUST_BENCHMARK=1 VEREX_RUST_BENCHMARK_OUTPUT="$RAW" \
+      lake env lean VerexRust/Tests/Source.lean
     ;;
   e2e)
-    cd "$LEAN_ROOT/leaner-e2e-tests"
-    quiet_build LeanerE2ETestDriver
-    RAW="$(mktemp "$LEAN_ROOT/leaner-e2e-tests/.lake/build/rust-pipeline-bench.XXXXXX")"
+    cd "$LEAN_ROOT/verex-e2e-tests"
+    quiet_build VerexE2ETestDriver
+    RAW="$(mktemp "$LEAN_ROOT/verex-e2e-tests/.lake/build/rust-pipeline-bench.XXXXXX")"
     trap 'rm -f "$RAW"' EXIT
-    LEANER_E2E_SUITE=rust LEANER_RUST_BENCHMARK=1 \
-      LEANER_RUST_BENCHMARK_OUTPUT="$RAW" lake test
+    VEREX_E2E_SUITE=rust VEREX_RUST_BENCHMARK=1 \
+      VEREX_RUST_BENCHMARK_OUTPUT="$RAW" lake test
     ;;
   *)
     echo "usage: $0 [source|e2e]" >&2
@@ -38,7 +38,7 @@ case "$MODE" in
     ;;
 esac
 
-if ! grep -q '^LEANER_RUST_BENCH|' "$RAW"; then
+if ! grep -q '^VEREX_RUST_BENCH|' "$RAW"; then
   echo "benchmark produced no phase timings" >&2
   exit 1
 fi
@@ -46,7 +46,7 @@ fi
 echo ""
 echo "=== Rust pipeline benchmark: $MODE ==="
 awk -F'|' '
-  /^LEANER_RUST_BENCH\|/ {
+  /^VEREX_RUST_BENCH\|/ {
     total[$2] += $3
     count[$2] += 1
     if ($3 > maximum[$2]) maximum[$2] = $3

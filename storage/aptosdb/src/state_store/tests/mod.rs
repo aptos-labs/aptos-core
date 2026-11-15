@@ -19,7 +19,10 @@ use aptos_jellyfish_merkle::{
 };
 use aptos_storage_interface::{DbReader, DbWriter, StateKind, StateSnapshotReceiver};
 use aptos_temppath::TempPath;
-use aptos_types::nibble::nibble_path::NibblePath;
+use aptos_types::{
+    nibble::nibble_path::NibblePath,
+    on_chain_config::{HotStateConfigV1, OnChainHotStateConfig},
+};
 use proptest::{collection::hash_map, prelude::*};
 use std::collections::BTreeMap;
 
@@ -185,6 +188,55 @@ pub fn test_get_state_snapshot_before() {
             .unwrap(),
         Some(0)
     );
+}
+
+#[test]
+fn test_load_on_chain_hot_state_config() {
+    let tmp_dir = TempPath::new();
+    let config_key = StateKey::on_chain_config::<OnChainHotStateConfig>().unwrap();
+    let on_chain = OnChainHotStateConfig::V1(HotStateConfigV1 {
+        max_items_per_shard: vec![3; NUM_STATE_SHARDS],
+        max_bytes_per_shard: vec![5_000; NUM_STATE_SHARDS],
+        refresh_interval_versions: 7,
+        max_promotion_bytes_per_block: 0,
+        defer_cold_writes_to_eviction: false,
+    });
+    let config_value = StateValue::new_legacy(
+        bcs::to_bytes(&bcs::to_bytes(&on_chain).unwrap())
+            .unwrap()
+            .into(),
+    );
+
+    // Away from the config key's shard, so only these keys count.
+    let shard_id = (config_key.get_shard_id() + 1) % NUM_STATE_SHARDS;
+    let writes = (0..)
+        .map(|i| StateKey::raw(format!("key{i}").as_bytes()))
+        .filter(|key| key.get_shard_id() == shard_id)
+        .take(5)
+        .map(|key| (key, Some(StateValue::new_legacy(b"value".to_vec().into()))))
+        .collect_vec();
+    let num_hot_items = |db: &AptosDB| {
+        db.state_store
+            .live()
+            .unwrap()
+            .current_state_locked()
+            .ledger_state()
+            .num_hot_items(shard_id)
+    };
+
+    {
+        let db = AptosDB::new_for_test(&tmp_dir);
+        db.state_store.commit_block_for_test(0, [writes.clone()]);
+        assert_eq!(num_hot_items(&db), 5);
+        db.state_store
+            .commit_block_for_test(1, [vec![(config_key, Some(config_value))]]);
+        assert_eq!(num_hot_items(&db), 3);
+    }
+
+    // Would be 5 if the local config were used after restart.
+    let db = AptosDB::new_for_test(&tmp_dir);
+    db.state_store.commit_block_for_test(2, [writes]);
+    assert_eq!(num_hot_items(&db), 3);
 }
 
 proptest! {

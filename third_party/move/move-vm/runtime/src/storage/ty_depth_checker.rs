@@ -182,8 +182,10 @@ where
                 let depth = formula.solve(&[])?;
                 check_depth!(depth)
             },
-            Type::StructInstantiation { idx, ty_args, .. } => {
-                let ty_arg_depths = ty_args
+            Type::StructInstantiation(node) => {
+                let idx = &node.idx();
+                let ty_arg_depths = node
+                    .ty_args()
                     .iter()
                     .map(|ty| {
                         self.recursive_check_depth_of_type(
@@ -342,8 +344,10 @@ where
                 debug_assert!(struct_formula.terms.is_empty());
                 struct_formula.scale(1)
             },
-            Type::StructInstantiation { idx, ty_args, .. } => {
-                let ty_arg_map = ty_args
+            Type::StructInstantiation(node) => {
+                let idx = &node.idx();
+                let ty_arg_map = node
+                    .ty_args()
                     .iter()
                     .enumerate()
                     .map(|(idx, ty)| {
@@ -491,10 +495,7 @@ mod tests {
         let f = loader.get_struct_identifier("F");
         let g = loader.get_struct_identifier("G");
         loader.add_enum("F", vec![("V0", vec![("g", struct_ty(g))])]);
-        loader.add_enum("G", vec![("V0", vec![(
-            "fs",
-            Type::Vector(triomphe::Arc::new(struct_ty(f))),
-        )])]);
+        loader.add_enum("G", vec![("V0", vec![("fs", Type::vector(struct_ty(f)))])]);
 
         let checker = TypeDepthChecker::new(&loader);
         let mut currently_visiting = HashSet::new();
@@ -567,7 +568,7 @@ mod tests {
         ]);
         loader.add_enum("E", vec![("V0", vec![(
             "ds",
-            Type::Vector(triomphe::Arc::new(generic_struct_ty(d, vec![Type::U8]))),
+            Type::vector(generic_struct_ty(d, vec![Type::U8])),
         )])]);
 
         let checker = TypeDepthChecker::new(&loader);
@@ -714,16 +715,16 @@ mod tests {
 
         assert_ok!(checker.check_depth_of_type(&mut gas_meter, &mut traversal_context, &Type::U8));
 
-        let vec_u8_ty = Type::Vector(triomphe::Arc::new(Type::U8));
+        let vec_u8_ty = Type::vector(Type::U8);
         assert_ok!(checker.check_depth_of_type(&mut gas_meter, &mut traversal_context, &vec_u8_ty));
 
-        let vec_vec_u8_ty = Type::Vector(triomphe::Arc::new(vec_u8_ty.clone()));
+        let vec_vec_u8_ty = Type::vector(vec_u8_ty.clone());
         assert_err!(checker.check_depth_of_type(
             &mut gas_meter,
             &mut traversal_context,
             &vec_vec_u8_ty
         ));
-        let ref_vec_u8_ty = Type::Reference(Box::new(vec_u8_ty));
+        let ref_vec_u8_ty = Type::reference(vec_u8_ty);
         assert_err!(checker.check_depth_of_type(
             &mut gas_meter,
             &mut traversal_context,

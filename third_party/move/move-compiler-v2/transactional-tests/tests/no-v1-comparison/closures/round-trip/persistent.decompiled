@@ -4,7 +4,7 @@
 module 0x66::test {
     use 0x1::signer;
     struct Work has store, key {
-        _0: ||(u64) has store,
+        _0: ||u64 has store,
     }
     entry fun exec(p0: &signer)
         acquires Work

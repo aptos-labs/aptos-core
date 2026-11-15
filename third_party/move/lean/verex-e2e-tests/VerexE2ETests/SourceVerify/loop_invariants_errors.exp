@@ -1,0 +1,50 @@
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:8:15: error: the loop invariant `i == 0` is not preserved by an iteration
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:5:6: error: verex verification failed: the automatic verification of `wrong_step` failed; provide a proof in the module:
+  verify wrong_step by lean =>
+    verex_obligations
+    verex_on
+    | invariant_2_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:13:15: error: the loop invariant `i == 1` is not established at entry
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:13:15: error: the loop invariant `i == 1` is not preserved by an iteration
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `wrong_entry` failed; provide a proof in the module:
+  verify wrong_entry by lean =>
+    verex_obligations
+    verex_on
+    | invariant_2_entry => verex_prepare; sorry
+    | invariant_2_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:20:15: error: the loop invariant `column == 0` is not preserved by an iteration
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:15:6: error: verex verification failed: the automatic verification of `wrong_inner` failed; provide a proof in the module:
+  verify wrong_inner by lean =>
+    verex_obligations
+    verex_on
+    | invariant_3_of_loop_2_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:23:3: error: the specification clause `panics_if false` is not established
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:22:6: error: verex verification failed: the automatic verification of `overflow` failed; provide a proof in the module:
+  verify overflow by lean =>
+    verex_obligations
+    verex_on
+    | panics_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:30:3: error: the precondition `requires x > 0` of `positive` does not hold at call 1
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:32:6: error: verex verification failed: the automatic verification of `call_in_exiting_loop` failed; provide a proof in the module:
+  verify call_in_exiting_loop by lean =>
+    verex_obligations
+    verex_on
+    | requires_1_of_positive_at_call_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:30:3: error: the precondition `requires x > 0` of `positive` does not hold at call 1
+VerexE2ETests/SourceVerify/loop_invariants_errors.spec.lean:36:6: error: verex verification failed: the automatic verification of `call_in_while` failed; provide a proof in the module:
+  verify call_in_while by lean =>
+    verex_obligations
+    verex_on
+    | requires_1_of_positive_at_call_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

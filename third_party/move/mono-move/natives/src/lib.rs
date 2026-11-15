@@ -35,12 +35,15 @@ pub mod mem;
 pub mod multi_ed25519;
 pub mod object;
 pub mod randomness;
+pub mod reflect;
 pub mod ristretto255_point;
 pub mod ristretto255_scalar;
 pub mod secp256k1;
 pub mod signer;
 pub mod state_storage;
+pub mod storage_slot;
 pub mod string;
+pub mod string_utils;
 pub mod table;
 #[cfg(feature = "testing")]
 pub mod test_natives;
@@ -80,6 +83,7 @@ pub use multi_ed25519::make_all_multi_ed25519_natives;
 pub use multi_ed25519::make_all_multi_ed25519_test_natives;
 pub use object::{make_all_object_natives, ObjectContextExtension};
 pub use randomness::{make_all_randomness_natives, RandomnessContext};
+pub use reflect::make_all_reflect_natives;
 pub use ristretto255_point::{make_all_ristretto255_point_natives, RistrettoPointStore};
 pub use ristretto255_scalar::make_all_ristretto255_scalar_natives;
 #[cfg(feature = "testing")]
@@ -87,7 +91,9 @@ pub use ristretto255_scalar::make_all_ristretto255_scalar_test_natives;
 pub use secp256k1::make_all_secp256k1_natives;
 pub use signer::make_all_signer_natives;
 pub use state_storage::{make_all_state_storage_natives, StorageUsageAtEpochBoundary};
+pub use storage_slot::make_all_storage_slot_natives;
 pub use string::make_all_string_natives;
+pub use string_utils::make_all_string_utils_natives;
 pub use table::make_all_table_natives;
 #[cfg(feature = "testing")]
 pub use test_natives::{
@@ -119,11 +125,13 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_aptos_hash_natives::<F>());
     natives.extend(make_all_init_natives::<F>());
     natives.extend(make_all_string_natives::<F>());
+    natives.extend(make_all_string_utils_natives::<F>());
     natives.extend(make_all_bcs_natives::<F>());
     natives.extend(make_all_cmp_natives::<F>());
     natives.extend(make_all_consensus_config_natives::<F>());
     natives.extend(make_all_from_bytes_natives::<F>());
     natives.extend(make_all_table_natives::<F>());
+    natives.extend(make_all_storage_slot_natives::<F>());
     natives.extend(make_all_secp256k1_natives::<F>());
     natives.extend(make_all_ed25519_natives::<F>());
     natives.extend(make_all_multi_ed25519_natives::<F>());
@@ -133,6 +141,23 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_bulletproofs_natives::<F>());
     natives.extend(make_all_crypto_algebra_natives::<F>());
     natives.extend(make_all_vector_natives::<F>());
+    natives.extend(make_all_reflect_natives::<F>());
+    natives
+}
+
+/// Returns test-only natives (signer creation, key generation, event queries)
+/// followed by production natives, matching V1's `testing` registration.
+#[cfg(feature = "testing")]
+pub fn make_all_test_only_and_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
+    let mut natives = make_all_unit_test_natives::<F>();
+    natives.extend(make_all_ed25519_test_natives::<F>());
+    natives.extend(make_all_multi_ed25519_test_natives::<F>());
+    natives.extend(make_all_bls12381_test_natives::<F>());
+    natives.extend(make_all_ristretto255_scalar_test_natives::<F>());
+    natives.extend(make_all_bulletproofs_test_natives::<F>());
+    natives.extend(make_all_crypto_algebra_test_natives::<F>());
+    natives.extend(make_all_event_test_natives::<F>());
+    natives.extend(make_all_production_natives::<F>());
     natives
 }
 

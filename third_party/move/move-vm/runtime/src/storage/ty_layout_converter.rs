@@ -106,6 +106,80 @@ impl LocalSinglePassStructLayoutCache {
     }
 }
 
+/// Per-allocation overhead: allocator metadata and size-class rounding, plus the reference counts
+/// of an `Arc` (not counted by `size_of` of the value behind it). Sizes of the values themselves
+/// are derived from `size_of` below, so they follow changes to the layout types automatically.
+const ALLOCATION_OVERHEAD_IN_BYTES: usize = 16;
+
+// Invariant: the overhead covers at least the strong and weak counts of an `Arc` allocation.
+const _: () = assert!(ALLOCATION_OVERHEAD_IN_BYTES >= 2 * std::mem::size_of::<usize>());
+
+/// Size of a layout node, counted as a struct node (the largest kind).
+const PER_NODE_SIZE_ESTIMATE_IN_BYTES: usize = std::mem::size_of::<MoveTypeLayout>()
+    + std::mem::size_of::<MoveStructLayout>()
+    + ALLOCATION_OVERHEAD_IN_BYTES;
+
+/// Size of an enum variant: its entry in the variants vector and its fields buffer.
+const PER_VARIANT_SIZE_ESTIMATE_IN_BYTES: usize =
+    std::mem::size_of::<Vec<MoveTypeLayout>>() + ALLOCATION_OVERHEAD_IN_BYTES;
+
+/// Size of a defining module without its name: one copy in the set, one (with hash) in the vector.
+const PER_MODULE_FIXED_SIZE_ESTIMATE_IN_BYTES: usize = std::mem::size_of::<ModuleId>()
+    + std::mem::size_of::<(ModuleId, [u8; 32])>()
+    + 2 * ALLOCATION_OVERHEAD_IN_BYTES;
+
+/// Size of a defining module, including its name (stored twice).
+fn defining_module_size_estimate_in_bytes(module_id: &ModuleId) -> usize {
+    PER_MODULE_FIXED_SIZE_ESTIMATE_IN_BYTES.saturating_add(2 * module_id.name().len())
+}
+
+/// Size of a cached layout regardless of its contents: key, entry and modules.
+const BASE_SIZE_ESTIMATE_IN_BYTES: usize = std::mem::size_of::<LayoutCacheKey>()
+    + std::mem::size_of::<LayoutCacheEntry>()
+    + std::mem::size_of::<DefiningModules>()
+    + 2 * ALLOCATION_OVERHEAD_IN_BYTES;
+
+/// Layouts with estimated size larger than this are never cached in the long-living layout cache.
+/// With bounds on the number of nodes in a layout this is not expected to happen in practice.
+pub(crate) const MAX_CACHED_LAYOUT_SIZE_ESTIMATE_IN_BYTES: usize = 1024 * 1024;
+
+/// Counters accumulated during the construction of a single layout.
+struct LayoutConstructionCounter {
+    /// Number of nodes in the layout, used to enforce limits on the layout size.
+    num_nodes: u64,
+    /// Estimated number of bytes the layout (and its defining modules) occupy in memory. Used to
+    /// bound the memory of the layout caches.
+    size_estimate_in_bytes: usize,
+}
+
+impl LayoutConstructionCounter {
+    fn new() -> Self {
+        Self {
+            num_nodes: 0,
+            size_estimate_in_bytes: BASE_SIZE_ESTIMATE_IN_BYTES,
+        }
+    }
+
+    fn add_node(&mut self) {
+        self.num_nodes += 1;
+        self.size_estimate_in_bytes = self
+            .size_estimate_in_bytes
+            .saturating_add(PER_NODE_SIZE_ESTIMATE_IN_BYTES);
+    }
+
+    fn add_variants(&mut self, num_variants: usize) {
+        self.size_estimate_in_bytes = self
+            .size_estimate_in_bytes
+            .saturating_add(num_variants.saturating_mul(PER_VARIANT_SIZE_ESTIMATE_IN_BYTES));
+    }
+
+    fn add_defining_module(&mut self, module_id: &ModuleId) {
+        self.size_estimate_in_bytes = self
+            .size_estimate_in_bytes
+            .saturating_add(defining_module_size_estimate_in_bytes(module_id));
+    }
+}
+
 /// Stores type layout as well as a flag if it contains any delayed fields.
 #[derive(Debug, Clone)]
 pub struct LayoutWithDelayedFields {
@@ -114,6 +188,11 @@ pub struct LayoutWithDelayedFields {
 }
 
 impl LayoutWithDelayedFields {
+    /// Returns the number of bytes the layout serializes to. Walks the layout.
+    pub(crate) fn serialized_size(&self) -> u64 {
+        self.layout.serialized_size()
+    }
+
     /// If layout contains delayed fields, returns [None]. If there are no delayed fields, the
     /// layout is returned.
     pub fn into_layout_when_has_no_delayed_fields(self) -> Option<TriompheArc<MoveTypeLayout>> {
@@ -129,6 +208,19 @@ impl LayoutWithDelayedFields {
     /// Unpacks and returns the layout and delayed fields flag for the caller to handle.
     pub fn unpack(self) -> (TriompheArc<MoveTypeLayout>, bool) {
         (self.layout, self.contains_delayed_fields)
+    }
+}
+
+// Defined here because only this module can construct a [LayoutWithDelayedFields].
+#[cfg(any(test, feature = "testing"))]
+impl LayoutCacheEntry {
+    /// Returns an entry with a dummy layout of the specified size estimate. Used for tests only.
+    pub fn new_for_testing(size_estimate_in_bytes: usize) -> Self {
+        let layout = LayoutWithDelayedFields {
+            layout: TriompheArc::new(MoveTypeLayout::U8),
+            contains_delayed_fields: false,
+        };
+        Self::new(layout, DefiningModules::new(), size_estimate_in_bytes)
     }
 }
 
@@ -199,6 +291,40 @@ where
         traversal_context: &mut TraversalContext,
         ty: &Type,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
+        Ok(self
+            .type_to_type_layout_with_delayed_fields_and_cached_size(
+                gas_meter,
+                traversal_context,
+                ty,
+            )?
+            .0)
+    }
+
+    /// Like [Self::type_to_type_layout_with_delayed_fields], but also returns the number of bytes
+    /// the layout serializes to. Cached layouts store their size, so a cache hit does not walk the
+    /// layout.
+    pub(crate) fn type_to_type_layout_with_delayed_fields_and_size(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        ty: &Type,
+    ) -> PartialVMResult<(LayoutWithDelayedFields, u64)> {
+        let (layout, size) = self.type_to_type_layout_with_delayed_fields_and_cached_size(
+            gas_meter,
+            traversal_context,
+            ty,
+        )?;
+        let size = size.unwrap_or_else(|| layout.serialized_size());
+        Ok((layout, size))
+    }
+
+    /// Returns the layout of a type, and its serialized size if the layout is cached.
+    fn type_to_type_layout_with_delayed_fields_and_cached_size(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        ty: &Type,
+    ) -> PartialVMResult<(LayoutWithDelayedFields, Option<u64>)> {
         if self.vm_config().enable_layout_caches {
             if let Some(key) = self.layout_cache_key(ty) {
                 if let Some(result) = self.struct_definition_loader.load_layout_from_cache(
@@ -206,30 +332,38 @@ where
                     traversal_context,
                     &key,
                 ) {
-                    return result;
+                    return result.map(|(layout, size)| (layout, Some(size)));
                 }
 
                 // Otherwise a cache miss, compute the result and store it.
                 let mut modules = DefiningModules::new();
-                let layout = self.type_to_type_layout_with_delayed_fields_impl::<false>(
-                    gas_meter,
-                    traversal_context,
-                    &mut modules,
-                    ty,
-                )?;
-                let cache_entry = LayoutCacheEntry::new(layout.clone(), modules);
-                self.struct_definition_loader
-                    .store_layout_to_cache(&key, cache_entry)?;
-                return Ok(layout);
+                let (layout, size_estimate_in_bytes) = self
+                    .type_to_type_layout_with_delayed_fields_impl::<false>(
+                        gas_meter,
+                        traversal_context,
+                        &mut modules,
+                        ty,
+                    )?;
+                // Do not cache layouts that are too large, to keep cache memory bounded.
+                if size_estimate_in_bytes <= MAX_CACHED_LAYOUT_SIZE_ESTIMATE_IN_BYTES {
+                    let cache_entry =
+                        LayoutCacheEntry::new(layout.clone(), modules, size_estimate_in_bytes);
+                    let size = cache_entry.serialized_size();
+                    self.struct_definition_loader
+                        .store_layout_to_cache(&key, cache_entry)?;
+                    return Ok((layout, Some(size)));
+                }
+                return Ok((layout, None));
             }
         }
 
-        self.type_to_type_layout_with_delayed_fields_impl::<false>(
+        let (layout, _) = self.type_to_type_layout_with_delayed_fields_impl::<false>(
             gas_meter,
             traversal_context,
             &mut DefiningModules::new(),
             ty,
-        )
+        )?;
+        Ok((layout, None))
     }
 
     /// Returns the decorated layout of a type.
@@ -247,6 +381,7 @@ where
             &mut DefiningModules::new(),
             ty,
         )
+        .map(|(layout, _)| layout)
     }
 
     /// Returns the VM config used in the system.
@@ -295,14 +430,15 @@ where
 
     /// Since layout is a tree data structure, we limit its size and depth during construction.
     /// This function checks that the number of nodes in the layout and its depth are within limits
-    /// enforced by the VM config. The count is incremented.
+    /// enforced by the VM config. The count (and the size estimate) is incremented.
     fn check_depth_and_increment_count(
         &self,
-        node_count: &mut u64,
+        count: &mut LayoutConstructionCounter,
         depth: u64,
     ) -> PartialVMResult<()> {
         let max_count = self.vm_config().layout_max_size;
-        if *node_count > max_count || *node_count == max_count && self.is_lazy_loading_enabled() {
+        let node_count = count.num_nodes;
+        if node_count > max_count || node_count == max_count && self.is_lazy_loading_enabled() {
             return Err(
                 PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
                     "Number of type nodes when constructing type layout exceeded the maximum of {}",
@@ -310,7 +446,7 @@ where
                 )),
             );
         }
-        *node_count += 1;
+        count.add_node();
 
         if depth > self.vm_config().layout_max_depth {
             return Err(
@@ -324,16 +460,18 @@ where
     }
 
     /// Entrypoint into layout construction. Additionally, measures the time taken to construct it.
+    /// Returns the layout and the estimated number of bytes it (and its defining modules) occupy
+    /// in memory when cached.
     fn type_to_type_layout_with_delayed_fields_impl<const ANNOTATED: bool>(
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         modules: &mut DefiningModules,
         ty: &Type,
-    ) -> PartialVMResult<LayoutWithDelayedFields> {
+    ) -> PartialVMResult<(LayoutWithDelayedFields, usize)> {
         let _timer = VM_TIMER.timer_with_label("type_to_type_layout_with_delayed_fields");
 
-        let mut count = 0;
+        let mut count = LayoutConstructionCounter::new();
         // Keep the cache scoped to this single traversal; do not hoist it
         // beyond this call (see invariant above).
         let mut struct_layout_cache = LocalSinglePassStructLayoutCache::new();
@@ -346,10 +484,11 @@ where
             1,
             &mut struct_layout_cache,
         )?;
-        Ok(LayoutWithDelayedFields {
+        let layout = LayoutWithDelayedFields {
             layout: TriompheArc::new(layout),
             contains_delayed_fields,
-        })
+        };
+        Ok((layout, count.size_estimate_in_bytes))
     }
 
     /// Converts [Type] to [MoveTypeLayout]. Fails if there is not enough gas to account for module
@@ -361,7 +500,7 @@ where
         traversal_context: &mut TraversalContext,
         modules: &mut DefiningModules,
         ty: &Type,
-        count: &mut u64,
+        count: &mut LayoutConstructionCounter,
         depth: u64,
         struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
@@ -408,17 +547,16 @@ where
                 depth + 1,
                 struct_layout_cache,
             )?,
-            Type::StructInstantiation { idx, ty_args, .. } => self
-                .struct_to_type_layout::<ANNOTATED>(
-                    gas_meter,
-                    traversal_context,
-                    modules,
-                    idx,
-                    ty_args,
-                    count,
-                    depth + 1,
-                    struct_layout_cache,
-                )?,
+            Type::StructInstantiation(node) => self.struct_to_type_layout::<ANNOTATED>(
+                gas_meter,
+                traversal_context,
+                modules,
+                &node.idx(),
+                node.ty_args(),
+                count,
+                depth + 1,
+                struct_layout_cache,
+            )?,
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -436,7 +574,7 @@ where
         traversal_context: &mut TraversalContext,
         modules: &mut DefiningModules,
         tys: &[Type],
-        count: &mut u64,
+        count: &mut LayoutConstructionCounter,
         depth: u64,
         struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(Vec<MoveTypeLayout>, bool)> {
@@ -476,7 +614,7 @@ where
         modules: &mut DefiningModules,
         idx: &StructNameIndex,
         ty_args: &[Type],
-        count: &mut u64,
+        count: &mut LayoutConstructionCounter,
         depth: u64,
         struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
@@ -519,6 +657,7 @@ where
                 )
                 .map_err(|err| err.to_partial())?;
             modules.insert(struct_identifier.module(), hash);
+            count.add_defining_module(struct_identifier.module());
         }
 
         let result = match &struct_definition.layout {
@@ -571,6 +710,7 @@ where
                         ));
                     }
                 }
+                count.add_variants(variants.len());
                 let variant_layouts = variants
                     .iter()
                     .map(|variant| {
@@ -899,7 +1039,7 @@ mod tests {
 
     /// Wraps `ty` in `n` nested vectors.
     fn vec_ty(ty: Type, n: usize) -> Type {
-        (0..n).fold(ty, |ty, _| Type::Vector(triomphe::Arc::new(ty)))
+        (0..n).fold(ty, |ty, _| Type::vector(ty))
     }
 
     /// Asserts that every key in `keys` is distinct from every other.
@@ -970,13 +1110,9 @@ mod tests {
             Type::I256,
             Type::Address,
             Type::Signer,
-            Type::Function {
-                args: vec![Type::U8],
-                results: vec![Type::U256],
-                abilities: AbilitySet::EMPTY,
-            },
-            Type::Reference(Box::new(Type::U8)),
-            Type::MutableReference(Box::new(Type::U8)),
+            Type::function(vec![Type::U8], vec![Type::U256], AbilitySet::EMPTY),
+            Type::reference(Type::U8),
+            Type::mut_reference(Type::U8),
             Type::TyParam(0),
         ];
         for ty in &uncacheable {
@@ -1008,6 +1144,167 @@ mod tests {
         );
     }
 
+    /// Returns the size estimate of the layout constructed for the given type.
+    fn size_estimate_for_test(
+        layout_converter: &LayoutConverter<MockStructDefinitionLoader>,
+        ty: &Type,
+    ) -> usize {
+        let mut gas_meter = UnmeteredGasMeter;
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+        let result = layout_converter.type_to_type_layout_with_delayed_fields_impl::<false>(
+            &mut gas_meter,
+            &mut traversal_context,
+            &mut DefiningModules::new(),
+            ty,
+        );
+        let (_, size_estimate_in_bytes) = assert_ok!(result);
+        size_estimate_in_bytes
+    }
+
+    fn module_size_estimate(name: &str) -> usize {
+        let module_id = ModuleId::from_str(&format!("0x1::{}", name)).unwrap();
+        defining_module_size_estimate_in_bytes(&module_id)
+    }
+
+    #[test]
+    fn test_layout_size_estimate_accumulates_nodes() {
+        let loader = MockStructDefinitionLoader::default();
+        let layout_converter = LayoutConverter::new(&loader);
+
+        let base = BASE_SIZE_ESTIMATE_IN_BYTES;
+        let node = PER_NODE_SIZE_ESTIMATE_IN_BYTES;
+
+        assert_eq!(
+            size_estimate_for_test(&layout_converter, &Type::U8),
+            base + node
+        );
+        for n in [1, 5, 20] {
+            assert_eq!(
+                size_estimate_for_test(&layout_converter, &vec_ty(Type::U64, n)),
+                base + (n + 1) * node
+            );
+        }
+
+        // Struct with 10 primitive fields: 1 node for the struct, 10 for the fields, plus the
+        // defining module.
+        let a = loader.get_struct_identifier("A");
+        loader.add_struct("A", (0..10).map(|_| ("x", Type::U8)).collect::<Vec<_>>());
+        assert_eq!(
+            size_estimate_for_test(&layout_converter, &struct_ty(a)),
+            base + 11 * node + module_size_estimate("foo")
+        );
+
+        // A struct with fields of the same struct type: the first field constructs the layout of
+        // A, while other fields reuse it from the local cache and only account for a single node.
+        // The defining module is accounted for only once.
+        let b = loader.get_struct_identifier("B");
+        loader.add_struct("B", (0..5).map(|_| ("a", struct_ty(a))).collect::<Vec<_>>());
+        assert_eq!(
+            size_estimate_for_test(&layout_converter, &struct_ty(b)),
+            base + (1 + 11 + 4) * node + module_size_estimate("foo")
+        );
+    }
+
+    #[test]
+    fn test_layout_size_estimate_accumulates_variants() {
+        let loader = MockStructDefinitionLoader::default();
+        let layout_converter = LayoutConverter::new(&loader);
+
+        let base = BASE_SIZE_ESTIMATE_IN_BYTES;
+        let node = PER_NODE_SIZE_ESTIMATE_IN_BYTES;
+        let variant = PER_VARIANT_SIZE_ESTIMATE_IN_BYTES;
+        let module = module_size_estimate("foo");
+
+        // Empty variants add no nodes, but are still accounted for.
+        let num_variants = 50;
+        let names = (0..num_variants)
+            .map(|i| format!("V{}", i))
+            .collect::<Vec<_>>();
+        let e = loader.get_struct_identifier("E");
+        loader.add_enum("E", names.iter().map(|name| (name.as_str(), vec![])));
+        assert_eq!(
+            size_estimate_for_test(&layout_converter, &struct_ty(e)),
+            base + node + module + num_variants * variant
+        );
+
+        // Variant fields are accounted for as nodes on top of the variants.
+        let f = loader.get_struct_identifier("F");
+        loader.add_enum("F", vec![
+            ("V0", vec![]),
+            ("V1", vec![("x", Type::U8), ("y", Type::U64)]),
+        ]);
+        assert_eq!(
+            size_estimate_for_test(&layout_converter, &struct_ty(f)),
+            base + 3 * node + module + 2 * variant
+        );
+
+        // Fields of the same enum type reuse the layout from the local cache, so variants are
+        // accounted for only once.
+        let s = loader.get_struct_identifier("S");
+        loader.add_struct("S", (0..5).map(|_| ("e", struct_ty(e))).collect::<Vec<_>>());
+        assert_eq!(
+            size_estimate_for_test(&layout_converter, &struct_ty(s)),
+            base + (1 + 5) * node + module + num_variants * variant
+        );
+    }
+
+    #[test]
+    fn test_layout_size_estimate_accumulates_modules() {
+        let loader = MockStructDefinitionLoader::default();
+        let layout_converter = LayoutConverter::new(&loader);
+
+        let base = BASE_SIZE_ESTIMATE_IN_BYTES;
+        let node = PER_NODE_SIZE_ESTIMATE_IN_BYTES;
+
+        // Same struct defined in modules with short and long names: only the module part of the
+        // estimate differs.
+        let long_name = "a".repeat(200);
+        let short_module = "0x1::m";
+        let long_module = format!("0x1::{}", long_name);
+
+        let s_short = loader.get_struct_identifier_in_module(short_module, "S");
+        loader.add_struct_in_module(short_module, "S", vec![("x", Type::U8)]);
+        let s_long = loader.get_struct_identifier_in_module(&long_module, "S");
+        loader.add_struct_in_module(&long_module, "S", vec![("x", Type::U8)]);
+
+        let short_estimate = size_estimate_for_test(&layout_converter, &struct_ty(s_short));
+        let long_estimate = size_estimate_for_test(&layout_converter, &struct_ty(s_long));
+        assert_eq!(short_estimate, base + 2 * node + module_size_estimate("m"));
+        assert_eq!(
+            long_estimate,
+            base + 2 * node + module_size_estimate(&long_name)
+        );
+        assert_eq!(long_estimate - short_estimate, 2 * (long_name.len() - 1));
+
+        // Struct with fields from many different modules accounts for every defining module.
+        let num_modules = 20;
+        let module_names = (0..num_modules)
+            .map(|i| format!("m{}_{}", i, long_name))
+            .collect::<Vec<_>>();
+        let fields = module_names
+            .iter()
+            .map(|name| {
+                let module = format!("0x1::{}", name);
+                let idx = loader.get_struct_identifier_in_module(&module, "L");
+                loader.add_struct_in_module(&module, "L", vec![("x", Type::U8)]);
+                ("l", struct_ty(idx))
+            })
+            .collect::<Vec<_>>();
+        let big = loader.get_struct_identifier_in_module("0x1::big", "Big");
+        loader.add_struct_in_module("0x1::big", "Big", fields);
+
+        let expected_modules = module_size_estimate("big")
+            + module_names
+                .iter()
+                .map(|name| module_size_estimate(name))
+                .sum::<usize>();
+        assert_eq!(
+            size_estimate_for_test(&layout_converter, &struct_ty(big)),
+            base + (1 + 2 * num_modules) * node + expected_modules
+        );
+    }
+
     #[test_case(true)]
     #[test_case(false)]
     fn test_simple_tys_to_layouts(annotated: bool) {
@@ -1025,15 +1322,11 @@ mod tests {
             (Type::Address, MoveTypeLayout::Address),
             (Type::Signer, MoveTypeLayout::Signer),
             (
-                Type::Vector(triomphe::Arc::new(Type::U8)),
+                Type::vector(Type::U8),
                 MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
             ),
             (
-                Type::Function {
-                    args: vec![Type::U8],
-                    results: vec![Type::U256],
-                    abilities: AbilitySet::EMPTY,
-                },
+                Type::function(vec![Type::U8], vec![Type::U256], AbilitySet::EMPTY),
                 MoveTypeLayout::Function,
             ),
         ];
@@ -1060,14 +1353,14 @@ mod tests {
         let loader = MockStructDefinitionLoader::new_with_config(vm_config);
         let layout_converter = LayoutConverter::new(&loader);
 
-        let vec_u8_ty = Type::Vector(triomphe::Arc::new(Type::U8));
+        let vec_u8_ty = Type::vector(Type::U8);
         assert_ok!(construct_layout_for_test(
             &layout_converter,
             &vec_u8_ty,
             annotated
         ));
 
-        let vec_vec_u8_ty = Type::Vector(triomphe::Arc::new(vec_u8_ty));
+        let vec_vec_u8_ty = Type::vector(vec_u8_ty);
         let result = construct_layout_for_test(&layout_converter, &vec_vec_u8_ty, annotated);
         if enable_lazy_loading {
             let err = assert_err!(result);
@@ -1076,7 +1369,7 @@ mod tests {
             assert_ok!(result);
         }
 
-        let vec_vec_vec_u8_ty = Type::Vector(triomphe::Arc::new(vec_vec_u8_ty));
+        let vec_vec_vec_u8_ty = Type::vector(vec_vec_u8_ty);
         let err = assert_err!(construct_layout_for_test(
             &layout_converter,
             &vec_vec_vec_u8_ty,
@@ -1095,14 +1388,14 @@ mod tests {
         let loader = MockStructDefinitionLoader::new_with_config(vm_config);
         let layout_converter = LayoutConverter::new(&loader);
 
-        let vec_u8_ty = Type::Vector(triomphe::Arc::new(Type::U8));
+        let vec_u8_ty = Type::vector(Type::U8);
         assert_ok!(construct_layout_for_test(
             &layout_converter,
             &vec_u8_ty,
             annotated
         ));
 
-        let vec_vec_u8_ty = Type::Vector(triomphe::Arc::new(vec_u8_ty));
+        let vec_vec_u8_ty = Type::vector(vec_u8_ty);
         let err = assert_err!(construct_layout_for_test(
             &layout_converter,
             &vec_vec_u8_ty,
@@ -1224,10 +1517,7 @@ mod tests {
         let f = loader.get_struct_identifier("F");
         let g = loader.get_struct_identifier("G");
         loader.add_enum("F", vec![("V0", vec![("g", struct_ty(g))])]);
-        loader.add_enum("G", vec![("V0", vec![(
-            "fs",
-            Type::Vector(triomphe::Arc::new(struct_ty(f))),
-        )])]);
+        loader.add_enum("G", vec![("V0", vec![("fs", Type::vector(struct_ty(f)))])]);
 
         let layout_converter = LayoutConverter::new(&loader);
         for idx in [a, b] {
@@ -1320,7 +1610,7 @@ mod tests {
         ]);
         loader.add_enum("E", vec![("V0", vec![(
             "ds",
-            Type::Vector(triomphe::Arc::new(generic_struct_ty(d, vec![Type::U8]))),
+            Type::vector(generic_struct_ty(d, vec![Type::U8])),
         )])]);
 
         let layout_converter = LayoutConverter::new(&loader);

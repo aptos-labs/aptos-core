@@ -1,0 +1,14 @@
+VerexE2ETests/SourceVerify/proof_lemmas_errors.proof.lean:13:3: error: `decide` does not close the lemma's conclusion from the block's facts:
+  a : Int
+  premise : True
+  ⊢ 0 ≤ a * a
+VerexE2ETests/SourceVerify/proof_lemmas_errors.proof.lean:10:7: error: unsolved goals
+a : Int
+premise : True
+⊢ 0 ≤ a * a
+VerexE2ETests/SourceVerify/proof_lemmas_errors.proof.lean:10:7: error: verex verification failed: the lemma `unsigned_square` is not established
+VerexE2ETests/SourceVerify/proof_lemmas_errors.proof.lean:20:9: error: the lemma's premise is not proved:
+  x c : Int
+  premise : 0 < c
+  ⊢ 0 ≤ x
+VerexE2ETests/SourceVerify/proof_lemmas_errors.proof.lean:16:7: error: verex verification failed: the lemma `unbounded_quotient` is not established

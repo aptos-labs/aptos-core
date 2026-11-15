@@ -19,7 +19,7 @@ use std::sync::{mpsc::Receiver, Arc};
 
 pub(crate) struct StateMerkleCommit {
     pub snapshot: StateWithSummary,
-    pub hot_batch: Option<MerkleBatch>,
+    pub hot_batch: MerkleBatch,
     pub cold_batch: MerkleBatch,
 }
 
@@ -64,16 +64,14 @@ impl StateMerkleBatchCommitter {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_jellyfish_merkle_nodes"]);
             // `ShardedJmtMerkleDb::commit` handles version-cache eviction
             // internally — see `sharded_jmt_merkle_db.rs`.
-            if let Some(hot) = hot_batch {
-                state_db
-                    .hot_state_merkle_db
-                    .commit(
-                        current_version,
-                        hot.top_levels_batch,
-                        hot.batches_for_shards,
-                    )
-                    .expect("Hot state merkle nodes commit failed.");
-            }
+            state_db
+                .hot_state_merkle_db
+                .commit(
+                    current_version,
+                    hot_batch.top_levels_batch,
+                    hot_batch.batches_for_shards,
+                )
+                .expect("Hot state merkle nodes commit failed.");
             state_db
                 .state_merkle_db
                 .commit(

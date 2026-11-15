@@ -184,21 +184,34 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
     }
 
     pub fn previous_key_hash(&self) -> Result<Option<HashValue>> {
-        let hash_opt = match (
-            self.kv_restore
-                .lock()
-                .as_ref()
-                .unwrap()
-                .previous_key_hash()?,
-            self.tree_restore
-                .lock()
-                .as_ref()
-                .unwrap()
-                .previous_key_hash(),
-        ) {
-            (None, hash_opt) => hash_opt,
-            (hash_opt, None) => hash_opt,
-            (Some(hash1), Some(hash2)) => Some(std::cmp::min(hash1, hash2)),
+        let kv = self
+            .kv_restore
+            .lock()
+            .as_ref()
+            .unwrap()
+            .previous_key_hash()?;
+        let tree = self
+            .tree_restore
+            .lock()
+            .as_ref()
+            .unwrap()
+            .previous_key_hash();
+        let hash_opt = match self.restore_mode {
+            // Both sides take every chunk, so resume from the one behind. A
+            // side without progress is behind everything: the tree writes
+            // nothing until its first leaf is frozen by the next key, or while
+            // an async commit is in flight, but the KV side records every
+            // chunk.
+            StateSnapshotRestoreMode::Default => {
+                kv.zip(tree).map(|(kv, tree)| std::cmp::min(kv, tree))
+            },
+            // Only one side takes chunks at this version.
+            StateSnapshotRestoreMode::KvOnly | StateSnapshotRestoreMode::TreeOnly => {
+                match (kv, tree) {
+                    (None, hash_opt) | (hash_opt, None) => hash_opt,
+                    (Some(kv), Some(tree)) => Some(std::cmp::min(kv, tree)),
+                }
+            },
         };
         Ok(hash_opt)
     }

@@ -422,6 +422,14 @@ pub static GLOBAL_LAYOUT_CACHE_NUM_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static GLOBAL_LAYOUT_CACHE_SIZE_IN_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "global_layout_cache_size_in_bytes",
+        "Sum of estimated sizes (in bytes) of struct/enum layouts cached in global cache"
+    )
+    .unwrap()
+});
+
 pub static GLOBAL_LAYOUT_CACHE_MISSES: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "global_layout_cache_misses",
@@ -457,6 +465,18 @@ pub static HOT_STATE_PROMOTIONS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
         // metric description
         "Number of keys the block end info designates for hot state promotion",
         exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 16).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static HOT_STATE_PROMOTION_BYTES_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_hot_state_promotion_bytes_per_block",
+        // metric description
+        "Total size of the keys the block end info designates for hot state promotion",
+        // 64 B to 2 MiB.
+        exponential_buckets(/*start=*/ 64.0, /*factor=*/ 2.0, /*count=*/ 16).unwrap(),
     )
     .unwrap()
 });

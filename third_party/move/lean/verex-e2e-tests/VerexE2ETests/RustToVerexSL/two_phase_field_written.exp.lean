@@ -1,0 +1,2 @@
+-- error: VerexE2ETests/RustToVerexSL/two_phase_field_written.rs:1:1: Rust RawUnit for `two_phase_field_written.rs` did not validate:
+-- two_phase_field_written.rs:14:12: VIR-RUST-TWO-PHASE: a two-phase borrow names a place that is written, moved or mutably borrowed before its use

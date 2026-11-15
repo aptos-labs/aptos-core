@@ -10,7 +10,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use bytes::Bytes;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*};
-use rapidhash::rapidhash;
+use rapidhash::v3::rapidhash_v3;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Deserialize, Serialize)]
@@ -240,7 +240,7 @@ impl Serialize for StateValue {
 impl StateValue {
     /// Computes rapid hash if data is large enough, otherwise returns None
     fn compute_rapid_hash(data: &Bytes) -> Option<(u64, usize)> {
-        (data.len() >= RAPID_HASH_THRESHOLD).then(|| (rapidhash(data), data.len()))
+        (data.len() >= RAPID_HASH_THRESHOLD).then(|| (rapidhash_v3(data), data.len()))
     }
 
     fn to_persistable_form(&self) -> PersistedStateValue {

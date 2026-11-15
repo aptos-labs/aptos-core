@@ -1,0 +1,128 @@
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:12:3: error: the specification clause `ensures spec.result[1] == v` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:11:6: error: verex verification failed: the automatic verification of `whole_repoint_trailing_false` failed; provide a proof in the module:
+  verify whole_repoint_trailing_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:15:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:14:6: error: verex verification failed: the automatic verification of `whole_repoint_trailing_vacuous` failed; provide a proof in the module:
+  verify whole_repoint_trailing_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:22:3: error: the specification clause `ensures spec.result[1] == v` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:21:6: error: verex verification failed: the automatic verification of `cond_store_trailing_false` failed; provide a proof in the module:
+  verify cond_store_trailing_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:25:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:24:6: error: verex verification failed: the automatic verification of `cond_store_trailing_vacuous` failed; provide a proof in the module:
+  verify cond_store_trailing_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:31:3: error: the specification clause `ensures result == a` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:30:6: error: verex verification failed: the automatic verification of `reborrow_chain_false` failed; provide a proof in the module:
+  verify reborrow_chain_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:34:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:33:6: error: verex verification failed: the automatic verification of `reborrow_chain_vacuous` failed; provide a proof in the module:
+  verify reborrow_chain_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:41:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:40:6: error: verex verification failed: the automatic verification of `cond_consume_false` failed; provide a proof in the module:
+  verify cond_consume_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:44:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:43:6: error: verex verification failed: the automatic verification of `cond_consume_vacuous` failed; provide a proof in the module:
+  verify cond_consume_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:52:3: error: the specification clause `ensures spec.result[0] == v` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:51:6: error: verex verification failed: the automatic verification of `sibling_live_false` failed; provide a proof in the module:
+  verify sibling_live_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:55:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:54:6: error: verex verification failed: the automatic verification of `sibling_live_vacuous` failed; provide a proof in the module:
+  verify sibling_live_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:62:3: error: the specification clause `ensures spec.result[1] == v` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:61:6: error: verex verification failed: the automatic verification of `then_reads_else_repoints_false` failed; provide a proof in the module:
+  verify then_reads_else_repoints_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:65:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:64:6: error: verex verification failed: the automatic verification of `then_reads_else_repoints_vacuous` failed; provide a proof in the module:
+  verify then_reads_else_repoints_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:76:3: error: the specification clause `ensures n >= 1 ==> result == n` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:75:6: error: verex verification failed: the automatic verification of `loop_local_write_false` failed; provide a proof in the module:
+  verify loop_local_write_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:83:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:82:6: error: verex verification failed: the automatic verification of `loop_local_write_vacuous` failed; provide a proof in the module:
+  verify loop_local_write_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:98:3: error: the specification clause `ensures spec.result[1] == v` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:95:6: error: verex verification failed: the automatic verification of `break_skips_repoint_false` failed; provide a proof in the module:
+  verify break_skips_repoint_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:103:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/death_points_errors.spec.lean:100:6: error: verex verification failed: the automatic verification of `break_skips_repoint_vacuous` failed; provide a proof in the module:
+  verify break_skips_repoint_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

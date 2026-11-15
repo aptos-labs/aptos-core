@@ -1,0 +1,33 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/counter_model/sources/counter_model.move:28:9
+   │
+28 │         ensures result == 1;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/counter_model/sources/counter_model.move:12: walk
+   =         i = <redacted>
+   =     at tests/counter_model/sources/counter_model.move:14: walk
+   =     at tests/counter_model/sources/counter_model.move:15: walk
+   =     at tests/counter_model/sources/counter_model.move:16: walk
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/counter_model/sources/counter_model.move:15: walk
+   =     at tests/counter_model/sources/counter_model.move:16: walk
+   =     at tests/counter_model/sources/counter_model.move:19: walk
+   =     at tests/counter_model/sources/counter_model.move:13: walk
+   =     at tests/counter_model/sources/counter_model.move:23: walk
+   =     at tests/counter_model/sources/counter_model.move:11: walk
+   =         result = <redacted>
+   =     at tests/counter_model/sources/counter_model.move:28: walk (spec)
+
+error: post-condition does not hold
+   ┌─ tests/counter_model/sources/counter_model.move:37:9
+   │
+37 │         ensures result == 1;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/counter_model/sources/counter_model.move:33: zero
+   =         result = <redacted>
+   =     at tests/counter_model/sources/counter_model.move:37: zero (spec)

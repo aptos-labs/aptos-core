@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/folds_of_abort_projection.move:57:9: error: the specification clause `aborts_if ∃ (j in 0 .. v.length), «spec_fold$lambda$0»(v, 0, j) >= 101` is not established
+tests/sources/functional/closures/inline/folds_of_abort_projection.move:56:5: error: verex verification failed: the automatic verification of `dependent_first_abort_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_abort_projection.proof.lean`:
+  verify dependent_first_abort_wrong by lean =>
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

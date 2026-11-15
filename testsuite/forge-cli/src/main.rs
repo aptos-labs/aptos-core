@@ -338,7 +338,7 @@ fn main() -> Result<()> {
                     let namespace = if k8s.namespace.is_none() {
                         let mut rng: ThreadRng = rand::thread_rng();
                         // Lets pick some four letter words ;)
-                        let words = random_word::all_len(4)
+                        let words = random_word::all_len(4, random_word::Lang::En)
                             .ok_or_else(|| {
                                 format_err!(
                                     "Failed to get namespace, rerun with --namespace <namespace>"

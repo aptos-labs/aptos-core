@@ -322,7 +322,7 @@ theorem wp_mono {action : Spec State Result}
     fun code execution => weakenAborts code (established.2.1 code execution),
     established.2.2⟩
 
-/-- Fixed-point induction with a `wp` step. Most Leaner loop proofs naturally
+/-- Fixed-point induction with a `wp` step. Most Verex loop proofs naturally
 reason about one call and need not duplicate success and abort forwarding. -/
 theorem satisfies_fix_of_wp
     (body : (Args → Spec State Result) → Args → Spec State Result)

@@ -88,6 +88,9 @@ pub struct VMConfig {
     /// so that it can be priced by the size of its instantiation rather than by
     /// a flat amount.
     pub meter_closure_ty_args: bool,
+    /// When enabled, a storable closure records the serialized size of its captured layouts, so
+    /// that it is priced by the bytes they serialize to.
+    pub meter_closure_captured_layouts: bool,
 }
 
 impl Default for VMConfig {
@@ -129,6 +132,7 @@ impl VMConfig {
         include_closure_mask_in_cmp: true,
         revalidate_resolved_closures: true,
         meter_closure_ty_args: true,
+        meter_closure_captured_layouts: true,
     };
 }
 

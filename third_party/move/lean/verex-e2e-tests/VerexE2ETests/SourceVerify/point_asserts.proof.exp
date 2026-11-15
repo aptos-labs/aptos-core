@@ -1,0 +1,8 @@
+VerexE2ETests/SourceVerify/point_asserts.proof.lean:22:5: error: the step's fact is not proved:
+  x : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed : True
+  permitted : x < 18446744073709551615
+  bounds : 0 ≤ x ∧ x ≤ 2 ^ 64 - 1
+  ⊢ 100 < x
+VerexE2ETests/SourceVerify/point_asserts.proof.lean:20:8: error: verex verification failed: the proof of `successor` does not establish its specification

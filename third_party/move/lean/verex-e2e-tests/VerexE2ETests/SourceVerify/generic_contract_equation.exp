@@ -1,0 +1,16 @@
+VerexE2ETests/SourceVerify/generic_contract_equation.move:111:9: error: the specification clause `ensures result == other` is not established
+VerexE2ETests/SourceVerify/generic_contract_equation.move:110:5: error: verex verification failed: the automatic verification of `wrong_value` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_contract_equation.proof.lean`:
+  verify wrong_value by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_contract_equation.move:118:9: error: the specification clause `ensures result == spec_just(key)` is not established
+VerexE2ETests/SourceVerify/generic_contract_equation.move:117:5: error: verex verification failed: the automatic verification of `wrong_variant` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_contract_equation.proof.lean`:
+  verify wrong_variant by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -1,0 +1,21 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_old_bp.move:57:9
+   │
+57 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:45: caller_false
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:52: caller_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:53: caller_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:54: caller_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:55: caller_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:45: caller_false
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:33: bump (spec)
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:34: bump (spec)
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:47: caller_false
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:45: caller_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:56: caller_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_old_bp.move:57: caller_false (spec)

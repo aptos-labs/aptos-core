@@ -8,7 +8,7 @@
 //! Implementation of native functions for utf8 strings.
 
 use aptos_gas_schedule::{
-    gas_feature_versions::RELEASE_V1_50, gas_params::natives::move_stdlib::*,
+    gas_feature_versions::TESTNET_RESET_OCT_2026, gas_params::natives::move_stdlib::*,
 };
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
@@ -116,7 +116,7 @@ fn native_sub_string(
     let s_arg = safely_pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref()?;
 
-    if context.gas_feature_version() >= RELEASE_V1_50 {
+    if context.gas_feature_version() >= TESTNET_RESET_OCT_2026 {
         context.charge(STRING_SUB_STRING_PER_BYTE * NumBytes::new(s_ref.len() as u64))?;
     }
 

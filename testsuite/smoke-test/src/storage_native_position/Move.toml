@@ -1,0 +1,10 @@
+[package]
+name = "native_position_smoke"
+version = "0.0.0"
+
+[addresses]
+exchange = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../../aptos-move/framework/aptos-framework" }
+AptosExperimental = { local = "../../../../aptos-move/framework/aptos-experimental" }

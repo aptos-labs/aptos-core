@@ -10,12 +10,12 @@ import MoveModel.Frontend.XIR.FromIR
 /-!
 # Move module export
 
-`#export_leaner_xir module to "path"` evaluates an already elaborated
+`#export_verex_xir module to "path"` evaluates an already elaborated
 semantic `IR.Module`, materializes XIR only for the JSON boundary, and writes
 deterministic schema-versioned JSON. The command is an explicit author action;
 ordinary declaration elaboration performs no writes.
 
-`#export_leaner "Module"` is the source-facing compiler directive. It combines
+`#export_verex "Module"` is the source-facing compiler directive. It combines
 `module_from_context%` with the compiler-owned export handoff, so deployable
 sources do not need to name an intermediate IR value. The directive records the
 request and performs compilation at end of input, after all declarations have
@@ -30,21 +30,21 @@ open MoveModel.IR
 open MoveModel.Frontend.XIR
 open scoped Move.Compiler
 
-syntax (name := exportLeanerXIR)
-  "#export_leaner_xir " term " to " str : command
+syntax (name := exportVerexXIR)
+  "#export_verex_xir " term " to " str : command
 
 /-- Marks an existing semantic `IR.Module` value as the deployable module in a
 `.lean` compiler input. XIR is materialized only while writing the exchange
 file. -/
-syntax (name := emitLeanerXIR)
-  "#emit_leaner_xir " term : command
+syntax (name := emitVerexXIR)
+  "#emit_verex_xir " term : command
 
 /-- Compiles the attributed declarations in the current namespace and marks
 the resulting module as this `.lean` compiler input's deployable module. The
 optional selection has the same meaning as `module_from_context%` and
 `module%` respectively. -/
-syntax (name := exportLeaner)
-  "#export_leaner " str
+syntax (name := exportVerex)
+  "#export_verex " str
     (" structs " "[" ident,* "]" " functions " "[" ident,* "]")? : command
 
 /-- Internal command emitted by `module` to persist the relationship
@@ -288,14 +288,14 @@ private partial def hasMoveDeclarationAttribute (stx : Syntax) : Bool :=
   else
     stx.getArgs.any hasMoveDeclarationAttribute
 
-private partial def expandLeanerAttributeAliases (stx : Syntax) : Syntax :=
+private partial def expandVerexAttributeAliases (stx : Syntax) : Syntax :=
   if stx.isOfKind ``Lean.Parser.Attr.simple && stx[0].isIdent then
     if stx[0].getId == `entry then
       stx.setArg 0 (mkIdentFrom stx[0] `move_entry)
     else
       stx
   else
-    stx.modifyArgs (·.map expandLeanerAttributeAliases)
+    stx.modifyArgs (·.map expandVerexAttributeAliases)
 
 /-- Move type parameters are always inhabited.  Lean needs the corresponding
 instance for the opaque implementations of operations such as vector indexing
@@ -478,7 +478,7 @@ macro_rules
         $signature:optDeclSig $value:declVal) => do
       let signature ← addMoveTypeInhabitants signature
       let modifiers : TSyntax ``Lean.Parser.Command.declModifiers :=
-        ⟨expandLeanerAttributeAliases modifiers.raw⟩
+        ⟨expandVerexAttributeAliases modifiers.raw⟩
       let modifiers ← if hasPublicModifier modifiers then
         prependDeclarationAttribute `move_public (dropPublicModifier modifiers)
       else if hasMoveDeclarationAttribute modifiers.raw then
@@ -532,11 +532,11 @@ macro_rules
       `($modifiers:declModifiers def $declName:declId
         $signature:optDeclSig $value:declVal)
 
-private partial def expandLeanerCommandAliases (stx : Syntax) : Syntax :=
+private partial def expandVerexCommandAliases (stx : Syntax) : Syntax :=
   if stx.isOfKind ``Lean.Parser.Command.declaration then
-    stx.setArg 0 (expandLeanerAttributeAliases stx[0])
+    stx.setArg 0 (expandVerexAttributeAliases stx[0])
   else
-    stx.modifyArgs (·.map expandLeanerCommandAliases)
+    stx.modifyArgs (·.map expandVerexCommandAliases)
 
 /-- Preserve calls to Lean-only helpers until Move lowering. Otherwise Lean
 may inline a helper into a `fun` and silently erase the source boundary which
@@ -966,7 +966,7 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
     (stx : Syntax) : MacroM (Array Syntax) := do
   if let some attrStx := suspendedIntrinsicAttribute? stx then
     Macro.throwErrorAt attrStx
-      "intrinsic declarations are temporarily unsupported; support is suspended until intrinsic validation is implemented on the unified LIR"
+      "intrinsic declarations are temporarily unsupported; support is suspended until intrinsic validation is implemented on the unified VIR"
   if stx.isOfKind ``moveFriendDeclItem then
     let address : TSyntax `term := ⟨stx[1]⟩
     let moduleName : TSyntax `ident := ⟨stx[3]⟩
@@ -1247,7 +1247,7 @@ def expandMoveModuleCommand : Macro := fun stx => do
   unless stx.isOfKind ``moveModuleCommand do Macro.throwUnsupported
   let moduleName : TSyntax `ident := ⟨stx[1]⟩
   let exportName : TSyntax `str := ⟨Syntax.mkStrLit moduleName.getId.toString⟩
-  let exportCommand ← `(#export_leaner $exportName)
+  let exportCommand ← `(#export_verex $exportName)
   let namespaceCommand ← `(namespace $moduleName)
   let identityCommand ← if stx[2].getArgs.isEmpty then
       let address : TSyntax `str := ⟨Syntax.mkStrLit "0x0"⟩
@@ -1255,8 +1255,8 @@ def expandMoveModuleCommand : Macro := fun stx => do
     else
       let addressSpec : TSyntax `term := ⟨stx[2][1]⟩
       `(#register_module_identity_at $addressSpec, $exportName)
-  let openLeanerCommand ← `(open Move)
-  let openLeanerScopeCommand ← `(open scoped Move)
+  let openVerexCommand ← `(open Move)
+  let openVerexScopeCommand ← `(open scoped Move)
   let endCommand ← `(end $moduleName)
   let invariants := stx[4].getArgs.filterMap fun item =>
     if item.isOfKind ``Move.Spec.dataInvariantSpec then
@@ -1280,12 +1280,12 @@ def expandMoveModuleCommand : Macro := fun stx => do
         s!"`spec {named} where invariant …` names no `struct` or `enum` declared in this module"
   let body ← stx[4].getArgs.foldlM (init := #[]) fun result item => do
     (← desugarModuleItem invariants item).foldlM (init := result) fun result command => do
-      let command := expandLeanerCommandAliases command
+      let command := expandVerexCommandAliases command
       let command ← preserveLeanHelperBoundaries command
       return result.push command ++ (← sourceSemanticsDerivations command)
   return mkNullNode <|
     #[namespaceCommand.raw, identityCommand.raw, exportCommand.raw,
-      openLeanerCommand.raw, openLeanerScopeCommand.raw] ++
+      openVerexCommand.raw, openVerexScopeCommand.raw] ++
       body ++ #[endCommand.raw]
 
 /-- Elaborate a `module` item by item.  The items are not handed to the
@@ -1458,7 +1458,7 @@ private structure PendingExport where
 private initialize pendingExportExt : EnvExtension (Option PendingExport) ←
   registerEnvExtension (pure none)
 
-private unsafe def elabExportLeanerXIRUnsafe (moduleTerm pathTerm : Syntax) :
+private unsafe def elabExportVerexXIRUnsafe (moduleTerm pathTerm : Syntax) :
     CommandElabM Unit := do
   let compiled ← liftTermElabM do
     evalTerm MoveModel.IR.Module (mkConst ``MoveModel.IR.Module) moduleTerm
@@ -1471,17 +1471,17 @@ private unsafe def elabExportLeanerXIRUnsafe (moduleTerm pathTerm : Syntax) :
     | .ok encoded => pure encoded
     | .error message => throwErrorAt moduleTerm message
   IO.FS.writeFile path encoded
-  logInfo s!"wrote Leaner XIR to {path}"
+  logInfo s!"wrote Verex XIR to {path}"
 
-@[implemented_by elabExportLeanerXIRUnsafe]
-private opaque elabExportLeanerXIR (moduleTerm pathTerm : Syntax) :
+@[implemented_by elabExportVerexXIRUnsafe]
+private opaque elabExportVerexXIR (moduleTerm pathTerm : Syntax) :
     CommandElabM Unit
 
-@[command_elab exportLeanerXIR]
-def elabExportLeanerXIRCommand : CommandElab := fun stx =>
-  elabExportLeanerXIR stx[1] stx[3]
+@[command_elab exportVerexXIR]
+def elabExportVerexXIRCommand : CommandElab := fun stx =>
+  elabExportVerexXIR stx[1] stx[3]
 
-private unsafe def elabEmitLeanerXIRUnsafe (moduleTerm : Syntax) :
+private unsafe def elabEmitVerexXIRUnsafe (moduleTerm : Syntax) :
     CommandElabM Unit := do
   let compiled ← liftTermElabM do
     evalTerm MoveModel.IR.Module (mkConst ``MoveModel.IR.Module) moduleTerm
@@ -1491,22 +1491,22 @@ private unsafe def elabEmitLeanerXIRUnsafe (moduleTerm : Syntax) :
   let encoded ← match xir.encodeJson with
     | .ok encoded => pure encoded
     | .error message => throwErrorAt moduleTerm message
-  if let some path ← IO.getEnv "LEANER_XIR_OUTPUT" then
+  if let some path ← IO.getEnv "VEREX_XIR_OUTPUT" then
     if ← (System.FilePath.mk path).pathExists then
-      throwErrorAt moduleTerm "a `.lean` compiler input may contain only one Leaner export directive"
+      throwErrorAt moduleTerm "a `.lean` compiler input may contain only one Verex export directive"
     IO.FS.writeFile path encoded
     -- Compiler-provided paths live in random private directories. Do not leak
     -- that unstable implementation detail into diagnostics or test baselines.
-    logInfo "wrote Leaner XIR"
+    logInfo "wrote Verex XIR"
 
-@[implemented_by elabEmitLeanerXIRUnsafe]
-private opaque elabEmitLeanerXIR (moduleTerm : Syntax) : CommandElabM Unit
+@[implemented_by elabEmitVerexXIRUnsafe]
+private opaque elabEmitVerexXIR (moduleTerm : Syntax) : CommandElabM Unit
 
-@[command_elab emitLeanerXIR]
-def elabEmitLeanerXIRCommand : CommandElab := fun stx =>
-  elabEmitLeanerXIR stx[1]
+@[command_elab emitVerexXIR]
+def elabEmitVerexXIRCommand : CommandElab := fun stx =>
+  elabEmitVerexXIR stx[1]
 
-private unsafe def elabExportLeanerUnsafe (stx : Syntax) : CommandElabM Unit := do
+private unsafe def elabExportVerexUnsafe (stx : Syntax) : CommandElabM Unit := do
   let moduleTerm ← liftTermElabM do
     let moduleName : TSyntax `str := ⟨stx[1]⟩
     if stx[2].isNone then
@@ -1519,21 +1519,21 @@ private unsafe def elabExportLeanerUnsafe (stx : Syntax) : CommandElabM Unit := 
         (selection[6].getArgs.filter (·.isIdent)).map (⟨·⟩)
       `(module% $moduleName structs [$[$structIdents],*]
           functions [$[$functionIdents],*])
-  elabEmitLeanerXIRUnsafe moduleTerm
+  elabEmitVerexXIRUnsafe moduleTerm
 
-@[implemented_by elabExportLeanerUnsafe]
-private opaque elabExportLeaner (stx : Syntax) : CommandElabM Unit
+@[implemented_by elabExportVerexUnsafe]
+private opaque elabExportVerex (stx : Syntax) : CommandElabM Unit
 
-@[command_elab exportLeaner]
-def elabExportLeanerCommand : CommandElab := fun stx => do
+@[command_elab exportVerex]
+def elabExportVerexCommand : CommandElab := fun stx => do
   let env ← getEnv
   if let some pending := pendingExportExt.getState env then
-    throwErrorAt stx m!"only one Leaner export directive is allowed; the first is at {pending.marker.getPos?}"
+    throwErrorAt stx m!"only one Verex export directive is allowed; the first is at {pending.marker.getPos?}"
   let ns ← getCurrNamespace
   modifyEnv fun env => pendingExportExt.setState env (some { marker := stx, ns })
 
 @[command_elab Lean.Parser.Command.eoi]
-def elabPendingLeanerExport : CommandElab := fun _ => do
+def elabPendingVerexExport : CommandElab := fun _ => do
   -- This elaborator becomes visible at the end of this defining module, before
   -- its environment-extension initializer can be evaluated.
   if (← getMainModule) == `Move.Compiler.Export then
@@ -1541,6 +1541,6 @@ def elabPendingLeanerExport : CommandElab := fun _ => do
   let env ← getEnv
   if let some pending := pendingExportExt.getState env then
     modifyEnv fun env => pendingExportExt.setState env none
-    Lean.Elab.Command.withNamespace pending.ns <| elabExportLeaner pending.marker
+    Lean.Elab.Command.withNamespace pending.ns <| elabExportVerex pending.marker
 
 end Move.Compiler

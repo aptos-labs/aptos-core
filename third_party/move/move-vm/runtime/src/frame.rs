@@ -89,12 +89,12 @@ macro_rules! build_loaded_function {
                     let handle = module.$get_function_handle(idx.0);
                     match handle {
                         FunctionHandle::Local(function) => {
-                            (Ok(LoadedFunction {
-                                owner: LoadedFunctionOwner::Module(module.clone()),
-                                ty_args: verified_ty_args,
+                            (Ok(LoadedFunction::new_with_ty_args_id(
+                                LoadedFunctionOwner::Module(module.clone()),
+                                verified_ty_args,
                                 ty_args_id,
-                                function: function.clone(),
-                            }))
+                                function.clone(),
+                            )))
                         },
                         FunctionHandle::Remote { module, name } => self
                             .build_loaded_function_from_name_and_ty_args(
@@ -585,7 +585,7 @@ impl Frame {
         let ty_args_id = match ty_args_id {
             Some(ty_args_id) => ty_args_id,
             // We can hit this case where original type args were only a partial instantiation.
-            None => ty_pool.intern_ty_args(&instantiation),
+            None => ty_pool.intern_ty_args(&instantiation)?,
         };
 
         Ok((instantiation, ty_args_id))
@@ -609,11 +609,11 @@ impl Frame {
         // arguments against the callee actually resolved here.
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &verified_ty_args)?;
 
-        Ok(LoadedFunction {
-            owner: LoadedFunctionOwner::Module(module),
-            ty_args: verified_ty_args,
+        Ok(LoadedFunction::new_with_ty_args_id(
+            LoadedFunctionOwner::Module(module),
+            verified_ty_args,
             ty_args_id,
             function,
-        })
+        ))
     }
 }

@@ -648,9 +648,7 @@ fn accumulator_poly_scheduled_inner(
 /// $N$ is the smallest power of two $\ge n$.
 ///
 /// Any `t` evaluations are sufficient to reconstruct the secret `s`.
-pub fn shamir_secret_share<
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
->(
+pub fn shamir_secret_share<R: rand::Rng + rand::CryptoRng>(
     sc: &ThresholdConfigBlstrs,
     s: &InputSecret,
     rng: &mut R,

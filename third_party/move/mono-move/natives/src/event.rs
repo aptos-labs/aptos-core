@@ -9,6 +9,7 @@ use aptos_types::event::EventKey;
 #[cfg(feature = "testing")]
 use mono_move_core::native::{Opaque, Ref};
 use mono_move_core::{
+    memory::{read_ptr, write_ptr, MemoryRegion},
     native::{
         native_invariant_violation, NativeContext, NativeContextFamily, NativeExtension,
         NativeStatus, Vector,
@@ -18,9 +19,6 @@ use mono_move_core::{
 };
 #[cfg(feature = "testing")]
 use move_core_types::account_address::AccountAddress;
-
-/// Number of bytes a heap pointer occupies in the flat value representation.
-const POINTER_SIZE: usize = 8;
 
 /// Byte offset of `GUID::ID::creation_num` within `EventHandle<T>`, whose first
 /// field is a `u64` counter. `addr` follows immediately.
@@ -38,7 +36,9 @@ pub enum EventKind {
 /// Represents a recorded event. Supports both V1 and V2.
 pub struct EventEntry {
     pub msg_ty: InternedType,
-    pub msg_data: Vec<u8>,
+    /// The event value's in-frame representation from [`NativeContext::arg_raw`].
+    pub msg_data: MemoryRegion,
+    /// Heap-pointer offsets within `msg_data`.
     pub ptr_offsets: Vec<u32>,
     pub kind: EventKind,
 }
@@ -62,7 +62,7 @@ impl EventStore {
     fn emit(
         &mut self,
         msg_ty: InternedType,
-        msg_data: Vec<u8>,
+        msg_data: MemoryRegion,
         ptr_offsets: Vec<u32>,
         kind: EventKind,
     ) {
@@ -83,15 +83,16 @@ impl EventStore {
 impl NativeExtension for EventStore {
     unsafe fn relocate_roots(&mut self, relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {
         for entry in &mut self.entries {
+            let base = entry.msg_data.as_ptr();
             for &off in &entry.ptr_offsets {
                 let off = off as usize;
-                let bytes: [u8; POINTER_SIZE] = entry.msg_data[off..off + POINTER_SIZE]
-                    .try_into()
-                    .expect("offsets keep each pointer slot in bounds");
-                let ptr = usize::from_ne_bytes(bytes) as *mut u8;
-                if let Some(new) = relocate(ptr) {
-                    entry.msg_data[off..off + POINTER_SIZE]
-                        .copy_from_slice(&(new as usize).to_ne_bytes());
+                // SAFETY: `arg_ptr_offsets` provides complete, pointer-aligned
+                // slots within the aligned `msg_data` allocation. Typed pointer
+                // accesses preserve provenance.
+                unsafe {
+                    if let Some(new) = relocate(read_ptr(base, off)) {
+                        write_ptr(base, off, new);
+                    }
                 }
             }
         }
@@ -202,7 +203,7 @@ fn collect_events<'a, C: NativeContext>(
         let store = ctx.get_extension::<EventStore>()?;
         let mut data = Vec::with_capacity(indices.len() * elem_size as usize);
         for &index in &indices {
-            data.extend_from_slice(&store.entries()[index].msg_data);
+            data.extend_from_slice(store.entries()[index].msg_data.as_uninit_slice());
         }
         data
     };
@@ -285,4 +286,34 @@ pub fn make_all_event_test_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
             native_emitted_events_by_handle
         ),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mono_move_core::types::U64_TY;
+
+    /// Event payload pointers remain dereferenceable during relocation and
+    /// after the relocated pointer is written back.
+    #[test]
+    fn relocate_roots_keeps_payload_pointers_usable() {
+        let (old_val, new_val) = (1u64, 2u64);
+        let old = std::ptr::from_ref(&old_val).cast_mut().cast::<u8>();
+        let new = std::ptr::from_ref(&new_val).cast_mut().cast::<u8>();
+        // The second word holds a pointer; relocation uses `ptr_offsets`,
+        // independent of `msg_ty`.
+        let payload = MemoryRegion::new_zeroed(16);
+        unsafe { write_ptr(payload.as_ptr(), 8usize, old) };
+        let mut store = EventStore::new();
+        store.emit(U64_TY, payload, vec![8], EventKind::V2);
+
+        unsafe {
+            store.relocate_roots(&mut |ptr| {
+                assert_eq!(*ptr.cast::<u64>(), 1);
+                Some(new)
+            })
+        };
+        let relocated = unsafe { read_ptr(store.entries()[0].msg_data.as_ptr(), 8usize) };
+        assert_eq!(unsafe { *relocated.cast::<u64>() }, 2);
+    }
 }

@@ -10,7 +10,7 @@ use prometheus::{
     Opts,
 };
 use std::sync::Arc;
-use sysinfo::{ProcessExt, System, SystemExt};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
 
 const PROCESS_METRICS_COUNT: usize = 3;
 const PROCESS_SUBSYSTEM: &str = "process";
@@ -25,7 +25,7 @@ const TOTAL_WRITTEN_BYTES: &str = "disk_total_written_bytes";
 
 /// A Collector for exposing process metrics
 pub(crate) struct ProcessMetricsCollector {
-    system: Arc<Mutex<System>>,
+    system: Option<Arc<Mutex<System>>>,
 
     memory: Desc,
     virtual_memory: Desc,
@@ -38,7 +38,9 @@ pub(crate) struct ProcessMetricsCollector {
 
 impl ProcessMetricsCollector {
     fn new() -> Self {
-        let system = Arc::new(Mutex::new(System::new()));
+        let system = System::new()
+            .ok()
+            .map(|system| Arc::new(Mutex::new(system)));
 
         let memory = Opts::new(MEMORY, "Total memory usage (rss) in bytes.")
             .namespace(NAMESPACE)
@@ -114,10 +116,21 @@ impl Collector for ProcessMetricsCollector {
     fn collect(&self) -> Vec<MetricFamily> {
         let _measure = MeasureLatency::new("process".into());
 
-        let mut system = self.system.lock();
+        let Some(system) = &self.system else {
+            return Vec::new();
+        };
+        let mut system = system.lock();
 
         let pid = if let Ok(pid) = sysinfo::get_current_pid() {
-            system.refresh_process(pid);
+            system.refresh_processes_specifics(
+                ProcessesToUpdate::Some(&[pid]),
+                true,
+                ProcessRefreshKind::nothing()
+                    .with_memory()
+                    .with_cpu()
+                    .with_disk_usage()
+                    .without_tasks(),
+            );
             pid
         } else {
             return Vec::new();

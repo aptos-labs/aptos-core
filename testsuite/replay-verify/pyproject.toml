@@ -18,7 +18,7 @@ dateparser = "^1.2.0"
 
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.10.0"
+black = ">=24.10,<27.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

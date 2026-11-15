@@ -29,6 +29,7 @@ mod consensus_config;
 pub mod epoch_timeout_config;
 mod execution_config;
 mod gas_schedule;
+mod hot_state_config;
 mod jwk_consensus_config;
 pub mod randomness_api_v0_config;
 mod randomness_config;
@@ -56,6 +57,7 @@ pub use self::{
         ExecutionConfigV7, OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType,
     },
     gas_schedule::{DiffItem, GasSchedule, GasScheduleV2, StorageGasSchedule},
+    hot_state_config::{HotStateConfigV1, OnChainHotStateConfig},
     jwk_consensus_config::{
         ConfigV1 as JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig,
     },

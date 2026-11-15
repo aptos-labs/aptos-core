@@ -1,0 +1,23 @@
+processed 4 tasks
+task 0 lines 3-71:  publish --verbose [module 0x66::a]
+task 1 lines 73-73:  run 0x66::a::init --signers 0x66 --verbose
+task 2 lines 75-75:  run 0x66::a::hold_whole --args @0x66 --verbose
+Error: Function execution failed with VMError: {
+    message: Resource `0x66::a::R` cannot be accessed because of active reentrancy of defining module.,
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(3), 5)] }),
+}
+task 3 lines 77-77:  run 0x66::a::hold_nested --args @0x66 --verbose
+Error: Function execution failed with VMError: {
+    message: Resource `0x66::a::Outer` cannot be accessed because of active reentrancy of defining module.,
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(4), 6)] }),
+}

@@ -109,7 +109,7 @@ nonneg lemma. Operations become one generic set; `less/lessEq/equal` and the
 trust-base axioms are shared (already are). The doubled instances/`*_eq_ofInt`
 lemmas collapse.
 
-**`Compiler/LIR.lean` + `Normalize.lean`** — one recognition path keyed on the
+**`Compiler/VIR.lean` + `Normalize.lean`** — one recognition path keyed on the
 integer type's `(width, signed)`; one lowering to `int nt` ops. The parallel
 `uintBinary?`/`sintBinary?`, `loadUInt`/`loadSInt`, `cast`/`castS` collapse.
 

@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/fun_param_frame_captured_declared_dep.move:12:9
+   │
+12 │         ensures global<R2>(@0x42) == old(global<R2>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared_dep.move:9: h
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared_dep_dep.move:29: wrapper
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared_dep_dep.move:30: wrapper
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared_dep_dep.move:31: wrapper
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared_dep_dep.move:29: wrapper
+   =     at tests/sources/functional/closures/fun_param_frame_captured_declared_dep.move:12: h (spec)

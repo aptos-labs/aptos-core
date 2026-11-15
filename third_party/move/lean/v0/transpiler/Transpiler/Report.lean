@@ -2,16 +2,16 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 /-!
-# Leaner backend report
+# Verex backend report
 
-Report data is independent of the transitional XAST printer. LIR analysis and
+Report data is independent of the transitional XAST printer. VIR analysis and
 backend printing contribute to the same per-module value without making the
 report contract depend on a frontend AST.
 -/
 
 namespace Transpiler
 
-/-- A Leaner extension the generated source relies on. -/
+/-- A Verex extension the generated source relies on. -/
 inductive Extension where
   | nestedNamespace
   | loopInvariant
@@ -27,7 +27,7 @@ def Extension.describe : Extension → String
 
 /-- The per-module transpilation report. -/
 structure Report where
-  /-- Leaner extensions the output relies on. -/
+  /-- Verex extensions the output relies on. -/
   extensions : List Extension := []
   /-- Constructs dropped with a disposition (`what: why`). -/
   dropped : List String := []

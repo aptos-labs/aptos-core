@@ -34,3 +34,6 @@ clap = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+aptos-jemalloc = { workspace = true }

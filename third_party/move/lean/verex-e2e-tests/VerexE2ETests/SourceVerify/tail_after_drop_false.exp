@@ -1,0 +1,16 @@
+VerexE2ETests/SourceVerify/tail_after_drop_false.spec.lean:5:3: error: the specification clause `ensures result == tags.length + 1` is not established
+VerexE2ETests/SourceVerify/tail_after_drop_false.spec.lean:4:6: error: verex verification failed: the automatic verification of `tail_cast` failed; provide a proof in the module:
+  verify tail_cast by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tail_after_drop_false.spec.lean:8:3: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/SourceVerify/tail_after_drop_false.spec.lean:7:6: error: verex verification failed: the automatic verification of `tail_truncate` failed; provide a proof in the module:
+  verify tail_truncate by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

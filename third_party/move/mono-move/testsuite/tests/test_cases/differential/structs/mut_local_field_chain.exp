@@ -26,7 +26,7 @@ fun bump(r0): u64 {
     r3: u64
   code:
   L0:
-    0: [r1] := call build, [r0] @1
+    0: [r1] := call_exempt build, [r0] @1
     1: r2 := mut_borrow_loc_field_chain S::x.A::y.B::z, r1 @6
     2: r3 := read_ref r2 @9
     3: r3 := add r3, #1 @11
@@ -57,7 +57,7 @@ fun bump() {
   entry_gas: 257
   code:
     0: Move8 [80] <- [0] @1
-    1: CallIndirect 0x88::mut_local_field_chain::build @1
+    1: CallByNameExempt 0x88::mut_local_field_chain::build @1
     2: Move(24) [8] <- [80] @1
     3: SlotBorrow [32] <- &[16] @6
     4: ReadRef [48] <- *[32] (size=8) @9

@@ -135,7 +135,7 @@ impl InterpreterFunctionCaches {
         &mut self,
         function: &LoadedFunction,
     ) -> Rc<RefCell<FrameTypeCache>> {
-        if function.ty_args.is_empty() {
+        if function.ty_args().is_empty() {
             self.get_or_create_frame_cache_non_generic(function)
         } else {
             self.get_or_create_frame_cache_generic(function)

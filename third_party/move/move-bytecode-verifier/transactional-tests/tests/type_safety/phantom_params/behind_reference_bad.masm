@@ -1,0 +1,59 @@
+// M1 is rejected with either flag setting. M2 through M10 use phantom parameters behind references
+// and are rejected only when `check_phantom_params_behind_references` is enabled.
+
+//# publish
+module 0x1::M1
+struct S<phantom T0> has drop
+  a: |T0|u64 has drop
+
+//# publish
+module 0x1::M2
+struct S<phantom T0> has drop
+  a: |&T0|u64 has drop
+
+//# publish
+module 0x1::M3
+struct S<phantom T0> has drop
+  a: |&mut T0|u64 has drop
+
+//# publish
+module 0x1::M4
+struct S<phantom T0> has drop
+  a: |u64|&T0 has drop
+
+//# publish
+module 0x1::M5
+struct S<phantom T0> has drop
+  a: vector<|&T0|u64 has drop>
+
+//# publish
+module 0x1::M6
+struct S<phantom T0> has drop
+  a: |&vector<T0>|u64 has drop
+
+//# publish
+module 0x1::M7
+struct S1<T0> has drop
+  a: bool
+
+struct S2<phantom T0> has drop
+  a: |&S1<T0>|u64 has drop
+
+//# publish
+module 0x1::M8
+enum E<phantom T0> has drop
+  V1
+    a: |&T0|u64 has drop
+
+//# publish
+module 0x1::M9
+struct S1<phantom T0> has drop
+  a: bool
+
+struct S2<phantom T0> has drop
+  a: S1<|&T0|u64 has drop>
+
+//# publish
+module 0x1::M10
+struct S<phantom T0> has drop
+  a: |(|&T0|u64 has drop)|u64 has drop

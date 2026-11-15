@@ -20,6 +20,7 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewResult,
         TStateView,
     },
+    transaction::Version,
 };
 use dashmap::DashMap;
 use rayon::ThreadPool;
@@ -205,6 +206,10 @@ impl TStateView for RemoteStateViewClient {
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         unimplemented!("get_usage is not implemented for RemoteStateView")
+    }
+
+    fn next_version(&self) -> Version {
+        unimplemented!("next_version is not implemented for RemoteStateView")
     }
 }
 

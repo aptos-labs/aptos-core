@@ -1,0 +1,88 @@
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:5:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `valid_empty` failed; provide a proof in the module:
+  verify valid_empty by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:8:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `valid_ascii` failed; provide a proof in the module:
+  verify valid_ascii by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:11:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `valid_two_byte` failed; provide a proof in the module:
+  verify valid_two_byte by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:14:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:13:6: error: verex verification failed: the automatic verification of `valid_three_byte` failed; provide a proof in the module:
+  verify valid_three_byte by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:17:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `valid_four_byte` failed; provide a proof in the module:
+  verify valid_four_byte by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:20:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:19:6: error: verex verification failed: the automatic verification of `invalid_ff` failed; provide a proof in the module:
+  verify invalid_ff by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:23:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:22:6: error: verex verification failed: the automatic verification of `invalid_continuation` failed; provide a proof in the module:
+  verify invalid_continuation by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:26:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:25:6: error: verex verification failed: the automatic verification of `invalid_overlong` failed; provide a proof in the module:
+  verify invalid_overlong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:29:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:28:6: error: verex verification failed: the automatic verification of `invalid_truncated` failed; provide a proof in the module:
+  verify invalid_truncated by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:32:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:31:6: error: verex verification failed: the automatic verification of `invalid_surrogate` failed; provide a proof in the module:
+  verify invalid_surrogate by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:35:3: error: the specification clause `ensures !result` is not established
+VerexE2ETests/SourceVerify/library_utf8_literals_errors.spec.lean:34:6: error: verex verification failed: the automatic verification of `invalid_beyond_unicode` failed; provide a proof in the module:
+  verify invalid_beyond_unicode by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

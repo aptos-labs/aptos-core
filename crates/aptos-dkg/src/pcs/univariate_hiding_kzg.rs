@@ -34,7 +34,7 @@ use ark_poly::{
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::{borrow::Cow, fmt::Debug};
 

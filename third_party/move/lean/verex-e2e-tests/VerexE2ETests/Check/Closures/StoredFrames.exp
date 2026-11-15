@@ -1,0 +1,165 @@
+VerexE2ETests/Check/Closures/StoredFrames.lean:22:7: error: verification failed with a residual obligation:
+case returns
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+nativesTyped : VerexIR.NativesTyped executable✝
+nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
+verexAgree : VerexIR.Proofs.TypesAgree unit
+verexResources : VerexIR.Proofs.ResourcesTyped unit
+s : 0x99.stored_frames.unit.nominal.namespace.0.declaration✝¹⁻⁰.carrier
+x : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed : True
+permitted :
+  ∀
+    (field :
+      (VerexIR.Proofs.Denote.NTy.function
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [false] }
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            VerexIR.Proofs.Denote.NRow.nil)).carrier),
+    (∃ a, s.val = Sum.inr (Sum.inl a) ∧ a.fst = field) →
+      VerexIR.Proofs.KeepsMemoryAt executable✝
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [false] }
+        (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) field
+verexContinuation✝ : VerexIR.Proofs.Denote.Flow
+    (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false))
+    (VerexIR.Proofs.Denote.NRow.cons 0x99.stored_frames.unit.nominal.namespace.0.declaration✝¹⁻⁰
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [false] }
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
+          VerexIR.Proofs.Denote.NRow.nil)))
+    (VerexIR.Proofs.Denote.NTy.int 64 false).carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+      (fun result final => final = initialState✝) (fun failure => True) state
+pathDecision✝ :
+  ¬VerexIR.Proofs.Denote.variantPlainName ["Empty", "Pending"]
+        (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil
+          (VerexIR.Proofs.Denote.NRows.cons
+            (VerexIR.Proofs.Denote.NRow.cons
+              (VerexIR.Proofs.Denote.NTy.function
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [false] }
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil))
+              VerexIR.Proofs.Denote.NRow.nil)
+            VerexIR.Proofs.Denote.NRows.nil))
+        s.val =
+      "Empty"
+verexContinuation : VerexIR.Proofs.Denote.Flow
+    (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false))
+    (VerexIR.Proofs.Denote.NRow.cons 0x99.stored_frames.unit.nominal.namespace.0.declaration✝¹⁻⁰
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [false] }
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
+          VerexIR.Proofs.Denote.NRow.nil)))
+    (VerexIR.Proofs.Denote.NTy.function
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [false] }
+        (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)).row).carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun flow state =>
+    match flow with
+    | VerexIR.Proofs.Denote.Flow.value value env =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Flow.bind
+          (VerexIR.Proofs.Denote.Args.denoteIn (VerexIR.Proofs.Denote.closedMeanings executable✝ #[]).interpreterOps
+            (VerexIR.Proofs.Denote.Args.cons (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there)
+              VerexIR.Proofs.Denote.Args.nil)
+            env)
+          fun values env =>
+          (VerexIR.Proofs.Denote.opAt 209
+                ((VerexIR.Proofs.Denote.closedMeanings executable✝ #[]).interpreterOps.invoke
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                    VerexIR.Proofs.Denote.NRow.nil)
+                  { parameters := [false], results := [false] }
+                  (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) value values)).bind
+            fun result =>
+            VerexIR.Proofs.Spec.pure
+              (VerexIR.Proofs.Denote.Flow.value
+                ((VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)).toBody result) env))
+        verexContinuation✝ (fun failure => True) state
+    | VerexIR.Proofs.Denote.Flow.return_ result env =>
+      verexContinuation✝ (VerexIR.Proofs.Denote.Flow.return_ result env) state
+    | VerexIR.Proofs.Denote.Flow.break_ nest env =>
+      verexContinuation✝ (VerexIR.Proofs.Denote.Flow.break_ nest env) state
+    | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
+      verexContinuation✝ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
+fst✝ :
+  VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain
+    (VerexIR.Proofs.Denote.NTy.function
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [false] }
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
+left✝ : VerexIR.Proofs.Denote.Which.here.there.project? s.val = some (fst✝, PUnit.unit)
+symmetric :
+  ¬"Empty" =
+      VerexIR.Proofs.Denote.variantPlainName ["Empty", "Pending"]
+        (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil
+          (VerexIR.Proofs.Denote.NRows.cons
+            (VerexIR.Proofs.Denote.NRow.cons
+              (VerexIR.Proofs.Denote.NTy.function
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [false] }
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil))
+              VerexIR.Proofs.Denote.NRow.nil)
+            VerexIR.Proofs.Denote.NRows.nil))
+        s.val
+verexResult : (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)).carrier
+verexFinal : VerexIR.Proofs.Denote.Memory unit
+verexEnsures :
+  VerexIR.Proofs.EnsuresOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+    { parameters := [false], results := [false] }
+    (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) fst✝ (x, ()) verexResult
+    initialState✝ verexFinal
+verexUnaborted :
+  ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [false] }
+      (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) fst✝
+      (VerexIR.Proofs.Denote.HList.settle
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+        (x, ()))
+      initialState✝
+verexResultOf :
+  ∀ (default : (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)).carrier),
+    VerexIR.Proofs.ResultOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [false] }
+        (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) fst✝ (x, ()) initialState✝
+        default =
+      verexResult
+verexStateOf :
+  VerexIR.Proofs.StateOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [false] }
+      (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) fst✝
+      (VerexIR.Proofs.Denote.HList.settle
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+        (x, ()))
+      initialState✝ =
+    verexFinal
+⊢ verexFinal = initialState✝
+VerexE2ETests/Check/Closures/StoredFrames.lean:22:7: error: verex verification failed: the automatic verification of `apply_state` failed; provide a proof in the module:
+  verify apply_state by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

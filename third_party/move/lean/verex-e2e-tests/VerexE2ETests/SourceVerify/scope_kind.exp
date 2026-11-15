@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/scope_kind.spec.lean:5:1: error: VEREX-SCOPE-KIND: `Counter` reopens a scope of another kind, with another keyword

@@ -121,6 +121,14 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::DEFERRED_CLOSURE_FRAMES.to_string(),
+            description: "Let an unverified, memory-free opaque function leave an undeclared \
+                closure parameter's frame to its call sites (prover only; requires a backend \
+                that accounts for the deferred closure's effects)"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::LAMBDA_LIFTING_INLINE.to_string(),
             description: "Whether inline functions shall be included in lambda lifting".to_string(),
             default: Given(false),
@@ -313,6 +321,7 @@ impl Experiment {
     pub const CMP_REWRITE: &'static str = "cmp-rewrite";
     pub const COMPILE_FOR_TESTING: &'static str = "compile-for-testing";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
+    pub const DEFERRED_CLOSURE_FRAMES: &'static str = "deferred-closure-frames";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
     pub const FLUSH_WRITES_OPTIMIZATION: &'static str = "flush-writes-optimization";

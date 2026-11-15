@@ -1,0 +1,30 @@
+VerexE2ETests/SourceVerify/generic_function_literals.move:7:1: info: `put` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/generic_function_literals.move:7:1: info: `via_generic` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/SourceVerify/generic_function_literals.move:78:9: error: the specification clause `aborts_if aborts_of<function[Fn(T) -> Unit](put::<T>)>(x)` is not established
+VerexE2ETests/SourceVerify/generic_function_literals.move:75:5: error: verex verification failed: the automatic verification of `via_generic` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_function_literals.proof.lean`:
+  verify via_generic by lean =>
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_function_literals.move:98:9: error: the specification clause `ensures ensures_of<function[Fn(Version) -> Unit](put::<Version>)>(
+        new Version { major := 0 }
+      )` is not established
+VerexE2ETests/SourceVerify/generic_function_literals.move:94:5: error: verex verification failed: the automatic verification of `other_argument` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_function_literals.proof.lean`:
+  verify other_argument by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/generic_function_literals.move:106:9: error: the specification clause `ensures ensures_of<function[Fn(Version) -> Unit](put::<Version>)>(
+        new Version { major := x }
+      )` is not established
+VerexE2ETests/SourceVerify/generic_function_literals.move:104:5: error: verex verification failed: the automatic verification of `no_call` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_function_literals.proof.lean`:
+  verify no_call by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

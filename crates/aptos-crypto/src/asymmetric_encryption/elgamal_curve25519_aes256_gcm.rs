@@ -19,7 +19,7 @@ use curve25519_dalek::{
     edwards::{CompressedEdwardsY, EdwardsPoint},
     scalar::Scalar,
 };
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use sha3::{Digest, Sha3_256};
 
 /// An asymmetric encryption which:
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn gen_enc_dec() {
-        let mut main_rng = rand_core::OsRng;
+        let mut main_rng = rand::rngs::OsRng;
         let mut aead_rng = aes_gcm::aead::OsRng;
         let (sk, pk) = ElGamalCurve25519Aes256Gcm::key_gen(&mut main_rng);
         let msg = b"hello world again and again and again and again and again and again and again"

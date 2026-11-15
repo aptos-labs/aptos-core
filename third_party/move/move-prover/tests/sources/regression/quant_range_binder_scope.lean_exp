@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/quant_range_binder_scope.move:15:9: error: the specification clause `ensures result == (∃ (i in 1 .. 2; j in 0 .. i), true)` is not established
+tests/sources/regression/quant_range_binder_scope.move:13:5: error: verex verification failed: the automatic verification of `shadowed` failed; provide a proof in `tests/sources/regression/quant_range_binder_scope.proof.lean`:
+  verify shadowed by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/quant_range_binder_scope.move:24:9: error: the specification clause `ensures result == (∃ (i in 1 .. 2; j in 0 .. i), true)` is not established
+tests/sources/regression/quant_range_binder_scope.move:22:5: error: verex verification failed: the automatic verification of `unshadowed` failed; provide a proof in `tests/sources/regression/quant_range_binder_scope.proof.lean`:
+  verify unshadowed by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

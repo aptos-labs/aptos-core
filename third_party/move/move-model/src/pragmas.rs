@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 pub const VERIFY_PRAGMA: &str = "verify";
 
 /// Value of the `verify` pragma stating that an authored proof establishes the
-/// function's specification: the Leaner verifier requires `verify f by ...` in
+/// function's specification: the Verex verifier requires `verify f by ...` in
 /// the proof file; the Move Prover treats it as `true`.
 pub const VERIFY_MANUAL: &str = "manual";
 
@@ -37,10 +37,15 @@ pub const WEIGHT_PROP: &str = "weight";
 pub const VERIFY_DURATION_ESTIMATE_PRAGMA: &str = "verify_duration_estimate";
 
 /// Pragma indicating the heartbeat budget of the function's verification in
-/// the Leaner verifier, in thousands of Lean `maxHeartbeats` units; a function
+/// the Verex verifier, in thousands of Lean `maxHeartbeats` units; a function
 /// whose proof needs more than the default raises it for itself. Ignored by
 /// the Move Prover.
 pub const HEARTBEATS_PRAGMA: &str = "heartbeats";
+
+/// Pragma whose `false` resolves `verify` to false for the Verex verifier
+/// alone: a function the Move Prover verifies is not verified by Verex.
+/// Ignored by the Move Prover.
+pub const VEREX_VERIFY_PRAGMA: &str = "verex_verify";
 
 /// Pragma indicating whether implementation of function should be ignored and
 /// instead treated to be like a native function.
@@ -206,6 +211,10 @@ pub const INTRINSIC_FUN_MAP_HAS_KEY: &str = "map_has_key";
 /// Destroys the map, aborts if the length is not zero.
 /// `[move] fun map_destroy_empty<K, V>(m: Map<K, V>)`
 pub const INTRINSIC_FUN_MAP_DESTROY_EMPTY: &str = "map_destroy_empty";
+
+/// Consumes the map without checking emptiness; never aborts.
+/// `[move] fun map_destroy_unchecked<K, V>(m: Map<K, V>)`
+pub const INTRINSIC_FUN_MAP_DESTROY_UNCHECKED: &str = "map_destroy_unchecked";
 
 /// Add a new entry to the map, aborts if the key already exists
 /// `[move] fun map_add_no_override<K, V>(m: &mut Map<K, V>, k: K, v: V)`
@@ -513,6 +522,10 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
                 IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY)),
             ),
             (
+                INTRINSIC_FUN_MAP_DESTROY_UNCHECKED,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
                 INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE,
                 IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD)),
             ),
@@ -703,6 +716,7 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
 /// Pragmas accepted in a module specification block.
 const MODULE_PRAGMAS: &[&str] = &[
     VERIFY_PRAGMA,
+    VEREX_VERIFY_PRAGMA,
     HEARTBEATS_PRAGMA,
     EMITS_IS_STRICT_PRAGMA,
     EMITS_IS_PARTIAL_PRAGMA,
@@ -716,6 +730,7 @@ const MODULE_PRAGMAS: &[&str] = &[
 /// Pragmas accepted in a function specification block.
 const FUNCTION_PRAGMAS: &[&str] = &[
     VERIFY_PRAGMA,
+    VEREX_VERIFY_PRAGMA,
     HEARTBEATS_PRAGMA,
     TIMEOUT_PRAGMA,
     SEED_PRAGMA,

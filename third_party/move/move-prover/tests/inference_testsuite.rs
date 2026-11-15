@@ -32,6 +32,9 @@ use walkdir::WalkDir;
 /// keep baseline files focused on the verification outcome.
 const DEBUG: bool = false;
 
+/// When set, the verification step also runs the inconsistency check.
+const ENV_TEST_INCONSISTENCY: &str = "MVP_TEST_INCONSISTENCY";
+
 static NOT_CONFIGURED_WARNED: AtomicBool = AtomicBool::new(false);
 
 fn test_runner(path: &Path) -> anyhow::Result<()> {
@@ -201,6 +204,14 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
             verify_options.setup_logging_for_test();
             verify_options.prover.stable_test_output = true;
             verify_options.backend.stable_test_output = true;
+            // A verified inferred contract may rest on an inconsistent
+            // assumption. `MVP_TEST_INCONSISTENCY=1` verifies each baseline
+            // with the inconsistency check as well; a consistent one produces
+            // the same baseline. (Fixtures with abort-only functions exist,
+            // so an unconditional abort is not treated as an inconsistency.)
+            if !read_env_var(ENV_TEST_INCONSISTENCY).is_empty() {
+                verify_options.prover.check_inconsistency = true;
+            }
             if no_tools {
                 verify_options.prover.generate_only = true;
                 if NOT_CONFIGURED_WARNED

@@ -1,0 +1,16 @@
+VerexE2ETests/SourceVerify/return_in_nested_branch_errors.spec.lean:7:3: error: the specification clause `ensures a && !b && c ==> result == 2` is not established
+VerexE2ETests/SourceVerify/return_in_nested_branch_errors.spec.lean:6:6: error: verex verification failed: the automatic verification of `in_while` failed; provide a proof in the module:
+  verify in_while by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/return_in_nested_branch_errors.spec.lean:12:3: error: the specification clause `ensures a && !b && c ==> result == 2` is not established
+VerexE2ETests/SourceVerify/return_in_nested_branch_errors.spec.lean:11:6: error: verex verification failed: the automatic verification of `after_a_branch` failed; provide a proof in the module:
+  verify after_a_branch by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

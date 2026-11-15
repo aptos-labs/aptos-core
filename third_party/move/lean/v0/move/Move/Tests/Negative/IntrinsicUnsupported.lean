@@ -4,14 +4,14 @@
 
 import Move
 
-/-! Intrinsic attributes fail explicitly while their semantics await unified LIR. -/
+/-! Intrinsic attributes fail explicitly while their semantics await unified VIR. -/
 
 namespace Tests.Negative.IntrinsicUnsupported
 
 open Move
 open scoped Move Move.Compiler
 
-/-- error: intrinsic declarations are temporarily unsupported; support is suspended until intrinsic validation is implemented on the unified LIR -/
+/-- error: intrinsic declarations are temporarily unsupported; support is suspended until intrinsic validation is implemented on the unified VIR -/
 #guard_msgs in
 module Owner where
 
@@ -19,7 +19,7 @@ module Owner where
   struct Table (K V) where
     marker : Bool
 
-/-- error: intrinsic declarations are temporarily unsupported; support is suspended until intrinsic validation is implemented on the unified LIR -/
+/-- error: intrinsic declarations are temporarily unsupported; support is suspended until intrinsic validation is implemented on the unified VIR -/
 #guard_msgs in
 module Role where
 

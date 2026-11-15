@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/scope_unknown.spec.lean:5:1: error: specification names unknown function or nominal declaration `one`

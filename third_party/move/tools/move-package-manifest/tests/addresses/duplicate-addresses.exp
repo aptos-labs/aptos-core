@@ -7,6 +7,6 @@ error: failed to parse manifest
 5 | [addresses]
 6 | addr1 = "0x1"
 7 | addr1 = "0x1"
-  | ^ duplicate key `addr1` in table `addresses`
+  | ^^^^^ duplicate key
 8 | addr2 = "0x2"
   |

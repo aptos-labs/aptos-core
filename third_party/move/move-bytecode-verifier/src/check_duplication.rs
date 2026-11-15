@@ -10,6 +10,7 @@
 //! - struct and field definitions are consistent
 //! - the handles in struct and function definitions point to the self module index
 //! - all struct and function handles pointing to the self module index have a definition
+use crate::VerifierConfig;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     errors::{verification_error, Location, PartialVMResult, VMResult},
@@ -27,14 +28,19 @@ use std::{collections::HashSet, hash::Hash};
 
 pub struct DuplicationChecker<'a> {
     module: &'a CompiledModule,
+    config: &'a VerifierConfig,
 }
 
 impl<'a> DuplicationChecker<'a> {
-    pub fn verify_module(module: &'a CompiledModule) -> VMResult<()> {
-        Self::verify_module_impl(module).map_err(|e| e.finish(Location::Module(module.self_id())))
+    pub fn verify_module(config: &'a VerifierConfig, module: &'a CompiledModule) -> VMResult<()> {
+        Self::verify_module_impl(config, module)
+            .map_err(|e| e.finish(Location::Module(module.self_id())))
     }
 
-    fn verify_module_impl(module: &'a CompiledModule) -> PartialVMResult<()> {
+    fn verify_module_impl(
+        config: &'a VerifierConfig,
+        module: &'a CompiledModule,
+    ) -> PartialVMResult<()> {
         Self::check_identifiers(module.identifiers())?;
         Self::check_address_identifiers(module.address_identifiers())?;
         Self::check_constants(module.constant_pool())?;
@@ -45,10 +51,11 @@ impl<'a> DuplicationChecker<'a> {
         Self::check_function_handles(module.function_handles())?;
         Self::check_function_instantiations(module.function_instantiations())?;
 
-        let checker = Self { module };
+        let checker = Self { module, config };
         checker.check_field_handles()?;
         checker.check_field_instantiations()?;
         checker.check_variant_field_handles()?;
+        checker.check_variant_field_handle_variants()?;
         checker.check_variant_field_instantiations()?;
         checker.check_struct_variant_handles()?;
         checker.check_struct_variant_instantiations()?;
@@ -210,6 +217,24 @@ impl<'a> DuplicationChecker<'a> {
             )),
             None => Ok(()),
         }
+    }
+
+    /// Checks that each variant field handle lists distinct variant indices when
+    /// `uniform_variant_field_handles` is enabled.
+    fn check_variant_field_handle_variants(&self) -> PartialVMResult<()> {
+        if !self.config.uniform_variant_field_handles {
+            return Ok(());
+        }
+        for (idx, handle) in self.module.variant_field_handles().iter().enumerate() {
+            if Self::first_duplicate_element(&handle.variants).is_some() {
+                return Err(verification_error(
+                    StatusCode::DUPLICATE_ELEMENT,
+                    IndexKind::VariantFieldHandle,
+                    idx as TableIndex,
+                ));
+            }
+        }
+        Ok(())
     }
 
     fn check_variant_field_instantiations(&self) -> PartialVMResult<()> {

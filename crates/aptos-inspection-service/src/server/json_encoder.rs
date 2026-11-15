@@ -26,7 +26,7 @@ impl Encoder for JsonEncoder {
 
         // Go through each metric family and encode it
         for metric_family in metric_families {
-            let name = metric_family.get_name();
+            let name = metric_family.name();
             let metric_type = metric_family.get_field_type();
             for metric in metric_family.get_metric() {
                 match metric_type {
@@ -105,7 +105,7 @@ fn flatten_metric_with_labels(name: &str, metric: &Metric) -> String {
     let values: Vec<&str> = metric
         .get_label()
         .iter()
-        .map(LabelPair::get_value)
+        .map(LabelPair::value)
         .filter(|&x| !x.is_empty())
         .collect();
     let values = values.join(".");

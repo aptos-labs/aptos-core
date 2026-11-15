@@ -19,6 +19,9 @@ use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
 use std::{collections::HashMap, process::exit};
 
+#[cfg(unix)]
+aptos_jemalloc::setup_jemalloc!();
+
 // bump after a bigger test or perf change, so you can easily distinguish runs
 // that are on top of this commit
 const CODE_PERF_VERSION: &str = "v1";

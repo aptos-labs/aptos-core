@@ -25,6 +25,7 @@ use move_core_types::{
     int256,
     value::{
         self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
+        MAX_VALUE_NEST_DEPTH,
     },
     vm_status::{
         sub_status::{
@@ -54,7 +55,7 @@ use triomphe::Arc as TriompheArc;
 ///
 /// IMPORTANT: When changing this constant, make sure it is in-sync with one in VM config (it is
 /// used there now).
-pub const DEFAULT_MAX_VM_VALUE_NESTED_DEPTH: u64 = 128;
+pub const DEFAULT_MAX_VM_VALUE_NESTED_DEPTH: u64 = MAX_VALUE_NEST_DEPTH;
 
 /***************************************************************************************
  *
@@ -6635,9 +6636,46 @@ impl DepthCheckingVisitor {
         }
         Ok(())
     }
+
+    /// Same result as visiting the vector and each of its elements, without the per-element walk.
+    #[inline]
+    fn check_primitive_vec(&self, depth: u64, len: usize) -> PartialVMResult<()> {
+        self.check(depth)?;
+        if len > 0 {
+            self.check(depth + 1)?;
+        }
+        Ok(())
+    }
+}
+
+macro_rules! check_primitive_vecs {
+    ($($visit:ident: $ty:ty),* $(,)?) => {
+        $(
+            fn $visit(&mut self, depth: u64, vals: &[$ty]) -> PartialVMResult<()> {
+                self.check_primitive_vec(depth, vals.len())
+            }
+        )*
+    };
 }
 
 impl ValueVisitor for DepthCheckingVisitor {
+    check_primitive_vecs!(
+        visit_vec_u8: u8,
+        visit_vec_u16: u16,
+        visit_vec_u32: u32,
+        visit_vec_u64: u64,
+        visit_vec_u128: u128,
+        visit_vec_u256: move_core_types::int256::U256,
+        visit_vec_i8: i8,
+        visit_vec_i16: i16,
+        visit_vec_i32: i32,
+        visit_vec_i64: i64,
+        visit_vec_i128: i128,
+        visit_vec_i256: move_core_types::int256::I256,
+        visit_vec_bool: bool,
+        visit_vec_address: AccountAddress,
+    );
+
     fn visit_delayed(&mut self, depth: u64, _id: DelayedFieldID) -> PartialVMResult<()> {
         self.check(depth)
     }

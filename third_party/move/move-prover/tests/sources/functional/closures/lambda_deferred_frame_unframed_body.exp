@@ -1,0 +1,32 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:51:9
+   │
+51 │         ensures result == old(global<R>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:44: unframed
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:45: unframed
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:46: unframed
+   =         <redacted> = <redacted>
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:47: unframed
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:44: unframed
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:51: unframed (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:61:9
+   │
+61 │         ensures result == old(global<S>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:54: partly_framed
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:55: partly_framed
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:56: partly_framed
+   =         <redacted> = <redacted>
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:57: partly_framed
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:54: partly_framed
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_unframed_body.move:61: partly_framed (spec)

@@ -136,6 +136,10 @@ pub enum TransactionTypeArg {
     CdpLiquidation,
     DexAggregator,
     NftMintMarket,
+    // native position
+    NativePositionSet,
+    NativePositionDelete,
+    NativePositionChurn,
 }
 
 impl TransactionTypeArg {
@@ -158,6 +162,26 @@ impl TransactionTypeArg {
         };
 
         match &self {
+            TransactionTypeArg::NativePositionSet => {
+                call_custom_module(EntryPoints::NativePositionSet { num_markets: 10 })
+            },
+            TransactionTypeArg::NativePositionDelete => {
+                call_custom_module(EntryPoints::NativePositionDelete { num_markets: 10 })
+            },
+            TransactionTypeArg::NativePositionChurn => TransactionType::CallCustomModulesMix {
+                entry_points: vec![
+                    (
+                        Box::new(EntryPoints::NativePositionSet { num_markets: 10 }),
+                        3,
+                    ),
+                    (
+                        Box::new(EntryPoints::NativePositionDelete { num_markets: 10 }),
+                        1,
+                    ),
+                ],
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
             TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool,

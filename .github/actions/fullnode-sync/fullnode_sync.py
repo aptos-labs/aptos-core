@@ -17,8 +17,11 @@ MAINNET_STRING = "mainnet"
 FAST_SYNC_BOOTSTRAPPING_MODE = "DownloadLatestStates" # The bootstrapping string for fast sync
 FULLNODE_CONFIG_NAME = "public_full_node.yaml" # Relative to the aptos-core repo
 FULLNODE_CONFIG_TEMPLATE_PATH = "config/src/config/test_data/public_full_node.yaml" # Relative to the aptos-core repo
-GENESIS_BLOB_PATH = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/{network}/genesis.blob" # Location inside the aptos-networks repo
-WAYPOINT_FILE_PATH = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/{network}/waypoint.txt" # Location inside the aptos-networks repo
+GENESIS_BLOB_PATH = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/{directory}/genesis.blob" # Location inside the aptos-networks repo
+WAYPOINT_FILE_PATH = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/{directory}/waypoint.txt" # Location inside the aptos-networks repo
+NETWORK_GENESIS_DIRECTORY = {
+  TESTNET_STRING: "testnet-v2", # Testnet was redeployed (so we need to use the latest directory name)
+}
 
 # Service endpoint constants
 LOCAL_METRICS_ENDPOINT = "http://127.0.0.1:9101/json_metrics" # The json metrics endpoint running on the local host
@@ -316,12 +319,26 @@ def setup_fullnode_config(network, bootstrapping_mode, continuous_syncing_mode, 
     yaml.dump(fullnode_config, file)
 
 
+def genesis_directory_for_network(network):
+  """Returns the aptos-networks directory that holds genesis.blob and waypoint.txt"""
+  return NETWORK_GENESIS_DIRECTORY.get(network, network)
+
+
+def download_network_file(url):
+  """Downloads a network file into the current working directory. Exits on HTTP failure."""
+  result = subprocess.run(["curl", "-fsSL", "-O", url])
+  if result.returncode != 0:
+    print_error_and_exit("Exiting! Failed to download {url} (curl exit code {code}).".format(url=url, code=result.returncode))
+
+
 def get_genesis_and_waypoint(network):
-  """Clones the genesis blob and waypoint to the current working directory"""
-  genesis_blob_path = GENESIS_BLOB_PATH.format(network=network)
-  waypoint_file_path = WAYPOINT_FILE_PATH.format(network=network)
-  subprocess.run(["curl", "-s", "-O", genesis_blob_path])
-  subprocess.run(["curl", "-s", "-O", waypoint_file_path])
+  """Downloads the genesis blob and waypoint to the current working directory"""
+  genesis_directory = genesis_directory_for_network(network)
+  genesis_blob_path = GENESIS_BLOB_PATH.format(directory=genesis_directory)
+  waypoint_file_path = WAYPOINT_FILE_PATH.format(directory=genesis_directory)
+  print("Downloading genesis and waypoint for network: {network} from directory: {directory}".format(network=network, directory=genesis_directory))
+  download_network_file(genesis_blob_path)
+  download_network_file(waypoint_file_path)
 
 
 def check_if_syncing_historical_data(network, bootstrapping_mode):

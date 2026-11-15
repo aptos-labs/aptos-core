@@ -1,0 +1,36 @@
+VerexE2ETests/SourceVerify/static_step_errors.spec.lean:13:5: error: the specification clause `ensures self.value == old(self.value)` is not established
+VerexE2ETests/SourceVerify/static_step_errors.spec.lean:11:8: error: verex verification failed: the automatic verification of `<static_step_errors::Toggle as static_step_errors::Step>::step` failed; provide a proof in the module:
+  verify «<static_step_errors::Toggle as static_step_errors::Step>»::step by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/static_step_errors.rs:22:5: info: `step_twice` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/static_step_errors.rs:22:5: info: `forward` uses concrete verification: Given interpretation does not yet support behavioral contract interpretation
+VerexE2ETests/SourceVerify/static_step_errors.spec.lean:23:3: error: the specification clause `ensures value == old(value)` is not established
+VerexE2ETests/SourceVerify/static_step_errors.spec.lean:21:6: error: verex verification failed: the automatic verification of `forward` failed; provide a proof in the module:
+  verify forward by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/static_step_errors.spec.lean:7:5: error: the precondition `requires self.value < 100` of `<static_step_errors::Counter as static_step_errors::Step>::step` does not hold at this call
+VerexE2ETests/SourceVerify/static_step_errors.spec.lean:28:3: error: the specification clause `ensures result == (value + 2) % 18446744073709551616` is not established
+VerexE2ETests/SourceVerify/static_step_errors.spec.lean:25:6: error: verex verification failed: the automatic verification of `counter` failed; provide a proof in the module:
+  verify counter by lean =>
+    verex_obligations
+    verex_on
+    | requires_1_of_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/static_step_errors.spec.lean:31:3: error: the specification clause `ensures result == !value` is not established
+VerexE2ETests/SourceVerify/static_step_errors.spec.lean:30:6: error: verex verification failed: the automatic verification of `toggle` failed; provide a proof in the module:
+  verify toggle by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

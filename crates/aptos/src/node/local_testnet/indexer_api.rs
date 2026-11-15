@@ -16,8 +16,8 @@ pub use aptos_localnet::indexer_api::{
 };
 use async_trait::async_trait;
 use bollard::{
-    container::{Config, CreateContainerOptions, StartContainerOptions, WaitContainerOptions},
-    models::{HostConfig, PortBinding},
+    models::{ContainerCreateBody, HostConfig, PortBinding},
+    query_parameters::{CreateContainerOptionsBuilder, WaitContainerOptionsBuilder},
 };
 use clap::Parser;
 use futures::TryStreamExt;
@@ -195,7 +195,7 @@ impl ServiceManager for IndexerApiManager {
                 )
             };
 
-        let exposed_ports = Some(hashmap! {self.indexer_api_port.to_string() => hashmap!{}});
+        let exposed_ports = Some(vec![self.indexer_api_port.to_string()]);
         let host_config = HostConfig {
             // Connect the container to the network we made in the postgres pre_run.
             // This allows the indexer API to access the postgres container without
@@ -219,7 +219,7 @@ impl ServiceManager for IndexerApiManager {
             postgres_connection_string
         );
 
-        let config = Config {
+        let config = ContainerCreateBody {
             image: Some(HASURA_IMAGE.to_string()),
             tty: Some(true),
             exposed_ports,
@@ -241,10 +241,11 @@ impl ServiceManager for IndexerApiManager {
             ..Default::default()
         };
 
-        let options = Some(CreateContainerOptions {
-            name: INDEXER_API_CONTAINER_NAME,
-            ..Default::default()
-        });
+        let options = Some(
+            CreateContainerOptionsBuilder::new()
+                .name(INDEXER_API_CONTAINER_NAME)
+                .build(),
+        );
 
         info!("Starting indexer API with this config: {:?}", config);
 
@@ -253,7 +254,7 @@ impl ServiceManager for IndexerApiManager {
         info!("Created container for indexer API with this ID: {}", id);
 
         docker
-            .start_container(&id, None::<StartContainerOptions<&str>>)
+            .start_container(&id, None)
             .await
             .context("Failed to start indexer API container")?;
 
@@ -263,9 +264,11 @@ impl ServiceManager for IndexerApiManager {
         let wait = docker
             .wait_container(
                 &id,
-                Some(WaitContainerOptions {
-                    condition: "not-running",
-                }),
+                Some(
+                    WaitContainerOptionsBuilder::new()
+                        .condition("not-running")
+                        .build(),
+                ),
             )
             .try_collect::<Vec<_>>()
             .await

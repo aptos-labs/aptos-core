@@ -56,8 +56,8 @@ The current implementation rounds every allocation up to `MAX_ALIGN` (via `align
    fp
    │
    ▼
-   ├── params ──┼── locals ──┼── meta(24) ──┼── callee args/returns ──┤
-   0          p_sum        pl_sum        pl_sum + 24              extended
+   ├── params ──┼── locals ──┼── meta(24) ──┼── callee args/returns ──┼── return scratch ──┤
+   0          p_sum        pl_sum        pl_sum + 24                                 extended
                                             ▲
                                             │
                                     callee's fp lands here
@@ -66,7 +66,8 @@ The current implementation rounds every allocation up to `MAX_ALIGN` (via `align
 - **Parameters** (`[0, p_sum)`) start at offset 0. Each parameter sits at its natural alignment relative to `fp` (which is `MAX_ALIGN`-aligned).
 - **Locals** (`[p_sum, pl_sum)`) continue immediately after parameters with the same natural-alignment rule. The layout pass rounds the locals' end up to 8 so the metadata that follows is 8-byte aligned.
 - **Frame metadata** (`[pl_sum, pl_sum + FRAME_METADATA_SIZE)`) is a `FRAME_METADATA_SIZE`-byte block holding `(saved_pc: u64, saved_fp: ptr, saved_func_ptr: ptr)` and requires 8-byte alignment. Today `FRAME_METADATA_SIZE = 24`.
-- **Callee arg/return region** (`[pl_sum + FRAME_METADATA_SIZE, extended)`) doubles as the start of the callee's frame, so the callee's `fp = caller_fp + pl_sum + FRAME_METADATA_SIZE`.
+- **Callee arg/return region** (starting at `pl_sum + FRAME_METADATA_SIZE`) doubles as the start of the callee's frame, so the callee's `fp = caller_fp + pl_sum + FRAME_METADATA_SIZE`.
+- **Return scratch** (from the end of the callee arg/return region to `extended`) holds bytes saved while a return shuffles values into place. It is live only during a return, when no call is in flight, and is empty when no return needs it.
 
 For the callee's `fp` to be `MAX_ALIGN`-aligned given the caller's is, `pl_sum + FRAME_METADATA_SIZE` must be a multiple of `MAX_ALIGN`. With `MAX_ALIGN = 8` this is automatic (`FRAME_METADATA_SIZE = 24` is divisible by 8 and `pl_sum` is already 8-aligned by the locals layout). With `MAX_ALIGN > 8`, the metadata block needs to be padded up to `MAX_ALIGN` bytes — see [§2](#2-the-max_align-constant).
 

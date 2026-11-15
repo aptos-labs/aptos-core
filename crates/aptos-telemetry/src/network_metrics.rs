@@ -51,10 +51,10 @@ fn collect_connection_metrics(network_metrics: &mut BTreeMap<String, String>) {
         for metric in metric_family.get_metric() {
             // TODO(joshlind): avoid matching on strings that can change!
             for label in metric.get_label() {
-                if label.get_name() == "direction" {
-                    if label.get_value() == "inbound" {
+                if label.name() == "direction" {
+                    if label.value() == "inbound" {
                         inbound_connection_count += metric.get_gauge().get_value();
-                    } else if label.get_value() == "outbound" {
+                    } else if label.value() == "outbound" {
                         outbound_connection_count += metric.get_gauge().get_value();
                     }
                 }

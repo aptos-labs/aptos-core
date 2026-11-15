@@ -151,6 +151,8 @@ pub(crate) struct MockOutput<K, E> {
     pub(crate) reads_needing_exchange:
         HashMap<K, (StateValueMetadata, TriompheArc<MoveTypeLayout>)>,
     pub(crate) group_reads_needing_exchange: HashMap<K, StateValueMetadata>,
+    pub(crate) native_writes_needing_exchange: Vec<(K, ValueType, &'static MoveTypeLayout)>,
+    pub(crate) patched_native_writes: OnceCell<Vec<(K, ValueType)>>,
 }
 
 /// A builder for incrementally constructing MockOutput instances for cleaner code.
@@ -178,6 +180,8 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
             maybe_error_msg: None,
             reads_needing_exchange: HashMap::new(),
             group_reads_needing_exchange: HashMap::new(),
+            native_writes_needing_exchange: vec![],
+            patched_native_writes: OnceCell::new(),
         };
 
         Self { output }
@@ -637,6 +641,8 @@ impl<K, E> MockOutput<K, E> {
             maybe_error_msg: None,
             reads_needing_exchange: HashMap::new(),
             group_reads_needing_exchange: HashMap::new(),
+            native_writes_needing_exchange: vec![],
+            patched_native_writes: OnceCell::new(),
         }
     }
 
@@ -659,6 +665,8 @@ impl<K, E> MockOutput<K, E> {
             maybe_error_msg: error_msg,
             reads_needing_exchange: HashMap::new(),
             group_reads_needing_exchange: HashMap::new(),
+            native_writes_needing_exchange: vec![],
+            patched_native_writes: OnceCell::new(),
         }
     }
 
@@ -873,14 +881,20 @@ where
             .collect()
     }
 
+    fn native_writes_needing_exchange(&self) -> Vec<(K, ValueType, &'static MoveTypeLayout)> {
+        self.native_writes_needing_exchange.clone()
+    }
+
     fn incorporate_materialized_txn_output(
         self,
         patched_resource_write_set: Vec<(K, ValueType)>,
         _patched_events: Vec<E>,
+        patched_native_writes: Vec<(K, ValueType)>,
     ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
         assert_ok!(self
             .patched_resource_write_set
             .set(patched_resource_write_set.into_iter().collect()));
+        assert_ok!(self.patched_native_writes.set(patched_native_writes));
         // TODO: Also test patched events
 
         // The mock's committed output is a snapshot of itself, carrying the reads

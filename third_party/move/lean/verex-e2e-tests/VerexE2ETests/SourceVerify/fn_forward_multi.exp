@@ -1,0 +1,4 @@
+VerexE2ETests/SourceVerify/fn_forward_multi.rs:4:1: info: `__fn_to_fnmut_both_0` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fn_forward_multi.rs:4:1: info: `__fn_to_fnmut_both_1` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fn_forward_multi.rs:4:1: info: `apply_mut` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/fn_forward_multi.rs:4:1: info: `both` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation

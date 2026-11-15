@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `f` may modify: `frame_cycle_contract::deferred` declares no `modifies_of` for it, and the argument is not a closure with a known footprint built at this call site
+   ┌─ tests/sources/functional/closures/fun_param_frame_cycle_contract.move:23:40
+   │
+23 │     fun enclosing(x: u64) acquires R { deferred(|y| t(y), x) }
+   │                                        ^^^^^^^^^^^^^^^^^^^^^

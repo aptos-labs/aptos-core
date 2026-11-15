@@ -2,7 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    backup_types::state_snapshot::manifest::{StateSnapshotBackup, StateSnapshotChunk},
+    backup_types::state_snapshot::manifest::{
+        PositionSnapshotBackup, SnapshotKind, StateSnapshotBackup, StateSnapshotChunk,
+    },
     metadata::Metadata,
     metrics::backup::BACKUP_TIMER,
     storage::{BackupHandleRef, BackupStorage, FileHandle, ShellSafeName},
@@ -60,11 +62,10 @@ impl<RecordStream> ChunkerState<RecordStream>
 where
     RecordStream: TryStream<Ok = Bytes, Error = anyhow::Error> + Unpin,
 {
-    async fn new(mut record_stream: RecordStream, max_chunk_size: usize) -> Result<Self> {
-        let first_record = record_stream
-            .try_next()
-            .await?
-            .ok_or_else(|| anyhow!("State is empty."))?;
+    async fn new(mut record_stream: RecordStream, max_chunk_size: usize) -> Result<Option<Self>> {
+        let Some(first_record) = record_stream.try_next().await? else {
+            return Ok(None);
+        };
 
         let chunk_first_key = Self::parse_key(&first_record)?;
         let prev_record_len = first_record.len();
@@ -73,7 +74,7 @@ where
         buf.put_slice(&(first_record.len() as u32).to_be_bytes());
         buf.extend(first_record);
 
-        Ok(Self {
+        Ok(Some(Self {
             record_stream: Some(record_stream),
             buf,
             chunk_first_key,
@@ -81,7 +82,7 @@ where
             current_idx: 0,
             chunk_first_idx: 0,
             max_chunk_size,
-        })
+        }))
     }
 
     async fn next_full_chunk(&mut self) -> Result<Option<Chunk>> {
@@ -177,10 +178,11 @@ impl<RecordStream> Chunker<RecordStream>
 where
     RecordStream: TryStream<Ok = Bytes, Error = anyhow::Error> + Unpin,
 {
-    async fn new(record_stream: RecordStream, max_chunk_size: usize) -> Result<Self> {
-        Ok(Self {
-            state: Some(ChunkerState::new(record_stream, max_chunk_size).await?),
-        })
+    /// `None` for an empty record stream.
+    async fn new(record_stream: RecordStream, max_chunk_size: usize) -> Result<Option<Self>> {
+        Ok(ChunkerState::new(record_stream, max_chunk_size)
+            .await?
+            .map(|state| Self { state: Some(state) }))
     }
 
     async fn next_chunk(&mut self) -> Result<Option<Chunk>> {
@@ -239,8 +241,40 @@ impl StateSnapshotBackupController {
             .create_backup_with_random_suffix(&self.backup_name())
             .await?;
 
-        let record_stream = Box::pin(self.record_stream(self.concurrent_data_requests).await?);
-        let chunker = Chunker::new(record_stream, self.max_chunk_size).await?;
+        let proof_bytes = self.client.get_state_root_proof(self.version()).await?;
+        let (txn_info, _): (TransactionInfoWithProof, LedgerInfoWithSignatures) =
+            bcs::from_bytes(&proof_bytes)?;
+
+        let chunks = self
+            .write_chunks(&backup_handle, SnapshotKind::State)
+            .await?;
+        let positions = match txn_info.transaction_info().position_state_checkpoint_hash() {
+            Some(root_hash) => Some(PositionSnapshotBackup {
+                root_hash,
+                chunks: self
+                    .write_chunks(&backup_handle, SnapshotKind::Position)
+                    .await?,
+            }),
+            None => None,
+        };
+
+        self.write_manifest(&backup_handle, proof_bytes, txn_info, chunks, positions)
+            .await
+    }
+
+    async fn write_chunks(
+        &self,
+        backup_handle: &BackupHandleRef,
+        kind: SnapshotKind,
+    ) -> Result<Vec<StateSnapshotChunk>> {
+        let record_stream = Box::pin(
+            self.record_stream(kind, self.concurrent_data_requests)
+                .await?,
+        );
+        let Some(chunker) = Chunker::new(record_stream, self.max_chunk_size).await? else {
+            ensure!(kind == SnapshotKind::Position, "State is empty.");
+            return Ok(vec![]);
+        };
 
         let start = Instant::now();
         let chunk_stream = futures::stream::try_unfold(chunker, |mut chunker| async {
@@ -248,13 +282,14 @@ impl StateSnapshotBackupController {
         });
 
         let chunk_manifest_fut_stream =
-            chunk_stream.map_ok(|chunk| self.write_chunk(&backup_handle, chunk));
+            chunk_stream.map_ok(|chunk| self.write_chunk(backup_handle, kind, chunk));
 
-        let chunks: Vec<_> = chunk_manifest_fut_stream
+        chunk_manifest_fut_stream
             .try_buffered_x(8, 4) // 4 concurrently, at most 8 results in buffer.
             .map_ok(|chunk_manifest| {
                 let last_idx = chunk_manifest.last_idx;
                 info!(
+                    kind = ?kind,
                     last_idx = last_idx,
                     values_per_second =
                         ((last_idx + 1) as f64 / start.elapsed().as_secs_f64()) as u64,
@@ -263,19 +298,18 @@ impl StateSnapshotBackupController {
                 chunk_manifest
             })
             .try_collect()
-            .await?;
-
-        self.write_manifest(&backup_handle, chunks).await
+            .await
     }
 
     async fn record_stream(
         &self,
+        kind: SnapshotKind,
         concurrency: usize,
     ) -> Result<impl TryStream<Ok = Bytes, Error = anyhow::Error, Item = Result<Bytes>> + use<>>
     {
         const CHUNK_SIZE: usize = if cfg!(test) { 2 } else { 100_000 };
 
-        let count = self.client.get_state_item_count(self.version()).await?;
+        let count = self.client.get_item_count(kind, self.version()).await?;
         let version = self.version();
         let client = self.client.clone();
 
@@ -298,6 +332,7 @@ impl StateSnapshotBackupController {
                 // spawn and forget, propagate error through channel
                 let _join_handle = tokio::spawn(send_records(
                     client.clone(),
+                    kind,
                     version,
                     start_idx,
                     chunk_size,
@@ -316,18 +351,22 @@ impl StateSnapshotBackupController {
 
 async fn send_records(
     client: Arc<BackupServiceClient>,
+    kind: SnapshotKind,
     version: Version,
     start_idx: usize,
     chunk_size: usize,
     sender: Sender<Result<Bytes>>,
 ) {
-    if let Err(err) = send_records_inner(client, version, start_idx, chunk_size, &sender).await {
+    if let Err(err) =
+        send_records_inner(client, kind, version, start_idx, chunk_size, &sender).await
+    {
         let _ = sender.send(Err(err)).await;
     }
 }
 
 async fn send_records_inner(
     client: Arc<BackupServiceClient>,
+    kind: SnapshotKind,
     version: Version,
     start_idx: usize,
     chunk_size: usize,
@@ -335,7 +374,7 @@ async fn send_records_inner(
 ) -> Result<()> {
     let _timer = BACKUP_TIMER.timer_with(&["state_snapshot_record_stream_all"]);
     let mut input = client
-        .get_state_snapshot_chunk(version, start_idx, chunk_size)
+        .get_snapshot_chunk(kind, version, start_idx, chunk_size)
         .await?;
     let mut count = 0;
     while let Some(record_bytes) = {
@@ -376,14 +415,28 @@ impl StateSnapshotBackupController {
         &NAME
     }
 
-    fn chunk_name(first_idx: usize) -> ShellSafeName {
-        format!("{}-.chunk", first_idx).try_into().unwrap()
+    fn chunk_name_prefix(kind: SnapshotKind) -> &'static str {
+        match kind {
+            SnapshotKind::State => "",
+            SnapshotKind::Position => "position-",
+        }
     }
 
-    fn chunk_proof_name(first_idx: usize, last_idx: usize) -> ShellSafeName {
-        format!("{}-{}.proof", first_idx, last_idx)
+    fn chunk_name(kind: SnapshotKind, first_idx: usize) -> ShellSafeName {
+        format!("{}{}-.chunk", Self::chunk_name_prefix(kind), first_idx)
             .try_into()
             .unwrap()
+    }
+
+    fn chunk_proof_name(kind: SnapshotKind, first_idx: usize, last_idx: usize) -> ShellSafeName {
+        format!(
+            "{}{}-{}.proof",
+            Self::chunk_name_prefix(kind),
+            first_idx,
+            last_idx
+        )
+        .try_into()
+        .unwrap()
     }
 
     async fn get_version_for_epoch_ending(&self, epoch: u64) -> Result<u64> {
@@ -404,6 +457,7 @@ impl StateSnapshotBackupController {
     async fn write_chunk(
         &self,
         backup_handle: &BackupHandleRef,
+        kind: SnapshotKind,
         chunk: Chunk,
     ) -> Result<StateSnapshotChunk> {
         let _timer = BACKUP_TIMER.timer_with(&["state_snapshot_write_chunk"]);
@@ -418,18 +472,21 @@ impl StateSnapshotBackupController {
 
         let (chunk_handle, mut chunk_file) = self
             .storage
-            .create_for_write(backup_handle, &Self::chunk_name(first_idx))
+            .create_for_write(backup_handle, &Self::chunk_name(kind, first_idx))
             .await?;
         chunk_file.write_all(&bytes).await?;
         chunk_file.shutdown().await?;
         let (proof_handle, mut proof_file) = self
             .storage
-            .create_for_write(backup_handle, &Self::chunk_proof_name(first_idx, last_idx))
+            .create_for_write(
+                backup_handle,
+                &Self::chunk_proof_name(kind, first_idx, last_idx),
+            )
             .await?;
         tokio::io::copy(
             &mut self
                 .client
-                .get_account_range_proof(last_key, self.version())
+                .get_range_proof(kind, last_key, self.version())
                 .await?,
             &mut proof_file,
         )
@@ -449,12 +506,11 @@ impl StateSnapshotBackupController {
     async fn write_manifest(
         &self,
         backup_handle: &BackupHandleRef,
+        proof_bytes: Vec<u8>,
+        txn_info: TransactionInfoWithProof,
         chunks: Vec<StateSnapshotChunk>,
+        positions: Option<PositionSnapshotBackup>,
     ) -> Result<FileHandle> {
-        let proof_bytes = self.client.get_state_root_proof(self.version()).await?;
-        let (txn_info, _): (TransactionInfoWithProof, LedgerInfoWithSignatures) =
-            bcs::from_bytes(&proof_bytes)?;
-
         let (proof_handle, mut proof_file) = self
             .storage
             .create_for_write(backup_handle, Self::proof_name())
@@ -468,6 +524,7 @@ impl StateSnapshotBackupController {
             root_hash: txn_info.transaction_info().ensure_state_checkpoint_hash()?,
             chunks,
             proof: proof_handle,
+            positions,
         };
 
         let (manifest_handle, mut manifest_file) = self

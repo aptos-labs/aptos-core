@@ -318,7 +318,9 @@ pub fn setup_networks_and_get_interfaces(
                 network_id,
                 &network_config,
                 consensus_observer_network_configuration(node_config),
-                false,
+                // The fair scheduler serializes messages from each peer, preserving
+                // publisher order without letting another peer block delivery.
+                true,
             );
 
             // Add the network handle to the set of handles

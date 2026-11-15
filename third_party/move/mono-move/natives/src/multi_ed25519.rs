@@ -22,7 +22,7 @@ use mono_move_core::{
     VMResult,
 };
 #[cfg(feature = "testing")]
-use rand_core::OsRng;
+use rand::rngs::OsRng;
 
 /// Counts the leading sub-public-keys of `pks_bytes` that are valid points and
 /// not in the small subgroup, stopping at the first invalid one (matching V1).

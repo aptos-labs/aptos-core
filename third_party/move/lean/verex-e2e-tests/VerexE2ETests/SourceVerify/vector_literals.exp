@@ -1,0 +1,8 @@
+VerexE2ETests/SourceVerify/vector_literals.move:43:9: error: the specification clause `ensures result == b"abd"` is not established
+VerexE2ETests/SourceVerify/vector_literals.move:41:5: error: verex verification failed: the automatic verification of `bytes_wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/vector_literals.proof.lean`:
+  verify bytes_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

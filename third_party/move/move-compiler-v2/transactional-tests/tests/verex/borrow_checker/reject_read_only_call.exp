@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-17:  publish [import VerexMove]
+Error: compilation errors:
+ error: VIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active mutable loan
+   ┌─ TEMPFILE:13:19
+   │
+13 │     let second := &mut owner
+   │                   ^^^^^^^^^^
+
+
+exiting with Verex elaboration errors

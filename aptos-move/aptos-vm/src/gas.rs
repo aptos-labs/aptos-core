@@ -15,7 +15,10 @@ use aptos_logger::{enabled, Level};
 use aptos_memory_usage_tracker::{
     MemoryAlgebra, MemoryTrackedGasMeter, MemoryTrackedGasMeterImpl, StandardMemoryAlgebra,
 };
-use aptos_types::{on_chain_config::Features, transaction::TxnLimitsRequest};
+use aptos_types::{
+    on_chain_config::{Features, TimedFeatures},
+    transaction::TxnLimitsRequest,
+};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
 use aptos_vm_types::{
     resolver::BlockSynchronizationKillSwitch,
@@ -40,7 +43,7 @@ pub fn make_prod_gas_meter<'a, T: BlockSynchronizationKillSwitch>(
     txn_limits_request: Option<&TxnLimitsRequest>,
     meter_balance: Gas,
     block_synchronization_kill_switch: &'a T,
-    meter_value_nodes_on_deserialize: bool,
+    timed_features: &TimedFeatures,
 ) -> ProdGasMeter<'a, T> {
     make_prod_gas_meter_impl::<T, StandardMemoryAlgebra>(
         gas_feature_version,
@@ -49,7 +52,7 @@ pub fn make_prod_gas_meter<'a, T: BlockSynchronizationKillSwitch>(
         txn_limits_request,
         meter_balance,
         block_synchronization_kill_switch,
-        meter_value_nodes_on_deserialize,
+        timed_features,
     )
 }
 
@@ -60,9 +63,9 @@ pub fn make_prod_gas_meter_impl<'a, T: BlockSynchronizationKillSwitch, M: Memory
     txn_limits_request: Option<&TxnLimitsRequest>,
     meter_balance: Gas,
     block_synchronization_kill_switch: &'a T,
-    meter_value_nodes_on_deserialize: bool,
+    timed_features: &TimedFeatures,
 ) -> MemoryTrackedGasMeterImpl<StandardGasMeter<StandardGasAlgebra<'a, T>>, M> {
-    MemoryTrackedGasMeterImpl::new(StandardGasMeter::new(
+    MemoryTrackedGasMeterImpl::new(StandardGasMeter::new_with_timed_features(
         StandardGasAlgebra::new(
             gas_feature_version,
             vm_gas_params,
@@ -71,7 +74,7 @@ pub fn make_prod_gas_meter_impl<'a, T: BlockSynchronizationKillSwitch, M: Memory
             meter_balance,
             block_synchronization_kill_switch,
         ),
-        meter_value_nodes_on_deserialize,
+        timed_features,
     ))
 }
 

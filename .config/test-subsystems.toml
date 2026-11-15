@@ -78,7 +78,7 @@ related_test_packages = [
 
 # Rust tests consume the Lean frontend/backend and its shared IR by file path.
 [[subsystems.lean.path_rules]]
-paths = ["third_party/move/lean/leaner-ir", "third_party/move/lean/leaner-move"]
+paths = ["third_party/move/lean/verex-ir", "third_party/move/lean/verex-move"]
 affects_packages = [
     "move-compiler-v2",
     "move-compiler-v2-transactional-tests",

@@ -1,0 +1,11 @@
+# Copyright © Aptos Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+# The workspace the proof files of the Move Prover's test sources open in, so that their header,
+# `import VerexMove.Proofs`, resolves; see
+# `third_party/move/lean/designs/proof-file-editing.md`.
+name = "prover-test-proofs"
+
+[[require]]
+name = "verex-move"
+path = "../../../lean/verex-move"

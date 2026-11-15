@@ -33,8 +33,8 @@ fun quad(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call double, [r0] @1
-    1: [x0] := call double, [x0] @2
+    0: [x0] := call_exempt double, [r0] @1
+    1: [x0] := call_exempt double, [x0] @2
     2: ret [x0] @3
 }
 === micro-ops ===
@@ -54,8 +54,8 @@ fun quad() {
   entry_gas: 126
   code:
     0: Move8 [32] <- [0] @1
-    1: CallIndirect 0x1::test::double @1
-    2: CallIndirect 0x1::test::double @2
+    1: CallByNameExempt 0x1::test::double @1
+    2: CallByNameExempt 0x1::test::double @2
     3: Move8 [0] <- [32] @3
     4: Return @3
 }

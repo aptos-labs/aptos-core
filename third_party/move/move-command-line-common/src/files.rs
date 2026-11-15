@@ -44,7 +44,7 @@ pub const MOVE_EXTENSION: &str = "move";
 pub const LEAN_EXTENSION: &str = "lean";
 /// Suffix of the proof file beside a Move source (`foo.proof.lean` beside
 /// `foo.move`): the Lean proofs of the source's specifications, read by
-/// the Leaner verifier and never a Lean source of the package.
+/// the Verex verifier and never a Lean source of the package.
 pub const LEAN_PROOF_SUFFIX: &str = ".proof.lean";
 /// Extension for Move IR files
 pub const MOVE_IR_EXTENSION: &str = "mvir";

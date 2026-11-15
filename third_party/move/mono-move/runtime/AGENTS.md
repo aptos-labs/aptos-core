@@ -15,7 +15,8 @@ three invariants held jointly by the compiler, the verifier, and the runtime.
 Any change that could break one needs a matching verifier check or a proof:
 
 1. **Frame metadata integrity** — saved `fp`/`pc`/`func_ptr` are written only by
-   call/return, never by user micro-ops.
+   call/return (the call protocol also sets the checked-frame flag, packed into
+   the `saved_pc` word), never by user micro-ops.
 2. **Pointer-slot accuracy** — `Function::frame_layout` and the matching
    `safe_point_layouts` entries exactly describe the frame slots holding live
    heap pointers. The GC trusts them to find roots.

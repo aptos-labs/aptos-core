@@ -77,6 +77,7 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[addr];
         ensures [inferred] result == result_of<remove_resource>(addr);
+        ensures [inferred] ensures_of<remove_resource>(addr, result_of<remove_resource>(addr));
         aborts_if [inferred] aborts_of<remove_resource>(addr);
     }
 
@@ -339,6 +340,14 @@ module 0x42::state_labels {
         modifies Resource[addr1];
         ensures [inferred] result_1 == (..S1 |~ result_of<remove_resource>(addr1));
         ensures [inferred] result_2 == (S1.. |~ result_of<remove_resource>(addr2));
+        ensures [inferred] ({
+            let a = S1.. |~ result_of<remove_resource>(addr2);
+            S1.. |~ ensures_of<remove_resource>(addr2, a)
+        });
+        ensures [inferred] ({
+            let a = ..S1 |~ result_of<remove_resource>(addr1);
+            ..S1 |~ ensures_of<remove_resource>(addr1, a)
+        });
         aborts_if [inferred] S1 |~ (aborts_of<remove_resource>(addr2));
         aborts_if [inferred] aborts_of<remove_resource>(addr1);
     }
@@ -408,6 +417,29 @@ module 0x42::state_labels {
             };
             S2.. |~ result_of<swap_value>(a3, a)
         };
+        ensures [inferred] ({
+            let a = {
+                let c = ..S1 |~ result_of<swap_value>(a1, 0);
+                S1..S2 |~ result_of<swap_value>(a2, c)
+            };
+            let b = S2.. |~ result_of<swap_value>(a3, a);
+            {
+                let d = S2.. |~ result_of<swap_value>(a3, a);
+                S2.. |~ ensures_of<swap_value>(a3, a, d)
+            }
+        });
+        ensures [inferred] ({
+            let a = ..S1 |~ result_of<swap_value>(a1, 0);
+            let b = S1..S2 |~ result_of<swap_value>(a2, a);
+            {
+                let c = S1..S2 |~ result_of<swap_value>(a2, a);
+                S1..S2 |~ ensures_of<swap_value>(a2, a, c)
+            }
+        });
+        ensures [inferred] ({
+            let a = ..S1 |~ result_of<swap_value>(a1, 0);
+            ..S1 |~ ensures_of<swap_value>(a1, 0, a)
+        });
         aborts_if [inferred] aborts_of<swap_value>(a1, 0);
         aborts_if [inferred] ({
             let a = ..S1 |~ result_of<swap_value>(a1, 0);

@@ -1,0 +1,52 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::closure_ret_transfer_cascade
+
+fun two_rets(): (u64, u64)
+    ld_u64 1
+    ld_u64 2
+    ret
+
+fun three_rets(): (u64, u64, u64)
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ret
+
+fun three_args(a: u64, b: u64, c: u64): u64
+    move_loc a
+    ld_u64 100
+    mul
+    move_loc b
+    ld_u64 10
+    mul
+    add
+    move_loc c
+    add
+    ret
+
+public fun collision(extra: u64): u64
+    move_loc extra
+    pack_closure three_rets, 0
+    call_closure < | |(u64, u64, u64)>
+    ld_u64 5
+    add
+    pop
+    call three_args
+    ret
+
+public fun non_monotonic(h0: u64, h1: u64): u64
+    move_loc h0
+    move_loc h1
+    pack_closure two_rets, 0
+    call_closure < | |(u64, u64)>
+    ld_u64 1
+    add
+    pop
+    call three_args
+    ret
+
+// RUN: execute 0x66::closure_ret_transfer_cascade::collision --args 7
+// CHECK: results: 712
+
+// RUN: execute 0x66::closure_ret_transfer_cascade::non_monotonic --args 5, 7
+// CHECK: results: 571

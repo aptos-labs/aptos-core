@@ -13,7 +13,7 @@ use crate::{
 };
 use aptos_gas_algebra::{
     AbstractValueSize, BytecodeVersion, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas,
-    GasExpression, GasScalingFactor, GasUnit, NumModules, NumSlots, NumTypeNodes,
+    GasExpression, GasMultiplier, GasScalingFactor, GasUnit, NumModules, NumSlots, NumTypeNodes,
 };
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitWithParams,
@@ -64,8 +64,14 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             high_limit_txn_min_price_per_gas_unit: FeePerGasUnit,
             { RELEASE_V1_45.. => "high_limit_txn_min_price_per_gas_unit" },
-            // 10x of the min_price_per_gas_unit (100).
-            1000
+            aptos_global_constants::GAS_UNIT_PRICE
+        ],
+        // Transactions with a staking-backed limits request pay this many times
+        // the gas price for execution and IO gas used above the base limits.
+        [
+            high_limit_txn_excess_price_multiplier: GasMultiplier,
+            { RELEASE_V1_50.. => "high_limit_txn_excess_price_multiplier" },
+            10
         ],
         // The maximum gas unit price that a transaction can be submitted with.
         [

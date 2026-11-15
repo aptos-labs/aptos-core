@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/shared_views_aggregates_errors.rs:10:1: error: `final` reads a place only in a loop invariant
+VerexE2ETests/SourceVerify/shared_views_aggregates_errors.rs:10:1: error: `final` reads a place only in a loop invariant

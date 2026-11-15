@@ -875,8 +875,37 @@ impl<'a> Ctx<'a> {
                 access_of: self.access_of(struct_env.get_field_access_of())?,
                 ..self.spec(&struct_env.get_spec())?
             },
+            ghost_fields: self.ghost_fields(struct_env)?,
             intrinsic: self.intrinsic(struct_env),
         })
+    }
+
+    /// The ghost fields of a struct, each initializer read with the struct's
+    /// fields in scope.
+    fn ghost_fields(&self, struct_env: &StructEnv) -> Result<Vec<xast::GhostField>> {
+        let fields: Vec<(Symbol, Type)> = if struct_env.has_variants() {
+            vec![]
+        } else {
+            struct_env
+                .get_fields()
+                .map(|f| (f.get_name(), f.get_type()))
+                .collect()
+        };
+        struct_env
+            .get_ghost_fields()
+            .map(|ghost| {
+                let init = match ghost.get_init_exp() {
+                    Some(init) => Some(self.with_scope(fields.clone(), || self.exp(init))?),
+                    None => None,
+                };
+                Ok(xast::GhostField {
+                    name: self.name(ghost.get_name()),
+                    doc: ghost.get_doc().to_string(),
+                    ty: self.ty(&ghost.get_type())?,
+                    init,
+                })
+            })
+            .collect()
     }
 
     fn function(&self, fun_env: &FunctionEnv) -> Result<xast::Function> {
@@ -1371,6 +1400,11 @@ impl<'a> Ctx<'a> {
             ExpData::Value(_, v) => xast::ExpNode::Value {
                 value: self.value(v)?,
                 constant: self.constant_name(id, v),
+                defaulted_num: matches!(v, Value::Number(_))
+                    && self
+                        .env
+                        .get_extension::<move_model::model::SpecDefaultedNumLocs>()
+                        .is_some_and(|locs| locs.0.contains(&self.env.get_node_loc(id))),
             },
             ExpData::LocalVar(_, name) => {
                 let node = xast::ExpNode::Local {
@@ -1645,6 +1679,7 @@ impl<'a> Ctx<'a> {
                     BehaviorKind::UnchangedOf => xast::BehaviorKind::UnchangedOf,
                     BehaviorKind::FoldsOf => xast::BehaviorKind::FoldsOf,
                     BehaviorKind::WriteOf(index) => xast::BehaviorKind::WriteOf(*index),
+                    BehaviorKind::TransitionOf => xast::BehaviorKind::TransitionOf,
                 },
                 range: self.memory_range(range),
             },

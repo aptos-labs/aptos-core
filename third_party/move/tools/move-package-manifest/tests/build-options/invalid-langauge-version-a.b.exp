@@ -7,4 +7,3 @@ error: failed to parse manifest
 5 | [build]
 6 | language_version = "a.b"
   |                    ^^^^^ unrecognized language version "a.b" (supported versions: "2", "2.2"-"2.5")
-  |

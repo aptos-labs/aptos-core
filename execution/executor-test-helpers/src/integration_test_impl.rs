@@ -26,6 +26,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::LedgerInfo,
+    on_chain_config::{Features, OnChainConfig},
     state_store::{MoveResourceExt, StateView},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{
@@ -34,7 +35,7 @@ use aptos_types::{
         },
         AuxiliaryInfo, AuxiliaryInfoTrait, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo,
         Transaction::{self, UserTransaction},
-        TransactionListWithProofV2, TransactionWithProof, WriteSetPayload,
+        TransactionListWithProofV2, TransactionWithProof, Version, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
@@ -42,7 +43,7 @@ use aptos_types::{
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use move_core_types::move_resource::MoveStructType;
 use rand::SeedableRng;
-use std::{path::Path, sync::Arc};
+use std::{ops::RangeInclusive, path::Path, sync::Arc};
 
 pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let path = aptos_temppath::TempPath::new();
@@ -67,6 +68,12 @@ pub fn test_execution_with_storage_impl_inner(
 
     let (aptos_db, db, executor, waypoint) =
         create_db_and_executor(db_path, &genesis_txn, force_sharding);
+
+    // Same as consensus, so tools re-executing the chain reproduce the committed outputs.
+    let features = Features::fetch_config(&db.reader.state_view_at_version(Some(0)).unwrap())
+        .unwrap()
+        .expect("Genesis must write Features.");
+    let onchain_config = TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG.with_features(&features);
 
     let parent_block_id = executor.committed_block_id();
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
@@ -193,7 +200,7 @@ pub fn test_execution_with_storage_impl_inner(
             )
                 .into(),
             parent_block_id,
-            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+            onchain_config,
         )
         .unwrap();
     let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, std::slice::from_ref(&signer));
@@ -310,7 +317,7 @@ pub fn test_execution_with_storage_impl_inner(
             )
                 .into(),
             epoch2_genesis_id,
-            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+            onchain_config,
         )
         .unwrap();
     let li2 = gen_ledger_info_with_sigs(2, &output2, block2_id, std::slice::from_ref(&signer));
@@ -336,7 +343,7 @@ pub fn test_execution_with_storage_impl_inner(
             )
                 .into(),
             epoch3_genesis_id,
-            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+            onchain_config,
         )
         .unwrap();
     let li3 = gen_ledger_info_with_sigs(3, &output3, block3_id, &[signer]);
@@ -386,6 +393,69 @@ pub fn test_execution_with_storage_impl_inner(
     verify_transactions(&transaction_list_with_proof, &expected_txns).unwrap();
 
     aptos_db
+}
+
+/// Commits two blocks on top of genesis, executed with the on-chain `Features` the way consensus
+/// does, so the stored write sets and `TransactionInfo`s are in the formats the features select
+/// (unlike `TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG`). Returns the version range of the second block,
+/// which unlike the first block of the epoch doesn't write the state storage usage.
+pub fn commit_blocks_with_onchain_features(db_path: &Path) -> RangeInclusive<Version> {
+    let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
+    let (_, db, executor, _) = create_db_and_executor(db_path, &genesis_txn, false);
+    let signer = aptos_types::validator_signer::ValidatorSigner::new(
+        validators[0].data.owner_address,
+        Arc::new(validators[0].consensus_key.clone()),
+    );
+
+    let features = Features::fetch_config(&db.reader.state_view_at_version(Some(0)).unwrap())
+        .unwrap()
+        .expect("Genesis must write Features.");
+    let onchain_config = TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG.with_features(&features);
+
+    let core_resources_account = LocalAccount::new(
+        aptos_test_root_address(),
+        AccountKey::from_private_key(aptos_vm_genesis::GENESIS_KEYPAIR.0.clone()),
+        0,
+    );
+    let txn_factory = TransactionFactory::new(ChainId::test());
+    let mut first_version = 0;
+    let mut last_version = 0;
+    for round in 1..=2 {
+        let block_id = gen_block_id(round);
+        let block = block(vec![
+            Transaction::BlockMetadata(BlockMetadata::new(
+                block_id,
+                1,
+                round as u64,
+                signer.author(),
+                vec![0],
+                vec![],
+                round as u64,
+            )),
+            UserTransaction(
+                core_resources_account
+                    .sign_with_transaction_builder(txn_factory.mint(signer.author(), 1_000_000)),
+            ),
+        ]);
+        let output = executor
+            .execute_block(
+                (
+                    block_id,
+                    block.clone(),
+                    gen_auxiliary_info_for_block(&block),
+                )
+                    .into(),
+                executor.committed_block_id(),
+                onchain_config,
+            )
+            .unwrap();
+        let li = gen_ledger_info_with_sigs(1, &output, block_id, std::slice::from_ref(&signer));
+        executor.commit_blocks(vec![block_id], li.clone()).unwrap();
+        first_version = last_version + 1;
+        last_version = li.ledger_info().version();
+    }
+    first_version..=last_version
 }
 
 fn approx_eq(a: u64, b: u64) -> bool {

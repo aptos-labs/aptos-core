@@ -7,8 +7,8 @@
 //! `destack/analysis.rs`) that survives slot allocation:
 //!
 //! 1. Every use of `Transfer(j)` is preceded by a def in the same block.
-//! 2. At a call boundary, every bound Transfer slot is consumed by the
-//!    call's args (orphans signal an upstream regression).
+//! 2. At a call boundary, every bound Transfer slot must be consumed by an
+//!    argument. Closure calls require all Transfer slots to be unbound.
 //! 3. Calls clobber every Transfer slot; ret defs re-bind on the same
 //!    instruction.
 //! 4. No Transfer binding leaks across a block boundary.
@@ -24,7 +24,7 @@
 
 use super::FuncCtx;
 use crate::stackless_exec_ir::{
-    instr_utils::{call_boundary_rets_and_args, for_each_def, for_each_slot, for_each_value_use},
+    instr_utils::{for_each_def, for_each_slot, for_each_value_use, transfer_rets_and_args},
     NamedSlot, TransferPosition,
 };
 use mono_move_core::{ExecutionErrorKind, IntoExecutionError};
@@ -229,7 +229,7 @@ pub(crate) fn verify(ctx: &FuncCtx) -> Result<(), TransferVerifierError> {
             // (2) at a call boundary, every bound Transfer slot must
             // be consumed by this call's args as args[j] = Transfer(j)
             // (arg positionality).
-            if let Some((rets, args)) = call_boundary_rets_and_args(instr) {
+            if let Some((rets, args)) = transfer_rets_and_args(instr) {
                 // Structural invariants (arg positionality, return Transfer prefix,
                 // return monotonicity).
                 check_call_structural_invariants(args, rets, |s| match s {

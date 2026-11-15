@@ -261,10 +261,15 @@ impl LegacyTxnOutput for TestOutput {
         vec![]
     }
 
+    fn native_writes_needing_exchange(&self) -> Vec<(StateKey, WriteOp, &'static MoveTypeLayout)> {
+        vec![]
+    }
+
     fn incorporate_materialized_txn_output(
         self,
         _patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         _patched_events: Vec<ContractEvent>,
+        _patched_native_writes: Vec<(StateKey, WriteOp)>,
     ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
         Ok((
             aptos_types::transaction::TransactionOutput::new_empty_success(),

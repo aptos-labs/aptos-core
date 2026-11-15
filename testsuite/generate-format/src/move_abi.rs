@@ -11,18 +11,19 @@ pub fn output_file() -> Option<&'static str> {
 }
 
 pub fn get_registry() -> Result<Registry> {
-    let mut tracer =
-        Tracer::new(TracerConfig::default().is_human_readable(bcs::is_human_readable()));
-    let samples = Samples::new();
+    let mut tracer = Tracer::new(
+        TracerConfig::default()
+            .record_samples_for_structs(true)
+            .is_human_readable(bcs::is_human_readable()),
+    );
+    let mut samples = Samples::new();
     // 1. Record samples for types with custom deserializers.
+    crate::trace_type_tags(&mut tracer, &mut samples)?;
 
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<transaction::EntryABI>(&samples)?;
     tracer.trace_type::<language_storage::FunctionParamOrReturnTag>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
-
-    // aliases within StructTag
-    tracer.ignore_aliases("StructTag", &["type_params"])?;
 
     tracer.registry()
 }

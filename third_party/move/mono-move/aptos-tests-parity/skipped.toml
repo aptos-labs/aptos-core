@@ -71,11 +71,55 @@ name = "e2e-move-tests::e2e_move_tests$tests::per_category_gas_limits::execution
 note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
+name = "mono-move-aptos-transaction-executor::e2e$block_epilogue_v0_is_empty_like_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$block_epilogue_v1_matches_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$block_metadata_ext_v3_matches_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$block_metadata_matches_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$decrypted_payload_matches_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$empty_payload_discarded_like_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
 name = "mono-move-aptos-transaction-executor::e2e$event_emitting_script_refused_like_v1"
 note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
 
 [[test]]
+name = "mono-move-aptos-transaction-executor::e2e$extra_signers_rejected_like_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$gas_checks_discard_like_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$native_function_rejected_like_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$non_entry_function_rejected_like_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
 name = "mono-move-aptos-transaction-executor::e2e$nonexistent_entry_function_kept_like_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$option_of_private_struct_rejected_like_v1"
 note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
 
 [[test]]
@@ -88,6 +132,18 @@ note = "Differential against V1, but the reference side is a FakeExecutor, which
 
 [[test]]
 name = "mono-move-aptos-transaction-executor::e2e$p2p_transfer_matches_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$randomness_api_matches_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$reference_parameter_rejected_like_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$returning_function_rejected_like_v1"
 note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
 
 [[test]]
@@ -108,4 +164,24 @@ note = "Differential against V1, but the reference side is a FakeExecutor, which
 
 [[test]]
 name = "mono-move-aptos-transaction-executor::e2e$script_transfer_matches_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$sequential_execution_applies_outputs"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$signer_after_argument_rejected_like_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$state_checkpoint_is_empty_like_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$undecrypted_payload_kept_like_v1"
+note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
+
+[[test]]
+name = "mono-move-aptos-transaction-executor::e2e$undeserializable_script_kept_like_v1"
 note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."

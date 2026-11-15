@@ -146,7 +146,7 @@ fun sum_first_n() {
   entry_gas: 90
   code:
     0: Move8 [32] <- [0] @1
-    1: CallIndirect 0xc0ffee::foo::push_and_sum @1
+    1: CallByName 0xc0ffee::foo::push_and_sum @1
     2: Move8 [0] <- [32] @2
     3: Return @2
 }

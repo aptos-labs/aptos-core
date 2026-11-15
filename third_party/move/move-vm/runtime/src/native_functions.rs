@@ -29,6 +29,7 @@ use move_binary_format::{
 use move_core_types::{
     ability::AbilitySet,
     account_address::AccountAddress,
+    function::FunctionResolutionError,
     gas_algebra::{InternalGas, NumBytes},
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
@@ -180,6 +181,47 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         self.module_storage.runtime_environment().ty_to_ty_tag(ty)
     }
 
+    /// Canonical string of the type's tag.
+    pub fn type_to_canonical_string(&self, ty: &Type) -> PartialVMResult<String> {
+        self.module_storage
+            .runtime_environment()
+            .ty_to_canonical_string(ty)
+    }
+
+    /// Address and name of a struct type, from the struct name index; `None` otherwise.
+    pub fn struct_address_and_name(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<Option<(AccountAddress, Identifier)>> {
+        let env = self.module_storage.runtime_environment();
+        Ok(match ty {
+            Type::Struct { .. } | Type::StructInstantiation(_) => {
+                let name = env.get_struct_name(ty)?;
+                name.map(|(module_id, _)| (module_id.address, module_id.name))
+            },
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
+            | Type::Address
+            | Type::Signer
+            | Type::Vector(_)
+            | Type::Function(_)
+            | Type::Reference(_)
+            | Type::MutableReference(_)
+            | Type::TyParam(_) => None,
+        })
+    }
+
     /// Returns the runtime layout of a type that can be used to (de)serialize the value.
     ///
     /// NOTE: use with caution as this ignores the flag if layout contains delayed fields or not.
@@ -301,15 +343,6 @@ pub struct LoaderContext<'a, 'b> {
     traversal_context: &'a mut TraversalContext<'b>,
 }
 
-/// Error returned by `LoaderContext::resolve_function`
-pub enum FunctionResolutionError {
-    Reserved = 0x0,
-    FunctionNotFound = 0x1,
-    FunctionNotAccessible = 0x2,
-    FunctionIncompatibleType = 0x3,
-    FunctionNotInstantiated = 0x4,
-}
-
 impl<'a, 'b> LoaderContext<'a, 'b> {
     /// Returns a vector of layouts for captured arguments. Used to format captured arguments as
     /// strings. Returns [Ok(None)] in case layouts contain delayed fields (i.e., the values cannot
@@ -338,7 +371,8 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
                             fun,
                             *mask,
                         )
-                    })?,
+                    })?
+                    .map(|(layouts, _)| layouts),
                 },
             },
         )
@@ -420,14 +454,10 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
         if !func.is_public() {
             return Ok(Err(FunctionNotAccessible));
         }
-        let Type::Function {
-            args,
-            results,
-            abilities,
-        } = expected_ty
-        else {
+        let Type::Function(node) = expected_ty else {
             return Ok(Err(FunctionIncompatibleType));
         };
+        let (args, results, abilities) = (node.args(), node.results(), node.abilities());
 
         // A resolved function is always public (checked above) and captures no arguments, so the
         // resulting closure value has exactly the abilities of a public function value, i.e.,
@@ -464,8 +494,6 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
 
         // Construct result.
         let env = self.module_storage.runtime_environment();
-        let ty_args_id = env.ty_pool().intern_ty_args(&ty_args);
-
         // Record the version (hash) of the defining module so that the resolved function does not
         // need to be re-resolved on its first call just to learn its version. The module was just
         // loaded here, so this lookup is a cache hit.
@@ -479,12 +507,12 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
             None
         };
 
-        let loaded_fun = Rc::new(LoadedFunction {
-            owner: LoadedFunctionOwner::Module(module),
+        let loaded_fun = Rc::new(LoadedFunction::new(
+            LoadedFunctionOwner::Module(module),
             ty_args,
-            ty_args_id,
-            function: func,
-        });
+            func,
+            env.ty_pool(),
+        )?);
         Ok(Ok(Box::new(
             LazyLoadedFunction::new_resolved_not_capturing(env, loaded_fun, module_hash)?,
         )))

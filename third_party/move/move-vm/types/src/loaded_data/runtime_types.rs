@@ -8,6 +8,7 @@
 use crate::{
     loaded_data::struct_name_indexing::StructNameIndex,
     module_id_interner::{InternedModuleId, InternedModuleIdPool},
+    ty_interner::TypeId,
 };
 use derivative::Derivative;
 use itertools::Itertools;
@@ -24,11 +25,11 @@ use move_core_types::{
     language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
+use once_cell::sync::OnceCell;
 use serde::Serialize;
 use smallbitvec::SmallBitVec;
 use smallvec::{smallvec, SmallVec};
 use std::{
-    cell::RefCell,
     cmp::max,
     collections::{btree_map, BTreeMap},
     fmt,
@@ -314,9 +315,335 @@ impl StructIdentifier {
     }
 }
 
+/// Size, depth and abilities of a type, computed when the type is constructed so runtime checks
+/// never walk it. Derived from the structure, so ignored by equality and hashing.
+///
+/// `num_nodes` and `max_depth` count every node, while [TypeBuilder] limits do not count some
+/// references, and they saturate at `u16::MAX`. So a limit check may accept a type based on
+/// them, but must recount exactly before rejecting it.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct TypeInfo {
+    num_nodes: u16,
+    max_depth: u16,
+    abilities: AbilitySet,
+    /// Bit set of [Self::HAS_TY_PARAMS] and [Self::ABILITIES_UNKNOWN].
+    flags: u8,
+}
+
+impl TypeInfo {
+    /// Abilities could not be determined; [Type::abilities] computes them.
+    const ABILITIES_UNKNOWN: u8 = 2;
+    /// The type contains a [Type::TyParam].
+    const HAS_TY_PARAMS: u8 = 1;
+
+    const fn leaf(abilities: AbilitySet) -> Self {
+        Self {
+            num_nodes: 1,
+            max_depth: 1,
+            abilities,
+            flags: 0,
+        }
+    }
+
+    const fn ty_param() -> Self {
+        Self {
+            num_nodes: 1,
+            max_depth: 1,
+            abilities: AbilitySet::EMPTY,
+            flags: Self::HAS_TY_PARAMS | Self::ABILITIES_UNKNOWN,
+        }
+    }
+
+    fn compound<'a>(
+        children: impl Iterator<Item = &'a Type>,
+        abilities: Option<AbilitySet>,
+    ) -> Self {
+        let mut num_nodes: u16 = 1;
+        let mut max_depth: u16 = 0;
+        let mut flags = 0;
+        for child in children {
+            let child = child.type_info();
+            num_nodes = num_nodes.saturating_add(child.num_nodes);
+            max_depth = max_depth.max(child.max_depth);
+            flags |= child.flags & Self::HAS_TY_PARAMS;
+        }
+        let abilities = match abilities {
+            Some(abilities) => abilities,
+            None => {
+                flags |= Self::ABILITIES_UNKNOWN;
+                AbilitySet::EMPTY
+            },
+        };
+        Self {
+            num_nodes,
+            max_depth: max_depth.saturating_add(1),
+            abilities,
+            flags,
+        }
+    }
+
+    #[inline(always)]
+    pub fn num_nodes(&self) -> usize {
+        self.num_nodes as usize
+    }
+
+    #[inline(always)]
+    pub fn max_depth(&self) -> usize {
+        self.max_depth as usize
+    }
+
+    #[inline(always)]
+    pub fn has_ty_params(&self) -> bool {
+        self.flags & Self::HAS_TY_PARAMS != 0
+    }
+
+    /// [None] for generic or malformed types.
+    #[inline(always)]
+    pub fn cached_abilities(&self) -> Option<AbilitySet> {
+        if self.flags & Self::ABILITIES_UNKNOWN == 0 {
+            Some(self.abilities)
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    fn is_saturated(&self) -> bool {
+        self.num_nodes == u16::MAX || self.max_depth == u16::MAX
+    }
+}
+
+/// Shared payload of a vector or reference type. Only the child type takes part in equality,
+/// hashing and formatting; the rest is derived.
+#[derive(Clone)]
+pub struct TypeNode {
+    ty: Type,
+    info: TypeInfo,
+    /// Interned id, filled lazily and used as an equality fast path. Never filled for generic
+    /// types. The pool is only flushed together with the module cache, between block executions
+    /// (`RuntimeEnvironment::flush_all_caches`), which drops every loaded type; types must not
+    /// outlive that.
+    cached_ty_id: OnceCell<TypeId>,
+}
+
+impl TypeNode {
+    #[inline(always)]
+    pub fn ty(&self) -> &Type {
+        &self.ty
+    }
+
+    #[inline(always)]
+    pub fn cached_ty_id(&self) -> Option<TypeId> {
+        self.cached_ty_id.get().copied()
+    }
+}
+
+impl std::ops::Deref for TypeNode {
+    type Target = Type;
+
+    #[inline(always)]
+    fn deref(&self) -> &Type {
+        &self.ty
+    }
+}
+
+impl PartialEq for TypeNode {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        // Interned ids are canonical: two filled ids decide equality.
+        if let (Some(a), Some(b)) = (self.cached_ty_id.get(), other.cached_ty_id.get()) {
+            return a == b;
+        }
+        self.ty == other.ty
+    }
+}
+
+impl Eq for TypeNode {}
+
+impl std::hash::Hash for TypeNode {
+    #[inline(always)]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.ty.hash(state)
+    }
+}
+
+impl fmt::Debug for TypeNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.ty, f)
+    }
+}
+
+impl fmt::Display for TypeNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.ty, f)
+    }
+}
+
+/// Shared payload of a struct instantiation; cached values as in [TypeNode].
+#[derive(Clone)]
+pub struct StructInstNode {
+    idx: StructNameIndex,
+    ty_args: Vec<Type>,
+    ability: AbilityInfo,
+    info: TypeInfo,
+    cached_ty_id: OnceCell<TypeId>,
+}
+
+impl StructInstNode {
+    #[inline(always)]
+    pub fn idx(&self) -> StructNameIndex {
+        self.idx
+    }
+
+    #[inline(always)]
+    pub fn ty_args(&self) -> &[Type] {
+        &self.ty_args
+    }
+
+    #[inline(always)]
+    pub fn ability(&self) -> &AbilityInfo {
+        &self.ability
+    }
+
+    #[inline(always)]
+    pub fn cached_ty_id(&self) -> Option<TypeId> {
+        self.cached_ty_id.get().copied()
+    }
+}
+
+impl PartialEq for StructInstNode {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        if let (Some(a), Some(b)) = (self.cached_ty_id.get(), other.cached_ty_id.get()) {
+            return a == b;
+        }
+        self.idx == other.idx && self.ty_args == other.ty_args
+    }
+}
+
+impl Eq for StructInstNode {}
+
+impl std::hash::Hash for StructInstNode {
+    #[inline(always)]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+        self.ty_args.hash(state)
+    }
+}
+
+impl fmt::Debug for StructInstNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StructInstantiation")
+            .field("idx", &self.idx)
+            .field("ty_args", &self.ty_args)
+            .finish()
+    }
+}
+
+/// Shared payload of a function type; cached values as in [TypeNode].
+#[derive(Clone)]
+pub struct FunctionNode {
+    args: Vec<Type>,
+    results: Vec<Type>,
+    abilities: AbilitySet,
+    info: TypeInfo,
+    cached_ty_id: OnceCell<TypeId>,
+}
+
+impl FunctionNode {
+    #[inline(always)]
+    pub fn args(&self) -> &[Type] {
+        &self.args
+    }
+
+    #[inline(always)]
+    pub fn results(&self) -> &[Type] {
+        &self.results
+    }
+
+    #[inline(always)]
+    pub fn abilities(&self) -> AbilitySet {
+        self.abilities
+    }
+
+    #[inline(always)]
+    pub fn cached_ty_id(&self) -> Option<TypeId> {
+        self.cached_ty_id.get().copied()
+    }
+}
+
+impl PartialEq for FunctionNode {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        if let (Some(a), Some(b)) = (self.cached_ty_id.get(), other.cached_ty_id.get()) {
+            return a == b;
+        }
+        self.abilities == other.abilities
+            && self.args == other.args
+            && self.results == other.results
+    }
+}
+
+impl Eq for FunctionNode {}
+
+impl std::hash::Hash for FunctionNode {
+    #[inline(always)]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.abilities.hash(state);
+        self.args.hash(state);
+        self.results.hash(state)
+    }
+}
+
+impl fmt::Debug for FunctionNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Function")
+            .field("args", &self.args)
+            .field("results", &self.results)
+            .field("abilities", &self.abilities)
+            .finish()
+    }
+}
+
+/// The interner's access to a node's id cell. Never fill a generic node.
+pub(crate) trait InternedNode {
+    fn interned_info(&self) -> TypeInfo;
+    fn cached_id(&self) -> Option<TypeId>;
+    fn fill_id(&self, id: TypeId);
+}
+
+macro_rules! impl_interned_node {
+    ($node:ty) => {
+        impl InternedNode for $node {
+            #[inline(always)]
+            fn interned_info(&self) -> TypeInfo {
+                self.info
+            }
+
+            #[inline(always)]
+            fn cached_id(&self) -> Option<TypeId> {
+                self.cached_ty_id.get().copied()
+            }
+
+            #[inline(always)]
+            fn fill_id(&self, id: TypeId) {
+                let _ = self.cached_ty_id.set(id);
+            }
+        }
+    };
+}
+
+impl_interned_node!(TypeNode);
+impl_interned_node!(StructInstNode);
+impl_interned_node!(FunctionNode);
+
 // CAUTION: Do not derive/implement `Ord`/`PartialOrd` because `StructNameIndex`
 // is not guaranteed to be deterministic.
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+//
+// Compound variants must only be built through the `Type::*` constructors below, which compute
+// the cached metadata.
+#[derive(Derivative)]
+#[derivative(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum Type {
     Bool,
     U8,
@@ -324,23 +651,15 @@ pub enum Type {
     U128,
     Address,
     Signer,
-    Vector(TriompheArc<Type>),
+    Vector(TriompheArc<TypeNode>),
     Struct {
         idx: StructNameIndex,
         ability: AbilityInfo,
     },
-    StructInstantiation {
-        idx: StructNameIndex,
-        ty_args: TriompheArc<Vec<Type>>,
-        ability: AbilityInfo,
-    },
-    Function {
-        args: Vec<Type>,
-        results: Vec<Type>,
-        abilities: AbilitySet,
-    },
-    Reference(Box<Type>),
-    MutableReference(Box<Type>),
+    StructInstantiation(TriompheArc<StructInstNode>),
+    Function(TriompheArc<FunctionNode>),
+    Reference(TriompheArc<TypeNode>),
+    MutableReference(TriompheArc<TypeNode>),
     TyParam(u16),
     U16,
     U32,
@@ -393,17 +712,17 @@ impl<'a> Iterator for TypePreorderTraversalIterWithDepth<'a> {
                         self.stack.push((inner_ty, depth + 1));
                     },
 
-                    StructInstantiation { ty_args, .. } => {
-                        for ty_arg in ty_args.iter().rev() {
+                    StructInstantiation(node) => {
+                        for ty_arg in node.ty_args.iter().rev() {
                             self.stack.push((ty_arg, depth + 1));
                         }
                     },
 
-                    Function { args, results, .. } => {
-                        for arg in args.iter() {
+                    Function(node) => {
+                        for arg in node.args.iter() {
                             self.stack.push((arg, depth + 1));
                         }
-                        for result in results.iter() {
+                        for result in node.results.iter() {
                             self.stack.push((result, depth + 1));
                         }
                     },
@@ -463,6 +782,165 @@ macro_rules! paranoid_failure {
 }
 
 impl Type {
+    pub fn to_short_string(&self) -> &'static str {
+        use Type::*;
+        match self {
+            Bool => "bool",
+            U8 => "u8",
+            U16 => "u16",
+            U32 => "u32",
+            U64 => "u64",
+            U128 => "u128",
+            U256 => "u256",
+            I8 => "i8",
+            I16 => "i16",
+            I32 => "i32",
+            I64 => "i64",
+            I128 => "i128",
+            I256 => "i256",
+            Address => "address",
+            Signer => "signer",
+            Vector(_) => "vector",
+            Struct { .. } | StructInstantiation { .. } => "struct",
+            Function { .. } => "function",
+            Reference(_) => "reference",
+            MutableReference(_) => "mutable reference",
+            TyParam(_) => "type parameter",
+        }
+    }
+
+    #[inline(always)]
+    pub fn type_info(&self) -> TypeInfo {
+        match self {
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
+            | Type::Address => TypeInfo::leaf(AbilitySet::PRIMITIVES),
+            Type::Signer => TypeInfo::leaf(AbilitySet::SIGNER),
+            Type::TyParam(_) => TypeInfo::ty_param(),
+            Type::Struct { ability, .. } => TypeInfo::leaf(ability.base_ability_set),
+            Type::Vector(node) | Type::Reference(node) | Type::MutableReference(node) => node.info,
+            Type::StructInstantiation(node) => node.info,
+            Type::Function(node) => node.info,
+        }
+    }
+
+    pub fn vector(elem_ty: Type) -> Type {
+        let abilities = elem_ty
+            .type_info()
+            .cached_abilities()
+            .map(|elem_abilities| AbilitySet::VECTOR.intersect(Self::required_by(elem_abilities)));
+        let info = TypeInfo::compound(std::iter::once(&elem_ty), abilities);
+        Type::Vector(TriompheArc::new(TypeNode {
+            ty: elem_ty,
+            info,
+            cached_ty_id: OnceCell::new(),
+        }))
+    }
+
+    pub fn reference(inner_ty: Type) -> Type {
+        let info = TypeInfo::compound(std::iter::once(&inner_ty), Some(AbilitySet::REFERENCES));
+        Type::Reference(TriompheArc::new(TypeNode {
+            ty: inner_ty,
+            info,
+            cached_ty_id: OnceCell::new(),
+        }))
+    }
+
+    pub fn mut_reference(inner_ty: Type) -> Type {
+        let info = TypeInfo::compound(std::iter::once(&inner_ty), Some(AbilitySet::REFERENCES));
+        Type::MutableReference(TriompheArc::new(TypeNode {
+            ty: inner_ty,
+            info,
+            cached_ty_id: OnceCell::new(),
+        }))
+    }
+
+    pub fn struct_instantiation(
+        idx: StructNameIndex,
+        ty_args: Vec<Type>,
+        ability: AbilityInfo,
+    ) -> Type {
+        let abilities = Self::struct_instantiation_abilities_from_cache(&ability, &ty_args);
+        let info = TypeInfo::compound(ty_args.iter(), abilities);
+        Type::StructInstantiation(TriompheArc::new(StructInstNode {
+            idx,
+            ty_args,
+            ability,
+            info,
+            cached_ty_id: OnceCell::new(),
+        }))
+    }
+
+    pub fn function(args: Vec<Type>, results: Vec<Type>, abilities: AbilitySet) -> Type {
+        let info = TypeInfo::compound(args.iter().chain(results.iter()), Some(abilities));
+        Type::Function(TriompheArc::new(FunctionNode {
+            args,
+            results,
+            abilities,
+            info,
+            cached_ty_id: OnceCell::new(),
+        }))
+    }
+
+    #[inline(always)]
+    fn required_by(abilities: AbilitySet) -> AbilitySet {
+        abilities
+            .into_iter()
+            .map(|a| a.required_by())
+            .fold(AbilitySet::EMPTY, AbilitySet::union)
+    }
+
+    /// [None] for generic or malformed types, which [Type::abilities] handles as before.
+    fn struct_instantiation_abilities_from_cache(
+        ability: &AbilityInfo,
+        ty_args: &[Type],
+    ) -> Option<AbilitySet> {
+        if ability.phantom_ty_args_mask.len() != ty_args.len() {
+            return None;
+        }
+        let mut abilities = ability.base_ability_set;
+        for (ty_arg, is_phantom) in ty_args.iter().zip(ability.phantom_ty_args_mask.iter()) {
+            let arg_abilities = ty_arg.type_info().cached_abilities()?;
+            if !is_phantom {
+                abilities = abilities.intersect(Self::required_by(arg_abilities));
+            }
+        }
+        Some(abilities)
+    }
+
+    #[cfg(any(test, debug_assertions))]
+    pub fn has_consistent_type_info(&self) -> bool {
+        self.preorder_traversal_with_depth().all(|(ty, _)| {
+            let info = ty.type_info();
+            if info.is_saturated() {
+                return true;
+            }
+            let (num_nodes, max_depth) = ty.num_nodes_with_max_depth_uncached();
+            let has_ty_params = ty
+                .preorder_traversal_with_depth()
+                .any(|(t, _)| matches!(t, Type::TyParam(_)));
+            let abilities_ok = match info.cached_abilities() {
+                Some(abilities) => ty.abilities_uncached().ok() == Some(abilities),
+                None => true,
+            };
+            info.num_nodes() == num_nodes
+                && info.max_depth() == max_depth
+                && info.has_ty_params() == has_ty_params
+                && abilities_ok
+        })
+    }
+
     pub fn verify_ty_arg_abilities<'a, I>(
         ty_param_abilities: I,
         ty_args: &[Self],
@@ -491,7 +969,7 @@ impl Type {
         use Type::*;
         match self {
             Signer => true,
-            Reference(inner_ty) => matches!(inner_ty.as_ref(), Signer),
+            Reference(inner_ty) => matches!(inner_ty.ty(), Signer),
             Bool
             | U8
             | U16
@@ -592,7 +1070,7 @@ impl Type {
 
     pub fn paranoid_check_is_signer_ref_ty(&self) -> PartialVMResult<()> {
         if let Self::Reference(inner_ty) = self {
-            if matches!(inner_ty.as_ref(), Self::Signer) {
+            if matches!(inner_ty.ty(), Self::Signer) {
                 return Ok(());
             }
         }
@@ -634,21 +1112,14 @@ impl Type {
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_assignable(&self, expected_ty: &Self) -> PartialVMResult<()> {
         let ok = match (expected_ty, self) {
-            (
-                Type::Function {
-                    args,
-                    results,
-                    abilities,
-                },
-                Type::Function {
-                    args: given_args,
-                    results: given_results,
-                    abilities: given_abilities,
-                },
-            ) => {
-                args == given_args
-                    && results == given_results
-                    && abilities.is_subset(*given_abilities)
+            (Type::Function(expected), Type::Function(given)) => {
+                expected.abilities.is_subset(given.abilities)
+                    && (TriompheArc::ptr_eq(expected, given)
+                        || matches!(
+                            (expected.cached_ty_id(), given.cached_ty_id()),
+                            (Some(a), Some(b)) if a == b
+                        )
+                        || (expected.args == given.args && expected.results == given.results))
             },
             (Type::Reference(ty), Type::Reference(given)) => {
                 given.paranoid_check_assignable(ty)?;
@@ -682,7 +1153,7 @@ impl Type {
         expected_elem_ty: &Self,
     ) -> PartialVMResult<()> {
         if let Self::MutableReference(inner_ty) = self {
-            if let Self::Vector(elem_ty) = inner_ty.as_ref() {
+            if let Self::Vector(elem_ty) = inner_ty.ty() {
                 elem_ty.paranoid_check_eq(expected_elem_ty)?;
                 return Ok(());
             }
@@ -690,7 +1161,7 @@ impl Type {
 
         if let Self::Reference(inner_ty) = self {
             if !IS_MUT {
-                if let Self::Vector(elem_ty) = inner_ty.as_ref() {
+                if let Self::Vector(elem_ty) = inner_ty.ty() {
                     elem_ty.paranoid_check_eq(expected_elem_ty)?;
                     return Ok(());
                 }
@@ -712,14 +1183,14 @@ impl Type {
         expected_elem_ty: &Self,
     ) -> PartialVMResult<Self> {
         self.paranoid_check_is_vec_ref_ty::<IS_MUT>(expected_elem_ty)?;
-        let elem_ty = Box::new(self.get_vec_ref_elem_ty());
+        let elem_ty = self.get_vec_ref_elem_ty();
 
         // SAFETY: This type construction satisfies all constraints on size/depth because the parent
         //         vector reference type has been safely constructed.
         Ok(if IS_MUT {
-            Type::MutableReference(elem_ty)
+            Type::mut_reference(elem_ty)
         } else {
-            Type::Reference(elem_ty)
+            Type::reference(elem_ty)
         })
     }
 
@@ -737,9 +1208,8 @@ impl Type {
     #[cfg_attr(feature = "force-inline", inline(always))]
     fn get_vec_ref_elem_ty(&self) -> Self {
         match self {
-            Self::Reference(inner_ty) | Self::MutableReference(inner_ty) => match inner_ty.as_ref()
-            {
-                Self::Vector(elem_ty) => elem_ty.as_ref().clone(),
+            Self::Reference(inner_ty) | Self::MutableReference(inner_ty) => match inner_ty.ty() {
+                Self::Vector(elem_ty) => elem_ty.ty().clone(),
                 _ => unreachable!("The inner type must be a vector"),
             },
             _ => unreachable!("The top-level type must be a reference"),
@@ -762,7 +1232,7 @@ impl Type {
         match self {
             Type::Reference(inner_ty) | Type::MutableReference(inner_ty) => {
                 inner_ty.paranoid_check_has_ability(Ability::Copy)?;
-                Ok(inner_ty.as_ref().clone())
+                Ok(inner_ty.ty().clone())
             },
             _ => {
                 let msg = format!("Expected a reference to read, got {}", self);
@@ -805,7 +1275,7 @@ impl Type {
     /// Otherwise, returns [None].
     pub fn get_ref_inner_ty(&self) -> Option<&Self> {
         match self {
-            Type::Reference(ty) | Type::MutableReference(ty) => Some(ty.as_ref()),
+            Type::Reference(ty) | Type::MutableReference(ty) => Some(ty.ty()),
             Type::Bool
             | Type::U8
             | Type::U64
@@ -833,6 +1303,14 @@ impl Type {
     //               and doesn't add much compile time.
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn abilities(&self) -> PartialVMResult<AbilitySet> {
+        if let Some(abilities) = self.type_info().cached_abilities() {
+            return Ok(abilities);
+        }
+        self.abilities_uncached()
+    }
+
+    /// Slow path for generic or malformed types, keeping their error reporting unchanged.
+    fn abilities_uncached(&self) -> PartialVMResult<AbilitySet> {
         match self {
             Type::Bool
             | Type::U8
@@ -859,7 +1337,7 @@ impl Type {
 
             Type::Vector(ty) => {
                 AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
-                    ty.abilities()?
+                    ty.abilities_uncached()?
                 ])
                 .map_err(|e| {
                     PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
@@ -867,18 +1345,15 @@ impl Type {
                 })
             },
             Type::Struct { ability, .. } => Ok(ability.base_ability_set),
-            Type::StructInstantiation {
-                ty_args,
-                ability:
-                    AbilityInfo {
-                        base_ability_set,
-                        phantom_ty_args_mask,
-                    },
-                ..
-            } => {
-                let type_argument_abilities = ty_args
+            Type::StructInstantiation(node) => {
+                let AbilityInfo {
+                    base_ability_set,
+                    phantom_ty_args_mask,
+                } = &node.ability;
+                let type_argument_abilities = node
+                    .ty_args
                     .iter()
-                    .map(|arg| arg.abilities())
+                    .map(|arg| arg.abilities_uncached())
                     .collect::<PartialVMResult<Vec<_>>>()?;
                 AbilitySet::polymorphic_abilities(
                     *base_ability_set,
@@ -890,7 +1365,7 @@ impl Type {
                         .with_message(e.to_string())
                 })
             },
-            Type::Function { abilities, .. } => Ok(*abilities),
+            Type::Function(node) => Ok(node.abilities),
         }
     }
 
@@ -908,7 +1383,7 @@ impl Type {
     ///   - `Foo<u64, Bar<u8, bool>>` has 5 nodes.
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn num_nodes(&self) -> usize {
-        self.preorder_traversal_with_depth().count()
+        self.num_nodes_with_max_depth().0
     }
 
     /// Returns the number of nodes the type has and the maximum depth.
@@ -920,6 +1395,14 @@ impl Type {
     ///   - `Foo<u64, Bar<u8, bool>>` has 5 nodes with depth of 3.
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn num_nodes_with_max_depth(&self) -> (usize, usize) {
+        let info = self.type_info();
+        if info.is_saturated() {
+            return self.num_nodes_with_max_depth_uncached();
+        }
+        (info.num_nodes(), info.max_depth())
+    }
+
+    fn num_nodes_with_max_depth_uncached(&self) -> (usize, usize) {
         self.preorder_traversal_with_depth()
             .fold((0, 0), |(count, max_depth), (_, depth)| {
                 (count + 1, max_depth.max(depth))
@@ -930,71 +1413,59 @@ impl Type {
     pub fn num_nodes_in_subst(&self, ty_args: &[Type]) -> PartialVMResult<(usize, usize)> {
         use Type::*;
 
-        thread_local! {
-            static CACHE: RefCell<BTreeMap<usize, (usize, usize)>> = const { RefCell::new(BTreeMap::new()) };
+        let num_nodes_in_arg = |idx: usize| -> PartialVMResult<(usize, usize)> {
+            let ty = ty_args.get(idx).ok_or_else(|| {
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    format!(
+                        "type substitution failed: index out of bounds -- len {} got {}",
+                        ty_args.len(),
+                        idx
+                    ),
+                )
+            })?;
+            Ok(ty.num_nodes_with_max_depth())
+        };
+
+        let mut n = 0;
+        let mut max_depth = 0;
+        for (ty, depth) in self.preorder_traversal_with_depth() {
+            match ty {
+                TyParam(idx) => {
+                    let (nodes, arg_depth) = num_nodes_in_arg(*idx as usize)?;
+                    n += nodes;
+                    // When substituting type parameter, we need to subtract 1 from the depth
+                    // of the type we substitute in to account for the current depth of the
+                    // type parameter node.
+                    max_depth = max_depth.max(depth + arg_depth - 1);
+                },
+                Address
+                | Bool
+                | Signer
+                | U8
+                | U16
+                | U32
+                | U64
+                | U128
+                | U256
+                | I8
+                | I16
+                | I32
+                | I64
+                | I128
+                | I256
+                | Vector(..)
+                | Struct { .. }
+                | Reference(..)
+                | MutableReference(..)
+                | StructInstantiation { .. }
+                | Function { .. } => {
+                    n += 1;
+                    max_depth = max_depth.max(depth);
+                },
+            }
         }
 
-        CACHE.with(|cache| {
-            let mut cache = cache.borrow_mut();
-            cache.clear();
-            let mut num_nodes_in_arg = |idx: usize| -> PartialVMResult<(usize, usize)> {
-                Ok(match cache.entry(idx) {
-                    btree_map::Entry::Occupied(entry) => *entry.into_mut(),
-                    btree_map::Entry::Vacant(entry) => {
-                        let ty = ty_args.get(idx).ok_or_else(|| {
-                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                                .with_message(format!(
-                                "type substitution failed: index out of bounds -- len {} got {}",
-                                ty_args.len(),
-                                idx
-                            ))
-                        })?;
-                        *entry.insert(ty.num_nodes_with_max_depth())
-                    },
-                })
-            };
-
-            let mut n = 0;
-            let mut max_depth = 0;
-            for (ty, depth) in self.preorder_traversal_with_depth() {
-                match ty {
-                    TyParam(idx) => {
-                        let (nodes, arg_depth) = num_nodes_in_arg(*idx as usize)?;
-                        n += nodes;
-                        // When substituting type parameter, we need to subtract 1 from the depth
-                        // of the type we substitute in to account for the current depth of the
-                        // type parameter node.
-                        max_depth = max_depth.max(depth + arg_depth - 1);
-                    },
-                    Address
-                    | Bool
-                    | Signer
-                    | U8
-                    | U16
-                    | U32
-                    | U64
-                    | U128
-                    | U256
-                    | I8
-                    | I16
-                    | I32
-                    | I64
-                    | I128
-                    | I256
-                    | Vector(..)
-                    | Struct { .. }
-                    | Reference(..)
-                    | MutableReference(..)
-                    | StructInstantiation { .. }
-                    | Function { .. } => {
-                        n += 1;
-                        max_depth = max_depth.max(depth);
-                    },
-                }
-            }
-
-            Ok((n, max_depth))
-        })
+        Ok((n, max_depth))
     }
 }
 
@@ -1030,26 +1501,18 @@ impl fmt::Display for Type {
             Signer => f.write_str("signer"),
             Vector(et) => write!(f, "vector<{}>", et),
             Struct { idx, ability: _ } => write!(f, "s#{}", idx),
-            StructInstantiation {
-                idx,
-                ty_args,
-                ability: _,
-            } => write!(
+            StructInstantiation(node) => write!(
                 f,
                 "s#{}<{}>",
-                idx,
-                ty_args.iter().map(|t| t.to_string()).join(",")
+                node.idx,
+                node.ty_args.iter().map(|t| t.to_string()).join(",")
             ),
-            Function {
-                args,
-                results,
-                abilities,
-            } => write!(
+            Function(node) => write!(
                 f,
                 "|{}|{}{}",
-                args.iter().map(|t| t.to_string()).join(","),
-                results.iter().map(|t| t.to_string()).join(","),
-                abilities.display_postfix()
+                node.args.iter().map(|t| t.to_string()).join(","),
+                node.results.iter().map(|t| t.to_string()).join(","),
+                node.abilities.display_postfix()
             ),
             Reference(t) => write!(f, "&{}", t),
             MutableReference(t) => write!(f, "&mut {}", t),
@@ -1180,24 +1643,24 @@ impl TypeBuilder {
     /// Returns an error if the type size or depth are too large.
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
-        let mut count = 1 - self.ref_ty_count_decrement;
-        let check = |c: &mut u64, d: u64| self.check_before_count_increment(c, d);
-        let inner_ty = self
-            .clone_impl(inner_ty, &mut count, 1 + self.ref_ty_depth_increment, check)
-            .map_err(|e| {
-                e.append_message_with_separator(
-                    '.',
-                    format!(
-                        "Failed to create a (mutable: {}) reference type with inner type {}",
-                        is_mut, inner_ty
-                    ),
-                )
-            })?;
-        let inner_ty = Box::new(inner_ty);
+        self.check_existing_ty(
+            inner_ty,
+            1 - self.ref_ty_count_decrement,
+            1 + self.ref_ty_depth_increment,
+        )
+        .map_err(|e| {
+            e.append_message_with_separator(
+                '.',
+                format!(
+                    "Failed to create a (mutable: {}) reference type with inner type {}",
+                    is_mut, inner_ty
+                ),
+            )
+        })?;
         Ok(if is_mut {
-            Type::MutableReference(inner_ty)
+            Type::mut_reference(inner_ty.clone())
         } else {
-            Type::Reference(inner_ty)
+            Type::reference(inner_ty.clone())
         })
     }
 
@@ -1205,20 +1668,90 @@ impl TypeBuilder {
     /// if the type size or depth are too large.
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn create_vec_ty(&self, elem_ty: &Type) -> PartialVMResult<Type> {
-        let mut count = 1;
-        let check = |c: &mut u64, d: u64| self.check_before_count_increment(c, d);
-        let elem_ty = self
-            .clone_impl(elem_ty, &mut count, 2, check)
-            .map_err(|e| {
-                e.append_message_with_separator(
-                    '.',
-                    format!(
-                        "Failed to create a vector type with element type {}",
-                        elem_ty
-                    ),
-                )
-            })?;
-        Ok(Type::Vector(TriompheArc::new(elem_ty)))
+        self.check_existing_ty(elem_ty, 1, 2).map_err(|e| {
+            e.append_message_with_separator(
+                '.',
+                format!(
+                    "Failed to create a vector type with element type {}",
+                    elem_ty
+                ),
+            )
+        })?;
+        Ok(Type::vector(elem_ty.clone()))
+    }
+
+    /// Checks that an existing type fits within the limits at `depth` with `count` nodes already
+    /// used. The cached count may over-count (reference nodes may be free), so it is only used
+    /// to accept; otherwise the exact walk runs, so verdicts and errors are unchanged.
+    fn check_existing_ty(&self, ty: &Type, count: u64, depth: u64) -> PartialVMResult<()> {
+        let info = ty.type_info();
+        if !info.is_saturated() && !info.has_ty_params() {
+            let total_count = count.saturating_add(info.num_nodes() as u64);
+            let total_depth = depth.saturating_add(info.max_depth() as u64 - 1);
+            if total_count <= self.max_ty_size && total_depth <= self.max_ty_depth {
+                return Ok(());
+            }
+        }
+        let mut count = count;
+        self.check_existing_ty_exact(ty, &mut count, depth)
+    }
+
+    /// The limit checks of `clone_impl`, without building.
+    fn check_existing_ty_exact(
+        &self,
+        ty: &Type,
+        count: &mut u64,
+        depth: u64,
+    ) -> PartialVMResult<()> {
+        use Type::*;
+
+        self.check_before_count_increment(count, depth)?;
+        *count += 1;
+        match ty {
+            TyParam(idx) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                        "There is an unresolved type parameter (index: {}) when cloning type {}",
+                        idx, ty
+                    )),
+                );
+            },
+            Bool
+            | U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | I8
+            | I16
+            | I32
+            | I64
+            | I128
+            | I256
+            | Address
+            | Signer
+            | Struct { .. } => {},
+            Vector(elem_ty) => {
+                self.check_existing_ty_exact(elem_ty, count, depth + 1)?;
+            },
+            Reference(inner_ty) | MutableReference(inner_ty) => {
+                *count -= self.ref_ty_count_decrement;
+                self.check_existing_ty_exact(inner_ty, count, depth + self.ref_ty_depth_increment)?;
+            },
+            StructInstantiation(node) => {
+                for ty_arg in node.ty_args.iter() {
+                    self.check_existing_ty_exact(ty_arg, count, depth + 1)?;
+                }
+            },
+            Function(node) => {
+                for ty in node.args.iter().chain(node.results.iter()) {
+                    self.check_existing_ty_exact(ty, count, depth + 1)?;
+                }
+            },
+        }
+        Ok(())
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
@@ -1258,14 +1791,14 @@ impl TypeBuilder {
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        Ok(Type::StructInstantiation {
-            idx: struct_ty.idx,
-            ty_args: triomphe::Arc::new(ty_args),
-            ability: AbilityInfo::generic_struct(
+        Ok(Type::struct_instantiation(
+            struct_ty.idx,
+            ty_args,
+            AbilityInfo::generic_struct(
                 struct_ty.abilities,
                 struct_ty.phantom_ty_params_mask.clone(),
             ),
-        })
+        ))
     }
 
     /// Creates a type for a Move constant. Note that constant types can be
@@ -1330,11 +1863,7 @@ impl TypeBuilder {
             .map(|ty| self.subst_impl(ty, ty_args, &mut count, 2, check))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        Ok(Type::Function {
-            args,
-            results,
-            abilities,
-        })
+        Ok(Type::function(args, results, abilities))
     }
 
     /// Given [`Type`]'s node count and depth, returns an error if these values exceed limits.
@@ -1410,7 +1939,7 @@ impl TypeBuilder {
             S::Address => Address,
             S::Vector(elem_tok) => {
                 let elem_ty = self.create_constant_ty_impl(elem_tok, count, depth + 1)?;
-                Vector(TriompheArc::new(elem_ty))
+                Type::vector(elem_ty)
             },
 
             S::Struct(_) | S::StructInstantiation(_, _) => {
@@ -1450,7 +1979,10 @@ impl TypeBuilder {
         self.apply_subst(
             ty,
             |idx, c, d| match ty_args.get(idx as usize) {
-                Some(ty) => self.clone_impl(ty, c, d, check),
+                Some(ty) => {
+                    self.check_existing_ty_exact(ty, c, d)?;
+                    Ok(ty.clone())
+                },
                 None => Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
@@ -1466,6 +1998,7 @@ impl TypeBuilder {
         )
     }
 
+    #[cfg(test)]
     fn clone_impl<G>(
         &self,
         ty: &Type,
@@ -1536,7 +2069,7 @@ impl TypeBuilder {
             Signer => Signer,
             Vector(elem_ty) => {
                 let elem_ty = self.apply_subst(elem_ty, subst, count, depth + 1, check)?;
-                Vector(TriompheArc::new(elem_ty))
+                Type::vector(elem_ty)
             },
             Reference(inner_ty) => {
                 *count -= self.ref_ty_count_decrement;
@@ -1547,7 +2080,7 @@ impl TypeBuilder {
                     depth + self.ref_ty_depth_increment,
                     check,
                 )?;
-                Reference(Box::new(inner_ty))
+                Type::reference(inner_ty)
             },
             MutableReference(inner_ty) => {
                 *count -= self.ref_ty_count_decrement;
@@ -1558,49 +2091,35 @@ impl TypeBuilder {
                     depth + self.ref_ty_depth_increment,
                     check,
                 )?;
-                MutableReference(Box::new(inner_ty))
+                Type::mut_reference(inner_ty)
             },
             Struct { idx, ability } => Struct {
                 idx: *idx,
                 ability: ability.clone(),
             },
-            StructInstantiation {
-                idx,
-                ty_args: non_instantiated_tys,
-                ability,
-            } => {
+            StructInstantiation(node) => {
                 let mut instantiated_tys = vec![];
-                for ty in non_instantiated_tys.iter() {
+                for ty in node.ty_args.iter() {
                     let ty = self.apply_subst(ty, subst, count, depth + 1, check)?;
                     instantiated_tys.push(ty);
                 }
-                StructInstantiation {
-                    idx: *idx,
-                    ty_args: TriompheArc::new(instantiated_tys),
-                    ability: ability.clone(),
-                }
+                Type::struct_instantiation(node.idx, instantiated_tys, node.ability.clone())
             },
-            Function {
-                args,
-                results,
-                abilities,
-            } => {
+            Function(node) => {
                 let subs_elem = |count: &mut u64, ty: &Type| -> PartialVMResult<Type> {
                     self.apply_subst(ty, subst, count, depth + 1, check)
                 };
-                let args = args
+                let args = node
+                    .args
                     .iter()
                     .map(|ty| subs_elem(count, ty))
                     .collect::<PartialVMResult<Vec<_>>>()?;
-                let results = results
+                let results = node
+                    .results
                     .iter()
                     .map(|ty| subs_elem(count, ty))
                     .collect::<PartialVMResult<Vec<_>>>()?;
-                Function {
-                    args,
-                    results,
-                    abilities: *abilities,
-                }
+                Type::function(args, results, node.abilities)
             },
         })
     }
@@ -1638,7 +2157,7 @@ impl TypeBuilder {
             T::Signer => Signer,
             T::Vector(elem_ty_tag) => {
                 let elem_ty = self.create_ty_impl(elem_ty_tag, resolver, count, depth + 1)?;
-                Vector(triomphe::Arc::new(elem_ty))
+                Type::vector(elem_ty)
             },
             T::Struct(struct_tag) => {
                 let struct_ty = resolver(struct_tag.as_ref())?;
@@ -1655,14 +2174,14 @@ impl TypeBuilder {
                         ty_args.push(ty_arg);
                     }
                     Type::verify_ty_arg_abilities(struct_ty.ty_param_constraints(), &ty_args)?;
-                    StructInstantiation {
-                        idx: struct_ty.idx,
-                        ty_args: triomphe::Arc::new(ty_args),
-                        ability: AbilityInfo::generic_struct(
+                    Type::struct_instantiation(
+                        struct_ty.idx,
+                        ty_args,
+                        AbilityInfo::generic_struct(
                             struct_ty.abilities,
                             struct_ty.phantom_ty_params_mask.clone(),
                         ),
-                    }
+                    )
                 }
             },
             T::Function(fun) => {
@@ -1680,12 +2199,17 @@ impl TypeBuilder {
                             // Note: for reference or mutable reference tags, we add 1 more level
                             // of depth, hence adding 2 to the counter.
                             Ok(match t {
-                                FunctionParamOrReturnTag::Reference(t) => Reference(Box::new(
+                                FunctionParamOrReturnTag::Reference(t) => Type::reference(
                                     self.create_ty_impl(t, resolver, count, depth + 2)?,
-                                )),
-                                FunctionParamOrReturnTag::MutableReference(t) => MutableReference(
-                                    Box::new(self.create_ty_impl(t, resolver, count, depth + 2)?),
                                 ),
+                                FunctionParamOrReturnTag::MutableReference(t) => {
+                                    Type::mut_reference(self.create_ty_impl(
+                                        t,
+                                        resolver,
+                                        count,
+                                        depth + 2,
+                                    )?)
+                                },
                                 FunctionParamOrReturnTag::Value(t) => {
                                     self.create_ty_impl(t, resolver, count, depth + 1)?
                                 },
@@ -1693,11 +2217,7 @@ impl TypeBuilder {
                         })
                         .collect::<PartialVMResult<Vec<_>>>()
                 };
-                Function {
-                    args: to_list(args)?,
-                    results: to_list(results)?,
-                    abilities: *abilities,
-                }
+                Type::function(to_list(args)?, to_list(results)?, *abilities)
             },
         })
     }
@@ -1765,25 +2285,19 @@ impl<'a> TypeParamMap<'a> {
             },
             // Function types, the expected abilities need to be equal to the provided ones,
             // and recursively argument and result types need to match.
-            (
-                Type::Function {
-                    args,
-                    results,
-                    abilities,
-                },
-                Type::Function {
-                    args: exp_args,
-                    results: exp_results,
-                    abilities: exp_abilities,
-                },
-            ) if abilities == exp_abilities
-                && args.len() == exp_args.len()
-                && results.len() == exp_results.len() =>
+            (Type::Function(node), Type::Function(exp_node))
+                if node.abilities == exp_node.abilities
+                    && node.args.len() == exp_node.args.len()
+                    && node.results.len() == exp_node.results.len() =>
             {
-                args.iter().zip(exp_args).all(|(t, e)| self.match_ty(t, e))
-                    && results
+                node.args
+                    .iter()
+                    .zip(exp_node.args.iter())
+                    .all(|(t, e)| self.match_ty(t, e))
+                    && node
+                        .results
                         .iter()
-                        .zip(exp_results)
+                        .zip(exp_node.results.iter())
                         .all(|(t, e)| self.match_ty(t, e))
             },
             // Abilities should not contribute to the equality check as they just serve for caching
@@ -1795,19 +2309,13 @@ impl<'a> TypeParamMap<'a> {
                 },
             ) => *idx == *expected_idx,
             // For struct instantiations we need to additionally match all type arguments.
-            (
-                Type::StructInstantiation { idx, ty_args, .. },
-                Type::StructInstantiation {
-                    idx: expected_idx,
-                    ty_args: expected_ty_args,
-                    ..
-                },
-            ) => {
-                *idx == *expected_idx
-                    && ty_args.len() == expected_ty_args.len()
-                    && ty_args
+            (Type::StructInstantiation(node), Type::StructInstantiation(exp_node)) => {
+                node.idx == exp_node.idx
+                    && node.ty_args.len() == exp_node.ty_args.len()
+                    && node
+                        .ty_args
                         .iter()
-                        .zip(expected_ty_args.iter())
+                        .zip(exp_node.ty_args.iter())
                         .all(|types| self.match_ty(types.0, types.1))
             },
             // For primitive types we need to assure the types match.
@@ -1895,11 +2403,7 @@ mod unit_tests {
         let expected = AbilitySet::from_u8(0x07).expect("0x07 is a valid ability set");
         let malformed =
             bcs::from_bytes::<AbilitySet>(&[0x17]).expect("Deserialize accepts any ability byte");
-        let function_type = Type::Function {
-            args: vec![],
-            results: vec![],
-            abilities: malformed,
-        };
+        let function_type = Type::function(vec![], vec![], malformed);
 
         assert_ne!(expected, malformed);
         assert!(expected.is_subset(malformed));
@@ -1994,11 +2498,7 @@ mod unit_tests {
         assert!(claims_key.has_key());
         assert!(!claims_key.is_subset(AbilitySet::PUBLIC_FUNCTIONS));
 
-        let function_type = Type::Function {
-            args: vec![],
-            results: vec![],
-            abilities: claims_key,
-        };
+        let function_type = Type::function(vec![], vec![], claims_key);
         assert_eq!(function_type.abilities().unwrap(), claims_key);
 
         let key_constraint = AbilitySet::singleton(Ability::Key);
@@ -2008,22 +2508,149 @@ mod unit_tests {
         ));
         assert_ok!(function_type.paranoid_check_abilities(key_constraint));
 
-        let honest_function_type = Type::Function {
-            args: vec![],
-            results: vec![],
-            abilities: AbilitySet::PUBLIC_FUNCTIONS,
-        };
+        let honest_function_type = Type::function(vec![], vec![], AbilitySet::PUBLIC_FUNCTIONS);
         assert_err!(Type::verify_ty_arg_abilities([&key_constraint], &[
             honest_function_type
         ]));
     }
 
-    fn struct_instantiation_ty_for_test(ty_args: Vec<Type>) -> Type {
-        Type::StructInstantiation {
-            idx: StructNameIndex::new(0),
-            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
-            ty_args: TriompheArc::new(ty_args),
+    #[test]
+    fn test_struct_identifier_identity_is_interner_history_independent() {
+        use move_core_types::account_address::AccountAddress;
+        use std::{
+            cmp::Ordering,
+            hash::{DefaultHasher, Hash, Hasher},
+        };
+
+        fn hash_of(identifier: &StructIdentifier) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            identifier.hash(&mut hasher);
+            hasher.finish()
         }
+
+        let alpha = ModuleId::new(AccountAddress::ONE, Identifier::new("alpha").unwrap());
+        let beta = ModuleId::new(AccountAddress::TWO, Identifier::new("beta").unwrap());
+        let name = Identifier::new("S").unwrap();
+
+        // Warm two pools in opposite orders, so the same module gets different interned ids.
+        let cold_pool = InternedModuleIdPool::new();
+        let cold_beta = StructIdentifier::new(&cold_pool, beta.clone(), name.clone());
+        let cold_alpha = StructIdentifier::new(&cold_pool, alpha.clone(), name.clone());
+
+        let warm_pool = InternedModuleIdPool::new();
+        let warm_alpha = StructIdentifier::new(&warm_pool, alpha, name.clone());
+        let warm_beta = StructIdentifier::new(&warm_pool, beta, name);
+
+        assert_ne!(
+            cold_alpha.interned_module_id(),
+            warm_alpha.interned_module_id()
+        );
+
+        // Identity, hashing, and ordering must not depend on interner history.
+        assert_eq!(cold_alpha, warm_alpha);
+        assert_eq!(cold_beta, warm_beta);
+        assert_eq!(hash_of(&cold_alpha), hash_of(&warm_alpha));
+        assert_eq!(cold_alpha.cmp(&warm_alpha), Ordering::Equal);
+        assert_eq!(cold_alpha.partial_cmp(&warm_alpha), Some(Ordering::Equal));
+        assert_eq!(cold_alpha.cmp(&cold_beta), warm_alpha.cmp(&warm_beta));
+    }
+
+    fn wide_fn_ty(abilities: AbilitySet) -> Type {
+        let args = (0..64u32)
+            .map(|i| {
+                Type::struct_instantiation(
+                    StructNameIndex::new(i),
+                    vec![Type::U64, Type::Bool],
+                    AbilityInfo::struct_(AbilitySet::EMPTY),
+                )
+            })
+            .collect();
+        Type::function(args, vec![Type::U8], abilities)
+    }
+
+    #[test]
+    fn function_assignability_short_circuits_on_node_identity_and_interned_ids() {
+        use crate::ty_interner::InternedTypePool;
+
+        let copy_drop =
+            AbilitySet::singleton(Ability::Copy).union(AbilitySet::singleton(Ability::Drop));
+        let f = wide_fn_ty(copy_drop);
+
+        // Same node on both sides (a value assigned to a local of its own declared type): the
+        // check must pass through pointer identity without touching the argument list.
+        assert_ok!(f.paranoid_check_assignable(&f));
+
+        // Separately built, structurally equal: passes via the structural fallback. Intern
+        // both and the equal ids take over; either way the verdict is the same.
+        let g = wide_fn_ty(copy_drop);
+        assert_ok!(g.paranoid_check_assignable(&f));
+        let pool = InternedTypePool::new();
+        pool.intern_ty(&f);
+        pool.intern_ty(&g);
+        assert_ok!(g.paranoid_check_assignable(&f));
+
+        // Abilities are inclusion, not equality: a copy+drop value is assignable to a
+        // drop-only slot (fewer abilities expected), but not the reverse.
+        let drop_only = wide_fn_ty(AbilitySet::singleton(Ability::Drop));
+        assert_ok!(f.paranoid_check_assignable(&drop_only));
+        assert_err!(drop_only.paranoid_check_assignable(&f));
+
+        // A different signature is never assignable, interned or not.
+        let mut other_args = vec![Type::U64];
+        other_args.extend((0..63u32).map(|i| {
+            Type::struct_instantiation(
+                StructNameIndex::new(i),
+                vec![Type::U64, Type::Bool],
+                AbilityInfo::struct_(AbilitySet::EMPTY),
+            )
+        }));
+        let h = Type::function(other_args, vec![Type::U8], copy_drop);
+        pool.intern_ty(&h);
+        assert_err!(h.paranoid_check_assignable(&f));
+    }
+
+    #[test]
+    fn substitution_shares_the_type_argument_node() {
+        let ty_builder = TypeBuilder::with_limits(128, 20, true, true, true);
+        let arg = Type::struct_instantiation(
+            StructNameIndex::new(3),
+            vec![Type::vector(Type::U8), Type::Bool],
+            AbilityInfo::struct_(AbilitySet::EMPTY),
+        );
+        let Type::StructInstantiation(arg_node) = &arg else {
+            panic!("expected a struct instantiation")
+        };
+
+        let x = assert_ok!(
+            ty_builder.create_ty_with_subst(&Type::TyParam(0), std::slice::from_ref(&arg))
+        );
+        let y = assert_ok!(
+            ty_builder.create_ty_with_subst(&Type::TyParam(0), std::slice::from_ref(&arg))
+        );
+        for ty in [&x, &y] {
+            let Type::StructInstantiation(node) = ty else {
+                panic!("expected a struct instantiation")
+            };
+            assert!(TriompheArc::ptr_eq(node, arg_node));
+        }
+
+        let v = assert_ok!(ty_builder
+            .create_ty_with_subst(&Type::vector(Type::TyParam(0)), std::slice::from_ref(&arg)));
+        let Type::Vector(elem) = &v else {
+            panic!("expected a vector")
+        };
+        let Type::StructInstantiation(node) = elem.ty() else {
+            panic!("expected a struct instantiation")
+        };
+        assert!(TriompheArc::ptr_eq(node, arg_node));
+    }
+
+    fn struct_instantiation_ty_for_test(ty_args: Vec<Type>) -> Type {
+        Type::struct_instantiation(
+            StructNameIndex::new(0),
+            ty_args,
+            AbilityInfo::struct_(AbilitySet::EMPTY),
+        )
     }
 
     fn struct_ty_for_test() -> Type {
@@ -2044,7 +2671,7 @@ mod unit_tests {
 
         let mut depth = 1;
         while depth < ty_depth {
-            ty = Vector(TriompheArc::new(ty.clone()));
+            ty = Type::vector(ty.clone());
             tok = S::Vector(Box::new(tok.clone()));
             tag = T::Vector(Box::new(tag.clone()));
             depth += 1;
@@ -2058,9 +2685,9 @@ mod unit_tests {
 
         let cases = [
             (U8, 1),
-            (Vector(TriompheArc::new(U8)), 2),
-            (Vector(TriompheArc::new(Vector(TriompheArc::new(U8)))), 3),
-            (Reference(Box::new(Bool)), 2),
+            (Type::vector(U8), 2),
+            (Type::vector(Type::vector(U8)), 3),
+            (Type::reference(Bool), 2),
             (TyParam(0), 1),
             (struct_ty_for_test(), 1),
             (struct_instantiation_ty_for_test(vec![U8, U8]), 3),
@@ -2086,20 +2713,17 @@ mod unit_tests {
         let ty_builder = TypeBuilder::with_limits(11, 5, true, true, true);
         let cases: Vec<(Type, Vec<Type>, usize, usize)> = vec![
             (TyParam(0), vec![Bool], 1, 1),
-            (TyParam(0), vec![Vector(TriompheArc::new(Bool))], 2, 2),
+            (TyParam(0), vec![Type::vector(Bool)], 2, 2),
             (Bool, vec![], 1, 1),
             (
                 struct_instantiation_ty_for_test(vec![TyParam(0), TyParam(0)]),
-                vec![Vector(TriompheArc::new(Bool))],
+                vec![Type::vector(Bool)],
                 5,
                 3,
             ),
             (
                 struct_instantiation_ty_for_test(vec![TyParam(0), TyParam(1)]),
-                vec![
-                    Vector(TriompheArc::new(Bool)),
-                    Vector(TriompheArc::new(Vector(TriompheArc::new(Bool)))),
-                ],
+                vec![Type::vector(Bool), Type::vector(Type::vector(Bool))],
                 6,
                 4,
             ),
@@ -2120,11 +2744,11 @@ mod unit_tests {
 
         let ty_builder = TypeBuilder::with_limits(11, 5, true, true, true);
 
-        let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
-        let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
+        let ty = Type::vector(Type::vector(TyParam(0)));
+        let ty_arg = Type::vector(Type::vector(Bool));
         assert_ok!(ty_builder.create_ty_with_subst(&ty, std::slice::from_ref(&ty_arg)));
 
-        let ty_arg = Vector(TriompheArc::new(ty_arg));
+        let ty_arg = Type::vector(ty_arg);
         let err = assert_err!(ty_builder.create_ty_with_subst(&ty, &[ty_arg]));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
     }
@@ -2139,7 +2763,7 @@ mod unit_tests {
         let ty = struct_instantiation_ty_for_test(ty_params);
 
         // Each type argument contributes 2 nodes, so in total the count is 11.
-        let ty_args: Vec<Type> = (0..5).map(|_| Vector(TriompheArc::new(Bool))).collect();
+        let ty_args: Vec<Type> = (0..5).map(|_| Type::vector(Bool)).collect();
         let num_nodes = assert_ok!(ty_builder.num_nodes_in_subst(&ty, &ty_args));
         assert_eq!(num_nodes, 11);
 
@@ -2149,7 +2773,7 @@ mod unit_tests {
                     // 3 nodes, to increase the total count to 12.
                     struct_instantiation_ty_for_test(vec![U64, struct_ty_for_test()])
                 } else {
-                    Vector(TriompheArc::new(Bool))
+                    Type::vector(Bool)
                 }
             })
             .collect();
@@ -2193,27 +2817,24 @@ mod unit_tests {
 
         // Should succeed, type size limit is 5, and we have 5 nodes.
         let ty_builder = TypeBuilder::with_limits(5, 100, true, true, true);
-        let ty_args = [Bool, Vector(TriompheArc::new(Bool))];
+        let ty_args = [Bool, Type::vector(Bool)];
         assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
 
         // Should fail, we have size of 6 now.
-        let ty_args = [
-            Vector(TriompheArc::new(Bool)),
-            Vector(TriompheArc::new(Bool)),
-        ];
+        let ty_args = [Type::vector(Bool), Type::vector(Bool)];
         let err = assert_err!(
             ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args)
         );
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
 
         // Should succeed, type depth limit is 4, and we have 4 nodes (3 in type parameter + struct).
-        let nested_vec = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
+        let nested_vec = Type::vector(Type::vector(Bool));
         let ty_args = vec![Bool, nested_vec.clone()];
         let ty_builder = TypeBuilder::with_limits(100, 4, true, true, true);
         assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
 
         // Should fail, we have depth of 5 now.
-        let ty_params = vec![Bool, Vector(TriompheArc::new(nested_vec))];
+        let ty_params = vec![Bool, Type::vector(nested_vec)];
         let err = assert_err!(
             ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args)
         );
@@ -2415,44 +3036,319 @@ mod unit_tests {
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
 
-    #[test]
-    fn test_struct_identifier_identity_is_interner_history_independent() {
-        use move_core_types::account_address::AccountAddress;
-        use std::{
-            cmp::Ordering,
-            hash::{DefaultHasher, Hash, Hasher},
-        };
+    fn struct_ty_for_test_with(abilities: AbilitySet, phantom_mask: &[bool]) -> StructType {
+        let mut ty = StructType::for_test();
+        ty.abilities = abilities;
+        ty.phantom_ty_params_mask = phantom_mask.iter().copied().collect();
+        ty.ty_params = phantom_mask
+            .iter()
+            .map(|is_phantom| StructTypeParameter {
+                constraints: AbilitySet::EMPTY,
+                is_phantom: *is_phantom,
+            })
+            .collect();
+        ty
+    }
 
-        fn hash_of(identifier: &StructIdentifier) -> u64 {
-            let mut hasher = DefaultHasher::new();
-            identifier.hash(&mut hasher);
-            hasher.finish()
+    /// Builds a diverse set of (fully instantiated) types for property-style tests.
+    ///
+    /// Keep the entries with references nested inside a type: newer gas versions count reference
+    /// nodes as free, so the cached node count may over-count and is only ever used to accept,
+    /// never to reject. Those entries are what exercise that fallback.
+    fn sample_tys() -> Vec<Type> {
+        use Type::*;
+
+        let ty_builder = TypeBuilder::with_limits(1000, 1000, true, true, true);
+        let p = struct_ty_for_test_with(
+            AbilitySet::singleton(Ability::Copy) | AbilitySet::singleton(Ability::Drop),
+            &[true],
+        );
+        let s = struct_ty_for_test_with(
+            AbilitySet::singleton(Ability::Copy) | AbilitySet::singleton(Ability::Drop),
+            &[true; 32],
+        );
+        let n = struct_ty_for_test_with(AbilitySet::ALL, &[false, false]);
+        let p_params = [TyParam(0)];
+        let s_params: Vec<Type> = (0..32).map(TyParam).collect();
+        let n_params = [TyParam(0), TyParam(1)];
+
+        // P<P<P<u8>>>
+        let mut t = U8;
+        for _ in 0..3 {
+            t = assert_ok!(ty_builder.create_struct_instantiation_ty(&p, &p_params, &[t]));
+        }
+        // S<T x 30, u8, u8>: the 123-node type from the reports.
+        let mut s_args = vec![t.clone(); 30];
+        s_args.push(U8);
+        s_args.push(U8);
+        let wide = assert_ok!(ty_builder.create_struct_instantiation_ty(&s, &s_params, &s_args));
+        assert_eq!(wide.num_nodes(), 123);
+
+        let (nested_vec, _, _) = nested_vec_for_test(6);
+        let n_signer =
+            assert_ok!(ty_builder.create_struct_instantiation_ty(&n, &n_params, &[Signer, U8]));
+        let n_nested = assert_ok!(ty_builder
+            .create_struct_instantiation_ty(&n, &n_params, &[wide.clone(), n_signer.clone()]));
+        let func = Type::function(
+            vec![
+                Type::reference(wide.clone()),
+                Type::mut_reference(U8),
+                nested_vec.clone(),
+            ],
+            vec![n_signer.clone()],
+            AbilitySet::EMPTY,
+        );
+        vec![
+            U8,
+            Signer,
+            struct_ty_for_test(),
+            nested_vec.clone(),
+            t,
+            wide.clone(),
+            n_signer,
+            n_nested,
+            Type::vector(wide.clone()),
+            Type::reference(nested_vec),
+            Type::mut_reference(wide),
+            func,
+        ]
+    }
+
+    #[test]
+    fn test_type_info_is_consistent_with_structure() {
+        use Type::*;
+
+        for ty in sample_tys() {
+            assert!(ty.has_consistent_type_info(), "{ty}");
+            assert!(!ty.type_info().has_ty_params(), "{ty}");
         }
 
-        let alpha = ModuleId::new(AccountAddress::ONE, Identifier::new("alpha").unwrap());
-        let beta = ModuleId::new(AccountAddress::TWO, Identifier::new("beta").unwrap());
-        let name = Identifier::new("S").unwrap();
-
-        // Warm two pools in opposite orders, so the same module gets different interned ids.
-        let cold_pool = InternedModuleIdPool::new();
-        let cold_beta = StructIdentifier::new(&cold_pool, beta.clone(), name.clone());
-        let cold_alpha = StructIdentifier::new(&cold_pool, alpha.clone(), name.clone());
-
-        let warm_pool = InternedModuleIdPool::new();
-        let warm_alpha = StructIdentifier::new(&warm_pool, alpha, name.clone());
-        let warm_beta = StructIdentifier::new(&warm_pool, beta, name);
-
-        assert_ne!(
-            cold_alpha.interned_module_id(),
-            warm_alpha.interned_module_id()
+        // Types with type parameters: counts are still exact, abilities are unknown.
+        let ty_builder = TypeBuilder::with_limits(1000, 1000, true, true, true);
+        let n = struct_ty_for_test_with(AbilitySet::ALL, &[false, true]);
+        let template = Type::struct_instantiation(
+            n.idx,
+            vec![TyParam(0), Type::vector(TyParam(1))],
+            AbilityInfo::generic_struct(n.abilities, n.phantom_ty_params_mask.clone()),
         );
+        assert!(template.has_consistent_type_info());
+        assert!(template.type_info().has_ty_params());
+        assert_eq!(template.num_nodes_with_max_depth(), (4, 3));
+        assert!(template.type_info().cached_abilities().is_none());
+        assert_err!(template.abilities());
 
-        // Identity, hashing, and ordering must not depend on interner history.
-        assert_eq!(cold_alpha, warm_alpha);
-        assert_eq!(cold_beta, warm_beta);
-        assert_eq!(hash_of(&cold_alpha), hash_of(&warm_alpha));
-        assert_eq!(cold_alpha.cmp(&warm_alpha), Ordering::Equal);
-        assert_eq!(cold_alpha.partial_cmp(&warm_alpha), Some(Ordering::Equal));
-        assert_eq!(cold_alpha.cmp(&cold_beta), warm_alpha.cmp(&warm_beta));
+        // Substituting produces a type with known abilities.
+        let instantiated = assert_ok!(ty_builder.create_ty_with_subst(&template, &[Signer, U8]));
+        assert!(instantiated.has_consistent_type_info());
+        assert!(!instantiated.type_info().has_ty_params());
+        assert_eq!(
+            instantiated.type_info().cached_abilities(),
+            Some(AbilitySet::singleton(Ability::Drop))
+        );
+        assert_eq!(
+            assert_ok!(instantiated.abilities()),
+            AbilitySet::singleton(Ability::Drop)
+        );
+    }
+
+    #[test]
+    fn test_type_info_does_not_affect_equality_and_hashing() {
+        use std::hash::{Hash, Hasher};
+
+        // A type built via the constructor and the "same" type with (deliberately) different
+        // cached info must compare and hash equal.
+        let s = struct_ty_for_test_with(AbilitySet::ALL, &[false, true]);
+        let a = Type::struct_instantiation(
+            s.idx,
+            vec![Type::Signer, Type::U8],
+            AbilityInfo::generic_struct(s.abilities, s.phantom_ty_params_mask.clone()),
+        );
+        let b = Type::struct_instantiation(
+            s.idx,
+            vec![Type::Signer, Type::U8],
+            AbilityInfo::struct_(AbilitySet::EMPTY),
+        );
+        assert_eq!(a, b);
+        let hash = |ty: &Type| {
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            ty.hash(&mut h);
+            h.finish()
+        };
+        assert_eq!(hash(&a), hash(&b));
+    }
+
+    #[test]
+    fn test_create_ref_and_vec_ty_share_inner_ty() {
+        use Type::*;
+
+        let ty_builder = TypeBuilder::with_limits(128, 20, true, true, true);
+        for ty in sample_tys() {
+            let node_arc = match &ty {
+                StructInstantiation(node) => node.clone(),
+                _ => continue,
+            };
+            // Creating a reference or a vector must not rebuild the inner type: the node
+            // must be the very same allocation.
+            let same_args = |inner: &Type| match inner {
+                StructInstantiation(node) => TriompheArc::ptr_eq(node, &node_arc),
+                _ => false,
+            };
+            for is_mut in [false, true] {
+                let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, is_mut));
+                match &ref_ty {
+                    Reference(inner_ty) | MutableReference(inner_ty) => {
+                        assert_eq!(inner_ty.ty(), &ty);
+                        assert!(same_args(inner_ty));
+                    },
+                    _ => panic!("expected reference"),
+                }
+                assert!(ref_ty.has_consistent_type_info());
+            }
+            let vec_ty = assert_ok!(ty_builder.create_vec_ty(&ty));
+            match &vec_ty {
+                Vector(elem_ty) => assert!(same_args(elem_ty)),
+                _ => panic!("expected vector"),
+            }
+            assert!(vec_ty.has_consistent_type_info());
+        }
+    }
+
+    #[test]
+    fn test_subst_limits_match_rebuild() {
+        let tys = sample_tys();
+        for v2 in [false, true] {
+            for max_size in 1..=130u64 {
+                for max_depth in 1..=12u64 {
+                    let ty_builder = TypeBuilder::with_limits(max_size, max_depth, v2, true, true);
+                    let check = |c: &mut u64, d: u64| ty_builder.check_before_count_increment(c, d);
+                    for ty in &tys {
+                        for generic in [Type::TyParam(0), Type::vector(Type::TyParam(0))] {
+                            let concrete = match &generic {
+                                Type::TyParam(_) => ty.clone(),
+                                _ => Type::vector(ty.clone()),
+                            };
+                            let expected = ty_builder
+                                .clone_impl(&concrete, &mut 0, 1, check)
+                                .map_err(|e| e.major_status());
+                            let actual = ty_builder
+                                .create_ty_with_subst(&generic, std::slice::from_ref(ty))
+                                .map_err(|e| e.major_status());
+                            assert_eq!(
+                                actual, expected,
+                                "v2={v2} size={max_size} depth={max_depth} ty={concrete}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_create_ref_and_vec_ty_limits_match_rebuild() {
+        // For every combination of counting mode, size limit, and depth limit, creating a
+        // reference / vector over an existing type must produce exactly the same result (and the
+        // same error code) as rebuilding the type node by node via `clone_impl` does.
+        let tys = sample_tys();
+        for v2 in [false, true] {
+            for max_size in 1..=130u64 {
+                for max_depth in 1..=12u64 {
+                    let ty_builder = TypeBuilder::with_limits(max_size, max_depth, v2, true, true);
+                    for ty in &tys {
+                        for is_mut in [false, true] {
+                            let mut count = 1 - ty_builder.ref_ty_count_decrement;
+                            let check =
+                                |c: &mut u64, d: u64| ty_builder.check_before_count_increment(c, d);
+                            let expected = ty_builder
+                                .clone_impl(
+                                    ty,
+                                    &mut count,
+                                    1 + ty_builder.ref_ty_depth_increment,
+                                    check,
+                                )
+                                .map(|inner_ty| {
+                                    if is_mut {
+                                        Type::mut_reference(inner_ty)
+                                    } else {
+                                        Type::reference(inner_ty)
+                                    }
+                                })
+                                .map_err(|e| e.major_status());
+                            let actual = ty_builder
+                                .create_ref_ty(ty, is_mut)
+                                .map_err(|e| e.major_status());
+                            assert_eq!(
+                                actual, expected,
+                                "ref v2={v2} size={max_size} depth={max_depth} ty={ty}"
+                            );
+                        }
+
+                        let mut count = 1;
+                        let check =
+                            |c: &mut u64, d: u64| ty_builder.check_before_count_increment(c, d);
+                        let expected = ty_builder
+                            .clone_impl(ty, &mut count, 2, check)
+                            .map(Type::vector)
+                            .map_err(|e| e.major_status());
+                        let actual = ty_builder.create_vec_ty(ty).map_err(|e| e.major_status());
+                        assert_eq!(
+                            actual, expected,
+                            "vec v2={v2} size={max_size} depth={max_depth} ty={ty}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_create_ref_ty_rejects_ty_params() {
+        let ty_builder = TypeBuilder::with_limits(128, 20, true, true, true);
+        let ty = Type::vector(Type::TyParam(0));
+        let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
+        assert_eq!(
+            err.major_status(),
+            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+        );
+        let err = assert_err!(ty_builder.create_vec_ty(&ty));
+        assert_eq!(
+            err.major_status(),
+            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+        );
+    }
+
+    #[test]
+    fn test_cached_abilities_match_recursive_computation() {
+        for ty in sample_tys() {
+            assert_eq!(
+                assert_ok!(ty.abilities()),
+                assert_ok!(ty.abilities_uncached()),
+                "{ty}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_type_info_saturates_safely() {
+        // Build a type whose node count overflows u16 and make sure counts fall back to exact
+        // traversal rather than reporting a wrong (saturated) value.
+        let mut ty = Type::U8;
+        for _ in 0..16 {
+            ty = Type::struct_instantiation(
+                StructNameIndex::new(0),
+                vec![ty.clone(), ty],
+                AbilityInfo::struct_(AbilitySet::EMPTY),
+            );
+        }
+        assert!(ty.type_info().is_saturated());
+        let (num_nodes, depth) = ty.num_nodes_with_max_depth();
+        assert_eq!(num_nodes, (1 << 17) - 1);
+        assert_eq!(depth, 17);
+        assert_eq!(ty.num_nodes(), (1 << 17) - 1);
+        assert!(ty.has_consistent_type_info());
+        // Limit checks must still reject it with the right error.
+        let ty_builder = TypeBuilder::with_limits(128, 20, true, true, true);
+        let err = assert_err!(ty_builder.create_vec_ty(&ty));
+        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
 }

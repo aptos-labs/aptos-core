@@ -323,7 +323,7 @@ impl StorageAdapter {
     ) -> anyhow::Result<CommitHistoryResource> {
         Ok(bcs::from_bytes(
             self.aptos_db
-                .get_state_value_by_version(
+                .get_state_value_at_checkpoint(
                     &StateKey::on_chain_config::<CommitHistoryResource>()?,
                     latest_version,
                 )?
@@ -386,7 +386,7 @@ impl DAGStorage for StorageAdapter {
                 .map_err(|e| anyhow::anyhow!("Failed to serialize index: {:?}", e))?;
             let state_value = self
                 .aptos_db
-                .get_state_value_by_version(&StateKey::table_item(handle, &idx_bytes), version)?
+                .get_state_value_at_checkpoint(&StateKey::table_item(handle, &idx_bytes), version)?
                 .ok_or_else(|| anyhow::anyhow!("Table item doesn't exist"))?;
             let new_block_event = bcs::from_bytes::<NewBlockEvent>(state_value.bytes())
                 .map_err(|e| anyhow::anyhow!("Failed to deserialize NewBlockEvent: {:?}", e))?;

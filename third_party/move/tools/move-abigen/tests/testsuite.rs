@@ -104,4 +104,6 @@ fn test_abigen(path: &Path, mut options: AbigenOptions, suffix: &str) -> anyhow:
     Ok(())
 }
 
-datatest_stable::harness!(test_runner, "tests/sources", r".*\.move$",);
+datatest_stable::harness! {
+    { test = test_runner, root = "tests/sources", pattern = r".*\.move$" },
+}

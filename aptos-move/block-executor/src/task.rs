@@ -223,6 +223,16 @@ pub trait LegacyTxnOutput: TxnOutput {
     /// group write set.
     fn resource_group_metadata_ops(&self) -> Vec<(Self::Key, <Self::Txn as Transaction>::Value)>;
 
+    /// Native-store writes (outside the resource write set) whose bytes hold delayed
+    /// field identifiers, each with the layout locating them. Only non-deletions.
+    fn native_writes_needing_exchange(
+        &self,
+    ) -> Vec<(
+        Self::Key,
+        <Self::Txn as Transaction>::Value,
+        &'static MoveTypeLayout,
+    )>;
+
     /// Will be called once per transaction when the output is ready to be committed.
     /// Ensures that any writes corresponding to materialized delayed fields and group
     /// updates (recorded in output separately) are incorporated into the transaction
@@ -234,5 +244,9 @@ pub trait LegacyTxnOutput: TxnOutput {
             <Self::Txn as Transaction>::Value,
         )>,
         patched_events: Vec<<Self::Txn as Transaction>::Event>,
+        patched_native_writes: Vec<(
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+        )>,
     ) -> Result<(Self::CommittedOutput, Trace), PanicError>;
 }

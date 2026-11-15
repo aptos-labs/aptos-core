@@ -26,7 +26,10 @@ pub use crate::{
     storage::Storage,
     vault::VaultStorage,
 };
-
+use base64::{
+    engine::general_purpose::{STANDARD, STANDARD_PAD_INDIFFERENT},
+    Engine as _,
+};
 // Some common serializations for interacting with bytes these must be manually added to types via:
 // #[serde(serialize_with = "to_base64", deserialize_with = "from_base64")]
 // some_value: Vec<u8>
@@ -35,7 +38,7 @@ pub fn to_base64<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
-    serializer.serialize_str(&base64::encode(bytes))
+    serializer.serialize_str(&STANDARD.encode(bytes))
 }
 
 pub fn from_base64<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
@@ -43,7 +46,9 @@ where
     D: serde::Deserializer<'de>,
 {
     let s: String = serde::Deserialize::deserialize(deserializer)?;
-    base64::decode(s).map_err(serde::de::Error::custom)
+    STANDARD_PAD_INDIFFERENT
+        .decode(s)
+        .map_err(serde::de::Error::custom)
 }
 
 #[cfg(test)]

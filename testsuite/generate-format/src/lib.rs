@@ -12,6 +12,11 @@ use aptos_types::{
     transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
 };
 use clap::{Parser, ValueEnum};
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+};
 use serde_reflection::{Registry, Samples, Tracer};
 use std::fmt::{Display, Formatter};
 
@@ -80,6 +85,43 @@ impl Display for Corpus {
             Corpus::MoveABI => "MoveABI",
         })
     }
+}
+
+/// Deserialization tracing doesn't understand serde aliases: `StructTag` would get an extra
+/// `type_params` field, and `TypeTag` variants would be named after their aliases (e.g. `U8`).
+/// Samples make the tracer use the serialized names instead. Needs `record_samples_for_structs`.
+pub(crate) fn trace_type_tags(
+    tracer: &mut Tracer,
+    samples: &mut Samples,
+) -> serde_reflection::Result<()> {
+    let struct_tag = StructTag {
+        address: AccountAddress::ONE,
+        module: Identifier::new("m").unwrap(),
+        name: Identifier::new("S").unwrap(),
+        type_args: vec![TypeTag::Bool],
+    };
+    for type_tag in [
+        TypeTag::Bool,
+        TypeTag::U8,
+        TypeTag::U16,
+        TypeTag::U32,
+        TypeTag::U64,
+        TypeTag::U128,
+        TypeTag::U256,
+        TypeTag::I8,
+        TypeTag::I16,
+        TypeTag::I32,
+        TypeTag::I64,
+        TypeTag::I128,
+        TypeTag::I256,
+        TypeTag::Address,
+        TypeTag::Signer,
+        TypeTag::Vector(Box::new(TypeTag::Bool)),
+        TypeTag::Struct(Box::new(struct_tag)),
+    ] {
+        tracer.trace_value(samples, &type_tag)?;
+    }
+    Ok(())
 }
 
 pub(crate) fn trace_keyless_structs(

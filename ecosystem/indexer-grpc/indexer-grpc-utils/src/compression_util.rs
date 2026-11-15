@@ -3,6 +3,10 @@
 
 use crate::default_file_storage_format;
 use aptos_protos::{indexer::v1::TransactionsInStorage, transaction::v1::Transaction};
+use base64::{
+    engine::general_purpose::{STANDARD, STANDARD_PAD_INDIFFERENT},
+    Engine as _,
+};
 use lz4::{Decoder, EncoderBuilder};
 use prost::Message;
 use ripemd::{Digest, Ripemd128};
@@ -114,7 +118,7 @@ impl CacheEntry {
                 CacheEntry::Lz4CompressionProto(compressed.finish().0)
             },
             StorageFormat::Base64UncompressedProto => {
-                let base64 = base64::encode(bytes).into_bytes();
+                let base64 = STANDARD.encode(bytes).into_bytes();
                 CacheEntry::Base64UncompressedProto(base64)
             },
             StorageFormat::JsonBase64UncompressedProto => {
@@ -150,7 +154,9 @@ impl CacheEntry {
                 Transaction::decode(decompressed.as_slice()).expect("proto deserialization failed.")
             },
             CacheEntry::Base64UncompressedProto(bytes) => {
-                let bytes: Vec<u8> = base64::decode(bytes).expect("base64 decoding failed.");
+                let bytes: Vec<u8> = STANDARD_PAD_INDIFFERENT
+                    .decode(bytes)
+                    .expect("base64 decoding failed.");
                 Transaction::decode(bytes.as_slice()).expect("proto deserialization failed.")
             },
         }
@@ -224,7 +230,7 @@ impl FileEntry {
                         transaction
                             .encode(&mut bytes)
                             .expect("proto serialization failed.");
-                        base64::encode(bytes)
+                        STANDARD.encode(bytes)
                     })
                     .collect::<Vec<String>>();
                 let file = TransactionsLegacyFile {
@@ -277,8 +283,9 @@ impl FileEntry {
                     .transactions_in_base64
                     .into_iter()
                     .map(|base64| {
-                        let bytes: Vec<u8> =
-                            base64::decode(base64).expect("base64 decoding failed.");
+                        let bytes: Vec<u8> = STANDARD_PAD_INDIFFERENT
+                            .decode(base64)
+                            .expect("base64 decoding failed.");
                         Transaction::decode(bytes.as_slice())
                             .expect("proto deserialization failed.")
                     })

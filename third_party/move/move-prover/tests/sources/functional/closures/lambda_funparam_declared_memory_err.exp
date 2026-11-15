@@ -1,5 +1,5 @@
-Move prover returns: exiting with condition generation errors
-error: the specification of this function (used as a function value) applies a behavioral predicate to a function-typed parameter whose possible targets or declared `modifies_of`/`reads_of` footprints access global memory; this is not yet supported — give the lambda an explicit specification or exclude it from verification
+Move prover returns: exiting with bytecode transformation errors
+error: captured function value `g` may modify resource `launder_mem::Counter`, which is not declared in `modifies_of` for `g` of `launder_mem::__lambda__1__outer`
    ┌─ tests/sources/functional/closures/lambda_funparam_declared_memory_err.move:23:15
    │
 23 │         apply(|x| g(x), a)

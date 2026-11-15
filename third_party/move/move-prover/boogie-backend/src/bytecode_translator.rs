@@ -76,8 +76,12 @@ use move_stackless_bytecode::{
         AbortAction, AttrId, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, IndexEdgeKind,
         Operation, PropKind,
     },
+    usage_analysis,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
+};
 
 macro_rules! bv_op_not_enabled_error {
     ($bytecode:expr, $fun_target:expr, $env:expr, $loc:expr) => {
@@ -104,6 +108,18 @@ enum ApplyFrameAccess {
     WritesAt(Vec<String>),
 }
 
+/// Where an `$apply` variant's result locals get their values.
+enum ResultSource<'a> {
+    /// The target's result function applied to `result_args`.
+    Carrier {
+        result_fun_name: &'a str,
+        multi_result_fun_name: &'a str,
+        result_args: &'a str,
+    },
+    /// Fresh well-formed values, as at a direct opaque call.
+    Fresh,
+}
+
 pub struct BoogieTranslator<'env> {
     env: &'env GlobalEnv,
     options: &'env BoogieOptions,
@@ -116,6 +132,9 @@ pub struct BoogieTranslator<'env> {
     /// Semantic instances needed by verification roots in this Boogie file.
     selected_theory: MonoSlice,
     verification_root: Option<VerificationRoot>,
+    /// Transition-guarded closure targets for which a pre-state-only
+    /// `ensures_of` predicate (suffix `_pre`) has been emitted.
+    pre_state_ensures_funs: RefCell<BTreeSet<QualifiedInstId<FunId>>>,
 }
 
 pub struct FunctionTranslator<'env> {
@@ -247,6 +266,7 @@ impl<'env> BoogieTranslator<'env> {
             fun_param_infos: BTreeMap::new(),
             selected_theory: MonoSlice::default(),
             verification_root,
+            pre_state_ensures_funs: RefCell::new(BTreeSet::new()),
         }
     }
 
@@ -1412,6 +1432,7 @@ impl<'env> BoogieTranslator<'env> {
             self.emit_behavioral_predicate_body(
                 &aborts_name,
                 &ensures_name,
+                None,
                 &bp_args,
                 &result_fun_name,
                 &multi_result_fun_name,
@@ -1423,6 +1444,9 @@ impl<'env> BoogieTranslator<'env> {
                 &params,
                 memory,
                 &frame_access,
+                // Trusts the declared parameter frame; a wildcard or undeclared one yields a
+                // memory-free carrier (#20936).
+                true,
             );
             if is_only {
                 // Single variant: no outer block to close
@@ -1509,6 +1533,7 @@ impl<'env> BoogieTranslator<'env> {
             self.emit_behavioral_predicate_body(
                 &aborts_name,
                 &ensures_name,
+                None,
                 &bp_args,
                 &result_fun_name,
                 &multi_result_fun_name,
@@ -1520,6 +1545,9 @@ impl<'env> BoogieTranslator<'env> {
                 &params,
                 memory,
                 &frame_access,
+                // Trusts the declared field frame, which is neither enforced nor framed
+                // (#20797, #20934).
+                true,
             );
             if is_only {
                 // Single variant: no outer block to close
@@ -1629,6 +1657,13 @@ impl<'env> BoogieTranslator<'env> {
             boogie_behavioral_fun_spec_name(self.env, &info.fun, BehaviorKind::EnsuresOf);
         let result_fun_name = boogie_behavioral_fun_result_name(self.env, &info.fun, false);
         let multi_result_fun_name = boogie_behavioral_fun_result_name(self.env, &info.fun, true);
+        let transition_name = usage_analysis::behavioral_transition_guarded_in(
+            self.env,
+            self.targets,
+            info.fun.to_qualified_id(),
+            &info.fun.inst,
+        )
+        .then(|| boogie_behavioral_fun_spec_name(self.env, &info.fun, BehaviorKind::TransitionOf));
         let explicit_results = results.clone().flatten();
 
         // Compute frame access for this closure
@@ -1636,8 +1671,7 @@ impl<'env> BoogieTranslator<'env> {
         let frame_access = self.closure_frame_to_apply_frame(&frame_access_raw, &bp_arg_list);
 
         // The target's abort condition, frame and ensures hold only under its `requires`.
-        // When it fails, abort and memory are unknown; results stay the result function of
-        // the pre-state, where its axiom finds `requires_of` false and adds nothing.
+        // When it fails, abort, memory and results are unknown.
         let guarded = fun_env.get_spec().any_kind(ConditionKind::Requires);
         if guarded {
             let requires_name =
@@ -1649,6 +1683,7 @@ impl<'env> BoogieTranslator<'env> {
         self.emit_behavioral_predicate_body(
             &aborts_name,
             &ensures_name,
+            transition_name.as_deref(),
             &bp_args,
             &result_fun_name,
             &multi_result_fun_name,
@@ -1660,25 +1695,18 @@ impl<'env> BoogieTranslator<'env> {
             params,
             memory,
             &frame_access,
+            self.closure_results_from_carrier(info),
         );
         if guarded {
             self.writer.unindent();
             emitln!(self.writer, "} else {");
             self.writer.indent();
             emitln!(self.writer, "havoc $abort_flag, $abort_code;");
-            let mut_ref_param_indices: Vec<usize> = params
-                .iter()
-                .enumerate()
-                .filter(|(_, p)| p.is_mutable_reference())
-                .map(|(idx, _)| idx)
-                .collect();
-            self.emit_result_assignments(
+            self.emit_results(
                 result_locals,
                 &explicit_results,
-                &mut_ref_param_indices,
-                &result_fun_name,
-                &multi_result_fun_name,
-                &bp_args,
+                params,
+                ResultSource::Fresh,
             );
             for (_, mem_name) in memory {
                 emitln!(self.writer, "havoc {};", mem_name);
@@ -1686,6 +1714,37 @@ impl<'env> BoogieTranslator<'env> {
             self.writer.unindent();
             emitln!(self.writer, "}");
         }
+    }
+
+    /// Whether an invocation of the closure target `info.fun` takes its results from the
+    /// target's `result_of` carrier. The carrier ranges over the target's specification memory,
+    /// not over what its body reads, so two invocations whose carrier arguments agree may still
+    /// return different results unless [`spec_derivation::closure_result_is_carrier`]. A
+    /// native whose carrier is the prelude's model is a function of its arguments.
+    fn closure_results_from_carrier(&self, info: &ClosureInfo) -> bool {
+        self.closure_target_has_prelude_model(info)
+            || spec_derivation::closure_result_is_carrier(self.env, info.fun.to_qualified_id())
+    }
+
+    /// Whether the closure target's carrier is defined inline as the prelude's `$`-spec model
+    /// of a native without a specification.
+    fn closure_target_has_prelude_model(&self, info: &ClosureInfo) -> bool {
+        let fun_env = self.env.get_function(info.fun.to_qualified_id());
+        let param_tys = Type::instantiate_vec(fun_env.get_parameter_types(), &info.fun.inst);
+        let results = fun_env
+            .get_result_type()
+            .instantiate(&info.fun.inst)
+            .flatten();
+        fun_env.is_native()
+            && fun_env.get_spec().conditions.is_empty()
+            && boogie_native_fun_has_spec_fun(&fun_env)
+            && Self::behavioral_output_types(&param_tys, &results).len() == 1
+            && spec_derivation::behavioral_target_memory(
+                self.env,
+                info.fun.to_qualified_id(),
+                &info.fun.inst,
+            )
+            .is_empty()
     }
 
     /// The function types of values reachable from a value of type `ty`, through references,
@@ -1831,6 +1890,7 @@ impl<'env> BoogieTranslator<'env> {
         &self,
         aborts_name: &str,
         ensures_name: &str,
+        transition_name: Option<&str>,
         bp_args: &str,
         result_fun_name: &str,
         multi_result_fun_name: &str,
@@ -1842,15 +1902,10 @@ impl<'env> BoogieTranslator<'env> {
         params: &[Type],
         memory: &[(QualifiedInstId<StructId>, String)],
         frame_access: &BTreeMap<QualifiedInstId<StructId>, ApplyFrameAccess>,
+        results_from_carrier: bool,
     ) {
         let env = self.env;
         let explicit_result_count = explicit_results.len();
-        let mut_ref_param_indices: Vec<usize> = params
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| p.is_mutable_reference())
-            .map(|(idx, _)| idx)
-            .collect();
 
         // Compute which memory names are covered by frame_access
         let covered_by_frame: BTreeSet<String> = frame_access
@@ -1974,14 +2029,16 @@ impl<'env> BoogieTranslator<'env> {
         let result_bp_args = post_mem_args.iter().chain(data_args.iter()).join(", ");
 
         // Assign results using result_of function (now using post-state args)
-        self.emit_result_assignments(
-            result_locals,
-            explicit_results,
-            &mut_ref_param_indices,
-            result_fun_name,
-            multi_result_fun_name,
-            &result_bp_args,
-        );
+        let source = if results_from_carrier {
+            ResultSource::Carrier {
+                result_fun_name,
+                multi_result_fun_name,
+                result_args: &result_bp_args,
+            }
+        } else {
+            ResultSource::Fresh
+        };
+        self.emit_results(result_locals, explicit_results, params, source);
 
         // Build result args for ensures_of, dereferencing mutable reference results.
         // Behavioral predicates reason over plain values, not mutation types.
@@ -2006,96 +2063,87 @@ impl<'env> BoogieTranslator<'env> {
             (false, false) => format!("{}, {}", result_bp_args, ensures_result_args.join(", ")),
         };
         emitln!(self.writer, "assume {}({});", ensures_name, ensures_args);
+        // The invocation is a transition of the target: witness it for the
+        // guarded `result_of` axiom.
+        if let Some(transition_name) = transition_name {
+            emitln!(
+                self.writer,
+                "assume {}({});",
+                transition_name,
+                result_bp_args
+            );
+        }
 
         self.writer.unindent();
         emitln!(self.writer, "}");
     }
 
-    /// Assigns an `$apply` variant's result locals from the target's result function applied
-    /// to `result_args`: explicit results first, then the `&mut` parameter outputs.
-    fn emit_result_assignments(
+    /// Assigns an `$apply` variant's result locals from `source`: explicit results first, then
+    /// the `&mut` parameter outputs, which keep their parameter's location.
+    fn emit_results(
         &self,
         result_locals: &[String],
         explicit_results: &[Type],
-        mut_ref_param_indices: &[usize],
-        result_fun_name: &str,
-        multi_result_fun_name: &str,
-        result_args: &str,
+        params: &[Type],
+        source: ResultSource,
     ) {
-        let first_mut_ref_param = mut_ref_param_indices.first().copied();
-        if !result_locals.is_empty() {
-            if result_locals.len() == 1 {
-                let result_local = &result_locals[0];
-                if explicit_results.len() == 1 {
-                    if explicit_results[0].is_mutable_reference() {
-                        let base_param = first_mut_ref_param.unwrap_or(0);
-                        emitln!(
-                            self.writer,
-                            "{} := $ChildMutation(p{}, -1, {}({}));",
-                            result_local,
-                            base_param,
-                            result_fun_name,
-                            result_args
-                        );
+        let mut_ref_param_indices: Vec<usize> = params
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.is_mutable_reference())
+            .map(|(idx, _)| idx)
+            .collect();
+        let first_mut_ref_param = mut_ref_param_indices.first().copied().unwrap_or(0);
+        for (i, result_local) in result_locals.iter().enumerate() {
+            let value = match &source {
+                ResultSource::Carrier {
+                    result_fun_name,
+                    multi_result_fun_name,
+                    result_args,
+                } => {
+                    if result_locals.len() == 1 {
+                        format!("{}({})", result_fun_name, result_args)
                     } else {
-                        emitln!(
-                            self.writer,
-                            "{} := {}({});",
-                            result_local,
-                            result_fun_name,
-                            result_args
-                        );
+                        format!("{}({})->${}", multi_result_fun_name, result_args, i)
                     }
-                } else {
-                    // Mutable reference param output: wrap in $UpdateMutation
-                    let param_idx = mut_ref_param_indices[0];
-                    emitln!(
-                        self.writer,
-                        "{} := $UpdateMutation(p{}, {}({}));",
-                        result_local,
-                        param_idx,
-                        result_fun_name,
-                        result_args
-                    );
-                }
-            } else {
-                // Multiple results: use tuple projection
-                for (i, result_local) in result_locals.iter().enumerate() {
-                    if i < explicit_results.len() {
-                        if explicit_results[i].is_mutable_reference() {
-                            let base_param = first_mut_ref_param.unwrap_or(0);
-                            emitln!(
-                                self.writer,
-                                "{} := $ChildMutation(p{}, -1, {}({})->${});",
-                                result_local,
-                                base_param,
-                                multi_result_fun_name,
-                                result_args,
-                                i
-                            );
-                        } else {
-                            emitln!(
-                                self.writer,
-                                "{} := {}({})->${};",
-                                result_local,
-                                multi_result_fun_name,
-                                result_args,
-                                i
-                            );
-                        }
-                    } else {
-                        let mut_ref_idx = i - explicit_results.len();
-                        let param_idx = mut_ref_param_indices[mut_ref_idx];
-                        emitln!(
-                            self.writer,
-                            "{} := $UpdateMutation(p{}, {}({})->${});",
-                            result_local,
-                            param_idx,
-                            multi_result_fun_name,
-                            result_args,
-                            i
-                        );
-                    }
+                },
+                ResultSource::Fresh => {
+                    emitln!(self.writer, "havoc {};", result_local);
+                    format!("$Dereference({})", result_local)
+                },
+            };
+            let mut_ref_param = i
+                .checked_sub(explicit_results.len())
+                .map(|idx| mut_ref_param_indices[idx]);
+            match (mut_ref_param, &source) {
+                (Some(param_idx), _) => emitln!(
+                    self.writer,
+                    "{} := $UpdateMutation(p{}, {});",
+                    result_local,
+                    param_idx,
+                    value
+                ),
+                (None, _) if explicit_results[i].is_mutable_reference() => emitln!(
+                    self.writer,
+                    "{} := $ChildMutation(p{}, -1, {});",
+                    result_local,
+                    first_mut_ref_param,
+                    value
+                ),
+                (None, ResultSource::Carrier { .. }) => {
+                    emitln!(self.writer, "{} := {};", result_local, value)
+                },
+                (None, ResultSource::Fresh) => {},
+            }
+            if matches!(source, ResultSource::Fresh) {
+                let ty = match mut_ref_param {
+                    Some(param_idx) => &params[param_idx],
+                    None if explicit_results[i].is_mutable_reference() => &explicit_results[i],
+                    None => explicit_results[i].skip_reference(),
+                };
+                let check = boogie_well_formed_check(self.env, result_local, ty, false);
+                if !check.is_empty() {
+                    emitln!(self.writer, "{}", check);
                 }
             }
         }
@@ -2714,8 +2762,10 @@ impl<'env> BoogieTranslator<'env> {
 
         let result_of_call = format!("{}({})", result_of_name, input_args.join(", "));
         // `result_of` denotes the value returned by an actual function-value
-        // invocation.  Connect the per-type evaluator directly to each
-        // variant's result Skolem before relating that value to `ensures_of`.
+        // invocation. The per-type evaluator equals a variant's result Skolem
+        // for every function-parameter and struct-field variant, and for a
+        // closure variant only when `closure_results_from_carrier` holds;
+        // otherwise it is related to the closure only through `ensures_of`.
         // The latter remains guarded by `requires_of` and `aborts_of`: a
         // function's postconditions are only available on its valid,
         // non-aborting domain, while its returned value is still the same
@@ -2752,49 +2802,87 @@ impl<'env> BoogieTranslator<'env> {
             );
         }
 
+        // A closure variant whose postcondition holds only across an actual
+        // call guards the axiom by the per-type transition witness, which
+        // dispatches to the variant's own; see `emit_ensures_of_predicate`.
+        let transition = self.emit_eval_transition_predicate(
+            fun_type,
+            closure_infos,
+            &params_flat,
+            &results_flat,
+            &output_types,
+            &param_decls,
+            &input_args,
+        );
+        let axiom_guard = transition
+            .as_ref()
+            .map(|(call, _)| format!("({}) && ", call))
+            .unwrap_or_default();
+        // The pre-state-only evaluator keeps the unguarded relation, as the
+        // per-function axiom does; see `generate_behavioral_spec_funs_for_functions`.
+        let pre_state_name = transition.as_ref().map(|(_, name)| name.clone());
+
         // ensures_of takes: input_args, then output slots (declared + post-state).
         let mut ensures_args = input_args.clone();
         if output_types.len() == 1 {
             ensures_args.push(result_of_call.clone());
-            let body = format!(
-                "({}) && !({}) ==> {}({})",
-                requires_of_call,
-                aborts_of_call,
-                ensures_of_name,
-                ensures_args.join(", ")
-            );
-            emitln!(
-                self.writer,
-                "axiom (forall {} :: {{{}}} {});",
-                param_decls.join(", "),
-                result_of_call,
-                body
-            );
+            let ensures_args = ensures_args.join(", ");
+            let mut axioms = vec![format!(
+                "{}({}) && !({}) ==> {}({})",
+                axiom_guard, requires_of_call, aborts_of_call, ensures_of_name, ensures_args
+            )];
+            if let Some(name) = &pre_state_name {
+                axioms.push(format!(
+                    "({}) && !({}) ==> {}({})",
+                    requires_of_call, aborts_of_call, name, ensures_args
+                ));
+            }
+            for body in axioms {
+                emitln!(
+                    self.writer,
+                    "axiom (forall {} :: {{{}}} {});",
+                    param_decls.join(", "),
+                    result_of_call,
+                    body
+                );
+            }
         } else {
             let tuple_projections: Vec<String> = (0..output_types.len())
                 .map(|i| format!("_r->${}", i))
                 .collect();
             ensures_args.extend(tuple_projections);
-            let body = format!(
-                "({}) && !({}) ==> (var _r := {}; {}({}))",
+            let ensures_args = ensures_args.join(", ");
+            let mut axioms = vec![format!(
+                "{}({}) && !({}) ==> (var _r := {}; {}({}))",
+                axiom_guard,
                 requires_of_call,
                 aborts_of_call,
                 result_of_call,
                 ensures_of_name,
-                ensures_args.join(", ")
-            );
-            emitln!(
-                self.writer,
-                "axiom (forall {} :: {{{}}} {});",
-                param_decls.join(", "),
-                result_of_call,
-                body
-            );
+                ensures_args
+            )];
+            if let Some(name) = &pre_state_name {
+                axioms.push(format!(
+                    "({}) && !({}) ==> (var _r := {}; {}({}))",
+                    requires_of_call, aborts_of_call, result_of_call, name, ensures_args
+                ));
+            }
+            for body in axioms {
+                emitln!(
+                    self.writer,
+                    "axiom (forall {} :: {{{}}} {});",
+                    param_decls.join(", "),
+                    result_of_call,
+                    body
+                );
+            }
         }
     }
 
-    /// Connect the public `result_of` evaluator to every concrete function
-    /// value variant. This is deliberately separate from the guarded
+    /// Equate the public `result_of` evaluator with a variant's carrier: for
+    /// every function-parameter and struct-field variant, and for a closure
+    /// variant only when `closure_results_from_carrier` holds, as `$apply`
+    /// binds. This is deliberately separate from the guarded
     /// `result_of -> ensures_of` axiom above: callers observe a function's
     /// return value even when its behavioral postcondition is unavailable.
     #[allow(clippy::too_many_arguments)]
@@ -2851,6 +2939,10 @@ impl<'env> BoogieTranslator<'env> {
         }
 
         for info in closure_infos {
+            // The carrier stands for the variant's value only where `$apply` binds it.
+            if !self.closure_results_from_carrier(info) {
+                continue;
+            }
             let fun_env = env.get_function(info.fun.to_qualified_id());
             let callee_tys = Type::instantiate_vec(fun_env.get_parameter_types(), &info.fun.inst);
             let mut capture_decls = vec![];
@@ -3030,7 +3122,11 @@ impl<'env> BoogieTranslator<'env> {
         param_decls: &[String],
         result_type: &str,
     ) -> bool {
-        if closure_infos.is_empty() {
+        if closure_infos.is_empty()
+            || closure_infos
+                .iter()
+                .any(|info| !self.closure_results_from_carrier(info))
+        {
             return false;
         }
         let mut arms = Vec::new();
@@ -3040,19 +3136,11 @@ impl<'env> BoogieTranslator<'env> {
             if Self::behavioral_output_types(&callee_tys, results) != output_types {
                 return false;
             }
-            let mut args = Self::build_instantiated_memory_args(self.env, &fun_env, &info.fun.inst);
-            let mut captured = 0;
-            let mut regular = 0;
-            for pos in 0..callee_tys.len() {
-                if info.mask.is_captured(pos) {
-                    args.push(format!("f->p{}_v{}", captured, variant_idx));
-                    captured += 1;
-                } else {
-                    args.push(format!("p{}", regular));
-                    regular += 1;
-                }
-            }
-            debug_assert_eq!(regular, params.len());
+            let args = self.closure_variant_input_args(info, variant_idx, &callee_tys);
+            debug_assert_eq!(
+                callee_tys.len() - info.mask.captured_count() as usize,
+                params.len()
+            );
             let result_name =
                 boogie_behavioral_fun_result_name(self.env, &info.fun, output_types.len() > 1);
             arms.push((
@@ -3201,6 +3289,7 @@ impl<'env> BoogieTranslator<'env> {
                     kind,
                     &info.fun.inst,
                     &inst_old,
+                    false,
                 );
                 match body {
                     Some((body, true)) if !is_higher_order => emitln!(
@@ -3243,6 +3332,63 @@ impl<'env> BoogieTranslator<'env> {
             let ensures_fun_name =
                 boogie_behavioral_fun_spec_name(self.env, &info.fun, BehaviorKind::EnsuresOf);
 
+            // The postcondition of a function which may write memory its
+            // contract observes holds only across an actual call. Its
+            // `result_of` axiom is then guarded by the transition witness,
+            // which is assumed wherever an `ensures_of` fact of a call is
+            // (an opaque call, an `$apply` variant, a caller's contract).
+            // The clauses which read no post-state memory hold for the
+            // result of a call at any pre-state the function does not abort
+            // in, so they are related to the carrier unguarded; a claim over
+            // every state (a data invariant over a function-valued field)
+            // keeps those. See `behavioral_transition_guarded`.
+            let transition_guarded = usage_analysis::behavioral_transition_guarded_in(
+                self.env,
+                self.targets,
+                info.fun.to_qualified_id(),
+                &info.fun.inst,
+            );
+            let axiom_guard = if transition_guarded {
+                let name = boogie_behavioral_fun_spec_name(
+                    self.env,
+                    &info.fun,
+                    BehaviorKind::TransitionOf,
+                );
+                emitln!(
+                    self.writer,
+                    "function {}({}): bool;",
+                    name,
+                    input_param_decls.join(", ")
+                );
+                format!("({}({})) && ", name, input_args_str)
+            } else {
+                String::new()
+            };
+            // The pre-state-only clauses, as a predicate with the signature
+            // of `ensures_of`; `None` when there is none to state.
+            let pre_state_ensures_name = transition_guarded
+                .then(|| {
+                    self.translate_fun_spec_conditions(
+                        &fun_env,
+                        &closure_spec,
+                        BehaviorKind::EnsuresOf,
+                        &info.fun.inst,
+                        &inst_old,
+                        true,
+                    )
+                    .filter(|(body, _)| body != "true")
+                    .map(|(body, _)| {
+                        let name = format!("{}_pre", ensures_fun_name);
+                        (name, body)
+                    })
+                })
+                .flatten();
+            if pre_state_ensures_name.is_some() && !all_result_types.is_empty() {
+                self.pre_state_ensures_funs
+                    .borrow_mut()
+                    .insert(info.fun.clone());
+            }
+
             let mut full_param_decls = input_param_decls.clone();
             for (i, result_type) in all_result_types.iter().enumerate() {
                 full_param_decls.push(format!("r{}: {}", i, result_type));
@@ -3279,11 +3425,7 @@ impl<'env> BoogieTranslator<'env> {
                 // native.bpl are pure and do not take memory arguments — and only for the
                 // natives the prelude actually defines a "$-spec" function for; any other
                 // native's result function stays uninterpreted.
-                let is_native_no_spec = fun_env.is_native()
-                    && closure_spec.conditions.is_empty()
-                    && mem_param_decls.is_empty()
-                    && boogie_native_fun_has_spec_fun(&fun_env);
-                let native_spec_call = if is_native_no_spec {
+                let native_spec_call = if self.closure_target_has_prelude_model(info) {
                     let spec_name = boogie_native_spec_fun_name(&fun_env, &info.fun.inst);
                     let call = format!("{}({})", spec_name, input_args.join(", "));
                     Some(call)
@@ -3330,6 +3472,7 @@ impl<'env> BoogieTranslator<'env> {
                         BehaviorKind::EnsuresOf,
                         &info.fun.inst,
                         &inst_old,
+                        false,
                     )
                     .map(|(body, _)| body)
                 };
@@ -3343,28 +3486,39 @@ impl<'env> BoogieTranslator<'env> {
                     &ensures_param_decls,
                     ensures_body,
                 );
-
-                let ensures_of_with_result = {
-                    let mut call_args = all_input_arg_names.clone();
-                    call_args.push(format!("{}({})", result_fun_name, input_args_str));
-                    format!(
-                        "({}) && !({}) ==> {}({})",
-                        requires_of_call,
-                        aborts_of_call,
-                        ensures_fun_name,
-                        call_args.join(", ")
-                    )
-                };
-                if input_param_decls.is_empty() {
-                    emitln!(self.writer, "axiom {};", ensures_of_with_result);
-                } else {
-                    emitln!(
-                        self.writer,
-                        "axiom (forall {} :: {{{}}} {});",
-                        input_param_decls.join(", "),
-                        result_fun_app,
-                        ensures_of_with_result
+                if let Some((name, body)) = &pre_state_ensures_name {
+                    self.spec_translator.defer_inline_predicate(
+                        name.clone(),
+                        &ensures_param_decls,
+                        body.clone(),
                     );
+                }
+
+                let mut call_args = all_input_arg_names.clone();
+                call_args.push(format!("{}({})", result_fun_name, input_args_str));
+                let call_args = call_args.join(", ");
+                let mut axioms = vec![format!(
+                    "{}({}) && !({}) ==> {}({})",
+                    axiom_guard, requires_of_call, aborts_of_call, ensures_fun_name, call_args
+                )];
+                if let Some((name, _)) = &pre_state_ensures_name {
+                    axioms.push(format!(
+                        "({}) && !({}) ==> {}({})",
+                        requires_of_call, aborts_of_call, name, call_args
+                    ));
+                }
+                for ensures_of_with_result in axioms {
+                    if input_param_decls.is_empty() {
+                        emitln!(self.writer, "axiom {};", ensures_of_with_result);
+                    } else {
+                        emitln!(
+                            self.writer,
+                            "axiom (forall {} :: {{{}}} {});",
+                            input_param_decls.join(", "),
+                            result_fun_app,
+                            ensures_of_with_result
+                        );
+                    }
                 }
             } else if all_result_types.len() >= 2 {
                 let result_fun_name = boogie_behavioral_fun_result_name(self.env, &info.fun, true);
@@ -3395,6 +3549,7 @@ impl<'env> BoogieTranslator<'env> {
                         BehaviorKind::EnsuresOf,
                         &info.fun.inst,
                         &inst_old,
+                        false,
                     )
                     .map(|(body, _)| body);
                 self.emit_behavioral_predicate(
@@ -3402,33 +3557,53 @@ impl<'env> BoogieTranslator<'env> {
                     &full_param_decls,
                     ensures_body,
                 );
+                if let Some((name, body)) = &pre_state_ensures_name {
+                    self.spec_translator.defer_inline_predicate(
+                        name.clone(),
+                        &full_param_decls,
+                        body.clone(),
+                    );
+                }
 
                 let tuple_projections: Vec<String> = (0..all_result_types.len())
                     .map(|i| format!("_r->${}", i))
                     .collect();
-                let ensures_of_with_result = {
-                    let mut call_args = all_input_arg_names.clone();
-                    call_args.extend(tuple_projections);
-                    format!(
+                let mut call_args = all_input_arg_names.clone();
+                call_args.extend(tuple_projections);
+                let call_args = call_args.join(", ");
+                let mut axioms = vec![format!(
+                    "{}({}) && !({}) ==> (var _r := {}({}); {}({}))",
+                    axiom_guard,
+                    requires_of_call,
+                    aborts_of_call,
+                    result_fun_name,
+                    input_args_str,
+                    ensures_fun_name,
+                    call_args
+                )];
+                if let Some((name, _)) = &pre_state_ensures_name {
+                    axioms.push(format!(
                         "({}) && !({}) ==> (var _r := {}({}); {}({}))",
                         requires_of_call,
                         aborts_of_call,
                         result_fun_name,
                         input_args_str,
-                        ensures_fun_name,
-                        call_args.join(", ")
-                    )
-                };
-                if input_param_decls.is_empty() {
-                    emitln!(self.writer, "axiom {};", ensures_of_with_result);
-                } else {
-                    emitln!(
-                        self.writer,
-                        "axiom (forall {} :: {{{}}} {});",
-                        input_param_decls.join(", "),
-                        result_fun_app,
-                        ensures_of_with_result
-                    );
+                        name,
+                        call_args
+                    ));
+                }
+                for ensures_of_with_result in axioms {
+                    if input_param_decls.is_empty() {
+                        emitln!(self.writer, "axiom {};", ensures_of_with_result);
+                    } else {
+                        emitln!(
+                            self.writer,
+                            "axiom (forall {} :: {{{}}} {});",
+                            input_param_decls.join(", "),
+                            result_fun_app,
+                            ensures_of_with_result
+                        );
+                    }
                 }
             } else {
                 let ensures_body = self
@@ -3438,6 +3613,7 @@ impl<'env> BoogieTranslator<'env> {
                         BehaviorKind::EnsuresOf,
                         &info.fun.inst,
                         &inst_old,
+                        false,
                     )
                     .map(|(body, _)| body);
                 self.emit_behavioral_predicate(
@@ -3447,6 +3623,174 @@ impl<'env> BoogieTranslator<'env> {
                 );
             }
         }
+    }
+
+    /// Whether an `ensures` clause, with the specification's `let`s in
+    /// scope, depends on the pre-state and the result alone, so that it
+    /// holds for the result of a call at any pre-state the function does not
+    /// abort in (and whose assumed invariants hold), whatever the post-state.
+    /// An allowlist: values, variables, the state-free operations, `let`,
+    /// `if`, quantifiers over type domains, spec functions with a body which
+    /// passes itself, and under `old(..)` the unlabeled resource reads, whose
+    /// translation selects the pre-state slot (`old_aware_memory_name`).
+    /// Anything else is not: behavioral predicates (their memory arguments do
+    /// not follow `old`), mutation builtins, state anchors, labeled reads,
+    /// uninterpreted or native spec functions (`object::spec_exists_at`
+    /// translates to a post-state `exists`), events, closures.
+    fn ensures_clause_is_pre_state_only(&self, exp: &Exp) -> bool {
+        spec_derivation::exp_is_pre_state_only(self.env, exp, false, &mut BTreeSet::new())
+    }
+
+    /// The arguments a closure variant of a per-type evaluator passes to its
+    /// target's per-function predicates: the target's memory, then its
+    /// parameters, captured ones read from the closure value `f`.
+    fn closure_variant_input_args(
+        &self,
+        info: &ClosureInfo,
+        variant_idx: usize,
+        callee_tys: &[Type],
+    ) -> Vec<String> {
+        let fun_env = self.env.get_function(info.fun.to_qualified_id());
+        let mut args = Self::build_instantiated_memory_args(self.env, &fun_env, &info.fun.inst);
+        let mut captured = 0;
+        let mut regular = 0;
+        for pos in 0..callee_tys.len() {
+            if info.mask.is_captured(pos) {
+                args.push(format!("f->p{}_v{}", captured, variant_idx));
+                captured += 1;
+            } else {
+                args.push(format!("p{}", regular));
+                regular += 1;
+            }
+        }
+        args
+    }
+
+    /// When a closure variant of the type is transition-guarded, emits the
+    /// per-type transition witness evaluator (dispatching to the variant's
+    /// own witness, `true` for any other variant) and the per-type
+    /// pre-state-only `ensures_of` evaluator (dispatching to a variant's
+    /// pre-state-only predicate, or to its full `ensures_of` when the
+    /// variant is not guarded), and returns the witness application to the
+    /// evaluator's parameters together with the latter's name. `None`
+    /// otherwise, where the per-type `result_of` axiom needs no guard.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_eval_transition_predicate(
+        &self,
+        fun_type: &Type,
+        closure_infos: &BTreeSet<ClosureInfo>,
+        params: &[Type],
+        results: &[Type],
+        output_types: &[Type],
+        param_decls: &[String],
+        input_args: &[String],
+    ) -> Option<(String, String)> {
+        let variants: Vec<(usize, &ClosureInfo, bool)> = closure_infos
+            .iter()
+            .enumerate()
+            .map(|(idx, info)| {
+                let guarded = usage_analysis::behavioral_transition_guarded_in(
+                    self.env,
+                    self.targets,
+                    info.fun.to_qualified_id(),
+                    &info.fun.inst,
+                );
+                (idx, info, guarded)
+            })
+            .collect();
+        if !variants.iter().any(|(_, _, guarded)| *guarded) {
+            return None;
+        }
+        let variant_arm =
+            |variant_idx: usize, info: &ClosureInfo, callee: String, outputs: bool| {
+                let fun_env = self.env.get_function(info.fun.to_qualified_id());
+                let callee_tys =
+                    Type::instantiate_vec(fun_env.get_parameter_types(), &info.fun.inst);
+                let mut args = self.closure_variant_input_args(info, variant_idx, &callee_tys);
+                if outputs {
+                    args.extend(Self::behavioral_output_args(params, results));
+                }
+                (
+                    boogie_closure_pack_name(self.env, &info.fun, info.mask),
+                    format!("{}({})", callee, args.join(", ")),
+                )
+            };
+        let dispatch = |arms: Vec<(String, String)>| {
+            arms.iter()
+                .rev()
+                .fold("true".to_string(), |rest, (ctor, arm)| {
+                    format!("if (f is {}) then ({}) else ({})", ctor, arm, rest)
+                })
+        };
+
+        let transition_arms = variants
+            .iter()
+            .filter(|(_, _, guarded)| *guarded)
+            .map(|(idx, info, _)| {
+                variant_arm(
+                    *idx,
+                    info,
+                    boogie_behavioral_fun_spec_name(
+                        self.env,
+                        &info.fun,
+                        BehaviorKind::TransitionOf,
+                    ),
+                    false,
+                )
+            })
+            .collect();
+        let transition_name =
+            boogie_behavioral_eval_fun_name(self.env, fun_type, BehaviorKind::TransitionOf);
+        emitln!(
+            self.writer,
+            "function {{:inline}} {}({}): bool {{ {} }}",
+            transition_name,
+            param_decls.join(", "),
+            dispatch(transition_arms)
+        );
+
+        let pre_state_funs = self.pre_state_ensures_funs.borrow();
+        let pre_arms = variants
+            .iter()
+            .filter_map(|(idx, info, guarded)| {
+                let fun_env = self.env.get_function(info.fun.to_qualified_id());
+                let callee_tys =
+                    Type::instantiate_vec(fun_env.get_parameter_types(), &info.fun.inst);
+                if Self::behavioral_output_types(&callee_tys, results) != output_types {
+                    return None;
+                }
+                let ensures_name =
+                    boogie_behavioral_fun_spec_name(self.env, &info.fun, BehaviorKind::EnsuresOf);
+                let callee = match (guarded, pre_state_funs.contains(&info.fun)) {
+                    (false, _) => ensures_name,
+                    (true, true) => format!("{}_pre", ensures_name),
+                    (true, false) => return None,
+                };
+                Some(variant_arm(*idx, info, callee, true))
+            })
+            .collect();
+        let pre_state_name = format!(
+            "{}_pre",
+            boogie_behavioral_eval_fun_name(self.env, fun_type, BehaviorKind::EnsuresOf)
+        );
+        let mut pre_decls = param_decls.to_vec();
+        pre_decls.extend(
+            output_types
+                .iter()
+                .enumerate()
+                .map(|(pos, ty)| format!("r{}: {}", pos, boogie_type(self.env, ty, false))),
+        );
+        emitln!(
+            self.writer,
+            "function {{:inline}} {}({}): bool {{ {} }}",
+            pre_state_name,
+            pre_decls.join(", "),
+            dispatch(pre_arms)
+        );
+        Some((
+            format!("{}({})", transition_name, input_args.join(", ")),
+            pre_state_name,
+        ))
     }
 
     /// Translate a function's spec conditions of the given kind to a Boogie
@@ -3461,6 +3805,7 @@ impl<'env> BoogieTranslator<'env> {
         kind: BehaviorKind,
         type_inst: &[Type],
         old_memory: &BTreeSet<QualifiedInstId<StructId>>,
+        pre_state_only: bool,
     ) -> Option<(String, bool)> {
         let conditions: Vec<_> = closure_spec
             .conditions
@@ -3477,6 +3822,7 @@ impl<'env> BoogieTranslator<'env> {
                     // spec-condition counterpart.
                     BehaviorKind::ResultOf
                     | BehaviorKind::WriteOf(_)
+                    | BehaviorKind::TransitionOf
                     | BehaviorKind::UnchangedOf
                     | BehaviorKind::FoldsOf => false,
                 };
@@ -3552,6 +3898,28 @@ impl<'env> BoogieTranslator<'env> {
                 .collect(),
         };
 
+        let is_two_state = !old_memory.is_empty() || fun_env.spec_uses_old();
+        let items: Vec<(ConditionKind, Exp)> = if pre_state_only {
+            items
+                .into_iter()
+                .filter(|(cond_kind, exp)| {
+                    let scoped = if derived_aborts.is_some() {
+                        exp.clone()
+                    } else {
+                        self.wrap_behavioral_condition_with_lets(
+                            closure_spec,
+                            cond_kind,
+                            is_two_state,
+                            exp,
+                        )
+                    };
+                    self.ensures_clause_is_pre_state_only(&scoped)
+                })
+                .collect()
+        } else {
+            items
+        };
+
         if items.is_empty() {
             // For intrinsic functions with abort-condition spec functions registered,
             // emit a call to the abort spec function instead of the default "false".
@@ -3573,6 +3941,7 @@ impl<'env> BoogieTranslator<'env> {
                     BehaviorKind::AbortsOf => "false".to_string(),
                     BehaviorKind::ResultOf
                     | BehaviorKind::WriteOf(_)
+                    | BehaviorKind::TransitionOf
                     | BehaviorKind::UnchangedOf
                     | BehaviorKind::FoldsOf => "true".to_string(),
                 },
@@ -3594,8 +3963,6 @@ impl<'env> BoogieTranslator<'env> {
             .enumerate()
             .map(|(mut_ref_idx, (param_idx, _))| (param_idx, num_results + mut_ref_idx))
             .collect::<Vec<_>>();
-
-        let is_two_state = !old_memory.is_empty() || fun_env.spec_uses_old();
 
         let translated: Vec<_> = items
             .iter()
@@ -3657,6 +4024,7 @@ impl<'env> BoogieTranslator<'env> {
                         // FoldsOf have no spec conditions — no body translated.
                         BehaviorKind::ResultOf
                         | BehaviorKind::WriteOf(_)
+                        | BehaviorKind::TransitionOf
                         | BehaviorKind::UnchangedOf
                         | BehaviorKind::FoldsOf => unreachable!(),
                     };
@@ -3696,6 +4064,7 @@ impl<'env> BoogieTranslator<'env> {
             },
             BehaviorKind::ResultOf
             | BehaviorKind::WriteOf(_)
+            | BehaviorKind::TransitionOf
             | BehaviorKind::UnchangedOf
             | BehaviorKind::FoldsOf => return Some(("true".to_string(), false)),
         };
@@ -3734,6 +4103,7 @@ impl<'env> BoogieTranslator<'env> {
                         BehaviorKind::EnsuresOf => matches!(c.kind, ConditionKind::Ensures),
                         BehaviorKind::ResultOf
                         | BehaviorKind::WriteOf(_)
+                        | BehaviorKind::TransitionOf
                         | BehaviorKind::UnchangedOf
                         | BehaviorKind::FoldsOf => false,
                     };
@@ -3889,6 +4259,7 @@ impl<'env> BoogieTranslator<'env> {
             match kind {
                 BehaviorKind::ResultOf
                 | BehaviorKind::WriteOf(_)
+                | BehaviorKind::TransitionOf
                 | BehaviorKind::UnchangedOf
                 | BehaviorKind::FoldsOf => unreachable!(),
                 BehaviorKind::RequiresOf | BehaviorKind::AbortsOf | BehaviorKind::EnsuresOf => {
@@ -3899,11 +4270,9 @@ impl<'env> BoogieTranslator<'env> {
         Some((result, has_existential))
     }
 
-    /// Wraps a condition expression with `(var sym := binding; body)` for each
-    /// `LetPre`/`LetPost` binding in the spec. For `LetPre` in two-state contexts,
-    /// Wraps a condition expression with `(var sym := binding; body)` for each
-    /// `LetPre`/`LetPost` binding in the spec. For `LetPre` in two-state contexts,
-    /// the binding is wrapped in `old()` to ensure pre-state evaluation.
+    /// The condition with the spec `let`s it references in scope; see
+    /// `spec_derivation::wrap_condition_with_referenced_lets`, which the
+    /// transition-guard classification shares.
     fn wrap_behavioral_condition_with_lets(
         &self,
         closure_spec: &move_model::ast::Spec,
@@ -3911,41 +4280,13 @@ impl<'env> BoogieTranslator<'env> {
         is_two_state: bool,
         exp: &Exp,
     ) -> Exp {
-        let include_post_lets = matches!(source_kind, ConditionKind::Ensures);
-        closure_spec
-            .conditions
-            .iter()
-            .rev()
-            .fold(exp.clone(), |scope, cond| match &cond.kind {
-                ConditionKind::LetPre(sym, _) => {
-                    // In two-state context, wrap binding in old() to ensure pre-state
-                    // evaluation. In one-state context, there's only pre-state so no
-                    // old() wrapping is needed.
-                    let binding = if is_two_state {
-                        let ty = self.env.get_node_type(cond.exp.node_id());
-                        let loc = self.env.get_node_loc(cond.exp.node_id());
-                        let node_id = self.env.new_node(loc, ty);
-                        ExpData::Call(node_id, AstOperation::Old, vec![cond.exp.clone()]).into_exp()
-                    } else {
-                        cond.exp.clone()
-                    };
-                    ExpData::Block(
-                        cond.exp.node_id(),
-                        Pattern::Var(cond.exp.node_id(), *sym),
-                        Some(binding),
-                        scope,
-                    )
-                    .into_exp()
-                },
-                ConditionKind::LetPost(sym, _) if include_post_lets => ExpData::Block(
-                    cond.exp.node_id(),
-                    Pattern::Var(cond.exp.node_id(), *sym),
-                    Some(cond.exp.clone()),
-                    scope,
-                )
-                .into_exp(),
-                _ => scope,
-            })
+        spec_derivation::wrap_condition_with_referenced_lets(
+            self.env,
+            closure_spec,
+            source_kind,
+            is_two_state,
+            exp,
+        )
     }
 
     /// Collect frame save resources and old memory resources across all closure and
@@ -4310,6 +4651,72 @@ impl<'env> BoogieTranslator<'env> {
         }
     }
 
+    /// Emits that an uninterpreted behavioral predicate gives equal answers on
+    /// equal Move values.
+    ///
+    /// Boogie applies an uninterpreted function to Boogie terms, but Move
+    /// equality is `$IsEqual`, which is extensional for vectors and the types
+    /// built on them (`Option`, `String`). Without this axiom, a callback
+    /// invoked with a value the program only knows to be *equal* to the one a
+    /// specification names (for example, an order rebuilt after a field update)
+    /// gets an unrelated abort or requires predicate, and the specification
+    /// cannot be proven. A Move function's behavior depends only on the values
+    /// it receives, so the axiom is sound wherever equality covers everything
+    /// a specification can read; it is not emitted when an argument carries a
+    /// ghost field.
+    fn emit_predicate_congruence(&self, fun_name: &str, prefix_decls: &[String], params: &[Type]) {
+        // `$IsEqual` ignores ghost fields, but a requires or aborts
+        // specification can read them, so values equal as Move values may
+        // still get different answers.
+        if params.is_empty()
+            || params
+                .iter()
+                .any(|ty| type_has_ghost_transitively(self.env, ty.skip_reference()))
+        {
+            return;
+        }
+        let prefix_args: Vec<String> = prefix_decls
+            .iter()
+            .map(|decl| {
+                decl.split(':')
+                    .next()
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string()
+            })
+            .collect();
+        let mut decls = prefix_decls.to_vec();
+        let mut lhs_args = prefix_args.clone();
+        let mut rhs_args = prefix_args;
+        let mut equalities = vec![];
+        for (i, ty) in params.iter().enumerate() {
+            let ty = ty.skip_reference();
+            let boogie_ty = boogie_type(self.env, ty, false);
+            decls.push(format!("a{}: {}", i, boogie_ty));
+            decls.push(format!("b{}: {}", i, boogie_ty));
+            lhs_args.push(format!("a{}", i));
+            rhs_args.push(format!("b{}", i));
+            equalities.push(format!(
+                "{}(a{}, b{})",
+                boogie_equality_for_type(self.env, true, ty, false),
+                i,
+                i
+            ));
+        }
+        let lhs = format!("{}({})", fun_name, lhs_args.join(", "));
+        let rhs = format!("{}({})", fun_name, rhs_args.join(", "));
+        emitln!(
+            self.writer,
+            "axiom (forall {} :: {{{}, {}}} {} ==> ({} <==> {}));",
+            decls.join(", "),
+            lhs,
+            rhs,
+            equalities.join(" && "),
+            lhs,
+            rhs
+        );
+    }
+
     /// Generate uninterpreted spec functions for behavioral predicates on function-typed parameters.
     /// These functions are called by the behavioral evaluators and connected to closures via assumptions.
     ///
@@ -4359,6 +4766,7 @@ impl<'env> BoogieTranslator<'env> {
                     fun_name,
                     input_param_decls.join(", ")
                 );
+                self.emit_predicate_congruence(&fun_name, &mem_param_decls, &params);
             }
 
             // Multi-output Skolem (declared returns + `&mut` post-states).
@@ -4590,6 +4998,9 @@ impl<'env> BoogieTranslator<'env> {
                     fun_name,
                     input_param_decls.join(", ")
                 );
+                let mut prefix_decls = mem_param_decls.clone();
+                prefix_decls.push("n: int".to_string());
+                self.emit_predicate_congruence(&fun_name, &prefix_decls, &params);
             }
 
             // Multi-output Skolem (declared returns + `&mut` post-states).
@@ -6097,10 +6508,15 @@ impl StructTranslator<'_> {
         }
 
         // Emit compare function and procedure
+        // The struct is translated once per normalized instantiation; a comparison
+        // registered under another ability variant of it is the same Boogie entity.
         let cmp_struct_types = self.parent.env.cmp_types.borrow();
+        let normalized_type_inst = Type::normalize_inst(self.type_inst);
         for cmp_struct_type in cmp_struct_types.iter() {
             if let Some((cur_struct, inst)) = cmp_struct_type.get_struct(env) {
-                if cur_struct.get_id() == struct_env.get_id() && inst == self.type_inst {
+                if cur_struct.get_id() == struct_env.get_id()
+                    && Type::normalize_inst(inst) == normalized_type_inst
+                {
                     if !struct_env.has_variants() {
                         let suffix =
                             boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
@@ -7063,6 +7479,7 @@ impl FunctionTranslator<'_> {
                     // When WellFormed is assumed for a struct with function-typed fields,
                     // the apply procedure needs to know which variant the field is.
                     self.emit_struct_field_identity_assumes(exp, env, writer);
+                    self.emit_transition_assumes(exp, spec_translator, writer);
                 },
                 PropKind::Modifies => {
                     let ty = self.inst(&env.get_node_type(exp.node_id()));
@@ -9172,6 +9589,65 @@ impl FunctionTranslator<'_> {
     /// After a WellFormed assume for a struct with function-typed fields,
     /// this emits `assume <value>-><field> is <struct_field_ctor>;` so the apply
     /// procedure can dispatch on the correct variant.
+    /// An assumed `ensures_of<f>(args, ..)` fact at a memory pair witnesses
+    /// that pair as a transition of `f` at `args`: assume the witness the
+    /// `result_of` axiom of a transition-guarded `f` is guarded by. Sound as
+    /// the witness is modelled by the fact itself (some result satisfies the
+    /// postcondition there). Only the conjuncts of the assumption are
+    /// considered; a fact under a binder is merely not exploited.
+    fn emit_transition_assumes(
+        &self,
+        exp: &Exp,
+        spec_translator: &SpecTranslator,
+        writer: &CodeWriter,
+    ) {
+        let env = self.parent.env;
+        let mut conjuncts = vec![exp.clone()];
+        let mut facts = vec![];
+        while let Some(conjunct) = conjuncts.pop() {
+            match conjunct.as_ref() {
+                ExpData::Call(_, AstOperation::And, args) => conjuncts.extend(args.iter().cloned()),
+                ExpData::Call(id, AstOperation::Behavior(BehaviorKind::EnsuresOf, range), args) => {
+                    facts.push((*id, range.clone(), args.clone()));
+                },
+                _ => {},
+            }
+        }
+        for (id, range, args) in facts {
+            let Some(ExpData::Call(closure_id, AstOperation::Closure(mid, fid, mask), _)) =
+                args.first().map(|e| e.as_ref())
+            else {
+                continue;
+            };
+            let fun_id = mid.qualified(*fid);
+            let inst =
+                Type::instantiate_slice(&env.get_node_instantiation(*closure_id), self.type_inst);
+            if !usage_analysis::behavioral_transition_guarded_in(
+                env,
+                self.parent.targets,
+                fun_id,
+                &inst,
+            ) {
+                continue;
+            }
+            let num_inputs =
+                env.get_function(fun_id).get_parameter_count() - mask.captured_count() as usize;
+            if args.len() < num_inputs + 1 {
+                continue;
+            }
+            let transition_id = env.new_node(env.get_node_loc(id), BOOL_TYPE.clone());
+            let transition = ExpData::Call(
+                transition_id,
+                AstOperation::Behavior(BehaviorKind::TransitionOf, range),
+                args[..=num_inputs].to_vec(),
+            )
+            .into_exp();
+            emit!(writer, "assume ");
+            spec_translator.translate(&transition, self.type_inst);
+            emitln!(writer, ";");
+        }
+    }
+
     fn emit_struct_field_identity_assumes(&self, exp: &Exp, env: &GlobalEnv, writer: &CodeWriter) {
         let mono_info = mono_analysis::get_info(env);
         if mono_info.fun_struct_field_infos.is_empty() {

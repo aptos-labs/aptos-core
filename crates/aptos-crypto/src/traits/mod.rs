@@ -338,13 +338,13 @@ pub trait TSecretSharingConfig: Display {
     /// Useful during testing.
     fn get_random_player<R>(&self, rng: &mut R) -> Player
     where
-        R: rand_core::RngCore + rand_core::CryptoRng;
+        R: rand::RngCore + rand::CryptoRng;
 
     /// Returns a random subset of players who are capable of reconstructing the secret.
     /// Useful during testing.
     fn get_random_eligible_subset_of_players<R>(&self, rng: &mut R) -> Vec<Player>
     where
-        R: rand_core::RngCore;
+        R: rand::RngCore;
 
     /// Returns the total number of players in the scheme.
     fn get_total_num_players(&self) -> usize;

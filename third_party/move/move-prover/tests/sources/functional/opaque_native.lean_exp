@@ -1,2 +1,0 @@
-Move prover returns: exiting with verification errors
-tests/sources/functional/opaque_native.move:12:9: error: generic module axioms are outside the current LeanerLang parser

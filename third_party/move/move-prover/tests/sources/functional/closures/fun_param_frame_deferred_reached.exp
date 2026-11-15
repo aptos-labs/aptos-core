@@ -1,0 +1,32 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/fun_param_frame_deferred_reached.move:45:9
+   │
+45 │         ensures result == old(global<R>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:38: native_in_body
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:39: native_in_body
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:40: native_in_body
+   =         <redacted> = <redacted>
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:41: native_in_body
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:38: native_in_body
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:45: native_in_body (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/fun_param_frame_deferred_reached.move:55:9
+   │
+55 │         ensures result == old(global<R>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:48: unverified_in_body
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:49: unverified_in_body
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:50: unverified_in_body
+   =         <redacted> = <redacted>
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:51: unverified_in_body
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:48: unverified_in_body
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_reached.move:55: unverified_in_body (spec)

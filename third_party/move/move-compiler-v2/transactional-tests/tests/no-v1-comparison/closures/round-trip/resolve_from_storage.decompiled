@@ -3,7 +3,7 @@
 //# publish
 module 0x66::test {
     struct Func has key {
-        f: ||(u64) has copy + store,
+        f: ||u64 has copy + store,
     }
     public fun init(p0: &signer) {
         let _v0 = Func{f: || identity<u64>(23)};

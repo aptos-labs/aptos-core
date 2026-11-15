@@ -1,0 +1,6 @@
+Move prover returns: exiting with compilation errors
+error: function argument accesses resource `lambda_forwarded_param_not_deferred::R` which is not declared in `modifies_of`/`reads_of` for `fv`
+   ┌─ tests/sources/functional/closures/lambda_forwarded_param_not_deferred.move:22:9
+   │
+22 │         apply(fv, a)
+   │         ^^^^^^^^^^^^

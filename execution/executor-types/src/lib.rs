@@ -260,6 +260,8 @@ pub trait TransactionReplayer: Send {
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<usize>;
 
+    /// Commits the next chunk that has gone through ledger update. Called once per chunk counted by
+    /// `enqueue_chunks()`.
     fn commit(&self) -> Result<Version>;
 }
 

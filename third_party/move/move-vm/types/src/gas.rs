@@ -287,6 +287,12 @@ pub trait GasMeter: NativeGasMeter {
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()>;
 
+    /// Charges for traversing captured values to check their depth when packing a closure.
+    fn charge_pack_closure_captured_values(
+        &mut self,
+        args: impl Iterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()>;
+
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()>;
 
     fn charge_write_ref(
@@ -512,6 +518,13 @@ impl GasMeter for UnmeteredGasMeter {
         &mut self,
         _is_generic: bool,
         _args: impl ExactSizeIterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_pack_closure_captured_values(
+        &mut self,
+        _args: impl Iterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
         Ok(())
     }

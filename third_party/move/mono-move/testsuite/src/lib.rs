@@ -7,7 +7,6 @@ pub mod compile;
 pub mod engine;
 pub mod extensions;
 pub mod matcher;
-pub mod module_provider;
 pub mod parser;
 pub mod print_sections;
 pub mod programs;
@@ -15,7 +14,6 @@ pub mod resource_provider;
 pub mod runner;
 pub mod transactional_adapter;
 pub mod transactional_session;
-pub mod unit_test;
 pub mod v1_test_natives;
 
 pub use compile::{
@@ -26,7 +24,7 @@ pub use engine::{
     build_natives, with_loaded_module, with_loaded_mono_function, with_mono_function, MonoRunner,
     RunResult,
 };
-pub use module_provider::InMemoryModuleProvider;
+pub use mono_move_unit_test_backend::InMemoryModuleProvider;
 pub use runner::{finalize_events_v1, finalize_events_v2};
 pub use transactional_adapter::{run_transactional_test, supports_source};
 pub use transactional_session::{

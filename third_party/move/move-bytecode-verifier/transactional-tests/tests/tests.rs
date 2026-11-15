@@ -4,6 +4,7 @@
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use libtest_mimic::{Arguments, Trial};
+use move_bytecode_verifier::VerifierConfig;
 use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunConfig};
 use once_cell::sync::Lazy;
 use std::{
@@ -20,17 +21,39 @@ struct TestConfig {
     /// Path substrings for tests to exclude (applied after the include filter).
     /// If empty, no additional tests are excluded.
     exclude: &'static [&'static str],
+    verifier_config: VerifierConfig,
 }
 
 /// Note that any config which has different output for a test directory *must* be added to the
 /// [SEPARATE_BASELINE] array below, so that a special output file `test.foo.exp` will be used for
 /// outputs comparison when running `test.move` or `test.masm` for config "foo".
 static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
-    vec![TestConfig {
-        name: "baseline",
-        include: &[],
-        exclude: &[],
-    }]
+    vec![
+        TestConfig {
+            name: "baseline",
+            include: &[],
+            exclude: &[],
+            verifier_config: VerifierConfig::production_testing(),
+        },
+        TestConfig {
+            name: "no-uniform-variant-field-handles",
+            include: &["variant_field_handles"],
+            exclude: &[],
+            verifier_config: VerifierConfig {
+                uniform_variant_field_handles: false,
+                ..VerifierConfig::production_testing()
+            },
+        },
+        TestConfig {
+            name: "no_phantom_ref_check",
+            include: &["phantom_params/behind_reference_bad"],
+            exclude: &[],
+            verifier_config: VerifierConfig {
+                check_phantom_params_behind_references: false,
+                ..VerifierConfig::production_testing()
+            },
+        },
+    ]
 });
 
 /// Test files which must use separate baselines because their result is different.
@@ -39,7 +62,10 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
 /// `test.masm`) to the same baseline file `test.exp` *unless* there is an entry in this array
 /// matching the path of `test.move` or `test.masm`. If there is such an entry, then each config
 /// "foo" will have a separate baseline output file `test.foo.exp`.
-const SEPARATE_BASELINE: &[&str] = &[];
+const SEPARATE_BASELINE: &[&str] = &[
+    "variant_field_handles",
+    "phantom_params/behind_reference_bad",
+];
 
 fn get_config_by_name(name: &str) -> TestConfig {
     TEST_CONFIGS
@@ -56,8 +82,9 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     } else {
         None
     };
-    let config = TestRunConfig::default();
-    vm_test_harness::run_test_with_config_and_exp_suffix(config, path, &exp_suffix)
+    let mut run_config = TestRunConfig::default();
+    run_config.vm_config.verifier_config = config.verifier_config;
+    vm_test_harness::run_test_with_config_and_exp_suffix(run_config, path, &exp_suffix)
 }
 
 fn main() {

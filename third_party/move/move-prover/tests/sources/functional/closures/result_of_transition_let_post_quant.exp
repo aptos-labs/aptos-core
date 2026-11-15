@@ -1,0 +1,22 @@
+Move prover returns: exiting with verification errors
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+   ┌─ tests/sources/functional/closures/result_of_transition_let_post_quant.move:35:21
+   │
+35 │     fun quant_false(a: address): u64 {
+   │                     ^
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_let_post_quant.move:43:9
+   │
+43 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_let_post_quant.move:35: quant_false
+   =     at tests/sources/functional/closures/result_of_transition_let_post_quant.move:40: quant_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_let_post_quant.move:41: quant_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_let_post_quant.move:35: quant_false
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_let_post_quant.move:36: quant_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_let_post_quant.move:42: quant_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_let_post_quant.move:43: quant_false (spec)

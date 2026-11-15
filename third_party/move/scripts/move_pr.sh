@@ -33,7 +33,7 @@ Usage:
     move_pr <flags>
 Flags:
     -h   Print this help
-    -t   Run the selected Move tests and both Lean verification projects.
+    -t   Run the selected Move tests and the Verex Lean packages.
          Lean tests build the standalone Move CLI, never the full aptos CLI.
     -i   In addition to -t, run the selected integration tests
          (Aptos framework, e2e, and related Move tests).
@@ -131,11 +131,13 @@ MOVE_CRATES="\
   -p mono-move-aptos-transaction-executor \
 "
 
-# These projects exercise the Lean-authored Move semantics, verifier, and XIR
-# frontend. The frontend tests use the lightweight locally built exchange binary.
+# These packages exercise the Verex semantics, verifier, and source frontends.
+# The Move frontend tests use the locally built standalone Move CLI.
 LEAN_TEST_PROJECTS="\
-  $MOVE_BASE/lean/move-model \
-  $MOVE_BASE/lean/move \
+  $MOVE_BASE/lean/verex-ir \
+  $MOVE_BASE/lean/verex-move \
+  $MOVE_BASE/lean/verex-rust \
+  $MOVE_BASE/lean/verex-e2e-tests \
 "
 
 # This is a list of crates for integration testing.
@@ -191,6 +193,17 @@ if [ ! -z "$GEN_ARTIFACTS" ]; then
         cd $BASE
         cargo build $CARGO_OP_PARAMS -p aptos-cached-packages
     )
+fi
+
+if [ ! -z "$LEAN_TEST" ]; then
+  # The CLI tests invoke this executable before the Lean package suites run.
+  # Build it with its imports so those tests cannot use a stale verifier or
+  # skip verification because the executable is missing.
+  echo "*************** [move-pr] Building the Verex Move verifier"
+  (
+    cd "$MOVE_BASE/lean/verex-move"
+    lake build verex-move
+  )
 fi
 
 if [ ! -z "$TEST" ]; then

@@ -1,0 +1,330 @@
+`publish_echo` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/Check/Storage/FrameReadingInvariants.lean:28:7: error: Tactic `apply` failed: could not unify the conclusion of the term
+  VerexIR.Proofs.Denote.OwnAtArguments «0x42».frame_reading_invariants.unit
+    «0x42».frame_reading_invariants.functionCarriersBase
+    (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+    «0x42».frame_reading_invariants.dataOwn.case1
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+      VerexIR.Proofs.Denote.NRow.nil)
+    (@VerexIR.Proofs.Denote.NTy.plainEncode
+      (@VerexIR.Proofs.Denote.Skolems.toCarriers «0x42».frame_reading_invariants.unit
+        «0x42».frame_reading_invariants.functionCarriersBase
+        (VerexIR.Proofs.Denote.Skolems.atArguments «0x42».frame_reading_invariants.unit
+          «0x42».frame_reading_invariants.functionCarriersBase
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil)
+          ⋯))
+      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+      (Θ✝.plainReframe ⋯ ⋯ ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())))
+with the goal
+  VerexIR.Proofs.Denote.OwnAtArguments «0x42».frame_reading_invariants.unit
+    «0x42».frame_reading_invariants.functionCarriersBase
+    (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+    «0x42».frame_reading_invariants.dataOwn.case1
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+      VerexIR.Proofs.Denote.NRow.nil)
+    (@VerexIR.Proofs.Denote.NTy.plainEncode
+      (@VerexIR.Proofs.Denote.Skolems.toCarriers «0x42».frame_reading_invariants.unit
+        «0x42».frame_reading_invariants.functionCarriers
+        (Θ✝.instance
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil) ⋯))
+      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+      (Θ✝.plainReframe ⋯ ⋯ ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())))
+
+Note: The full type of the term is
+  «0x42».frame_reading_invariants.dataOwn.case1
+      ⟨VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+          VerexIR.Proofs.Denote.NRow.nil,
+        ⋯⟩
+      (Θ✝.plainReframe ⋯ ⋯ ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())) →
+    VerexIR.Proofs.Denote.OwnAtArguments «0x42».frame_reading_invariants.unit
+      «0x42».frame_reading_invariants.functionCarriersBase
+      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+      «0x42».frame_reading_invariants.dataOwn.case1
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+        VerexIR.Proofs.Denote.NRow.nil)
+      ((0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+            (VerexIR.Proofs.Denote.NTy.param 0)).plainEncode
+        (Θ✝.plainReframe ⋯ ⋯ ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())))
+
+case holds
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit «0x42».frame_reading_invariants.unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ «0x42».frame_reading_invariants.unit = Except.ok executable✝
+verexInhabitants :
+  VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime «0x42».frame_reading_invariants.unit)
+Θ✝ : VerexIR.Proofs.Denote.Skolems «0x42».frame_reading_invariants.unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
+frame✝ :
+  VerexIR.Proofs.Denote.FrameOf «0x42».frame_reading_invariants.unit
+    { namespaceId := { index := 0 }, functionId := { index := 0 } } [VerexIR.BinderKind.typeArg] typeInstantiation✝
+account : VerexIR.Proofs.Denote.NTy.signer.carrier
+value : (VerexIR.Proofs.Denote.NTy.param 0).carrier
+snd✝ : VerexIR.Proofs.Denote.HList VerexIR.Proofs.Denote.NRow.nil
+initialState✝ : VerexIR.Proofs.Denote.Memory «0x42».frame_reading_invariants.unit
+assumed permitted : True
+verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory «0x42».frame_reading_invariants.unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp
+      (VerexIR.Proofs.Denote.ResultShape.finish «0x42».frame_reading_invariants.publish_echo.exitSite
+        «0x42».frame_reading_invariants.publish_echo.mutables «0x42».frame_reading_invariants.publish_echo.shape value)
+      (fun result final =>
+        (∀ (key : VerexIR.StorageKey),
+            ¬key = VerexIR.StorageKey.address account →
+              final
+                  {
+                    type :=
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+                          (VerexIR.Proofs.Denote.NTy.param 0)),
+                    arguments :=
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                          (VerexIR.Proofs.Denote.NTy.param 0))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  key =
+                initialState✝
+                  {
+                    type :=
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+                          (VerexIR.Proofs.Denote.NTy.param 0)),
+                    arguments :=
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                          (VerexIR.Proofs.Denote.NTy.param 0))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  key) ∧
+          (∀ (resource : VerexIR.Proofs.Denote.ResourceType),
+              ¬resource =
+                    {
+                      type :=
+                        VerexIR.Proofs.Denote.Skolems.resolve
+                          (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+                            (VerexIR.Proofs.Denote.NTy.param 0)),
+                      arguments :=
+                        VerexIR.Proofs.Denote.NRow.cons
+                          (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                            (VerexIR.Proofs.Denote.NTy.param 0))
+                          VerexIR.Proofs.Denote.NRow.nil } →
+                final resource = initialState✝ resource) ∧
+            initialState✝
+                {
+                  type :=
+                    VerexIR.Proofs.Denote.Skolems.resolve
+                      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+                        (VerexIR.Proofs.Denote.NTy.param 0)),
+                  arguments :=
+                    VerexIR.Proofs.Denote.NRow.cons
+                      (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                        (VerexIR.Proofs.Denote.NTy.param 0))
+                      VerexIR.Proofs.Denote.NRow.nil }
+                (VerexIR.StorageKey.address account) =
+              none)
+      (fun failure =>
+        VerexIR.Proofs.Obligation "VerexE2ETests/Check/Storage/FrameReadingInvariants.lean" 950 993
+          ((initialState✝
+                {
+                  type :=
+                    VerexIR.Proofs.Denote.Skolems.resolve
+                      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+                        (VerexIR.Proofs.Denote.NTy.param 0)),
+                  arguments :=
+                    VerexIR.Proofs.Denote.NRow.cons
+                      (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                        (VerexIR.Proofs.Denote.NTy.param 0))
+                      VerexIR.Proofs.Denote.NRow.nil }
+                (VerexIR.StorageKey.address account)).isSome =
+            true))
+      state
+⊢ VerexIR.Proofs.Denote.OwnAtArguments «0x42».frame_reading_invariants.unit
+    «0x42».frame_reading_invariants.functionCarriersBase
+    (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+    «0x42».frame_reading_invariants.dataOwn.case1
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+      VerexIR.Proofs.Denote.NRow.nil)
+    ((0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+          (VerexIR.Proofs.Denote.NTy.param 0)).plainEncode
+      (Θ✝.plainReframe ⋯ ⋯ ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())))
+VerexE2ETests/Check/Storage/FrameReadingInvariants.lean:28:7: error: verex verification failed: the automatic verification of `publish_echo` failed; provide a proof in the module:
+  verify publish_echo by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+`publish` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/Check/Storage/FrameReadingInvariants.lean:34:7: error: Tactic `apply` failed: could not unify the conclusion of the term
+  VerexIR.Proofs.Denote.OwnAtArguments «0x42».frame_reading_invariants.unit
+    «0x42».frame_reading_invariants.functionCarriersBase
+    (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+    «0x42».frame_reading_invariants.dataOwn.case0
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+      VerexIR.Proofs.Denote.NRow.nil)
+    (@VerexIR.Proofs.Denote.NTy.plainEncode
+      (@VerexIR.Proofs.Denote.Skolems.toCarriers «0x42».frame_reading_invariants.unit
+        «0x42».frame_reading_invariants.functionCarriersBase
+        (VerexIR.Proofs.Denote.Skolems.atArguments «0x42».frame_reading_invariants.unit
+          «0x42».frame_reading_invariants.functionCarriersBase
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil)
+          ⋯))
+      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+      (Θ✝.plainReframe ⋯ ⋯
+        ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, (VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())))
+with the goal
+  VerexIR.Proofs.Denote.OwnAtArguments «0x42».frame_reading_invariants.unit
+    «0x42».frame_reading_invariants.functionCarriersBase
+    (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+    «0x42».frame_reading_invariants.dataOwn.case0
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+      VerexIR.Proofs.Denote.NRow.nil)
+    (@VerexIR.Proofs.Denote.NTy.plainEncode
+      (@VerexIR.Proofs.Denote.Skolems.toCarriers «0x42».frame_reading_invariants.unit
+        «0x42».frame_reading_invariants.functionCarriers
+        (Θ✝.instance
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil) ⋯))
+      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+      (Θ✝.plainReframe ⋯ ⋯
+        ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, (VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())))
+
+Note: The full type of the term is
+  «0x42».frame_reading_invariants.dataOwn.case0
+      ⟨VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+          VerexIR.Proofs.Denote.NRow.nil,
+        ⋯⟩
+      (Θ✝.plainReframe ⋯ ⋯
+        ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, (VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())) →
+    VerexIR.Proofs.Denote.OwnAtArguments «0x42».frame_reading_invariants.unit
+      «0x42».frame_reading_invariants.functionCarriersBase
+      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+      «0x42».frame_reading_invariants.dataOwn.case0
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+        VerexIR.Proofs.Denote.NRow.nil)
+      ((0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰
+            (VerexIR.Proofs.Denote.NTy.param 0)).plainEncode
+        (Θ✝.plainReframe ⋯ ⋯
+          ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, (VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())))
+
+case holds
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit «0x42».frame_reading_invariants.unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ «0x42».frame_reading_invariants.unit = Except.ok executable✝
+verexInhabitants :
+  VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime «0x42».frame_reading_invariants.unit)
+Θ✝ : VerexIR.Proofs.Denote.Skolems «0x42».frame_reading_invariants.unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
+frame✝ :
+  VerexIR.Proofs.Denote.FrameOf «0x42».frame_reading_invariants.unit
+    { namespaceId := { index := 0 }, functionId := { index := 1 } } [VerexIR.BinderKind.typeArg] typeInstantiation✝
+account : VerexIR.Proofs.Denote.NTy.signer.carrier
+value : (VerexIR.Proofs.Denote.NTy.param 0).carrier
+snd✝ : VerexIR.Proofs.Denote.HList VerexIR.Proofs.Denote.NRow.nil
+initialState✝ : VerexIR.Proofs.Denote.Memory «0x42».frame_reading_invariants.unit
+assumed permitted : True
+verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory «0x42».frame_reading_invariants.unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp
+      (VerexIR.Proofs.Denote.ResultShape.finish «0x42».frame_reading_invariants.publish.exitSite
+        «0x42».frame_reading_invariants.publish.mutables «0x42».frame_reading_invariants.publish.shape value)
+      (fun result final =>
+        (∀ (key : VerexIR.StorageKey),
+            ¬key = VerexIR.StorageKey.address account →
+              final
+                  {
+                    type :=
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰
+                          (VerexIR.Proofs.Denote.NTy.param 0)),
+                    arguments :=
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                          (VerexIR.Proofs.Denote.NTy.param 0))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  key =
+                initialState✝
+                  {
+                    type :=
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰
+                          (VerexIR.Proofs.Denote.NTy.param 0)),
+                    arguments :=
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                          (VerexIR.Proofs.Denote.NTy.param 0))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  key) ∧
+          (∀ (resource : VerexIR.Proofs.Denote.ResourceType),
+              ¬resource =
+                    {
+                      type :=
+                        VerexIR.Proofs.Denote.Skolems.resolve
+                          (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰
+                            (VerexIR.Proofs.Denote.NTy.param 0)),
+                      arguments :=
+                        VerexIR.Proofs.Denote.NRow.cons
+                          (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                            (VerexIR.Proofs.Denote.NTy.param 0))
+                          VerexIR.Proofs.Denote.NRow.nil } →
+                final resource = initialState✝ resource) ∧
+            initialState✝
+                {
+                  type :=
+                    VerexIR.Proofs.Denote.Skolems.resolve
+                      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰
+                        (VerexIR.Proofs.Denote.NTy.param 0)),
+                  arguments :=
+                    VerexIR.Proofs.Denote.NRow.cons
+                      (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                        (VerexIR.Proofs.Denote.NTy.param 0))
+                      VerexIR.Proofs.Denote.NRow.nil }
+                (VerexIR.StorageKey.address account) =
+              none)
+      (fun failure =>
+        VerexIR.Proofs.Obligation "VerexE2ETests/Check/Storage/FrameReadingInvariants.lean" 1222 1265
+          ((initialState✝
+                {
+                  type :=
+                    VerexIR.Proofs.Denote.Skolems.resolve
+                      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰
+                        (VerexIR.Proofs.Denote.NTy.param 0)),
+                  arguments :=
+                    VerexIR.Proofs.Denote.NRow.cons
+                      (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
+                        (VerexIR.Proofs.Denote.NTy.param 0))
+                      VerexIR.Proofs.Denote.NRow.nil }
+                (VerexIR.StorageKey.address account)).isSome =
+            true))
+      state
+⊢ VerexIR.Proofs.Denote.OwnAtArguments «0x42».frame_reading_invariants.unit
+    «0x42».frame_reading_invariants.functionCarriersBase
+    (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
+    «0x42».frame_reading_invariants.dataOwn.case0
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+      VerexIR.Proofs.Denote.NRow.nil)
+    ((0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰
+          (VerexIR.Proofs.Denote.NTy.param 0)).plainEncode
+      (Θ✝.plainReframe ⋯ ⋯
+        ((VerexIR.Proofs.Denote.Carriers.lent 0).of value, (VerexIR.Proofs.Denote.Carriers.lent 0).of value, ())))
+VerexE2ETests/Check/Storage/FrameReadingInvariants.lean:34:7: error: verex verification failed: the automatic verification of `publish` failed; provide a proof in the module:
+  verify publish by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+`same` uses concrete verification: Given interpretation does not yet support storage interpretation
+VerexE2ETests/Check/Storage/FrameReadingInvariants.lean:48:4: error: the specification clause `ensures result` is not established
+VerexE2ETests/Check/Storage/FrameReadingInvariants.lean:46:7: error: verex verification failed: the automatic verification of `same` failed; provide a proof in the module:
+  verify same by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

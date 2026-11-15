@@ -104,6 +104,11 @@ pub enum AptosErrorCode {
     MempoolIsFull = 501,
     /// The transaction was dropped because the inbound transaction rate limit was exceeded.
     RateLimited = 502,
+    /// The node has not finished bootstrapping and has no ledger data to serve
+    ///
+    /// Distinct from an internal error: the node is healthy, it just has not
+    /// caught up far enough to answer yet.
+    NodeNotBootstrapped = 503,
 
     /// Internal server error
     InternalError = 600,

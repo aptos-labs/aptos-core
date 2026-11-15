@@ -25,8 +25,7 @@ use criterion::{
     criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, BenchmarkId,
     Criterion, Throughput,
 };
-use rand::{thread_rng, Rng};
-use rand_core::RngCore;
+use rand::{thread_rng, Rng, RngCore};
 use std::ops::Mul;
 
 /// FFT sizes for the benchmarks.

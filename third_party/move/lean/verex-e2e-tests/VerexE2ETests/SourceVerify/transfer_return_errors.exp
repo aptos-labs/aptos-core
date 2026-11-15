@@ -1,0 +1,16 @@
+VerexE2ETests/SourceVerify/transfer_return_errors.spec.lean:15:3: error: the specification clause `ensures a == 2` is not established
+VerexE2ETests/SourceVerify/transfer_return_errors.spec.lean:14:6: error: verex verification failed: the automatic verification of `return_between_false` failed; provide a proof in the module:
+  verify return_between_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/transfer_return_errors.spec.lean:18:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/transfer_return_errors.spec.lean:17:6: error: verex verification failed: the automatic verification of `return_between_vacuous` failed; provide a proof in the module:
+  verify return_between_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

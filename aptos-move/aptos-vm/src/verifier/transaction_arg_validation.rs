@@ -350,7 +350,8 @@ fn construct_public_copy_struct(
 
     // Load the struct definition — needed both for the copy check and to determine layout.
     let struct_idx = match expected_type {
-        Type::Struct { idx, .. } | Type::StructInstantiation { idx, .. } => *idx,
+        Type::Struct { idx, .. } => *idx,
+        Type::StructInstantiation(node) => node.idx(),
         _ => return Err(invalid_signature()),
     };
 
@@ -724,17 +725,14 @@ fn assemble_loaded_function(
         })?);
     }
 
-    let ty_args_id = loader
-        .runtime_environment()
-        .ty_pool()
-        .intern_ty_args(&ty_args);
-    let loaded = LoadedFunction {
-        owner: LoadedFunctionOwner::Module(module),
+    let loaded = LoadedFunction::new(
+        LoadedFunctionOwner::Module(module),
         ty_args,
-        ty_args_id,
         function,
-    };
-    Type::verify_ty_arg_abilities(loaded.function.ty_param_abilities(), &loaded.ty_args)
+        loader.runtime_environment().ty_pool(),
+    )
+    .map_err(|e| e.finish(module_loc.clone()))?;
+    Type::verify_ty_arg_abilities(loaded.function.ty_param_abilities(), loaded.ty_args())
         .map_err(|e| e.finish(module_loc))?;
     Ok(loaded)
 }

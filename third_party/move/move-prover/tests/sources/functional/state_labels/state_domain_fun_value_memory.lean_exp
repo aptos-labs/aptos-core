@@ -1,0 +1,100 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:24:9: error: the specification clause `ensures ∀ (S : StateDomain), !(S.. |~ aborts_of<_f>(_a))` is not established
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:21:5: error: verex verification failed: the automatic verification of `lift_false` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify lift_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:44:9: error: the specification clause `ensures ∃ (S : StateDomain), !(S.. |~ aborts_of<_f>(_a))` is not established
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:42:5: error: verex verification failed: the automatic verification of `exists_false` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify exists_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:51:9: error: the specification clause `ensures !aborts_of<_f>(_a)` is not established
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:48:5: error: verex verification failed: the automatic verification of `exists_req_false` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify exists_req_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:66:9: error: the specification clause `ensures ∀ (S : StateDomain),
+        ∀ (T : StateDomain),
+          (S.. |~ aborts_of<_f>(_a)) == (T.. |~ aborts_of<_f>(_a))` is not established
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:63:5: error: verex verification failed: the automatic verification of `nested_false` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify nested_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:76:9: error: the specification clause `ensures ∀ (S : StateDomain), !(S.. |~ aborts_of<_c.g>(_a))` is not established
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:74:5: error: verex verification failed: the automatic verification of `field_lift_false` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify field_lift_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:89:9: error: the specification clause `ensures ∀ (S : StateDomain), !(S.. |~ aborts_of<g>(_a))` is not established
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:86:5: error: verex verification failed: the automatic verification of `local_lift_false` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify local_lift_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:111:9: error: the specification clause `ensures never_aborts(_f, _a)` is not established
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:108:5: error: verex verification failed: the automatic verification of `spec_fun_lift_false` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify spec_fun_lift_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:129:9: error: the specification clause `ensures ∀ (S : StateDomain), S.. |~ result_of<_h>(_a)` is not established
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:126:5: error: verex verification failed: the automatic verification of `pre_lift_false` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify pre_lift_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:167:9: error: the specification clause `ensures ∀ (S : StateDomain), !(S.. |~ aborts_of<_k>(_x))` is not established
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:165:5: error: verex verification failed: the automatic verification of `nomem_lift_true` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify nomem_lift_true by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:172:9: error: the specification clause `ensures ∀ (S : StateDomain), !(S.. |~ aborts_of<_k>(_x))` is not established
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:171:5: error: verex verification failed: the automatic verification of `nomem_false` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify nomem_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:222:9: error: the specification clause `ensures ∀ (S : StateDomain), !(S.. |~ aborts_of<_m>(_x, _a))` is not established
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:219:5: error: verex verification failed: the automatic verification of `mixed_forall_false` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify mixed_forall_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:182:9: error: the data invariant `invariant ∀ (S : StateDomain; x : u64; y : u64),
+        (S.. |~ result_of<this.f>(x, y)) <= x` does not hold where a value is constructed
+tests/sources/functional/state_labels/state_domain_fun_value_memory.move:203:5: error: verex verification failed: the automatic verification of `pack_false` failed; provide a proof in `tests/sources/functional/state_labels/state_domain_fun_value_memory.proof.lean`:
+  verify pack_false by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -6,7 +6,7 @@ module 0xc0ffee::m {
     struct Resource {
         _0: u64,
     }
-    fun apply<T0>(p0: ||(vector<T0>)): vector<T0> {
+    fun apply<T0>(p0: ||vector<T0>): vector<T0> {
         p0()
     }
     public fun test10(): vector<u64> {

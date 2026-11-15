@@ -1,0 +1,8 @@
+VerexE2ETests/SourceVerify/partial_move_tag_errors.spec.lean:5:3: error: the specification clause `ensures (result is Some) == (value is Err)` is not established
+VerexE2ETests/SourceVerify/partial_move_tag_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `take` failed; provide a proof in the module:
+  verify take by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

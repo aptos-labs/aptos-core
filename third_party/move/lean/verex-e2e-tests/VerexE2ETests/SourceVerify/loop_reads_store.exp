@@ -1,0 +1,8 @@
+VerexE2ETests/SourceVerify/loop_reads_store.move:37:9: error: the specification clause `ensures global<Link>(start) == old(global<Link>(start))` is not established
+VerexE2ETests/SourceVerify/loop_reads_store.move:35:5: error: verex verification failed: the automatic verification of `rewrite` failed; provide a proof in `VerexE2ETests/SourceVerify/loop_reads_store.proof.lean`:
+  verify rewrite by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

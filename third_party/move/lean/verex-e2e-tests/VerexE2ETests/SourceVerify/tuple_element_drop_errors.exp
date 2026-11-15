@@ -1,0 +1,24 @@
+VerexE2ETests/SourceVerify/tuple_element_drop_errors.spec.lean:8:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/tuple_element_drop_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `tuple_element_drop_false` failed; provide a proof in the module:
+  verify tuple_element_drop_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_element_drop_errors.spec.lean:11:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/tuple_element_drop_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `tuple_element_drop_vacuous` failed; provide a proof in the module:
+  verify tuple_element_drop_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/tuple_element_drop_errors.spec.lean:17:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/tuple_element_drop_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `vec_in_tuple_drop_false` failed; provide a proof in the module:
+  verify vec_in_tuple_drop_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

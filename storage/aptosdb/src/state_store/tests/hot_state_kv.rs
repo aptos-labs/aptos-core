@@ -812,7 +812,6 @@ fn test_load_write_then_load_roundtrip() {
 
     let hot_state_updates = HotStateUpdates {
         for_last_checkpoint: Some(shards),
-        for_latest: None,
     };
 
     let mut sharded_batches = hot_state_kv_db.new_sharded_native_batches();
@@ -1101,7 +1100,6 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
 
     let hot_state_updates = HotStateUpdates {
         for_last_checkpoint: Some(shards),
-        for_latest: None,
     };
 
     let mut sharded_batches = hot_state_kv_db.new_sharded_native_batches();
@@ -1226,7 +1224,6 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
         });
     let updates1 = HotStateUpdates {
         for_last_checkpoint: Some(shards),
-        for_latest: None,
     };
     let mut batches = hot_state_kv_db.new_sharded_native_batches();
     StateStore::put_hot_state_updates(&updates1, &mut batches).unwrap();
@@ -1244,7 +1241,6 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
         });
     let updates2 = HotStateUpdates {
         for_last_checkpoint: Some(shards2),
-        for_latest: None,
     };
     let mut batches2 = hot_state_kv_db.new_sharded_native_batches();
     StateStore::put_hot_state_updates(&updates2, &mut batches2).unwrap();

@@ -6,22 +6,24 @@ use crate::{
     event_store::EventStore,
     ledger_db::LedgerDb,
     metrics::{API_LATENCY_SECONDS, CONCURRENCY_GAUGE},
+    native_store::bundle::NativeStoreConfigs,
     pruner::{LedgerPrunerManager, PrunerManager},
     rocksdb_property_reporter::RocksdbPropertyReporter,
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
-    state_store::{StatePruner, StateStore},
-    trading_native::ENABLE_TRADING_NATIVE,
+    state_store::{StatePruner, StateStore, StateStoreMode},
     transaction_store::TransactionStore,
 };
 #[cfg(any(test, feature = "db-debugger"))]
 use crate::{
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    utils::truncation_helper::get_current_version_in_state_merkle_db,
+    utils::truncation_helper::{
+        find_tree_root_at_or_before, get_current_version_in_state_merkle_db,
+        get_state_kv_commit_progress,
+    },
 };
 use aptos_config::config::{
-    HotStateConfig, PrunerConfig, RocksdbConfigs, StateMerklePrunerConfig, StorageDirPaths,
-    NO_OP_STORAGE_PRUNER_CONFIG,
+    HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_logger::prelude::*;
@@ -54,8 +56,7 @@ impl AptosDB {
         state_kv_db: StateKvDb,
         pruner_config: PrunerConfig,
         buffered_state_target_items: usize,
-        hack_for_tests: bool,
-        empty_buffered_state_for_restore: bool,
+        state_store_mode: StateStoreMode,
         internal_indexer_db: Option<InternalIndexerDB>,
         hot_state_config: HotStateConfig,
     ) -> Self {
@@ -80,8 +81,7 @@ impl AptosDB {
                 .state_kv_db(Arc::clone(&state_kv_db))
                 .state_pruner(state_pruner)
                 .buffered_state_target_items(buffered_state_target_items)
-                .hack_for_tests(hack_for_tests)
-                .empty_buffered_state_for_restore(empty_buffered_state_for_restore)
+                .mode(state_store_mode)
                 .skip_usage(true)
                 .maybe_internal_indexer_db(internal_indexer_db.clone())
                 .hot_state_config(hot_state_config)
@@ -114,6 +114,8 @@ impl AptosDB {
             commit_lock: std::sync::Mutex::new(()),
             update_subscriber: None,
             position: None,
+            order: None,
+            collateral: None,
         }
     }
 
@@ -124,10 +126,11 @@ impl AptosDB {
         rocksdb_configs: RocksdbConfigs,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
-        empty_buffered_state_for_restore: bool,
+        for_restore: bool,
         internal_indexer_db: Option<InternalIndexerDB>,
         hot_state_config: HotStateConfig,
     ) -> Result<Self> {
+        let enable_trading_native = rocksdb_configs.enable_trading_native;
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
             "Do not set prune_window when opening readonly.",
@@ -162,13 +165,23 @@ impl AptosDB {
             hot_state_kv_db.write_pruner_progress(synced_version)?;
         }
 
-        // Capture before `pruner_config` is moved; the position pruners
+        // Capture before `pruner_config` is moved; the native stores' pruners
         // reuse the same windows as main state's value/merkle pruners.
-        let position_value_pruner_config = pruner_config.ledger_pruner_config;
-        let position_state_merkle_pruner_config = pruner_config.state_merkle_pruner_config;
-        let position_epoch_snapshot_pruner_config: StateMerklePrunerConfig =
-            pruner_config.epoch_snapshot_pruner_config.into();
+        let native_store_configs = NativeStoreConfigs {
+            kv_config: rocksdb_configs.state_kv_db_config,
+            merkle_config: rocksdb_configs.state_merkle_db_config,
+            value_pruner_config: pruner_config.ledger_pruner_config,
+            state_merkle_pruner_config: pruner_config.state_merkle_pruner_config,
+            epoch_snapshot_pruner_config: pruner_config.epoch_snapshot_pruner_config.into(),
+        };
 
+        let state_store_mode = if for_restore {
+            StateStoreMode::Restore
+        } else if readonly {
+            StateStoreMode::ReadOnly
+        } else {
+            StateStoreMode::ReadWrite
+        };
         let mut myself = Self::new_with_dbs(
             ledger_db,
             hot_state_merkle_db,
@@ -177,23 +190,35 @@ impl AptosDB {
             state_kv_db,
             pruner_config,
             buffered_state_target_items,
-            readonly,
-            empty_buffered_state_for_restore,
+            state_store_mode,
             internal_indexer_db,
             hot_state_config,
         );
 
-        if ENABLE_TRADING_NATIVE {
+        if enable_trading_native {
             myself.init_native_position(
                 db_paths,
-                rocksdb_configs.state_kv_db_config,
-                rocksdb_configs.state_merkle_db_config,
-                position_value_pruner_config,
-                position_state_merkle_pruner_config,
-                position_epoch_snapshot_pruner_config,
+                &native_store_configs,
                 &env,
                 &block_cache,
                 readonly,
+                for_restore,
+            )?;
+            myself.init_native_order(
+                db_paths,
+                &native_store_configs,
+                &env,
+                &block_cache,
+                readonly,
+                for_restore,
+            )?;
+            myself.init_native_collateral(
+                db_paths,
+                &native_store_configs,
+                &env,
+                &block_cache,
+                readonly,
+                for_restore,
             )?;
         }
 
@@ -213,7 +238,8 @@ impl AptosDB {
                     .hot_state_kv_pruner
                     .maybe_set_pruner_target_db_version(version);
             }
-            if let Some(version) = myself.get_latest_state_checkpoint_version()? {
+            // A restore loads no state checkpoint until it finishes.
+            if !for_restore && let Some(version) = myself.get_latest_state_checkpoint_version()? {
                 myself
                     .state_store
                     .state_pruner
@@ -236,32 +262,18 @@ impl AptosDB {
                     .maybe_set_pruner_target_db_version(version);
             }
 
-            // Activate the native-position pruners; otherwise their
-            // workers idle at persisted progress until the next position
-            // commit, even when committed versions are already ahead.
+            // Activate the native stores' pruners; otherwise their workers
+            // idle at persisted progress until the next commit, even when
+            // committed versions are already ahead.
             let synced_version = myself.get_synced_version()?;
-            if let Some(bundle) = myself.position.as_ref()
-                && let Some(position_pruner) = bundle.position_pruner.as_ref()
-            {
-                if let Some(version) = synced_version {
-                    position_pruner
-                        .value_pruner
-                        .maybe_set_pruner_target_db_version(version);
-                }
-                // Drive the merkle pruners to the persisted base version
-                // (set after init's seed + replay).
-                if let Some(version) = bundle
-                    .persisted
-                    .as_ref()
-                    .and_then(|persisted| persisted.get().version())
-                {
-                    position_pruner
-                        .state_merkle_pruner
-                        .maybe_set_pruner_target_db_version(version);
-                    position_pruner
-                        .epoch_snapshot_pruner
-                        .maybe_set_pruner_target_db_version(version);
-                }
+            if let Some(bundle) = myself.position.as_ref() {
+                bundle.store.activate_pruners(synced_version);
+            }
+            if let Some(order) = myself.order.as_ref() {
+                order.store.activate_pruners(synced_version);
+            }
+            if let Some(collateral) = myself.collateral.as_ref() {
+                collateral.store.activate_pruners(synced_version);
             }
         }
 
@@ -296,14 +308,17 @@ impl AptosDB {
     /// Opens the raw sub-databases, sets the overall commit progress to
     /// `target_version`, truncates all sub-databases to be consistent, and
     /// catches up the state merkle DB by replaying write sets if needed.
+    ///
+    /// Hot state is truncated as well. If its history starts after `target_version`, e.g. it was
+    /// deleted on a later restart, truncating it would remove all of it, so we delete it and let
+    /// the catch-up rebuild it. The regular truncation can't do this since it needs a hot root at
+    /// or before `target_version`.
     #[cfg(any(test, feature = "db-debugger"))]
     pub(crate) fn truncate_to_version(
         db_dir: &StorageDirPaths,
         target_version: Version,
     ) -> Result<()> {
-        // TODO(HotState): Preserve hot state during truncation and pass its config to catch-up.
-        let delete_hot_state_on_restart = true;
-        let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) =
+        let open_dbs = |hot_state_config| {
             Self::open_dbs(
                 db_dir,
                 RocksdbConfigs::default(),
@@ -311,11 +326,30 @@ impl AptosDB {
                 None,  // block_cache
                 false, // readonly
                 0,     // max_num_nodes_per_lru_cache_shard
-                HotStateConfig {
-                    delete_on_restart: delete_hot_state_on_restart,
-                    ..HotStateConfig::default()
-                },
-            )?;
+                hot_state_config,
+            )
+        };
+        let mut hot_state_config = HotStateConfig {
+            delete_on_restart: false,
+            ..HotStateConfig::default()
+        };
+        let mut dbs = open_dbs(hot_state_config)?;
+        let (ledger_db, hot_state_merkle_db, _, hot_state_kv_db, _) = &dbs;
+        if !Self::hot_state_covers_version(
+            ledger_db,
+            hot_state_merkle_db,
+            hot_state_kv_db,
+            target_version,
+        )? {
+            warn!(
+                target_version = target_version,
+                "Hot state history starts at or after the target version, deleting it."
+            );
+            drop(dbs);
+            hot_state_config.delete_on_restart = true;
+            dbs = open_dbs(hot_state_config)?;
+        }
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) = dbs;
 
         let ledger_db = Arc::new(ledger_db);
         let hot_state_merkle_db = Arc::new(hot_state_merkle_db);
@@ -337,24 +371,43 @@ impl AptosDB {
             Arc::clone(&hot_state_kv_db),
             Arc::clone(&hot_state_merkle_db),
             /*crash_if_difference_is_too_large=*/ false,
-            delete_hot_state_on_restart,
+            hot_state_config.delete_on_restart,
         );
 
-        if let Some(state_merkle_db_version) =
-            get_current_version_in_state_merkle_db(&state_merkle_db)?
-        {
-            if state_merkle_db_version < target_version {
-                StateStore::catch_up_state_merkle_db(
-                    ledger_db,
-                    hot_state_merkle_db,
-                    state_merkle_db,
-                    hot_state_kv_db,
-                    state_kv_db,
-                )?;
-            }
+        // Runs even if the state merkle DB is at `target_version`, to rebuild deleted hot state.
+        if get_current_version_in_state_merkle_db(&state_merkle_db)?.is_some() {
+            StateStore::catch_up_state_merkle_db(
+                ledger_db,
+                hot_state_merkle_db,
+                state_merkle_db,
+                hot_state_kv_db,
+                state_kv_db,
+                hot_state_config,
+            )?;
         }
 
         Ok(())
+    }
+
+    /// Whether hot state has what the regular truncation in `sync_commit_progress` needs: a hot
+    /// root at or before `target_version`, and KV commit progress at or after it.
+    #[cfg(any(test, feature = "db-debugger"))]
+    fn hot_state_covers_version(
+        ledger_db: &LedgerDb,
+        hot_state_merkle_db: &StateMerkleDb,
+        hot_state_kv_db: &StateKvDb,
+        target_version: Version,
+    ) -> Result<bool> {
+        let kv_commit_progress = get_state_kv_commit_progress(hot_state_kv_db)?;
+        let merkle_root_version = find_tree_root_at_or_before(
+            ledger_db.metadata_db(),
+            hot_state_merkle_db,
+            target_version,
+        )?;
+        Ok(
+            kv_commit_progress.is_some_and(|v| v >= target_version)
+                && merkle_root_version.is_some(),
+        )
     }
 
     pub(super) fn error_if_ledger_pruned(&self, data_type: &str, version: Version) -> Result<()> {
@@ -471,42 +524,6 @@ impl AptosDB {
             min_readable_version
         );
         Ok(())
-    }
-
-    /// Mirrors [`Self::error_if_state_merkle_pruned`] for the native-position
-    /// snapshot store. When the subsystem or its pruner isn't attached (disabled
-    /// / read-only), there's nothing to enforce here.
-    pub(super) fn error_if_position_pruned(&self, data_type: &str, version: Version) -> Result<()> {
-        let Some(position_pruner) = self
-            .position
-            .as_ref()
-            .and_then(|position| position.position_pruner.as_ref())
-        else {
-            return Ok(());
-        };
-
-        let min_readable_version = position_pruner
-            .state_merkle_pruner
-            .get_min_readable_version();
-        if version >= min_readable_version {
-            return Ok(());
-        }
-
-        let min_readable_epoch_snapshot_version = position_pruner
-            .epoch_snapshot_pruner
-            .get_min_readable_version();
-        if version >= min_readable_epoch_snapshot_version {
-            self.ledger_db.metadata_db().ensure_epoch_ending(version)
-        } else {
-            bail!(
-                "{} at version {} is pruned. position snapshots are available at >= {}, \
-                 position epoch snapshots are available at >= {}",
-                data_type,
-                version,
-                min_readable_version,
-                min_readable_epoch_snapshot_version,
-            )
-        }
     }
 
     pub(super) fn get_raw_block_info_by_height(&self, block_height: u64) -> Result<BlockInfo> {

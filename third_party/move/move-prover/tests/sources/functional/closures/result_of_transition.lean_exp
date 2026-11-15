@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/result_of_transition.move:1:1: error: VIR-SEMANTIC-TYPE: in fun caller2_tied: behavior predicate arguments differ from the callable type; expected 3 value operand(s), got 3 at [4603, 4628)
+VIR-SEMANTIC-TYPE: in fun caller_tied: behavior predicate arguments differ from the callable type; expected 3 value operand(s), got 3 at [4157, 4182)
+VIR-SEMANTIC-TYPE: in fun no_call: behavior predicate arguments differ from the callable type; expected 3 value operand(s), got 3 at [4984, 5009)
+VIR-SEMANTIC-TYPE: in fun with_call: behavior predicate arguments differ from the callable type; expected 3 value operand(s), got 3 at [5260, 5285)

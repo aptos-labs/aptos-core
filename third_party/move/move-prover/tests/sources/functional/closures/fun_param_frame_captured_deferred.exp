@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/fun_param_frame_captured_deferred.move:37:9
+   │
+37 │         ensures global<R2>(@0x42) == old(global<R2>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/fun_param_frame_captured_deferred.move:31: client
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_captured_deferred.move:32: client
+   =     at tests/sources/functional/closures/fun_param_frame_captured_deferred.move:33: client
+   =     at tests/sources/functional/closures/fun_param_frame_captured_deferred.move:37: client (spec)

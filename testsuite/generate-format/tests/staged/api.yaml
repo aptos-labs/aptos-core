@@ -335,6 +335,15 @@ CoinStoreResource:
         TYPENAME: EventHandle
     - withdraw_events:
         TYPENAME: EventHandle
+CollateralScope:
+  ENUM:
+    0:
+      Cross: UNIT
+    1:
+      Isolated:
+        STRUCT:
+          - market:
+              TYPENAME: AccountAddress
 ContractEvent:
   ENUM:
     0:
@@ -536,6 +545,22 @@ Extension:
   ENUM:
     0:
       NativePosition:
+        NEWTYPE:
+          MAP:
+            KEY:
+              TYPENAME: StateKey
+            VALUE:
+              TYPENAME: WriteOp
+    1:
+      NativeOrder:
+        NEWTYPE:
+          MAP:
+            KEY:
+              TYPENAME: StateKey
+            VALUE:
+              TYPENAME: WriteOp
+    2:
+      NativeCollateral:
         NEWTYPE:
           MAP:
             KEY:
@@ -869,6 +894,32 @@ TradingNativeKey:
               TYPENAME: AccountAddress
           - market:
               TYPENAME: AccountAddress
+    1:
+      Order:
+        STRUCT:
+          - exchange:
+              TYPENAME: AccountAddress
+          - market:
+              TYPENAME: AccountAddress
+          - order_id: U128
+    2:
+      BulkOrder:
+        STRUCT:
+          - exchange:
+              TYPENAME: AccountAddress
+          - market:
+              TYPENAME: AccountAddress
+          - account:
+              TYPENAME: AccountAddress
+    3:
+      Collateral:
+        STRUCT:
+          - exchange:
+              TYPENAME: AccountAddress
+          - account:
+              TYPENAME: AccountAddress
+          - scope:
+              TYPENAME: CollateralScope
 Transaction:
   ENUM:
     0:
@@ -1098,10 +1149,10 @@ TransactionInfoV1:
     - position_state_checkpoint_hash:
         OPTION:
           TYPENAME: HashValue
-    - placeholder1:
+    - order_state_checkpoint_hash:
         OPTION:
           TYPENAME: HashValue
-    - placeholder2:
+    - collateral_state_checkpoint_hash:
         OPTION:
           TYPENAME: HashValue
     - placeholder3:

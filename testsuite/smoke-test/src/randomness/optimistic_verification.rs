@@ -9,7 +9,10 @@ use crate::{
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;
 use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 /// Combined test for optimistic share verification covering:
 /// 1. Happy path: all shares valid, randomness produced normally
@@ -56,9 +59,9 @@ async fn optimistic_verification() {
     info!("Verify randomness correctness for 10 versions.");
     for _ in 0..10 {
         let v = get_current_version(rest_client).await;
-        assert!(verify_randomness(&decrypt_key_map, rest_client, v)
+        verify_randomness(&decrypt_key_map, rest_client, v)
             .await
-            .is_ok());
+            .expect("Randomness should be correct");
     }
 
     // --- Phase 2: Corrupt share, sufficient valid shares ---
@@ -76,13 +79,17 @@ async fn optimistic_verification() {
     info!("Verify randomness still works with 3 valid shares.");
     for _ in 0..10 {
         let v = get_current_version(rest_client).await;
-        assert!(
-            verify_randomness(&decrypt_key_map, rest_client, v)
-                .await
-                .is_ok(),
-            "Randomness should survive corrupt shares via fallback"
-        );
+        verify_randomness(&decrypt_key_map, rest_client, v)
+            .await
+            .expect("Randomness should survive corrupt shares via fallback");
     }
+    swarm
+        .validators()
+        .next()
+        .unwrap()
+        .health_check()
+        .await
+        .expect("Validator 0 should survive its own corrupt share");
 
     // --- Phase 3: Stall — stop validator 3, only 2 valid shares remain ---
     info!("Stop validator 3.");
@@ -106,21 +113,22 @@ async fn optimistic_verification() {
     info!("Start validator 3.");
     swarm.validators_mut().nth(3).unwrap().start().unwrap();
 
-    tokio::time::sleep(Duration::from_secs(15)).await;
+    info!("Wait for chain to resume.");
+    // Rejoining takes a restarted validator a while (peer dialing backoff, DKG setup).
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while get_current_version(rest_client).await <= version_after {
+        assert!(
+            Instant::now() < deadline,
+            "Chain should resume after starting validator 3"
+        );
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 
-    info!("Verify chain resumed and randomness works via unhappy path.");
-    let version_after_recovery = get_current_version(rest_client).await;
-    assert!(
-        version_after_recovery > version_after,
-        "Chain should resume after starting validator 3"
-    );
+    info!("Verify randomness works via unhappy path.");
     for _ in 0..10 {
         let v = get_current_version(rest_client).await;
-        assert!(
-            verify_randomness(&decrypt_key_map, rest_client, v)
-                .await
-                .is_ok(),
-            "Randomness should work via unhappy path with 3 valid shares"
-        );
+        verify_randomness(&decrypt_key_map, rest_client, v)
+            .await
+            .expect("Randomness should work via unhappy path with 3 valid shares");
     }
 }

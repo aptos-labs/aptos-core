@@ -14,6 +14,7 @@
 //! It's used to compress mostly indexes into the main binary tables.
 use crate::file_format::Bytecode;
 use anyhow::{bail, Result};
+pub use move_core_types::value::{bcs_size_of_byte_array, size_u32_as_uleb128};
 use move_core_types::{int256, value};
 use std::{
     io::{Cursor, Read},
@@ -434,20 +435,6 @@ pub fn write_u64_as_uleb128(binary: &mut BinaryData, mut val: u64) -> Result<()>
         }
     }
     Ok(())
-}
-
-pub fn size_u32_as_uleb128(mut value: usize) -> usize {
-    let mut len = 1;
-    while value >= 0x80 {
-        // 7 (lowest) bits of data get written in a single byte.
-        len += 1;
-        value >>= 7;
-    }
-    len
-}
-
-pub fn bcs_size_of_byte_array(length: usize) -> usize {
-    size_u32_as_uleb128(length) + length
 }
 
 /// Write a `u16` in Little Endian format.

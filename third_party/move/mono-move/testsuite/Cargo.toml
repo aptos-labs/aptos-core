@@ -30,17 +30,15 @@ mono-move-loader = { workspace = true }
 mono-move-natives = { workspace = true, features = ["testing"] }
 mono-move-output = { workspace = true }
 mono-move-runtime = { workspace = true }
+mono-move-unit-test-backend = { workspace = true, features = ["testing"] }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true }
-move-bytecode-verifier = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
-move-package = { workspace = true }
 move-prover-test-utils = { workspace = true }
 move-transactional-test-runner = { workspace = true }
-move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
@@ -55,7 +53,9 @@ aptos-vm = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
 datatest-stable = { workspace = true }
 libtest-mimic = { workspace = true }
+move-package = { workspace = true }
 move-transactional-test-matrix = { workspace = true }
+move-unit-test = { workspace = true }
 walkdir = { workspace = true }
 
 [[test]]
@@ -88,4 +88,8 @@ harness = false
 
 [[bench]]
 name = "int_arith_loop"
+harness = false
+
+[[bench]]
+name = "calls"
 harness = false

@@ -10,7 +10,7 @@ use super::{
     metadata::TxnMetadata,
     pre_execution_checks::PreExecutionChecker,
     script::run_script,
-    validation::{run_epilogue, run_prologue, ValidationSigners},
+    validation::{run_epilogue, run_metered_prologue, run_prologue, ValidationSigners},
 };
 use crate::{
     errors::{call_result, DiscardReason, ExecutionStage, ExecutionStatus, MoveExecutionFailure},
@@ -182,17 +182,43 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 failure,
             }
         })?;
-        // A failed payload rolls back to here, so prologue effects (e.g. nonce insertion) survive.
+
+        // ======================== Metered prologue ==========================
+        // State setup that costs real gas (today: creating the sender's
+        // account on its first transaction). Runs after the fee payer is
+        // validated and before the checkpoint, so it is paid for and survives
+        // a failed payload. A failure here discards, as in AptosVM: the
+        // epilogue needs the account to bump the sequence number.
+        //
+        // TODO(metering): eagarly charge a created slot's storage fee here,
+        // so the payload cannot spend that part of the budget.
+        //
+        // TODO(correctness): right now the metered prologue only does account
+        // creation, so the transaction is discarded when there is an error.
+        //
+        // When additional checks or setup get added, we should make it so that
+        // 1. Account creation is the first thing done in the metered prologue
+        // 2. The transaction is discard only if account creation fails (as we
+        //    don't have a sequence number to increment)
+        // 3. Other errors, after account creation, should result in gas being
+        //    charged and the transaction being committed.
+        self.run_metered(interp, |interp| {
+            run_metered_prologue(interp, self.symbols, &signers, txn_data)
+        })
+        .map_err(|failure| DiscardReason::Failure {
+            stage: ExecutionStage::MeteredPrologue,
+            failure,
+        })?;
+        // A failed payload rolls back to here, so the effects of both prologue
+        // halves (e.g. nonce insertion, the created account) survive.
         checkpoint(interp)?;
 
         // ========================== User payload ============================
         // An unmetered payload leaves the balance untouched, making the
         // epilogue charge nothing.
-        let payload_result = if self.unmetered {
-            interp.unmetered(|interp| self.execute_payload(interp, txn_data, &executable, ty_args))
-        } else {
+        let payload_result = self.run_metered(interp, |interp| {
             self.execute_payload(interp, txn_data, &executable, ty_args)
-        };
+        });
         let gas_remaining = interp.gas_balance();
         let gas_used = max_gas.saturating_sub(gas_remaining);
 
@@ -214,6 +240,9 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         // ============================ Epilogue ==============================
         // Transaction cleanup -- charge gas, bump sequence number etc.
+        //
+        // TODO(correctness): remove the redundant account creation logic in the
+        // epilogue once the metered prologue ensures its existence.
         let fee_statement = placeholder_fee_statement(gas_used);
         let epilogue = |interp: &mut InterpreterContext<'guard>| {
             run_epilogue(
@@ -295,6 +324,20 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         };
 
         call_result(status)
+    }
+
+    /// Runs `f` metered against the transaction's budget, or unmetered if the
+    /// executor was built `without_metering`.
+    fn run_metered<R>(
+        &self,
+        interp: &mut InterpreterContext<'guard>,
+        f: impl FnOnce(&mut InterpreterContext<'guard>) -> R,
+    ) -> R {
+        if self.unmetered {
+            interp.unmetered(f)
+        } else {
+            f(interp)
+        }
     }
 }
 

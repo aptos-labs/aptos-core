@@ -32,7 +32,7 @@ fun entry(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call outer<u64>, [r0] @1
+    0: [x0] := call_exempt outer<u64>, [r0] @1
     1: ret [x0] @2
 }
 
@@ -49,7 +49,7 @@ fun middle(r0): _0 {
     r0: _0
   code:
   L0:
-    0: [x0] := call innermost<_0>, [r0] @1
+    0: [x0] := call_exempt innermost<_0>, [r0] @1
     1: ret [x0] @2
 }
 
@@ -58,7 +58,7 @@ fun outer(r0): _0 {
     r0: _0
   code:
   L0:
-    0: [x0] := call middle<_0>, [r0] @1
+    0: [x0] := call_exempt middle<_0>, [r0] @1
     1: ret [x0] @2
 }
 === micro-ops ===
@@ -69,7 +69,7 @@ fun entry() {
   entry_gas: 90
   code:
     0: Move8 [32] <- [0] @1
-    1: CallIndirect 0x1::test::outer<u64> @1
+    1: CallByNameExempt 0x1::test::outer<u64> @1
     2: Move8 [0] <- [32] @2
     3: Return @2
 }

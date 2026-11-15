@@ -1,0 +1,1 @@
+tests/sources/functional/old_param_ok.move:1:1: info: `split` uses concrete verification: Given interpretation does not yet support calls to callees without a contract

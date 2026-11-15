@@ -2726,7 +2726,7 @@
           "General"
         ],
         "summary": "Check basic node health",
-        "description": "By default this endpoint just checks that it can get the latest ledger\ninfo and then returns 200.\n\nIf the duration_secs param is provided, this endpoint will return a\n200 if the following condition is true:\n\n`server_latest_ledger_info_timestamp >= server_current_time_timestamp - duration_secs`",
+        "description": "Without `duration_secs`, this endpoint returns 200 as long as the node\nis running. It is a liveness check, so a node that is still\nbootstrapping (and therefore has no ledger data yet) still passes: it\nis alive and must not be restarted.\n\nWith `duration_secs`, it returns 200 only if\n\n`server_latest_ledger_info_timestamp >= server_current_time_timestamp - duration_secs`\n\nwhich makes it a readiness check instead: a node that has not caught\nup, or has not bootstrapped at all, fails it.",
         "parameters": [
           {
             "name": "duration_secs",
@@ -17303,6 +17303,7 @@
           "health_check_failed",
           "mempool_is_full",
           "rate_limited",
+          "node_not_bootstrapped",
           "internal_error",
           "web_framework_error",
           "bcs_not_supported",

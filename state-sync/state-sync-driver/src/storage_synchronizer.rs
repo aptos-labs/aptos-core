@@ -436,7 +436,7 @@ impl<
     fn acknowledge_storage_data_error(&self) {
         if self
             .pending_data_errors
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |count| {
                 count.checked_sub(1)
             })
             .is_err()
@@ -1005,6 +1005,8 @@ async fn apply_snapshot_chunk<MetadataStorage: MetadataStorageInterface + Clone>
     let operation = match kind {
         SnapshotKind::MAIN_STATE => StorageSynchronizerOperations::SyncedStates,
         SnapshotKind::POSITION => StorageSynchronizerOperations::SyncedPositionStates,
+        SnapshotKind::ORDER => StorageSynchronizerOperations::SyncedOrderStates,
+        SnapshotKind::COLLATERAL => StorageSynchronizerOperations::SyncedCollateralStates,
         SnapshotKind::HOT_STATE => StorageSynchronizerOperations::SyncedHotStates,
     };
     let noun = kind.label();
@@ -1107,6 +1109,8 @@ fn spawn_snapshot_receiver<
     let timer_label = match kind {
         SnapshotKind::MAIN_STATE => metrics::STORAGE_SYNCHRONIZER_STATE_VALUE_CHUNK,
         SnapshotKind::POSITION => metrics::STORAGE_SYNCHRONIZER_POSITION_STATE_VALUE_CHUNK,
+        SnapshotKind::ORDER => metrics::STORAGE_SYNCHRONIZER_ORDER_STATE_VALUE_CHUNK,
+        SnapshotKind::COLLATERAL => metrics::STORAGE_SYNCHRONIZER_COLLATERAL_STATE_VALUE_CHUNK,
         SnapshotKind::HOT_STATE => metrics::STORAGE_SYNCHRONIZER_HOT_STATE_VALUE_CHUNK,
     };
     let receiver = async move {

@@ -1,0 +1,14 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ ../move-stdlib/sources/option.move:13:9
+   │
+13 │         invariant len(vec) <= 1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/wp_join_label_cycle.move:18: apply
+   =         st = <redacted>
+   =         f = <redacted>
+   =     at tests/sources/regression/wp_join_label_cycle.move:19: apply
+   =         result = <redacted>
+   =         st = <redacted>
+   =     at ../move-stdlib/sources/option.move:13

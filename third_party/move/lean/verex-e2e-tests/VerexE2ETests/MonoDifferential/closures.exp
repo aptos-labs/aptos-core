@@ -1,0 +1,61 @@
+step 0: 0x4c::closures::leading(3, 4)
+  mono:       returned 7
+  VIR:        returned 7
+  round trip: returned 7
+
+step 1: 0x4c::closures::trailing(10, 4)
+  mono:       returned 6
+  VIR:        returned 6
+  round trip: returned 6
+
+step 2: 0x4c::closures::generic(true, 1, 2)
+  mono:       returned 1
+  VIR:        returned 1
+  round trip: returned 1
+
+step 3: 0x4c::closures::generic(false, 1, 2)
+  mono:       returned 2
+  VIR:        returned 2
+  round trip: returned 2
+
+step 4: 0x4c::closures::returned(5, 6)
+  mono:       returned 11
+  VIR:        returned 11
+  round trip: returned 11
+
+step 5: 0x4c::closures::field(7, 8)
+  mono:       returned 15
+  VIR:        returned 15
+  round trip: returned 15
+
+step 6: 0x4c::closures::higher_order(2, 9)
+  mono:       returned 7
+  VIR:        returned 7
+  round trip: returned 7
+
+step 7: 0x4c::closures::checked(10, 3)
+  mono:       returned 3
+  VIR:        returned 3
+  round trip: returned 3
+
+step 8: 0x4c::closures::checked(10, 30)
+  mono:       aborted 7
+  VIR:        aborted 7
+  round trip: aborted 7
+
+step 9: 0x4c::closures::mutated(1, 5)
+  mono:       returned 11
+  VIR:        returned 11
+  round trip: returned 11
+
+step 10: 0x4c::closures::same(4, 4)
+  mono:       error (adapter run failure: equality is not supported for this operand type)
+  VIR:        returned true
+  round trip: returned true
+  ERROR: mono and VIR diverge
+
+step 11: 0x4c::closures::same(4, 5)
+  mono:       error (adapter run failure: equality is not supported for this operand type)
+  VIR:        returned false
+  round trip: returned false
+  ERROR: mono and VIR diverge

@@ -1,0 +1,10 @@
+`map` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+`apply_both` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/Check/Closures/GenericHofs.lean:53:4: error: the specification clause `ensures result == x * 2` is not established
+VerexE2ETests/Check/Closures/GenericHofs.lean:52:7: error: verex verification failed: the automatic verification of `map_triple_incorrect` failed; provide a proof in the module:
+  verify map_triple_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

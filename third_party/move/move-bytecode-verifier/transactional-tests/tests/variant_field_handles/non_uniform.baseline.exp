@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-14:  publish [// The field must be declared with the same type in all listed variants.]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::non_uniform'. Got VMError: {
+    major_status: BORROWFIELD_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: 0x42::non_uniform,
+    indices: [(VariantFieldHandle, 0)],
+    offsets: [],
+}

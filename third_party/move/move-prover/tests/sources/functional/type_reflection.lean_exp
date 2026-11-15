@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/type_reflection.move:40:5: error: `test_type_name_concrete` calls the native `0x2::type_info::type_name`, which has neither a specification nor a prelude model; specify it
 tests/sources/functional/type_reflection.move:53:5: error: `test_type_info_concrete` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/type_reflection.move:71:5: error: no denotation for `test_type_info_symbolic`: a literal of this type is not carried by the denotation
+tests/sources/functional/type_reflection.move:71:5: error: `test_type_info_symbolic` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
 tests/sources/functional/type_reflection.move:80:5: error: `test_type_info_ignores_type_param` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
 tests/sources/functional/type_reflection.move:88:5: error: `test_type_info_keeps_type_param` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
 tests/sources/functional/type_reflection.move:95:5: error: `test_type_info_can_abort` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it

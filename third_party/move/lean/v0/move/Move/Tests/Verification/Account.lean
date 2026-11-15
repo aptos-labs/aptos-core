@@ -5,7 +5,7 @@
 import Move
 import MoveModel.Tests.Common
 
-/-! Interpreter tests for a nested-resource Leaner account program. -/
+/-! Interpreter tests for a nested-resource Verex account program. -/
 
 namespace Tests.MovePrograms
 

@@ -1,0 +1,31 @@
+name = "verex-rust"
+defaultTargets = ["VerexRust", "verex-rust"]
+# The differential check (`differentialCheck` below) is parked: its tree
+# evaluator does not build on the carriers base (`doc/plan/rust-verification.md`).
+# Until it does, `lake test` builds the test library.
+testDriver = "VerexRustTests"
+
+[[require]]
+name = "verex-ir"
+path = "../verex-ir"
+
+[[lean_lib]]
+name = "VerexRust"
+
+[[lean_exe]]
+name = "verex-rust"
+root = "Main"
+# Elaborating the rendering runs imported elaborators, which may reach the
+# interpreter.
+supportInterpreter = true
+
+[[lean_exe]]
+name = "differentialCheck"
+root = "VerexRust.Tests.DifferentialMain"
+# Imports VerexSL to compile the rendering; the test library builds first.
+supportInterpreter = true
+needs = ["VerexRustTests"]
+
+[[lean_lib]]
+name = "VerexRustTests"
+roots = ["VerexRust.Tests.Profile", "VerexRust.Tests.Driver", "VerexRust.Tests.NativeCases", "VerexRust.Tests.VerexSL", "VerexRust.Tests.RegistryConsumer", "VerexRust.Tests.Source", "VerexRust.Tests.SourcePredicates"]

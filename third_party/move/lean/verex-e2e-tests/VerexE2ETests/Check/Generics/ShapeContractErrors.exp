@@ -1,0 +1,11 @@
+VerexE2ETests/Check/Generics/ShapeContractErrors.lean:24:2: error: VIR-SHAPE-OVERLAP: the function's contracts overlap: an instantiation matches this shape and an earlier one
+VerexE2ETests/Check/Generics/ShapeContractErrors.lean:30:2: error: VIR-SHAPE-OVERLAP: the function's contracts overlap: an instantiation matches this shape and an earlier one
+VerexE2ETests/Check/Generics/ShapeContractErrors.lean:36:2: error: VIR-SHAPE-OVERLAP: the function's contracts overlap: an instantiation matches this shape and an earlier one
+VerexE2ETests/Check/Generics/ShapeContractErrors.lean:44:2: error: VIR-SHAPE-OVERLAP: the verifier's types do not tell an instantiation of this shape from one of an earlier shape that differs in more than a pointer-width integer
+VerexE2ETests/Check/Generics/ShapeContractErrors.lean:50:2: error: VIR-SHAPE-OVERLAP: the function has a contract over all its generics, which overlaps its contract at a shape
+VerexE2ETests/Check/Generics/ShapeContractErrors.lean:56:2: error: VIR-SHAPE-OVERLAP: the function has a contract over all its generics, which overlaps its contract at a shape
+VerexE2ETests/Check/Generics/ShapeContractErrors.lean:81:2: error: VEREX-SHAPE-NAME: `bool` in a shape of `misspelled` is neither a type nor a generic binder of the function, whose binders are `T`
+VerexE2ETests/Check/Generics/ShapeContractErrors.lean:86:2: error: VEREX-SHAPE-ARITY: a shape of `two` needs a type for each of the function's 2 type parameters, its other generics being lifetimes; it has 1
+VerexE2ETests/Check/Generics/ShapeContractErrors.lean:91:2: error: VEREX-SHAPE-BODY: a contract at a shape is of a function without a body: its callers assume it, and verifying a body at a shape is not supported
+VerexE2ETests/Check/Generics/ShapeContractErrors.lean:96:2: error: VIR-SHAPE-PROFILE: a contract at a shape is available in the Rust profile
+VerexE2ETests/Check/Generics/ShapeContractErrors.lean:102:2: error: `Plain` is no function, and has no contract at a shape

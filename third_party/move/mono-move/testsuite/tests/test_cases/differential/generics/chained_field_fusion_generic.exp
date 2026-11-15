@@ -33,9 +33,9 @@ fun run_u64(r0): u64 {
   code:
   L0:
     0: x0 := ld_u64 0 @0
-    1: [r1] := call mk<u64>, [x0, r0] @2
+    1: [r1] := call_exempt mk<u64>, [x0, r0] @2
     2: x0 := imm_borrow_loc r1 @4
-    3: [x0] := call read_chain<u64>, [x0] @5
+    3: [x0] := call_exempt read_chain<u64>, [x0] @5
     4: ret [x0] @6
 }
 
@@ -46,9 +46,9 @@ fun run_u8(r0): u8 {
   code:
   L0:
     0: x0 := ld_u8 0 @0
-    1: [r1] := call mk<u8>, [x0, r0] @2
+    1: [r1] := call_exempt mk<u8>, [x0, r0] @2
     2: x0 := imm_borrow_loc r1 @4
-    3: [x0] := call read_chain<u8>, [x0] @5
+    3: [x0] := call_exempt read_chain<u8>, [x0] @5
     4: ret [x0] @6
 }
 === micro-ops ===
@@ -64,10 +64,10 @@ fun run_u64() {
   code:
     0: StoreImm8 [48] <- #0 @0
     1: Move8 [56] <- [0] @2
-    2: CallIndirect 0x77::chained_field_fusion_generic::mk<u64> @2
+    2: CallByNameExempt 0x77::chained_field_fusion_generic::mk<u64> @2
     3: Move(16) [8] <- [48] @2
     4: SlotBorrow [48] <- &[8] @4
-    5: CallIndirect 0x77::chained_field_fusion_generic::read_chain<u64> @5
+    5: CallByNameExempt 0x77::chained_field_fusion_generic::read_chain<u64> @5
     6: Move8 [0] <- [48] @6
     7: Return @6
 }
@@ -78,10 +78,10 @@ fun run_u8() {
   code:
     0: StoreImm1 [32] <- #0 @0
     1: Move(1) [33] <- [0] @2
-    2: CallIndirect 0x77::chained_field_fusion_generic::mk<u8> @2
+    2: CallByNameExempt 0x77::chained_field_fusion_generic::mk<u8> @2
     3: Move(2) [1] <- [32] @2
     4: SlotBorrow [32] <- &[1] @4
-    5: CallIndirect 0x77::chained_field_fusion_generic::read_chain<u8> @5
+    5: CallByNameExempt 0x77::chained_field_fusion_generic::read_chain<u8> @5
     6: Move(1) [0] <- [32] @6
     7: Return @6
 }

@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-14:  publish [// A variant field handle must not list the same variant twice.]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::duplicate'. Got VMError: {
+    major_status: DUPLICATE_ELEMENT,
+    sub_status: None,
+    location: 0x42::duplicate,
+    indices: [(VariantFieldHandle, 0)],
+    offsets: [],
+}

@@ -11,7 +11,7 @@ use aptos_crypto::{
     ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 /// A generic transformation from a non-malleable PVSS to a signed and non-malleable PVSS.
@@ -108,7 +108,7 @@ impl<
         format!("signed_{}", T::scheme_name())
     }
 
-    fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn deal<A: Serialize + Clone, R: rand::RngCore + rand::CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,

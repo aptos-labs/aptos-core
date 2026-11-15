@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: cannot select field `x` since it has different types in variants of enum `m::E<u64, u64>`
+   ┌─ tests/checking-lang-v2.4/cross_module_borrow_generic_field_err.move:13:9
+   │
+13 │         e.x
+   │         ^
+   │
+   = in `enum m::E<T1, T2>`, field `x` has type `T1` in variant `C` and type `T2` in variant `B`

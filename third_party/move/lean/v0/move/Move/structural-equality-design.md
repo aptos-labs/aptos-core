@@ -2,7 +2,7 @@
 
 ## Runtime status
 
-Move bytecode `Eq` compares reference-free values structurally. Leaner lowers
+Move bytecode `Eq` compares reference-free values structurally. Verex lowers
 the compiler marker `Move.Compare.equal` to that operation, and the generic
 low-priority `BEq` instance makes `left == right` available for Move values.
 Types with a host `DecidableEq` may otherwise cause Lean to synthesize a

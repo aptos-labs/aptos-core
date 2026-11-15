@@ -58,6 +58,11 @@ terraform/testnet/*-vault.ca
 # Move Build Output
 build/
 
+# Verex renderings of Move files, which their proof files load, and the Lake
+# workspaces those proof files are opened in
+.verex/
+.lake/
+
 # Move coverage and tracing information
 .trace
 *.mvcov

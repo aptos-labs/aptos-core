@@ -3,7 +3,7 @@
 //# publish
 module 0x77::m {
     struct Func has drop {
-        _0: |&u64|(bool) has drop,
+        _0: |&u64|bool has drop,
     }
     fun test() {
         let _v0 = Func{_0: |x| lambda__1__test(x)};

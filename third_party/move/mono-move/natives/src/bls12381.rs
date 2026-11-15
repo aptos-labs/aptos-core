@@ -15,7 +15,7 @@ use mono_move_core::{
     VMResult,
 };
 #[cfg(feature = "testing")]
-use rand_core::OsRng;
+use rand::rngs::OsRng;
 
 fn verify_signature<C: NativeContext>(ctx: &C, check_pk_subgroup: bool) -> VMResult<NativeStatus> {
     // SAFETY: args 0, 1, and 2 are `vector<u8>`.

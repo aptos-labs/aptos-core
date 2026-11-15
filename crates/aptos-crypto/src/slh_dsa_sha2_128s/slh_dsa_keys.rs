@@ -154,17 +154,14 @@ impl Uniform for PrivateKey {
     /// Generate a random private key from a cryptographically-secure RNG.
     fn generate<R>(rng: &mut R) -> Self
     where
-        R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
+        R: ::rand::RngCore + ::rand::CryptoRng,
     {
         // Generate a random SigningKey directly using the RNG
         // The slh-dsa crate expects a type that implements CryptoRng from the signature crate
         // We create an adapter that implements the required traits
         use slh_dsa::signature::rand_core::{TryCryptoRng as SlhTryCryptoRng, TryRng as SlhTryRng};
 
-        struct RngAdapter<
-            'a,
-            R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
-        >(&'a mut R);
+        struct RngAdapter<'a, R: ::rand::RngCore + ::rand::CryptoRng>(&'a mut R);
 
         impl<'a, R: ::rand::RngCore + ::rand::CryptoRng> SlhTryRng for RngAdapter<'a, R> {
             type Error = core::convert::Infallible;

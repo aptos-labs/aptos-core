@@ -13,6 +13,10 @@ use aptos_framework::ReleaseBundle;
 use aptos_genesis::config::Layout;
 use aptos_github_client::Client as GithubClient;
 use async_trait::async_trait;
+use base64::{
+    engine::general_purpose::{STANDARD, STANDARD_PAD_INDIFFERENT},
+    Engine as _,
+};
 use clap::Parser;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -238,7 +242,7 @@ impl Client {
                 Ok(ReleaseBundle::read(path)?)
             },
             Client::Github(client) => {
-                let bytes = base64::decode(client.get_file(FRAMEWORK_NAME)?)?;
+                let bytes = STANDARD_PAD_INDIFFERENT.decode(client.get_file(FRAMEWORK_NAME)?)?;
                 Ok(bcs::from_bytes::<ReleaseBundle>(&bytes)?)
             },
         }
@@ -254,9 +258,9 @@ pub fn from_yaml<T: DeserializeOwned>(input: &str) -> CliTypedResult<T> {
 }
 
 pub fn to_base64_encoded_yaml<T: Serialize + ?Sized>(input: &T) -> CliTypedResult<String> {
-    Ok(base64::encode(to_yaml(input)?))
+    Ok(STANDARD.encode(to_yaml(input)?))
 }
 
 pub fn from_base64_encoded_yaml<T: DeserializeOwned>(input: &str) -> CliTypedResult<T> {
-    from_yaml(&String::from_utf8(base64::decode(input)?)?)
+    from_yaml(&String::from_utf8(STANDARD_PAD_INDIFFERENT.decode(input)?)?)
 }

@@ -22,7 +22,7 @@ pub fn gather_metrics() -> Vec<prometheus::proto::MetricFamily> {
         let family_count = metric_family.get_metric().len();
         if family_count > 2000 {
             families_over_2000 = families_over_2000.saturating_add(1);
-            let name = metric_family.get_name();
+            let name = metric_family.name();
             warn!(
                 count = family_count,
                 metric_family = name,

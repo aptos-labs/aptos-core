@@ -1,0 +1,9 @@
+processed 6 tasks
+task 0 lines 3-21:  publish [module 0x66::public_entry {]
+task 1 lines 24-24:  run 0x66::public_entry::store --signers 0x66
+task 2 lines 26-26:  run 0x66::public_entry::exec --args @0x66
+return values: 2
+task 3 lines 28-47:  publish [module 0x66::persistent_entry {]
+task 4 lines 50-50:  run 0x66::persistent_entry::store --signers 0x66
+task 5 lines 52-52:  run 0x66::persistent_entry::exec --args @0x66
+return values: 2

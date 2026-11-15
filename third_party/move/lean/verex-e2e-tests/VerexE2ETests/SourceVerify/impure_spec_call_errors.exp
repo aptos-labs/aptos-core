@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/impure_spec_call_errors.spec.lean:13:11: error: VEREX-SPEC-IMPURE-CALL: cannot call impure function `one` (calls `next`, which takes `&mut`)

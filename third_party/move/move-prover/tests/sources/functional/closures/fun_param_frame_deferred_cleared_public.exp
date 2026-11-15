@@ -1,0 +1,16 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/fun_param_frame_deferred_cleared_public.move:42:9
+   │
+42 │         ensures result == old(global<R>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_cleared_public.move:35: caller
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_cleared_public.move:36: caller
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_cleared_public.move:37: caller
+   =         <redacted> = <redacted>
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_cleared_public.move:38: caller
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_cleared_public.move:35: caller
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/fun_param_frame_deferred_cleared_public.move:42: caller (spec)

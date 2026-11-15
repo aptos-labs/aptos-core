@@ -1,0 +1,6 @@
+Move prover returns: exiting with model building errors
+error: function argument accesses resource `lambda_deferred_frame_escape::C` which is not declared in `modifies_of`/`reads_of` for `f`
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_escape.move:41:9
+   │
+41 │         stash(bump);
+   │         ^^^^^^^^^^^

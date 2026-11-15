@@ -96,7 +96,7 @@ impl WeightedVUF for PinkasWUF {
     type SecretKey = pvss::dealt_secret_key::g1::DealtSecretKey;
     type SecretKeyShare = Vec<pvss::dealt_secret_key_share::g1::DealtSecretKeyShare>;
 
-    fn augment_key_pair<R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn augment_key_pair<R: rand::RngCore + rand::CryptoRng>(
         pp: &Self::PublicParameters,
         sk: Self::SecretKeyShare,
         pk: Self::PubKeyShare,

@@ -83,6 +83,23 @@ enum Label {
     Field(QualifiedId<StructId>, usize),
 }
 
+impl Label {
+    /// Returns whether an edge may borrow through this label. An empty path
+    /// matches every label; otherwise, the first label must match.
+    fn is_covered_by(self, path: &[Label]) -> bool {
+        path.first().is_none_or(|first| *first == self)
+    }
+}
+
+/// Borrow kinds included in diagnostic hints for a failed check.
+#[derive(Clone, Copy)]
+enum BorrowConflict {
+    /// Any borrow, as for writes and moves.
+    Any,
+    /// Only mutable borrows, as for reads and freezes.
+    Mutable,
+}
+
 /// An abstract value associated with a temporary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AbstractValue {
@@ -333,22 +350,11 @@ impl LifetimeState {
             .has_consistent_mutable_borrows(self.frame_root(), Some(Label::Global(struct_id)))
     }
 
-    /// Returns all currently active global borrow edges.
-    fn global_borrow_edges(
-        &self,
-    ) -> impl Iterator<Item = (AttrId, QualifiedId<StructId>, RefID)> + use<> {
-        self.borrow_graph
-            .out_edges(self.frame_root())
-            .into_iter()
-            .flat_map(|(code_id, labels, _strong, target)| {
-                labels.into_iter().filter_map(move |l| {
-                    if let Label::Global(struct_id) = l {
-                        Some((code_id, struct_id, target))
-                    } else {
-                        None
-                    }
-                })
-            })
+    /// Returns whether the frame has an empty-path borrow, covering every local
+    /// and global. Such paths arise from borrow edge set overflow; ordinary
+    /// frame borrows start with a local or global label.
+    fn is_frame_fully_borrowed(&self) -> bool {
+        self.borrow_graph.has_full_borrows(self.frame_root())
     }
 }
 
@@ -501,7 +507,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                         self.cur_loc(),
                         format!("cannot move {} which is still borrowed", self.display(src)),
                         "move attempted here",
-                        self.borrow_info_for_local(src).into_iter(),
+                        self.borrow_info_for_local(src, BorrowConflict::Any)
+                            .into_iter(),
                     )
                 }
                 AbstractValue::NonReference
@@ -526,7 +533,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                             self.display(src)
                         ),
                         "copy attempted here",
-                        self.borrow_info_for_local(src).into_iter(),
+                        self.borrow_info_for_local(src, BorrowConflict::Mutable)
+                            .into_iter(),
                     )
                 }
                 AbstractValue::NonReference
@@ -546,7 +554,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                         self.cur_loc(),
                         format!("cannot drop {} which is still borrowed", self.display(src)),
                         "dropped here",
-                        self.borrow_info_for_local(src).into_iter(),
+                        self.borrow_info_for_local(src, BorrowConflict::Any)
+                            .into_iter(),
                     )
                 }
             },
@@ -586,77 +595,102 @@ impl LifetimeAnalysisStep<'_, '_> {
         self.parent.target
     }
 
-    fn borrow_info_for_global(&self, struct_id: QualifiedId<StructId>) -> Vec<(Loc, String)> {
-        let mut result = vec![];
-        self.collect_borrow_info(
-            &mut result,
+    fn borrow_info_for_global(
+        &self,
+        struct_id: QualifiedId<StructId>,
+        conflict: BorrowConflict,
+    ) -> Vec<(Loc, String)> {
+        self.borrow_info(
             self.state.frame_root(),
-            Some(Label::Global(struct_id)),
-        );
-        self.collect_usage_info(&mut result, |id| {
-            self.state
-                .borrow_graph
-                .is_borrowed_via(id, &Label::Global(struct_id))
-        });
-        result
+            |path| Label::Global(struct_id).is_covered_by(path),
+            conflict,
+            None,
+        )
     }
 
-    fn borrow_info_for_local(&self, local: TempIndex) -> Vec<(Loc, String)> {
-        let mut result = vec![];
-        self.collect_borrow_info(
-            &mut result,
+    fn borrow_info_for_local(
+        &self,
+        local: TempIndex,
+        conflict: BorrowConflict,
+    ) -> Vec<(Loc, String)> {
+        self.borrow_info(
             self.state.frame_root(),
-            Some(Label::Local(local)),
-        );
-        self.collect_usage_info(&mut result, |id| {
-            self.state
-                .borrow_graph
-                .is_borrowed_via(id, &Label::Local(local))
-        });
-        result
+            |path| Label::Local(local).is_covered_by(path),
+            conflict,
+            None,
+        )
     }
 
-    fn borrow_info_for_ref(&self, id: RefID, for_label: Option<Label>) -> Vec<(Loc, String)> {
+    /// Collects borrow locations for outgoing edges of `id` whose paths satisfy `covers`
+    /// and whose borrowers match `conflict`. Also collects usage hints for these borrowers
+    /// and their descendants that are live and match `conflict`, excluding the reference
+    /// held in `operand`.
+    fn borrow_info(
+        &self,
+        id: RefID,
+        covers: impl Fn(&[Label]) -> bool,
+        conflict: BorrowConflict,
+        operand: Option<TempIndex>,
+    ) -> Vec<(Loc, String)> {
+        let is_conflicting = |borrower: RefID| match conflict {
+            BorrowConflict::Any => true,
+            BorrowConflict::Mutable => self.state.borrow_graph.is_mutable(borrower),
+        };
+        let is_blocking =
+            |path: &[Label], borrower: RefID| covers(path) && is_conflicting(borrower);
         let mut result = vec![];
-        self.collect_borrow_info(&mut result, id, for_label);
+        self.collect_borrow_info(&mut result, id, is_blocking);
+        let operand_id = operand.and_then(|local| self.state.locals[local].ref_id());
         self.collect_usage_info(&mut result, |other_id| {
-            self.state.borrow_graph.is_derived_from(other_id, id)
+            Some(other_id) != operand_id
+                && is_conflicting(other_id)
+                && self
+                    .state
+                    .borrow_graph
+                    .has_ancestor_edge(other_id, |parent, path, child| {
+                        parent == id && is_blocking(path, child)
+                    })
         });
         result
     }
 
+    /// Collects borrow locations for the outgoing edges of `id` satisfying `is_blocking`.
     fn collect_borrow_info(
         &self,
         result: &mut Vec<(Loc, String)>,
         id: RefID,
-        for_label: Option<Label>,
+        is_blocking: impl Fn(&[Label], RefID) -> bool,
     ) {
+        let is_frame_root = id == self.state.frame_root();
         result.extend(
             self.state
                 .borrow_graph
                 .out_edges(id)
                 .into_iter()
-                .filter_map(|(code_id, path, _, target)| {
+                .filter(|(_, path, _, target)| is_blocking(path, *target))
+                .map(|(code_id, path, _, target)| {
                     let loc = self.target().get_bytecode_loc(code_id);
                     let mut_str = if self.state.borrow_graph.is_mutable(target) {
                         "mutably "
                     } else {
                         ""
                     };
-                    if path.is_empty() && for_label.is_none() {
-                        Some((loc, format!("previously {}borrowed here", mut_str)))
-                    } else if for_label.is_none() || path.contains(&for_label.unwrap()) {
-                        Some((
-                            loc,
-                            format!(
-                                "{} previously {}borrowed here",
-                                self.display_path(&path),
-                                mut_str
-                            ),
-                        ))
+                    let msg = if !path.is_empty() {
+                        format!(
+                            "{} previously {}borrowed here",
+                            self.display_path(&path),
+                            mut_str
+                        )
+                    } else if is_frame_root {
+                        format!(
+                            "previously {}borrowed here (too many borrow sources to track \
+                             individually, so all locals and globals are considered borrowed)",
+                            mut_str
+                        )
                     } else {
-                        None
-                    }
+                        format!("previously {}borrowed here", mut_str)
+                    };
+                    (loc, msg)
                 }),
         )
     }
@@ -702,47 +736,55 @@ impl LifetimeAnalysisStep<'_, '_> {
             // Not function in the same module, a native function, or inline
             return;
         }
-        let empty_acquires = BTreeSet::new();
-        let acquires = fun.get_acquired_structs().unwrap_or(&empty_acquires);
+        let Some(acquires) = fun.get_acquired_structs() else {
+            return;
+        };
 
-        for (_code_id, struct_id, target) in self.state.global_borrow_edges() {
-            let is_mut = self.state.borrow_graph.is_mutable(target);
-            if struct_id.module_id == fun.module_env.get_id() && acquires.contains(&struct_id.id) {
-                // Try to find the location of the access declaration via the access specifier
-                // list.
-                let access_origin_hint = fun
-                    .get_access_specifiers()
-                    .unwrap_or_default()
-                    .iter()
-                    .find_map(|s| {
-                        if s.kind == AccessSpecifierKind::LegacyAcquires
-                            && matches!(&s.resource.1,
-                    ResourceSpecifier::Resource(s) if s.to_qualified_id() == struct_id)
-                        {
-                            Some(vec![(s.loc.clone(), "`acquires` declared here".to_owned())])
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or_else(|| {
-                        vec![(
-                            fun.get_id_loc(),
-                            "`acquires` of this function was inferred".to_owned(),
-                        )]
-                    });
-                self.error_with_hints(
-                    self.cur_loc(),
-                    format!(
-                        "function acquires global `{}` which is currently {}borrowed",
-                        self.global_env().display(&struct_id),
-                        if is_mut { "mutably " } else { "" }
-                    ),
-                    "function called here",
-                    self.borrow_info_for_global(struct_id)
-                        .into_iter()
-                        .chain(access_origin_hint),
-                )
+        for struct_id in acquires.iter().map(|id| fun_id.module_id.qualified(*id)) {
+            if !self.state.is_global_borrowed(struct_id) {
+                continue;
             }
+            let is_mut = self.state.is_global_mutably_borrowed(struct_id);
+            // Use the explicit `acquires` location when available; otherwise, point to the
+            // function.
+            let access_origin_hint = fun
+                .get_access_specifiers()
+                .unwrap_or_default()
+                .iter()
+                .find_map(|spec| {
+                    if spec.kind == AccessSpecifierKind::LegacyAcquires
+                        && matches!(
+                            &spec.resource.1,
+                            ResourceSpecifier::Resource(resource)
+                                if resource.to_qualified_id() == struct_id
+                        )
+                    {
+                        Some(vec![(
+                            spec.loc.clone(),
+                            "`acquires` declared here".to_owned(),
+                        )])
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| {
+                    vec![(
+                        fun.get_id_loc(),
+                        "`acquires` of this function was inferred".to_owned(),
+                    )]
+                });
+            self.error_with_hints(
+                self.cur_loc(),
+                format!(
+                    "function acquires global `{}` which is currently {}borrowed",
+                    self.global_env().display(&struct_id),
+                    if is_mut { "mutably " } else { "" }
+                ),
+                "function called here",
+                self.borrow_info_for_global(struct_id, BorrowConflict::Any)
+                    .into_iter()
+                    .chain(access_origin_hint),
+            )
         }
     }
 }
@@ -778,7 +820,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                 } else {
                     "implicitly frozen here"
                 },
-                self.borrow_info_for_ref(id, None).into_iter(),
+                self.borrow_info(id, |_| true, BorrowConflict::Mutable, Some(src))
+                    .into_iter(),
             )
         }
         let frozen_id = self.state.new_ref(false);
@@ -789,9 +832,25 @@ impl LifetimeAnalysisStep<'_, '_> {
 
     fn borrow_local(&mut self, dest: TempIndex, src: TempIndex) {
         let is_mut = self.ty(dest).is_mutable_reference();
-        // nothing to check in case borrow is mutable since the frame cannot have an full borrow/
-        // epsilon outgoing edge
-        if !is_mut && self.state.is_local_mutably_borrowed(src) {
+        // A mutable borrow redirects existing borrows of `src` through the new reference.
+        // Full frame borrows have empty paths and cannot be redirected this way.
+        if is_mut && self.state.is_frame_fully_borrowed() {
+            self.error_with_hints(
+                self.cur_loc(),
+                format!(
+                    "cannot mutably borrow {} which is already borrowed",
+                    self.display(src)
+                ),
+                "borrow attempted here",
+                self.borrow_info(
+                    self.state.frame_root(),
+                    |path| path.is_empty(),
+                    BorrowConflict::Any,
+                    None,
+                )
+                .into_iter(),
+            )
+        } else if !is_mut && self.state.is_local_mutably_borrowed(src) {
             self.error_with_hints(
                 self.cur_loc(),
                 format!(
@@ -799,7 +858,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                     self.display(dest)
                 ),
                 "borrow attempted here",
-                self.borrow_info_for_local(src).into_iter(),
+                self.borrow_info_for_local(src, BorrowConflict::Mutable)
+                    .into_iter(),
             )
         }
         let new_id = self.state.new_ref(is_mut);
@@ -826,7 +886,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                     self.display(dest)
                 ),
                 "borrow attempted here",
-                self.borrow_info_for_ref(id, None).into_iter(),
+                self.borrow_info(id, |path| path.is_empty(), BorrowConflict::Any, Some(src))
+                    .into_iter(),
             )
         } else if !is_mut && !self.state.borrow_graph.is_readable(id, Some(field_label)) {
             self.error_with_hints(
@@ -837,7 +898,13 @@ impl LifetimeAnalysisStep<'_, '_> {
                     self.display(dest)
                 ),
                 "borrow attempted here",
-                self.borrow_info_for_ref(id, Some(field_label)).into_iter(),
+                self.borrow_info(
+                    id,
+                    |path| field_label.is_covered_by(path),
+                    BorrowConflict::Mutable,
+                    Some(src),
+                )
+                .into_iter(),
             )
         }
         let new_id = self.state.new_ref(is_mut);
@@ -871,7 +938,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                     self.global_env().get_struct(struct_id).get_full_name_str()
                 ),
                 "mutable borrow attempted here",
-                self.borrow_info_for_global(struct_id).into_iter(),
+                self.borrow_info_for_global(struct_id, BorrowConflict::Any)
+                    .into_iter(),
             )
         } else if self.state.is_global_mutably_borrowed(struct_id) {
             self.error_with_hints(
@@ -881,7 +949,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                     self.global_env().get_struct(struct_id).get_full_name_str()
                 ),
                 "borrow attempted here",
-                self.borrow_info_for_global(struct_id).into_iter(),
+                self.borrow_info_for_global(struct_id, BorrowConflict::Mutable)
+                    .into_iter(),
             )
         }
         let _address_value = self.move_or_copy(src, &[], &[dest]);
@@ -955,7 +1024,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                     self.display(src)
                 ),
                 "transfer attempted here",
-                self.borrow_info_for_ref(id, None).into_iter(),
+                self.borrow_info(id, |_| true, BorrowConflict::Any, Some(src))
+                    .into_iter(),
             )
         }
     }
@@ -971,7 +1041,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                     self.global_env().display(&struct_id)
                 ),
                 "extraction attempted here",
-                self.borrow_info_for_global(struct_id).into_iter(),
+                self.borrow_info_for_global(struct_id, BorrowConflict::Any)
+                    .into_iter(),
             )
         }
         self.replace(dest, AbstractValue::NonReference)
@@ -997,14 +1068,25 @@ impl LifetimeAnalysisStep<'_, '_> {
 
         // Check that no local or global is still borrowed
         for (_, path, _, _) in self.state.borrow_graph.out_edges(self.state.frame_root()) {
+            let source = if path.is_empty() {
+                "a local or global".to_owned()
+            } else {
+                self.display_path(&path)
+            };
             self.error_with_hints(
                 self.cur_loc(),
                 format!(
                     "cannot return a reference derived from {} since it is not based on a parameter",
-                    self.display_path(&path)
+                    source
                 ),
                 "return attempted here",
-                self.borrow_info_for_ref(self.state.frame_root(), path.first().cloned()).into_iter()
+                self.borrow_info(
+                    self.state.frame_root(),
+                    |edge_path| path.first().is_none_or(|label| label.is_covered_by(edge_path)),
+                    BorrowConflict::Any,
+                    None,
+                )
+                .into_iter(),
             )
         }
 
@@ -1022,7 +1104,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                     self.display(src)
                 ),
                 "read attempted here",
-                self.borrow_info_for_ref(id, None).into_iter(),
+                self.borrow_info(id, |_| true, BorrowConflict::Mutable, Some(src))
+                    .into_iter(),
             )
         }
         self.state.release(id);
@@ -1037,7 +1120,8 @@ impl LifetimeAnalysisStep<'_, '_> {
                 self.cur_loc(),
                 format!("cannot write {} since it is borrowed", self.display(dest)),
                 "write attempted here",
-                self.borrow_info_for_ref(id, None).into_iter(),
+                self.borrow_info(id, |_| true, BorrowConflict::Any, Some(dest))
+                    .into_iter(),
             )
         }
         self.state.release(id)

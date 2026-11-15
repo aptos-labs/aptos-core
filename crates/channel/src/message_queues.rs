@@ -195,6 +195,24 @@ impl<K: Eq + Hash + Clone, T> PerKeyQueue<K, T> {
         message
     }
 
+    /// Pops from the next eligible key, leaving other keys' messages queued.
+    /// Skipped keys retain their position relative to one another.
+    pub(crate) fn pop_if(&mut self, mut eligible: impl FnMut(&K) -> bool) -> Option<T> {
+        for _ in 0..self.round_robin_queue.len() {
+            let key = self.round_robin_queue.front()?;
+            if eligible(key) {
+                return self.pop();
+            }
+            let key = self.round_robin_queue.pop_front()?;
+            self.round_robin_queue.push_back(key);
+        }
+        None
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.round_robin_queue.is_empty()
+    }
+
     /// Garbage collect any empty per-key-queues.
     fn remove_empty_queues(&mut self) {
         self.per_key_queue.retain(|_key, queue| !queue.is_empty());

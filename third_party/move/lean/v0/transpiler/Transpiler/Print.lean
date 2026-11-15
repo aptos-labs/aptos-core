@@ -10,15 +10,15 @@ import Transpiler.Comments
 import Transpiler.Intrinsics
 
 /-!
-# Leaner Move printer
+# Verex Move printer
 
-Prints a decoded XAST module as textual Leaner Move (`leaner-move.md`).  The
+Prints a decoded XAST module as textual Verex Move (`verex-move.md`).  The
 printer owns all transpilation policy that is not naming or ordering:
 
 - **Effects.**  Functions print with an `Action` result when
   `Transpiler.Effects` says so; bodies with statements print as `do` blocks
-  (Leaner wraps a pure `do` in `Id.run`), single expressions as terms.
-- **Hoisting.**  Leaner sequences `Action` operations explicitly, so an
+  (Verex wraps a pure `do` in `Id.run`), single expressions as terms.
+- **Hoisting.**  Verex sequences `Action` operations explicitly, so an
   effectful sub-expression in value position (`*r`, `&mut R[a].f`, a call to
   an `Action` function) is hoisted into a `let tmp ← …` binding in evaluation
   order and replaced by the temporary.
@@ -28,7 +28,7 @@ printer owns all transpilation policy that is not naming or ordering:
   borrow becomes a named loan (`let tmp ← &mut place`), and a loan of a local
   that is passed to a callee is read back (`v ← *tmp`) so later uses of the
   local see the mutation.
-- **Specs.**  Clauses print in Leaner's order (`requires; modifies; ensures;
+- **Specs.**  Clauses print in Verex's order (`requires; modifies; ensures;
   aborts_if …`), repeated `requires`/`ensures` conjoined, `ensures True` when
   absent, `pragma aborts_if_is_partial` and the loose frame `modifies *` per
   the design (`transpile-design.md`), `aborts_if_is_strict` as `aborts_if
@@ -111,7 +111,7 @@ structure St where
   /-- The live loans of the block being printed: the textual place, the
   reference variable holding the loan, and whether the loan is mutable.  A
   loan is the access path of its place for the rest of the block: later
-  borrows reuse it (Leaner's verifier requires borrows of a loaned place to
+  borrows reuse it (Verex's verifier requires borrows of a loaned place to
   chain through the live loan), and an owned local is read back through it
   after every mutation. -/
   loans : List (String × String × Bool) := []
@@ -192,7 +192,7 @@ def commitBinding (n printedName : String) (isMut : Bool) : PM Unit :=
     boundMuts := if isMut then printedName :: s.boundMuts else s.boundMuts.filter (· != n) }
 
 /-- The live loan of a place that can serve a borrow of `kind`: a mutable loan
-serves both kinds (Leaner freezes `&mut` to `&` where `&` is expected), an
+serves both kinds (Verex freezes `&mut` to `&` where `&` is expected), an
 immutable loan only an immutable borrow. -/
 def loanFor (kind : RefKind) (placeKey : String) : PM (Option String) := do
   let found := (← get).loans.find? fun (p, _, isMut) =>
@@ -252,7 +252,7 @@ def isRefTy : Ty → Bool
   | .reference _ _ => true
   | _ => false
 
-/-- Whether a type contains a Move function value. The executable Leaner
+/-- Whether a type contains a Move function value. The executable Verex
 boundary accepts these only on compile-time-only inline helpers. -/
 partial def containsFunctionTy : Ty → Bool
   | .function _ _ _ => true
@@ -846,7 +846,7 @@ partial def referenceVariable (kind : RefKind) (e : Exp) : PM String := do
 
 /-- The scrutinee of a `match`: a tuple prints as `a, b`.  Through a
 reference, a `match` whose arms bind payload variables binds them by
-reference — Leaner's `match` on a reference local (its arms borrow the
+reference — Verex's `match` on a reference local (its arms borrow the
 payload through it) — so the scrutinee is the reference variable; a
 variable-free match through a reference matches the referent instead. -/
 partial def scrutinee (s : Exp) (arms : List MatchArm) : PM (Format × Bool) := do
@@ -946,7 +946,7 @@ partial def placePath (e : Exp) : PM PlacePath := do
     pure { p with steps := p.steps ++ [.field (legalize field)] }
   | .call (.selectVariants _ fields) _ [inner] _ =>
     -- The payload field of an enum: one name across the variants that have
-    -- it; Leaner borrows it through the reference (`&r.f`), the VM's variant
+    -- it; Verex borrows it through the reference (`&r.f`), the VM's variant
     -- check included.
     let some field := variantFieldName? fields | unsupported "variant field selection across differently named fields"
     let p ← placePath inner
@@ -969,7 +969,7 @@ partial def place (e : Exp) : PM Format := do
   pure (p.rootText ++ renderSteps p.steps)
 
 /-- The operand of `&`/`&mut` for a `kind`-borrow of a place, or (`inl`) the
-live loan that already holds the place.  Leaner's place grammar accepts an
+live loan that already holds the place.  Verex's place grammar accepts an
 element step only directly after the root and borrows fields and elements
 through references only, and its verifier requires the borrows of a place to
 chain through its live loan; so the place is rebased onto its longest loaned
@@ -1002,7 +1002,7 @@ partial def resolvePath (kind : RefKind) (path : PlacePath) : PM (String ⊕ For
     | .«local» _ | .param _ => !refRoot
     | _ => false
   if !found && ownedRoot && !path.steps.isEmpty then
-    -- Leaner borrows fields and elements through references only: loan the
+    -- Verex borrows fields and elements through references only: loan the
     -- local itself first; the sub-borrow chains through the live loan, and the
     -- local is read back through it after mutations.
     let r ← freshName "ref"
@@ -1035,7 +1035,7 @@ partial def borrowRef (kind : RefKind) (e : Exp) (base : String := "ref") : PM S
     pure r
 
 /-- A reference for a `kind`-borrow of `e`: of its place if it is one, else of
-a fresh local bound to its value (Move borrows temporaries, `&2`; Leaner
+a fresh local bound to its value (Move borrows temporaries, `&2`; Verex
 borrows places). -/
 partial def materializedRef (kind : RefKind) (e : Exp) : PM String := do
   if isPlaceExp e then borrowRef kind e
@@ -1072,7 +1072,7 @@ partial def resourceHead (inst : List Ty) : PM Format := do
 partial def mutateStmt (target value : Exp) : PM Unit := do
   match target.node with
   | .«local» _ | .param _ =>
-    -- Writing through a reference variable; `*r = *r op e` keeps Leaner's
+    -- Writing through a reference variable; `*r = *r op e` keeps Verex's
     -- sequenced `r := *r op e` shape.
     let tname ← localName? target
     let sequenced ← match value.node with
@@ -1276,7 +1276,7 @@ partial def callTerm (e : Exp) (op : Operation) (inst : List Ty) (args : List Ex
     | _ => unsupported "arity of field selection"
   | .selectVariants _ fields =>
     -- The payload field of whichever variant the owner is: borrowed through
-    -- the owner (Leaner's `&r.f` on an enum referent performs the VM's
+    -- the owner (Verex's `&r.f` on an enum referent performs the VM's
     -- variant check), then read.
     match args with
     | [inner] =>
@@ -1624,7 +1624,7 @@ partial def letStmt (p : Pattern) (binding : Option Exp) : PM Unit := do
   let mutKw := if isMut then "mut " else ""
   match binding with
   | none =>
-    -- A declaration without a value (`let x;`): Leaner needs a value; use the
+    -- A declaration without a value (`let x;`): Verex needs a value; use the
     -- type's default via a later assignment — the first assignment will bind.
     -- Move requires assignment before use, so the declaration is dropped and
     -- the first `assign` prints as a `let mut`.
@@ -1673,7 +1673,7 @@ where
       let a ← actionDoc b
       emit (text s!"let {mutKw}" ++ pat ++ text " ← " ++ a)
     | .pure =>
-      -- Literal-rooted bindings need the type: Leaner infers widths from
+      -- Literal-rooted bindings need the type: Verex infers widths from
       -- the expected type.
       let annotate ← needsAnnotation b
       if annotate then
@@ -1796,7 +1796,7 @@ partial def stmt (e : Exp) : PM Unit := do
         | .call (.foldsCaptureAnchor label) _ [] _
         | .call (.saveStateAnchor label) _ [] _ =>
           -- The model compiler inserts this before an inlined fold.  Its
-          -- anchored `old` uses become `oldAt[label](…)` below, and Leaner's
+          -- anchored `old` uses become `oldAt[label](…)` below, and Verex's
           -- source-spec translator snapshots their values at this point.
           record .specStatement
           emit (text s!"__moveSpecCapture {label}")
@@ -2473,9 +2473,9 @@ partial def specTermCore (e : Exp) : PM (Format × Bool) := do
       | _ => unsupported s!"arity of {repr op}"
     | .specFunction name _ =>
       -- A companion (`$f`, the specification version of the Move function
-      -- `f`) is applied as `f`: Leaner derives that meaning of `f` in
+      -- `f`) is applied as `f`: Verex derives that meaning of `f` in
       -- specifications from the function's own body.  `std::vector`'s
-      -- operations have curated renderings (the module is Leaner's).
+      -- operations have curated renderings (the module is Verex's).
       if let some base := companionFunction? name.name then
         if name.module == ctxt.mod.ref && (← get).failed.contains base then
           unsupported s!"uses `{base}`, which was not transpiled"
@@ -2560,7 +2560,7 @@ partial def specTermCore (e : Exp) : PM (Format × Bool) := do
         pure (sepBy " ∨ " (variants.map fun v => atom it ic ++ text s!" is {head}.{legalize v}"), true)
       | _ => unsupported "arity of `is`"
     | .selectVariants _ fields =>
-      -- `x.f` on an enum value: Leaner's field selection on an enum value
+      -- `x.f` on an enum value: Verex's field selection on an enum value
       -- is the field of whichever variant has it, an unspecified value
       -- otherwise — the Move Prover's reading (`translate_select_variant`).
       match args with
@@ -2598,7 +2598,7 @@ partial def specTermCore (e : Exp) : PM (Format × Bool) := do
   | _ => unsupported "expression form in spec"
 where
   -- A spec function under its Move name; a companion `$f` as `f`, the Move
-  -- function it is the specification version of (Leaner resolves `f` in a
+  -- function it is the specification version of (Verex resolves `f` in a
   -- specification to the version derived from `f`'s body).
   specFunHead (name : QualifiedName) : PM String := do
     let ctxt ← read
@@ -2650,7 +2650,7 @@ def docComment (doc : String) : List Format :=
 def moduleDocComment (doc : String) : List Format :=
   if doc.trim.isEmpty then [] else [text ("/-! " ++ doc.trim ++ " -/")]
 
-/-- Move attributes in Leaner's attribute grammar. -/
+/-- Move attributes in Verex's attribute grammar. -/
 partial def attributeDoc (a : Attribute) : PM (Option Format) := do
   match a with
   | .apply name args =>
@@ -2753,13 +2753,13 @@ def functionKeywords (f : Function) (recursive : Bool) : String :=
     | .regular => ""
   let entry := if f.isEntry then "entry " else ""
   let partialKw := if recursive then "partial " else ""
-  -- Leaner: modifiers [public] [partial] [entry | friend] fun; `package`/`native` are item heads.
+  -- Verex: modifiers [public] [partial] [entry | friend] fun; `package`/`native` are item heads.
   if f.kind == .native then s!"{vis}{kind}fun"
   else if f.visibility == .package then s!"{partialKw}package fun"
   else s!"{vis}{partialKw}{kind}{entry}{if f.visibility == .friend then "" else ""}fun"
 
 /-- Binders of a function signature; `fun` type parameters carry no ability
-bounds in Leaner. -/
+bounds in Verex. -/
 def paramBinders (f : Function) : PM Format := do
   let tps := typeParamsDoc (f.typeParams.map fun tp => { tp with abilities := [] }) "{" "}"
   let ps ← f.params.mapM fun p => do
@@ -2786,7 +2786,7 @@ def modifiesClause (f : Function) (facts : Facts) : PM (Option Format) := do
   else if isOpaque then pure (some (text "modifies " ++ sepBy ", " targets))
   else pure (some (text "modifies " ++ sepBy ", " (targets ++ [text "*"])))
 
-/-- The header of a function's `spec`: binders follow Leaner's asymmetry
+/-- The header of a function's `spec`: binders follow Verex's asymmetry
 (immutable references become values, except `&signer`). -/
 def specHeader (f : Function) : PM Format := do
   let tps := typeParamsDoc (f.typeParams.map fun tp => { tp with abilities := [] }) "{" "}"
@@ -2800,7 +2800,7 @@ def specHeader (f : Function) : PM Format := do
 
 /-- The `spec f` block, if the function has one worth printing. -/
 def specDecl (f : Function) (facts : Facts) : PM (List Format) := do
-  -- Inline helpers are compile-time-only: Leaner inlines their bodies into a
+  -- Inline helpers are compile-time-only: Verex inlines their bodies into a
   -- deployable caller before compilation and source-spec derivation. A
   -- standalone contract would instead try to assign runtime semantics to the
   -- function-valued parameters which bytecode never sees.
@@ -2830,7 +2830,7 @@ def specDecl (f : Function) (facts : Facts) : PM (List Format) := do
       return (model.decls.map text) ++ (if model.decls.isEmpty then [] else [text ""]) ++
         [header ++ indent 2 (hard ++ vcat clauseLines)]
     | none => pure ()
-  -- A function without conditions or pragmas has no `spec`: Leaner derives
+  -- A function without conditions or pragmas has no `spec`: Verex derives
   -- its semantics from the body, for callers in any module, exactly when
   -- there is no `spec` block -- a dummy `ensures true` would replace that
   -- derivation by an uninterpreted contract.  A native without conditions
@@ -2874,7 +2874,7 @@ def specDecl (f : Function) (facts : Facts) : PM (List Format) := do
   -- Pragmas.  `aborts_if_is_partial` is transported as written.  A pure
   -- function whose spec declares no abort clause (and is not strict) gets the
   -- same pragma: it states the production default — abort behavior
-  -- uninterpreted — and selects Leaner's relational contract shape, whose
+  -- uninterpreted — and selects Verex's relational contract shape, whose
   -- value-contract alternative reads aborting executions with wrapping values.
   let hasAbortClause := conds.any fun c => match c.kind with
     | .abortsIf | .abortsWith => true
@@ -2883,7 +2883,7 @@ def specDecl (f : Function) (facts : Facts) : PM (List Format) := do
   if pragmaTrue f.pragmas "aborts_if_is_partial" ||
       (!facts.isAction && !hasAbortClause && !isStrict) then
     clauses := clauses ++ [text "pragma aborts_if_is_partial"]
-  -- `pragma opaque`: Leaner summarizes the function by its contract for its
+  -- `pragma opaque`: Verex summarizes the function by its contract for its
   -- callers (and still verifies the body when it can).
   if pragmaTrue f.pragmas "opaque" then
     clauses := clauses ++ [text "pragma opaque"]
@@ -3002,11 +3002,11 @@ where
       mutables := mutables ++ rebound ++ rebound.map (· ++ "'"),
       inAction := facts.isAction, tyParams := tyParams }
 
-/-- A spec function as Leaner's `spec fun` declaration — a specification
+/-- A spec function as Verex's `spec fun` declaration — a specification
 function under its Move name; an uninterpreted one is `spec opaque`.  A
 spec function may read global memory (`spec fun` is stateful then); `old`
 has no meaning in one.  A companion (`$f`, the spec rewriter's specification
-version of the Move function `f`) prints nothing: Leaner derives the
+version of the Move function `f`) prints nothing: Verex derives the
 specification version of `f` from `f`'s own body (at `fun f`), which is what
 a specification's `f args` denotes. -/
 def specFunDecl (sf : SpecFun) : PM (List Format) :=
@@ -3029,7 +3029,7 @@ def specFunDecl (sf : SpecFun) : PM (List Format) :=
   match sf.body with
   | some body =>
     if sf.usesOld then
-      unsupported "`old` in a spec function (Leaner's specification functions read the state of the clause that applies them)"
+      unsupported "`old` in a spec function (Verex's specification functions read the state of the clause that applies them)"
     let paramNames := sf.params.map (·.name) |>.toArray
     let (t, _) ← withReader (fun c => { c with inSpec := true, fn := some fnAsFunction, params := paramNames })
       (specTerm body)
@@ -3070,7 +3070,7 @@ def invariantsDecl (m : Module) : PM (List Format) := do
       let name := fresh "move_axiom" taken
       taken := name :: taken
       -- Like every generated generic Move declaration, a source axiom needs
-      -- the internal inhabitance evidence that Leaner associates with each
+      -- the internal inhabitance evidence that Verex associates with each
       -- Move type parameter.  It is required here to apply an uninterpreted
       -- `spec opaque` whose type parameter has the same implicit evidence.
       let typeParams := String.join <| inv.typeParams.flatMap fun tp =>
@@ -3239,7 +3239,7 @@ def printModule (pkg : Package) (m : Module) (effects : Table) (width : Nat := 1
     Except String (String × Report) := do
   if let some owner := m.structs.find? fun s => s.intrinsic.isSome then
     let model := owner.intrinsic.map (·.name) |>.getD "unknown"
-    throw s!"unsupported: intrinsic type `{owner.name}` uses model `{model}`; E16 is suspended until intrinsic validation is implemented on the unified LIR"
+    throw s!"unsupported: intrinsic type `{owner.name}` uses model `{model}`; E16 is suspended until intrinsic validation is implemented on the unified VIR"
   let ctxt : Ctx := { pkg, mod := m, effects, emitVerify, leanRoot }
   let st : St := { comments := Pool.ofModule m, report := initialReport }
   let (doc, st) ← (moduleDoc ctxt).run st

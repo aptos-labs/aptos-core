@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_gas_schedule::{
-    gas_feature_versions::RELEASE_V1_50, gas_params::natives::aptos_framework::*,
+    gas_feature_versions::TESTNET_RESET_OCT_2026, gas_params::natives::aptos_framework::*,
 };
 use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
@@ -92,7 +92,7 @@ fn native_exists_at(
     // Only structs can be resources in global storage. A non-struct type (e.g., a function type
     // that declared the `key` ability) would reach the data cache and trip a VM invariant
     // violation, so reject it here with a deterministic, kept abort instead.
-    if context.gas_feature_version() >= RELEASE_V1_50 && !ty.is_struct_or_enum() {
+    if context.gas_feature_version() >= TESTNET_RESET_OCT_2026 && !ty.is_struct_or_enum() {
         return Err(SafeNativeError::abort_with_message(
             ENOT_A_RESOURCE_TYPE,
             "Object type argument must be a resource (struct) type",

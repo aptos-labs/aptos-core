@@ -1,15 +1,15 @@
-# Leaner structured loops
+# Verex structured loops
 
 Status: implemented; open items are listed at the end
 
 This document specifies in-function `loop` / `while` / `break` / `continue` /
-`return` for Leaner Move. The surface is designed to host compiler-v2 model
+`return` for Verex Move. The surface is designed to host compiler-v2 model
 AST directly, so a later AST import can pretty-print rather than extract
 helpers at the language boundary.
 
 The two consumers of a `fun` body treat loops differently:
 
-- **Compilation** (Leaner → LIR → IR) keeps the loop idiom the author wrote.
+- **Compilation** (Verex → VIR → IR) keeps the loop idiom the author wrote.
   One source function stays one IR function. `while` and `loop` become
   natural loops in that CFG (header, back edge, exit), not calls to
   generated helpers.
@@ -23,13 +23,13 @@ The two consumers of a `fun` body treat loops differently:
 Structured `loop` / `while` may occur in the same module, but `continue f`
 inside a structured loop body is an error.
 
-Related documents: [`leaner-move.md`](leaner-move.md),
+Related documents: [`verex-move.md`](verex-move.md),
 [`verification-design.md`](verification-design.md),
 [`design-plan.md`](design-plan.md).
 
 ## Requirements
 
-- Accept Move-shaped loops in authored Leaner, including `let mut` updates.
+- Accept Move-shaped loops in authored Verex, including `let mut` updates.
 - Preserve those idioms in the compiled CFG: the author's `while` is a
   header that tests a condition; their `loop` / `break` is a header at the
   body with an exit edge; nested and sequential loops are nested / adjacent
@@ -63,7 +63,7 @@ authored `fun` body  (while / loop / break / continue / return)
            LCNF --> Normalize  -->  one FunDecl, internal loop headers
                  |
                  v
-           LIR / IR / XIR     (no extra functions)
+           VIR / IR / XIR     (no extra functions)
 ```
 
 The `fun` command does **not** rewrite the body before retention:
@@ -126,7 +126,7 @@ rejected at `spec` generation; `abort code` already escapes and is unchanged.
 The `do` elaborator expands `while` / `loop` / `break` / `continue` into
 opaque markers in the *same* `do` sequence. Bodies are inlined; nothing is a
 Move-level closure. The markers live in `Move/Syntax.lean` and are private,
-so authored Leaner cannot forge CFG control:
+so authored Verex cannot forge CFG control:
 
 ```lean
 loopEnter        (label nonce arity token : Nat) (state : σ) : Nat
@@ -171,7 +171,7 @@ captures the continuation after a `break`.
 
 `Normalize.walk` recognizes the markers:
 
-| Marker | LIR |
+| Marker | VIR |
 |---|---|
 | `loopEnter L ... state` | Start the header and record its canonical state locals. |
 | `loopContinue[Tail] L ... state` | Copy current state to header locals and `jump L`. |
@@ -200,7 +200,7 @@ natural loop of each source `while` / `loop`. No new `FunDecl` is created.
 Extracting `f.loop0` would change the module: extra private functions, calls
 instead of back edges, and a different natural-loop structure than the author
 (or an imported Move AST) wrote. That fights the AST-import goal and makes
-compiler correctness talk about functions the source does not contain. LIR
+compiler correctness talk about functions the source does not contain. VIR
 already has arbitrary `jump` / `branch`; the loops only needed internal
 headers, not a new IR construct.
 

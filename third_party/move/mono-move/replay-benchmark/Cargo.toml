@@ -37,6 +37,7 @@ move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+vm-comparison = { workspace = true }
 
 [dev-dependencies]
 mono-move-testsuite = { workspace = true }

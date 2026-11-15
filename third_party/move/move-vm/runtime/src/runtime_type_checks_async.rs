@@ -165,7 +165,11 @@ where
                 ExitCode::Done => return Ok(()),
                 ExitCode::Return => {
                     self.call_stack
-                        .type_check_return::<RTTCheck>(&mut self.type_stack, &mut current_frame)
+                        .type_check_return::<RTTCheck>(
+                            &mut self.type_stack,
+                            &mut current_frame,
+                            self.ty_pool,
+                        )
                         .map_err(|err| set_err_info!(current_frame, err))?;
                     if let Some(frame) = self.call_stack.pop() {
                         // Return control to the caller, advance PC past the call instruction.
@@ -516,27 +520,16 @@ where
         let mut arg_tys = VecDeque::new();
         if RTTCheck::should_perform_checks(&current_frame.function.function) {
             let num_params = native.param_tys().len();
+            // Same memoization as the inline checker: see `call_native_impl`.
+            let expected_tys = native.instantiated_param_tys(self.ty_builder)?;
             for i in (0..num_params).rev() {
-                let expected_ty = &native.param_tys()[i];
+                let expected_ty = &expected_tys[i];
                 if !mask.is_captured(i) {
                     let ty = self.type_stack.pop_ty()?;
-                    if ty_args.is_empty() {
-                        ty.paranoid_check_assignable(expected_ty)?;
-                    } else {
-                        let expected_ty =
-                            self.ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
-                        ty.paranoid_check_assignable(&expected_ty)?;
-                    }
+                    ty.paranoid_check_assignable(expected_ty)?;
                     arg_tys.push_front(ty);
                 } else {
-                    #[allow(clippy::collapsible_else_if)]
-                    if ty_args.is_empty() {
-                        arg_tys.push_front(expected_ty.clone())
-                    } else {
-                        let expected_ty =
-                            self.ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
-                        arg_tys.push_front(expected_ty)
-                    }
+                    arg_tys.push_front(expected_ty.clone())
                 }
             }
         }
@@ -566,9 +559,8 @@ where
                         self.type_stack.push_ty(ty.clone())?;
                     }
                 } else {
-                    for ty in native.return_tys() {
-                        let ty = self.ty_builder.create_ty_with_subst(ty, ty_args)?;
-                        self.type_stack.push_ty(ty)?;
+                    for ty in native.instantiated_return_tys(self.ty_builder)? {
+                        self.type_stack.push_ty(ty.clone())?;
                     }
                 }
             }
@@ -769,7 +761,7 @@ where
             LoadedFunctionOwner::Script(script) => script.function_at(idx.0),
             LoadedFunctionOwner::Module(module) => module.function_at(idx.0),
         };
-        let no_ty_args_id = self.ty_pool.intern_ty_args(&[]);
+        let no_ty_args_id = self.ty_pool.intern_ty_args(&[])?;
         self.handle_to_loaded_function(frame, handle, vec![], no_ty_args_id)
     }
 
@@ -813,12 +805,9 @@ where
                 (LoadedFunctionOwner::Module(module), function)
             },
         };
-        Ok(Rc::new(LoadedFunction {
-            owner,
-            ty_args,
-            ty_args_id,
-            function,
-        }))
+        Ok(Rc::new(LoadedFunction::new_with_ty_args_id(
+            owner, ty_args, ty_args_id, function,
+        )))
     }
 }
 

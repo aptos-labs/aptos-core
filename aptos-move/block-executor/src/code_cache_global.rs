@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::counters::GLOBAL_LAYOUT_CACHE_MISSES;
+use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     error::PanicError, state_store::state_value::StateValue, vm::modules::AptosModuleExtension,
@@ -16,7 +17,7 @@ use std::{
     hash::Hash,
     ops::Deref,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
 };
@@ -81,6 +82,10 @@ where
     }
 }
 
+/// The default maximum for the sum of estimated sizes (in bytes) of all cached layouts. Inserting a
+/// layout that would exceed it flushes the layout cache.
+pub const DEFAULT_MAX_LAYOUT_CACHE_SIZE_IN_BYTES: usize = 1024 * 1024 * 1024;
+
 /// A global cache for verified code and derived information (such as layouts) that is concurrently
 /// accessed during the block execution. Module cache is read-only, and modified safely only at
 /// block boundaries. Layout cache can be modified during execution of the block.
@@ -92,6 +97,13 @@ pub struct GlobalModuleCache<K, D, V, E> {
     /// Cached layouts of structs or enums. This cache stores roots only and is invalidated when
     /// modules are published.
     struct_layouts: DashMap<LayoutCacheKey, LayoutCacheEntry>,
+    /// Sum of estimated sizes (in bytes) of all cached layouts.
+    layout_cache_size_estimate_in_bytes: AtomicUsize,
+    /// Maximum value of the sum of estimated sizes (in bytes) of all cached layouts. If inserting
+    /// a new layout exceeds it, the layout cache is flushed first.
+    max_layout_cache_size_in_bytes: usize,
+    /// True while a thread is flushing the layout cache, so that only one thread flushes at a time.
+    layout_cache_flush_in_progress: AtomicBool,
 }
 
 impl<K, D, V, E> GlobalModuleCache<K, D, V, E>
@@ -106,7 +118,15 @@ where
             module_cache: HashMap::new(),
             size: 0,
             struct_layouts: DashMap::new(),
+            layout_cache_size_estimate_in_bytes: AtomicUsize::new(0),
+            max_layout_cache_size_in_bytes: DEFAULT_MAX_LAYOUT_CACHE_SIZE_IN_BYTES,
+            layout_cache_flush_in_progress: AtomicBool::new(false),
         }
+    }
+
+    /// Sets the maximum value of the sum of estimated sizes (in bytes) of all cached layouts.
+    pub fn set_max_layout_cache_size_in_bytes(&mut self, max_layout_cache_size_in_bytes: usize) {
+        self.max_layout_cache_size_in_bytes = max_layout_cache_size_in_bytes;
     }
 
     /// Returns true if the key exists in cache and the corresponding module is not overridden.
@@ -148,6 +168,12 @@ where
         self.struct_layouts.len()
     }
 
+    /// Returns the sum of estimated sizes (in bytes) of all cached layouts.
+    pub fn layout_cache_size_estimate_in_bytes(&self) -> usize {
+        self.layout_cache_size_estimate_in_bytes
+            .load(Ordering::Relaxed)
+    }
+
     /// Returns the sum of serialized sizes of modules stored in cache.
     pub fn size_in_bytes(&self) -> usize {
         self.size
@@ -157,13 +183,49 @@ where
     pub fn flush_all_caches(&mut self) {
         self.module_cache.clear();
         self.size = 0;
-        self.struct_layouts.clear();
+        // Replace the map instead of clearing it to release the allocated table capacity.
+        self.struct_layouts = DashMap::new();
+        self.layout_cache_size_estimate_in_bytes
+            .store(0, Ordering::Relaxed);
     }
 
-    /// Flushes only layout caches. Used for memory management only (flush when
-    /// cache size gets too large).
-    pub fn flush_layout_cache(&self) {
-        self.struct_layouts.clear();
+    /// Flushes only layout caches. Used for memory management only (flush when cache size gets
+    /// too large).
+    ///
+    /// Safe to call at any point during block execution: readers clone entries and do not hold
+    /// any references into the cache, and cache hits are equivalent to cache misses (in terms of
+    /// gas charging and read sets), so flushing cannot change the result of executing a
+    /// transaction. Must never be called while holding a reference or entry guard of the cache,
+    /// as that would deadlock.
+    ///
+    /// Only one thread flushes at a time: if a flush is already in progress, returns false
+    /// without flushing. Returns true otherwise.
+    pub fn flush_layout_cache(&self) -> bool {
+        if self
+            .layout_cache_flush_in_progress
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            return false;
+        }
+
+        // Remove entries one by one, so that the size estimate stays exact even if there are
+        // concurrent insertions. Removed entries are kept alive and dropped asynchronously, so
+        // that freeing their memory happens off the execution's critical path and outside of the
+        // shard locks.
+        let mut removed = Vec::with_capacity(self.struct_layouts.len());
+        self.struct_layouts.retain(|_, entry| {
+            self.layout_cache_size_estimate_in_bytes
+                .fetch_sub(entry.size_estimate_in_bytes(), Ordering::Relaxed);
+            removed.push(entry.clone());
+            false
+        });
+        self.struct_layouts.shrink_to_fit();
+        self.layout_cache_flush_in_progress
+            .store(false, Ordering::Release);
+
+        DEFAULT_DROPPER.schedule_drop(removed);
+        true
     }
 
     /// Returns layout entry if it exists in global cache.
@@ -182,14 +244,37 @@ where
         key: &LayoutCacheKey,
         entry: LayoutCacheEntry,
     ) -> PartialVMResult<()> {
+        let size_estimate_in_bytes = entry.size_estimate_in_bytes();
+
+        // Flush before inserting (and before taking any entry guard), so that the size of the
+        // cache stays bounded at all times, including in the middle of the block execution.
+        let current_size_estimate_in_bytes = self.layout_cache_size_estimate_in_bytes();
+        if current_size_estimate_in_bytes.saturating_add(size_estimate_in_bytes)
+            > self.max_layout_cache_size_in_bytes
+            && !self.flush_layout_cache()
+        {
+            // Another thread is flushing the cache: do not cache this layout, so that the cache
+            // does not grow while the flush is in progress.
+            return Ok(());
+        }
+
         if let dashmap::Entry::Vacant(e) = self.struct_layouts.entry(*key) {
+            // Only account for the size when the entry is actually inserted, as there can be
+            // concurrent insertions of the same key. The size is added while holding the entry
+            // guard and before the insertion, so that a concurrent flush (which needs the same
+            // shard lock to remove this entry) always subtracts it after it has been added.
+            self.layout_cache_size_estimate_in_bytes
+                .fetch_add(size_estimate_in_bytes, Ordering::Relaxed);
             e.insert(entry);
         }
         Ok(())
     }
 
     pub(crate) fn remove_struct_layout_entry(&self, key: &LayoutCacheKey) {
-        self.struct_layouts.remove(key);
+        if let Some((_, entry)) = self.struct_layouts.remove(key) {
+            self.layout_cache_size_estimate_in_bytes
+                .fetch_sub(entry.size_estimate_in_bytes(), Ordering::Relaxed);
+        }
     }
 
     /// Inserts modules into the cache.
@@ -267,6 +352,11 @@ where
             module_cache,
             size: self.size,
             struct_layouts: self.struct_layouts.clone(),
+            layout_cache_size_estimate_in_bytes: AtomicUsize::new(
+                self.layout_cache_size_estimate_in_bytes(),
+            ),
+            max_layout_cache_size_in_bytes: self.max_layout_cache_size_in_bytes,
+            layout_cache_flush_in_progress: AtomicBool::new(false),
         }
     }
 }
@@ -314,7 +404,15 @@ pub(crate) fn add_module_write_to_module_cache(
 mod test {
     use super::*;
     use claims::{assert_err, assert_ok};
-    use move_vm_types::code::{mock_deserialized_code, mock_verified_code, MockExtension};
+    use move_vm_types::{
+        code::{
+            mock_deserialized_code, mock_verified_code, MockDeserializedCode, MockExtension,
+            MockVerifiedCode,
+        },
+        loaded_data::runtime_types::Type,
+        ty_interner::InternedTypePool,
+    };
+    use once_cell::sync::Lazy;
 
     #[test]
     fn test_entry_new() {
@@ -370,6 +468,157 @@ mod test {
         cache.flush_all_caches();
         assert_eq!(cache.num_modules(), 0);
         assert_eq!(cache.size_in_bytes(), 0);
+    }
+
+    /// Returns a distinct layout cache key for every `n`: the key of `vector^n<u8>`.
+    fn layout_cache_key(n: u32) -> LayoutCacheKey {
+        static TY_POOL: Lazy<InternedTypePool> = Lazy::new(InternedTypePool::new);
+        let ty = (0..n).fold(Type::U8, |ty, _| Type::vector(ty));
+        LayoutCacheKey {
+            id: TY_POOL.instantiate_and_intern(&ty, &[]),
+        }
+    }
+
+    type MockGlobalModuleCache =
+        GlobalModuleCache<u32, MockDeserializedCode, MockVerifiedCode, MockExtension>;
+
+    fn mock_cache() -> MockGlobalModuleCache {
+        GlobalModuleCache::empty()
+    }
+
+    /// Stores a dummy layout with the specified size estimate under the key for `n`.
+    fn store_layout(cache: &MockGlobalModuleCache, n: u32, size_estimate_in_bytes: usize) {
+        let entry = LayoutCacheEntry::new_for_testing(size_estimate_in_bytes);
+        assert_ok!(cache.store_struct_layout_entry(&layout_cache_key(n), entry));
+    }
+
+    #[test]
+    fn test_layout_cache_size_accounting() {
+        let cache = mock_cache();
+        assert_eq!(cache.num_cached_layouts(), 0);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 0);
+
+        store_layout(&cache, 0, 10);
+        store_layout(&cache, 1, 20);
+        assert_eq!(cache.num_cached_layouts(), 2);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 30);
+
+        // Duplicate insertion is a no-op.
+        store_layout(&cache, 1, 100);
+        assert_eq!(cache.num_cached_layouts(), 2);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 30);
+
+        // Removal subtracts the size, removal of non-existent entries is a no-op.
+        cache.remove_struct_layout_entry(&layout_cache_key(0));
+        cache.remove_struct_layout_entry(&layout_cache_key(0));
+        cache.remove_struct_layout_entry(&layout_cache_key(5));
+        assert_eq!(cache.num_cached_layouts(), 1);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 20);
+
+        cache.flush_layout_cache();
+        assert_eq!(cache.num_cached_layouts(), 0);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 0);
+
+        let mut cache = cache;
+        store_layout(&cache, 0, 10);
+        cache.flush_all_caches();
+        assert_eq!(cache.num_cached_layouts(), 0);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 0);
+    }
+
+    #[test]
+    fn test_layout_cache_flushes_when_full() {
+        let mut cache = mock_cache();
+        cache.set_max_layout_cache_size_in_bytes(100);
+
+        for i in 0..4 {
+            store_layout(&cache, i, 25);
+        }
+        // Exactly at the limit, so no flush.
+        assert_eq!(cache.num_cached_layouts(), 4);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 100);
+
+        // Does not fit, so the cache is flushed first and only the new entry remains.
+        store_layout(&cache, 4, 1);
+        assert_eq!(cache.num_cached_layouts(), 1);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 1);
+        assert!(cache
+            .get_struct_layout_entry(&layout_cache_key(4))
+            .is_some());
+        assert!(cache
+            .get_struct_layout_entry(&layout_cache_key(0))
+            .is_none());
+    }
+
+    #[test]
+    fn test_layout_cache_flush_in_progress_skips_flush_and_insert() {
+        let mut cache = mock_cache();
+        cache.set_max_layout_cache_size_in_bytes(100);
+        store_layout(&cache, 0, 60);
+
+        // Simulate a flush in progress on another thread.
+        cache
+            .layout_cache_flush_in_progress
+            .store(true, Ordering::Relaxed);
+        assert!(!cache.flush_layout_cache());
+        assert_eq!(cache.num_cached_layouts(), 1);
+
+        // Does not fit and cannot flush, so the new layout is not cached.
+        store_layout(&cache, 1, 60);
+        assert_eq!(cache.num_cached_layouts(), 1);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 60);
+        assert!(cache
+            .get_struct_layout_entry(&layout_cache_key(1))
+            .is_none());
+
+        // Fits, so it is cached without flushing.
+        store_layout(&cache, 2, 40);
+        assert_eq!(cache.num_cached_layouts(), 2);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 100);
+
+        // Once the other flush is done, flushing works again.
+        cache
+            .layout_cache_flush_in_progress
+            .store(false, Ordering::Relaxed);
+        assert!(cache.flush_layout_cache());
+        assert_eq!(cache.num_cached_layouts(), 0);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 0);
+    }
+
+    #[test]
+    fn test_layout_cache_concurrent_inserts_and_flushes() {
+        let mut cache = mock_cache();
+        cache.set_max_layout_cache_size_in_bytes(1_000);
+
+        let num_threads = 8;
+        let num_keys = 500;
+        std::thread::scope(|s| {
+            for t in 0..num_threads {
+                let cache = &cache;
+                s.spawn(move || {
+                    for i in 0..num_keys {
+                        store_layout(cache, i, 1 + (i % 7) as usize);
+                        if (i + t) % 50 == 0 {
+                            cache.flush_layout_cache();
+                        }
+                        if (i + t) % 13 == 0 {
+                            cache.remove_struct_layout_entry(&layout_cache_key(i / 2));
+                        }
+                        // Every thread can exceed the bound by at most one entry (inserted
+                        // concurrently after the check for flushing).
+                        let bound = 1_000 + 7 * num_threads as usize;
+                        assert!(cache.layout_cache_size_estimate_in_bytes() <= bound);
+                    }
+                });
+            }
+        });
+
+        let expected = cache
+            .struct_layouts
+            .iter()
+            .map(|e| e.value().size_estimate_in_bytes())
+            .sum::<usize>();
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), expected);
     }
 
     #[test]

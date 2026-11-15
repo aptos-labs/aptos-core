@@ -2,16 +2,16 @@
 
 //# publish
 module 0xc0ffee::m {
-    fun make_func_1(): |u64|(|u64|(u64)) has copy + drop {
+    fun make_func_1(): |u64|(|u64|u64) has copy + drop {
         |x| lambda__2__make_func_1(x)
     }
-    fun lambda__2__make_func_1(p0: u64): |u64|(u64) {
+    fun lambda__2__make_func_1(p0: u64): |u64|u64 {
         |x| lambda__1__make_func_1(p0, x)
     }
-    fun make_func_2(): |u64, u64|(||(u64)) has copy + drop {
+    fun make_func_2(): |u64, u64|(||u64) has copy + drop {
         |x,y| lambda__2__make_func_2(x, y)
     }
-    fun lambda__2__make_func_2(p0: u64, p1: u64): ||(u64) {
+    fun lambda__2__make_func_2(p0: u64, p1: u64): ||u64 {
         || lambda__1__make_func_2(p0, p1)
     }
     fun make_func_3(): |u64, u64|(||(u64, u64)) has copy + drop {

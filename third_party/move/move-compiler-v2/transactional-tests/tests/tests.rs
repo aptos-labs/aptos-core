@@ -35,17 +35,17 @@ fn lake_available() -> bool {
         .is_ok_and(|output| output.status.success())
 }
 
-fn positive_leaner_baselines_are_clean() -> Result<(), String> {
+fn positive_verex_baselines_are_clean() -> Result<(), String> {
     const FAILURE_MARKERS: &[&str] = &[
         "warning:",
         "bug:",
         "Error: compilation errors:",
         "LINKER_ERROR",
-        "exiting with Leaner stackless-bytecode checks failed",
+        "exiting with Verex stackless-bytecode checks failed",
         "exiting with bytecode verification errors",
     ];
     let mut failures = vec![];
-    for entry in WalkDir::new("tests/leaner")
+    for entry in WalkDir::new("tests/verex")
         .min_depth(1)
         .into_iter()
         .flatten()
@@ -57,7 +57,7 @@ fn positive_leaner_baselines_are_clean() -> Result<(), String> {
         let is_negative = name.starts_with("reject_");
         let is_differential = path
             .to_string_lossy()
-            .contains("/borrow_checker/leaner_permissive_");
+            .contains("/borrow_checker/verex_permissive_");
         if !name.ends_with(".exp") || is_negative || is_differential {
             continue;
         }
@@ -72,7 +72,7 @@ fn positive_leaner_baselines_are_clean() -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "positive Leaner baselines must not record compilation or linker failures:\n{}",
+            "positive Verex baselines must not record compilation or linker failures:\n{}",
             failures.join("\n")
         ))
     }
@@ -101,8 +101,8 @@ fn main() {
                 })
         })
         .collect_vec();
-    tests.push(Trial::test("leaner-positive-baselines-are-clean", || {
-        positive_leaner_baselines_are_clean().map_err(Into::into)
+    tests.push(Trial::test("verex-positive-baselines-are-clean", || {
+        positive_verex_baselines_are_clean().map_err(Into::into)
     }));
     tests.sort_unstable_by(|a, b| a.name().cmp(b.name()));
     let args = Arguments::from_args();

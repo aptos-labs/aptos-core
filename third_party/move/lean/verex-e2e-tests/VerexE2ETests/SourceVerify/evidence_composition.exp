@@ -1,0 +1,15 @@
+VerexE2ETests/SourceVerify/evidence_composition.rs:4:1: info: `apply` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/evidence_composition.rs:4:1: info: `apply_arg` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/evidence_composition.rs:4:1: info: `two` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/evidence_composition.rs:4:1: info: `collision` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/evidence_composition.rs:4:1: info: `outer::{closure#0}::call_mut` uses concrete verification: Given interpretation does not yet support behavioral contract interpretation
+VerexE2ETests/SourceVerify/evidence_composition.rs:4:1: info: `outer` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
+VerexE2ETests/SourceVerify/evidence_composition.spec.lean:21:6: error: the precondition of `apply` is not established
+VerexE2ETests/SourceVerify/evidence_composition.spec.lean:21:6: error: verex verification failed: the automatic verification of `outer` failed; provide a proof in the module:
+  verify outer by lean =>
+    verex_obligations
+    verex_on
+    | requires_of_apply => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/evidence_composition.rs:4:1: info: `apply_two` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation

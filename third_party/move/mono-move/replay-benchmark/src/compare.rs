@@ -3,6 +3,11 @@
 
 //! Comparison of the two VMs' transaction outputs. Both replays run
 //! configured to be gas-free, so allow for byte-for-byte equivalence.
+//!
+//! Status, gas, the write set, and events are compared. Table items are
+//! ordinary write-set keys, so they go through the same comparison as
+//! resources and modules. `auxiliary_data` is error detail outside the
+//! transaction hash and is not compared.
 
 use aptos_types::{
     contract_event::ContractEvent,
@@ -23,8 +28,8 @@ pub enum Correctness {
 
 /// Compares V2's result against the reference (V1's output).
 ///
-/// No-ops (modifications whose bytes equal the pre-transaction state) are pruned
-/// from both write sets before comparison.
+/// V1's no-op modifications are pruned first. V2's write set is compared as it
+/// comes.
 pub fn compare_outputs(
     v1: &TransactionOutput,
     v2: Result<&TransactionOutput, &str>,
@@ -61,7 +66,14 @@ pub fn compare_outputs(
         };
     }
 
-    match compare_write_sets(&real_writes(v1, &pre_state), &real_writes(v2, &pre_state)) {
+    // Only V1 needs the prune. It emits a `Modification` whenever a transaction
+    // stores a value back unchanged, while V2 drops those at session end.
+    // Leaving V2's set unpruned is what turns a write V2 made and V1 did not
+    // into a mismatch.
+    let v1_writes = real_writes(v1, &pre_state);
+    let v2_writes = v2.write_set().write_op_iter().collect::<BTreeMap<_, _>>();
+
+    match compare_write_sets(&v1_writes, &v2_writes) {
         Correctness::Match => compare_events(v1.events(), v2.events()),
         mismatch => mismatch,
     }
@@ -296,38 +308,48 @@ mod tests {
         assert!(detail.contains("it broke"), "{detail}");
     }
 
+    /// Reports `B` as holding `[1, 2, 3]` before the transaction.
+    fn pre_state(k: &StateKey) -> Option<Vec<u8>> {
+        (*k == key("B")).then(|| vec![1, 2, 3])
+    }
+
     #[test]
-    fn one_sided_noop_modification_is_pruned() {
-        // V2 over-approximates: it also "writes" B, but with the pre-state
-        // bytes. Pruning treats that as no write, so the outputs match.
+    fn a_v1_only_noop_modification_is_pruned() {
         let v1 = success(
-            vec![("A", WriteOp::legacy_modification(vec![9].into()))],
-            vec![],
-        );
-        let v2 = success(
             vec![
                 ("A", WriteOp::legacy_modification(vec![9].into())),
                 ("B", WriteOp::legacy_modification(vec![1, 2, 3].into())),
             ],
             vec![],
         );
-        let pre_state = |k: &StateKey| (*k == key("B")).then(|| vec![1, 2, 3]);
+        let v2 = success(
+            vec![("A", WriteOp::legacy_modification(vec![9].into()))],
+            vec![],
+        );
         assert!(matches!(
             compare_outputs(&v1, Ok(&v2), pre_state),
             Correctness::Match
         ));
+    }
 
-        // A changed write to B (bytes differ from pre-state) is still real.
-        let v2_changed = success(
-            vec![
-                ("A", WriteOp::legacy_modification(vec![9].into())),
-                ("B", WriteOp::legacy_modification(vec![4, 5].into())),
-            ],
+    #[test]
+    fn a_v2_only_write_is_a_mismatch_even_when_it_is_a_noop() {
+        let v1 = success(
+            vec![("A", WriteOp::legacy_modification(vec![9].into()))],
             vec![],
         );
-        assert!(matches!(
-            compare_outputs(&v1, Ok(&v2_changed), pre_state),
-            Correctness::Mismatch { .. }
-        ));
+        for b in [vec![1, 2, 3], vec![4, 5]] {
+            let v2 = success(
+                vec![
+                    ("A", WriteOp::legacy_modification(vec![9].into())),
+                    ("B", WriteOp::legacy_modification(b.into())),
+                ],
+                vec![],
+            );
+            assert!(matches!(
+                compare_outputs(&v1, Ok(&v2), pre_state),
+                Correctness::Mismatch { .. }
+            ));
+        }
     }
 }

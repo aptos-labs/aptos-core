@@ -223,7 +223,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         self.register_temp_filename(&data);
         let data = match syntax {
             SyntaxChoice::Source => temp_with_extension(data, MOVE_EXTENSION)?,
-            SyntaxChoice::Leaner => temp_with_extension(data, LEAN_EXTENSION)?,
+            SyntaxChoice::Verex => temp_with_extension(data, LEAN_EXTENSION)?,
             SyntaxChoice::ASM => data,
         };
         // Keep an extension-normalized compiler input associated with the
@@ -234,7 +234,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         let run_config = self.run_config();
         let state = self.compiled_state();
         let (named_addr_opt, module, opt_model, warnings_opt) = match syntax {
-            SyntaxChoice::Source | SyntaxChoice::Leaner => {
+            SyntaxChoice::Source | SyntaxChoice::Verex => {
                 // It is possible that a module gets republished. In this case, we need to filter
                 // existing pre-compiled dependencies to remove old module. Because we do not know
                 // in advance the module we are compiling, we need to see if the module matches the
@@ -266,7 +266,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.known_attributes(),
                         run_config.language_version,
                         run_config.experiments,
-                        syntax == SyntaxChoice::Leaner,
+                        syntax == SyntaxChoice::Verex,
                     )?
                 };
                 let (named_addr_opt, module) = match unit {
@@ -353,7 +353,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let script = compile_asm_script(state.dep_modules(), data_path)?;
                 (script, None, None)
             },
-            SyntaxChoice::Leaner => bail!("Leaner XIR currently represents modules, not scripts"),
+            SyntaxChoice::Verex => bail!("Verex XIR currently represents modules, not scripts"),
         };
         Ok((script, opt_model, warning_opt))
     }
@@ -605,7 +605,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     move_asm::disassembler::disassemble_module(&mut out, module)?;
                     out
                 },
-                SyntaxChoice::Leaner => unreachable!("Leaner is not a cross-compilation target"),
+                SyntaxChoice::Verex => unreachable!("Verex is not a cross-compilation target"),
             };
             self.compiled_state()
                 .cross_compiled
@@ -637,7 +637,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     move_asm::disassembler::disassemble_script(&mut out, script)?;
                     out
                 },
-                SyntaxChoice::Leaner => unreachable!("Leaner is not a cross-compilation target"),
+                SyntaxChoice::Verex => unreachable!("Verex is not a cross-compilation target"),
             };
             self.compiled_state()
                 .cross_compiled
@@ -1035,7 +1035,7 @@ where
     let default_syntax = match extension {
         MOVE_EXTENSION | DECOMPILED_EXTENSION => SyntaxChoice::Source,
         MOVE_ASM_EXTENSION | DISASSEMBLED_EXTENSION => SyntaxChoice::ASM,
-        LEAN_EXTENSION => SyntaxChoice::Leaner,
+        LEAN_EXTENSION => SyntaxChoice::Verex,
         _ => {
             panic!("unexpected extensions `{}`", extension)
         },
@@ -1178,7 +1178,7 @@ fn handle_cross_compiled_output(
     let ending = match target.syntax {
         SyntaxChoice::Source => DECOMPILED_EXTENSION,
         SyntaxChoice::ASM => DISASSEMBLED_EXTENSION,
-        SyntaxChoice::Leaner => unreachable!("Leaner is not a cross-compilation target"),
+        SyntaxChoice::Verex => unreachable!("Verex is not a cross-compilation target"),
     };
     let file_name = test_path
         .with_extension(ending)

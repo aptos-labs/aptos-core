@@ -1,0 +1,36 @@
+VerexE2ETests/SourceVerify/no_abort.move:14:5: error: `no abort when aborts at op 1` is not established: the operation `a / b` at VerexE2ETests/SourceVerify/no_abort.move:12:9 may abort
+  from: b.val = 0
+VerexE2ETests/SourceVerify/no_abort.move:14:5: error: verex verification failed: the automatic verification of `divide` failed; provide a proof in `VerexE2ETests/SourceVerify/no_abort.proof.lean`:
+  verify divide by lean =>
+    verex_obligations
+    verex_on
+    | no_abort when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/no_abort.move:22:5: error: `no abort when aborts at abort 1` is not established: the abort `assert` at VerexE2ETests/SourceVerify/no_abort.move:19:9 may abort
+  from: x.val ≤ 0
+VerexE2ETests/SourceVerify/no_abort.move:22:5: error: verex verification failed: the automatic verification of `checked` failed; provide a proof in `VerexE2ETests/SourceVerify/no_abort.proof.lean`:
+  verify checked by lean =>
+    verex_obligations
+    verex_on
+    | no_abort when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/no_abort.move:29:5: error: `no abort when aborts at op 1` is not established: the operation `v[i]` at VerexE2ETests/SourceVerify/.verex/no_abort.move.lean:29:52 may abort
+  from: v.values[i.val.toNat]? = none
+VerexE2ETests/SourceVerify/no_abort.move:29:5: error: verex verification failed: the automatic verification of `element` failed; provide a proof in `VerexE2ETests/SourceVerify/no_abort.proof.lean`:
+  verify element by lean =>
+    verex_obligations
+    verex_on
+    | no_abort when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/no_abort.move:36:5: error: `no abort when aborts at call 1 of checked` is not established: the call `checked(x)` at VerexE2ETests/SourceVerify/no_abort.move:34:9 may abort
+  from: x.val ≤ 0
+VerexE2ETests/SourceVerify/no_abort.move:36:5: error: verex verification failed: the automatic verification of `calling` failed; provide a proof in `VerexE2ETests/SourceVerify/no_abort.proof.lean`:
+  verify calling by lean =>
+    verex_obligations
+    verex_on
+    | no_abort when aborts at call 1 of checked => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
