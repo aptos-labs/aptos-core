@@ -131,8 +131,11 @@ When the manager's lock cannot be taken, `try_lock_inner` builds a fresh context
 
 MonoMove does not run in parallel yet, so this is a requirement on that work, not on today's code. The check is the same, made by each worker before it starts an incarnation; what differs is what a failed check can do, because other workers hold guards and the `MVHashMap` holds pointers.
 
-- **Simplest: fall back.** Stop the parallel attempt and finish the block on the sequential path, which can flush. This is the shape of the existing parallel-to-sequential fallback. Cost: a block that fills the cache loses its parallelism.
-- **Later, if that cost matters: private mode.** The worker runs the transaction against a context it owns alone, materializes the output, and resets that context. This keeps the block parallel and is the "stop caching globally, cache per executor, free at the end" scheme. It needs a path for values to cross as bytes, because the `MVHashMap` would be keyed by `InMemoryStorageKey` and hold `MonoValue` pointers, and neither means anything to a second context (§5.2).
+A flush is impossible while any worker is inside a transaction, or while the `MVHashMap`, the outputs and the read sets of uncommitted transactions exist. So under concurrency a flush always means stopping every worker and giving up the speculative work past the committed prefix. There are three ways to proceed, in order of preference:
+
+- **Cut at the committed prefix and resume in parallel.** The worker whose check fails halts the scheduler, as the block gas limit already does (`scheduler.halt()`). Workers finish the incarnation they are in (the `N * E` term). The committed prefix finishes materializing, which still needs the context. Then the `MVHashMap`, and the outputs and read sets of everything uncommitted, are dropped; the context is flushed; and a fresh Block-STM run executes the remaining transactions on top of `base_view` plus the prefix's writes as bytes, the same delta as §4.4. The first transaction of each run reads only committed state, so it always commits, and every cut makes progress. Cost: the speculative work past the prefix, and a cold cache. What is new in the block executor is resuming on a suffix while carrying the block-level state across (block limit processor, delayed-field counter, output vector, epilogue index).
+- **Fall back.** Stop the parallel attempt and re-run the whole block on the sequential path, which can flush. This is the existing parallel-to-sequential fallback in `execute_block`, so it costs nothing to build, but it discards the committed prefix too and loses the block's parallelism.
+- **Private mode**, to never stop at all. The worker runs the transaction against a context it owns alone, materializes the output, and resets that context. This keeps the block parallel and is the "stop caching globally, cache per executor, free at the end" scheme. It needs a path for values to cross as bytes, because the `MVHashMap` would be keyed by `InMemoryStorageKey` and hold `MonoValue` pointers, and neither means anything to a second context (§5.2).
 
 Either way the bound is unchanged: an incarnation starts only while `S <= W`, and each of the `N` running ones adds at most `E`.
 
@@ -208,7 +211,7 @@ Each step is useful on its own.
 2. **Flush at block start** in `AptosModuleCacheManager::try_lock`, with a real `MaintenanceConfig`. Bounds growth across blocks.
 3. **Per-transaction limit.** Memory meter beside `GasMeter`; charges at first-use sites in `loader.rs`; charge-before-build in `get_verified_module_from_storage`; new deterministic error kind; type arguments interned after the prologue.
 4. **Flush between transactions** in `execute_transactions_sequential`: the check, the `UnsyncMap` reset, the bytes delta in `BlockSTMSequentialProvider`. Completes the hard bound.
-5. With parallel MonoMove execution: the fallback of §4.6.
+5. With parallel MonoMove execution: the prefix cut of §4.6, or the fallback until it exists.
 6. Optional: pinned tier (§5.3), private mode (§4.6).
 
 ## 8. Alternatives considered
